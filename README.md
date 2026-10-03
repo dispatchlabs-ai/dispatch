@@ -2,7 +2,7 @@
 
 A fresh implementation of Dispatch Web using stock upstream Pi Durable, developed on M1 Air.
 
-**Status: design stage.** This repository starts with documentation. The first implementation slice, application structure, and checks will be established through specification work with Chris.
+**Status: design stage.** Chat with a default agent on stock Pi Durable is the agreed first feature, followed by named agent definitions. Detailed application contracts, implementation packages, and checks will be established through specification work with Chris.
 
 Dispatch Web is the browser workspace for Dispatch: a general-purpose platform for solving client problems with reusable agents, independent agent instances, handoffs, and event- or schedule-triggered work. These are product goals, not implemented features in this repository.
 
@@ -43,7 +43,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and director
 
 ## Development approach
 
-Specify the first workflow, its contracts, and acceptance criteria in the [Web package documentation](packages/web/README.md#documentation). Implement the agreed work packages in order, verify each one, and review it with Chris before continuing. The process reference is Pi Durable's [Pico5 handoff](https://github.com/earendil-works/pi/blob/v1.0.0/packages/durable/docs/pico-v5-handoff.md).
+Complete the first chat workflow's contracts and work-package acceptance criteria in the [Web package documentation](packages/web/README.md#documentation). Implement the agreed work packages in order, verify each one, and review it with Chris before continuing. The process reference is Pi Durable's [Pico5 handoff](https://github.com/earendil-works/pi/blob/v1.0.0/packages/durable/docs/pico-v5-handoff.md).
 
 Use stock Pi Durable through its public interfaces. The upstream runtime owns durable execution and recovery; Dispatch owns the application experience and its integrations. The detailed application boundary will be established in the specification.
 

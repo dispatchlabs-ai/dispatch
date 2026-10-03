@@ -1,12 +1,14 @@
 # Dispatch Web implementation handoff
 
-**Status: foundational, company access, desktop/mobile support, and workspace layout requirements accepted; authentication details and first implementation slice pending.** No application implementation package is defined or approved yet.
+**Status: chat is the agreed first feature, using Pi Durable and a default agent.** Foundational, company access, desktop/mobile, and workspace requirements apply. Detailed contracts and the implementation-package breakdown remain pending; implementation has not started.
 
 [spec.md](spec.md) defines the package's agreed behavior and contracts. Implement the work packages recorded here in order. After each package, run its tests and the repository checks, record the results, and review with Chris before proceeding. Do not redesign later packages while implementing the current one.
 
 ## Decisions
 
 - Use stock upstream Pi Durable as the durable execution foundation.
+- Implement [chat with a default agent first](spec.md#first-agent-work-workflow-and-observable-outcomes), using independent native Pi conversations and Pi-owned execution and durable state.
+- Follow chat with named agent definitions, then further Pi Durable capabilities in focused slices. The broader product goals remain in scope.
 - Require company users to sign in with 2FA; support TOTP and passkeys.
 - Give all users equal initial application capabilities, with RBAC planned for later. See [company access](spec.md#company-access-and-authentication) for accepted scope and unresolved flows.
 - Use TypeScript throughout the application and support local development on M1 Air.
@@ -16,7 +18,21 @@
 - Keep this package's specifications, handoff, and usage documentation in `packages/web/docs/`.
 - Keep validation in each work package's acceptance criteria and in the package tests.
 
-The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains the decision history. The first agent-work workflow, final application structure, and detailed implementation contracts remain unresolved.
+The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains the decision history. Final application structure and detailed implementation contracts remain unresolved.
+
+## First chat feature acceptance requirements
+
+Translate these accepted outcomes into the owning work packages:
+
+- An authenticated user can start a conversation, send messages, receive streamed responses, stop a response, and reopen saved history on desktop and mobile.
+- New chats use the default agent's ordinary Pi configuration and have independent history and execution state within the user's authorized scope.
+- A reload restores persisted history. Disconnecting the browser leaves admitted work running; reconnecting restores the current committed state, including work completed while disconnected.
+- A service restart recovers the conversation and ongoing work through Pi's public recovery interfaces. Verify interruption during a response, not only an idle restart.
+- Stop and failure states match the agreed cancellation/error contracts and remain distinguishable from a completed response.
+- The integration preserves native transcript entry types and execution information needed for later tools and agent capabilities. Pi remains the owner of durable history and execution.
+- Authentication, responsive layout, and contextual-view behavior meet the applicable acceptance requirements below.
+
+Before the affected work packages begin, settle the default model/instructions/tools, authentication flows and company scope, mobile interactions, transport schemas, cancellation behavior, and implementation tooling. Selecting tools also requires specifying their user controls. These open details do not reopen the agreed chat-first feature sequence.
 
 ## Authentication acceptance requirements
 
@@ -58,14 +74,12 @@ Define visibility/resizing, exact responsive presentation, keyboard interaction,
 
 ## Architecture proposal and review
 
-The [proposed web architecture](spec.md#proposed-web-architecture) uses a React SPA and persistent TypeScript/Node Pi Durable service. React Router framework mode is the leading option; data mode remains open. The review emphasized that runtime ownership, a single live-state layer, and reconnection semantics matter more than router mode.
+The [proposed web architecture](spec.md#proposed-web-architecture) uses a React SPA and persistent TypeScript/Node Pi Durable service. React Router framework mode is the leading option; data mode remains open. Chat's browser/service/Pi ownership boundaries and continuity outcomes are accepted independently of the frontend framework.
 
-When these contracts and the first workflow are agreed, include acceptance checks in the owning work package for:
+The chat requirements above cover disconnection and restart recovery. When the remaining implementation contracts are agreed, add checks for:
 
-- Work continuing after browser disconnect, with a fresh committed view on reconnect.
 - Snapshot replacement and ordered updates, including a slow or interrupted subscriber.
 - Retrying one logical submission without admitting duplicate work, while preserving distinct submissions.
-- Service restart and Pi recovery, with browser reattachment to recovered state.
 - Frontend hot reload preserving the runtime owner, and development/test instances using separate storage.
 - Server-side authorization and request validation on commands and subscriptions.
 
@@ -73,7 +87,7 @@ Choose the exact storage ownership mechanism, transport, schemas, and router mod
 
 ## Work packages
 
-No implementation packages have been scheduled. After agreeing the first slice, add ordered entries containing:
+The agreed feature order is chat with a default agent, then named agent definitions and independent instances, followed by further Pi Durable capabilities as their use cases are specified. Implementation packages have not yet been scheduled. Break the first chat feature and its prerequisites into ordered entries containing:
 
 - Goal, scope, and prerequisite decisions or earlier packages.
 - Relevant specification sections and implementation boundaries.

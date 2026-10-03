@@ -1,6 +1,6 @@
 # Dispatch Web specification
 
-**Status: partial specification.** The language, development/build, company access, desktop/mobile support, and workspace layout requirements below are accepted. The first agent-work workflow and implementation slice remain undecided; unresolved details are not accepted contracts.
+**Status: partial specification.** The foundational requirements and chat as the first feature are accepted. Chat will use stock Pi Durable with a default agent, followed by named agent definitions and further native capabilities. Detailed contracts and implementation work packages remain to be agreed; unresolved details are not accepted contracts.
 
 ## Product context
 
@@ -108,24 +108,49 @@ Next.js remains an alternative if later workflows justify server rendering. It i
 
 ## First agent-work workflow and observable outcomes
 
-To be specified with Chris: the actor, goal, entry point, successful outcome, alternative paths, and initial scope.
+**Accepted October 3, 2026.** Implement chat first, directly on stock Pi Durable, with one default agent configuration. Chat is the first usable feature in the broader agent workspace. It must meet the existing company-login, desktop/mobile, and workspace requirements.
+
+### Use case: chat with the default agent
+
+- **Actor and goal:** an authenticated company user works with the default agent through a conversation.
+- **Entry:** the user starts a new conversation or reopens an existing conversation within their authorized scope.
+- **Successful outcome:** the user sends messages, sees streamed responses, and continues the conversation with its saved history.
+- **Control:** the user can stop a response. The UI must distinguish a stopped or failed response from a completed answer; precise cancellation scope and error presentation remain to be defined.
+- **Continuity:** history persists across reloads. Browser disconnection does not cancel admitted work; reconnection restores the current committed state. Verify service-restart recovery as part of the first chat feature.
+
+The default agent uses Pi's normal per-conversation agent configuration. Each chat is an independent Pi conversation with its own history, agent configuration, and ongoing work. Selecting the default configuration for multiple chats must not combine their conversation state. The initial model, instructions, and tools remain to be chosen; a user-facing agent editor is not required for this first feature.
+
+Keep Pi's transcript and execution distinctions intact through the integration, including tool activity and other native entry types. The initial UI can expose a small subset of capabilities, but its model must not flatten the underlying conversation into only user/assistant text or create a competing durable history. Tool capabilities selected for the first agent must have whatever interaction and controls their use requires.
+
+### Feature sequence and broader scope
+
+After chat, add named agent definitions and the ability to start independent conversations from them. A reusable definition supplies configuration for new conversations; it is distinct from any one running conversation. The catalog, editor, versioning, and update policy are Dispatch features built on Pi's native configuration. Define those contracts when that feature is specified.
+
+Continue adding Pi Durable capabilities in focused feature slices: tools and integrations, delegation and handoffs, background work, event- and schedule-triggered work, and the broader native configuration surface. These remain product goals. Their order after named definitions and their detailed workflows are unresolved; the [capability assessment](https://wiki.chrisreynolds.me/wiki/pi-durable-capabilities/) records the native foundations and application responsibilities.
+
+Design the first chat around Pi's public interfaces and the ownership boundaries below. Add later features' detailed behavior and UI when their use cases are agreed. The right column remains available for specified supporting views; chat-first scope does not invent content for it.
 
 ## Contracts and state ownership
 
-**Proposed boundaries:**
+**Accepted ownership boundaries for chat:**
 
 - The browser owns presentation and temporary interaction state, such as panel selection and unsent input.
 - The application service owns authentication/authorization, request validation, transport, and application integration with Pi's public interfaces. Browser code does not receive server credentials or direct storage access.
 - Pi Durable owns durable conversation/task state, execution, and recovery. Application code should not recreate Pi's execution engine or maintain a competing durable conversation store.
-- Each Pi storage instance has one owning process. Development instances and tests use separate storage. The exact ownership enforcement and deployment arrangement remain unresolved; this is not a limit on concurrent agents within a runtime.
+
+**Proposed runtime arrangement:** each Pi storage instance has one owning process. Development instances and tests use separate storage. The exact ownership enforcement and deployment arrangement remain unresolved; this is not a limit on concurrent agents within a runtime.
 
 Define request/response schemas and the mapping to native Pi operations for the first workflow. Share transport contracts across browser and service, with runtime validation at trust boundaries. Schema tooling, transport (for example SSE or WebSocket), public API shape, and configuration semantics remain undecided.
 
 ## Failure and recovery behavior
 
-**Proposed observable requirements:**
+**Accepted chat outcomes:**
 
 - Browser refresh, navigation, or disconnection stops observation only; admitted agent work continues under the service/runtime lifetime. Explicit user cancellation is a separate operation.
+- History persists, and reconnecting restores the current committed conversation state. Service-restart recovery must be verified in the first chat feature.
+
+**Proposed implementation contracts for those outcomes:**
+
 - On initial connection or reconnection, restore the current committed Pi view and then apply subsequent updates through one subscription layer. Pi's watch APIs may coalesce updates and do not promise replay of missed events; do not assume a replay cursor or an exactly-once event feed. Define snapshot replacement and snapshot/update ordering before implementation.
 - A retry of the same logical submission reuses its request ID within the correct conversation and authorization scope. Distinct submissions receive distinct IDs. Native submission deduplication does not make external tool effects exactly once; effect-specific retry/reconciliation rules depend on the chosen workflow.
 - A service restart reopens storage, reinstalls the required implementations, and resumes work through Pi's public recovery interfaces. The browser can reconnect to the recovered state. Do not equate reopening storage alone with a completed recovery implementation.
@@ -134,4 +159,4 @@ These proposals follow [Pi's public README](https://github.com/earendil-works/pi
 
 ## Acceptance
 
-Once the first workflow and its contracts are agreed, record work-package acceptance criteria and checks in [handoff.md](handoff.md), with executable coverage in the [package tests](../test/). There is no separate validation plan.
+The first workflow is chat. Resolve its remaining contracts and record ordered work-package acceptance criteria and checks in [handoff.md](handoff.md), with executable coverage in the [package tests](../test/). There is no separate validation plan.
