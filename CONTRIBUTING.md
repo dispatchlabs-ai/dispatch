@@ -2,6 +2,10 @@
 
 Dispatch Web is at the specification stage. There is no runnable application, dependency installation, build command, or test suite yet. Establish those commands with the first implementation package and document them here and in the owning package's README.
 
+## Local development and Nix builds
+
+Use TypeScript throughout application code. Local development, including on M1 Air, and Nix-based builds are accepted requirements; see the [Web specification](packages/web/docs/spec.md#language-and-development-requirements). Establish `nix develop`, `nix build`, and `nix flake check` with the first implementation package, sharing pinned toolchain and dependency definitions. They are not available yet. Shared flake configuration and lockfiles belong at the repository root; package-specific build recipes stay with their package. Future automation must invoke the same build definitions.
+
 ## Where work belongs
 
 | Location | Responsibility |
