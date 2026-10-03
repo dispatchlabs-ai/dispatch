@@ -14,6 +14,7 @@
 - Use TypeScript throughout the application and support local development on M1 Air.
 - Use Nix for the development environment and builds, following the [accepted requirements](spec.md#language-and-development-requirements).
 - Prioritize quick localhost development; internal Omarchy/Palm deployment is deferred. The tooling slice uses React Router framework mode, Vite, Tailwind, and npm.
+- Use [Dispatch branding](spec.md#dispatch-branding), including official logos, the brand palette, and established typography/styling across desktop and mobile.
 - Adopt the [workspace layout](spec.md#workspace-layout), including a full right column with optional tabs subordinate to the active main tab.
 - Support [all user-facing functionality on desktop and mobile](spec.md#desktop-and-mobile-support) in each implementation slice, with presentation adapted to screen size and input method.
 - Keep this package's specifications, handoff, and usage documentation in `packages/web/docs/`.
@@ -46,6 +47,15 @@ When the authentication work package is agreed, include checks for:
 - Logout, session expiry/revocation, enrollment, and recovery matching their agreed contracts.
 
 Settle the login flow, account provisioning, enrollment/recovery, session policy, and company/workspace scope before implementing the affected behavior. No implementation package is scheduled by these requirements.
+
+## Branding acceptance requirements
+
+Apply the [Dispatch branding requirement](spec.md#dispatch-branding) when implementing or changing user-facing screens:
+
+- Verify logo and palette provenance against the established Dispatch brand materials; keep the selected assets and shared design tokens with this package.
+- Check consistent branding across the affected screens and components, including authentication and chat as those features are implemented.
+- Verify approved logo variants retain their proportions and remain legible at desktop and mobile sizes, with readable text, controls, status, and focus indicators.
+- Replace the provisional startup-page identity as part of the first branding implementation. The current tooling page has not passed brand acceptance.
 
 ## Desktop and mobile acceptance requirements
 

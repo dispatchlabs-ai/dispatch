@@ -58,6 +58,18 @@ Equal capabilities do not define which companies, workspaces, or resources a use
 
 Before implementing authentication, specify account provisioning/invitations, enrollment and replacement of authenticators, lost-device/account recovery, required enrollment methods, and session policy. Recovery must not silently bypass the required authentication. Initial equal access also leaves user-management authority to be specified; do not invent an administrator role to fill that gap.
 
+## Dispatch branding
+
+**Accepted October 3, 2026.** Use Dispatch's established visual identity throughout the application: official logos and marks, the brand color palette, and typography and other styling defined by the brand materials. Apply it consistently to login, the workspace, chat, supporting views, and future features on desktop and mobile.
+
+Reuse the approved source assets, preserving their proportions and intended background variants. Theme shared components through common design tokens so pages and controls follow the same identity. Responsive layouts may use an appropriate approved logo or mark variant. Keep text, controls, status, and focus indicators readable and distinguishable when applying the palette.
+
+### Existing brand references
+
+The [Dispatch design system's brand guide](https://github.com/dispatchlabs-ai/dispatch-design-system/blob/e4cacb0fbf656ac1ea55a6623cc9cf6b73047e1a/DESIGN.md) defines navy `#1D3D6A`, aqua `#4DD5CF`, ice `#F9FAFC`, slate `#333333`, and white `#FFFFFF`, with Inter for display, headings, and body text. The previous app records [asset provenance](https://github.com/dispatchlabs-ai/dispatch-web/blob/8ab0014bdd69c1585810cdb2099c5aa390843cd2/docs/asset-provenance.md) and [matching tokens](https://github.com/dispatchlabs-ai/dispatch-web/blob/8ab0014bdd69c1585810cdb2099c5aa390843cd2/apps/web/src/styles/dispatch-tokens.css), alongside its primary/inverse horizontal logos and icon mark. Use these traceable sources when integrating the brand; verify later brand changes before adopting them. Their older product workflows and layouts do not override this rebuild's accepted requirements. Font hosting remains an implementation choice.
+
+The local startup page's current text-only name, green palette, and system font are provisional tooling styles, not the approved Dispatch identity. Before branding is implemented, verify the existing source assets and palette, record their provenance with the package, and resolve any missing typography or usage rules from the brand materials. Do not invent replacement logos or treat a component library's defaults as Dispatch branding.
+
 ## Desktop and mobile support
 
 **Accepted October 3, 2026.** All user-facing functionality must be usable in desktop and mobile browsers, including authentication, navigation, main work, supporting views, and future features. Each implementation slice must support both from the start. Adapt presentation and interaction to the available space and input method while preserving the user's capabilities.
