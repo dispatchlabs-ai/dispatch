@@ -1,5 +1,7 @@
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import type { ReactNode } from "react";
+import iconMark from "./assets/dispatch-icon-mark-primary.svg";
+import { Brand } from "./components/brand";
 import "./styles.css";
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -8,6 +10,8 @@ export function Layout({ children }: { children: ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#1d3d6a" />
+        <link rel="icon" type="image/svg+xml" href={iconMark} />
         <link rel="icon" href="data:," />
         <Meta />
         <Links />
@@ -27,8 +31,9 @@ export default function App() {
 
 export function HydrateFallback() {
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background text-muted" aria-busy="true">
-      <p>Loading Dispatch…</p>
+    <main className="page-loading" aria-busy="true">
+      <Brand />
+      <p role="status">Opening your workspace…</p>
     </main>
   );
 }
