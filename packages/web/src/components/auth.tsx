@@ -33,8 +33,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return <main className="page-loading" aria-busy="true"><Brand /><p><Spinner /> Opening your workspace…</p></main>;
   }
   if (state.state === "authenticated") {
-    if (state.recoveryCodes?.length) return <RecoveryCodes state={state} onDone={() => setState({ ...state, recoveryCodes: undefined })} />;
-    return children;
+    return <><div hidden={!!state.recoveryCodes?.length}>{children}</div>{state.recoveryCodes?.length ? <RecoveryCodes state={state} onDone={() => setState({ ...state, recoveryCodes: undefined })} /> : null}</>;
   }
   if (state.state === "totp_required") return <TotpChallenge email={state.email} />;
   if (state.state === "enrollment") return <Enrollment state={state} />;
@@ -67,7 +66,7 @@ function SignIn({ onRecover }: { onRecover: () => void }) {
     <div className="auth-divider">or use a password</div>
     <form onSubmit={submit} aria-busy={busy}>
       <Field label="Email address">{props => <Input {...props} type="email" name="username" autoComplete="username webauthn" value={email} onChange={event => setEmail(event.target.value)} required autoCapitalize="none" spellCheck={false} />}</Field>
-      <Field label="Password">{props => <Input {...props} type="password" name="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required />}</Field>
+      <Field label="Password">{props => <Input {...props} type="password" maxLength={128} name="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required />}</Field>
       <Button type="submit" disabled={busy}>{busy ? <Spinner label="Signing in" /> : <>Continue <ArrowRight /></>}</Button>
     </form>
   </AuthLayout>;
@@ -112,12 +111,12 @@ function Enrollment({ state }: { state: EnrollmentState }) {
         }
       });
     }} aria-busy={busy}>
-      <Field label="Your name">{props => <Input {...props} name="name" autoComplete="name" value={name} onChange={event => setName(event.target.value)} required maxLength={120} />}</Field>
+      <Field label="Your name">{props => <Input {...props} name="name" autoComplete="name" value={name} onChange={event => setName(event.target.value)} required maxLength={100} />}</Field>
       <fieldset className="auth-methods"><legend>How would you like to sign in?</legend>
         <label><input type="radio" name="method" value="passkey" checked={method === "passkey"} onChange={() => setMethod("passkey")} /><Fingerprint size={20} /><span><strong>Use a passkey</strong><small>Face, fingerprint, or device PIN</small></span></label>
         <label><input type="radio" name="method" value="totp" checked={method === "totp"} onChange={() => setMethod("totp")} /><KeyRound size={20} /><span><strong>Password and authenticator</strong><small>Password plus a six-digit code</small></span></label>
       </fieldset>
-      {method === "totp" ? <Field label="Choose a password" hint="Use at least 12 characters. A password manager can create and save a strong password.">{props => <Input {...props} type="password" name="new-password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} minLength={12} required />}</Field> : null}
+      {method === "totp" ? <Field label="Choose a password" hint="Use at least 12 characters. A password manager can create and save a strong password.">{props => <Input {...props} type="password" maxLength={128} name="new-password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} minLength={12} required />}</Field> : null}
       <Button type="submit" disabled={busy}>{busy ? <Spinner label="Setting up your account" /> : <>{method === "passkey" ? "Create your passkey" : "Connect authenticator"} <ArrowRight /></>}</Button>
     </form>}
   </AuthLayout>;
@@ -157,7 +156,7 @@ function Recovery({ onBack }: { onBack: () => void }) {
     {error ? <Notice>{error}</Notice> : null}
     <form onSubmit={event => { event.preventDefault(); void run(async () => { const next = await auth("/api/auth/recovery/start", { email, password, code }); setPassword(""); setCode(""); setState(next); }); }} aria-busy={busy}>
       <Field label="Email address">{props => <Input {...props} type="email" autoComplete="username" value={email} onChange={event => setEmail(event.target.value)} required />}</Field>
-      <Field label="Password">{props => <Input {...props} type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required />}</Field>
+      <Field label="Password">{props => <Input {...props} type="password" maxLength={128} autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required />}</Field>
       <Field label="Recovery code">{props => <Input {...props} autoComplete="off" value={code} onChange={event => setCode(event.target.value)} required spellCheck={false} />}</Field>
       <Button type="submit" disabled={busy}>{busy ? <Spinner label="Verifying recovery code" /> : "Continue to account recovery"}</Button>
     </form>

@@ -30,7 +30,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return await request(path, body, signal);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
-        setState(current => current?.state === "authenticated" ? { state: "signed_out" } : current);
+        setState(current => current?.state === "authenticated" || error.code === "FLOW_EXPIRED" ? { state: "signed_out" } : current);
       }
       throw error;
     }

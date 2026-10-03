@@ -65,10 +65,14 @@ export function SecurityPage() {
         {security.totpEnabled ? <p className="factor-status"><ShieldCheck size={16} /> Connected · {security.recoveryCodesRemaining} recovery codes remaining</p> : null}
         {settingTotp ? <div className="inline-form">
           <Notice tone="info">Verifying a new authenticator replaces your previous password and authenticator, generates new recovery codes, and signs out your other sessions.</Notice>
-          {totp ? <TotpForm enrollment={totp} busy={busy} onVerify={code => run(async () => setState(await auth("/api/auth/security/totp/verify", { code })))} /> : <form className="stack" onSubmit={event => {
+          {totp ? <TotpForm enrollment={totp} busy={busy} onVerify={code => run(async () => {
+            const next = await auth("/api/auth/security/totp/verify", { code });
+            setTotp(null); setSettingTotp(false); setState(next);
+            await load();
+          })} /> : <form className="stack" onSubmit={event => {
             event.preventDefault();
             void run(async () => { setTotp(await auth("/api/auth/security/totp/start", { password })); setPassword(""); });
-          }}><Field label="New password" hint="Use at least 12 characters.">{props => <Input {...props} type="password" value={password} onChange={event => setPassword(event.target.value)} minLength={12} autoComplete="new-password" required />}</Field><Button type="submit" disabled={busy}>{busy ? <Spinner /> : <KeyRound />} Set up authenticator</Button></form>}
+          }}><Field label="New password" hint="Use at least 12 characters.">{props => <Input {...props} type="password" maxLength={128} value={password} onChange={event => setPassword(event.target.value)} minLength={12} autoComplete="new-password" required />}</Field><Button type="submit" disabled={busy}>{busy ? <Spinner /> : <KeyRound />} Set up authenticator</Button></form>}
           <Button variant="ghost" disabled={busy} onClick={() => { setSettingTotp(false); setTotp(null); setPassword(""); }}>Cancel</Button>
         </div> : <Button variant="secondary" disabled={busy || !security.canManage} onClick={() => setSettingTotp(true)}>{security.totpEnabled ? "Replace password & authenticator" : "Add password & authenticator"}</Button>}
       </section>
