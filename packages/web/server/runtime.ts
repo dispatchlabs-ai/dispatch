@@ -7,11 +7,11 @@ import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import { configure, createRegistry, defineDoc, Harness, type ConversationId, type ConversationView, type Cursor, type HarnessSettings, type LiveState, type Storage, type SubmissionRecord } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
-import type { AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, RuntimeScope } from "../src/shared/contracts.js";
+import type { AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, RuntimeScope, UpdateChatInput } from "../src/shared/contracts.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 
 const context = BACKGROUND_CONTEXT;
-type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision" | "agentName"> & { agentName?: string; companyId: string; userId: string; requestId: string };
+type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived"> & { pinned?: boolean; archived?: boolean; agentName?: string; companyId: string; userId: string; requestId: string };
 type StoredAgent = { [Key in keyof AgentDefinition]: AgentDefinition[Key] } & { companyId: string };
 type Catalog = { chats: StoredChat[]; agents: StoredAgent[]; runtimeInstance?: string };
 const CatalogDoc = defineDoc<Catalog>({
@@ -88,7 +88,7 @@ export class DispatchRuntime {
   async listChats(scope: RuntimeScope): Promise<ChatSummary[]> {
     const catalog = await this.harness.snapshot(CatalogDoc, context);
     const summaries = await Promise.all(catalog!.chats.filter((chat) => owns(scope, chat)).map(async (chat) => (await this.getChat(scope, chat.id)).conversation));
-    return summaries.sort((a, b) => b.updatedAt - a.updatedAt);
+    return summaries.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
   }
 
   async createChat(scope: RuntimeScope, input: { agentDefinitionId?: string; title?: string; requestId: string }): Promise<ChatSnapshot> {
@@ -110,6 +110,17 @@ export class DispatchRuntime {
       const id = String(record.id);
       catalog.chats.push({ id, title, createdAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, agentName: agent.name, companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
       return id;
+    }, context);
+    return this.getChat(scope, id);
+  }
+
+  async updateChat(scope: RuntimeScope, id: string, input: UpdateChatInput): Promise<ChatSnapshot> {
+    await this.harness.commit(async (tx) => {
+      const catalog = await tx.doc(CatalogDoc);
+      const chat = catalog.chats.find(item => item.id === id && owns(scope, item));
+      if (!chat) throw new RuntimeError(404, "Conversation not found.");
+      if (input.pinned !== undefined) chat.pinned = input.pinned;
+      if (input.archived !== undefined) chat.archived = input.archived;
     }, context);
     return this.getChat(scope, id);
   }
@@ -307,5 +318,5 @@ function summary(chat: StoredChat, agentName: string, view: ConversationView, su
   const firstInput = messages.find((message) => message.role === "user");
   const firstText = firstInput?.role === "user" ? (typeof firstInput.content === "string" ? firstInput.content : firstInput.content.filter((part) => part.type === "text").map((part) => part.text).join(" ")) : "";
   const title = chat.title === "New conversation" && firstText ? firstText.slice(0, 80) : chat.title;
-  return { id: chat.id, title, createdAt: chat.createdAt, updatedAt: lastTimestamp, revision, agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, agentName, status, ...(error ? { error } : {}) };
+  return { id: chat.id, title, pinned: chat.pinned ?? false, archived: chat.archived ?? false, createdAt: chat.createdAt, updatedAt: lastTimestamp, revision, agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, agentName, status, ...(error ? { error } : {}) };
 }

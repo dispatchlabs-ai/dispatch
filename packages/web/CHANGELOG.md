@@ -4,6 +4,7 @@
 
 ### Added
 
+- Saved conversation pin/unpin and archive/restore actions, with right-side hover/focus controls and an archived view; removed redundant leading chat icons.
 - Independent desktop sidebar/details visibility controls and draggable, keyboard-accessible width dividers that preserve active work.
 - Implemented company invitation enrollment, password/TOTP and user-verified passkeys, opaque sessions, account security, restricted recovery, and local operator provisioning. Initial users have equal capabilities; chats remain private to their creator.
 - Integrated stock Pi Durable 1.0.1 for native chat entries, streamed snapshots, Stop, request identity, persistent history, and service recovery. A persistent owner remains independent of frontend hot reload; company-shared agent definitions use immutable revisions copied into new chats.
@@ -13,6 +14,7 @@
 
 ### Fixed
 
+- Aligned conversation search with the New chat button and placed its magnifying glass inside the field.
 - Removed the entire single-view main header and its duplicate New chat action. Sidebar chat creation opens tabs; desktop column toggles live in the rail and narrow-screen navigation in the bottom bar.
 - Right-aligned user message bubbles, labels, timestamps, and copy actions while keeping assistant responses on the left across desktop and mobile.
 - Moved close buttons onto their individual main tabs and hid the main tab strip when only one view is open, including the extra phone tab row.

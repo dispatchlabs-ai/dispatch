@@ -1,14 +1,15 @@
 import { Tabs } from "@base-ui/react/tabs";
-import { Bot, ChevronLeft, ChevronRight, CircleHelp, LogOut, Menu, MessageSquare, PanelLeft, PanelRight, Plus, Search, Settings2, X } from "lucide-react";
+import { Bot, ChevronLeft, ChevronRight, CircleHelp, LogOut, Menu, MessageSquare, PanelLeft, PanelRight, Plus, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router";
 import type { AgentDefinition, ApplicationConfig, ChatSnapshot, ChatSummary, CreateChatInput, SendMessageInput } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
-import { mergeChat, statusLabels, type ConnectionState, type PendingMessage } from "../lib/chat";
+import { mergeChat, type ConnectionState, type PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
 import { AgentsPage } from "./agents";
 import { Brand } from "./brand";
 import { ChatPanel } from "./chat";
+import { ConversationSidebar } from "./conversation-sidebar";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ContextPanel } from "./context-panel";
 import { SecurityPage } from "./security";
@@ -257,7 +258,7 @@ export function Workspace() {
     const existing = [...tabs].reverse().find(tab => tab.kind === "chat");
     activate(existing || welcomeTab);
   };
-  const sidebar = <ConversationSidebar chats={chats} activeChatId={active.kind === "chat" ? active.chatId : undefined} companyName={config?.company.name || "Workspace"} search={search} onSearchChange={setSearch} creating={creating} onSelect={chatId => activate({ id: `chat:${chatId}`, kind: "chat", chatId })} onCreate={() => void createChat()} />;
+  const sidebar = <ConversationSidebar chats={chats} activeChatId={active.kind === "chat" ? active.chatId : undefined} companyName={config?.company.name || "Workspace"} search={search} onSearchChange={setSearch} creating={creating} onSelect={chatId => activate({ id: `chat:${chatId}`, kind: "chat", chatId })} onCreate={() => void createChat()} onUpdate={async (id, input) => onSnapshot(await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(id)}/preferences`, input))} />;
 
   if (state?.state !== "authenticated") return null;
   if (loading) return <main className="page-loading">
@@ -418,31 +419,6 @@ export function Workspace() {
       <span className="status-company">{config.company.name}</span>
       <span className="status-user">{state.user.name}</span>
     </footer>
-  </div>;
-}
-
-function ConversationSidebar({ chats, activeChatId, companyName, search, onSearchChange, creating, onSelect, onCreate }: { chats: ChatSummary[]; activeChatId?: string; companyName: string; search: string; onSearchChange: (value: string) => void; creating: boolean; onSelect: (id: string) => void; onCreate: () => void }) {
-  const filtered = chats.filter(chat => chat.title.toLowerCase().includes(search.toLowerCase()));
-  return <div className="conversation-sidebar">
-    <header className="sidebar-brand">
-      <Brand />{companyName.toLowerCase() !== "dispatch" ? <p>{companyName}</p> : null}
-    </header>
-    <Button className="new-chat-button" onClick={onCreate} disabled={creating}>{creating ? <Spinner /> : <Plus />} New chat</Button>
-    <label className="conversation-search">
-      <span className="sr-only">Find a conversation</span>
-      <Search size={15} aria-hidden="true" />
-      <input type="search" value={search} onChange={event => onSearchChange(event.target.value)} placeholder="Find a conversation" />
-    </label>
-    <div className="sidebar-list-heading">
-      <h2>Conversations</h2>
-      <span>{chats.length}</span>
-    </div>
-    <nav className="conversation-list" aria-label="Saved conversations">{filtered.map(chat => <button type="button" key={chat.id} onClick={() => onSelect(chat.id)} className={chat.id === activeChatId ? "selected" : ""} aria-current={chat.id === activeChatId ? "page" : undefined} title={chat.title}>
-      <MessageSquare size={15} aria-hidden="true" />
-      <span>{chat.title}</span>
-      <span className={`conversation-dot dot-${chat.status}`} aria-label={statusLabels[chat.status]} />
-    </button>)}{!filtered.length ? <p className="sidebar-empty">{search ? "No conversations match your search." : "Your conversations will appear here."}</p> : null}
-    </nav>
   </div>;
 }
 

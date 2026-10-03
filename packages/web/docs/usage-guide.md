@@ -66,6 +66,8 @@ The main tab strip appears when multiple views are open. Close a view with the �
 
 Above 1100 pixels, use the left rail’s conversations and details icons to hide or show either side. Drag either inner divider to resize it, or focus the divider and use Left/Right (Shift for larger steps) or Home/End. These choices last while the workspace is open; reloading restores the defaults. Phone Menu and Details controls live in the bottom bar and open panels.
 
+Hover or focus a conversation row to pin/unpin or archive it using the controls on its right. Touch layouts keep these actions visible. Pinned conversations stay above the others. Archive hides a conversation from the regular list without deleting it or stopping work; use Archived conversations at the bottom of the sidebar to reopen or restore it. These choices are saved with your account’s conversations.
+
 ## Checks and builds
 
 Inside the Nix shell:
@@ -117,6 +119,9 @@ Use HTTPS for any non-loopback origin. HTTP configurations must bind to loopback
 The state directory contains `auth.sqlite`, `auth.key`, and `runtime/` with Pi storage and its ownership lock. Back up the authentication database and encryption key together, along with Pi state. Stop the service before a simple file-copy backup so SQLite journals are settled. A missing encryption key must be restored; generating another key cannot decrypt existing TOTP factors. Do not copy these files into build inputs or source control.
 
 ## Application API
+
+`POST /api/chats/:id/preferences` accepts one or both boolean fields `pinned` and `archived` and returns the current chat snapshot. Only the owning user may update a conversation. `GET /api/chats` includes archived records with these flags so the browser can present active and archived lists.
+
 
 All `/api` access requires a fully authenticated session except the authentication flow endpoints. Mutations require same-origin JSON requests. Protected commands validate input; unavailable resources return 404 across identity boundaries.
 

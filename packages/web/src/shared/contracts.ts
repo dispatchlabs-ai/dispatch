@@ -18,6 +18,8 @@ export interface ChatSummary {
   agentRevision: number;
   /** Display name captured with the conversation's immutable agent revision. */
   agentName: string;
+  pinned: boolean;
+  archived: boolean;
   status: ChatStatus;
   error?: string;
 }
@@ -56,6 +58,11 @@ export interface CreateChatInput {
   requestId: string;
   title?: string;
   agentDefinitionId?: string;
+}
+
+export interface UpdateChatInput {
+  pinned?: boolean;
+  archived?: boolean;
 }
 
 export interface SendMessageInput {

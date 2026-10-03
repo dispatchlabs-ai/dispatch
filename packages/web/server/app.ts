@@ -52,6 +52,11 @@ export function createApp(options: AppOptions) {
     return c.json(await runtime.createChat(c.get("principal"), input), 201);
   });
   app.get("/api/chats/:id", async (c) => c.json(await runtime.getChat(c.get("principal"), c.req.param("id"))));
+  app.post("/api/chats/:id/preferences", async (c) => {
+    const input = z.object({ pinned: z.boolean().optional(), archived: z.boolean().optional() }).strict()
+      .refine(value => value.pinned !== undefined || value.archived !== undefined).parse(await c.req.json());
+    return c.json(await runtime.updateChat(c.get("principal"), c.req.param("id"), input));
+  });
   app.post("/api/chats/:id/messages", async (c) => {
     const input = z.object({ requestId, text: z.string().trim().min(1).max(100_000) }).strict().parse(await c.req.json());
     await runtime.submit(c.get("principal"), c.req.param("id"), input);
