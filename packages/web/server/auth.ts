@@ -104,6 +104,7 @@ interface PasskeyRow {
 type PendingPurpose = "password" | "enrollment" | "passkey_login" | "security_passkey" | "security_totp";
 
 interface PendingData {
+  passkeyName?: string;
   reason?: "invitation" | "recovery";
   name?: string;
   passwordHash?: string;
@@ -570,6 +571,7 @@ export class AuthService {
     const pending = security ? null : this.pending(request, "enrollment");
     const user = this.user(principal?.userId ?? pending!.user_id!)!;
     const name = displayName(stringField(body, "name", 100));
+    const passkeyName = !security && body.passkeyName !== undefined ? displayName(stringField(body, "passkeyName", 100)) : undefined;
     const credentials = this.store.all<PasskeyRow>("SELECT * FROM auth_passkeys WHERE user_id = ?", user.id);
     const options = await generateRegistrationOptions({
       rpName: this.config.companyName ?? "Dispatch",
@@ -584,7 +586,7 @@ export class AuthService {
     this.currentUser(user);
     if (security) this.requirePrincipal(request, true);
     const current = security ? this.newPending(request, headers, "security_passkey", user, { sessionId: principal!.sessionId, name }) : this.pending(request, "enrollment");
-    current.data = { ...current.data, name, challenge: options.challenge, challengeExpiresAt: this.now() + CHALLENGE_LIFETIME };
+    current.data = { ...current.data, name, passkeyName, challenge: options.challenge, challengeExpiresAt: this.now() + CHALLENGE_LIFETIME };
     // Choosing a passkey during enrollment discards the unfinished TOTP secret.
     delete current.data.totpSecret;
     delete current.data.passwordHash;
@@ -639,7 +641,7 @@ export class AuthService {
         this.store.run("UPDATE auth_users SET name = ?, status = 'active', password_hash = NULL, totp_secret = NULL, totp_last_step = -1, credential_version = credential_version + 1 WHERE id = ?", pending.data.name!, user.id);
         this.store.run("DELETE FROM auth_sessions WHERE user_id = ?", user.id);
       }
-      this.store.run("INSERT INTO auth_passkeys (id, user_id, name, public_key, counter, transports, device_type, backed_up, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", info.credential.id, user.id, security ? pending.data.name! : "Passkey", Buffer.from(info.credential.publicKey).toString("base64url"), info.credential.counter, JSON.stringify(info.credential.transports ?? []), info.credentialDeviceType, info.credentialBackedUp ? 1 : 0, this.now());
+      this.store.run("INSERT INTO auth_passkeys (id, user_id, name, public_key, counter, transports, device_type, backed_up, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", info.credential.id, user.id, security ? pending.data.name! : pending.data.passkeyName ?? "Passkey", Buffer.from(info.credential.publicKey).toString("base64url"), info.credential.counter, JSON.stringify(info.credential.transports ?? []), info.credentialDeviceType, info.credentialBackedUp ? 1 : 0, this.now());
       if (security) {
         this.clearPending(request, headers);
         return this.securityState(principal!);

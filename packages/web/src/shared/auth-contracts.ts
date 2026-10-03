@@ -102,7 +102,7 @@ export interface AuthEndpoints {
   };
   "/api/auth/enrollment/passkey/options": {
     method: "POST";
-    request: { name: string };
+    request: { name: string; passkeyName?: string };
     response: { options: PublicKeyCredentialCreationOptionsJSON };
   };
   "/api/auth/enrollment/passkey/verify": {
