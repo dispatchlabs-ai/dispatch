@@ -6,18 +6,48 @@ A fresh implementation of Dispatch Web using stock upstream Pi Durable, develope
 
 Dispatch Web is the browser workspace for Dispatch: a general-purpose platform for solving client problems with reusable agents, independent agent instances, handoffs, and event- or schedule-triggered work. These are product goals, not implemented features in this repository.
 
+## Packages
+
+| Package | Purpose | Status |
+| --- | --- | --- |
+| [Web](packages/web/README.md) | Dispatch browser workspace and its application integration with Pi Durable | Specification drafts; no implementation |
+
+## Repository layout
+
+Documentation lives with the package that owns the behavior. Repository-wide instructions and tooling stay at the root, following Pi's root layout and Durable's package layout.
+
+```text
+README.md
+AGENTS.md
+CONTRIBUTING.md
+.pi/
+  prompts/
+  skills/
+packages/
+  web/
+    README.md
+    CHANGELOG.md
+    docs/
+      spec.md
+      handoff.md
+      usage-guide.md
+    src/
+    test/
+      examples/
+scripts/
+.github/
+  workflows/
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and directory responsibilities. Empty directories are tracked with `.gitkeep`; their presence does not imply installed tools, runnable examples, or configured CI.
+
 ## Development approach
 
-Follow the specification-led, incremental approach demonstrated in Pi Durable's [Pico5 handoff](https://github.com/earendil-works/pi/blob/v1.0.0/packages/durable/docs/pico-v5-handoff.md):
-
-1. Specify the user workflow and observable outcomes for the first slice.
-2. Define contracts, state ownership, failure and recovery behavior, and acceptance checks before implementation.
-3. Break the agreed design into ordered implementation packages.
-4. Implement one package, run its tests and repository checks, and review it with Chris before moving to the next.
+Specify the first workflow, its contracts, and acceptance criteria in the [Web package documentation](packages/web/README.md#documentation). Implement the agreed work packages in order, verify each one, and review it with Chris before continuing. The process reference is Pi Durable's [Pico5 handoff](https://github.com/earendil-works/pi/blob/v1.0.0/packages/durable/docs/pico-v5-handoff.md).
 
 Use stock Pi Durable through its public interfaces. The upstream runtime owns durable execution and recovery; Dispatch owns the application experience and its integrations. The detailed application boundary will be established in the specification.
 
-The wiki owns maintained product intent and decisions. Keep implementation specifications and technical documentation in this repository and link them to the relevant wiki decisions.
+The wiki owns maintained product intent and decisions. Package specifications and handoffs translate those decisions into implementation contracts and work packages. Acceptance criteria and package tests carry validation; there is no separate validation-plan document.
 
 ## References
 
