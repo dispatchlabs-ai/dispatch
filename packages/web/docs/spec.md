@@ -112,7 +112,7 @@ The sketch establishes the regions and their arrangement. Its sample icons, card
 | Right contextual column | Full column alongside the main tab strip and content, extending down to the bottom bar. It has its own content area and supports its own tabs. |
 | Bottom bar | Horizontal bar beneath the workspace columns. It shows the current company/session and connection state. |
 
-Rail sections own their sidebar and main content. Chat tabs belong only to Chats. Switching rail sections preserves the selected chat, open chat tabs, unsent drafts, and mounted agent/account forms. Returning to Chats restores its selected conversation. Agents' sidebar selects a saved agent or the whole library; while editing, finish or cancel that edit before choosing another agent. Account's sidebar jumps to existing sign-in and session sections without unmounting forms. Rail selection remains in workspace memory and returns to Chats after a reload. These October 3 refinements supersede treating Agents and Account as main tabs.
+Rail sections own their sidebar and main content. Chat tabs belong only to Chats. Switching rail sections preserves the selected chat, open chat tabs, unsent drafts, and mounted agent/account forms. Returning to Chats restores its selected conversation. Agents' sidebar selects a saved agent; while editing, finish or cancel that edit before choosing another agent. Account's sidebar jumps to existing sign-in and session sections without unmounting forms. Rail selection remains in workspace memory and returns to Chats after a reload. These October 3 refinements supersede treating Agents and Account as main tabs.
 
 The right column follows the active main content within the selected section. Leaving Chats clears its supporting content immediately; pages without a defined supporting view show an explicit empty state.
 
@@ -164,6 +164,14 @@ Keep desktop columns in their own layout space, with scrolling contained to thei
 - "Unsent input" covers every form in a main tab, not just chat drafts: agent editing, account/security flows, and search. Switching main tabs or layouts never discards it. Closing a tab that has unsaved input asks before discarding it.
 - Restoring a chat tab restores its transcript scroll position. Auto-scroll only when the reader was already at the latest content.
 - **Proposed:** warn before idle session expiry. After re-authentication as the same user, restore that user's open tabs and unsent drafts. Clear them on explicit sign-out or when a different user signs in. Re-confirm identity for sign-in-method changes in place, without a full sign-out. Ask for confirmation before sign-out discards unsent input.
+
+### Consistent collection screens
+
+**Accepted October 3, 2026:** carry the conversation-screen refinements into Agents. Use the same shared sidebar spacing, primary action, search field, row styling, selection marker, hover/focus actions, touch target sizes, and bottom archive navigation. New agent occupies the same top-left sidebar position as New chat, with no duplicate main-header creation action or repeated logo. The agent search field matches the action width and uses the shared inset magnifying glass.
+
+Agents initially selects the default definition. Selecting a sidebar row shows that agent's name, description, instructions, and supported actions in the main view rather than another catalog. A shared compact object header gives chat and agent views the same spacing and typography. Agents remains a rail section, with no main tab strip. Edit/archive actions appear at the row's right on hover/focus and stay visible on touch layouts. The operator-managed default and archived definitions offer no rejected edit/archive actions. An Archived agents view at the bottom allows inspection; restoring definitions remains unsupported by the existing service.
+
+The right column follows the selected agent's saved revision, model, provider, thinking, tools, and archive status. During editing it explicitly identifies the saved configuration; a new draft clears any previous agent's details and states that it has not been saved. The editor retains service defaults and existing save/conflict/discard behavior. Creating or editing preserves unsaved input across rail and responsive layout changes; finish or cancel the current editor before choosing another agent. Search and archive-list state belong to the section and survive navigation-panel remounts. These refinements supersede WP-012's All agents catalog entry and empty Agents supporting view.
 
 ### Actions and defaults
 

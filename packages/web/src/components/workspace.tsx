@@ -6,7 +6,8 @@ import type { AgentDefinition, ApplicationConfig, ChatSnapshot, ChatSummary, Cre
 import { ApiError, errorMessage } from "../lib/api";
 import { mergeChat, type ConnectionState, type PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
-import { AgentsPage } from "./agents";
+import { AgentArchiveDialog, AgentDetails, AgentsPage, type AgentEditing } from "./agents";
+import { AgentSidebar } from "./agent-sidebar";
 import { Brand } from "./brand";
 import { ChatPanel } from "./chat";
 import { ConversationSidebar } from "./conversation-sidebar";
@@ -25,7 +26,10 @@ export function Workspace() {
   const [section, setSection] = useState<WorkspaceSection>("chats");
   const [visited, setVisited] = useState({ agents: false, security: false });
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [editingAgent, setEditingAgent] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<AgentEditing>(null);
+  const [archivingAgent, setArchivingAgent] = useState<AgentDefinition | null>(null);
+  const [agentSearch, setAgentSearch] = useState("");
+  const [showArchivedAgents, setShowArchivedAgents] = useState(false);
   const [config, setConfig] = useState<ApplicationConfig | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [agents, setAgents] = useState<AgentDefinition[]>([]);
@@ -258,22 +262,26 @@ export function Workspace() {
 
   function updateAgent(agent: AgentDefinition) { setAgents(current => [agent, ...current.filter(item => item.id !== agent.id)].sort((a, b) => a.name.localeCompare(b.name))); }
 
+  const selectedAgent = agents.find(agent => agent.id === selectedAgentId) ?? agents.find(agent => agent.id === config?.defaultAgentId);
   const active: WorkspaceTab | { id: string; kind: "agents" | "security" } = section === "chats" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
   const snapshot = active.kind === "chat" ? snapshots[active.chatId] : undefined;
   const connection = active.kind === "chat" ? connections[active.chatId] || "connecting" : null;
-  const supporting = <ContextPanel kind={active.kind} snapshot={snapshot} tab={supportTabs[active.id] || "agent"} onTabChange={tab => setSupportTabs(current => ({ ...current, [active.id]: tab }))} />;
+  const supporting = section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} /> : <ContextPanel kind={active.kind} snapshot={snapshot} tab={supportTabs[active.id] || "agent"} onTabChange={tab => setSupportTabs(current => ({ ...current, [active.id]: tab }))} />;
   const chatNav = () => selectSection("chats");
   const conversations = <ConversationSidebar chats={chats} activeChatId={active.kind === "chat" ? active.chatId : undefined} search={search} onSearchChange={setSearch} creating={creating} onSelect={chatId => activate({ id: `chat:${chatId}`, kind: "chat", chatId })} onCreate={() => void createChat()} onUpdate={async (id, input) => onSnapshot(await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(id)}/preferences`, input))} />;
   const sidebar = <>
     <div className="section-sidebar-panel" hidden={section !== "chats"}>{conversations}</div>
-    {section === "agents" ? <div className="section-sidebar">
-      <h2>Agents</h2>
-      <nav aria-label="Agent library">
-        <Button variant="ghost" disabled={editingAgent} aria-current={selectedAgentId === null ? "page" : undefined} onClick={() => { setSelectedAgentId(null); setNavigationOpen(false); }}>All agents</Button>
-        {agents.map(agent => <Button key={agent.id} variant="ghost" disabled={editingAgent} aria-current={selectedAgentId === agent.id ? "page" : undefined} onClick={() => { setSelectedAgentId(agent.id); setNavigationOpen(false); }}>{agent.name}{agent.archived ? " (archived)" : ""}</Button>)}
-      </nav>
-      {editingAgent ? <p>Save or cancel your edit to choose another agent.</p> : null}
-    </div> : section === "security" ? <div className="section-sidebar">
+    <div className="section-sidebar-panel" hidden={section !== "agents"}>
+      <AgentSidebar agents={agents} defaultAgentId={config?.defaultAgentId}
+        selectedAgentId={editingAgent && editingAgent !== "new" ? editingAgent.id : selectedAgent?.id}
+        editing={editingAgent === "new" ? "new" : !!editingAgent}
+        search={agentSearch} onSearchChange={setAgentSearch} showArchived={showArchivedAgents} onShowArchivedChange={setShowArchivedAgents}
+        onCreate={() => { setEditingAgent("new"); setAgentSearch(""); setShowArchivedAgents(false); setNavigationOpen(false); }}
+        onSelect={id => { setSelectedAgentId(id); setNavigationOpen(false); }}
+        onEdit={agent => { setSelectedAgentId(agent.id); setEditingAgent(agent); setNavigationOpen(false); }}
+        onArchive={agent => { setArchivingAgent(agent); setNavigationOpen(false); }} />
+    </div>
+    {section === "security" ? <div className="section-sidebar">
       <h2>Account</h2>
       <nav aria-label="Account settings">
         {[['passkeys', 'Passkeys'], ['password', 'Password & authenticator'], ['sessions', 'Active sessions']].map(([id, label]) => <Button key={id} variant="ghost" onClick={() => {
@@ -401,18 +409,20 @@ export function Workspace() {
           </Tabs.Panel>)}
           </div>
           {visited.agents ? <div className="workspace-section" hidden={section !== "agents"}>
-            <AgentsPage agents={agents} config={config} selectedAgentId={selectedAgentId} onEditingChange={setEditingAgent}
-              onSaved={agent => { updateAgent(agent); setSelectedAgentId(agent.id); }} onRefresh={load}
+            <AgentsPage agent={selectedAgent} editing={editingAgent} config={config} defaultAgent={agents.find(agent => agent.id === config.defaultAgentId)}
+              onSaved={agent => { updateAgent(agent); setSelectedAgentId(agent.id); setEditingAgent(null); }}
+              onCancel={() => { setEditingAgent(null); void load(); }} onEdit={setEditingAgent}
               onStartChat={agentId => void createChat(agentId)} creating={creating} />
           </div> : null}
           {visited.security ? <div className="workspace-section" hidden={section !== "security"}><SecurityPage /></div> : null}
         </main>
       </div>
-      <aside className="context-column" id="details-column" aria-label={active.kind === "chat" ? `Supporting views for ${snapshot?.conversation.title || "active conversation"}` : "Supporting view"}>
+      <aside className="context-column" id="details-column" aria-label={active.kind === "chat" ? `Supporting views for ${snapshot?.conversation.title || "active conversation"}` : section === "agents" ? "Agent supporting view" : "Supporting view"}>
         <ColumnResizeHandle side="right" controls="details-column" width={detailsWidth} min={240} max={detailsMax} onResize={setDetailsWidth} />
         <div className="context-column-content">{supporting}</div>
       </aside>
     </Tabs.Root>
+    {archivingAgent ? <AgentArchiveDialog key={archivingAgent.id} agent={archivingAgent} onClose={() => setArchivingAgent(null)} onSaved={updateAgent} onRefresh={load} /> : null}
     <Modal title="Discard unsaved work?" description="Closing this tab discards its unsaved input. Saved work and any running response remain available."
       finalFocus={() => tabList.current?.querySelector<HTMLElement>('[aria-selected="true"]') ?? document.getElementById("main-workspace")}
       open={closingTab !== null} onOpenChange={open => { if (!open) setClosingTab(null); }}>
@@ -438,7 +448,7 @@ export function Workspace() {
           </Modal>
         </div>
         {active.kind !== "welcome" ? <div className="mobile-context">
-          <Modal title={active.kind === "chat" ? "Conversation details" : "Details"} description={active.kind === "chat" ? snapshot?.conversation.title || "Active conversation" : "For your current view"} side="right" open={contextOpen} onOpenChange={setContextOpen} trigger={<Button variant="ghost" className="workspace-action">
+          <Modal title={active.kind === "chat" ? "Conversation details" : section === "agents" ? "Agent details" : "Details"} description={active.kind === "chat" ? snapshot?.conversation.title || "Active conversation" : "For your current view"} side="right" open={contextOpen} onOpenChange={setContextOpen} trigger={<Button variant="ghost" className="workspace-action">
             <PanelRight size={19} /> Details</Button>}>{supporting}</Modal>
         </div> : null}
       </div>

@@ -1,8 +1,9 @@
-import { Archive, ArchiveRestore, Pin, Plus, Search } from "lucide-react";
+import { Archive, ArchiveRestore, Pin, Plus } from "lucide-react";
 import { useRef, useState } from "react";
 import type { ChatSummary, UpdateChatInput } from "../shared/contracts";
 import { errorMessage } from "../lib/api";
 import { statusLabels } from "../lib/chat";
+import { SidebarSearch } from "./sidebar-search";
 import { Button, IconButton, Notice, Spinner } from "./ui";
 
 type ConversationSidebarProps = {
@@ -36,26 +37,22 @@ export function ConversationSidebar({ chats, activeChatId, search, onSearchChang
     finally { setUpdating(current => { const next = new Set(current); next.delete(chat.id); return next; }); }
   }
 
-  return <div className="conversation-sidebar">
-    <Button className="new-chat-button" onClick={() => { setShowArchived(false); onCreate(); }} disabled={creating}>{creating ? <Spinner /> : <Plus />} New chat</Button>
-    <label className="conversation-search">
-      <span className="sr-only">Find a conversation</span>
-      <Search size={15} aria-hidden="true" />
-      <input type="search" value={search} onChange={event => onSearchChange(event.target.value)} placeholder="Find a conversation" />
-    </label>
+  return <div className="collection-sidebar">
+    <Button className="sidebar-create" onClick={() => { setShowArchived(false); onCreate(); }} disabled={creating}>{creating ? <Spinner /> : <Plus />} New chat</Button>
+    <SidebarSearch label="Find a conversation" value={search} onChange={onSearchChange} />
     <div className="sidebar-list-heading">
       <h2>{showArchived ? "Archived" : "Conversations"}</h2>
       <span>{visible.length}</span>
     </div>
     {error ? <Notice>{error}</Notice> : null}
-    <nav className="conversation-list" aria-label={showArchived ? "Archived conversations" : "Saved conversations"}>
-      {filtered.map(chat => <div key={chat.id} className={`conversation-row ${chat.id === activeChatId ? "selected" : ""} ${chat.pinned ? "is-pinned" : ""}`}>
-        <button type="button" className="conversation-select" onClick={() => onSelect(chat.id)} aria-current={chat.id === activeChatId ? "page" : undefined} title={chat.title}>
+    <nav className="sidebar-list" aria-label={showArchived ? "Archived conversations" : "Saved conversations"}>
+      {filtered.map(chat => <div key={chat.id} className={`sidebar-row ${chat.id === activeChatId ? "selected" : ""} ${chat.pinned ? "is-pinned" : ""}`}>
+        <button type="button" className="sidebar-select" onClick={() => onSelect(chat.id)} aria-current={chat.id === activeChatId ? "page" : undefined} title={chat.title}>
           <span>{chat.title}</span>
           {chat.pinned ? <span className="sr-only">Pinned</span> : null}
           <span className={`conversation-dot dot-${chat.status}`} aria-label={statusLabels[chat.status]} />
         </button>
-        <div className="conversation-row-actions">
+        <div className="sidebar-row-actions">
           <IconButton className="conversation-pin" label={`${chat.pinned ? "Unpin" : "Pin"} conversation: ${chat.title}`} disabled={updating.has(chat.id)} onClick={() => void update(chat, { pinned: !chat.pinned })}>
             <Pin size={15} fill={chat.pinned ? "currentColor" : "none"} />
           </IconButton>

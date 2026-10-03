@@ -106,7 +106,7 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
   }
 
   return <div className="chat-panel">
-    <header className="chat-heading">
+    <header className="view-heading">
       <div>
         <h1>{snapshot?.conversation.title || "Conversation"}</h1>
         <p>{snapshot ? agentName : "Loading agent…"}</p>

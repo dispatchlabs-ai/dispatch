@@ -48,6 +48,10 @@ Explicit `DISPATCH_PROVIDER`, `DISPATCH_MODEL`, and `DISPATCH_THINKING` override
 
 The default agent is chat-only and has no tools. The Agents section creates company-shared definitions with instructions, provider/model, and supported thinking levels. Each save produces a new immutable revision. New conversations copy that configuration; existing conversations remain unchanged. A stale edit returns a conflict. Archived definitions cannot start new chats or be edited; there is no restore operation in this slice.
 
+In Agents, New agent is at the top of the sidebar, followed by Find an agent and the saved-agent list. Select an agent to read its description and instructions; the right column shows its saved configuration. Start chat opens a conversation using that revision. Hover or focus a custom agent's row for Edit/Archive; touch layouts keep the actions visible. Archived agents is at the bottom of the sidebar and supports inspection, not restoration. The default agent remains operator-managed.
+
+New agent opens an editor with the service's model/thinking defaults. Save or cancel it before selecting another agent. Switching to Chats or Account, hiding a column, or changing screen size preserves the open editor. The right column identifies saved configuration while editing and clears the previous agent when creating a new one.
+
 ## Chat and workspace
 
 Your messages appear on the right; agent replies stay on the left.
