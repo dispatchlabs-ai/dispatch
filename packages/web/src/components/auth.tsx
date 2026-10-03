@@ -16,7 +16,9 @@ function useAuthAction() {
     if (busy) return;
     setBusy(true);
     setError(null);
-    try { await action(); } catch (error) { setError(errorMessage(error)); } finally { setBusy(false); }
+    try { await action(); } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) setError(errorMessage(error));
+    } finally { setBusy(false); }
   }
   return { busy, error, run };
 }
@@ -33,7 +35,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return <main className="page-loading" aria-busy="true"><Brand /><p><Spinner /> Opening your workspace…</p></main>;
   }
   if (state.state === "authenticated") {
-    return <><div hidden={!!state.recoveryCodes?.length}>{children}</div>{state.recoveryCodes?.length ? <RecoveryCodes state={state} onDone={() => setState({ ...state, recoveryCodes: undefined })} /> : null}</>;
+    return <><div key={`${state.user.companyId}:${state.user.id}`} hidden={!!state.recoveryCodes?.length}>{children}</div>{state.recoveryCodes?.length ? <RecoveryCodes state={state} onDone={() => setState({ ...state, recoveryCodes: undefined })} /> : null}</>;
   }
   if (state.state === "totp_required") return <TotpChallenge email={state.email} />;
   if (state.state === "enrollment") return <Enrollment state={state} />;
@@ -56,7 +58,7 @@ function SignIn({ onRecover }: { onRecover: () => void }) {
     });
   }
 
-  return <AuthLayout title="Welcome back" description="Sign in to your Dispatch workspace." footer={<><p>Access is by invitation. Contact your team if you need an account.</p><Button variant="ghost" className="recovery-link" onClick={onRecover}>Having trouble signing in?</Button></>}>
+  return <AuthLayout title="Welcome back" description="Sign in to your Dispatch workspace." footer={<><p>Access is by invitation. Contact your team if you need an account.</p><Button variant="ghost" className="recovery-link" disabled={busy} onClick={onRecover}>Having trouble signing in?</Button></>}>
     {error ? <Notice>{error}</Notice> : null}
     <Button className="auth-passkey" variant="secondary" disabled={busy} onClick={() => void run(async () => {
       const { options } = await auth("/api/auth/passkey/login/options", {});
