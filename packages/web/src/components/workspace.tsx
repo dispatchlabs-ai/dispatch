@@ -287,6 +287,14 @@ export function Workspace() {
           <Bot size={21} />
         </IconButton>
       </div>
+      <div className="rail-layout" role="group" aria-label="Workspace columns">
+        <IconButton className="sidebar-toggle" label={sidebarVisible ? "Hide conversations" : "Show conversations"} aria-expanded={sidebarVisible} aria-controls="conversations-sidebar" onClick={() => setSidebarVisible(value => !value)}>
+          <PanelLeft size={19} />
+        </IconButton>
+        <IconButton className="details-toggle" label={detailsVisible ? "Hide details" : "Show details"} aria-expanded={detailsVisible} aria-controls="details-column" onClick={() => setDetailsVisible(value => !value)}>
+          <PanelRight size={19} />
+        </IconButton>
+      </div>
       <div className="rail-account">
         <IconButton label="Account and security" className={active.kind === "security" ? "active" : ""} aria-current={active.kind === "security" ? "page" : undefined} onClick={() => activate({ id: "security", kind: "security" })}>
           <Settings2 size={20} />
@@ -302,25 +310,7 @@ export function Workspace() {
     </aside>
     <Tabs.Root className="workspace-content" value={activeId} onValueChange={value => { const tab = tabs.find(tab => tab.id === value); if (tab) activate(tab); }}>
       <div className="main-column">
-        <header className={`workspace-toolbar ${tabs.length > 1 ? "has-tabs" : "single-view"}`}>
-          <IconButton className="sidebar-toggle" label={sidebarVisible ? "Hide conversations" : "Show conversations"} aria-expanded={sidebarVisible} aria-controls="conversations-sidebar" onClick={() => setSidebarVisible(value => !value)}>
-            <PanelLeft size={19} />
-          </IconButton>
-          <div className="mobile-navigation">
-            <Modal title="Your workspace" description={config.company.name} side="left" open={navigationOpen} onOpenChange={setNavigationOpen} trigger={<Button variant="ghost" className="workspace-action">
-              <Menu size={21} /> Menu</Button>}>
-              <nav className="mobile-destinations" aria-label="Workspace navigation">
-                <Button variant="ghost" aria-current={active.kind === "chat" || active.kind === "welcome" ? "page" : undefined} onClick={chatNav}>
-                  <MessageSquare /> Chats</Button>
-                <Button variant="ghost" aria-current={active.kind === "agents" ? "page" : undefined} onClick={() => activate({ id: "agents", kind: "agents" })}>
-                  <Bot /> Agents</Button>
-                <Button variant="ghost" aria-current={active.kind === "security" ? "page" : undefined} onClick={() => activate({ id: "security", kind: "security" })}>
-                  <Settings2 /> Account</Button>
-              </nav>{sidebar}<Button className="mobile-signout" variant="ghost" onClick={() => void signOut()} disabled={signingOut}>
-                <LogOut /> Sign out</Button>
-            </Modal>
-          </div>
-          {tabs.length > 1 ? <>
+        {tabs.length > 1 ? <header className="workspace-toolbar">
             <p id="tab-keyboard-help" className="sr-only">Use arrow keys to choose a tab, Enter to open it, and Delete to close it.</p>
             <div className="tabs-strip">
               {tabOverflow.before || tabOverflow.after ? <IconButton disabled={!tabOverflow.before} className="tab-scroll-button" label="Show earlier tabs" onClick={() => tabList.current?.scrollBy({ left: -200, behavior: "smooth" })}>
@@ -350,16 +340,7 @@ export function Workspace() {
                 <ChevronRight />
               </IconButton> : null}
             </div>
-          </> : null}
-          <Button variant="ghost" className="workspace-action" disabled={creating} onClick={() => void createChat()}>{creating ? <Spinner /> : <Plus size={18} />} New chat</Button>
-          <IconButton className="details-toggle" label={detailsVisible ? "Hide details" : "Show details"} aria-expanded={detailsVisible} aria-controls="details-column" onClick={() => setDetailsVisible(value => !value)}>
-            <PanelRight size={19} />
-          </IconButton>
-          {active.kind !== "welcome" ? <div className="mobile-context">
-            <Modal title={active.kind === "chat" ? "Conversation details" : "Details"} description={active.kind === "chat" ? snapshot?.conversation.title || "Active conversation" : "For your current tab"} side="right" open={contextOpen} onOpenChange={setContextOpen} trigger={<Button variant="ghost" className="workspace-action">
-              <PanelRight size={19} /> Details</Button>}>{supporting}</Modal>
-          </div> : null}
-        </header>
+        </header> : null}
         {error ? <div className="workspace-notice">
           <Notice>{error}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat(createRequest.current?.agentDefinitionId)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}
         </div> : null}
@@ -412,6 +393,26 @@ export function Workspace() {
       </div>
     </Modal>
     <footer className="workspace-status">
+      <div className="mobile-workspace-actions">
+        <div className="mobile-navigation">
+          <Modal title="Your workspace" description={config.company.name} side="left" open={navigationOpen} onOpenChange={setNavigationOpen} trigger={<Button variant="ghost" className="workspace-action">
+            <Menu size={21} /> Menu</Button>}>
+            <nav className="mobile-destinations" aria-label="Workspace navigation">
+              <Button variant="ghost" aria-current={active.kind === "chat" || active.kind === "welcome" ? "page" : undefined} onClick={chatNav}>
+                <MessageSquare /> Chats</Button>
+              <Button variant="ghost" aria-current={active.kind === "agents" ? "page" : undefined} onClick={() => activate({ id: "agents", kind: "agents" })}>
+                <Bot /> Agents</Button>
+              <Button variant="ghost" aria-current={active.kind === "security" ? "page" : undefined} onClick={() => activate({ id: "security", kind: "security" })}>
+                <Settings2 /> Account</Button>
+            </nav>{sidebar}<Button className="mobile-signout" variant="ghost" onClick={() => void signOut()} disabled={signingOut}>
+              <LogOut /> Sign out</Button>
+          </Modal>
+        </div>
+        {active.kind !== "welcome" ? <div className="mobile-context">
+          <Modal title={active.kind === "chat" ? "Conversation details" : "Details"} description={active.kind === "chat" ? snapshot?.conversation.title || "Active conversation" : "For your current tab"} side="right" open={contextOpen} onOpenChange={setContextOpen} trigger={<Button variant="ghost" className="workspace-action">
+            <PanelRight size={19} /> Details</Button>}>{supporting}</Modal>
+        </div> : null}
+      </div>
       <span className={`connection-status connection-${connection || "unobserved"}`} role="status">
         <span aria-hidden="true" />{connection === "reconnecting" ? "Reconnecting · agent work continues" : connection === "connecting" ? "Connecting to conversation" : connection === "error" ? "Connection needs attention" : connection === "connected" ? "Conversation connected" : "No live conversation selected"}</span>
       <span className="status-company">{config.company.name}</span>
