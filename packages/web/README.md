@@ -24,6 +24,7 @@ The current rule is zero tests. Add end-to-end and API coverage later, after sta
 - [Implementation handoff](docs/handoff.md): work packages, source/build evidence, and unverified outcomes.
 - [Usage guide](docs/usage-guide.md): startup, account/model configuration, API, state, and troubleshooting.
 - [Runtime integration](docs/runtime.md): native Pi ownership, request identity, cancellation, and recovery.
+- [UI/UX review](docs/ui-ux-review.md): October 3, 2026 review of `d83f70d` that introduced the spec's UI implementation rules.
 - [Brand asset provenance](src/assets/README.md) and [changelog](CHANGELOG.md).
 - [Repository contribution workflow](../../CONTRIBUTING.md) and [wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/).
 

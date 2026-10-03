@@ -10,6 +10,10 @@
 - Extended the pinned Nix artifact to include the service, static client, dependencies, and app/account launchers. Root development, account, and built-app commands share local state and origin defaults.
 - Recorded zero tests during this implementation stage. Future coverage focuses on end-to-end and API tests only after useful behavior is stable enough to preserve. Removed the initial exploratory suites; source/type/build checks continue, with runtime/device qualification deferred.
 
+### Documentation
+
+- Recorded an independent UI/UX review of `d83f70d` and proposed UI implementation rules covering tokens, readability, shared controls, workspace keyboard/touch behaviour, work preservation, and content hierarchy. The review found contrast, token, status, and state-preservation deviations, plus gaps in shared-control consistency and tab focus. Application code is unchanged.
+
 ### Earlier foundation decisions
 
 

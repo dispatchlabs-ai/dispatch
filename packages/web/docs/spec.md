@@ -94,7 +94,7 @@ Support touch as well as pointer and keyboard operation. Required actions must n
 
 Changing viewport size, orientation, or visible workspace region must preserve the active work and unsent input. A responsive layout change must not itself submit, cancel, or restart work. The rule preventing stale supporting content or actions from appearing under a different main tab applies at every size.
 
-The implementation uses navigation panels below 1100 pixels and a contextual panel below 800 pixels, with the main work remaining reachable. Keyboard focus and touch controls use shared primitives. Modern desktop/mobile browsers with WebAuthn are the target; real-device, virtual-keyboard, and browser-matrix qualification is deferred under the testing policy. Native apps, installation, and offline operation have not been specified.
+The implementation uses navigation panels below 1100 pixels and a contextual panel below 800 pixels, with the main work remaining reachable. Buttons, icon buttons, inputs, dialogs, and tabs use Base UI primitives. Selects, checkboxes, radios, and textareas are native elements styled per screen; see the [October 3 UI/UX review](ui-ux-review.md). Modern desktop/mobile browsers with WebAuthn are the target; real-device, virtual-keyboard, and browser-matrix qualification is deferred under the testing policy. Native apps, installation, and offline operation have not been specified.
 
 ## Workspace layout
 
@@ -125,6 +125,47 @@ Keep the right region as a full layout column rather than implementing the deskt
 A signed-in user activates main tab A and sees its main content and any defined supporting views in the right column. Selecting another right-column tab keeps A active. Activating main tab B changes both the main content and the right column's supporting context to B. Late updates for A must not replace B's supporting content.
 
 Keep desktop columns in their own layout space, with scrolling contained to their content. On smaller screens, panels expose navigation and supporting content. Preserve per-chat drafts and active work when changing layouts or main tabs. Resizable columns and cross-reload persistence of panel preferences are not part of this slice.
+
+## UI implementation rules
+
+**Proposed October 3, 2026, from the [UI/UX review](ui-ux-review.md); pending Chris's confirmation.** These rules make the accepted branding, desktop/mobile, and workspace requirements checkable by source review. Where a rule adds a new product decision, it says so.
+
+### Tokens and readability
+
+- Define every colour, font size, spacing value, radius, and shadow once as a token in the shared stylesheet. Component rules reference tokens only. Derive tints and status colours from the [brand token reference](#existing-brand-references), and record any deliberate departure (for example, a darker status colour chosen for contrast) beside the token.
+- Text meets WCAG 2.2 AA contrast: 4.5:1, or 3:1 for large text. This includes status, timestamps, hints, and placeholder-adjacent guidance. Focus indicators, selected-state indicators, status dots, and icon-only controls meet 3:1 against every surface they appear on.
+- No text is smaller than the brand scale's smallest step (12 px). Express font sizes in `rem`, so that browser font-size settings as well as zoom enlarge text.
+- Show selection, status, and errors with more than colour or font weight alone.
+
+### Shared controls
+
+- Every control of the same type looks and behaves the same everywhere, including size, mobile font size, focus treatment, and disabled and error states. Native semantic elements are fine. Style them through shared control styles or wrappers in `src/components/ui`, not per screen. Put a Base UI composition several features need there.
+- Record one styling approach for components (Tailwind utilities with tokens, or token-based CSS) in [handoff.md](handoff.md) and use only that approach.
+
+### Workspace keyboard, touch, and status
+
+- Closing a main tab works from the keyboard without adding a Tab stop per tab, and tab-list semantics with close controls follow the WAI-ARIA Authoring Practices tabs pattern. When activating a tab mounts content or opens a subscription, focusing it must not activate it.
+- Rail and navigation destinations expose the current location with `aria-current`, not toggle semantics.
+- Every icon-only control has an accessible name. Do not rely on `title` tooltips to explain an action. On touch-primary layouts, primary actions and the entry point to supporting views show a visible label or another visible cue.
+- Primary touch targets on narrow screens are at least 44×44 CSS px. No target is smaller than 24×24 CSS px.
+- Connection and run status reflect what is actually observed. Never show "connected" for something that is not being observed. Show the active main tab's reconnecting or error state inside that tab's content as well as in the bottom bar.
+
+### Preserving work
+
+- "Unsent input" covers every form in a main tab, not just chat drafts: agent editing, account/security flows, and search. Switching main tabs or layouts never discards it. Closing a tab that has unsaved input asks before discarding it.
+- Restoring a chat tab restores its transcript scroll position. Auto-scroll only when the reader was already at the latest content.
+- **New decision, pending:** warn before idle session expiry. After re-authentication as the same user, restore that user's open tabs and unsent drafts. Clear them on explicit sign-out or when a different user signs in. Re-confirm identity for sign-in-method changes in place, without a full sign-out. Ask for confirmation before sign-out discards unsent input.
+
+### Hierarchy and content
+
+- Each main tab's `<h1>` names its destination or object, such as "Agents", "Account and security", or the conversation title. Taglines may appear only as secondary text.
+- Label the transcript and headers with the conversation's agent name from its saved revision. Keep that name after the definition is later edited. Show model and provider identifiers as supporting facts, not as the main label.
+- Translate native Pi records into human-readable labels and statuses in the main transcript. Show raw JSON or enum values only behind an explicitly labelled technical-details disclosure, while keeping the native distinctions the [chat workflow](#first-agent-work-workflow-and-observable-outcomes) requires.
+- A main tab with no specified supporting view shows a brief empty state in the full right column. Static help text is not a supporting view.
+
+### Recording outcomes
+
+- Under the [testing policy](#testing-policy), record UI properties that were not checked (contrast, device behaviour, keyboard flows) as unverified in [handoff.md](handoff.md). Do not describe them as implemented facts in the spec, README, or changelog.
 
 ## Web architecture
 
