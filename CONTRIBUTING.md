@@ -1,6 +1,10 @@
 # Contributing
 
-Dispatch Web has a local frontend foundation. Chat, authentication, and Pi Durable integration remain to be implemented through the agreed work-package process.
+Dispatch Web has a local browser/service implementation with authentication, native Pi Durable chat, named agents, and a branded responsive workspace. Continue through focused work packages and the check policy below.
+
+## Current check policy
+
+Chris requested **zero tests at this stage** on October 3, 2026. Do not add or run automated tests, smoke tests, or browser acceptance tests. Use source review, TypeScript checks, and builds while this rule is active. Functional acceptance remains unverified unless prior evidence is explicitly dated; a successful build does not establish runtime correctness. The browser-testing workflow below is reserved for when this rule changes. Once useful behavior is stable enough to lock in, focus coverage on end-to-end and API tests; unit and implementation-level tests are not the default. Follow the [package testing policy](packages/web/docs/spec.md#testing-policy) before starting test work.
 
 ## Local development and Nix builds
 
@@ -12,9 +16,9 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173`. Source edits hot reload; stop the server with Ctrl-C. Repeat `npm ci` after the lockfile changes. Run `npm run check` for route-type generation, TypeScript, and the frontend build; run `nix build` and `nix flake check` for the pinned build and declared checks. The Node 24 toolchain is shared by the Nix shell and build, and npm dependencies are locked in `package-lock.json`.
+Open `http://localhost:5173`. Frontend source edits hot reload without restarting the persistent service; stop the launcher with Ctrl-C. Repeat `npm ci` after the lockfile changes. Run `npm run check` for route-type generation, frontend/service/tooling TypeScript, and application builds; run `nix build` and `nix flake check` for the pinned build and declared type/build checks. The Node 24 toolchain is shared by the Nix shell and build, and npm dependencies are locked in `package-lock.json`.
 
-See the [package usage guide](packages/web/docs/usage-guide.md) for preview, troubleshooting, dependency updates, and platform coverage. Shared flake configuration and lockfiles belong at the repository root; the package-specific Nix recipe stays with its package. Future automation must invoke the same build definitions.
+Use `npm run auth -- invite --email person@example.com --name "Person"` to provision an account. See the [package usage guide](packages/web/docs/usage-guide.md) for sign-in, provider credentials, built mode, dependency updates, and platform coverage. Shared flake configuration and lockfiles belong at the repository root; the package-specific Nix recipe stays with its package. Future automation must invoke the same build definitions.
 
 ## Where work belongs
 
@@ -31,21 +35,21 @@ See the [package usage guide](packages/web/docs/usage-guide.md) for preview, tro
 | `packages/<package>/docs/handoff.md` | Implementation decisions, ordered work packages, and acceptance criteria |
 | `packages/<package>/docs/usage-guide.md` | Detailed integration guidance when the package has usable interfaces |
 | `packages/<package>/src/` | Implementation |
-| `packages/<package>/test/` | Package tests, with runnable examples in `test/examples/` |
+| `packages/<package>/server/` | Owning package’s persistent service integration |
 | `scripts/` | Shared development and release tooling |
 | `.github/workflows/` | Reserved workflow location; no CI is configured |
 
-Language-specific manifests and build configuration belong beside the relevant package code. Add root configuration only for shared workspace tooling. The `web` package owns the frontend; further package boundaries will follow the design.
+Language-specific manifests and build configuration belong beside the relevant package code. Add root configuration only for shared workspace tooling. The `web` package owns the frontend and persistent service; further package boundaries will follow the design.
 
 ## Specification and implementation
 
 1. Read the relevant product intent and decisions from the [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/), then the affected package's specification and handoff.
 2. Agree the user workflow and observable outcomes. Record behavior and contracts in `docs/spec.md`, including state ownership, failure paths, and recovery. Mark proposed or unresolved details explicitly.
 3. Translate the design into ordered work packages in `docs/handoff.md`. Each package needs its scope, dependencies, acceptance criteria, and applicable checks. Link significant decisions to their maintained wiki record.
-4. Implement the current work package. Keep validation in its acceptance criteria and the package's tests. Add runnable examples under `test/examples/` and document actual usage when it exists.
-5. Run the package tests and repository checks, inspect the diff, update the package changelog as appropriate, and review the result with Chris before starting the next package. Do not redesign later packages while implementing the current one.
+4. Implement the current work package. Keep source/type/build evidence and unverified functional outcomes in its acceptance criteria; document actual usage.
+5. Run the permitted repository checks, inspect the diff, update the package changelog as appropriate, and review the result with Chris before starting the next package. Do not redesign later packages while implementing the current one.
 
-The reference is [Pi Durable's Pico5 handoff](https://github.com/earendil-works/pi/blob/v1.0.0/packages/durable/docs/pico-v5-handoff.md). Use this repository's actual checks below; add behavioral tests with each implemented feature.
+The reference is [Pi Durable's Pico5 handoff](https://github.com/earendil-works/pi/blob/v1.0.0/packages/durable/docs/pico-v5-handoff.md). Use this repository's actual checks below; follow the current testing policy for any future coverage.
 
 The wiki maintains product intent and decision history. Package documents define implementation contracts and execution steps linked to those decisions. Keep both current when an authorized change affects them.
 
@@ -73,7 +77,7 @@ Use `/deslop` after implementing a work package, then rerun affected checks befo
 
 ## Checks and publication
 
-Run `npm run check` inside `nix develop` for code changes. Run `nix flake check` for the declared build/type check and `nix build` when verifying artifacts. There is no functional test suite yet; add meaningful tests with application behavior. Apply the browser-testing procedure for observable UI changes.
+Run `npm run check` inside `nix develop` for code changes. Run `nix flake check` for the declared type/build check and `nix build` to produce artifacts. There is no functional test suite under the current zero-tests rule. Do not run the browser-testing procedure.
 
 Also run `git diff --check` (and `git diff --cached --check` after staging), inspect the full diff, and verify changed local documentation links. Documentation checks do not verify application behavior.
 

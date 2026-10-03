@@ -24,7 +24,7 @@ export interface ChatSnapshot {
   submissions: readonly SubmissionRecord[];
 }
 
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface AgentDraft {
   name: string;
@@ -64,6 +64,7 @@ export interface ModelOption {
   id: string;
   name: string;
   reasoning: boolean;
+  thinkingLevels: ThinkingLevel[];
 }
 
 export interface ApplicationConfig {

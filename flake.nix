@@ -1,5 +1,5 @@
 {
-  description = "Dispatch Web local development and frontend build";
+  description = "Dispatch Web local development and application build";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 

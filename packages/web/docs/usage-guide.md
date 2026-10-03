@@ -1,10 +1,10 @@
 # Dispatch Web usage guide
 
-The current implementation is a local frontend foundation with a startup page. Authentication, chat, and Pi Durable integration are still being specified.
+Dispatch Web provides company sign-in, private conversations on stock Pi Durable, shared named agent definitions, and a branded desktop/mobile workspace. This is a local development implementation. Source/type/build checks are permitted; functional and browser qualification are deferred under the [testing policy](spec.md#testing-policy).
 
 ## Start development
 
-Use Nix with `nix-command` and `flakes` enabled. M1 Air's Nix installation and user configuration are managed by [Palm](https://wiki.chrisreynolds.me/wiki/palm/#section-portable-application-build-prerequisites-september-21-2026); application tooling is owned here. Open a new terminal after installing Nix. If an existing terminal has not loaded its shell integration, the binary is `/nix/var/nix/profiles/default/bin/nix`.
+Use Nix with `nix-command` and `flakes` enabled. M1 Air's Nix prerequisite is managed by [Palm](https://wiki.chrisreynolds.me/wiki/palm-nix-builders/); application tooling is owned here. Open a new terminal after installing Nix. An existing terminal can use `/nix/var/nix/profiles/default/bin/nix` directly.
 
 From the repository root:
 
@@ -14,39 +14,122 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173`. Keep that terminal running and edit files in `packages/web/src/`; Vite applies source edits without a full Nix build. Stop with Ctrl-C. Run `npm ci` on a fresh checkout and after `package-lock.json` changes. The initial dependency fetch requires network access; this slice requires no credentials or backend services.
+Open `http://localhost:5173`. The development launcher runs Vite on localhost and the API/Pi service on `127.0.0.1:3001`, proxying `/api` through Vite. Edit files in `packages/web/src/` for frontend hot reload. Server changes require stopping the launcher with Ctrl-C and restarting it. Frontend edits and browser disconnection do not restart the Pi owner or cancel its work.
 
-The development server binds only to localhost and fails if port 5173 is occupied, so it cannot silently move to another URL. Reuse a server only when its checkout is known; stop only a task-owned server. Check the terminal's reported URL and use `localhost`, rather than assuming both IPv4 and IPv6 loopback addresses have listeners.
+The launcher fails if the frontend port is occupied, rather than silently choosing another URL. Stop only a server owned by this task/check-out. Run `npm ci` after the dependency lock changes. The initial dependency fetch needs network access; model calls need configured server-side credentials.
 
-Browser developer tools can debug the TypeScript source through Vite's source maps. The terminal reports compilation failures. Source changes normally hot reload; configuration changes may restart Vite. If a broken edit prevents loading, fix the reported error and reload if necessary.
+The root development, account, and built-app commands share `.local/state/dispatch` in the repository root. This directory is ignored by Git. Do not point two runtime processes at the same storage; a native SQLite ownership lock rejects the second owner. Separate worktrees default to separate state.
+
+## First account and sign-in
+
+With the same root checkout and Nix shell, create a single-use enrollment link:
+
+```sh
+npm run auth -- invite --email person@example.com --name "Person"
+```
+
+The link expires after one hour by default; `--hours` permits a value up to 24. Share it privately with its intended owner. No email is sent by the application. The browser user chooses a passkey with device PIN/biometric verification, or a password plus TOTP authenticator. There is no default password or authentication bypass.
+
+Password/TOTP setup displays recovery codes once. Save them in a password manager. Account settings let a recently signed-in user add/remove passkeys, set or replace password/TOTP, and revoke sessions. Factor changes require authentication within the preceding ten minutes; sign out and back in when prompted. The final complete sign-in method cannot be removed.
+
+Lost-device recovery uses the account password and a one-use recovery code, followed by fresh factor enrollment. For a passkey-only account or when those recovery materials are unavailable, an operator must independently establish the owner's identity before issuing a reset:
+
+```sh
+npm run auth -- reset --email person@example.com --confirm-reset
+```
+
+A reset immediately suspends the old sign-in methods and revokes sessions; the new link only permits fresh enrollment. It does not grant workspace access by itself. Completing recovery replaces old factors. An expired or lost invitation can be reissued with `invite` for an account that has not completed enrollment; use the explicit reset path for an existing account.
+
+## Model credentials and agent configuration
+
+The service uses Pi's public `ModelRuntime` from the pinned coding-agent package. It reads the operator's Pi credential/model files from `~/.pi/agent` and uses Pi's locked credential refresh, including OAuth. Secrets stay on the service and do not enter browser snapshots, Git, build artifacts, or the Nix store.
+
+Explicit `DISPATCH_PROVIDER`, `DISPATCH_MODEL`, and `DISPATCH_THINKING` override Pi's `defaultProvider`, `defaultModel`, and `defaultThinkingLevel`. Without either configuration, the fallback is `openai` / `gpt-6-sol` / `off`; the provider still needs credentials. `DISPATCH_PI_AGENT_DIR` selects a different existing Pi configuration directory. Provider environment credentials supported by Pi can also be supplied to the service. Use Personal Vault's process injection for secrets rather than putting them on the command line or in committed files.
+
+The default agent is chat-only and has no tools. The Agents section creates company-shared definitions with instructions, provider/model, and supported thinking levels. Each save produces a new immutable revision. New conversations copy that configuration; existing conversations remain unchanged. A stale edit returns a conflict. Archived definitions cannot start new chats or be edited; there is no restore operation in this slice.
+
+## Chat and workspace
+
+Chats are private to the authenticated user in the installation's company. Open a saved conversation or start one with the default or a named agent. The service returns native Pi entries and streams complete snapshots; the browser derives its display from those records.
+
+- Sending while a response is active adds a native follow-up. Retry a failed network request with the same logical request ID; a changed message gets a new ID. Reusing an ID with different content returns a conflict.
+- Stop cancels the foreground response and queued follow-ups through Pi, preserving committed partial output. Failure and Stop are distinct from completed answers.
+- Closing a main tab, browser tab, or live connection stops observation only. Pi continues admitted work. Reopening restores the current saved state without replaying every missed event.
+- Restarting the service invokes native Pi recovery. An interrupted provider request can run again from its committed checkpoint, rather than continuing the exact streamed token; another provider charge is possible.
+- The right column follows the active main tab. Chat context exposes its immutable agent configuration and native run/usage data. Narrow screens expose navigation and context through panels; per-chat drafts remain in browser memory while switching layouts and tabs.
+
+Sessions last at most twelve hours and expire after thirty minutes without an authenticated request. Stream heartbeats do not extend idle expiry. Expiry or revocation ends protected access; agent work remains owned by the service.
 
 ## Checks and builds
 
 Inside the Nix shell:
 
 ```sh
-npm run typecheck
-npm run build
-npm run preview
+npm run check
+npm start
 ```
 
-`typecheck` generates React Router route types and runs TypeScript without emitting code. `build` writes the SPA to `packages/web/build/client/`. `preview` serves that build at `http://localhost:4173`, also on loopback with a fixed port. Build again after source edits; preview does not hot reload source. There is no functional test suite yet. `npm run check` combines typechecking and the frontend build.
+`check` generates React Router route types, checks frontend/service/tooling TypeScript, and builds the app. It does not run tests. `build` writes the SPA to `packages/web/build/client/` and the compiled service to `packages/web/build/service/`. Root `npm start` and `npm run preview` serve that built application at `http://localhost:5173`, using the same root state as development. Stop development first. Built mode does not hot reload; rebuild after edits.
 
-The reproducible build/check entry points can be run outside the development shell:
+The pinned build entry points work outside the shell:
 
 ```sh
 nix build
 nix flake check
 ```
 
-The Nix artifact is `result/share/dispatch-web/`, containing static HTML, CSS, and JavaScript. Its derivation also runs the typecheck. It needs no runtime state, secrets, or application services. When chat is implemented, its writable state must remain separate from this immutable output. `nix flake check` may reuse a successful cached build instead of rebuilding it.
+The Nix output includes `result/bin/dispatch-web`, `result/bin/dispatch-auth`, the compiled service/dependencies, and static client files linked at `result/share/dispatch-web/client/`. Its derivation runs TypeScript checks and a build, with no tests or application credentials. Writable state stays outside the immutable output.
 
-The flake declares Apple Silicon macOS and x86-64 Linux outputs. Apple Silicon macOS is verified. Linux has not been built or qualified for deployment yet; evaluating a Linux output does not establish support.
+The standalone Nix binaries use port/origin 3001 and a state directory relative to the current working directory unless configured. Use both binaries with the same explicit settings when launching outside the root npm workflow:
 
-## Update dependencies
+```sh
+export DISPATCH_DATA_DIR="$PWD/.local/state/dispatch"
+export DISPATCH_ORIGIN=http://localhost:3001
+export DISPATCH_PORT=3001
+result/bin/dispatch-auth invite --email person@example.com --name "Person"
+result/bin/dispatch-web
+```
 
-Use npm inside `nix develop`, keeping exact dependency versions in the owning package manifest and committing the root `package-lock.json`. When dependencies change, update `npmDepsHash` in `packages/web/nix/package.nix`: temporarily set it to `lib.fakeHash`, run `nix build`, replace it with the reported actual hash, then rebuild and run checks. Never commit the placeholder. `nix flake update` changes the toolchain lock and also requires a fresh build/check.
+Do not run that service beside the development owner of the same state. Passkeys are bound to the relying-party hostname; use the same hostname consistently. The local app has not been qualified across browsers/devices under the current no-tests policy. The flake declares Apple Silicon macOS and x86-64 Linux; Linux remains unbuilt and is not deployment-qualified.
 
-## Later internal deployment
+## Configuration
 
-Omarchy/Palm hosting, an internal HTTPS domain, and its application service are a later work package. The current pilot at `dispatch.chrisreynolds.me` remains in place. This loopback development server is not a LAN deployment and cannot be opened directly from a phone. Narrow-screen browser checks can run locally; real-device acceptance belongs with the affected product workflows and an appropriate reachable test environment.
+| Variable | Meaning |
+| --- | --- |
+| `DISPATCH_DATA_DIR` | Writable authentication and native Pi state; root launchers default to the repository's `.local/state/dispatch` |
+| `DISPATCH_WEB_PORT` | Root frontend/built-app port; default 5173; root account links use the same port |
+| `DISPATCH_PORT` | API service port during development or standalone Nix operation; default 3001; root built launcher uses `DISPATCH_WEB_PORT` |
+| `DISPATCH_ORIGIN` | Exact browser origin, without a trailing slash; root launchers default to localhost plus the web port |
+| `DISPATCH_HOST` | Standalone/built service bind address; default 127.0.0.1; development pins 127.0.0.1 |
+| `DISPATCH_COMPANY_ID`, `DISPATCH_COMPANY_NAME` | Installation company identity/display name; defaults `dispatch` / `Dispatch` |
+| `DISPATCH_PI_AGENT_DIR` | Pi credential/model/settings directory; defaults to `~/.pi/agent` |
+| `DISPATCH_PROVIDER`, `DISPATCH_MODEL`, `DISPATCH_THINKING` | Explicit default-agent model settings |
+| `DISPATCH_CLIENT_DIR` | Optional static-client location for a custom service launcher |
+
+Use HTTPS for any non-loopback origin. HTTP configurations must bind to loopback. Keep company identity and state together; changing the company ID does not migrate accounts or conversations. Custom origin/port settings must be shared by the service, frontend, and account CLI.
+
+The state directory contains `auth.sqlite`, `auth.key`, and `runtime/` with Pi storage and its ownership lock. Back up the authentication database and encryption key together, along with Pi state. Stop the service before a simple file-copy backup so SQLite journals are settled. A missing encryption key must be restored; generating another key cannot decrypt existing TOTP factors. Do not copy these files into build inputs or source control.
+
+## Application API
+
+All `/api` access requires a fully authenticated session except the authentication flow endpoints. Mutations require same-origin JSON requests. Protected commands validate input; unavailable resources return 404 across identity boundaries.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/config` | Company, default agent, available model choices and supported thinking levels, provider readiness |
+| `GET/POST /api/chats` | List private conversations / create with a request ID |
+| `GET /api/chats/:id` | Current native conversation and submission snapshot |
+| `POST /api/chats/:id/messages` | Admit a message idempotently; return a snapshot with status 202 |
+| `POST /api/chats/:id/stop` | Native foreground cancellation; return the current snapshot |
+| `GET /api/chats/:id/events` | SSE `snapshot` events; `session-ended` closes access on invalidation |
+| `GET/POST /api/agents` | List company definitions / append a revision using optimistic concurrency |
+| `POST /api/agents/:id/archive` | Archive using the expected revision |
+| `/api/auth/*` | Enrollment, sign-in, recovery, session and factor management, logout |
+
+The precise shared types are in `src/shared/contracts.ts` and `src/shared/auth-contracts.ts`. See [runtime.md](runtime.md) for native storage, cancellation, and request identity. The browser never sends an authoritative user or company ID for access checks.
+
+## Dependency updates and later deployment
+
+Use exact versions in the owning manifest and commit the root dependency lock. To update `npmDepsHash` in `packages/web/nix/package.nix`, temporarily set `lib.fakeHash`, run `nix build`, replace the placeholder with the reported actual hash, then rebuild. Never commit a placeholder. Toolchain changes through `nix flake update` also require a build.
+
+Omarchy/Palm hosting and its internal HTTPS domain are a later work package. The current pilot at `dispatch.chrisreynolds.me` remains in place. Loopback development cannot be opened directly from a phone; real-device access requires a later reachable environment. CI and release automation are unconfigured. Do not add tests until stable behavior is ready to preserve and Chris resumes that work; future coverage focuses on end-to-end and API tests.

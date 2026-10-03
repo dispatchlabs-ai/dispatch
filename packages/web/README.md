@@ -1,8 +1,8 @@
 # Dispatch Web package
 
-This package owns the Dispatch browser workspace and its application integration with stock Pi Durable. Chat with a default agent is the agreed first feature, followed by named agent definitions and further native capabilities. Detailed contracts and implementation packages remain to be specified.
+This package owns the Dispatch browser workspace and its integration with stock Pi Durable 1.0.1. It implements invitation enrollment, password/TOTP and verified passkeys, private chats with native persistence/recovery, versioned company agent definitions, and a branded responsive workspace.
 
-**Status: local frontend foundation.** React Router in SPA mode, React, TypeScript, Vite, and Tailwind serve a responsive startup page. Chat, authentication, and Pi Durable integration are not implemented.
+React Router in SPA mode, React, TypeScript, Vite, Tailwind, and shared Base UI primitives provide the browser app. A persistent Node/Hono service owns authentication and the native Pi runtime. Frontend hot reload does not restart that owner.
 
 ## Development
 
@@ -14,15 +14,17 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173`. Run `npm run check` for TypeScript and build checks, `nix build` for the pinned static artifact, and `nix flake check` for declared checks. See the [usage guide](docs/usage-guide.md) for prerequisites, preview, and dependency updates.
+Open `http://localhost:5173`. Use the root `npm run auth -- invite --email person@example.com --name "Person"` command to create an enrollment link. Run `npm run check` for TypeScript/build checks, `nix build` for the pinned application artifact, and `nix flake check` for declared build checks. Root `npm start` serves the built app at the same URL/state location after stopping development.
+
+The current rule is zero tests. Add end-to-end and API coverage later, after stable behavior is ready to lock in; functional/browser qualification remains deferred. Source, TypeScript, and build review are the current checks.
 
 ## Documentation
 
-- [Specification](docs/spec.md): accepted requirements and first chat workflow, with unresolved contracts labeled.
-- [Implementation handoff](docs/handoff.md): decisions, ordered work packages, and acceptance criteria; local tooling acceptance and the remaining feature contracts.
-- [Usage guide](docs/usage-guide.md): local startup, build, and troubleshooting guidance.
-- [Changelog](CHANGELOG.md): package changes.
-- [Repository contribution workflow](../../CONTRIBUTING.md): shared development and publication steps.
-- [Repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/): maintained product intent, decisions, and prior work.
+- [Specification](docs/spec.md): behavior, ownership, authentication, layout, and testing policy.
+- [Implementation handoff](docs/handoff.md): work packages, source/build evidence, and unverified outcomes.
+- [Usage guide](docs/usage-guide.md): startup, account/model configuration, API, state, and troubleshooting.
+- [Runtime integration](docs/runtime.md): native Pi ownership, request identity, cancellation, and recovery.
+- [Brand asset provenance](src/assets/README.md) and [changelog](CHANGELOG.md).
+- [Repository contribution workflow](../../CONTRIBUTING.md) and [wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/).
 
-Code belongs in `src/`, tests in `test/`, and runnable examples in `test/examples/`. Package configuration and the Nix recipe live here; shared workspace manifests and locks stay at the repository root.
+Browser code belongs in `src/`; the application service is in `server/`. Package-specific build configuration and the Nix recipe stay here; shared workspace scripts, manifests, and locks live at the repository root. Existing `test/` placeholders do not authorize adding tests while the current policy is active.

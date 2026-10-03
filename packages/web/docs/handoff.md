@@ -1,110 +1,83 @@
 # Dispatch Web implementation handoff
 
-**Status: chat is the agreed first feature, using Pi Durable and a default agent.** Foundational, company access, desktop/mobile, and workspace requirements apply. The localhost tooling package is implemented for review. Detailed chat contracts and later implementation packages remain pending.
+The local implementation covers company authentication, stock Pi Durable chat, the branded desktop/mobile workspace, and named agent definitions. [spec.md](spec.md) defines the current contracts; [usage-guide.md](usage-guide.md) explains operation. The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains product intent and decision history.
 
-[spec.md](spec.md) defines the package's agreed behavior and contracts. Implement the work packages recorded here in order. After each package, run its tests and the repository checks, record the results, and review with Chris before proceeding. Do not redesign later packages while implementing the current one.
+## Current testing policy
 
-## Decisions
+Chris requested **zero tests during this stage**, then clarified that future coverage should focus on end-to-end and API tests once useful behavior is stable enough to lock in. Follow the [testing policy](spec.md#testing-policy). Do not add or run tests, smoke checks, or browser acceptance procedures now. Source review, TypeScript checks, and builds are permitted. The acceptance outcomes below define intended behavior; they are not permission to start test work.
 
-- Use stock upstream Pi Durable as the durable execution foundation.
-- Implement [chat with a default agent first](spec.md#first-agent-work-workflow-and-observable-outcomes), using independent native Pi conversations and Pi-owned execution and durable state.
-- Follow chat with named agent definitions, then further Pi Durable capabilities in focused slices. The broader product goals remain in scope.
-- Require company users to sign in with 2FA; support TOTP and passkeys.
-- Give all users equal initial application capabilities, with RBAC planned for later. See [company access](spec.md#company-access-and-authentication) for accepted scope and unresolved flows.
-- Use TypeScript throughout the application and support local development on M1 Air.
-- Use Nix for the development environment and builds, following the [accepted requirements](spec.md#language-and-development-requirements).
-- Prioritize quick localhost development; internal Omarchy/Palm deployment is deferred. The tooling slice uses React Router framework mode, Vite, Tailwind, and npm.
-- Use [Dispatch branding](spec.md#dispatch-branding), including official logos, the brand palette, and established typography/styling across desktop and mobile.
-- Adopt the [workspace layout](spec.md#workspace-layout), including a full right column with optional tabs subordinate to the active main tab.
-- Support [all user-facing functionality on desktop and mobile](spec.md#desktop-and-mobile-support) in each implementation slice, with presentation adapted to screen size and input method.
-- Keep this package's specifications, handoff, and usage documentation in `packages/web/docs/`.
-- Keep validation in each work package's acceptance criteria and in the package tests.
+No test suites or test frameworks are retained. Functional, security-flow, recovery, and real-device qualification of the integrated revision remains deferred. Successful type/build checks do not establish those outcomes. Earlier WP-001 evidence is historical.
 
-The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains the decision history. Final application structure and detailed implementation contracts remain unresolved.
+## Decisions and ownership
 
-## First chat feature acceptance requirements
+- Use TypeScript, React Router framework SPA mode, React/Vite/Tailwind, and shared Base UI primitives with original Dispatch artwork and local Inter.
+- Keep a persistent Node/Hono service separate from frontend hot reload. One process owns each Pi directory, enforced by an OS-backed SQLite ownership lock without limiting concurrent agents.
+- Use stock Pi Durable 1.0.1 through its public interfaces. Pi owns admission, native entries, execution, cancellation, and recovery. Dispatch owns identity, access checks, transport, and presentation.
+- Serve one company per installation. Users have equal capabilities, private chats, and shared agent definitions. Role-based access control remains future work.
+- Require password/TOTP or a user-verified passkey, with restricted invitation/recovery flows and opaque sessions. The local operator provisions accounts; there is no application administrator role.
+- Keep desktop rail/sidebar/main tabs/full contextual column/bottom bar. Mobile uses navigation and context panels, preserving active work and drafts.
+- Prefer explicit service model configuration, then existing Pi settings/credentials. The first agent has no tools. Named agent revisions are immutable and copied into new chats.
+- Prioritize local development. Omarchy deployment, pilot retirement, tools/integrations, handoffs, background triggers, and schedules are deferred to separately specified packages.
 
-Translate these accepted outcomes into the owning work packages:
+## Coordinated work
 
-- An authenticated user can start a conversation, send messages, receive streamed responses, stop a response, and reopen saved history on desktop and mobile.
-- New chats use the default agent's ordinary Pi configuration and have independent history and execution state within the user's authorized scope.
-- A reload restores persisted history. Disconnecting the browser leaves admitted work running; reconnecting restores the current committed state, including work completed while disconnected.
-- A service restart recovers the conversation and ongoing work through Pi's public recovery interfaces. Verify interruption during a response, not only an idle restart.
-- Stop and failure states match the agreed cancellation/error contracts and remain distinguishable from a completed response.
-- The integration preserves native transcript entry types and execution information needed for later tools and agent capabilities. Pi remains the owner of durable history and execution.
-- Authentication, responsive layout, and contextual-view behavior meet the applicable acceptance requirements below.
+Chris's October 3 instruction to implement the discussed work authorizes the coordinator to complete these packages, using isolated subagent worktrees as useful. It supersedes the earlier stop-for-review between packages for this request. Source/type/build review follows the current testing policy.
 
-Before the affected work packages begin, settle the default model/instructions/tools, authentication flows and company scope, mobile interactions, transport schemas, cancellation behavior, and runtime integration details. Selecting agent tools also requires specifying their user controls. These open details do not reopen the agreed chat-first feature sequence.
+### WP-002 — Company authentication
 
-## Authentication acceptance requirements
+Implementation: `server/auth.ts`, the `server/auth/` helpers, account CLI, shared auth contracts, and browser authentication/account components.
 
-When the authentication work package is agreed, include checks for:
+Intended outcomes:
 
-- Protected pages, direct API requests, and live subscriptions denying access without a fully authenticated session.
-- Successful TOTP and passkey login paths under the selected policy, with invalid, expired, replayed, cancelled, and incomplete attempts denied as applicable.
-- Passkey-only login, if selected, requiring and verifying user verification; a possession-only assertion must not grant access.
-- All initial users receiving the same capabilities within their authorized scope, while retaining separate identities and sessions.
-- Logout, session expiry/revocation, enrollment, and recovery matching their agreed contracts.
+- Invitation enrollment, password/TOTP and verified passkey sign-in, and account security work through the same service boundary.
+- Missing, partial, expired, revoked, or invalid authentication cannot read protected data or subscribe to it. WebAuthn requires server-verified user verification; challenges and TOTP counters cannot be replayed.
+- Recovery grants restricted factor enrollment before application access. Operator reset suspends old factors and sessions. Credentials, recovery material, and mutable state stay outside source/build outputs.
+- Users can manage factors after recent authentication and revoke sessions; deleting the last complete sign-in method is rejected.
 
-Settle the login flow, account provisioning, enrollment/recovery, session policy, and company/workspace scope before implementing the affected behavior. No implementation package is scheduled by these requirements.
+Source review covers asynchronous verification/flow cancellation, atomic challenge/counter consumption, cookie/session policy, and company/user boundaries. Browser/authenticator qualification is deferred.
 
-## Branding acceptance requirements
+### WP-003 — Durable chat service
 
-Apply the [Dispatch branding requirement](spec.md#dispatch-branding) when implementing or changing user-facing screens:
+Implementation: `server/runtime.ts`, storage ownership, API/SSE adapter, shared native snapshot contracts, and provider credential integration. [runtime.md](runtime.md) explains native ownership and request identity.
 
-- Verify logo and palette provenance against the established Dispatch brand materials; keep the selected assets and shared design tokens with this package.
-- Check consistent branding across the affected screens and components, including authentication and chat as those features are implemented.
-- Verify approved logo variants retain their proportions and remain legible at desktop and mobile sizes, with readable text, controls, status, and focus indicators.
-- Replace the provisional startup-page identity as part of the first branding implementation. The current tooling page has not passed brand acceptance.
+Intended outcomes:
 
-## Desktop and mobile acceptance requirements
+- Independent private conversations support sending, streaming, Stop, and saved history without flattening native Pi records.
+- Browser disconnect and main-tab closure stop observation only; reconnect replaces state with the current native snapshot. Session invalidation closes access.
+- Repeated logical requests keep their IDs. Matching retries reuse native admission; changed payloads with the same ID return 409. Stop/failure stay distinct, including before the first token and when follow-ups are queued.
+- Service reopening installs the registry and calls Pi recovery. Interrupted provider work can be retried from its committed checkpoint. A second process cannot own the same directory.
 
-Apply these requirements to every work package that adds or changes user-facing behavior:
+Source review covers native API usage, subscriber backpressure and cleanup, failure summaries, request fingerprints, and lifecycle ownership. Final runtime/recovery/API qualification is deferred.
 
-- Complete the affected workflows on desktop and mobile, including the agreed TOTP/passkey authentication flows when implemented.
-- Verify phone, tablet/intermediate, and desktop widths against the agreed browser/device matrix, using browser automation and representative real-device checks for touch, virtual keyboards, and platform authentication.
-- Reach navigation, main tabs, and every defined supporting view/action on narrow screens, while preserving the active main tab and its contextual relationship.
-- Verify touch operation without hover or precise dragging, plus keyboard navigation and focus handling when views open, close, or change context.
-- Check readable content, reachable controls, intended scrolling, orientation changes, text enlargement, and the mobile keyboard opening and closing.
-- Preserve active work and unsent input across layout changes. Switching main tabs while supporting views are hidden must not reveal stale content or action targets when reopened.
+### WP-004 — Branded desktop/mobile workspace
 
-Agree the mobile interaction design and browser/device matrix before implementing the affected package. These are acceptance requirements for future work, not completed browser checks.
+Implementation: shared browser controls, official SVG assets/tokens, authentication screens, chat/native entry rendering, workspace tabs/context, and responsive CSS.
 
-## Workspace layout acceptance requirements
+Intended outcomes:
 
-When the workspace-shell work package is agreed, include checks for:
+- Desktop follows the supplied sketch with a full contextual column. Narrow screens retain every workflow through accessible navigation/context panels.
+- Main-tab changes immediately change contextual content/action targets. Late results for an inactive chat cannot replace the active context; closing tabs chooses or clears the remaining context.
+- Drafts and pending logical request IDs remain tied to their chat during layout/tab changes. Markdown, native entries, loading, failure, Stop, and connection states render meaningfully.
+- Logos keep their original proportions and correct background variants, with readable colors, visible focus, and local Inter.
 
-- The desktop arrangement: left rail, sidebar, tabbed main content, full right contextual column with tab support, and bottom bar.
-- The right column extending alongside the main tab strip/content down to the bottom bar, occupying its own layout space.
-- Main-tab changes updating the right column's context and available supporting views; right-tab changes preserving the active main tab.
-- Late updates from an inactive main tab not replacing the active main tab's supporting content or action targets.
-- Closing the active main tab selecting the correct remaining context or clearing the right context when none remains.
-- No invented right-column features or tabs when their purpose has not been specified.
+Source review covers component/state ownership and CSS structure. No browser, touch, keyboard, zoom, virtual-keyboard, or passkey-device acceptance runs are authorized now.
 
-Define visibility/resizing, exact responsive presentation, keyboard interaction, scroll ownership, and supporting-tab persistence with the first affected workflow, meeting the desktop/mobile acceptance requirements above. This records acceptance requirements without scheduling implementation.
+### WP-005 — Named agents and integration
 
-## Architecture proposal and review
+Implementation: company catalog/editor/archive, immutable revisions, startup/configuration scripts, locked dependencies, Nix client/service output, and operator docs.
 
-The [proposed web architecture](spec.md#proposed-web-architecture) uses a React SPA and persistent TypeScript/Node Pi Durable service. WP-001 uses React Router framework mode; the service integration remains proposed. Chat's browser/service/Pi ownership boundaries and continuity outcomes are accepted independently of the frontend framework.
+Intended outcomes:
 
-The chat requirements above cover disconnection and restart recovery. When the remaining implementation contracts are agreed, add checks for:
+- Company users create/edit named agents, choose provider/model and supported thinking level, and start independent conversations from them.
+- Stale revision edits return conflicts; archived definitions reject editing/new chats. Existing conversations keep their original configuration. The default definition is service-configured and read-only.
+- Root development, built-app, and account commands use the same default company, state, and browser origin. Nix output contains no credentials or writable state.
+- The integrated revision is source-reviewed, passes TypeScript/build checks, and is committed/pushed with maintained docs and wiki evidence.
 
-- Snapshot replacement and ordered updates, including a slow or interrupted subscriber.
-- Retrying one logical submission without admitting duplicate work, while preserving distinct submissions.
-- Frontend hot reload preserving the runtime owner, and development/test instances using separate storage.
-- Server-side authorization and request validation on commands and subscriptions.
+## Integration evidence
 
-Choose the exact storage ownership mechanism, transport, and schemas before implementing the affected contracts. These are proposed acceptance areas, not completed checks or a scheduled implementation package.
+Pending the final integrated TypeScript/build/Nix checks and publication. No final functional qualification is claimed. Apply the behavior-preserving [deslop review](../../../.pi/prompts/deslop.md) using source inspection and the permitted checks, then record the resulting revision and build evidence here.
 
-## Work packages
-
-The agreed feature order is chat with a default agent, then named agent definitions and independent instances, followed by further Pi Durable capabilities as their use cases are specified. WP-001 establishes the local tooling prerequisite. Break the first chat feature and its remaining prerequisites into subsequent ordered entries containing:
-
-- Goal, scope, and prerequisite decisions or earlier packages.
-- Relevant specification sections and implementation boundaries.
-- Acceptance criteria covering observable behavior, applicable failures, and recovery.
-- Tests and check commands that verify those criteria.
-- Completion evidence and review status.
+## Earlier foundation evidence
 
 ## WP-001 — Local development foundation
 
@@ -121,28 +94,4 @@ Acceptance criteria and October 3, 2026 evidence on M1 Air:
 - `nix build` produces the static artifact from locked inputs without application credentials, live services, or globally installed Node. `nix flake check` passes the declared build/type check, reusing the successful build when cached.
 - Inspect the diff, check local documentation links and whitespace, and apply the behavior-preserving `/deslop` review. An independent frontend review found no actionable issue; the implementation contains only the tooling and static startup page needed for this package.
 
-Apple Silicon macOS is verified. The declared x86-64 Linux output is not yet built or deployment-qualified. Review this package with Chris before starting the next implementation package.
-
-## Current repository state
-
-The frontend source, workspace manifests, package build configuration, and pinned Nix build are implemented. Test/example directories remain reserved. CI and release automation are unconfigured. Use the actual commands in the [usage guide](usage-guide.md) and [CONTRIBUTING.md](../../../CONTRIBUTING.md).
-
-## Coordinated implementation packages
-
-Chris's October 3 instruction to implement the discussed work authorizes the coordinator to complete and review these packages in sequence, including parallel work in isolated task worktrees. This supersedes the earlier stop-for-review between packages for this implementation request. The [implementation contracts](spec.md#implementation-contracts--october-3-2026) state the coordinator's concrete defaults.
-
-### WP-002 — Company authentication
-
-Implement invitation enrollment, password/TOTP and user-verified passkeys, sessions, factor management, logout, and restricted recovery. Verify denied access before full authentication, invalid/expired/replayed factors, missing user verification, origin rejection, expiry/revocation, and recovery without direct application access. Keep secrets and mutable state outside Git/build outputs. Test with isolated accounts and stores; real-account enrollment remains a user interaction.
-
-### WP-003 — Durable chat service
-
-Integrate stock Pi Durable for independent user-scoped conversations, native entries, streaming snapshots, idempotent messages, Stop, history, and restart recovery. Verify cross-user/company denial, duplicate submission behavior, concurrent independent chats, stream disconnect/reconnect, early errors/Stop, process restart during a response, and exclusion of a second storage owner. Use controlled provider tests for repeatability and a separate real-provider smoke check.
-
-### WP-004 — Branded desktop/mobile workspace
-
-Implement the accepted shell, authentication screens, chat workflow, contextual agent/run views, and responsive panels with Dispatch assets and shared controls. Verify desktop and narrow-screen operation, keyboard/focus behavior, per-chat draft preservation, main/right context changes, native transcript rendering, and signed-out/reconnecting/stopped/error states against the real service.
-
-### WP-005 — Named agents and integrated qualification
-
-Add company-scoped agent creation/editing/archiving with immutable revisions and new-chat selection. Verify stale-edit conflicts, independent conversations, and unchanged existing chat configuration after definition edits. Integrate startup/build/check commands and operator documentation; verify npm/Nix checks, native recovery, browser workflows, and static plus service artifacts. Apply the behavior-preserving review, reconcile remote main, commit/push all task changes, and update maintained wiki evidence. Internal hosting and broader undefined capability workflows remain separate future work.
+Apple Silicon macOS is verified. The declared x86-64 Linux output is not yet built or deployment-qualified. Chris subsequently authorized coordinated implementation of the remaining discussed packages. This evidence predates the zero-tests rule below.
