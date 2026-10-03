@@ -1,18 +1,32 @@
 # Dispatch Web implementation handoff
 
-**Status: foundational requirements accepted; first product workflow pending.** No application implementation package is defined or approved yet.
+**Status: foundational and company access requirements accepted; authentication details and first implementation slice pending.** No application implementation package is defined or approved yet.
 
 [spec.md](spec.md) defines the package's agreed behavior and contracts. Implement the work packages recorded here in order. After each package, run its tests and the repository checks, record the results, and review with Chris before proceeding. Do not redesign later packages while implementing the current one.
 
 ## Decisions
 
 - Use stock upstream Pi Durable as the durable execution foundation.
+- Require company users to sign in with 2FA; support TOTP and passkeys.
+- Give all users equal initial application capabilities, with RBAC planned for later. See [company access](spec.md#company-access-and-authentication) for accepted scope and unresolved flows.
 - Use TypeScript throughout the application and support local development on M1 Air.
 - Use Nix for the development environment and builds, following the [accepted requirements](spec.md#language-and-development-requirements).
 - Keep this package's specifications, handoff, and usage documentation in `packages/web/docs/`.
 - Keep validation in each work package's acceptance criteria and in the package tests.
 
-The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains the decision history. The first workflow, application structure, and implementation contracts remain unresolved.
+The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains the decision history. The first agent-work workflow, final application structure, and detailed implementation contracts remain unresolved.
+
+## Authentication acceptance requirements
+
+When the authentication work package is agreed, include checks for:
+
+- Protected pages, direct API requests, and live subscriptions denying access without a fully authenticated session.
+- Successful TOTP and passkey login paths under the selected policy, with invalid, expired, replayed, cancelled, and incomplete attempts denied as applicable.
+- Passkey-only login, if selected, requiring and verifying user verification; a possession-only assertion must not grant access.
+- All initial users receiving the same capabilities within their authorized scope, while retaining separate identities and sessions.
+- Logout, session expiry/revocation, enrollment, and recovery matching their agreed contracts.
+
+Settle the login flow, account provisioning, enrollment/recovery, session policy, and company/workspace scope before implementing the affected behavior. No implementation package is scheduled by these requirements.
 
 ## Architecture proposal and review
 

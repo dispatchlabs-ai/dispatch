@@ -1,10 +1,10 @@
 # Dispatch Web specification
 
-**Status: partial specification.** The language and development/build requirements below are accepted. The first product workflow and implementation slice remain undecided; unresolved details are not accepted contracts.
+**Status: partial specification.** The language, development/build, and company access requirements below are accepted. The first agent-work workflow and implementation slice remain undecided; unresolved details are not accepted contracts.
 
 ## Product context
 
-Dispatch Web is the browser workspace for general-purpose client problem-solving with agents. It uses stock Pi Durable for durable execution and recovery. The maintained product account and previous decisions are linked from the [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/).
+Dispatch Web is a browser workspace for companies doing general-purpose client problem-solving with agents. It uses stock Pi Durable for durable execution and recovery. The maintained product account and previous decisions are linked from the [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/).
 
 ## Language and development requirements
 
@@ -22,6 +22,36 @@ Use [Mitchell Hashimoto's shared development/build approach](https://mitchellh.c
 
 The exact Node version, package manager, UI/server frameworks, deployment platforms, and artifact format remain to be chosen. Nix builds do not require adopting NixOS or Docker. Platform support must be validated explicitly; a macOS build does not establish Linux compatibility.
 
+## Company access and authentication
+
+**Accepted October 3, 2026.** Dispatch Web is a tool for companies. Access requires an authenticated user session with two-factor authentication (2FA). Support both time-based one-time passwords (TOTP) from authenticator apps and passkeys using WebAuthn/FIDO2.
+
+### Use case: sign in to the company workspace
+
+- **Actor and goal:** a company user signs in to use Dispatch Web.
+- **Entry:** opening the application or a link to protected application content without a valid authenticated session presents the login flow.
+- **Successful outcome:** after completing the required authentication, the user can access the application with the same initial capabilities as other users in their authorized scope.
+- **Incomplete or failed authentication:** do not grant access to protected data, application operations, or live subscriptions. Enforce the authenticated session on the service as well as in the UI; completing only the first step of a two-step flow is insufficient.
+- **Session end:** logout or expiry removes access through that session. Exact timeouts, reauthentication, revocation, and treatment of existing subscriptions must be defined before implementation.
+
+Support for both methods is required at the product level; whether users must enroll both methods is still open.
+
+### Login flow under discussion
+
+**Proposed, not yet accepted:** offer password plus TOTP, or a passkey with required device PIN/biometric user verification. In the passkey flow, the server must verify the WebAuthn user-verification result; possession or a touch-only assertion is not sufficient by itself to meet the two-factor requirement. A verified passkey can combine possession and local user verification in one interaction. The alternative under discussion is a password followed by either TOTP or a passkey.
+
+See [NIST's distinction between single-factor and multi-factor cryptographic authenticators](https://pages.nist.gov/800-63-4/sp800-63b/authenticators/) and [FIDO's passkey overview](https://fidoalliance.org/passkeys/). The choice of authentication library/provider, credential storage, and exact login/enrollment flow remains unresolved.
+
+### Equal access now; RBAC later
+
+All users initially have the same application capabilities; there are no differentiated application roles in the initial scope. Users still have individual identities and sessions. Future role-based access control (RBAC) must be possible through a consistent server-side authorization boundary, without changing how users are identified. Role definitions, assignment, and role-management UI are future work.
+
+Equal capabilities do not define which companies, workspaces, or resources a user can access. Company membership and isolation, including whether deployments serve one or multiple companies, remain to be specified independently of RBAC. No cross-company access is implied.
+
+### Open authentication workflows
+
+Before implementing authentication, specify account provisioning/invitations, enrollment and replacement of authenticators, lost-device/account recovery, required enrollment methods, and session policy. Recovery must not silently bypass the required authentication. Initial equal access also leaves user-management authority to be specified; do not invent an administrator role to fill that gap.
+
 ## Proposed web architecture
 
 **Status: proposal, discussed October 3, 2026.** This records the architecture recommendation and independent Claude Code review. Framework selection and detailed contracts remain open; this section does not approve an implementation package.
@@ -34,7 +64,7 @@ The recommendation favors consistent patterns for agents: typed and runtime-vali
 
 Next.js remains an alternative if later workflows justify server rendering. It is not inherently incompatible with Pi Durable; whichever web framework is used, durable execution must have an appropriate persistent owner.
 
-## First workflow and observable outcomes
+## First agent-work workflow and observable outcomes
 
 To be specified with Chris: the actor, goal, entry point, successful outcome, alternative paths, and initial scope.
 
