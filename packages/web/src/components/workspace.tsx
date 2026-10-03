@@ -262,6 +262,13 @@ export function Workspace() {
 
   function updateAgent(agent: AgentDefinition) { setAgents(current => [agent, ...current.filter(item => item.id !== agent.id)].sort((a, b) => a.name.localeCompare(b.name))); }
 
+  function finishAgentEdit(agent?: AgentDefinition) {
+    if (agent) { updateAgent(agent); setSelectedAgentId(agent.id); }
+    else void load();
+    setEditingAgent(null);
+    requestAnimationFrame(() => document.getElementById("main-workspace")?.focus());
+  }
+
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId) ?? agents.find(agent => agent.id === config?.defaultAgentId);
   const active: WorkspaceTab | { id: string; kind: "agents" | "security" } = section === "chats" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
   const snapshot = active.kind === "chat" ? snapshots[active.chatId] : undefined;
@@ -410,8 +417,8 @@ export function Workspace() {
           </div>
           {visited.agents ? <div className="workspace-section" hidden={section !== "agents"}>
             <AgentsPage agent={selectedAgent} editing={editingAgent} config={config} defaultAgent={agents.find(agent => agent.id === config.defaultAgentId)}
-              onSaved={agent => { updateAgent(agent); setSelectedAgentId(agent.id); setEditingAgent(null); }}
-              onCancel={() => { setEditingAgent(null); void load(); }} onEdit={setEditingAgent}
+              onSaved={finishAgentEdit}
+              onCancel={() => finishAgentEdit()} onEdit={setEditingAgent}
               onStartChat={agentId => void createChat(agentId)} creating={creating} />
           </div> : null}
           {visited.security ? <div className="workspace-section" hidden={section !== "security"}><SecurityPage /></div> : null}

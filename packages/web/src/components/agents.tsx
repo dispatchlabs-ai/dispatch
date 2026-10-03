@@ -76,7 +76,7 @@ export function AgentArchiveDialog({ agent, onClose, onSaved, onRefresh }: {
 export function AgentDetails({ agent, editing }: { agent?: AgentDefinition; editing: AgentEditing }) {
   const saved = editing && editing !== "new" ? editing : agent;
   return <div className="context-empty">
-    <header className="context-header"><h2>{editing ? "Saved configuration" : "Agent details"}</h2></header>
+    <header className="context-header"><h2>{editing && editing !== "new" ? "Saved configuration" : "Agent details"}</h2></header>
     <div className="context-body">
       {editing === "new" ? <p>This agent hasn’t been saved yet.</p> : saved ? <>
         <div className="context-title"><h2>{saved.name}</h2><span className="revision-badge">Revision {saved.revision}</span></div>
@@ -192,6 +192,7 @@ function AgentEditor({
           {(props) => (
             <Input
               {...props}
+              autoFocus
               value={draft.name}
               onChange={(event) => update("name", event.target.value)}
               required
