@@ -2,7 +2,7 @@
 
 **Reviewer:** Claude Code (independent of the implementing agents), at Chris's request.
 **Revision reviewed:** `main` at `d83f70d57ccd0d592faf8a61843e20424bfd9a85`.
-**Status:** review record, not a validation plan. Findings are inputs to later work packages; nothing here was fixed in application code.
+**Status:** historical review of `d83f70d`, followed by the [WP-006 resolution](#resolution--october-3-2026). Findings below describe the reviewed revision, not the subsequently updated implementation.
 
 The rules derived from these findings are in [spec.md § UI implementation rules](spec.md#ui-implementation-rules). Routine rules are applied; new security and product decisions remain marked **Proposed** there.
 
@@ -113,3 +113,21 @@ These are matters of taste, not requirements.
 - The sign-in page matches the brand. The inverse logo sits on navy, the primary logo on white, Inter is served locally, the hierarchy is clear, and the passkey and password paths are distinct (desktop and 1000 px screenshots).
 - Contextual-column ownership is sound. Supporting-tab selection is stored per main tab (`workspace.tsx:37,174`), snapshots are keyed by chat, and the active context derives from the active tab, which meets the "late updates for A" rule. Chat drafts and pending request IDs are lifted per chat and survive tab and layout changes.
 - The focus ring (`#267e9b`, 4.63:1 on white) and the rail's aqua focus outline (6.09:1 on navy) are visible. There is a skip link and reduced-motion handling, 16 px mobile inputs prevent iOS zoom, and Enter-to-send applies only with a fine pointer.
+
+## Resolution — October 3, 2026
+
+Chris subsequently authorized subagents to fix the findings. [WP-006](handoff.md#wp-006--resolve-the-uiux-review-findings) records scope and source/build/rendered evidence for the integrated source at `1e20c65`.
+
+| Findings | Resolution |
+| --- | --- |
+| V1–V3; G7–G9, G19, G22 | Shared token-based CSS, a `rem` type scale starting at 12 px, accessible source colour pairs, stronger selection/focus, consistent native controls, and 44 px primary phone targets. |
+| V4; G15 | Unobserved tabs use a neutral status; observed chat connection/reconnection status is scoped to the chat and problems appear in its content. |
+| V5; G2–G5; R1–R2 | Open panels retain form/scroll state; chat subscriptions follow the active tab. Unsaved tab closure asks before discarding. Tabs use manual activation, keyboard Delete, a single external close action, focus restoration, visible overflow, and current-location navigation markers. A later source review also fixed delayed send responses clearing newer identical drafts. |
+| G6, G10; R6 | Phone toolbar actions have labels, destinations have meaningful headings, and supporting views share a header with explicit empty states. |
+| G11–G14; R5 | Immutable saved agent names remain visible. Initial system setup is represented in context rather than interrupting the exchange; later native events retain distinct human-readable labels and technical disclosures. |
+| R3–R4, R7; G17 | Last-factor removal is disabled with its reason; new passkeys receive recognizable enrollment labels; new agent drafts use service model/thinking defaults. Unsupported conditional passkey-autofill markup was removed; explicit passkey sign-in remains. Existing enrolled credential names are preserved. |
+| G18, G20–G21 | Latest-message action sits in layout above the composer, affected JSX is formatted, and documentation distinguishes source/build evidence from unverified interaction behavior. |
+
+G1 and the in-place re-authentication/sign-out proposals in G16 remain explicitly **Proposed** in the specification. This package does not change session lifetime, draft retention through sign-out/expiry, or authentication policy. Optional preferences R8–R10 remain nonrequirements: repeated company/logo and sidebar tagline content was reduced and the clipped Description placeholder shortened; conversation-title generation and composer sizing are unchanged.
+
+The visual subagent found no actionable layout issue in the final desktop, intermediate, and six phone stills. This is visual/source evidence, not keyboard, touch, recovery, or authentication-flow qualification. No tests were run.

@@ -64,7 +64,7 @@ Each installation serves one company. Accounts have separate identities. Chats a
 
 ### Enrollment, recovery, and sessions
 
-An operator provisions an expiring, single-use invitation through the local CLI; there is no public registration or invented application administrator role. The invited user enrolls either a verified passkey or password plus TOTP. A restricted enrollment cookie cannot access chats, agent definitions, or live subscriptions.
+An operator provisions an expiring, single-use invitation through the local CLI; there is no public registration or invented application administrator role. The invited user enrolls either a verified passkey or password plus TOTP. Passkey enrollment asks for a recognizable credential name; earlier enrollment requests without that optional field retain the legacy label. A restricted enrollment cookie cannot access chats, agent definitions, or live subscriptions.
 
 Password/TOTP enrollment issues one-use recovery codes. Password plus a recovery code starts restricted re-enrollment and revokes existing sessions; it does not restore application access until a fresh factor is verified. An operator can issue a reset invitation after independently establishing account ownership, including for passkey-only accounts. Completing recovery replaces the old sign-in methods.
 
@@ -94,7 +94,7 @@ Support touch as well as pointer and keyboard operation. Required actions must n
 
 Changing viewport size, orientation, or visible workspace region must preserve the active work and unsent input. A responsive layout change must not itself submit, cancel, or restart work. The rule preventing stale supporting content or actions from appearing under a different main tab applies at every size.
 
-The implementation uses navigation panels below 1100 pixels and a contextual panel below 800 pixels, with the main work remaining reachable. Buttons, icon buttons, inputs, dialogs, and tabs use Base UI primitives. Selects, checkboxes, radios, and textareas are native elements styled per screen; see the [October 3 UI/UX review](ui-ux-review.md). Modern desktop/mobile browsers with WebAuthn are the target; real-device, virtual-keyboard, and browser-matrix qualification is deferred under the testing policy. Native apps, installation, and offline operation have not been specified.
+The implementation uses navigation panels below 1100 pixels and a contextual panel below 800 pixels, with the main work remaining reachable. Buttons, icon buttons, inputs, dialogs, and tabs use Base UI primitives. Selects, checkboxes, radios, and textareas are native elements using shared token-based control styles. See the [October 3 UI/UX review and resolution](ui-ux-review.md). Modern desktop/mobile browsers with WebAuthn are the target; real-device, virtual-keyboard, and browser-matrix qualification is deferred under the testing policy. Native apps, installation, and offline operation have not been specified.
 
 ## Workspace layout
 
@@ -205,7 +205,7 @@ Keep Pi's transcript and execution distinctions intact through the integration, 
 
 ### Feature sequence and broader scope
 
-After chat, add named agent definitions and the ability to start independent conversations from them. A reusable definition supplies configuration for new conversations; it is distinct from any one running conversation. The catalog, editor, versioning, and update policy are Dispatch features built on Pi's native configuration. Definitions are company-shared, versioned immutably, and copied into new conversations. Editing or archiving a definition never changes an existing conversation. Stale edits return a conflict; archived definitions cannot be used for new chats or silently restored by editing.
+After chat, add named agent definitions and the ability to start independent conversations from them. A reusable definition supplies configuration for new conversations; it is distinct from any one running conversation. The catalog, editor, versioning, and update policy are Dispatch features built on Pi's native configuration. Definitions are company-shared, versioned immutably, and copied into new conversations. Each conversation retains the name from its saved agent revision, including after later renaming or archiving. Editing or archiving a definition never changes an existing conversation. Stale edits return a conflict; archived definitions cannot be used for new chats or silently restored by editing.
 
 Continue adding Pi Durable capabilities in focused feature slices: tools and integrations, delegation and handoffs, background work, event- and schedule-triggered work, and the broader native configuration surface. These remain product goals. Their order after named definitions and their detailed workflows are unresolved; the [capability assessment](https://wiki.chrisreynolds.me/wiki/pi-durable-capabilities/) records the native foundations and application responsibilities.
 
