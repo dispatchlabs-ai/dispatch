@@ -22,17 +22,43 @@ Use [Mitchell Hashimoto's shared development/build approach](https://mitchellh.c
 
 The exact Node version, package manager, UI/server frameworks, deployment platforms, and artifact format remain to be chosen. Nix builds do not require adopting NixOS or Docker. Platform support must be validated explicitly; a macOS build does not establish Linux compatibility.
 
+## Proposed web architecture
+
+**Status: proposal, discussed October 3, 2026.** This records the architecture recommendation and independent Claude Code review. Framework selection and detailed contracts remain open; this section does not approve an implementation package.
+
+Use a React SPA with a persistent TypeScript/Node service hosting stock Pi Durable. The leading UI option is React Router framework mode with `ssr: false`, using Vite. React Router data mode with an explicit API/subscription client remains a viable simpler alternative. Framework mode offers route types, route-module conventions, and code splitting; it does not provide the live agent-state contract. See [React Router's modes](https://reactrouter.com/start/modes) and [SPA behavior](https://reactrouter.com/how-to/spa).
+
+The service can serve the built SPA and API on one origin. During local development, run the frontend development server separately from the Pi runtime and proxy application requests to the service. Frontend hot reload must not create another runtime owner or cancel agent work. Package/deployment boundaries remain undecided.
+
+The recommendation favors consistent patterns for agents: typed and runtime-validated API contracts, a standard route-module pattern, one live-state subscription layer, and repeatable browser acceptance checks. Routing-level loading and one-shot commands should use documented patterns; ongoing Pi state should flow through the subscription layer. Client caches are derived views, not independent durable sources of truth.
+
+Next.js remains an alternative if later workflows justify server rendering. It is not inherently incompatible with Pi Durable; whichever web framework is used, durable execution must have an appropriate persistent owner.
+
 ## First workflow and observable outcomes
 
 To be specified with Chris: the actor, goal, entry point, successful outcome, alternative paths, and initial scope.
 
 ## Contracts and state ownership
 
-To be specified: application interfaces, state ownership, native Pi Durable operations, configuration semantics, and the boundaries between the browser, application, and runtime.
+**Proposed boundaries:**
+
+- The browser owns presentation and temporary interaction state, such as panel selection and unsent input.
+- The application service owns authentication/authorization, request validation, transport, and application integration with Pi's public interfaces. Browser code does not receive server credentials or direct storage access.
+- Pi Durable owns durable conversation/task state, execution, and recovery. Application code should not recreate Pi's execution engine or maintain a competing durable conversation store.
+- Each Pi storage instance has one owning process. Development instances and tests use separate storage. The exact ownership enforcement and deployment arrangement remain unresolved; this is not a limit on concurrent agents within a runtime.
+
+Define request/response schemas and the mapping to native Pi operations for the first workflow. Share transport contracts across browser and service, with runtime validation at trust boundaries. Schema tooling, transport (for example SSE or WebSocket), public API shape, and configuration semantics remain undecided.
 
 ## Failure and recovery behavior
 
-To be specified for the chosen workflow, including observable failures, retries, interruption, and recovery.
+**Proposed observable requirements:**
+
+- Browser refresh, navigation, or disconnection stops observation only; admitted agent work continues under the service/runtime lifetime. Explicit user cancellation is a separate operation.
+- On initial connection or reconnection, restore the current committed Pi view and then apply subsequent updates through one subscription layer. Pi's watch APIs may coalesce updates and do not promise replay of missed events; do not assume a replay cursor or an exactly-once event feed. Define snapshot replacement and snapshot/update ordering before implementation.
+- A retry of the same logical submission reuses its request ID within the correct conversation and authorization scope. Distinct submissions receive distinct IDs. Native submission deduplication does not make external tool effects exactly once; effect-specific retry/reconciliation rules depend on the chosen workflow.
+- A service restart reopens storage, reinstalls the required implementations, and resumes work through Pi's public recovery interfaces. The browser can reconnect to the recovered state. Do not equate reopening storage alone with a completed recovery implementation.
+
+These proposals follow [Pi's public README](https://github.com/earendil-works/pi/blob/b60993bcc299c705731f0281e2b4d0db7c72188b/packages/durable/README.md) and the [maintained capability assessment](https://wiki.chrisreynolds.me/wiki/pi-durable-capabilities/). Verify the exact APIs against the dependency version chosen for implementation. Detailed error presentation, cancellation scope, authorization changes during observation, and external-effect recovery remain to be specified.
 
 ## Acceptance
 

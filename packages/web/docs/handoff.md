@@ -14,6 +14,21 @@
 
 The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains the decision history. The first workflow, application structure, and implementation contracts remain unresolved.
 
+## Architecture proposal and review
+
+The [proposed web architecture](spec.md#proposed-web-architecture) uses a React SPA and persistent TypeScript/Node Pi Durable service. React Router framework mode is the leading option; data mode remains open. The review emphasized that runtime ownership, a single live-state layer, and reconnection semantics matter more than router mode.
+
+When these contracts and the first workflow are agreed, include acceptance checks in the owning work package for:
+
+- Work continuing after browser disconnect, with a fresh committed view on reconnect.
+- Snapshot replacement and ordered updates, including a slow or interrupted subscriber.
+- Retrying one logical submission without admitting duplicate work, while preserving distinct submissions.
+- Service restart and Pi recovery, with browser reattachment to recovered state.
+- Frontend hot reload preserving the runtime owner, and development/test instances using separate storage.
+- Server-side authorization and request validation on commands and subscriptions.
+
+Choose the exact storage ownership mechanism, transport, schemas, and router mode before implementing the affected contracts. These are proposed acceptance areas, not completed checks or a scheduled implementation package.
+
 ## Work packages
 
 No implementation packages have been scheduled. After agreeing the first slice, add ordered entries containing:
