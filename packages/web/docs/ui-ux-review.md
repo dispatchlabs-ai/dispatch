@@ -17,7 +17,7 @@ The rules derived from these findings are in [spec.md § UI implementation rules
   They show one real, short default-agent conversation. They are kept locally under the gitignored `.local/ui-ux-review/2026-10-03/` and are not committed, because they show account details. I also captured the sign-in screen with headless Chrome at 1440×900 and 1000×800. That tool's own 390 px capture rendered wider than its window and is disregarded; the phone evidence above replaces it.
 - **What the stills cannot show:** they are single frames. They show nothing about keyboard behaviour, touch, focus order, screen-reader output, streaming (the "streaming" capture shows a completed reply), reconnection, recovery, session expiry, or virtual-keyboard behaviour. The desktop captures end partway through the 29 px bottom bar, so the desktop bottom bar is assessed from source and the phone captures only.
 - **Not observed:** enrollment, recovery, TOTP flows, error states, and the 800–1100 px intermediate layout. No account, credential, or setting was changed by this review. No tests, API smoke checks, or acceptance procedures were run, following the [testing policy](spec.md#testing-policy).
-- **Wiki:** `wiki.chrisreynolds.me` needs a login, and this session has no wiki connection. Wiki use cases and decision records beyond what the spec quotes were not read.
+- **Wiki:** Claude had no wiki connector and could not read the authenticated site directly. The coordinator read the repository wiki home and relevant prior decision evidence through the configured personal wiki connector, then reconciled this review against that product intent before publication.
 
 ## 1. Violations of existing accepted rules
 
