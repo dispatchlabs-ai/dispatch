@@ -11,7 +11,7 @@ import type { AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, RuntimeSco
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 
 const context = BACKGROUND_CONTEXT;
-type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision"> & { companyId: string; userId: string; requestId: string };
+type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision" | "agentName"> & { agentName?: string; companyId: string; userId: string; requestId: string };
 type StoredAgent = { [Key in keyof AgentDefinition]: AgentDefinition[Key] } & { companyId: string };
 type Catalog = { chats: StoredChat[]; agents: StoredAgent[]; runtimeInstance?: string };
 const CatalogDoc = defineDoc<Catalog>({
@@ -108,7 +108,7 @@ export class DispatchRuntime {
       const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
       await configure(tx, record.id, { model: { provider: agent.provider, modelId: agent.modelId }, instructions: agent.instructions, thinkingLevel: agent.thinkingLevel, extensions: [], tools: [] });
       const id = String(record.id);
-      catalog.chats.push({ id, title, createdAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
+      catalog.chats.push({ id, title, createdAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, agentName: agent.name, companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
       return id;
     }, context);
     return this.getChat(scope, id);
@@ -125,7 +125,13 @@ export class DispatchRuntime {
         const chat = catalog.chats.find((item) => item.id === id && owns(scope, item));
         if (!chat) throw new RuntimeError(404, "Conversation not found.");
         const submissions = await this.readSubmissions(conversation.id);
-        return { conversation: summary(chat, view.value, submissions, this.commitRevision), view: view.value, submissions };
+        // Older catalog records predate the saved name; named revisions remain in the catalog.
+        const agentName = chat.agentName ?? (chat.agentDefinitionId === "default"
+          ? "Dispatch"
+          : catalog.agents.find((agent) => agent.companyId === chat.companyId
+            && agent.id === chat.agentDefinitionId && agent.revision === chat.agentRevision)?.name
+            ?? "Saved agent");
+        return { conversation: summary(chat, agentName, view.value, submissions, this.commitRevision), view: view.value, submissions };
       }, context);
     } finally { view.dispose(); }
   }
@@ -286,7 +292,7 @@ function requireText(value: unknown, field: string, max: number, allowEmpty = fa
 function fingerprint(value: string) { return createHash("sha256").update(value).digest("hex"); }
 function requestConflict() { return new RuntimeError(409, "This request ID was already used with different content. Use a new request ID."); }
 
-function summary(chat: StoredChat, view: ConversationView, submissions: readonly SubmissionRecord[], revision: number): ChatSummary {
+function summary(chat: StoredChat, agentName: string, view: ConversationView, submissions: readonly SubmissionRecord[], revision: number): ChatSummary {
   const latest = submissions.filter((submission) => submission.type === "input" && (submission.status === "done" || submission.status === "unanswered")).at(-1);
   const live = view.docs["pi.live"] as LiveState | undefined;
   let status: ChatSummary["status"] = "idle";
@@ -301,5 +307,5 @@ function summary(chat: StoredChat, view: ConversationView, submissions: readonly
   const firstInput = messages.find((message) => message.role === "user");
   const firstText = firstInput?.role === "user" ? (typeof firstInput.content === "string" ? firstInput.content : firstInput.content.filter((part) => part.type === "text").map((part) => part.text).join(" ")) : "";
   const title = chat.title === "New conversation" && firstText ? firstText.slice(0, 80) : chat.title;
-  return { id: chat.id, title, createdAt: chat.createdAt, updatedAt: lastTimestamp, revision, agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, status, ...(error ? { error } : {}) };
+  return { id: chat.id, title, createdAt: chat.createdAt, updatedAt: lastTimestamp, revision, agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, agentName, status, ...(error ? { error } : {}) };
 }

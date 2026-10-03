@@ -16,6 +16,8 @@ export interface ChatSummary {
   updatedAt: number;
   agentDefinitionId: string;
   agentRevision: number;
+  /** Display name captured with the conversation's immutable agent revision. */
+  agentName: string;
   status: ChatStatus;
   error?: string;
 }
