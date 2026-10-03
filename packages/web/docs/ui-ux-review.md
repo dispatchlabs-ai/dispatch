@@ -4,14 +4,19 @@
 **Revision reviewed:** `main` at `d83f70d57ccd0d592faf8a61843e20424bfd9a85`.
 **Status:** review record, not a validation plan. Findings are inputs to later work packages; nothing here was fixed in application code.
 
-The proposed rules derived from these findings are in [spec.md § UI implementation rules](spec.md#ui-implementation-rules).
+The rules derived from these findings are in [spec.md § UI implementation rules](spec.md#ui-implementation-rules). Routine rules are applied; new security and product decisions remain marked **Proposed** there.
 
 ## Method and limitations
 
 - **Source review** of every browser component (`src/components/*.tsx`, `src/lib/*`, `src/root.tsx`) and `src/styles.css`, measured against the [spec](spec.md), [handoff](handoff.md), [AGENTS.md](../../../AGENTS.md), the workspace sketch, and the brand references the spec pins.
-- **Contrast ratios** were computed from the stylesheet's literal colors with the WCAG relative-luminance formula. This is arithmetic on source values, not a browser test.
-- **Visual inspection** covered only the unauthenticated sign-in screen, via headless Chrome screenshots at 1440×900 and 1000×800. The 390-pixel capture rendered wider than its window (a headless window-size limit), so it is **not** evidence about phone layout either way.
-- **Not observed:** the authenticated workspace, chat, agents, account/security, enrollment, recovery, and every narrow-screen panel. Findings about those screens come from source only. No account, credential, or enrollment was used or changed. No tests, API smoke checks, or acceptance procedures were run, following the [testing policy](spec.md#testing-policy).
+- **Contrast ratios** were computed from the stylesheet's literal colours with the WCAG relative-luminance formula. This is arithmetic on source values, not a browser test.
+- **Rendered screens.** The coordinator captured 13 still screenshots of the authenticated app after Chris enrolled a passkey:
+  - seven desktop captures at 1368×1131: Welcome, chat empty, chat with a reply (Agent and Run & usage tabs), Agents, the unsaved agent editor, and Account;
+  - six phone captures at 390×844, verified in-app viewport overrides: chat, the context drawer, the navigation drawer, Agents, the agent editor, and Account.
+
+  They show one real, short default-agent conversation. They are kept locally under the gitignored `.local/ui-ux-review/2026-10-03/` and are not committed, because they show account details. I also captured the sign-in screen with headless Chrome at 1440×900 and 1000×800. That tool's own 390 px capture rendered wider than its window and is disregarded; the phone evidence above replaces it.
+- **What the stills cannot show:** they are single frames. They show nothing about keyboard behaviour, touch, focus order, screen-reader output, streaming (the "streaming" capture shows a completed reply), reconnection, recovery, session expiry, or virtual-keyboard behaviour. The desktop captures end partway through the 29 px bottom bar, so the desktop bottom bar is assessed from source and the phone captures only.
+- **Not observed:** enrollment, recovery, TOTP flows, error states, and the 800–1100 px intermediate layout. No account, credential, or setting was changed by this review. No tests, API smoke checks, or acceptance procedures were run, following the [testing policy](spec.md#testing-policy).
 - **Wiki:** `wiki.chrisreynolds.me` needs a login, and this session has no wiki connection. Wiki use cases and decision records beyond what the spec quotes were not read.
 
 ## 1. Violations of existing accepted rules
@@ -20,13 +25,40 @@ Each item cites the accepted requirement it breaks.
 
 | # | Evidence | Observable consequence | Requirement |
 | --- | --- | --- | --- |
-| V1 | `styles.css` uses 9–11 px text across product chrome: `.workspace-status` 10 px (202), 9 px on mobile (405); composer hint 9 px (301, 416); `.status-badge` 9 px (254); `.revision-badge` 9 px (216); message time 9 px (267); page eyebrow 9 px (307). Many secondary colors fail 4.5:1. Composer hint `#8d99aa` is 2.89:1, message time `#91a0b1` 2.67:1, "Working on your response" / "Response stopped" `#7e8ba0` 3.45:1, privacy note 3.17:1, sidebar empty/footer 3.42:1, archived and section-empty notes ≈3.05:1, status badge 3.96:1, chat-heading model line 3.24:1. | Run status ("Stopped", "Responding"), connection state, timestamps, and guidance are hard to read, especially on phones, where status text shrinks to 9 px. | [Branding](spec.md#dispatch-branding): "Keep text, controls, status, and focus indicators readable and distinguishable." |
+| V1 | `styles.css` uses 9–11 px text across product chrome: `.workspace-status` 10 px (202), 9 px on mobile (405); composer hint 9 px (301, 416); `.status-badge` 9 px (254); `.revision-badge` 9 px (216); message time 9 px (267); page eyebrow 9 px (307). Many secondary colors fail 4.5:1. Composer hint `#8d99aa` is 2.89:1, message time `#91a0b1` 2.67:1, "Working on your response" / "Response stopped" `#7e8ba0` 3.45:1, privacy note 3.17:1, sidebar empty/footer 3.42:1, archived and section-empty notes ≈3.05:1, status badge 3.96:1, chat-heading model line 3.24:1. | Run status ("Stopped", "Responding"), connection state, timestamps, and guidance are hard to read, especially on phones, where status text shrinks to 9 px. **Rendered:** the "Ready" badges, the composer privacy line (wrapping to two tiny lines on the phone), the model line under chat titles, and the phone bottom bar are all visibly the smallest, faintest text on screen. | [Branding](spec.md#dispatch-branding): "Keep text, controls, status, and focus indicators readable and distinguishable." |
 | V2 | The active main tab is marked by an aqua underline (`#4dd5cf` on white, 1.79:1) and a white background against a `#fbfcfe` toolbar (1.03:1) (`styles.css:191`). The copy-message icon `#8a97a8` is 2.97:1 (274). | Which main tab is active depends mostly on a text-weight change, and the copy control falls below the 3:1 non-text minimum. | Same as V1 ("controls … distinguishable"). |
 | V3 | About 80 colour literals sit outside the token block (`styles.css` lines 26–442), for example `#eaf0f8`, `#f6f8fb`, `#7b879a`, `#b08032`, and `#91a0b1`. Only seven colours are tokens (`@theme`, lines 4–13), plus three ad-hoc `:root` variables. The referenced [Dispatch token file](https://github.com/dispatchlabs-ai/dispatch-web/blob/8ab0014bdd69c1585810cdb2099c5aa390843cd2/apps/web/src/styles/dispatch-tokens.css) defines a type scale starting at 12 px (`--text-xs`), plus spacing, radius, and status tokens. The implementation ignores that scale and replaces `--dispatch-success`/`--dispatch-danger` with undocumented darker values. | Grey tints drift from screen to screen. A palette or contrast fix needs edits on dozens of lines. Undocumented status colours make brand traceability impossible. | [Branding](spec.md#dispatch-branding): "Theme shared components through common design tokens … typography and other styling defined by the brand materials." |
-| V4 | The bottom bar shows "Workspace connected" whenever the active tab is not a chat (`workspace.tsx:214`: `connection || "connected"`). Nothing is observed for Welcome, Agents, or Account. | The status claims a connection that was never checked. During a service outage on the Agents tab, the bar still says "connected". | [Workspace layout](spec.md#workspace-layout): the bottom bar "shows … connection state." |
+| V4 | The bottom bar shows "Workspace connected" whenever the active tab is not a chat (`workspace.tsx:214`: `connection || "connected"`). Nothing is observed for Welcome, Agents, or Account. | The status claims a connection that was never checked. During a service outage on the Agents tab, the bar still says "connected". **Rendered:** the phone Agents and Account captures show "Workspace connected". | [Workspace layout](spec.md#workspace-layout): the bottom bar "shows … connection state." |
 | V5 | `SecurityPage` is not kept mounted (`workspace.tsx:207` keeps only `agents` mounted). Its typed password, passkey name, and in-progress authenticator replacement (`security.tsx:17–21`) are discarded when the user switches main tabs. | A user halfway through replacing their authenticator who checks a chat must start again. | [Desktop and mobile](spec.md#desktop-and-mobile-support): "Changing … visible workspace region must preserve the active work and unsent input"; [workspace layout](spec.md#use-case-switch-work-and-its-supporting-views): "Preserve … active work when changing layouts or main tabs." |
 
-## 2. Gaps where guidance should be sharper
+## 2. Rendered-layout findings
+
+These come from the authenticated captures, not from source alone. File names are the local captures.
+
+**Gaps that need sharper guidance**
+
+- **R1. On a phone the active main tab can be cut off.** With Agents and Account open, the active chat tab shows only "Give…" behind the New chat and supporting-view buttons (`chat-phone`, `agents-phone`, `account-phone`). Nothing indicates that the strip scrolls. Agents and Account open as persistent main tabs, so on a phone they take two of the roughly 2.5 visible tab slots ahead of actual work.
+- **R2. The phone navigation drawer doesn't mark the current destination.** Chats, Agents, and Account look identical (`navigation-phone`). The desktop rail does highlight the current destination.
+- **R3. Account offers "Remove" on the only passkey** (`account-desktop`, `account-phone`). The spec says the last complete sign-in method cannot be removed, so this action can only fail after the user commits to it.
+- **R4. The enrolled passkey is labelled "Passkey"** (`account-*`). Enrollment doesn't capture a recognizable name, so once a second passkey is added, the user can't tell which one to remove.
+- **R5. Setup appears as a transcript event.** "Conversation instructions updated" appears between the user's first message and the reply (`chat-streaming-desktop`, `chat-run-desktop`, `chat-phone`). The initial instructions are labelled as an *update* and interrupt the exchange, even though the Agent tab already shows them. This extends G13.
+- **R6. The right column has no consistent structure.** For a chat it starts with a tab row aligned with the main tab strip. For Agents and Account it starts with an icon tile and static copy, with no header row (`agents-desktop`, `account-desktop`). For Welcome it is blank (`workspace-desktop`). This confirms G14 visually.
+- **R7. A new agent defaults to the first catalogue model, not the service default.** The editor opens on "DeepSeek V4.1 Flash · fireworks" with Thinking "Off", while the default agent uses `gpt-6-astra`/`openai-codex` (`agent-editor-*`).
+
+**Visual confirmation of source findings:**
+- G6: the phone toolbar's menu, New chat, and supporting-view controls are unlabeled icons.
+- G10: the Agents page `<h1>` is "Made for the way you work.".
+- V1 and V4: confirmed as noted in the table above.
+
+G11 is not visible in these stills, because the default agent happens to be named "Dispatch", matching the hard-coded label.
+
+**Optional preferences**
+
+- **R8. Brand repetition.** One desktop screen shows the rail mark, the full sidebar logo with the company name "Dispatch" beneath it (reading "dispatch / Dispatch"), the Welcome or empty-chat mark, and the assistant avatar (`workspace-desktop`, `chat-*`). One logo plus the rail mark would be enough.
+- **R9. Chat header redundancy.** The header repeats the whole first message as the title, plus the raw model ID. On a phone this takes two lines directly above the same text in the first bubble (`chat-phone`).
+- **R10. Small phone details.** The composer spends about 150 px on an empty field plus a two-line privacy hint (`chat-phone`). The Description placeholder is truncated (`agent-editor-phone`).
+
+## 3. Gaps found in source
 
 These issues don't clearly break an accepted rule, but each one produced weaker UX that a sharper rule would have prevented.
 
@@ -67,7 +99,7 @@ These issues don't clearly break an accepted rule, but each one produced weaker 
 - **G21. One documentation claim is broader than the code.** The spec says "Keyboard focus and touch controls use shared primitives" (line 97, before this review). That holds for buttons, icon buttons, inputs, dialogs, and tabs, which use Base UI or its wrappers. It does not hold for selects, checkboxes, radios, textareas, or the conversation list buttons, which are native elements with per-screen styling (G22). The changelog's "shared Base UI controls" is accurate for the controls just listed, and its "brand acceptance checks" line describes a requirement, not a claim that checks were completed. Under the zero-tests policy, coverage claims need to say which controls they cover, and unchecked properties need to be labelled as unverified.
 - **G22. No shared-control styling policy.** Native semantic `<select>`, `<textarea>`, checkbox, radio, and `<button>` elements are appropriate in themselves, and `Tabs` imported directly from `@base-ui/react/tabs` (`workspace.tsx:1`, `context-panel.tsx:1`) is still Base UI. Earlier advice to ban direct primitive imports was a recommendation, not an accepted requirement. The proven problem is inconsistency. The Welcome agent `<select>` (`workspace.tsx:226`) is styled separately (`styles.css:247`: 12 px, `--color-border`) from form selects (`.field select`, `styles.css:66`: 14 px, `#ccd7e6`). Below 600 px only `.field` controls move to 16 px (`styles.css:354`). The Welcome select therefore stays at 12 px, which on iOS Safari causes a page zoom when focused, unlike the other selects. No rule says which controls must go through `src/components/ui` wrappers or shared control styles.
 
-## 3. Optional design preferences
+## 4. Optional design preferences from source
 
 These are matters of taste, not requirements.
 
@@ -77,6 +109,7 @@ These are matters of taste, not requirements.
 
 ## What works well
 
+- **Rendered:** the desktop layout matches the sketch: navy rail, conversation sidebar, tabbed main column, and a full-height right column with its own Agent and Run & usage tabs. Run & usage presents tokens and cost clearly. The phone context drawer is titled with the conversation and keeps the Agent and Run & usage tabs. Its close button is large. The phone navigation drawer exposes every destination plus New chat and search. No page-wide horizontal overflow appears in the six phone captures. Markdown replies render with comfortable size and spacing on both widths.
 - The sign-in page matches the brand. The inverse logo sits on navy, the primary logo on white, Inter is served locally, the hierarchy is clear, and the passkey and password paths are distinct (desktop and 1000 px screenshots).
 - Contextual-column ownership is sound. Supporting-tab selection is stored per main tab (`workspace.tsx:37,174`), snapshots are keyed by chat, and the active context derives from the active tab, which meets the "late updates for A" rule. Chat drafts and pending request IDs are lifted per chat and survive tab and layout changes.
 - The focus ring (`#267e9b`, 4.63:1 on white) and the rail's aqua focus outline (6.09:1 on navy) are visible. There is a skip link and reduced-motion handling, 16 px mobile inputs prevent iOS zoom, and Enter-to-send applies only with a fine pointer.

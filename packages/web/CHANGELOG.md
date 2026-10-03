@@ -12,7 +12,7 @@
 
 ### Documentation
 
-- Recorded an independent UI/UX review of `d83f70d` and proposed UI implementation rules covering tokens, readability, shared controls, workspace keyboard/touch behaviour, work preservation, and content hierarchy. The review found contrast, token, status, and state-preservation deviations, plus gaps in shared-control consistency and tab focus. Application code is unchanged.
+- Recorded an independent UI/UX review of `d83f70d`, using source plus authenticated desktop and phone captures, and adopted UI implementation rules covering tokens, readability, shared controls, workspace keyboard/touch behaviour, work preservation, actions and defaults, and content hierarchy. Retaining drafts through re-authentication and in-place identity re-checks remain proposed. The review found contrast, token, status, and state-preservation deviations, plus gaps in shared controls, tab focus and visibility, navigation state, and right-column structure. Application code is unchanged.
 
 ### Earlier foundation decisions
 

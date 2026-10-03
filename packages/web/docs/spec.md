@@ -128,11 +128,11 @@ Keep desktop columns in their own layout space, with scrolling contained to thei
 
 ## UI implementation rules
 
-**Proposed October 3, 2026, from the [UI/UX review](ui-ux-review.md); pending Chris's confirmation.** These rules make the accepted branding, desktop/mobile, and workspace requirements checkable by source review. Where a rule adds a new product decision, it says so.
+**Accepted October 3, 2026, from the [UI/UX review](ui-ux-review.md), under Chris's authorization to update the rules.** These rules make the accepted branding, desktop/mobile, and workspace requirements checkable by source review and rendered screens. Items marked **Proposed** are new security or product decisions that still need Chris's confirmation.
 
 ### Tokens and readability
 
-- Define every colour, font size, spacing value, radius, and shadow once as a token in the shared stylesheet. Component rules reference tokens only. Derive tints and status colours from the [brand token reference](#existing-brand-references), and record any deliberate departure (for example, a darker status colour chosen for contrast) beside the token.
+- Define reusable design values (colours, the type scale, the spacing scale, radii, shadows, and status colours) once as tokens in the shared stylesheet, and reference them from components. Derive tints and status colours from the [brand token reference](#existing-brand-references), and record any deliberate departure (for example, a darker status colour chosen for contrast) beside the token. One-off structural geometry, such as a column width or a breakpoint, does not need a token.
 - Text meets WCAG 2.2 AA contrast: 4.5:1, or 3:1 for large text. This includes status, timestamps, hints, and placeholder-adjacent guidance. Focus indicators, selected-state indicators, status dots, and icon-only controls meet 3:1 against every surface they appear on.
 - No text is smaller than the brand scale's smallest step (12 px). Express font sizes in `rem`, so that browser font-size settings as well as zoom enlarge text.
 - Show selection, status, and errors with more than colour or font weight alone.
@@ -145,7 +145,8 @@ Keep desktop columns in their own layout space, with scrolling contained to thei
 ### Workspace keyboard, touch, and status
 
 - Closing a main tab works from the keyboard without adding a Tab stop per tab, and tab-list semantics with close controls follow the WAI-ARIA Authoring Practices tabs pattern. When activating a tab mounts content or opens a subscription, focusing it must not activate it.
-- Rail and navigation destinations expose the current location with `aria-current`, not toggle semantics.
+- The active main tab stays fully visible: scroll it into view when it is activated or the layout changes. When tabs overflow, show that more are available.
+- Rail and navigation destinations, including those in the narrow-screen navigation panel, mark the current location visibly and with `aria-current`, not with toggle semantics.
 - Every icon-only control has an accessible name. Do not rely on `title` tooltips to explain an action. On touch-primary layouts, primary actions and the entry point to supporting views show a visible label or another visible cue.
 - Primary touch targets on narrow screens are at least 44×44 CSS px. No target is smaller than 24×24 CSS px.
 - Connection and run status reflect what is actually observed. Never show "connected" for something that is not being observed. Show the active main tab's reconnecting or error state inside that tab's content as well as in the bottom bar.
@@ -154,14 +155,21 @@ Keep desktop columns in their own layout space, with scrolling contained to thei
 
 - "Unsent input" covers every form in a main tab, not just chat drafts: agent editing, account/security flows, and search. Switching main tabs or layouts never discards it. Closing a tab that has unsaved input asks before discarding it.
 - Restoring a chat tab restores its transcript scroll position. Auto-scroll only when the reader was already at the latest content.
-- **New decision, pending:** warn before idle session expiry. After re-authentication as the same user, restore that user's open tabs and unsent drafts. Clear them on explicit sign-out or when a different user signs in. Re-confirm identity for sign-in-method changes in place, without a full sign-out. Ask for confirmation before sign-out discards unsent input.
+- **Proposed:** warn before idle session expiry. After re-authentication as the same user, restore that user's open tabs and unsent drafts. Clear them on explicit sign-out or when a different user signs in. Re-confirm identity for sign-in-method changes in place, without a full sign-out. Ask for confirmation before sign-out discards unsent input.
+
+### Actions and defaults
+
+- Do not offer an action the service will reject for a known state. For example, show removal of the last complete sign-in method as unavailable, with the reason.
+- Give credentials recognizable names when they are created, including at enrollment, so the user can tell them apart later.
+- New agent definitions start from the service's default model and thinking level, not the first catalogue entry.
 
 ### Hierarchy and content
 
 - Each main tab's `<h1>` names its destination or object, such as "Agents", "Account and security", or the conversation title. Taglines may appear only as secondary text.
 - Label the transcript and headers with the conversation's agent name from its saved revision. Keep that name after the definition is later edited. Show model and provider identifiers as supporting facts, not as the main label.
 - Translate native Pi records into human-readable labels and statuses in the main transcript. Show raw JSON or enum values only behind an explicitly labelled technical-details disclosure, while keeping the native distinctions the [chat workflow](#first-agent-work-workflow-and-observable-outcomes) requires.
-- A main tab with no specified supporting view shows a brief empty state in the full right column. Static help text is not a supporting view.
+- Label native setup entries for what they are. Initial agent instructions are setup, not an "update". They don't interrupt the user/agent exchange when the supporting view already shows them.
+- The right column has the same structure for every kind of main tab: a header row aligned with the main tab strip, then content. A main tab with no specified supporting view shows a brief empty state. Static help text is not a supporting view.
 
 ### Recording outcomes
 
