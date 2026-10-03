@@ -11,9 +11,9 @@ import type { AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, RuntimeSco
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 
 const context = BACKGROUND_CONTEXT;
-type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt"> & { companyId: string; userId: string; requestId: string };
+type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision"> & { companyId: string; userId: string; requestId: string };
 type StoredAgent = { [Key in keyof AgentDefinition]: AgentDefinition[Key] } & { companyId: string };
-type Catalog = { chats: StoredChat[]; agents: StoredAgent[] };
+type Catalog = { chats: StoredChat[]; agents: StoredAgent[]; runtimeInstance?: string };
 const CatalogDoc = defineDoc<Catalog>({
   kind: "dispatch.catalog", version: 1, scope: "session",
   initial: () => ({ chats: [], agents: [] }),
@@ -44,6 +44,7 @@ export class DispatchRuntime {
   private models: Models;
   private defaultAgent: AgentDefinition;
   private owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>;
+  private commitRevision = 0;
   private closed = false;
 
   private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, defaultAgent: AgentDefinition) {
@@ -52,6 +53,7 @@ export class DispatchRuntime {
     this.models = models;
     this.owner = owner;
     this.defaultAgent = defaultAgent;
+    harness.subscribeCommits((publication) => { this.commitRevision = publication.seq; });
   }
 
   static async open(options: RuntimeOptions) {
@@ -63,7 +65,6 @@ export class DispatchRuntime {
       storage = await openNodeSqliteStorage(filename);
       await chmod(filename, 0o600);
       const harness = await Harness.open(storage, { models, registry: createRegistry(), settings: options.settings }, context);
-      await harness.commit(async (tx) => { await tx.doc(CatalogDoc); }, context);
       const defaultAgent: AgentDefinition = {
         id: "default", name: "Dispatch", description: "General-purpose conversation assistant.",
         instructions: "You are Dispatch, a thoughtful assistant helping people solve problems. Be accurate, direct, and useful. Explain uncertainty and never claim to have performed actions you cannot perform.",
@@ -73,6 +74,8 @@ export class DispatchRuntime {
         createdAt: 1790985600000, updatedAt: 1790985600000,
       };
       const runtime = new DispatchRuntime(harness, storage, models, owner, defaultAgent);
+      // A real metadata commit seeds the persisted sequence on reopen before recovery can publish snapshots.
+      await harness.commit(async (tx) => { (await tx.doc(CatalogDoc)).runtimeInstance = randomUUID(); }, context);
       harness.resume();
       return runtime;
     } catch (error) {
@@ -122,7 +125,7 @@ export class DispatchRuntime {
         const chat = catalog.chats.find((item) => item.id === id && owns(scope, item));
         if (!chat) throw new RuntimeError(404, "Conversation not found.");
         const submissions = await this.readSubmissions(conversation.id);
-        return { conversation: summary(chat, view.value, submissions), view: view.value, submissions };
+        return { conversation: summary(chat, view.value, submissions, this.commitRevision), view: view.value, submissions };
       }, context);
     } finally { view.dispose(); }
   }
@@ -283,7 +286,7 @@ function requireText(value: unknown, field: string, max: number, allowEmpty = fa
 function fingerprint(value: string) { return createHash("sha256").update(value).digest("hex"); }
 function requestConflict() { return new RuntimeError(409, "This request ID was already used with different content. Use a new request ID."); }
 
-function summary(chat: StoredChat, view: ConversationView, submissions: readonly SubmissionRecord[]): ChatSummary {
+function summary(chat: StoredChat, view: ConversationView, submissions: readonly SubmissionRecord[], revision: number): ChatSummary {
   const latest = submissions.filter((submission) => submission.type === "input" && (submission.status === "done" || submission.status === "unanswered")).at(-1);
   const live = view.docs["pi.live"] as LiveState | undefined;
   let status: ChatSummary["status"] = "idle";
@@ -298,5 +301,5 @@ function summary(chat: StoredChat, view: ConversationView, submissions: readonly
   const firstInput = messages.find((message) => message.role === "user");
   const firstText = firstInput?.role === "user" ? (typeof firstInput.content === "string" ? firstInput.content : firstInput.content.filter((part) => part.type === "text").map((part) => part.text).join(" ")) : "";
   const title = chat.title === "New conversation" && firstText ? firstText.slice(0, 80) : chat.title;
-  return { id: chat.id, title, createdAt: chat.createdAt, updatedAt: lastTimestamp, agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, status, ...(error ? { error } : {}) };
+  return { id: chat.id, title, createdAt: chat.createdAt, updatedAt: lastTimestamp, revision, agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, status, ...(error ? { error } : {}) };
 }
