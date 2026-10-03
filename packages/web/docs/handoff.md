@@ -1,6 +1,6 @@
 # Dispatch Web implementation handoff
 
-**Status: foundational, company access, and workspace layout requirements accepted; authentication details and first implementation slice pending.** No application implementation package is defined or approved yet.
+**Status: foundational, company access, desktop/mobile support, and workspace layout requirements accepted; authentication details and first implementation slice pending.** No application implementation package is defined or approved yet.
 
 [spec.md](spec.md) defines the package's agreed behavior and contracts. Implement the work packages recorded here in order. After each package, run its tests and the repository checks, record the results, and review with Chris before proceeding. Do not redesign later packages while implementing the current one.
 
@@ -12,6 +12,7 @@
 - Use TypeScript throughout the application and support local development on M1 Air.
 - Use Nix for the development environment and builds, following the [accepted requirements](spec.md#language-and-development-requirements).
 - Adopt the [workspace layout](spec.md#workspace-layout), including a full right column with optional tabs subordinate to the active main tab.
+- Support [all user-facing functionality on desktop and mobile](spec.md#desktop-and-mobile-support) in each implementation slice, with presentation adapted to screen size and input method.
 - Keep this package's specifications, handoff, and usage documentation in `packages/web/docs/`.
 - Keep validation in each work package's acceptance criteria and in the package tests.
 
@@ -29,6 +30,19 @@ When the authentication work package is agreed, include checks for:
 
 Settle the login flow, account provisioning, enrollment/recovery, session policy, and company/workspace scope before implementing the affected behavior. No implementation package is scheduled by these requirements.
 
+## Desktop and mobile acceptance requirements
+
+Apply these requirements to every work package that adds or changes user-facing behavior:
+
+- Complete the affected workflows on desktop and mobile, including the agreed TOTP/passkey authentication flows when implemented.
+- Verify phone, tablet/intermediate, and desktop widths against the agreed browser/device matrix, using browser automation and representative real-device checks for touch, virtual keyboards, and platform authentication.
+- Reach navigation, main tabs, and every defined supporting view/action on narrow screens, while preserving the active main tab and its contextual relationship.
+- Verify touch operation without hover or precise dragging, plus keyboard navigation and focus handling when views open, close, or change context.
+- Check readable content, reachable controls, intended scrolling, orientation changes, text enlargement, and the mobile keyboard opening and closing.
+- Preserve active work and unsent input across layout changes. Switching main tabs while supporting views are hidden must not reveal stale content or action targets when reopened.
+
+Agree the mobile interaction design and browser/device matrix before implementing the affected package. These are acceptance requirements for future work, not completed browser checks.
+
 ## Workspace layout acceptance requirements
 
 When the workspace-shell work package is agreed, include checks for:
@@ -40,7 +54,7 @@ When the workspace-shell work package is agreed, include checks for:
 - Closing the active main tab selecting the correct remaining context or clearing the right context when none remains.
 - No invented right-column features or tabs when their purpose has not been specified.
 
-Define visibility/resizing, responsive behavior, keyboard interaction, scroll ownership, and supporting-tab persistence with the first affected workflow. This records acceptance requirements without scheduling implementation.
+Define visibility/resizing, exact responsive presentation, keyboard interaction, scroll ownership, and supporting-tab persistence with the first affected workflow, meeting the desktop/mobile acceptance requirements above. This records acceptance requirements without scheduling implementation.
 
 ## Architecture proposal and review
 

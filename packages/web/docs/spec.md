@@ -1,6 +1,6 @@
 # Dispatch Web specification
 
-**Status: partial specification.** The language, development/build, company access, and workspace layout requirements below are accepted. The first agent-work workflow and implementation slice remain undecided; unresolved details are not accepted contracts.
+**Status: partial specification.** The language, development/build, company access, desktop/mobile support, and workspace layout requirements below are accepted. The first agent-work workflow and implementation slice remain undecided; unresolved details are not accepted contracts.
 
 ## Product context
 
@@ -52,9 +52,21 @@ Equal capabilities do not define which companies, workspaces, or resources a use
 
 Before implementing authentication, specify account provisioning/invitations, enrollment and replacement of authenticators, lost-device/account recovery, required enrollment methods, and session policy. Recovery must not silently bypass the required authentication. Initial equal access also leaves user-management authority to be specified; do not invent an administrator role to fill that gap.
 
+## Desktop and mobile support
+
+**Accepted October 3, 2026.** All user-facing functionality must be usable in desktop and mobile browsers, including authentication, navigation, main work, supporting views, and future features. Each implementation slice must support both from the start. Adapt presentation and interaction to the available space and input method while preserving the user's capabilities.
+
+The desktop workspace uses the columns described below. On narrow screens, navigation, main content, and contextual supporting views may occupy separate surfaces rather than appearing simultaneously. Users must still be able to select main tabs and reach every defined supporting view and action. The supporting context always belongs to the active main tab, even when the main content and supporting view are not visible together.
+
+Support touch as well as pointer and keyboard operation. Required actions must not depend solely on hover, a keyboard shortcut, or precise dragging. Keep controls reachable and content readable with the mobile keyboard open, in either orientation, and when text is enlarged. Avoid unintended page-wide horizontal scrolling; content that intrinsically needs more width may have an explicit local scrolling surface.
+
+Changing viewport size, orientation, or visible workspace region must preserve the active work and unsent input. A responsive layout change must not itself submit, cancel, or restart work. The rule preventing stale supporting content or actions from appearing under a different main tab applies at every size.
+
+Exact breakpoints, mobile navigation and tab presentation, transitions between main and supporting views, and the supported browser/device matrix remain to be agreed before the affected implementation. Native apps, installation, and offline operation have not been specified.
+
 ## Workspace layout
 
-**Accepted October 3, 2026.** Use the supplied sketch as the basic desktop workspace layout, with the right side implemented as a full column that can have its own tabs. This layout decision is independent of the still-proposed frontend framework.
+**Accepted October 3, 2026.** Use the supplied sketch as the basic desktop workspace layout, with the right side implemented as a full column that can have its own tabs. Adapt its regions for [desktop and mobile support](#desktop-and-mobile-support); simultaneous columns are the desktop arrangement. This layout decision is independent of the still-proposed frontend framework.
 
 [![User-supplied workspace sketch showing a left rail, sidebar, main tabs/content, right region, and bottom bar](assets/workspace-layout-reference.jpg)](assets/workspace-layout-reference.jpg)
 
@@ -80,7 +92,7 @@ Keep the right region as a full layout column rather than implementing the deskt
 
 A signed-in user activates main tab A and sees its main content and any defined supporting views in the right column. Selecting another right-column tab keeps A active. Activating main tab B changes both the main content and the right column's supporting context to B. Late updates for A must not replace B's supporting content.
 
-Column widths, resizing, collapse/visibility behavior, narrow-screen layout, scroll ownership, keyboard interaction, and persistence of each main tab's selected supporting tab remain unresolved. No specific right-column tab names or features are accepted yet.
+Column widths, resizing, collapse/visibility behavior, exact mobile presentation, scroll ownership, keyboard interaction, and persistence of each main tab's selected supporting tab remain unresolved within the accepted desktop/mobile requirements. No specific right-column tab names or features are accepted yet.
 
 ## Proposed web architecture
 

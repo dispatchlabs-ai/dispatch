@@ -4,6 +4,8 @@
 
 ### Added
 
+- Required all user-facing functionality on desktop and mobile from each implementation slice, with adaptive workspace presentation, touch support, state preservation, and device acceptance checks. Exact mobile interactions remain open.
+
 - Recorded the supplied workspace layout and reference sketch, with a full tab-capable right column scoped to the active main tab and matching acceptance requirements.
 
 - Specified company login with mandatory 2FA, TOTP and passkey support, equal initial user capabilities, and future RBAC. Login composition, enrollment/recovery, and company scope remain open.
