@@ -126,3 +126,23 @@ Apple Silicon macOS is verified. The declared x86-64 Linux output is not yet bui
 ## Current repository state
 
 The frontend source, workspace manifests, package build configuration, and pinned Nix build are implemented. Test/example directories remain reserved. CI and release automation are unconfigured. Use the actual commands in the [usage guide](usage-guide.md) and [CONTRIBUTING.md](../../../CONTRIBUTING.md).
+
+## Coordinated implementation packages
+
+Chris's October 3 instruction to implement the discussed work authorizes the coordinator to complete and review these packages in sequence, including parallel work in isolated task worktrees. This supersedes the earlier stop-for-review between packages for this implementation request. The [implementation contracts](spec.md#implementation-contracts--october-3-2026) state the coordinator's concrete defaults.
+
+### WP-002 — Company authentication
+
+Implement invitation enrollment, password/TOTP and user-verified passkeys, sessions, factor management, logout, and restricted recovery. Verify denied access before full authentication, invalid/expired/replayed factors, missing user verification, origin rejection, expiry/revocation, and recovery without direct application access. Keep secrets and mutable state outside Git/build outputs. Test with isolated accounts and stores; real-account enrollment remains a user interaction.
+
+### WP-003 — Durable chat service
+
+Integrate stock Pi Durable for independent user-scoped conversations, native entries, streaming snapshots, idempotent messages, Stop, history, and restart recovery. Verify cross-user/company denial, duplicate submission behavior, concurrent independent chats, stream disconnect/reconnect, early errors/Stop, process restart during a response, and exclusion of a second storage owner. Use controlled provider tests for repeatability and a separate real-provider smoke check.
+
+### WP-004 — Branded desktop/mobile workspace
+
+Implement the accepted shell, authentication screens, chat workflow, contextual agent/run views, and responsive panels with Dispatch assets and shared controls. Verify desktop and narrow-screen operation, keyboard/focus behavior, per-chat draft preservation, main/right context changes, native transcript rendering, and signed-out/reconnecting/stopped/error states against the real service.
+
+### WP-005 — Named agents and integrated qualification
+
+Add company-scoped agent creation/editing/archiving with immutable revisions and new-chat selection. Verify stale-edit conflicts, independent conversations, and unchanged existing chat configuration after definition edits. Integrate startup/build/check commands and operator documentation; verify npm/Nix checks, native recovery, browser workflows, and static plus service artifacts. Apply the behavior-preserving review, reconcile remote main, commit/push all task changes, and update maintained wiki evidence. Internal hosting and broader undefined capability workflows remain separate future work.
