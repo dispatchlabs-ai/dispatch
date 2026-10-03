@@ -58,7 +58,7 @@ export function Workspace() {
     const list = tabList.current;
     if (!list) return;
     const reveal = () => {
-      list.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      list.querySelector<HTMLElement>('[aria-selected="true"]')?.parentElement?.scrollIntoView({ block: "nearest", inline: "nearest" });
       updateTabOverflow();
     };
     reveal();
@@ -178,7 +178,7 @@ export function Workspace() {
       setSearchParams(selected.kind === "chat" ? { chat: selected.chatId } : {}, { replace: true });
     }
     requestAnimationFrame(() => {
-      tabList.current?.querySelector<HTMLElement>(`[data-work-tab="${CSS.escape(focusId)}"]`)?.focus();
+      (tabList.current?.querySelector<HTMLElement>(`[data-work-tab="${CSS.escape(focusId)}"]`) ?? document.getElementById("main-workspace"))?.focus();
     });
   }
 
@@ -283,7 +283,7 @@ export function Workspace() {
     <aside className="workspace-sidebar" aria-label="Conversations">{sidebar}</aside>
     <Tabs.Root className="workspace-content" value={activeId} onValueChange={value => { const tab = tabs.find(tab => tab.id === value); if (tab) activate(tab); }}>
       <div className="main-column">
-        <header className="workspace-toolbar">
+        <header className={`workspace-toolbar ${tabs.length > 1 ? "has-tabs" : "single-view"}`}>
           <div className="mobile-navigation">
             <Modal title="Your workspace" description={config.company.name} side="left" open={navigationOpen} onOpenChange={setNavigationOpen} trigger={<Button variant="ghost" className="workspace-action">
               <Menu size={21} /> Menu</Button>}>
@@ -298,31 +298,37 @@ export function Workspace() {
                 <LogOut /> Sign out</Button>
             </Modal>
           </div>
-          <p id="tab-keyboard-help" className="sr-only">Use arrow keys to choose a tab, Enter to open it, and Delete to close it.</p>
-          <div className="tabs-strip">
-            {tabOverflow.before || tabOverflow.after ? <IconButton disabled={!tabOverflow.before} className="tab-scroll-button" label="Show earlier tabs" onClick={() => tabList.current?.scrollBy({ left: -200, behavior: "smooth" })}>
-              <ChevronLeft />
-            </IconButton> : null}
-            <Tabs.List ref={tabList} className="main-tabs" aria-label="Open work" aria-describedby="tab-keyboard-help" activateOnFocus={false} onScroll={updateTabOverflow}>
-              {tabs.map(tab => <Tabs.Tab key={tab.id} value={tab.id} data-work-tab={tab.id}
-                className={`main-tab ${tab.id === activeId ? "selected" : ""}`}
-                onKeyDown={event => {
-                  if (event.key === "Delete" && tab.kind !== "welcome") {
-                    event.preventDefault();
-                    requestCloseTab(tab.id);
-                  }
-                }}>
-                {tab.kind === "agents" ? <Bot size={15} /> : tab.kind === "security" ? <Settings2 size={15} /> : <MessageSquare size={14} />}
-                <span>{tab.kind === "chat" ? chats.find(chat => chat.id === tab.chatId)?.title || "Conversation" : tab.kind === "agents" ? "Agents" : tab.kind === "security" ? "Account" : "Workspace"}</span>
-              </Tabs.Tab>)}
-            </Tabs.List>
-            {tabOverflow.before || tabOverflow.after ? <IconButton disabled={!tabOverflow.after} className="tab-scroll-button" label="Show later tabs" onClick={() => tabList.current?.scrollBy({ left: 200, behavior: "smooth" })}>
-              <ChevronRight />
-            </IconButton> : null}
-          </div>
-          {active.kind !== "welcome" ? <IconButton label="Close current tab (Delete)" onClick={() => requestCloseTab(activeId)}>
-            <X size={18} />
-          </IconButton> : null}
+          {tabs.length > 1 ? <>
+            <p id="tab-keyboard-help" className="sr-only">Use arrow keys to choose a tab, Enter to open it, and Delete to close it.</p>
+            <div className="tabs-strip">
+              {tabOverflow.before || tabOverflow.after ? <IconButton disabled={!tabOverflow.before} className="tab-scroll-button" label="Show earlier tabs" onClick={() => tabList.current?.scrollBy({ left: -200, behavior: "smooth" })}>
+                <ChevronLeft />
+              </IconButton> : null}
+              <Tabs.List ref={tabList} className="main-tabs" aria-label="Open work" aria-describedby="tab-keyboard-help" activateOnFocus={false} onScroll={updateTabOverflow}>
+                {tabs.map(tab => {
+                  const title = tab.kind === "chat" ? chats.find(chat => chat.id === tab.chatId)?.title || "Conversation" : tab.kind === "agents" ? "Agents" : tab.kind === "security" ? "Account" : "Workspace";
+                  return <div key={tab.id} role="presentation" className={`main-tab-item ${tab.id === activeId ? "selected" : ""}`}>
+                    <Tabs.Tab value={tab.id} data-work-tab={tab.id} className="main-tab"
+                      onKeyDown={event => {
+                        if (event.key === "Delete" && tab.kind !== "welcome") {
+                          event.preventDefault();
+                          requestCloseTab(tab.id);
+                        }
+                      }}>
+                      {tab.kind === "agents" ? <Bot size={15} /> : tab.kind === "security" ? <Settings2 size={15} /> : <MessageSquare size={14} />}
+                      <span>{title}</span>
+                    </Tabs.Tab>
+                    {tab.kind !== "welcome" ? <IconButton className="tab-close" tabIndex={-1} label={`Close ${title} (Delete)`} onClick={() => requestCloseTab(tab.id)}>
+                      <X size={16} />
+                    </IconButton> : null}
+                  </div>;
+                })}
+              </Tabs.List>
+              {tabOverflow.before || tabOverflow.after ? <IconButton disabled={!tabOverflow.after} className="tab-scroll-button" label="Show later tabs" onClick={() => tabList.current?.scrollBy({ left: 200, behavior: "smooth" })}>
+                <ChevronRight />
+              </IconButton> : null}
+            </div>
+          </> : null}
           <Button variant="ghost" className="workspace-action" disabled={creating} onClick={() => void createChat()}>{creating ? <Spinner /> : <Plus size={18} />} New chat</Button>
           {active.kind !== "welcome" ? <div className="mobile-context">
             <Modal title={active.kind === "chat" ? "Conversation details" : "Details"} description={active.kind === "chat" ? snapshot?.conversation.title || "Active conversation" : "For your current tab"} side="right" open={contextOpen} onOpenChange={setContextOpen} trigger={<Button variant="ghost" className="workspace-action">
@@ -333,7 +339,7 @@ export function Workspace() {
           <Notice>{error}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat(createRequest.current?.agentDefinitionId)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}
         </div> : null}
         <main className="workspace-main" id="main-workspace" tabIndex={-1}>
-          {tabs.map(tab => <Tabs.Panel key={tab.id} value={tab.id} className="main-tab-panel" keepMounted>
+          {tabs.map(tab => <Tabs.Panel key={tab.id} value={tab.id} className="main-tab-panel" role={tabs.length === 1 ? "region" : "tabpanel"} aria-label={tabs.length === 1 ? "Workspace content" : undefined} keepMounted>
             {tab.kind === "chat" ? <ChatPanel
               active={tab.id === activeId}
               connection={connections[tab.chatId] || "connecting"}
@@ -370,7 +376,7 @@ export function Workspace() {
       <aside className="context-column" aria-label={active.kind === "chat" ? `Supporting views for ${snapshot?.conversation.title || "active conversation"}` : "Supporting view"}>{supporting}</aside>
     </Tabs.Root>
     <Modal title="Discard unsaved work?" description="Closing this tab discards its unsaved input. Saved work and any running response remain available."
-      finalFocus={() => tabList.current?.querySelector<HTMLElement>('[aria-selected="true"]') ?? null}
+      finalFocus={() => tabList.current?.querySelector<HTMLElement>('[aria-selected="true"]') ?? document.getElementById("main-workspace")}
       open={closingTab !== null} onOpenChange={open => { if (!open) setClosingTab(null); }}>
       <div className="button-row">
         <Button variant="secondary" onClick={() => setClosingTab(null)}>Keep tab open</Button>

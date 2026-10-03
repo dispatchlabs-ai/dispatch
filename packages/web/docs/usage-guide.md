@@ -60,6 +60,8 @@ Chats are private to the authenticated user in the installation's company. Open 
 
 Sessions last at most twelve hours and expire after thirty minutes without an authenticated request. Stream heartbeats do not extend idle expiry. Expiry or revocation ends protected access; agent work remains owned by the service.
 
+The main tab strip appears when multiple views are open. Close a view with the × on its tab, or focus the tab and press Delete. With one view open, the strip is hidden; workspace actions and the view’s supporting context stay available.
+
 ## Checks and builds
 
 Inside the Nix shell:

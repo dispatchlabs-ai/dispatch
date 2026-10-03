@@ -108,7 +108,7 @@ The sketch establishes the regions and their arrangement. Its sample icons, card
 | --- | --- |
 | Left rail | Narrow, far-left navigation rail. Its initial destinations are Chats, Agents, and Account. |
 | Sidebar | Navigation/list area beside the rail, distinct from the main content. Saved conversations remain available beside the main tabs. |
-| Main content column | Primary workspace with a tab strip across its top and the active main tab's content below. |
+| Main content column | Primary workspace with a tab strip when multiple views are open and the active view's content below. |
 | Right contextual column | Full column alongside the main tab strip and content, extending down to the bottom bar. It has its own content area and supports its own tabs. |
 | Bottom bar | Horizontal bar beneath the workspace columns. It shows the current company/session and connection state. |
 
@@ -144,6 +144,7 @@ Keep desktop columns in their own layout space, with scrolling contained to thei
 
 ### Workspace keyboard, touch, and status
 
+- Show the main tab strip only when more than one view is open. Each visible closable tab has its own close button inside the tab’s visual boundary; do not place a detached close button in the toolbar. The single-view toolbar retains its actions without an empty tab row. Closing down to one view preserves its content and moves keyboard focus to the main workspace.
 - Closing a main tab works from the keyboard without adding a Tab stop per tab, and tab-list semantics with close controls follow the WAI-ARIA Authoring Practices tabs pattern. When activating a tab mounts content or opens a subscription, focusing it must not activate it.
 - The active main tab stays fully visible: scroll it into view when it is activated or the layout changes. When tabs overflow, show that more are available.
 - Rail and navigation destinations, including those in the narrow-screen navigation panel, mark the current location visibly and with `aria-current`, not with toggle semantics.
