@@ -107,7 +107,7 @@ The sketch establishes the regions and their arrangement. Its sample icons, card
 | Region | Layout responsibility |
 | --- | --- |
 | Left rail | Narrow, far-left navigation rail. Its initial destinations are Chats, Agents, and Account. |
-| Sidebar | Navigation/list area beside the rail, distinct from the main content. It lists saved chats or agent definitions for the selected workspace section. |
+| Sidebar | Navigation/list area beside the rail, distinct from the main content. Saved conversations remain available beside the main tabs. |
 | Main content column | Primary workspace with a tab strip across its top and the active main tab's content below. |
 | Right contextual column | Full column alongside the main tab strip and content, extending down to the bottom bar. It has its own content area and supports its own tabs. |
 | Bottom bar | Horizontal bar beneath the workspace columns. It shows the current company/session and connection state. |

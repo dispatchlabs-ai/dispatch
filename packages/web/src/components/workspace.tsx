@@ -56,6 +56,20 @@ export function Workspace() {
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
+    const navigation = window.matchMedia("(max-width: 1100px)");
+    const context = window.matchMedia("(max-width: 800px)");
+    const closeWidePanels = () => {
+      if (!navigation.matches) setNavigationOpen(false);
+      if (!context.matches) setContextOpen(false);
+    };
+    navigation.addEventListener("change", closeWidePanels);
+    context.addEventListener("change", closeWidePanels);
+    return () => {
+      navigation.removeEventListener("change", closeWidePanels);
+      context.removeEventListener("change", closeWidePanels);
+    };
+  }, []);
+  useEffect(() => {
     const refresh = () => { if (document.visibilityState === "visible") void load(); };
     document.addEventListener("visibilitychange", refresh);
     return () => document.removeEventListener("visibilitychange", refresh);
@@ -72,7 +86,8 @@ export function Workspace() {
   }, [hasRunningChats, api]);
 
   const onSnapshot = useCallback((snapshot: ChatSnapshot) => {
-    setSnapshots(current => ({ ...current, [snapshot.conversation.id]: snapshot }));
+    setSnapshots(current => current[snapshot.conversation.id]?.conversation.revision > snapshot.conversation.revision
+      ? current : { ...current, [snapshot.conversation.id]: snapshot });
     setChats(current => mergeChat(current, snapshot.conversation));
   }, []);
   const onConnection = useCallback((chatId: string, connection: ConnectionState) => setConnections(current => ({ ...current, [chatId]: connection })), []);
@@ -131,7 +146,7 @@ export function Workspace() {
     setSendErrors(current => ({ ...current, [chatId]: undefined }));
     try {
       const snapshot = await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/messages`, command);
-      setChats(current => mergeChat(current, snapshot.conversation));
+      onSnapshot(snapshot);
       setPending(current => current[chatId]?.requestId === command.requestId ? { ...current, [chatId]: undefined } : current);
       setDrafts(current => current[chatId]?.trim() === command.text ? { ...current, [chatId]: "" } : current);
     } catch (error) {
@@ -190,7 +205,7 @@ export function Workspace() {
         {error ? <div className="workspace-notice"><Notice>{error}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat(createRequest.current?.agentDefinitionId)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}</div> : null}
         <main className="workspace-main" id="main-workspace" tabIndex={-1}>
           {tabs.map(tab => <Tabs.Panel key={tab.id} value={tab.id} className="main-tab-panel" keepMounted={tab.kind === "agents"}>
-            {tab.kind === "chat" ? <ChatPanel chatId={tab.chatId} snapshot={snapshots[tab.chatId]} draft={drafts[tab.chatId] || ""} pending={pending[tab.chatId]} sendError={sendErrors[tab.chatId]} providerReady={config.providerReady} onDraftChange={text => { setDrafts(current => ({ ...current, [tab.chatId]: text })); setSendErrors(current => ({ ...current, [tab.chatId]: undefined })); setPending(current => current[tab.chatId] && !current[tab.chatId]?.sending && current[tab.chatId]?.text !== text.trim() ? { ...current, [tab.chatId]: undefined } : current); }} onSend={() => void sendMessage(tab.chatId)} onSnapshot={onSnapshot} onConnection={onConnection} /> : tab.kind === "agents" ? <AgentsPage agents={agents} config={config} onSaved={updateAgent} onRefresh={load} onStartChat={agentId => void createChat(agentId)} creating={creating} /> : tab.kind === "security" ? <SecurityPage /> : <Welcome name={state.user.name} config={config} agents={agents} onCreate={agentId => void createChat(agentId)} creating={creating} />}
+            {tab.kind === "chat" ? <ChatPanel chatId={tab.chatId} snapshot={snapshots[tab.chatId]} draft={drafts[tab.chatId] || ""} pending={pending[tab.chatId]} sendError={sendErrors[tab.chatId]} onDraftChange={text => { setDrafts(current => ({ ...current, [tab.chatId]: text })); setSendErrors(current => ({ ...current, [tab.chatId]: undefined })); setPending(current => current[tab.chatId] && !current[tab.chatId]?.sending && current[tab.chatId]?.text !== text.trim() ? { ...current, [tab.chatId]: undefined } : current); }} onSend={() => void sendMessage(tab.chatId)} onSnapshot={onSnapshot} onConnection={onConnection} /> : tab.kind === "agents" ? <AgentsPage agents={agents} config={config} onSaved={updateAgent} onRefresh={load} onStartChat={agentId => void createChat(agentId)} creating={creating} /> : tab.kind === "security" ? <SecurityPage /> : <Welcome name={state.user.name} config={config} agents={agents} onCreate={agentId => void createChat(agentId)} creating={creating} />}
           </Tabs.Panel>)}
         </main>
       </div>
@@ -208,5 +223,5 @@ function ConversationSidebar({ chats, activeChatId, companyName, creating, onSel
 
 function Welcome({ name, config, agents, creating, onCreate }: { name: string; config: ApplicationConfig; agents: AgentDefinition[]; creating: boolean; onCreate: (agentId: string) => void }) {
   const [agentId, setAgentId] = useState(config.defaultAgentId);
-  return <section className="welcome-view"><div className="welcome-icon"><Brand compact /></div><span className="eyebrow">Hello, {name.split(" ")[0]}</span><h1>Where should we begin?</h1><p>A question, a plan, a problem to untangle.<br />Start a conversation and make some headway.</p><div className="welcome-actions"><label htmlFor="starting-agent">Start with</label><select id="starting-agent" value={agentId} onChange={event => setAgentId(event.target.value)}>{agents.filter(agent => !agent.archived).map(agent => <option value={agent.id} key={agent.id}>{agent.name}</option>)}</select><Button disabled={creating || !agentId} onClick={() => onCreate(agentId)}>{creating ? <Spinner /> : <Plus />} New chat</Button></div>{!config.providerReady ? <Notice tone="info">A model provider still needs to be connected before your agent can respond.</Notice> : null}<p className="welcome-footnote"><CircleHelp size={14} /> Each conversation starts fresh and keeps its own history.</p></section>;
+  return <section className="welcome-view"><div className="welcome-icon"><Brand compact /></div><span className="eyebrow">Hello, {name.split(" ")[0]}</span><h1>Where should we begin?</h1><p>A question, a plan, a problem to untangle.<br />Start a conversation and make some headway.</p><div className="welcome-actions"><label htmlFor="starting-agent">Start with</label><select id="starting-agent" value={agentId} onChange={event => setAgentId(event.target.value)}>{agents.filter(agent => !agent.archived).map(agent => <option value={agent.id} key={agent.id}>{agent.name}</option>)}</select><Button disabled={creating || !agentId} onClick={() => onCreate(agentId)}>{creating ? <Spinner /> : <Plus />} New chat</Button></div>{!config.providerReady ? <Notice tone="info">The default agent is not connected yet. Choose another configured agent or ask your operator to connect it.</Notice> : null}<p className="welcome-footnote"><CircleHelp size={14} /> Each conversation starts fresh and keeps its own history.</p></section>;
 }

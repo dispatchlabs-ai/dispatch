@@ -24,7 +24,7 @@ export function chatUsage(snapshot: ChatSnapshot): UsageState {
 
 export function mergeChat(chats: ChatSummary[], update: ChatSummary): ChatSummary[] {
   const existing = chats.find(chat => chat.id === update.id);
-  if (existing && existing.updatedAt > update.updatedAt) return chats;
+  if (existing && existing.revision > update.revision) return chats;
   return [update, ...chats.filter(chat => chat.id !== update.id)].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 

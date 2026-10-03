@@ -13,7 +13,6 @@ type AppOptions = {
   origin: string;
   configuration: () => Promise<ApplicationConfig>;
   clientDir?: string;
-  sessionCheckMs?: number;
 };
 const requestId = z.string().trim().min(1).max(200);
 const agentSchema = z.object({
@@ -65,7 +64,7 @@ export function createApp(options: AppOptions) {
   app.get("/api/chats/:id/events", async (c) => {
     const principal = c.get("principal");
     const watch = await runtime.watchChat(principal, c.req.param("id"));
-    return new Response(snapshotStream(watch, () => auth.isSessionValid(principal.sessionId), c.req.raw.signal, (listener) => auth.onRevocation(listener), options.sessionCheckMs), {
+    return new Response(snapshotStream(watch, () => auth.isSessionValid(principal.sessionId), c.req.raw.signal, (listener) => auth.onRevocation(listener)), {
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-store", "X-Accel-Buffering": "no" },
     });
   });
@@ -92,7 +91,7 @@ export function createApp(options: AppOptions) {
 type ChatWatch = Awaited<ReturnType<DispatchRuntime["watchChat"]>>;
 
 /** Each subscriber retains at most the latest complete snapshot under backpressure. */
-function snapshotStream(watch: ChatWatch, isValid: () => boolean, signal: AbortSignal, onRevocation: (listener: () => void) => () => void, interval = 15_000) {
+function snapshotStream(watch: ChatWatch, isValid: () => boolean, signal: AbortSignal, onRevocation: (listener: () => void) => () => void) {
   const encoder = new TextEncoder();
   let controller: ReadableStreamDefaultController<Uint8Array>;
   let pending: ChatSnapshot | undefined = watch.value;
@@ -127,7 +126,7 @@ function snapshotStream(watch: ChatWatch, isValid: () => boolean, signal: AbortS
         if (!valid()) return;
         if (pending) flush();
         else if ((controller.desiredSize ?? 0) > 0) controller.enqueue(encoder.encode(": heartbeat\n\n"));
-      }, interval);
+      }, 15_000);
       unsubscribe = onRevocation(() => { valid(); });
       signal.addEventListener("abort", close, { once: true });
       if (signal.aborted) { close(); return; }

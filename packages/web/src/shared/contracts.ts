@@ -9,6 +9,8 @@ export type ChatStatus = "idle" | "running" | "stopped" | "failed";
 
 export interface ChatSummary {
   id: string;
+  /** Native Pi commit sequence used to order all derived observations. */
+  revision: number;
   title: string;
   createdAt: number;
   updatedAt: number;

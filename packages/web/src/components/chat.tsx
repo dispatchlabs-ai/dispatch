@@ -16,15 +16,14 @@ interface ChatPanelProps {
   draft: string;
   pending?: PendingMessage;
   sendError?: string;
-  providerReady: boolean;
   onDraftChange: (text: string) => void;
   onSend: () => void;
   onSnapshot: (snapshot: ChatSnapshot) => void;
   onConnection: (chatId: string, state: ConnectionState) => void;
 }
 
-export function ChatPanel({ chatId, snapshot, draft, pending, sendError, providerReady, onDraftChange, onSend, onSnapshot, onConnection }: ChatPanelProps) {
-  const { api, auth, setState } = useSession();
+export function ChatPanel({ chatId, snapshot, draft, pending, sendError, onDraftChange, onSend, onSnapshot, onConnection }: ChatPanelProps) {
+  const { api, refreshSession } = useSession();
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [stopping, setStopping] = useState(false);
@@ -59,13 +58,13 @@ export function ChatPanel({ chatId, snapshot, draft, pending, sendError, provide
       });
       stream.addEventListener("session-ended", () => {
         stream?.close();
-        setState({ state: "signed_out" });
-        void auth("/api/auth/session").then(setState).catch(() => setState({ state: "signed_out" }));
+        if (!active) return;
+        void refreshSession().catch(() => {});
       });
       stream.onerror = () => {
         if (!active) return;
         onConnection(chatId, "reconnecting");
-        void auth("/api/auth/session").then(next => { if (active && next.state !== "authenticated") setState(next); }).catch(() => {});
+        void refreshSession().catch(() => {});
       };
     }).catch(error => {
       if (!active) return;
@@ -73,7 +72,7 @@ export function ChatPanel({ chatId, snapshot, draft, pending, sendError, provide
       onConnection(chatId, "error");
     });
     return () => { active = false; controller.abort(); stream?.close(); };
-  }, [chatId, attempt, api, auth, setState, onSnapshot, onConnection]);
+  }, [chatId, attempt, api, refreshSession, onSnapshot, onConnection]);
 
   useEffect(() => {
     if (atBottom.current && transcript.current) transcript.current.scrollTop = transcript.current.scrollHeight;
@@ -120,20 +119,19 @@ export function ChatPanel({ chatId, snapshot, draft, pending, sendError, provide
     </div>
     {showLatest ? <Button className="latest-button" variant="secondary" onClick={scrollToLatest}><ArrowDown /> Latest messages</Button> : null}
     <div className="composer-area">
-      {!providerReady ? <Notice tone="info">The model connection is not ready. Ask the workspace operator to configure a provider before sending messages.</Notice> : null}
       {pending?.error ? <Notice>{pending.error} Your message is kept here. Retry sends the same message once.</Notice> : sendError ? <Notice>{sendError}</Notice> : null}
       {stopError ? <Notice>{stopError}</Notice> : null}
       <form className="composer" onSubmit={event => { event.preventDefault(); scrollToLatest(); onSend(); }}>
         <label className="sr-only" htmlFor={`composer-${chatId}`}>Message your agent</label>
         <textarea ref={textarea} id={`composer-${chatId}`} value={draft} maxLength={100000} onChange={event => onDraftChange(event.target.value)} placeholder="Message your agent…" rows={2} readOnly={pending?.sending} disabled={!snapshot} onKeyDown={event => {
-          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && window.matchMedia("(pointer: fine)").matches) { event.preventDefault(); if (draft.trim() && !pending?.sending && providerReady) { scrollToLatest(); onSend(); } }
+          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && window.matchMedia("(pointer: fine)").matches) { event.preventDefault(); if (draft.trim() && !pending?.sending) { scrollToLatest(); onSend(); } }
         }} />
         <div className="composer-toolbar"><span>{pending?.sending ? "Sending…" : running ? "You can send another message while your agent works." : "Your conversations are private to you."}</span><div className="button-row">
           {running ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
             setStopping(true); setStopError(null);
-            void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/stop`, {}).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));
+            void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/stop`, {}).then(onSnapshot).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));
           }}>{stopping ? <Spinner /> : <Square />} Stop</Button> : null}
-          <Button type="submit" className="send-button" disabled={!draft.trim() || pending?.sending || !snapshot || !providerReady} aria-label={pending?.error ? "Retry sending message" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}</Button>
+          <Button type="submit" className="send-button" disabled={!draft.trim() || pending?.sending || !snapshot} aria-label={pending?.error ? "Retry sending message" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}</Button>
         </div></div>
       </form>
     </div>
