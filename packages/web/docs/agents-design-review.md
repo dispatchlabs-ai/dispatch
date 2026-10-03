@@ -4,7 +4,7 @@
 - **Reviewer:** Claude Code, independent design review requested by Chris through the coordinator.
 - **Source:** worktree `codex/agents-design-review` at baseline `ed9fcb8`.
 - **Screenshots:** the canonical checkout's ignored `.local/agents-design-review/2026-10-03/`. Each is cited below as `01`–`08`, with CSS viewports from `screenshots.json`.
-- **Status:** review only. Everything under "Proposed redesign" is a **proposal, not approved or implemented**. Nothing here changes the accepted [consistent collection screens](spec.md#consistent-collection-screens) rules or [WP-013](handoff.md#wp-013--agents-continuity-with-chats) unless Chris accepts it.
+- **Status:** this preserves the initial review of `ed9fcb8`. Chris subsequently authorized the corrections and a return to Claude for design approval; see [WP-014](handoff.md#wp-014--agents-design-corrections-and-claude-approval). The proposal labels below describe their status at the time of this review. The final approval record is appended separately.
 
 ## Verdict
 

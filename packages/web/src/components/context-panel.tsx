@@ -1,11 +1,12 @@
 import { Tabs } from "@base-ui/react/tabs";
 import { Bot, Gauge, LockKeyhole } from "lucide-react";
-import type { ChatSnapshot } from "../shared/contracts";
+import type { ApplicationConfig, ChatSnapshot } from "../shared/contracts";
 import { chatAgent, chatUsage, statusLabels } from "../lib/chat";
 
-export function ContextPanel({ kind, snapshot, tab, onTabChange }: {
+export function ContextPanel({ kind, snapshot, models, tab, onTabChange }: {
   kind: "chat" | "agents" | "security" | "welcome";
   snapshot?: ChatSnapshot;
+  models: ApplicationConfig["models"];
   tab: string;
   onTabChange: (tab: string) => void;
 }) {
@@ -18,6 +19,7 @@ export function ContextPanel({ kind, snapshot, tab, onTabChange }: {
     </div>
   </div>;
   const agent = chatAgent(snapshot);
+  const model = models.find(model => model.provider === agent.model?.provider && model.id === agent.model?.modelId);
   const thinking = agent.thinkingLevel;
   const thinkingLabel = thinking ? thinking[0].toUpperCase() + thinking.slice(1) : "Default";
   const usage = chatUsage(snapshot);
@@ -42,7 +44,7 @@ export function ContextPanel({ kind, snapshot, tab, onTabChange }: {
       <dl className="context-facts">
         <div>
           <dt>Model</dt>
-          <dd>{agent.model?.modelId || "Not configured"}</dd>
+          <dd>{model?.name || agent.model?.modelId || "Not configured"}</dd>
         </div>
         <div>
           <dt>Provider</dt>

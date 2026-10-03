@@ -6,7 +6,7 @@ import type { AgentDefinition, ApplicationConfig, ChatSnapshot, ChatSummary, Cre
 import { ApiError, errorMessage } from "../lib/api";
 import { mergeChat, type ConnectionState, type PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
-import { AgentArchiveDialog, AgentDetails, AgentsPage, type AgentEditing } from "./agents";
+import { AgentArchiveDialog, AgentDetails, AgentsPage, agentEditIsDirty, beginAgentEdit, type AgentEditing } from "./agents";
 import { AgentSidebar } from "./agent-sidebar";
 import { Brand } from "./brand";
 import { ChatPanel } from "./chat";
@@ -14,7 +14,7 @@ import { ConversationSidebar } from "./conversation-sidebar";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ContextPanel } from "./context-panel";
 import { SecurityPage } from "./security";
-import { Button, IconButton, Modal, Notice, Spinner } from "./ui";
+import { Button, IconButton, Modal, Notice, Select, Spinner } from "./ui";
 
 type WorkspaceTab = { id: string; kind: "chat"; chatId: string } | { id: string; kind: "welcome" };
 type WorkspaceSection = "chats" | "agents" | "security";
@@ -26,7 +26,8 @@ export function Workspace() {
   const [section, setSection] = useState<WorkspaceSection>("chats");
   const [visited, setVisited] = useState({ agents: false, security: false });
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [editingAgent, setEditingAgent] = useState<AgentEditing>(null);
+  const [editingAgent, setEditingAgent] = useState<AgentEditing | null>(null);
+  const [pendingAgentAction, setPendingAgentAction] = useState<(() => void) | null>(null);
   const [archivingAgent, setArchivingAgent] = useState<AgentDefinition | null>(null);
   const [agentSearch, setAgentSearch] = useState("");
   const [showArchivedAgents, setShowArchivedAgents] = useState(false);
@@ -262,6 +263,21 @@ export function Workspace() {
 
   function updateAgent(agent: AgentDefinition) { setAgents(current => [agent, ...current.filter(item => item.id !== agent.id)].sort((a, b) => a.name.localeCompare(b.name))); }
 
+  function requestAgentAction(action: () => void) {
+    if (editingAgent?.busy) return;
+    setNavigationOpen(false);
+    if (editingAgent && agentEditIsDirty(editingAgent)) setPendingAgentAction(() => action);
+    else action();
+  }
+
+  function editAgent(agent?: AgentDefinition) {
+    requestAgentAction(() => {
+      setEditingAgent(beginAgentEdit(agent, agents.find(item => item.id === config?.defaultAgentId)));
+      if (agent) setSelectedAgentId(agent.id);
+      else { setAgentSearch(""); setShowArchivedAgents(false); }
+    });
+  }
+
   function finishAgentEdit(agent?: AgentDefinition) {
     if (agent) { updateAgent(agent); setSelectedAgentId(agent.id); }
     else void load();
@@ -273,20 +289,20 @@ export function Workspace() {
   const active: WorkspaceTab | { id: string; kind: "agents" | "security" } = section === "chats" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
   const snapshot = active.kind === "chat" ? snapshots[active.chatId] : undefined;
   const connection = active.kind === "chat" ? connections[active.chatId] || "connecting" : null;
-  const supporting = section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} /> : <ContextPanel kind={active.kind} snapshot={snapshot} tab={supportTabs[active.id] || "agent"} onTabChange={tab => setSupportTabs(current => ({ ...current, [active.id]: tab }))} />;
+  const supporting = (inDrawer = false) => section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : <ContextPanel kind={active.kind} snapshot={snapshot} models={config?.models ?? []} tab={supportTabs[active.id] || "agent"} onTabChange={tab => setSupportTabs(current => ({ ...current, [active.id]: tab }))} />;
   const chatNav = () => selectSection("chats");
   const conversations = <ConversationSidebar chats={chats} activeChatId={active.kind === "chat" ? active.chatId : undefined} search={search} onSearchChange={setSearch} creating={creating} onSelect={chatId => activate({ id: `chat:${chatId}`, kind: "chat", chatId })} onCreate={() => void createChat()} onUpdate={async (id, input) => onSnapshot(await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(id)}/preferences`, input))} />;
   const sidebar = <>
     <div className="section-sidebar-panel" hidden={section !== "chats"}>{conversations}</div>
     <div className="section-sidebar-panel" hidden={section !== "agents"}>
       <AgentSidebar agents={agents} defaultAgentId={config?.defaultAgentId}
-        selectedAgentId={editingAgent && editingAgent !== "new" ? editingAgent.id : selectedAgent?.id}
-        editing={editingAgent === "new" ? "new" : !!editingAgent}
+        selectedAgentId={editingAgent?.saved?.id ?? selectedAgent?.id}
+        editing={editingAgent ? editingAgent.saved ? true : "new" : false} busy={editingAgent?.busy ?? false}
         search={agentSearch} onSearchChange={setAgentSearch} showArchived={showArchivedAgents} onShowArchivedChange={setShowArchivedAgents}
-        onCreate={() => { setEditingAgent("new"); setAgentSearch(""); setShowArchivedAgents(false); setNavigationOpen(false); }}
-        onSelect={id => { setSelectedAgentId(id); setNavigationOpen(false); }}
-        onEdit={agent => { setSelectedAgentId(agent.id); setEditingAgent(agent); setNavigationOpen(false); }}
-        onArchive={agent => { setArchivingAgent(agent); setNavigationOpen(false); }} />
+        onCreate={() => editAgent()}
+        onSelect={id => requestAgentAction(() => { setEditingAgent(null); setSelectedAgentId(id); })}
+        onEdit={editAgent}
+        onArchive={agent => requestAgentAction(() => { setEditingAgent(null); setArchivingAgent(agent); })} />
     </div>
     {section === "security" ? <div className="section-sidebar">
       <h2>Account</h2>
@@ -312,7 +328,7 @@ export function Workspace() {
     <Button variant="ghost" onClick={() => void signOut()}>Sign out</Button>
   </main>;
 
-  return <div className={`workspace ${sidebarVisible ? "" : "sidebar-hidden"} ${detailsVisible ? "" : "details-hidden"}`}
+  return <div className={`workspace ${section === "agents" && editingAgent ? "agent-editing" : ""} ${sidebarVisible ? "" : "sidebar-hidden"} ${detailsVisible ? "" : "details-hidden"}`}
     style={{ "--sidebar-width": `${sidebarVisible ? sidebarWidth : 0}px`, "--details-width": `${detailsVisible ? detailsWidth : 0}px` } as CSSProperties}>
     <a className="skip-link" href="#main-workspace">Skip to main content</a>
     <nav className="workspace-rail" aria-label="Workspace navigation">
@@ -416,9 +432,9 @@ export function Workspace() {
           </Tabs.Panel>)}
           </div>
           {visited.agents ? <div className="workspace-section" hidden={section !== "agents"}>
-            <AgentsPage agent={selectedAgent} editing={editingAgent} config={config} defaultAgent={agents.find(agent => agent.id === config.defaultAgentId)}
+            <AgentsPage agent={selectedAgent} editing={editingAgent} config={config} onEditingChange={setEditingAgent}
               onSaved={finishAgentEdit}
-              onCancel={() => finishAgentEdit()} onEdit={setEditingAgent}
+              onCancel={() => requestAgentAction(() => finishAgentEdit())} onEdit={editAgent}
               onStartChat={agentId => void createChat(agentId)} creating={creating} />
           </div> : null}
           {visited.security ? <div className="workspace-section" hidden={section !== "security"}><SecurityPage /></div> : null}
@@ -426,9 +442,17 @@ export function Workspace() {
       </div>
       <aside className="context-column" id="details-column" aria-label={active.kind === "chat" ? `Supporting views for ${snapshot?.conversation.title || "active conversation"}` : section === "agents" ? "Agent supporting view" : "Supporting view"}>
         <ColumnResizeHandle side="right" controls="details-column" width={detailsWidth} min={240} max={detailsMax} onResize={setDetailsWidth} />
-        <div className="context-column-content">{supporting}</div>
+        <div className="context-column-content">{supporting()}</div>
       </aside>
     </Tabs.Root>
+    <Modal title="Discard agent changes?" description="Your unsaved changes will be lost."
+      open={pendingAgentAction !== null} onOpenChange={open => { if (!open) setPendingAgentAction(null); }}
+      finalFocus={() => document.getElementById("main-workspace")}>
+      <div className="button-row">
+        <Button variant="secondary" onClick={() => setPendingAgentAction(null)}>Keep editing</Button>
+        <Button variant="danger" onClick={() => { pendingAgentAction?.(); setPendingAgentAction(null); }}>Discard changes</Button>
+      </div>
+    </Modal>
     {archivingAgent ? <AgentArchiveDialog key={archivingAgent.id} agent={archivingAgent} onClose={() => setArchivingAgent(null)} onSaved={updateAgent} onRefresh={load} /> : null}
     <Modal title="Discard unsaved work?" description="Closing this tab discards its unsaved input. Saved work and any running response remain available."
       finalFocus={() => tabList.current?.querySelector<HTMLElement>('[aria-selected="true"]') ?? document.getElementById("main-workspace")}
@@ -455,8 +479,8 @@ export function Workspace() {
           </Modal>
         </div>
         {active.kind !== "welcome" ? <div className="mobile-context">
-          <Modal title={active.kind === "chat" ? "Conversation details" : section === "agents" ? "Agent details" : "Details"} description={active.kind === "chat" ? snapshot?.conversation.title || "Active conversation" : "For your current view"} side="right" open={contextOpen} onOpenChange={setContextOpen} trigger={<Button variant="ghost" className="workspace-action">
-            <PanelRight size={19} /> Details</Button>}>{supporting}</Modal>
+          <Modal title={active.kind === "chat" ? "Conversation details" : section === "agents" ? editingAgent ? "Draft preview" : "Agent details" : "Details"} description={active.kind === "chat" ? snapshot?.conversation.title || "Active conversation" : section === "agents" ? undefined : "For your current view"} side="right" open={contextOpen} onOpenChange={setContextOpen} trigger={<Button variant="ghost" className="workspace-action">
+            <PanelRight size={19} /> Details</Button>}>{supporting(true)}</Modal>
         </div> : null}
       </div>
       <span className={`connection-status connection-${connection || "unobserved"}`} role="status">
@@ -477,8 +501,8 @@ function Welcome({ name, config, agents, agentId, onAgentChange, creating, onCre
     <p>A question, a plan, a problem to untangle.<br />Start a conversation and make some headway.</p>
     <div className="welcome-actions">
       <label htmlFor="starting-agent">Start with</label>
-      <select className="control-select" id="starting-agent" value={agentId} onChange={event => onAgentChange(event.target.value)}>{agents.filter(agent => !agent.archived).map(agent => <option value={agent.id} key={agent.id}>{agent.name}</option>)}
-      </select>
+      <Select className="control-select" id="starting-agent" value={agentId} onChange={event => onAgentChange(event.target.value)}>{agents.filter(agent => !agent.archived).map(agent => <option value={agent.id} key={agent.id}>{agent.name}</option>)}
+      </Select>
       <Button disabled={creating || !agentId} onClick={() => onCreate(agentId)}>{creating ? <Spinner /> : <Plus />} New chat</Button>
     </div>{!config.providerReady ? <Notice tone="info">The default agent is not connected yet. Choose another configured agent or ask your operator to connect it.</Notice> : null}
     <p className="welcome-footnote">

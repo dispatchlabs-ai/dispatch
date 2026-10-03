@@ -1,7 +1,7 @@
 import { Button as BaseButton } from "@base-ui/react/button";
 import { Dialog } from "@base-ui/react/dialog";
 import { Input as BaseInput } from "@base-ui/react/input";
-import { LoaderCircle, X } from "lucide-react";
+import { ChevronDown, LoaderCircle, X } from "lucide-react";
 import { useId, type ComponentProps, type ReactElement, type ReactNode } from "react";
 
 export function Button({ variant = "primary", className = "", children, ...props }: ComponentProps<typeof BaseButton> & {
@@ -18,6 +18,10 @@ export function IconButton({ label, children, className = "", ...props }: Compon
 
 export const Input = BaseInput;
 
+export function Select(props: ComponentProps<"select">) {
+  return <span className="select-control"><select {...props} /><ChevronDown size={16} strokeWidth={1.5} aria-hidden="true" /></span>;
+}
+
 export function Spinner({ label = "Loading" }: { label?: string }) {
   return <span className="spinner" role="status"><LoaderCircle aria-hidden="true" /><span className="sr-only">{label}</span></span>;
 }
@@ -26,25 +30,27 @@ export function Notice({ children, tone = "error" }: { children: ReactNode; tone
   return <div className={`notice notice-${tone}`} role={tone === "error" ? "alert" : "status"}>{children}</div>;
 }
 
-export function Field({ label, children, hint, error }: {
+export function Field({ label, children, hint, error, hintPosition = "after" }: {
   label: string;
   children: (props: { id: string; "aria-describedby"?: string; "aria-invalid"?: true }) => ReactNode;
   hint?: string;
+  hintPosition?: "before" | "after";
   error?: string;
 }) {
   const id = useId();
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
+      {hint && !error && hintPosition === "before" ? <p id={`${id}-description`} className="field-hint">{hint}</p> : null}
       {children({ id, "aria-describedby": error || hint ? `${id}-description` : undefined, "aria-invalid": error ? true : undefined })}
-      {error || hint ? <p id={`${id}-description`} className={error ? "field-error" : "field-hint"}>{error || hint}</p> : null}
+      {error || (hint && hintPosition === "after") ? <p id={`${id}-description`} className={error ? "field-error" : "field-hint"}>{error || hint}</p> : null}
     </div>
   );
 }
 
 export function Modal({ title, description, children, trigger, open, onOpenChange, side, finalFocus }: {
   title: string;
-  description: string;
+  description?: string;
   children: ReactNode;
   trigger?: ReactElement;
   open: boolean;
@@ -61,7 +67,7 @@ export function Modal({ title, description, children, trigger, open, onOpenChang
           <header className="dialog-heading">
             <div>
               <Dialog.Title>{title}</Dialog.Title>
-              <Dialog.Description>{description}</Dialog.Description>
+              {description ? <Dialog.Description>{description}</Dialog.Description> : null}
             </div>
             <Dialog.Close render={<IconButton label="Close"><X size={20} /></IconButton>} />
           </header>

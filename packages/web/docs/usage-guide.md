@@ -50,7 +50,7 @@ The default agent is chat-only and has no tools. The Agents section creates comp
 
 In Agents, New agent is at the top of the sidebar, followed by Find an agent and the saved-agent list. Select an agent to read its description and instructions; the right column shows its saved configuration. Start chat opens a conversation using that revision. Hover or focus a custom agent's row for Edit/Archive; touch layouts keep the actions visible. Archived agents is at the bottom of the sidebar and supports inspection, not restoration. The default agent remains operator-managed.
 
-New agent opens an editor with the service's model/thinking defaults. Save or cancel it before selecting another agent. Switching to Chats or Account, hiding a column, or changing screen size preserves the open editor. The right column identifies saved configuration while editing and clears the previous agent when creating a new one.
+New agent opens an editor with the service's model/thinking defaults. Fill in Identity, Instructions, and Model; Cancel and Create agent/Save new revision stay below the scrolling form. The right column previews the unsaved draft and distinguishes changes from the saved revision for existing agents. Choosing another agent or starting a new edit asks before discarding unsaved changes. Switching to Chats or Account, hiding a column, or changing screen size preserves the open editor. On phones, Start chat fills its row and the agent view includes a short model/thinking/tools summary; Details exposes the full configuration.
 
 ## Chat and workspace
 
