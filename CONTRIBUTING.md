@@ -9,8 +9,8 @@ Dispatch Web is at the specification stage. There is no runnable application, de
 | Root `README.md` | Project overview and package links |
 | Root `AGENTS.md` | Concise repository-wide agent instructions |
 | Root `CONTRIBUTING.md` | Shared development and contribution workflow |
-| `.pi/prompts/` | Reusable development prompts, when needed |
-| `.pi/skills/` | Reusable development procedures, when needed |
+| `.pi/prompts/` | Reusable development prompts listed below |
+| `.pi/skills/` | Focused browser-testing and release procedures |
 | `packages/<package>/README.md` | Package purpose, usage, and documentation links |
 | `packages/<package>/CHANGELOG.md` | Package changes and release history |
 | `packages/<package>/docs/spec.md` | Intended behavior, contracts, and explicit unresolved questions |
@@ -34,6 +34,28 @@ Language-specific manifests and build configuration belong beside the relevant p
 The reference is [Pi Durable's Pico5 handoff](https://github.com/earendil-works/pi/blob/v1.0.0/packages/durable/docs/pico-v5-handoff.md). This repository will define its own real check commands as tooling is introduced.
 
 The wiki maintains product intent and decision history. Package documents define implementation contracts and execution steps linked to those decisions. Keep both current when an authorized change affects them.
+
+## Agent workflows
+
+These prompts adapt [Pi's development workflow](https://github.com/earendil-works/pi/tree/4c6fb7cfe8c538a668726f6f8b3554098c39faee/.pi) to Dispatch Web. They follow this repository's package contracts, worktree/publication policy, and available checks. They do not assume Pi's npm commands, release versioning, GitHub labels, or terminal UI.
+
+In Pi, launch from the repository or task-worktree root and grant project trust to load `.pi/` resources. Invoke a prompt by its filename, such as `/deslop` or `/is <issue-url>`; use `/reload` after changing templates in an active session. Other agents should read and follow the linked Markdown directly; these files are not automatically registered as commands in every client.
+
+| Prompt | Use it for |
+| --- | --- |
+| [/deslop](.pi/prompts/deslop.md) | Simplify a completed work package while preserving its intended behavior |
+| [/is](.pi/prompts/is.md) | Investigate an issue and propose a verified implementation approach |
+| [/pr](.pi/prompts/pr.md) | Review a PR against code, contracts, acceptance criteria, tests, and documentation |
+| [/wr](.pi/prompts/wr.md) | Finish the current task through checks, documentation, commit, and verified publication |
+| [/cl](.pi/prompts/cl.md) | Audit package changelogs against the relevant commit history |
+| [/sa](.pi/prompts/sa.md) | Prepare an evidence-based security advisory draft |
+
+Load these longer procedures only when their task applies:
+
+- [Interactive testing](.pi/skills/interactive-testing.md): verify specified browser workflows and observable outcomes once a runnable application exists.
+- [Release](.pi/skills/release.md): establish the actual release target and commands, validate the candidate, and verify an authorized publication. Release tooling is currently unconfigured.
+
+Use `/deslop` after implementing a work package, then rerun affected checks before `/wr`. `/is` and `/pr` are investigation/review tasks; neither authorizes implementation or external messages. `/wr` follows the Git publication policy below, but does not itself authorize GitHub comments, issue-state changes, a deployment, or starting the next work package.
 
 ## Checks and publication
 
