@@ -33,6 +33,8 @@ export function Workspace() {
   const [connections, setConnections] = useState<Record<string, ConnectionState>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<Record<string, PendingMessage | undefined>>({});
+  const draftVersions = useRef<Record<string, number>>({});
+  const messageRequests = useRef<Record<string, { requestId: string; draftVersion: number } | undefined>>({});
   const [sendErrors, setSendErrors] = useState<Record<string, string | undefined>>({});
   const [supportTabs, setSupportTabs] = useState<Record<string, string>>({});
   const [navigationOpen, setNavigationOpen] = useState(false);
@@ -117,14 +119,25 @@ export function Workspace() {
   }, []);
   const onConnection = useCallback((chatId: string, connection: ConnectionState) => setConnections(current => ({ ...current, [chatId]: connection })), []);
 
+  const settleMessage = useCallback((chatId: string, requestId: string) => {
+    const request = messageRequests.current[chatId];
+    if (request?.requestId !== requestId) return;
+    messageRequests.current[chatId] = undefined;
+    setPending(current => current[chatId]?.requestId === requestId ? { ...current, [chatId]: undefined } : current);
+    // A later draft can have identical text; only the submitted edit may be cleared.
+    if ((draftVersions.current[chatId] ?? 0) === request.draftVersion) {
+      setDrafts(current => ({ ...current, [chatId]: "" }));
+    }
+    setSendErrors(current => ({ ...current, [chatId]: undefined }));
+  }, []);
+
   useEffect(() => {
     for (const [chatId, message] of Object.entries(pending)) {
-      if (!message || !snapshots[chatId]?.submissions.some(submission => submission.requestId === message.requestId)) continue;
-      setPending(current => current[chatId]?.requestId === message.requestId ? { ...current, [chatId]: undefined } : current);
-      setDrafts(current => current[chatId]?.trim() === message.text ? { ...current, [chatId]: "" } : current);
-      setSendErrors(current => ({ ...current, [chatId]: undefined }));
+      if (message && snapshots[chatId]?.submissions.some(submission => submission.requestId === message.requestId)) {
+        settleMessage(chatId, message.requestId);
+      }
     }
-  }, [pending, snapshots]);
+  }, [pending, snapshots, settleMessage]);
 
   function activate(tab: WorkspaceTab) {
     setTabs(current => current.some(item => item.id === tab.id) ? current : [...current.filter(item => item.kind !== "welcome"), tab]);
@@ -145,6 +158,9 @@ export function Workspace() {
   function closeTab(tabId: string) {
     const closing = tabs.find(tab => tab.id === tabId);
     if (closing?.kind === "chat") {
+      messageRequests.current[closing.chatId] = undefined;
+      draftVersions.current[closing.chatId] = (draftVersions.current[closing.chatId] ?? 0) + 1;
+      setSendErrors(current => ({ ...current, [closing.chatId]: undefined }));
       setDrafts(current => ({ ...current, [closing.chatId]: "" }));
       setPending(current => ({ ...current, [closing.chatId]: undefined }));
     }
@@ -189,16 +205,20 @@ export function Workspace() {
     const text = previous?.text || drafts[chatId]?.trim();
     if (!text) return;
     const command: SendMessageInput = { requestId: previous?.requestId || crypto.randomUUID(), text };
+    const priorRequest = messageRequests.current[chatId];
+    messageRequests.current[chatId] = priorRequest?.requestId === command.requestId
+      ? priorRequest : { requestId: command.requestId, draftVersion: draftVersions.current[chatId] ?? 0 };
     setPending(current => ({ ...current, [chatId]: { ...command, sending: true } }));
     setSendErrors(current => ({ ...current, [chatId]: undefined }));
     try {
       const snapshot = await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/messages`, command);
       onSnapshot(snapshot);
-      setPending(current => current[chatId]?.requestId === command.requestId ? { ...current, [chatId]: undefined } : current);
-      setDrafts(current => current[chatId]?.trim() === command.text ? { ...current, [chatId]: "" } : current);
+      settleMessage(chatId, command.requestId);
     } catch (error) {
+      if (messageRequests.current[chatId]?.requestId !== command.requestId) return;
       const message = errorMessage(error);
       if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429) {
+        messageRequests.current[chatId] = undefined;
         setPending(current => current[chatId]?.requestId === command.requestId ? { ...current, [chatId]: undefined } : current);
         setSendErrors(current => ({ ...current, [chatId]: message }));
       } else {
@@ -323,6 +343,10 @@ export function Workspace() {
               pending={pending[tab.chatId]}
               sendError={sendErrors[tab.chatId]}
               onDraftChange={text => {
+                draftVersions.current[tab.chatId] = (draftVersions.current[tab.chatId] ?? 0) + 1;
+                if (pending[tab.chatId] && !pending[tab.chatId]?.sending && pending[tab.chatId]?.text !== text.trim()) {
+                  messageRequests.current[tab.chatId] = undefined;
+                }
                 setDrafts(current => ({ ...current, [tab.chatId]: text }));
                 setSendErrors(current => ({ ...current, [tab.chatId]: undefined }));
                 setPending(current => current[tab.chatId] && !current[tab.chatId]?.sending && current[tab.chatId]?.text !== text.trim()
