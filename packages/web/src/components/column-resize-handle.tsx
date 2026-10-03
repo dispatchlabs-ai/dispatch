@@ -14,7 +14,7 @@ export function ColumnResizeHandle({ side, controls, width, min, max, onResize }
   const direction = side === "left" ? 1 : -1;
   const resize = (next: number) => onResize(Math.round(Math.max(min, Math.min(max, next))));
   return <div className={`column-resize-handle resize-${side}`} role="separator" tabIndex={0}
-    aria-label={side === "left" ? "Resize conversations sidebar" : "Resize details column"}
+    aria-label={side === "left" ? "Resize sidebar" : "Resize details column"}
     aria-orientation="vertical" aria-controls={controls}
     aria-valuemin={min} aria-valuemax={max} aria-valuenow={width} aria-valuetext={`${width} pixels`}
     title="Drag to resize, or use the left and right arrow keys"

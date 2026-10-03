@@ -14,7 +14,7 @@ export function ContextPanel({ kind, snapshot, tab, onTabChange }: {
       <h2>Details</h2>
     </header>
     <div className="context-body">
-      <p>{kind === "chat" ? "Loading conversation details…" : kind === "welcome" ? "Open a conversation to see its agent setup and run details." : "No supporting view for this tab."}</p>
+      <p>{kind === "chat" ? "Loading conversation details…" : kind === "welcome" ? "Open a conversation to see its agent setup and run details." : "No supporting view for this page."}</p>
     </div>
   </div>;
   const agent = chatAgent(snapshot);

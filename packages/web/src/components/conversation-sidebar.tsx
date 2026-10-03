@@ -3,13 +3,11 @@ import { useRef, useState } from "react";
 import type { ChatSummary, UpdateChatInput } from "../shared/contracts";
 import { errorMessage } from "../lib/api";
 import { statusLabels } from "../lib/chat";
-import { Brand } from "./brand";
 import { Button, IconButton, Notice, Spinner } from "./ui";
 
 type ConversationSidebarProps = {
   chats: ChatSummary[];
   activeChatId?: string;
-  companyName: string;
   search: string;
   onSearchChange: (value: string) => void;
   creating: boolean;
@@ -18,7 +16,7 @@ type ConversationSidebarProps = {
   onUpdate: (id: string, input: UpdateChatInput) => Promise<void>;
 };
 
-export function ConversationSidebar({ chats, activeChatId, companyName, search, onSearchChange, creating, onSelect, onCreate, onUpdate }: ConversationSidebarProps) {
+export function ConversationSidebar({ chats, activeChatId, search, onSearchChange, creating, onSelect, onCreate, onUpdate }: ConversationSidebarProps) {
   const archiveToggle = useRef<HTMLButtonElement>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [updating, setUpdating] = useState<Set<string>>(() => new Set());
@@ -39,9 +37,6 @@ export function ConversationSidebar({ chats, activeChatId, companyName, search, 
   }
 
   return <div className="conversation-sidebar">
-    <header className="sidebar-brand">
-      <Brand />{companyName.toLowerCase() !== "dispatch" ? <p>{companyName}</p> : null}
-    </header>
     <Button className="new-chat-button" onClick={() => { setShowArchived(false); onCreate(); }} disabled={creating}>{creating ? <Spinner /> : <Plus />} New chat</Button>
     <label className="conversation-search">
       <span className="sr-only">Find a conversation</span>

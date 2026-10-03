@@ -62,7 +62,9 @@ Chats are private to the authenticated user in the installation's company. Open 
 
 Sessions last at most twelve hours and expire after thirty minutes without an authenticated request. Stream heartbeats do not extend idle expiry. Expiry or revocation ends protected access; agent work remains owned by the service.
 
-The main tab strip appears when multiple views are open. Close a view with the × on its tab, or focus the tab and press Delete. With one view open, the entire tab header is absent. Use New chat in the sidebar to open another conversation as a new tab, preserving the existing tabs. On narrow screens, open the sidebar with Menu in the bottom bar.
+The left rail selects Chats, Agents, or Account and changes both the sidebar and main content. It never adds tabs. Chats retains its open conversations and selected tab while you visit another section; open agent/account forms also remain in memory. Agents lists saved agents in its sidebar, and Account links to its settings sections. Reloading returns to Chats.
+
+Within Chats, the main tab strip appears when multiple conversations are open. Close a view with the × on its tab, or focus the tab and press Delete. With one view open, the entire tab header is absent. Use New chat in the sidebar to open another conversation as a new tab, preserving the existing tabs. On narrow screens, open the sidebar with Menu in the bottom bar.
 
 Above 1100 pixels, use the left rail’s conversations and details icons to hide or show either side. Drag either inner divider to resize it, or focus the divider and use Left/Right (Shift for larger steps) or Home/End. These choices last while the workspace is open; reloading restores the defaults. Phone Menu and Details controls live in the bottom bar and open panels.
 

@@ -106,11 +106,15 @@ The sketch establishes the regions and their arrangement. Its sample icons, card
 
 | Region | Layout responsibility |
 | --- | --- |
-| Left rail | Narrow, far-left navigation rail. Its initial destinations are Chats, Agents, and Account. |
-| Sidebar | Navigation/list area beside the rail, distinct from the main content. Saved conversations remain available beside the main tabs. |
-| Main content column | Primary workspace with a tab strip when multiple views are open and the active view's content below. |
+| Left rail | Narrow, far-left navigation rail. Its destinations are Chats, Agents, and Account. Selecting a destination switches the sidebar and main content; it does not add a main tab. |
+| Sidebar | Navigation/list area beside the rail, distinct from the main content. Chats shows saved conversations without a repeated Dispatch logo; Agents shows its library; Account links to its settings. |
+| Main content column | Primary workspace for the selected rail section, with a tab strip when multiple conversations are open in Chats and the active view's content below. |
 | Right contextual column | Full column alongside the main tab strip and content, extending down to the bottom bar. It has its own content area and supports its own tabs. |
 | Bottom bar | Horizontal bar beneath the workspace columns. It shows the current company/session and connection state. |
+
+Rail sections own their sidebar and main content. Chat tabs belong only to Chats. Switching rail sections preserves the selected chat, open chat tabs, unsent drafts, and mounted agent/account forms. Returning to Chats restores its selected conversation. Agents' sidebar selects a saved agent or the whole library; while editing, finish or cancel that edit before choosing another agent. Account's sidebar jumps to existing sign-in and session sections without unmounting forms. Rail selection remains in workspace memory and returns to Chats after a reload. These October 3 refinements supersede treating Agents and Account as main tabs.
+
+The right column follows the active main content within the selected section. Leaving Chats clears its supporting content immediately; pages without a defined supporting view show an explicit empty state.
 
 ### Right column belongs to the active main tab
 

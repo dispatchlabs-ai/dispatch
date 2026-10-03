@@ -26,7 +26,11 @@ export function AgentsPage({
   onStartChat,
   creating,
   onDirtyChange,
+  selectedAgentId = null,
+  onEditingChange,
 }: {
+  selectedAgentId?: string | null;
+  onEditingChange?: (editing: boolean) => void;
   agents: AgentDefinition[];
   config: ApplicationConfig;
   onSaved: (agent: AgentDefinition) => void;
@@ -41,6 +45,8 @@ export function AgentsPage({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+
+  useEffect(() => { onEditingChange?.(editing !== null); }, [editing, onEditingChange]);
 
   useEffect(() => {
     if (!editing) onDirtyChange?.(busy);
@@ -88,7 +94,7 @@ export function AgentsPage({
         </Button>
       </header>
       {error ? <Notice>{error}</Notice> : null}
-      <div className="agent-filter">
+      {!selectedAgentId ? <div className="agent-filter">
         <label className="checkbox-field">
           <input
             type="checkbox"
@@ -98,10 +104,10 @@ export function AgentsPage({
           Show archived agents
         </label>
         <span>{agents.filter((agent) => !agent.archived).length} active</span>
-      </div>
+      </div> : null}
       <div className="agent-list">
         {agents
-          .filter((agent) => showArchived || !agent.archived)
+          .filter((agent) => selectedAgentId ? agent.id === selectedAgentId : showArchived || !agent.archived)
           .map((agent) => (
             <article
               className={`agent-card ${agent.archived ? "agent-archived" : ""}`}

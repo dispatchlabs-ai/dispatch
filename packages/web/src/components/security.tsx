@@ -129,7 +129,7 @@ export function SecurityPage({
               </Button>
             </Notice>
           ) : null}
-          <section className="settings-section">
+          <section className="settings-section" id="account-passkeys">
             <header>
               <div className="section-icon">
                 <Fingerprint />
@@ -243,7 +243,7 @@ export function SecurityPage({
             )}
           </section>
 
-          <section className="settings-section">
+          <section className="settings-section" id="account-password">
             <header>
               <div className="section-icon">
                 <KeyRound />
@@ -349,7 +349,7 @@ export function SecurityPage({
             )}
           </section>
 
-          <section className="settings-section">
+          <section className="settings-section" id="account-sessions">
             <header>
               <div className="section-icon">
                 <ShieldCheck />
