@@ -1,6 +1,6 @@
 # Dispatch Web specification
 
-**Status: partial specification.** The language, development/build, and company access requirements below are accepted. The first agent-work workflow and implementation slice remain undecided; unresolved details are not accepted contracts.
+**Status: partial specification.** The language, development/build, company access, and workspace layout requirements below are accepted. The first agent-work workflow and implementation slice remain undecided; unresolved details are not accepted contracts.
 
 ## Product context
 
@@ -51,6 +51,36 @@ Equal capabilities do not define which companies, workspaces, or resources a use
 ### Open authentication workflows
 
 Before implementing authentication, specify account provisioning/invitations, enrollment and replacement of authenticators, lost-device/account recovery, required enrollment methods, and session policy. Recovery must not silently bypass the required authentication. Initial equal access also leaves user-management authority to be specified; do not invent an administrator role to fill that gap.
+
+## Workspace layout
+
+**Accepted October 3, 2026.** Use the supplied sketch as the basic desktop workspace layout, with the right side implemented as a full column that can have its own tabs. This layout decision is independent of the still-proposed frontend framework.
+
+[![User-supplied workspace sketch showing a left rail, sidebar, main tabs/content, right region, and bottom bar](assets/workspace-layout-reference.jpg)](assets/workspace-layout-reference.jpg)
+
+The sketch establishes the regions and their arrangement. Its sample icons, cards, text, and right-side widgets do not specify product features or final styling. The requirements below refine its right-side treatment.
+
+| Region | Layout responsibility |
+| --- | --- |
+| Left rail | Narrow, far-left navigation rail. Its destinations remain to be specified. |
+| Sidebar | Navigation/list area beside the rail, distinct from the main content. Its content and relationship to rail selection remain to be specified. |
+| Main content column | Primary workspace with a tab strip across its top and the active main tab's content below. |
+| Right contextual column | Full column alongside the main tab strip and content, extending down to the bottom bar. It has its own content area and supports its own tabs. |
+| Bottom bar | Horizontal bar beneath the workspace columns. Its controls and information remain to be specified. |
+
+### Right column belongs to the active main tab
+
+The active main tab determines the right column's context, available supporting tabs, and content. Right-column tabs are subordinate views for that main tab. Selecting a right-column tab changes the supporting view while leaving the main tab active.
+
+When the user changes the active main tab, the right column must immediately follow the newly active context. Content, loading results, and actions belonging to the previous main tab must not appear as though they belong to the new one. Closing the active main tab similarly updates the right column for the resulting active tab, or clears its context if no main tab remains. A right-column action must target the main context it visibly serves.
+
+Keep the right region as a full layout column rather than implementing the desktop design as a narrow inspector or overlay drawer. Its contents remain to be specified: do not populate it with generic details, activity, or other views simply to fill the space. This is consistent with the [earlier contextual-column and reserved-content decisions](https://wiki.chrisreynolds.me/wiki/dispatch-web/#section-decision-records).
+
+### Use case: switch work and its supporting views
+
+A signed-in user activates main tab A and sees its main content and any defined supporting views in the right column. Selecting another right-column tab keeps A active. Activating main tab B changes both the main content and the right column's supporting context to B. Late updates for A must not replace B's supporting content.
+
+Column widths, resizing, collapse/visibility behavior, narrow-screen layout, scroll ownership, keyboard interaction, and persistence of each main tab's selected supporting tab remain unresolved. No specific right-column tab names or features are accepted yet.
 
 ## Proposed web architecture
 

@@ -1,6 +1,6 @@
 # Dispatch Web implementation handoff
 
-**Status: foundational and company access requirements accepted; authentication details and first implementation slice pending.** No application implementation package is defined or approved yet.
+**Status: foundational, company access, and workspace layout requirements accepted; authentication details and first implementation slice pending.** No application implementation package is defined or approved yet.
 
 [spec.md](spec.md) defines the package's agreed behavior and contracts. Implement the work packages recorded here in order. After each package, run its tests and the repository checks, record the results, and review with Chris before proceeding. Do not redesign later packages while implementing the current one.
 
@@ -11,6 +11,7 @@
 - Give all users equal initial application capabilities, with RBAC planned for later. See [company access](spec.md#company-access-and-authentication) for accepted scope and unresolved flows.
 - Use TypeScript throughout the application and support local development on M1 Air.
 - Use Nix for the development environment and builds, following the [accepted requirements](spec.md#language-and-development-requirements).
+- Adopt the [workspace layout](spec.md#workspace-layout), including a full right column with optional tabs subordinate to the active main tab.
 - Keep this package's specifications, handoff, and usage documentation in `packages/web/docs/`.
 - Keep validation in each work package's acceptance criteria and in the package tests.
 
@@ -27,6 +28,19 @@ When the authentication work package is agreed, include checks for:
 - Logout, session expiry/revocation, enrollment, and recovery matching their agreed contracts.
 
 Settle the login flow, account provisioning, enrollment/recovery, session policy, and company/workspace scope before implementing the affected behavior. No implementation package is scheduled by these requirements.
+
+## Workspace layout acceptance requirements
+
+When the workspace-shell work package is agreed, include checks for:
+
+- The desktop arrangement: left rail, sidebar, tabbed main content, full right contextual column with tab support, and bottom bar.
+- The right column extending alongside the main tab strip/content down to the bottom bar, occupying its own layout space.
+- Main-tab changes updating the right column's context and available supporting views; right-tab changes preserving the active main tab.
+- Late updates from an inactive main tab not replacing the active main tab's supporting content or action targets.
+- Closing the active main tab selecting the correct remaining context or clearing the right context when none remains.
+- No invented right-column features or tabs when their purpose has not been specified.
+
+Define visibility/resizing, responsive behavior, keyboard interaction, scroll ownership, and supporting-tab persistence with the first affected workflow. This records acceptance requirements without scheduling implementation.
 
 ## Architecture proposal and review
 
