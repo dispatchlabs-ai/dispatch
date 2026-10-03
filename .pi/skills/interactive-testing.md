@@ -5,7 +5,7 @@ description: Verify Dispatch Web browser workflows against package acceptance cr
 
 # Browser acceptance checks
 
-Use for changes with observable browser behavior. Read `AGENTS.md`, `CONTRIBUTING.md`, the affected package README and specification, and the current handoff's acceptance criteria. This repository currently has no runnable application; documentation checks do not count as browser validation.
+Use for changes with observable browser behavior. Read `AGENTS.md`, `CONTRIBUTING.md`, the affected package README and specification, and the current handoff's acceptance criteria. The local frontend startup and build commands are documented in the package README; documentation checks do not count as browser validation.
 
 1. Identify the supported startup command, environment, test data, and application URL from the package's actual setup documentation. Inspect the implementation and maintained setup records before declaring a blocker. If setup is still undefined, report which criteria cannot yet be exercised; do not fabricate commands, services, or passing results.
 2. Translate the agreed criteria into concrete observations: starting state, user action, expected visible result, and relevant persisted outcome. Cover specified failure and recovery paths as well as success. Keep this evidence in the handoff or task report, without introducing a separate validation-plan document.

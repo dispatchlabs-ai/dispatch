@@ -1,0 +1,20 @@
+@import "tailwindcss" source(".");
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --color-background: #f8f9f6;
+  --color-surface: #ffffff;
+  --color-foreground: #1d2c27;
+  --color-muted: #5c6b65;
+  --color-border: #dfe5df;
+  --color-accent: #247452;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+}

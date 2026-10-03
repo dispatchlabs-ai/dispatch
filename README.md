@@ -2,7 +2,7 @@
 
 A fresh implementation of Dispatch Web using stock upstream Pi Durable, developed on M1 Air.
 
-**Status: design stage.** Chat with a default agent on stock Pi Durable is the agreed first feature, followed by named agent definitions. Detailed application contracts, implementation packages, and checks will be established through specification work with Chris.
+**Status: localhost development foundation.** A responsive startup page runs with hot reload and a pinned Nix toolchain/build. Chat with a default agent on stock Pi Durable is the agreed first feature, followed by named agent definitions; those features and authentication are not implemented yet.
 
 Dispatch Web is the browser workspace for Dispatch: a general-purpose platform for solving client problems with reusable agents, independent agent instances, handoffs, and event- or schedule-triggered work. These are product goals, not implemented features in this repository.
 
@@ -10,7 +10,17 @@ Dispatch Web is the browser workspace for Dispatch: a general-purpose platform f
 
 | Package | Purpose | Status |
 | --- | --- | --- |
-| [Web](packages/web/README.md) | Dispatch browser workspace and its application integration with Pi Durable | Specification drafts; no implementation |
+| [Web](packages/web/README.md) | Dispatch browser workspace and its application integration with Pi Durable | Local frontend foundation; chat contracts in progress |
+
+## Quick start
+
+```sh
+nix develop
+npm ci
+npm run dev
+```
+
+Open `http://localhost:5173`. See the [usage guide](packages/web/docs/usage-guide.md) for prerequisites, builds, and troubleshooting. Internal deployment on Omarchy/Palm is a later work package.
 
 ## Repository layout
 

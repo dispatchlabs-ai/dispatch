@@ -1,0 +1,13 @@
+{
+  "name": "dispatch-web-next",
+  "private": true,
+  "workspaces": ["packages/web"],
+  "engines": { "node": ">=24 <26" },
+  "scripts": {
+    "dev": "npm run dev --workspace @dispatch/web",
+    "build": "npm run build --workspace @dispatch/web",
+    "preview": "npm run preview --workspace @dispatch/web",
+    "typecheck": "npm run typecheck --workspace @dispatch/web",
+    "check": "npm run typecheck && npm run build"
+  }
+}

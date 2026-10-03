@@ -1,6 +1,6 @@
 # Dispatch Web specification
 
-**Status: partial specification.** The foundational requirements and chat as the first feature are accepted. Chat will use stock Pi Durable with a default agent, followed by named agent definitions and further native capabilities. Detailed contracts and implementation work packages remain to be agreed; unresolved details are not accepted contracts.
+**Status: partial specification.** The foundational requirements and chat as the first feature are accepted. Chat will use stock Pi Durable with a default agent, followed by named agent definitions and further native capabilities. The localhost tooling package is implemented; detailed chat contracts and later work packages remain to be agreed. Unresolved details are not accepted contracts.
 
 ## Product context
 
@@ -16,11 +16,17 @@ Accepted October 3, 2026:
 - Produce build artifacts from declared inputs without relying on globally installed Node tooling, developer-specific paths, production credentials, or live application services. Fetch dependencies through declared, pinned inputs; build steps must not download changing dependencies.
 - Keep development state and runtime secrets outside build outputs and the Nix store. Build artifacts must remain separate from writable Pi Durable runtime state.
 
-The intended entry points are `nix develop` for the local toolchain, `nix build` for application artifacts, and `nix flake check` for declared checks. These are requirements for future tooling, not commands available in this documentation-only repository. Keep the local edit/run loop inside the development environment; a full Nix build should not be required for every source edit. Future automation must reuse the same build definitions.
+The entry points are `nix develop` for the local toolchain, `nix build` for application artifacts, and `nix flake check` for declared checks. Keep the local edit/run loop inside the development environment; a full Nix build should not be required for every source edit. Future automation must reuse the same build definitions.
 
 Use [Mitchell Hashimoto's shared development/build approach](https://mitchellh.com/writing/nix-with-dockerfiles) and [Pi's Nix flake](https://github.com/earendil-works/pi/blob/b60993bcc299c705731f0281e2b4d0db7c72188b/flake.nix) and [package recipe](https://github.com/earendil-works/pi/blob/b60993bcc299c705731f0281e2b4d0db7c72188b/nix/package.nix) as references. Pi's inspected flake packages its coding agent; it is not a ready-made Dispatch Web development environment.
 
-The exact Node version, package manager, UI/server frameworks, deployment platforms, and artifact format remain to be chosen. Nix builds do not require adopting NixOS or Docker. Platform support must be validated explicitly; a macOS build does not establish Linux compatibility.
+The local tooling package uses Node 24 from locked nixpkgs, npm workspaces with a committed dependency lock, React Router framework mode (`ssr: false`), React, Vite, and Tailwind. The frontend artifact is static HTML/CSS/JavaScript at `result/share/dispatch-web` after `nix build`. A component library and server integration remain to be selected. Nix builds do not require NixOS or Docker. Apple Silicon macOS is verified; the declared Linux output still requires a Linux build before deployment support can be claimed.
+
+### Local development and later internal deployment
+
+Accepted October 3, 2026: prioritize a quick localhost edit/run loop now. The frontend binds only to `localhost:5173`, with hot reload and a clear startup page. This tooling slice has no user data, login, chat, or Pi runtime. It does not relax the authentication requirements for future product functionality. Developers can preview a production build on `localhost:4173`.
+
+Internal deployment on Omarchy, reachable over the Palm network at an HTTPS domain, is a later work package. The current `dispatch.chrisreynolds.me` pilot, DNS, and services remain in place. Local HTTP on loopback is the development endpoint, not an internal hosted site. Application deployment configuration will belong to this repository; machine prerequisites remain owned by Palm.
 
 ## Company access and authentication
 
@@ -66,7 +72,7 @@ Exact breakpoints, mobile navigation and tab presentation, transitions between m
 
 ## Workspace layout
 
-**Accepted October 3, 2026.** Use the supplied sketch as the basic desktop workspace layout, with the right side implemented as a full column that can have its own tabs. Adapt its regions for [desktop and mobile support](#desktop-and-mobile-support); simultaneous columns are the desktop arrangement. This layout decision is independent of the still-proposed frontend framework.
+**Accepted October 3, 2026.** Use the supplied sketch as the basic desktop workspace layout, with the right side implemented as a full column that can have its own tabs. Adapt its regions for [desktop and mobile support](#desktop-and-mobile-support); simultaneous columns are the desktop arrangement. This layout decision is independent of the local tooling selection.
 
 [![User-supplied workspace sketch showing a left rail, sidebar, main tabs/content, right region, and bottom bar](assets/workspace-layout-reference.jpg)](assets/workspace-layout-reference.jpg)
 
@@ -96,9 +102,9 @@ Column widths, resizing, collapse/visibility behavior, exact mobile presentation
 
 ## Proposed web architecture
 
-**Status: proposal, discussed October 3, 2026.** This records the architecture recommendation and independent Claude Code review. Framework selection and detailed contracts remain open; this section does not approve an implementation package.
+**Status: proposal, discussed October 3, 2026.** This records the architecture recommendation and independent Claude Code review. React Router framework mode was subsequently used for the localhost tooling package. The service/runtime arrangement and detailed contracts below remain proposed.
 
-Use a React SPA with a persistent TypeScript/Node service hosting stock Pi Durable. The leading UI option is React Router framework mode with `ssr: false`, using Vite. React Router data mode with an explicit API/subscription client remains a viable simpler alternative. Framework mode offers route types, route-module conventions, and code splitting; it does not provide the live agent-state contract. See [React Router's modes](https://reactrouter.com/start/modes) and [SPA behavior](https://reactrouter.com/how-to/spa).
+Use a React SPA with a persistent TypeScript/Node service hosting stock Pi Durable. The localhost frontend now uses React Router framework mode with `ssr: false`, using Vite. The earlier data-mode alternative was not used for this tooling package. Framework mode offers route types, route-module conventions, and code splitting; it does not provide the live agent-state contract. See [React Router's modes](https://reactrouter.com/start/modes) and [SPA behavior](https://reactrouter.com/how-to/spa).
 
 The service can serve the built SPA and API on one origin. During local development, run the frontend development server separately from the Pi runtime and proxy application requests to the service. Frontend hot reload must not create another runtime owner or cancel agent work. Package/deployment boundaries remain undecided.
 

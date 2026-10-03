@@ -1,10 +1,20 @@
 # Contributing
 
-Dispatch Web is at the specification stage. There is no runnable application, dependency installation, build command, or test suite yet. Establish those commands with the first implementation package and document them here and in the owning package's README.
+Dispatch Web has a local frontend foundation. Chat, authentication, and Pi Durable integration remain to be implemented through the agreed work-package process.
 
 ## Local development and Nix builds
 
-Use TypeScript throughout application code. Local development, including on M1 Air, and Nix-based builds are accepted requirements; see the [Web specification](packages/web/docs/spec.md#language-and-development-requirements). Establish `nix develop`, `nix build`, and `nix flake check` with the first implementation package, sharing pinned toolchain and dependency definitions. They are not available yet. Shared flake configuration and lockfiles belong at the repository root; package-specific build recipes stay with their package. Future automation must invoke the same build definitions.
+Use TypeScript throughout application code. From the repository root, with Nix installed and `nix-command`/`flakes` enabled:
+
+```sh
+nix develop
+npm ci
+npm run dev
+```
+
+Open `http://localhost:5173`. Source edits hot reload; stop the server with Ctrl-C. Repeat `npm ci` after the lockfile changes. Run `npm run check` for route-type generation, TypeScript, and the frontend build; run `nix build` and `nix flake check` for the pinned build and declared checks. The Node 24 toolchain is shared by the Nix shell and build, and npm dependencies are locked in `package-lock.json`.
+
+See the [package usage guide](packages/web/docs/usage-guide.md) for preview, troubleshooting, dependency updates, and platform coverage. Shared flake configuration and lockfiles belong at the repository root; the package-specific Nix recipe stays with its package. Future automation must invoke the same build definitions.
 
 ## Where work belongs
 
@@ -25,7 +35,7 @@ Use TypeScript throughout application code. Local development, including on M1 A
 | `scripts/` | Shared development and release tooling |
 | `.github/workflows/` | Reserved workflow location; no CI is configured |
 
-Language-specific manifests and build configuration belong beside the relevant package code. Add root configuration only for shared workspace tooling. The initial `web` directory establishes documentation ownership; further package boundaries will follow the design.
+Language-specific manifests and build configuration belong beside the relevant package code. Add root configuration only for shared workspace tooling. The `web` package owns the frontend; further package boundaries will follow the design.
 
 ## Specification and implementation
 
@@ -35,7 +45,7 @@ Language-specific manifests and build configuration belong beside the relevant p
 4. Implement the current work package. Keep validation in its acceptance criteria and the package's tests. Add runnable examples under `test/examples/` and document actual usage when it exists.
 5. Run the package tests and repository checks, inspect the diff, update the package changelog as appropriate, and review the result with Chris before starting the next package. Do not redesign later packages while implementing the current one.
 
-The reference is [Pi Durable's Pico5 handoff](https://github.com/earendil-works/pi/blob/v1.0.0/packages/durable/docs/pico-v5-handoff.md). This repository will define its own real check commands as tooling is introduced.
+The reference is [Pi Durable's Pico5 handoff](https://github.com/earendil-works/pi/blob/v1.0.0/packages/durable/docs/pico-v5-handoff.md). Use this repository's actual checks below; add behavioral tests with each implemented feature.
 
 The wiki maintains product intent and decision history. Package documents define implementation contracts and execution steps linked to those decisions. Keep both current when an authorized change affects them.
 
@@ -63,7 +73,9 @@ Use `/deslop` after implementing a work package, then rerun affected checks befo
 
 ## Checks and publication
 
-For this documentation-only stage, run `git diff --check` (and `git diff --cached --check` after staging), inspect the full diff, and verify local documentation links. No application behavior has been verified by these checks.
+Run `npm run check` inside `nix develop` for code changes. Run `nix flake check` for the declared build/type check and `nix build` when verifying artifacts. There is no functional test suite yet; add meaningful tests with application behavior. Apply the browser-testing procedure for observable UI changes.
+
+Also run `git diff --check` (and `git diff --cached --check` after staging), inspect the full diff, and verify changed local documentation links. Documentation checks do not verify application behavior.
 
 Use a task branch and worktree for concurrent work; edit canonical `main` only with exclusive checkout ownership. Before publication, fetch the latest remote target, reconcile any changes, and rerun the applicable checks. Commit only task changes, push normally to `main` unless the task requires a PR, and verify the published commit. Fast-forward a clean canonical checkout after publication; preserve existing edits and unpublished work.
 
