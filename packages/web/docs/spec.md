@@ -166,6 +166,8 @@ Keep desktop columns in their own layout space, with scrolling contained to thei
 
 ### Hierarchy and content
 
+- Place user messages in content-sized bubbles on the right and assistant responses on the left on desktop and mobile. Align the user label, timestamp, and copy action with the user bubble; keep message text naturally left-aligned and wrap long content within the transcript. Preserve native chronological order and message-role labels.
+
 - Each main tab's `<h1>` names its destination or object, such as "Agents", "Account and security", or the conversation title. Taglines may appear only as secondary text.
 - Label the transcript and headers with the conversation's agent name from its saved revision. Keep that name after the definition is later edited. Show model and provider identifiers as supporting facts, not as the main label.
 - Translate native Pi records into human-readable labels and statuses in the main transcript. Show raw JSON or enum values only behind an explicitly labelled technical-details disclosure, while keeping the native distinctions the [chat workflow](#first-agent-work-workflow-and-observable-outcomes) requires.

@@ -315,9 +315,12 @@ input::placeholder, textarea::placeholder { color: var(--color-muted); }
 .message-avatar { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; flex-shrink: 0; border-radius: var(--radius-sm); background: var(--color-surface-raised); color: var(--color-muted); }
 .message-avatar .brand-mark { width: 20px; height: 20px; }
 .message-content { padding-left: var(--space-8); min-width: 0; }
-.message-user .message-content { background: var(--color-surface-raised); margin-left: var(--space-8); padding: var(--space-3) var(--space-4); border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md); }
+.message-user { width: fit-content; max-width: 85%; margin-left: auto; }
+.message-user .message-heading { justify-content: flex-end; }
+.message-user .message-content { background: var(--color-surface-raised); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md) 0 var(--radius-md) var(--radius-md); }
 .user-message-text { white-space: pre-wrap; font-size: var(--text-sm); line-height: 1.75; overflow-wrap: anywhere; }
 .message-actions { display: flex; gap: var(--space-1); align-items: center; margin: var(--space-1) 0 calc(-1 * var(--space-2)) calc(-1 * var(--space-2)); }
+.message-user .message-actions { justify-content: flex-end; margin-left: 0; margin-right: calc(-1 * var(--space-2)); }
 .message-actions .icon-button { width: 27px; height: 28px; padding: var(--space-1); color: var(--color-muted); }
 .message-actions > span { font-size: var(--text-xs); color: var(--color-muted); }
 .message-image { max-width: 100%; max-height: 420px; border-radius: var(--radius-sm); }
@@ -450,7 +453,6 @@ input::placeholder, textarea::placeholder { color: var(--color-muted); }
   .chat-heading { padding: var(--space-4) var(--space-5); }
   .transcript { padding: var(--space-1) var(--space-4) var(--space-6); }
   .message-content { padding-left: 0; }
-  .message-user .message-content { margin-left: 0; }
   .message-heading { margin-bottom: var(--space-2); }
   .message { margin-bottom: var(--space-6); }
   .composer-area { padding: var(--space-3) var(--space-3) max(var(--space-4), env(safe-area-inset-bottom)); }

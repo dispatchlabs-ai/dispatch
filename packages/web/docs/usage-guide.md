@@ -50,6 +50,8 @@ The default agent is chat-only and has no tools. The Agents section creates comp
 
 ## Chat and workspace
 
+Your messages appear on the right; agent replies stay on the left.
+
 Chats are private to the authenticated user in the installation's company. Open a saved conversation or start one with the default or a named agent. The service returns native Pi entries and streams complete snapshots; the browser derives its display from those records.
 
 - Sending while a response is active adds a native follow-up. Retry a failed network request with the same logical request ID; a changed message gets a new ID. Reusing an ID with different content returns a conflict.
