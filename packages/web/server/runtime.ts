@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -17,6 +17,10 @@ type Catalog = { chats: StoredChat[]; agents: StoredAgent[] };
 const CatalogDoc = defineDoc<Catalog>({
   kind: "dispatch.catalog", version: 1, scope: "session",
   initial: () => ({ chats: [], agents: [] }),
+});
+const RequestFingerprintsDoc = defineDoc<{ fingerprints: Record<string, string> }>({
+  kind: "dispatch.request-fingerprints", version: 1, scope: "conversation", history: "latest", fork: "initial",
+  initial: () => ({ fingerprints: {} }),
 });
 
 export class RuntimeError extends Error {
@@ -92,7 +96,10 @@ export class DispatchRuntime {
     const id = await this.harness.commit(async (tx) => {
       const catalog = await tx.doc(CatalogDoc);
       const existing = catalog.chats.find((chat) => owns(scope, chat) && chat.requestId === input.requestId);
-      if (existing) return existing.id;
+      if (existing) {
+        if (existing.title !== title || existing.agentDefinitionId !== (input.agentDefinitionId ?? "default")) throw requestConflict();
+        return existing.id;
+      }
       const agent = this.findAgent(catalog, scope, input.agentDefinitionId ?? "default");
       this.validateAgent(agent);
       const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
@@ -143,13 +150,26 @@ export class DispatchRuntime {
     requireText(input.text, "Message", 100_000);
     await this.authorize(scope, id);
     const conversation = (await this.harness.conversation(nativeId(id), context))!;
-    const existing = await this.harness.commit((tx) => tx.submissionByRequest(conversation.id, input.requestId), context);
-    if (existing) return existing;
+    const prior = await this.harness.commit((tx) => tx.submissionByRequest(conversation.id, input.requestId), context);
     // Pi authenticates provider calls server-side. Do not convert a missing key into a pretend answer.
     const agent = await conversation.agent(context);
-    if (!agent.model || !await this.models.getAuth(agent.model.provider)) {
+    if (!prior && (!agent.model || !await this.models.getAuth(agent.model.provider))) {
       throw new RuntimeError(503, "The model provider is not configured. Configure its credentials on the Dispatch service.");
     }
+    // Pi drops a withdrawn inbox item's payload. Keep only an intent hash, never another transcript or run state.
+    const existing = await this.harness.commit(async (tx) => {
+      const admitted = await tx.submissionByRequest(conversation.id, input.requestId);
+      const fingerprints = await tx.doc(RequestFingerprintsDoc, conversation.id);
+      const key = fingerprint(input.requestId);
+      const hash = fingerprint(input.text);
+      const reserved = fingerprints.fingerprints[key];
+      if (reserved && reserved !== hash) throw requestConflict();
+      if (!reserved && admitted) throw new RuntimeError(409, "This older request no longer has a verifiable input. Use a new request ID.");
+      fingerprints.fingerprints[key] = hash;
+      return admitted;
+    }, context);
+    if (existing) return existing;
+    // A crash between hash reservation and admission leaves no app-owned pending state: a retry calls submit again.
     const submission = await conversation.submit({ type: "input", content: input.text, requestId: input.requestId, whenBusy: "followUp" }, context);
     return submission.status(context);
   }
@@ -175,6 +195,7 @@ export class DispatchRuntime {
       const catalog = await tx.doc(CatalogDoc);
       const prior = input.id ? [...catalog.agents].reverse().find((agent) => agent.id === input.id && agent.companyId === scope.companyId) : undefined;
       if (input.id && !prior) throw new RuntimeError(404, "Agent not found.");
+      if (prior?.archived) throw new RuntimeError(409, "This agent is archived. Create a new agent to use its configuration again.");
       if (prior && prior.revision !== input.expectedRevision) throw new RuntimeError(409, "The agent has changed. Reload it before saving.");
       const now = Date.now();
       const agent: StoredAgent = {
@@ -259,8 +280,11 @@ function requireText(value: unknown, field: string, max: number, allowEmpty = fa
   if (typeof value !== "string" || (!allowEmpty && !value.trim()) || value.length > max) throw new RuntimeError(400, `${field} must be ${allowEmpty ? "at most" : "between 1 and"} ${max} characters.`);
 }
 
+function fingerprint(value: string) { return createHash("sha256").update(value).digest("hex"); }
+function requestConflict() { return new RuntimeError(409, "This request ID was already used with different content. Use a new request ID."); }
+
 function summary(chat: StoredChat, view: ConversationView, submissions: readonly SubmissionRecord[]): ChatSummary {
-  const latest = submissions.filter((submission) => submission.type === "input").at(-1);
+  const latest = submissions.filter((submission) => submission.type === "input" && (submission.status === "done" || submission.status === "unanswered")).at(-1);
   const live = view.docs["pi.live"] as LiveState | undefined;
   let status: ChatSummary["status"] = "idle";
   let error: string | undefined;

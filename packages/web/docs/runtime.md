@@ -12,10 +12,10 @@ Pi owns native transcripts, submission admission, generations, queued inputs, ca
 
 ## Commands and observations
 
-- `createChat(scope, { requestId, agentDefinitionId?, title? })` admits an independent native conversation. Reusing the same creation request ID for the same user/company returns that conversation.
-- `submit(scope, id, { requestId, text })` uses Pi's per-conversation request deduplication. Inputs received during a response become native follow-ups. An accepted request retry returns its native submission even if provider credentials later become unavailable.
+- `createChat(scope, { requestId, agentDefinitionId?, title? })` admits an independent native conversation. Reusing the same creation request ID for the same user/company and payload returns that conversation; a different title or agent definition with that ID returns `409`.
+- `submit(scope, id, { requestId, text })` uses Pi's per-conversation request deduplication. Inputs received during a response become native follow-ups. An accepted request retry with the same text returns its native submission even if provider credentials later become unavailable. Reusing an ID with changed text returns `409`, including after cancellation or restart.
 - `stop(scope, id)` invokes native foreground cancellation, including queued follow-ups. It preserves committed partial output and returns the current snapshot.
-- `getChat()` and `watchChat()` return the full native `ConversationView` and native submission records. The summary's status is derived from those records, including cancellation or failure before a first output token. It is not separately persisted.
+- `getChat()` and `watchChat()` return the full native `ConversationView` and native submission records. The summary's status is derived from those records, including cancellation or failure before a first output token. It is not separately persisted. A failed generation remains visibly failed when Pi retains queued follow-ups; a subsequent input lets Pi continue the queue.
 - `watchChat()` supplies an initial `value`, then `start(async snapshot => ...)`, `stop()`, and `closed`. Emit the initial value before starting the listener. Each delivered value replaces the browser's previous snapshot. The wrapper takes a coherent current view and submission read on Pi's commit line; notifications can coalesce and no replay cursor is promised.
 
 Closing a watcher stops observation only. Work continues while the browser is absent. The service transport must independently enforce session expiry/revocation for live subscriptions.
@@ -24,18 +24,12 @@ On recovery, Pi can retain an interrupted partial as an aborted assistant entry 
 
 ## Agent definitions
 
-The default agent uses the supplied provider/model/thinking configuration with an ordinary native instruction string and no tools or extensions. Named agents are company-shared. Each save appends an immutable revision, using `expectedRevision` to reject stale edits. Archiving appends an archived revision; creating a new chat from it is denied. Existing chats retain the native agent configuration copied at creation and remain usable.
+The default agent uses the supplied provider/model/thinking configuration with an ordinary native instruction string and no tools or extensions. Named agents are company-shared. Each save appends an immutable revision, using `expectedRevision` to reject stale edits. Archiving appends an archived revision; creating a new chat from it or editing it is denied. There is no restore workflow in this slice; create a new definition to reuse its configuration. Existing chats retain the native agent configuration copied at creation and remain usable.
 
 Conversation reads, subscriptions, submission, and cancellation require both the creator's user ID and company ID. Named-definition access requires the company ID. HTTP authentication, account membership, and model credential resolution remain service responsibilities.
 
-## Verification
+## Request identity
 
-From the repository root inside `nix develop`:
+Pi removes a cancelled queued input from its inbox, so its terminal submission record cannot always recover the original text. Dispatch keeps SHA-256 input fingerprints in a native conversation-scoped metadata document. The fingerprint is reserved on Pi's serialized commit line before calling its public submission API. It contains no pending/completed operation state and does not own execution. If the service stops between reservation and native admission, a same-payload retry proceeds to normal Pi submission.
 
-```sh
-node --import tsx --test packages/web/test/runtime/runtime.test.ts
-```
-
-The controlled-provider tests cover independent concurrent chats; admission deduplication; user/company isolation; native transcript preservation; current snapshots after disconnection; partial and pre-token Stop; native provider failure; missing credentials; immutable agent revisions and archive behavior; and true process death during streamed output. The crash test uses `SIGKILL`, confirms exclusion of a competing owner, reopens the same storage, and verifies that Pi completes the original submission without duplicating its user entry.
-
-These are deterministic integration tests against stock Pi. A separate real-provider smoke test is required when qualifying the complete service and its credential configuration.
+The public submission API has no callback for atomically attaching application metadata to admission. This two-step reservation preserves request identity while leaving admission and deduplication to Pi. A pre-fingerprint development record cannot be verified and returns `409`, requiring a new request ID; there is no released-data migration contract.
