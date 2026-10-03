@@ -1,6 +1,6 @@
 import { Tabs } from "@base-ui/react/tabs";
-import { Bot, ChevronLeft, ChevronRight, CircleHelp, LogOut, Menu, MessageSquare, PanelRight, Plus, Search, Settings2, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Bot, ChevronLeft, ChevronRight, CircleHelp, LogOut, Menu, MessageSquare, PanelLeft, PanelRight, Plus, Search, Settings2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router";
 import type { AgentDefinition, ApplicationConfig, ChatSnapshot, ChatSummary, CreateChatInput, SendMessageInput } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
@@ -9,6 +9,7 @@ import { useSession } from "../lib/session";
 import { AgentsPage } from "./agents";
 import { Brand } from "./brand";
 import { ChatPanel } from "./chat";
+import { ColumnResizeHandle } from "./column-resize-handle";
 import { ContextPanel } from "./context-panel";
 import { SecurityPage } from "./security";
 import { Button, IconButton, Modal, Notice, Spinner } from "./ui";
@@ -39,6 +40,20 @@ export function Workspace() {
   const [supportTabs, setSupportTabs] = useState<Record<string, string>>({});
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [detailsVisible, setDetailsVisible] = useState(true);
+  const [preferredSidebarWidth, setSidebarWidth] = useState(244);
+  const [preferredDetailsWidth, setDetailsWidth] = useState(294);
+  const [viewportWidth, setViewportWidth] = useState(() => typeof window === "undefined" ? 1440 : window.innerWidth);
+  useEffect(() => {
+    const updateWidth = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, []);
+  const sidebarMax = Math.max(200, Math.min(420, Math.floor(viewportWidth * .25)));
+  const detailsMax = Math.max(240, Math.min(480, Math.floor(viewportWidth * .3)));
+  const sidebarWidth = Math.min(preferredSidebarWidth, sidebarMax);
+  const detailsWidth = Math.min(preferredDetailsWidth, detailsMax);
   const [creating, setCreating] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [agentDirty, setAgentDirty] = useState(false);
@@ -257,7 +272,8 @@ export function Workspace() {
     <Button variant="ghost" onClick={() => void signOut()}>Sign out</Button>
   </main>;
 
-  return <div className="workspace">
+  return <div className={`workspace ${sidebarVisible ? "" : "sidebar-hidden"} ${detailsVisible ? "" : "details-hidden"}`}
+    style={{ "--sidebar-width": `${sidebarVisible ? sidebarWidth : 0}px`, "--details-width": `${detailsVisible ? detailsWidth : 0}px` } as CSSProperties}>
     <a className="skip-link" href="#main-workspace">Skip to main content</a>
     <nav className="workspace-rail" aria-label="Workspace navigation">
       <div className="rail-brand">
@@ -280,10 +296,16 @@ export function Workspace() {
         </span>
       </div>
     </nav>
-    <aside className="workspace-sidebar" aria-label="Conversations">{sidebar}</aside>
+    <aside className="workspace-sidebar" id="conversations-sidebar" aria-label="Conversations">
+      {sidebar}
+      <ColumnResizeHandle side="left" controls="conversations-sidebar" width={sidebarWidth} min={200} max={sidebarMax} onResize={setSidebarWidth} />
+    </aside>
     <Tabs.Root className="workspace-content" value={activeId} onValueChange={value => { const tab = tabs.find(tab => tab.id === value); if (tab) activate(tab); }}>
       <div className="main-column">
         <header className={`workspace-toolbar ${tabs.length > 1 ? "has-tabs" : "single-view"}`}>
+          <IconButton className="sidebar-toggle" label={sidebarVisible ? "Hide conversations" : "Show conversations"} aria-expanded={sidebarVisible} aria-controls="conversations-sidebar" onClick={() => setSidebarVisible(value => !value)}>
+            <PanelLeft size={19} />
+          </IconButton>
           <div className="mobile-navigation">
             <Modal title="Your workspace" description={config.company.name} side="left" open={navigationOpen} onOpenChange={setNavigationOpen} trigger={<Button variant="ghost" className="workspace-action">
               <Menu size={21} /> Menu</Button>}>
@@ -330,6 +352,9 @@ export function Workspace() {
             </div>
           </> : null}
           <Button variant="ghost" className="workspace-action" disabled={creating} onClick={() => void createChat()}>{creating ? <Spinner /> : <Plus size={18} />} New chat</Button>
+          <IconButton className="details-toggle" label={detailsVisible ? "Hide details" : "Show details"} aria-expanded={detailsVisible} aria-controls="details-column" onClick={() => setDetailsVisible(value => !value)}>
+            <PanelRight size={19} />
+          </IconButton>
           {active.kind !== "welcome" ? <div className="mobile-context">
             <Modal title={active.kind === "chat" ? "Conversation details" : "Details"} description={active.kind === "chat" ? snapshot?.conversation.title || "Active conversation" : "For your current tab"} side="right" open={contextOpen} onOpenChange={setContextOpen} trigger={<Button variant="ghost" className="workspace-action">
               <PanelRight size={19} /> Details</Button>}>{supporting}</Modal>
@@ -373,7 +398,10 @@ export function Workspace() {
           </Tabs.Panel>)}
         </main>
       </div>
-      <aside className="context-column" aria-label={active.kind === "chat" ? `Supporting views for ${snapshot?.conversation.title || "active conversation"}` : "Supporting view"}>{supporting}</aside>
+      <aside className="context-column" id="details-column" aria-label={active.kind === "chat" ? `Supporting views for ${snapshot?.conversation.title || "active conversation"}` : "Supporting view"}>
+        <ColumnResizeHandle side="right" controls="details-column" width={detailsWidth} min={240} max={detailsMax} onResize={setDetailsWidth} />
+        <div className="context-column-content">{supporting}</div>
+      </aside>
     </Tabs.Root>
     <Modal title="Discard unsaved work?" description="Closing this tab discards its unsaved input. Saved work and any running response remain available."
       finalFocus={() => tabList.current?.querySelector<HTMLElement>('[aria-selected="true"]') ?? document.getElementById("main-workspace")}

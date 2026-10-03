@@ -124,7 +124,7 @@ Keep the right region as a full layout column rather than implementing the deskt
 
 A signed-in user activates main tab A and sees its main content and any defined supporting views in the right column. Selecting another right-column tab keeps A active. Activating main tab B changes both the main content and the right column's supporting context to B. Late updates for A must not replace B's supporting content.
 
-Keep desktop columns in their own layout space, with scrolling contained to their content. On smaller screens, panels expose navigation and supporting content. Preserve per-chat drafts and active work when changing layouts or main tabs. Resizable columns and cross-reload persistence of panel preferences are not part of this slice.
+Keep desktop columns in their own layout space, with scrolling contained to their content. On smaller screens, panels expose navigation and supporting content. Preserve per-chat drafts and active work when changing layouts or main tabs. On desktop (above 1100 CSS pixels), both the conversations sidebar and contextual column can be hidden independently and resized with their inner-edge dividers. Toolbar controls remain available to reopen either column. Arrow keys resize a focused divider, Shift accelerates, and Home/End select the bounds. Width bounds preserve room for main content. Hiding or resizing preserves drafts, active work, and supporting selection. Width and visibility choices persist across main-tab changes and responsive layout changes during the open workspace; cross-reload persistence remains out of scope. Narrow layouts keep their navigation and Details panels.
 
 ## UI implementation rules
 

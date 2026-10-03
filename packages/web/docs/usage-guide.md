@@ -64,6 +64,8 @@ Sessions last at most twelve hours and expire after thirty minutes without an au
 
 The main tab strip appears when multiple views are open. Close a view with the × on its tab, or focus the tab and press Delete. With one view open, the strip is hidden; workspace actions and the view’s supporting context stay available.
 
+Above 1100 pixels, use the toolbar’s conversations and details icons to hide or show either side. Drag either inner divider to resize it, or focus the divider and use Left/Right (Shift for larger steps) or Home/End. These choices last while the workspace is open; reloading restores the defaults. Phone navigation and Details still open as panels.
+
 ## Checks and builds
 
 Inside the Nix shell:
