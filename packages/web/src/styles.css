@@ -368,6 +368,19 @@ input::placeholder, textarea::placeholder { color: var(--color-muted); }
 .terminal-empty { padding: 0 var(--space-4) var(--space-3); color: var(--color-inverse-muted); line-height: 1.75; }
 .terminal-diagnostic { display: flex; align-items: baseline; gap: var(--space-2); padding: var(--space-2) var(--space-4); color: var(--color-inverse-muted); line-height: 1.75; overflow-wrap: anywhere; }
 .bash-terminal :focus-visible { outline: 3px solid var(--color-accent); outline-offset: -3px; }
+.file-change { margin: var(--space-3) 0; min-width: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); font-size: var(--text-xs); }
+.file-change-heading { width: 100%; min-height: 44px; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border: 0; background: var(--color-surface-raised); color: var(--color-muted); text-align: left; }
+.file-change-title { min-width: 0; display: grid; gap: var(--space-half); flex: 1; }
+.file-change-title strong { color: var(--color-foreground); font-weight: 600; overflow-wrap: anywhere; }
+.file-change-status { display: flex; align-items: center; flex-shrink: 0; gap: var(--space-1); }
+.file-change-status .spinner svg { width: 13px; height: 13px; }
+.file-change-status-completed { color: var(--color-success); }
+.file-change-status-failed { color: var(--color-danger); }
+.file-change-note { display: flex; align-items: baseline; gap: var(--space-2); padding: var(--space-2) var(--space-3); color: var(--color-muted); line-height: 1.75; overflow-wrap: anywhere; }
+.file-change-raw { margin: 0; max-height: 400px; overflow: auto; padding: var(--space-3); font-size: var(--text-xs); line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.file-diff-viewport { max-height: min(420px, 55dvh); overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; border-top: 1px solid var(--color-border); }
+.file-diff-viewport diffs-container { display: block; --diffs-font-size: var(--text-xs); --diffs-line-height: 1.75; --diffs-header-font-family: var(--font-sans); --diffs-addition-color-override: var(--color-success); --diffs-deletion-color-override: var(--color-danger); }
+.file-change :focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
 .agent-working, .run-outcome { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); line-height: 1.7; color: var(--color-muted); margin: var(--space-6) 0 var(--space-5) var(--space-8); }
 .agent-working .spinner svg { width: 15px; height: 15px; }
 .chat-load-error { display: grid; gap: var(--space-2); margin-bottom: var(--space-5); }

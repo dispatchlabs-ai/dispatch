@@ -23,7 +23,7 @@ buildNpmPackage {
     ];
   };
 
-  npmDepsHash = "sha256-uj9a3pAjoIFBKTpfKRp6UFU50P79n4Fmj8gJxgowv1A=";
+  npmDepsHash = "sha256-miHftdnCiOhM1VDSbqRxHoYPHhmL9l87EfCCHz7n78A=";
   npmBuildScript = "build";
 
   doCheck = true;

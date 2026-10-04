@@ -18,11 +18,11 @@ export interface ToolActivities {
   echoes: Set<Message>;
 }
 
-export function bashOutput(activity: ToolActivity): string {
+export function toolOutput(activity: ToolActivity): string {
   if (!activity.result) return activity.live?.output ?? "";
   const content = activity.result.content;
   const diagnostics = activity.diagnostics ?? [];
-  // Pi appends this exact block to model context; the terminal shows diagnostics separately.
+  // Pi appends this exact block to model context; presenters show diagnostics separately.
   const diagnosticText = `<harness>\n${diagnostics.map(item => `[${item.severity}] ${item.message}`).join("\n")}\n</harness>`;
   return content.filter((part, index) => !(diagnostics.length && index === content.length - 1 && part.type === "text" && part.text === diagnosticText)).filter(part => part.type === "text").map(part => part.text).join("\n");
 }
@@ -64,7 +64,7 @@ export function toolActivities(entries: readonly EntryRecord[], live: LiveState)
         activity.resultEntryId = entry.id;
         activity.diagnostics = ToolResultEntry.is(entry) ? entry.data.diagnostics : undefined;
         results.set(message, matched ? null : activity);
-        previousOutput = activity.name === "bash" ? bashOutput(activity) : "";
+        previousOutput = activity.name === "bash" ? toolOutput(activity) : "";
       } else {
         previousOutput = "";
       }
