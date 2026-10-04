@@ -3,7 +3,7 @@ import { MultiFileDiff, PatchDiff, VirtualizerContext, WorkerPoolContextProvider
 import WorkerUrl from "@pierre/diffs/worker/worker.js?worker&url";
 import { memo, useCallback, useMemo, useState, type ReactNode } from "react";
 
-type FileDiffProps = { kind: "write"; path: string; content: string } | { kind: "edit"; path: string; patch: string };
+type FileDiffProps = { kind: "write"; path: string; content: string } | { kind: "edit"; path: string; patch: string } | { kind: "read"; path: string; content: string; firstLine: number; lineCount: number };
 
 const options: FileDiffOptions<undefined, undefined> = {
   theme: "github-light", themeType: "light", diffStyle: "unified", diffIndicators: "classic",
@@ -13,13 +13,23 @@ const options: FileDiffOptions<undefined, undefined> = {
 const metrics: VirtualFileMetrics = { lineHeight: 21, diffHeaderHeight: 0, hunkLineCount: 100, spacing: 8 };
 const poolOptions = { workerFactory: () => new Worker(WorkerUrl, { type: "module" }) };
 const highlighterOptions: WorkerInitializationRenderOptions = { theme: "github-light" };
+const readOptions: FileDiffOptions<undefined, undefined> = { ...options, diffIndicators: "none", disableBackground: true, hunkSeparators: "simple" };
 
 export default memo(function FileDiff(props: FileDiffProps) {
-  const content = props.kind === "write" ? props.content : "";
+  const content = props.kind !== "edit" ? props.content : "";
   const newFile = useMemo(() => ({ name: props.path, contents: content }), [props.path, content]);
+  const firstLine = props.kind === "read" ? props.firstLine : 1;
+  const lineCount = props.kind === "read" ? props.lineCount : 0;
+  const readPatch = useMemo(() => {
+    if (lineCount === 0) return "";
+    // A context-only hunk gives a read excerpt its original file line numbers.
+    const name = JSON.stringify(props.path);
+    const lines = content.split("\n").slice(0, lineCount).map(line => ` ${line}`).join("\n");
+    return `--- ${name}\n+++ ${name}\n@@ -${firstLine},${lineCount} +${firstLine},${lineCount} @@\n${lines}\n`;
+  }, [props.path, content, firstLine, lineCount]);
   return <WorkerPoolContextProvider poolOptions={poolOptions} highlighterOptions={highlighterOptions}>
-    <DiffViewport label={`${props.kind === "write" ? "Written content" : "Recorded changes"} for ${props.path}`}>
-      {props.kind === "write" ? <MultiFileDiff oldFile={null} newFile={newFile} options={options} metrics={metrics} /> : <PatchDiff patch={props.patch} options={options} metrics={metrics} />}
+    <DiffViewport label={`${props.kind === "write" ? "Written content" : props.kind === "read" ? "Read content" : "Recorded changes"} for ${props.path}`}>
+      {props.kind === "write" ? <MultiFileDiff oldFile={null} newFile={newFile} options={options} metrics={metrics} /> : <PatchDiff patch={props.kind === "read" ? readPatch : props.patch} options={props.kind === "read" ? readOptions : options} metrics={metrics} />}
     </DiffViewport>
   </WorkerPoolContextProvider>;
 });
