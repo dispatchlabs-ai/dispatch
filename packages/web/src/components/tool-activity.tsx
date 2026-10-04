@@ -49,7 +49,6 @@ function BashTerminal({ activity }: { activity: ToolActivity }) {
       {content.map((part, index) => part.type === "image" ? <img className="message-image" key={index} src={`data:${part.mimeType};base64,${part.data}`} alt="Image returned by the command" /> : null)}
       {activity.live?.droppedBytes || activity.live?.droppedLines ? <p className="terminal-diagnostic">Earlier live output was trimmed. Showing the latest output.</p> : null}
       {diagnostics.map((item, index) => <p className="terminal-diagnostic" key={index}><CircleAlert size={14} /><span>{item.message}</span></p>)}
-      <DebugData value={{ arguments: activity.call?.arguments, result: activity.result, live: activity.live, diagnostics }} />
     </> : null}
   </section>;
 }
@@ -59,17 +58,6 @@ function DefaultTool({ activity }: { activity: ToolActivity }) {
   const [open, setOpen] = useState(false);
   return <details className={`tool-entry ${activity.result?.isError ? "tool-error" : ""}`} onToggle={event => setOpen(event.currentTarget.open)}>
     <summary><Wrench size={15} />{activity.name}<span>{status(activity)}</span></summary>
-    {open ? <>
-      {activity.call ? <DebugData label="Call arguments" value={activity.call.arguments} /> : null}
-      {activity.result ? activity.result.content.map((part, index) => part.type === "text" ? <pre key={index}>{part.text}</pre> : <img className="message-image" key={index} src={`data:${part.mimeType};base64,${part.data}`} alt="Image returned by the tool" />) : activity.live?.output ? <pre>{activity.live.output}</pre> : null}
-      <DebugData value={{ result: activity.result, live: activity.live, diagnostics: activity.diagnostics }} />
-    </> : null}
-  </details>;
-}
-
-function DebugData({ value, label = "Debug data" }: { value: unknown; label?: string }) {
-  const [open, setOpen] = useState(false);
-  return <details className="tool-debug" onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary>{label}</summary>{open ? <pre>{JSON.stringify(value, null, 2)}</pre> : null}
+    {open && (activity.result ? activity.result.content.map((part, index) => part.type === "text" ? <pre key={index}>{part.text}</pre> : <img className="message-image" key={index} src={`data:${part.mimeType};base64,${part.data}`} alt="Image returned by the tool" />) : activity.live?.output ? <pre>{activity.live.output}</pre> : null)}
   </details>;
 }

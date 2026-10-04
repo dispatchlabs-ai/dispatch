@@ -354,8 +354,7 @@ input::placeholder, textarea::placeholder { color: var(--color-muted); }
 .tool-entry > p { padding-top: var(--space-3); }
 .tool-entry .markdown { padding-top: var(--space-3); font-size: var(--text-xs); }
 .tool-error { border-color: var(--color-danger); color: var(--danger); }
-.message-tools { margin: var(--space-3) 0; }
-.message-tools .message-content { padding-left: 0; }
+.message-continuation { margin-top: var(--space-3); }
 .bash-terminal { margin: var(--space-3) 0; min-width: 0; border-radius: var(--radius-sm); overflow: hidden; background: var(--color-foreground); color: var(--color-background); font-size: var(--text-xs); }
 .terminal-heading { width: 100%; min-height: 44px; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 0; background: var(--color-navy); color: var(--color-background); text-align: left; }
 .terminal-status { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; color: var(--color-inverse-muted); }
@@ -363,18 +362,12 @@ input::placeholder, textarea::placeholder { color: var(--color-muted); }
 .terminal-chevron-open { transform: rotate(180deg); }
 .terminal-command { display: flex; align-items: baseline; gap: var(--space-2); padding: var(--space-3) var(--space-4); }
 .terminal-command > span { color: var(--color-accent); user-select: none; }
-.terminal-command pre, .terminal-output, .tool-debug pre { margin: 0; font-size: var(--text-xs); line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.terminal-command pre, .terminal-output { margin: 0; font-size: var(--text-xs); line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
 .terminal-command pre { min-width: 0; }
 .terminal-output { max-height: 320px; overflow: auto; overscroll-behavior: contain; padding: 0 var(--space-4) var(--space-3); }
 .terminal-empty { padding: 0 var(--space-4) var(--space-3); color: var(--color-inverse-muted); line-height: 1.75; }
 .terminal-diagnostic { display: flex; align-items: baseline; gap: var(--space-2); padding: var(--space-2) var(--space-4); color: var(--color-inverse-muted); line-height: 1.75; overflow-wrap: anywhere; }
-.tool-debug summary { cursor: pointer; min-height: 44px; display: list-item; padding: var(--space-2) 0; }
-.tool-debug pre { max-height: 320px; overflow: auto; }
-.bash-terminal .tool-debug { border-top: 1px solid var(--color-navy); padding: 0 var(--space-4); color: var(--color-inverse-muted); }
-.bash-terminal .tool-debug summary { min-height: 32px; }
-.bash-terminal .tool-debug pre { padding-bottom: var(--space-3); }
 .bash-terminal :focus-visible { outline: 3px solid var(--color-accent); outline-offset: -3px; }
-@media (max-width: 600px) { .bash-terminal .tool-debug summary { min-height: 44px; } }
 .agent-working, .run-outcome { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); line-height: 1.7; color: var(--color-muted); margin: var(--space-6) 0 var(--space-5) var(--space-8); }
 .agent-working .spinner svg { width: 15px; height: 15px; }
 .chat-load-error { display: grid; gap: var(--space-2); margin-bottom: var(--space-5); }

@@ -99,6 +99,23 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
   const running = snapshot?.conversation.status === "running";
   const entries = snapshot?.view.entries || [];
   const activities = useMemo(() => toolActivities(entries, live), [entries, live]);
+  const continuations = useMemo(() => {
+    const grouped = new Set<Message>();
+    let previousRole: Message["role"] | undefined;
+    function include(message: Message) {
+      if (message.role === "toolResult") return;
+      if (message.role === "assistant" && previousRole === "assistant") grouped.add(message);
+      previousRole = message.role;
+    }
+    for (const entry of entries) {
+      const contextBoundary = entry.kind === "pi.reset" || entry.kind === "pi.compaction";
+      if (contextBoundary) previousRole = undefined;
+      entry.model?.forEach(include);
+      if (contextBoundary) previousRole = undefined;
+    }
+    if (live.generation?.message) include(live.generation.message as Message);
+    return grouped;
+  }, [entries, live.generation?.message]);
   const initialSetupId = entries.find(entry => entry.model?.some(message => message.role === "system"))?.id;
   const hasMessages = entries.some(entry => entry.model?.some(message => message.role === "user" || message.role === "assistant"));
 
@@ -142,8 +159,8 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
           <h2>What are we working on?</h2>
           <p>Bring a question, a rough idea, or a problem to work through.</p>
         </div> : null}
-        {entries.map(entry => <TranscriptEntry key={entry.id} entry={entry} activities={activities} agentName={agentName} initialSetup={entry.id === initialSetupId} />)}
-        {live.generation?.message ? <TranscriptMessage message={live.generation.message as Message} activities={activities} agentName={agentName} streaming /> : null}
+        {entries.map(entry => <TranscriptEntry key={entry.id} entry={entry} activities={activities} continuations={continuations} agentName={agentName} initialSetup={entry.id === initialSetupId} />)}
+        {live.generation?.message ? <TranscriptMessage message={live.generation.message as Message} activities={activities} continuation={continuations.has(live.generation.message as Message)} agentName={agentName} streaming /> : null}
         {activities.extra.map(activity => <ToolActivityView key={activity.live?.callId} activity={activity} />)}
         {running && !live.generation?.message && !live.tools?.some(tool => tool.status !== "done") ? <div className="agent-working" role="status">
           <Spinner label="Agent is working" />
@@ -181,11 +198,11 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
   </div>;
 }
 
-function TranscriptEntry({ entry, activities, agentName, initialSetup }: { entry: EntryRecord; activities: ToolActivities; agentName: string; initialSetup: boolean }) {
+function TranscriptEntry({ entry, activities, continuations, agentName, initialSetup }: { entry: EntryRecord; activities: ToolActivities; continuations: Set<Message>; agentName: string; initialSetup: boolean }) {
   if (initialSetup && entry.model?.every(message => message.role === "system")) return null;
   if (entry.kind === "pi.reset" || entry.kind === "pi.compaction") {
     return <details className="native-entry">
-      <summary>{entry.kind === "pi.reset" ? "Conversation context started" : "Earlier context summarized"}</summary>{entry.model?.map((message, index) => <TranscriptMessage key={index} message={message} activities={activities} agentName={agentName} initialSetup={initialSetup} />)}{entry.data ? <details>
+      <summary>{entry.kind === "pi.reset" ? "Conversation context started" : "Earlier context summarized"}</summary>{entry.model?.map((message, index) => <TranscriptMessage key={index} message={message} activities={activities} continuation={continuations.has(message)} agentName={agentName} initialSetup={initialSetup} />)}{entry.data ? <details>
         <summary>Technical details</summary>
         <pre>{JSON.stringify(entry.data, null, 2)}
         </pre>
@@ -197,7 +214,7 @@ function TranscriptEntry({ entry, activities, agentName, initialSetup }: { entry
     <pre>{JSON.stringify({ kind: entry.kind, data: entry.data }, null, 2)}
     </pre>
   </details>;
-  return <>{entry.model.map((message, index) => <TranscriptMessage key={index} message={message} activities={activities} agentName={agentName} initialSetup={initialSetup} />)}{entry.data && entry.kind !== "pi.tool-result" ? <details className="native-entry">
+  return <>{entry.model.map((message, index) => <TranscriptMessage key={index} message={message} activities={activities} continuation={continuations.has(message)} agentName={agentName} initialSetup={initialSetup} />)}{entry.data && entry.kind !== "pi.tool-result" ? <details className="native-entry">
     <summary>Technical entry details</summary>
     <pre>{JSON.stringify(entry.data, null, 2)}
     </pre>
@@ -205,7 +222,7 @@ function TranscriptEntry({ entry, activities, agentName, initialSetup }: { entry
   </>;
 }
 
-function TranscriptMessage({ message, activities, agentName, initialSetup = false, streaming = false }: { message: Message; activities: ToolActivities; agentName: string; initialSetup?: boolean; streaming?: boolean }) {
+function TranscriptMessage({ message, activities, agentName, initialSetup = false, streaming = false, continuation = false }: { message: Message; activities: ToolActivities; continuation?: boolean; agentName: string; initialSetup?: boolean; streaming?: boolean }) {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const copiedTimer = useRef<number | null>(null);
@@ -224,9 +241,8 @@ function TranscriptMessage({ message, activities, agentName, initialSetup = fals
     const activity = activities.results.get(message);
     return activity ? <ToolActivityView activity={activity} /> : null;
   }
-  const toolsOnly = message.role === "assistant" && content.some(part => part.type === "toolCall") && !text && message.stopReason !== "error" && message.stopReason !== "aborted";
-  return <article className={`message message-${message.role}${toolsOnly ? " message-tools" : ""}`} aria-label={message.role === "user" ? "Your message" : "Agent response"}>
-    {!toolsOnly ? <div className="message-heading">
+  return <article className={`message message-${message.role}${continuation ? " message-continuation" : ""}`} aria-label={message.role === "user" ? "Your message" : "Agent response"}>
+    {!continuation ? <div className="message-heading">
       <span className="message-avatar">{message.role === "assistant" ? <Brand compact decorative /> : <MessageSquare size={15} />}</span>
       <strong>{message.role === "user" ? "You" : agentName}</strong>{message.timestamp ? <time dateTime={new Date(message.timestamp).toISOString()}>{new Date(message.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
       </time> : null}

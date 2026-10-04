@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Removed raw debug-data disclosures from tool activity while retaining command/output/status and native stored records. Grouped the terminal and follow-up text beneath one agent heading.
+
 ### Added
 
 - Compact bash terminal presentation with command, native live output, result status, and visible diagnostics in one transcript item; a generic fallback preserves other tools.
