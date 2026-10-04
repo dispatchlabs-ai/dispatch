@@ -245,6 +245,21 @@ Design the first chat around Pi's public interfaces and the ownership boundaries
 
 Share TypeScript contracts across browser and service. Validate JSON commands with Zod at the HTTP boundary; authentication verifies its own input through the same same-origin boundary. REST endpoints map to native Pi operations and SSE emits complete native conversation snapshots. [runtime.md](runtime.md) documents ownership, recovery, and request identity; the [usage guide](usage-guide.md#application-api) lists the API.
 
+### Agent collaboration and worker scaling
+
+**Accepted October 4, 2026.** Stay close to stock Pi Durable's capabilities. Agent interaction, handoffs, and work toward a common goal must use Pi's native submissions, tasks, ownership, documents, cancellation, and recovery. Dispatch supplies named definitions, authorization, workflow-specific tools, and presentation through Pi's public interfaces. The architecture must not require a separate Dispatch execution engine or a distributed orchestration protocol between role-specific stores. The [accepted architecture decision](https://wiki.dispatchworks.ai/wiki/agent-runtime-architecture/) records the rationale and supersedes the earlier proposal for one process and SQLite store per named agent type.
+
+- A named agent type is a reusable definition. Creating Designer, Reviewer, or another type does not provision a process or store. Each instance is a conversation with its selected configuration and independent history.
+- Keep collaborating instances in the same Pi Session when relying on native coordination. Different roles can use different models, instructions, tools, and execution environments within that Session. Shared storage does not change the existing company/user authorization boundaries.
+- Begin with the existing single runtime. When measured load or a concrete isolation requirement warrants additional workers, assign independent groups of work to workers that can each run every required role. Keep requests routed to the worker owning their Session.
+- A worker may exclusively own one or several independent Sessions, each with its own persistent SQLite store. A process per workflow is unnecessary. Hosting two Sessions in one process does not extend native coordination across their stores; all tightly coupled participants still belong in one Session.
+- Keep the harness, model loops, and durable state in the central agent service's workers. Tool execution can use a separate remote sandbox per conversation through Pi's execution-environment interface. Persisted conversation/task state and sandbox files have separate storage lifetimes.
+- Infrastructure provides durable storage and backup/restore, request routing, and process supervision. After a worker restart, reopen its existing storage, reinstall the required definitions, and resume work through Pi. The supervisor restarts the process; Pi owns execution recovery.
+
+The exact grouping boundary (for example, a case, project, or broader workspace) remains open and must follow the collaboration use cases. Choose worker capacity from observed workload, event-loop delay, and storage latency; this decision sets no numeric concurrency limit. Automatic failover across machines remains deferred.
+
+This is an accepted architecture constraint for future work packages. It does not mark agent collaboration, remote sandbox integration, or multiple workers as implemented or qualified.
+
 ## Failure and recovery behavior
 
 **Accepted chat outcomes:**
