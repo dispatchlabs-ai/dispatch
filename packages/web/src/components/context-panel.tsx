@@ -58,13 +58,18 @@ export function ContextPanel({ kind, snapshot, models, tab, onTabChange }: {
           <dt>Tools</dt>
           <dd>{Array.isArray(agent.tools) && agent.tools.length ? agent.tools.join(", ") : "No tools enabled"}</dd>
         </div>
+        {agent.cwd ? <div>
+          <dt>Local workspace</dt>
+          <dd>{agent.cwd}</dd>
+        </div> : null}
       </dl>
       <section className="context-section">
         <h3>Instructions</h3>
         <p className="saved-instructions">{agent.instructions || "No additional instructions."}</p>
       </section>
       <p className="privacy-note">
-        <LockKeyhole size={13} /> Only you can access this conversation.</p>
+        <LockKeyhole size={13} /> Only your account can open this conversation in Dispatch.</p>
+      {agent.cwd ? <p className="context-description">Coding tools run on the service machine with its account’s access. The workspace is not a sandbox.</p> : null}
     </Tabs.Panel>
     <Tabs.Panel value="run" className="context-body">
       <div className="context-title">

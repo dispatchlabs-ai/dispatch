@@ -4,7 +4,8 @@
 
 ### Added
 
-- Copied Pi Durable’s example `Coding` prompt extension into a reusable server module, preserving provenance and its MIT license. Runtime activation remains a separate integration step.
+- Registered Developer with Pi’s `Coding` extension, native read/write/edit/bash tools, and persistent local workspaces. It inherits the saved default model/thinking values once; basic edits preserve coding capabilities, and the UI shows tools and workspace details.
+- Copied Pi Durable’s example `Coding` prompt extension into a reusable server module, preserving provenance and its MIT license.
 
 - Saved conversation pin/unpin and archive/restore actions, with right-side hover/focus controls and an archived view; removed redundant leading chat icons.
 - Independent desktop sidebar/details visibility controls and draggable, keyboard-accessible width dividers that preserve active work.

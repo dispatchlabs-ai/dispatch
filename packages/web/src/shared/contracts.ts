@@ -43,6 +43,9 @@ export interface AgentDraft {
 
 export interface AgentDefinition extends AgentDraft {
   id: string;
+  /** Operator-registered Pi capabilities, preserved when editing the basic fields. */
+  extensions: string[];
+  tools: string[];
   revision: number;
   archived: boolean;
   createdAt: number;

@@ -52,6 +52,14 @@ In Agents, New agent is at the top of the sidebar, followed by Find an agent and
 
 New agent opens an editor with the saved default agent's model/thinking values. Fill in Identity, Instructions, and Model; Cancel and Create agent/Save new revision stay below the scrolling form. The right column previews the unsaved draft and distinguishes changes from the saved revision for existing agents. Choosing another agent or starting a new edit asks before discarding unsaved changes. Switching to Chats or Account, hiding a column, or changing screen size preserves the open editor. On phones, Start chat fills its row and the agent view includes a short model/thinking/tools summary; Details exposes the full configuration.
 
+### Developer
+
+The built-in Developer appears in Agents after service startup. It starts with the saved default agent's model and thinking level. Select Developer and choose Start chat to use Pi's `read`, `write`, `edit`, and `bash` tools. Its name, description, instructions, model, and thinking level use the normal editor; saving preserves its coding tools and affects new chats only. Archiving it prevents new chats and survives restart.
+
+Each Developer chat gets a persistent local directory at `<DISPATCH_DATA_DIR>/runtime/workspaces/<conversation ID>`, created when the agent first needs its environment. Chat Details shows the full path. Ask Developer to create a project there, or place existing project files there using your normal local workflow. Archiving the chat or agent does not remove those files. Keep the runtime and workspace paths stable when moving or restoring local state.
+
+Coding tools run on the service machine with the service account's access, including paths outside the working directory. This first setup is for trusted local use on M1 Air; the directory is not a sandbox. Native tool activity and results appear in the conversation. Stop uses Pi's cancellation; an interrupted shell/file operation is not guaranteed to be undone or to execute only once during recovery.
+
 ## Chat and workspace
 
 Your messages appear on the right; agent replies stay on the left.

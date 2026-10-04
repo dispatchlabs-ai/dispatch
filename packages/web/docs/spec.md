@@ -1,6 +1,6 @@
 # Dispatch Web specification
 
-**Status: local application specification.** The current implementation covers company authentication, native Pi Durable chat, named agent definitions, and the branded desktop/mobile workspace. The October 3 coordinated implementation contracts below settle the first feature set. Later tools, handoffs, schedules, RBAC, and internal deployment still need their own work packages. Functional qualification is deferred under the current [testing policy](#testing-policy).
+**Status: local application specification.** The current implementation covers company authentication, native Pi Durable chat, named agent definitions, and the branded desktop/mobile workspace. The October 3 coordinated implementation contracts below settle the first feature set. Developer adds native coding tools with an authorized local workspace. Additional tools, handoffs, schedules, RBAC, and internal deployment still need their own work packages. Functional qualification is deferred under the current [testing policy](#testing-policy).
 
 ## Product context
 
@@ -235,7 +235,18 @@ Design the first chat around Pi's public interfaces and the ownership boundaries
 
 ### Reusable Coding extension
 
-**Accepted October 4, 2026:** copy the `Coding` extension from Pi Durable's [example 26](https://github.com/earendil-works/pi/blob/v1.0.1/packages/durable/test/examples/26-coding-agent.ts) into the web package. [The server module](../server/extensions/coding.ts) exports its unchanged coding preamble and dynamic working-directory section through Pi's public extension API. The module is available for later registration and selection; this copy does not activate it, provide `CodingTools`, configure an execution environment, or change saved agent definitions.
+**Accepted October 4, 2026:** copy the `Coding` extension from Pi Durable's [example 26](https://github.com/earendil-works/pi/blob/v1.0.1/packages/durable/test/examples/26-coding-agent.ts) into the web package. [The server module](../server/extensions/coding.ts) exports its unchanged coding preamble and dynamic working-directory section through Pi's public extension API. The initial copy did not activate it or change saved agents. The Developer integration below now registers and selects it.
+
+### Developer coding agent
+
+**Accepted October 4, 2026:** register a company-shared `Developer` definition using the reusable `Coding` extension and stock Pi `CodingTools` (`read`, `write`, `edit`, `bash`). Chris chose a local M1 Air workspace for this first integration; remote sandboxes remain deferred. The [runtime decision record](https://wiki.dispatchworks.ai/wiki/agent-runtime-architecture/#section-developer-coding-agent) preserves that boundary.
+
+- Seed `developer` once, inheriting the latest saved default's provider, model, and thinking level. Preserve later edits and archived revisions on restart. Developer uses the existing five-field editor, revision conflicts, archive behavior, and Start chat action.
+- Persist the selected native extension/tool names with each definition revision. The basic save API preserves those server-owned selections; new user-created definitions and legacy records remain chat-only. No advanced capability editor is introduced.
+- Register implementations before native recovery. Resolve saved names to registered Pi definitions when configuring a new chat, and copy model, thinking, instructions, capabilities, and working directory into the native conversation. Missing registered capabilities fail creation explicitly. Existing conversations retain their native configuration.
+- Each new Developer chat uses `<stateDir>/runtime/workspaces/<native conversation ID>`. Create that private directory when Pi first requests its environment and retain files across restarts, chat archive, and agent edits. Expose the working directory in chat details so the operator can place a project there. No project checkout, upload, or workspace-cleanup workflow is added.
+- Use Pi's public `NodeExecutionEnv` and native tool execution, cancellation, and recovery. Local directories organize work; they do **not** isolate the filesystem, subprocesses, network, credentials, or other users' files. Coding tools run with the service account's access. This is an explicitly authorized trusted local development setup, not qualification for shared deployment. Application API ownership checks remain in force.
+- Agent details and draft previews show the selected tools. Chat details show the local workspace and execution boundary. Existing native tool activity/results remain visible in the transcript. Interrupted tools follow Pi's native recovery semantics; shell and file effects are not promised exactly once.
 
 ## Contracts and state ownership
 

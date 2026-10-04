@@ -21,11 +21,17 @@ Pi owns native transcripts, submission admission, generations, queued inputs, ca
 
 Closing a watcher stops observation only. Work continues while the browser is absent. The service transport must independently enforce session expiry/revocation for live subscriptions.
 
-On recovery, Pi can retain an interrupted partial as an aborted assistant entry and retry the pending generation. This does not promise token-exact continuation or exactly-once provider billing. The first agent has no tools; external-effect replay policies belong to later, specified tool integrations.
+On recovery, Pi can retain an interrupted partial as an aborted assistant entry and retry the pending generation. This does not promise token-exact continuation or exactly-once provider billing. The default agent has no tools. Developer uses stock Pi coding tools and their native replay policies; shell/file effects are not promised exactly once.
 
 ## Agent definitions
 
 Startup seeds a company-scoped `default` definition in the existing catalog only if it is absent, using the supplied provider/model/thinking configuration, general-purpose instructions, and no tools or extensions. That seed shares the startup metadata transaction; reopening storage preserves all saved revisions. The default and named agents are company-shared and use the same save path. The default cannot be archived. Service configuration supplies seed values only; provider availability is computed from the saved default. Each save appends an immutable revision, using `expectedRevision` to reject stale edits. Archiving appends an archived revision; creating a new chat from it or editing it is denied. There is no restore workflow in this slice; create a new definition to reuse its configuration. Existing chats retain the native agent configuration copied at creation and remain usable.
+
+Startup also seeds `developer` once from the latest saved default model/thinking values. Its definition selects the registered `coding` and `coding-tools` extensions and the `read`, `write`, `edit`, and `bash` tools. Definition reads normalize older missing selections to empty arrays. Basic edits preserve server-owned capability selections; new definitions use empty selections. Restart does not recreate an archived Developer or overwrite saved edits.
+
+The runtime installs both extension implementations before opening/resuming Pi. Chat creation resolves saved extension/tool names to native definition objects for `configure()`, which stores their names in `pi.agent`; unavailable selections return `503`. Developer conversations also store an absolute working directory under the runtime owner's `workspaces/<conversation ID>`. `HarnessOptions.env` creates that directory when first needed and returns `NodeExecutionEnv`; it returns no environment for conversations without a working directory. Files persist independently of transcript updates and archive state. Moving the state directory does not rewrite stored absolute paths.
+
+This local environment has the service account's filesystem, process, and network access. A per-conversation directory is not a sandbox or cross-user isolation boundary. Chris authorized it for trusted local development on M1 Air; remote sandbox provisioning and shared deployment remain separate work. Credentials stay out of API snapshots, but local tools can access whatever the service account can access. Pi owns tool tasks, cancellation, and recovery; Dispatch adds no execution scheduler or retry loop.
 
 Conversation reads, subscriptions, submission, and cancellation require both the creator's user ID and company ID. Named-definition access requires the company ID. HTTP authentication, account membership, and model credential resolution remain service responsibilities.
 

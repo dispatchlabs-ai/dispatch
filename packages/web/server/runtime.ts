@@ -1,18 +1,21 @@
 import { createHash, randomUUID } from "node:crypto";
-import { chmod } from "node:fs/promises";
+import { chmod, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, getSupportedThinkingLevels, type Models } from "@earendil-works/pi-ai/models";
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
-import { configure, createRegistry, defineDoc, Harness, type ConversationId, type ConversationView, type Cursor, type HarnessSettings, type LiveState, type Storage, type SubmissionRecord } from "@earendil-works/pi-durable";
+import { configure, createRegistry, defineDoc, Harness, type ConversationId, type ConversationView, type Cursor, type HarnessSettings, type LiveState, type RegistryReader, type Storage, type SubmissionRecord } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
+import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
+import { CodingTools } from "@earendil-works/pi-durable/tools";
 import type { AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, RuntimeScope, UpdateChatInput } from "../src/shared/contracts.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
+import { Coding } from "./extensions/coding.js";
 
 const context = BACKGROUND_CONTEXT;
 type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived"> & { pinned?: boolean; archived?: boolean; agentName?: string; companyId: string; userId: string; requestId: string };
-type StoredAgent = { [Key in keyof AgentDefinition]: AgentDefinition[Key] } & { companyId: string };
+type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: string; extensions?: string[]; tools?: string[] };
 type Catalog = { chats: StoredChat[]; agents: StoredAgent[]; runtimeInstance?: string };
 const CatalogDoc = defineDoc<Catalog>({
   kind: "dispatch.catalog", version: 1, scope: "session",
@@ -43,14 +46,16 @@ export class DispatchRuntime {
   private harness: Harness;
   private storage: Storage;
   private models: Models;
+  private registry: RegistryReader;
   private owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>;
   private commitRevision = 0;
   private closed = false;
 
-  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>) {
+  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: RegistryReader) {
     this.harness = harness;
     this.storage = storage;
     this.models = models;
+    this.registry = registry;
     this.owner = owner;
     harness.subscribeCommits((publication) => { this.commitRevision = publication.seq; });
   }
@@ -63,8 +68,19 @@ export class DispatchRuntime {
       const filename = join(owner.directory, "pi.sqlite");
       storage = await openNodeSqliteStorage(filename);
       await chmod(filename, 0o600);
-      const harness = await Harness.open(storage, { models, registry: createRegistry(), settings: options.settings }, context);
-      const runtime = new DispatchRuntime(harness, storage, models, owner);
+      const registry = createRegistry();
+      registry.install(CodingTools);
+      registry.install(Coding);
+      const harness = await Harness.open(storage, {
+        models, registry, settings: options.settings,
+        env: async ({ cwd }) => {
+          if (!cwd) return undefined;
+          await mkdir(cwd, { recursive: true, mode: 0o700 });
+          // A local working directory organizes files; it is not a filesystem or process sandbox.
+          return new NodeExecutionEnv({ cwd });
+        },
+      }, context);
+      const runtime = new DispatchRuntime(harness, storage, models, owner, registry);
       // Seed once and publish a real commit before recovery so snapshots use Pi's persisted sequence.
       await harness.commit(async (tx) => {
         const catalog = await tx.doc(CatalogDoc);
@@ -79,6 +95,18 @@ export class DispatchRuntime {
           };
           runtime.validateAgent(agent);
           catalog.agents.push(agent);
+        }
+        if (!catalog.agents.some(agent => agent.companyId === options.companyId && agent.id === "developer")) {
+          const defaults = runtime.findAgent(catalog, { companyId: options.companyId }, "default");
+          const now = Date.now();
+          catalog.agents.push({
+            id: "developer", companyId: options.companyId, name: "Developer",
+            description: "Builds, debugs, and improves software in a coding workspace.",
+            instructions: "Inspect the project and its instructions before changing code. Make focused changes, preserve existing work, and explain what changed and how it was checked. Be clear about anything you could not verify.",
+            provider: defaults.provider, modelId: defaults.modelId, thinkingLevel: defaults.thinkingLevel,
+            extensions: [Coding.name, CodingTools.name], tools: ["read", "write", "edit", "bash"],
+            revision: 1, archived: false, createdAt: now, updatedAt: now,
+          });
         }
         catalog.runtimeInstance = randomUUID();
       }, context);
@@ -111,8 +139,23 @@ export class DispatchRuntime {
       }
       const agent = this.findAgent(catalog, scope, input.agentDefinitionId ?? "default");
       this.validateAgent(agent);
+      const registry = this.registry.snapshot();
+      const extensions = (agent.extensions ?? []).map(name => {
+        const extension = registry.extension(name);
+        if (!extension) throw new RuntimeError(503, `Agent extension ${name} is unavailable.`);
+        return extension;
+      });
+      const tools = (agent.tools ?? []).map(name => {
+        const tool = extensions.flatMap(extension => extension.tools ?? []).find(tool => tool.name === name);
+        if (!tool) throw new RuntimeError(503, `Agent tool ${name} is unavailable.`);
+        return tool;
+      });
       const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
-      await configure(tx, record.id, { model: { provider: agent.provider, modelId: agent.modelId }, instructions: agent.instructions, thinkingLevel: agent.thinkingLevel, extensions: [], tools: [] });
+      await configure(tx, record.id, {
+        model: { provider: agent.provider, modelId: agent.modelId }, instructions: agent.instructions, thinkingLevel: agent.thinkingLevel,
+        extensions, tools,
+        ...(agent.extensions?.includes(CodingTools.name) ? { cwd: join(this.owner.directory, "workspaces", String(record.id)) } : {}),
+      });
       const id = String(record.id);
       catalog.chats.push({ id, title, createdAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, agentName: agent.name, companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
       return id;
@@ -231,6 +274,7 @@ export class DispatchRuntime {
       const agent: StoredAgent = {
         id: prior?.id ?? randomUUID(), name: input.name.trim(), description: input.description.trim(),
         instructions: input.instructions, provider: input.provider, modelId: input.modelId, thinkingLevel: input.thinkingLevel,
+        extensions: prior?.extensions ?? [], tools: prior?.tools ?? [],
         revision: (prior?.revision ?? 0) + 1, archived: false, createdAt: prior?.createdAt ?? now, updatedAt: now, companyId: scope.companyId,
       };
       catalog.agents.push(agent);
@@ -305,7 +349,9 @@ function nativeId(id: string): ConversationId {
 }
 
 function owns(scope: RuntimeScope, chat: RuntimeScope) { return scope.companyId === chat.companyId && scope.userId === chat.userId; }
-function publicAgent({ companyId: _companyId, ...agent }: StoredAgent): AgentDefinition { return agent; }
+function publicAgent({ companyId: _companyId, ...agent }: StoredAgent): AgentDefinition {
+  return { ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [] };
+}
 function requireText(value: unknown, field: string, max: number, allowEmpty = false): asserts value is string {
   if (typeof value !== "string" || (!allowEmpty && !value.trim()) || value.length > max) throw new RuntimeError(400, `${field} must be ${allowEmpty ? "at most" : "between 1 and"} ${max} characters.`);
 }
