@@ -130,6 +130,14 @@ A signed-in user activates main tab A and sees its main content and any defined 
 
 Keep desktop columns in their own layout space, with scrolling contained to their content. On smaller screens, panels expose navigation and supporting content. Preserve per-chat drafts and active work when changing layouts or main tabs. On desktop (above 1100 CSS pixels), both the conversations sidebar and contextual column can be hidden independently and resized with their inner-edge dividers. Controls in the left navigation rail remain available to reopen either column. Arrow keys resize a focused divider, Shift accelerates, and Home/End select the bounds. Width bounds preserve room for main content. Hiding or resizing preserves drafts, active work, and supporting selection. Width and visibility choices persist across main-tab changes and responsive layout changes during the open workspace; cross-reload persistence remains out of scope. Narrow layouts keep their navigation and Details panels.
 
+### Message composer
+
+**Accepted October 4, 2026:** the prompt field renders Markdown as editable content while typing or pasting; see the [composer decision](https://wiki.dispatchworks.ai/wiki/agent-runtime-architecture/#section-message-composer). Headings, ordered/unordered lists, quotes, emphasis, links, inline code, and fenced code use Lexical's Markdown transforms. Plain clipboard text is the import source; HTML is not interpreted as markup. Code-block paste remains literal. Markdown constructs without a transform remain text. Serialization may normalize Markdown spelling; this is a formatted editor, not a byte-preserving source editor.
+
+Each mounted chat owns its editor and undo history; workspace drafts and submitted messages remain Markdown strings. External draft changes, including an acknowledged send, update the editor without reinitializing it on every keystroke. The existing request/retry and draft-version rules remain unchanged. Draft persistence across reloads is still out of scope. Copy/cut exports the selected content as Markdown.
+
+The composer has one outer focus indicator, grows with its contents up to a scrolling bound, and has no privacy/status sentence in the toolbar. Send and Stop retain their existing state and accessible labels. Desktop Enter sends, Shift+Enter adds a line, and touch-primary Enter adds a line; IME composition must not submit. The existing 100,000-character limit applies to serialized Markdown: longer drafts remain editable, show an error, and cannot send until shortened.
+
 ## UI implementation rules
 
 **Accepted October 3, 2026, from the [UI/UX review](ui-ux-review.md), under Chris's authorization to update the rules.** These rules make the accepted branding, desktop/mobile, and workspace requirements checkable by source review and rendered screens. Items marked **Proposed** are new security or product decisions that still need Chris's confirmation.

@@ -64,6 +64,8 @@ Coding tools run on the service machine with the service account's access, inclu
 
 Your messages appear on the right; agent replies stay on the left.
 
+The message composer formats Markdown as you type or paste: headings, lists, quotes, bold/italic text, links, and code stay editable in place. Copying selected content retains its Markdown formatting. Paste inside a code block keeps the text literal. Desktop Enter sends; Shift+Enter inserts a line. Enter on a touch-primary device inserts a line; use Send to submit. The toolbar contains Send and, during active work, Stop. Drafts stay with each open chat. Messages over 100,000 characters including formatting must be shortened before sending.
+
 Chats are private to the authenticated user in the installation's company. Open a saved conversation or start one with the default or a named agent. The service returns native Pi entries and streams complete snapshots; the browser derives its display from those records.
 
 - Sending while a response is active adds a native follow-up. Retry a failed network request with the same logical request ID; a changed message gets a new ID. Reusing an ID with different content returns a conflict.

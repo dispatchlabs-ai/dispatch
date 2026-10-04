@@ -9,6 +9,7 @@ import { toolActivities, type ToolActivities } from "../lib/tool-activity";
 import { useSession } from "../lib/session";
 import { Brand } from "./brand";
 import { Markdown } from "./markdown";
+import { MarkdownComposer } from "./markdown-composer";
 import { ToolActivityView } from "./tool-activity";
 import { Button, IconButton, Notice, Spinner } from "./ui";
 
@@ -36,7 +37,6 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
   const transcript = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   const scrollPosition = useRef(0);
-  const textarea = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -88,12 +88,6 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
     if (!atBottom.current && snapshot) setShowLatest(true);
   }, [snapshot, visible]);
 
-  useEffect(() => {
-    if (!visible || !textarea.current) return;
-    textarea.current.style.height = "auto";
-    textarea.current.style.height = `${Math.min(textarea.current.scrollHeight, 180)}px`;
-  }, [draft, visible]);
-
   const live = snapshot ? chatLive(snapshot) : {};
   const agentName = snapshot?.conversation.agentName || "Agent";
   const running = snapshot?.conversation.status === "running";
@@ -118,11 +112,19 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
   }, [entries, live.generation?.message]);
   const initialSetupId = entries.find(entry => entry.model?.some(message => message.role === "system"))?.id;
   const hasMessages = entries.some(entry => entry.model?.some(message => message.role === "user" || message.role === "assistant"));
+  const tooLong = draft.length > 100000;
+  const canSend = Boolean(draft.trim() && !tooLong && !pending?.sending && snapshot);
 
   function scrollToLatest() {
     if (transcript.current) transcript.current.scrollTop = transcript.current.scrollHeight;
     atBottom.current = true;
     setShowLatest(false);
+  }
+
+  function sendDraft() {
+    if (!canSend) return;
+    scrollToLatest();
+    onSend();
   }
 
   return <div className="chat-panel">
@@ -178,19 +180,16 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
     <div className="composer-area">
       {pending?.error ? <Notice>{pending.error} Your message is kept here. Retry sends the same message once.</Notice> : sendError ? <Notice>{sendError}</Notice> : null}
       {stopError ? <Notice>{stopError}</Notice> : null}
-      <form className="composer" onSubmit={event => { event.preventDefault(); scrollToLatest(); onSend(); }}>
-        <label className="sr-only" htmlFor={`composer-${chatId}`}>Message your agent</label>
-        <textarea ref={textarea} id={`composer-${chatId}`} value={draft} maxLength={100000} onChange={event => onDraftChange(event.target.value)} placeholder="Message your agent…" rows={2} readOnly={pending?.sending} disabled={!snapshot} onKeyDown={event => {
-          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && window.matchMedia("(pointer: fine)").matches) { event.preventDefault(); if (draft.trim() && !pending?.sending) { scrollToLatest(); onSend(); } }
-        }} />
+      {tooLong ? <Notice>Shorten your message to 100,000 characters or fewer, including Markdown formatting.</Notice> : null}
+      <form className="composer" onSubmit={event => { event.preventDefault(); sendDraft(); }}>
+        <MarkdownComposer id={`composer-${chatId}`} value={draft} disabled={!snapshot} readOnly={Boolean(pending?.sending)} onChange={onDraftChange} onSend={sendDraft} />
         <div className="composer-toolbar">
-          <span>{pending?.sending ? "Sending…" : running ? "You can send another message while your agent works." : "Your conversations are private to you."}</span>
           <div className="button-row">
             {running ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
               setStopping(true); setStopError(null);
               void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/stop`, {}).then(onSnapshot).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));
             }}>{stopping ? <Spinner /> : <Square />} Stop</Button> : null}
-            <Button type="submit" className="send-button" disabled={!draft.trim() || pending?.sending || !snapshot} aria-label={pending?.error ? "Retry sending message" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}</Button>
+            <Button type="submit" className="send-button" disabled={!canSend} aria-label={pending?.error ? "Retry sending message" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}</Button>
           </div>
         </div>
       </form>

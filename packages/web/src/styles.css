@@ -376,12 +376,29 @@ input::placeholder, textarea::placeholder { color: var(--color-muted); }
 .composer-area { flex-shrink: 0; padding: var(--space-3) var(--space-6) var(--space-6); width: 100%; max-width: 890px; margin: 0 auto; }
 .composer-area > .notice { margin-bottom: var(--space-3); }
 .composer { border: 1px solid var(--color-control-border); background: var(--color-surface); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: var(--space-3); }
-.composer:focus-within { border-color: var(--focus); }
-.composer textarea { width: 100%; resize: none; border: 0; border-radius: 0; background: transparent; padding: var(--space-half) var(--space-half) var(--space-2); color: var(--color-foreground); font-size: var(--text-sm); line-height: 1.6; min-height: 50px; max-height: 180px; overflow-y: auto; }
-.composer textarea::placeholder { color: var(--color-muted); }
+.composer:focus-within { border-color: var(--focus); outline: 2px solid var(--focus); outline-offset: 1px; }
+.composer-editor { position: relative; }
+.composer-input { width: 100%; border: 0; background: transparent; padding: var(--space-half) var(--space-half) var(--space-2); color: var(--color-foreground); font-size: var(--text-sm); line-height: 1.6; min-height: 50px; max-height: min(40dvh, 320px); overflow-y: auto; overflow-wrap: anywhere; white-space: pre-wrap; }
+.composer-input:focus { outline: none; }
+.composer-placeholder { position: absolute; top: var(--space-half); left: var(--space-half); color: var(--color-muted); font-size: var(--text-sm); line-height: 1.6; pointer-events: none; }
+.composer-input h1 { font-size: var(--text-xl); }
+.composer-input h2 { font-size: var(--text-lg); }
+.composer-input h3, .composer-input h4, .composer-input h5, .composer-input h6 { font-size: var(--text-md); }
+.composer-input :is(h1, h2, h3, h4, h5, h6) { font-weight: 650; line-height: 1.4; }
+.composer-input ul { list-style: disc; padding-left: var(--space-6); }
+.composer-input ol { list-style: decimal; padding-left: var(--space-6); }
+.composer-input li > :is(ul, ol) { margin: 0; }
+.composer-input .composer-nested-list-item { list-style: none; }
+.composer-input blockquote { margin: 0; border-left: 3px solid var(--color-control-border); padding-left: var(--space-3); color: var(--color-muted); }
+.composer-code { display: block; font-family: monospace; font-size: inherit; background: var(--color-surface-raised); padding: var(--space-3); border-radius: var(--radius-sm); tab-size: 2; }
+.composer-input a { text-decoration: underline; }
+.composer-bold { font-weight: 650; }
+.composer-italic { font-style: italic; }
+.composer-strike { text-decoration: line-through; }
+.composer-inline-code { font-family: monospace; background: var(--color-surface-raised); border-radius: var(--space-1); padding: 0 var(--space-half); }
+.composer-highlight { background: var(--color-warning-soft); }
 
-.composer-toolbar { display: flex; align-items: flex-end; gap: var(--space-2); justify-content: space-between; }
-.composer-toolbar > span { font-size: var(--text-xs); color: var(--color-muted); line-height: 1.5; padding: var(--space-2) var(--space-half); }
+.composer-toolbar { display: flex; align-items: flex-end; gap: var(--space-2); justify-content: flex-end; }
 .composer-toolbar .button-row { gap: var(--space-1); flex-wrap: nowrap; }
 .composer .send-button { min-height: 33px; height: 33px; width: 35px; padding: var(--space-1); border-radius: var(--radius-sm); }
 .composer .stop-button { min-height: 33px; padding: var(--space-1) var(--space-2); font-size: var(--text-xs); }
@@ -507,8 +524,7 @@ input::placeholder, textarea::placeholder { color: var(--color-muted); }
   .message { margin-bottom: var(--space-6); }
   .composer-area { padding: var(--space-3) var(--space-3) max(var(--space-4), env(safe-area-inset-bottom)); }
   .composer { padding: var(--space-3); }
-  .composer-toolbar > span { font-size: var(--text-xs); max-width: 210px; }
-  .composer textarea { font-size: var(--text-md); }
+  .composer-input, .composer-placeholder { font-size: var(--text-md); }
   .agent-heading { flex-wrap: wrap; }
   .agent-content { padding-top: var(--space-5); }
   .agent-actions { width: 100%; }
@@ -539,7 +555,6 @@ input::placeholder, textarea::placeholder { color: var(--color-muted); }
   .settings-list li { align-items: flex-start; }
   .settings-list .button { padding-left: var(--space-1); padding-right: var(--space-1); }
   .settings-list .button svg { display: none; }
-  .composer-toolbar > span { max-width: 160px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -561,7 +576,7 @@ input::placeholder, textarea::placeholder { opacity: 1; }
   .composer .send-button, .composer .stop-button,
   .context-tab-list button, .sidebar-list button { min-width: 44px; min-height: 44px; }
   input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: var(--text-md); }
-  .composer textarea { font-size: var(--text-md); }
+  .composer-input, .composer-placeholder { font-size: var(--text-md); }
 }
 
 .tabs-strip { display: flex; flex: 1; align-items: center; min-width: 0; height: 100%; }
