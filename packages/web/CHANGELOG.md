@@ -4,6 +4,8 @@
 
 ### Added
 
+- Copied Pi Durable’s example `Coding` prompt extension into a reusable server module, preserving provenance and its MIT license. Runtime activation remains a separate integration step.
+
 - Saved conversation pin/unpin and archive/restore actions, with right-side hover/focus controls and an archived view; removed redundant leading chat icons.
 - Independent desktop sidebar/details visibility controls and draggable, keyboard-accessible width dividers that preserve active work.
 - Implemented company invitation enrollment, password/TOTP and user-verified passkeys, opaque sessions, account security, restricted recovery, and local operator provisioning. Initial users have equal capabilities; chats remain private to their creator.

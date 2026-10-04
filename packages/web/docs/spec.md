@@ -233,6 +233,10 @@ Continue adding Pi Durable capabilities in focused feature slices: tools and int
 
 Design the first chat around Pi's public interfaces and the ownership boundaries below. Add later features' detailed behavior and UI when their use cases are agreed. The right column remains available for specified supporting views; chat-first scope does not invent content for it.
 
+### Reusable Coding extension
+
+**Accepted October 4, 2026:** copy the `Coding` extension from Pi Durable's [example 26](https://github.com/earendil-works/pi/blob/v1.0.1/packages/durable/test/examples/26-coding-agent.ts) into the web package. [The server module](../server/extensions/coding.ts) exports its unchanged coding preamble and dynamic working-directory section through Pi's public extension API. The module is available for later registration and selection; this copy does not activate it, provide `CodingTools`, configure an execution environment, or change saved agent definitions.
+
 ## Contracts and state ownership
 
 **Accepted ownership boundaries for chat:**
