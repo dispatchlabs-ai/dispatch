@@ -225,6 +225,12 @@ The default agent uses Pi's normal per-conversation agent configuration. Each ch
 
 Keep Pi's transcript and execution distinctions intact through the integration, including tool activity and other native entry types. The initial UI can expose a small subset of capabilities, but its model must not flatten the underlying conversation into only user/assistant text or create a competing durable history. Tool capabilities selected for the first agent must have whatever interaction and controls their use requires.
 
+### Bash terminal presentation
+
+**Accepted October 4, 2026:** focus first on a compact terminal for `bash`; custom presentations for other tools follow Chris's review. Show the command and combined stdout/stderr together, open by default, with native live output replaced by the recorded result in the same component. Render output as plain text. Show observed preparing, waiting, running, completed, failed, stopped, interrupted, or unavailable-result status. Preserve native diagnostics, including exit errors and full-output paths, and make raw call/result data available in a secondary disclosure.
+
+Pair native results with their nearest preceding unmatched call by call ID and tool name; preserve unmatched results. This is a snapshot projection, not a second execution or history store. Other tools use the generic fallback with arguments, output, images, and raw details. Keep native reset/compaction and other transcript entries. Long output scrolls within the terminal and follows new output only while the reader is already at its bottom; terminal and debug disclosures must remain operable at desktop and phone sizes.
+
 ### Feature sequence and broader scope
 
 After chat, add named agent definitions and the ability to start independent conversations from them. A reusable definition supplies configuration for new conversations; it is distinct from any one running conversation. The catalog, editor, versioning, and update policy are Dispatch features built on Pi's native configuration. Definitions are company-shared, versioned immutably, and copied into new conversations. Each conversation retains the name from its saved agent revision, including after later renaming or archiving. Editing or archiving a definition never changes an existing conversation. Stale edits return a conflict; archived definitions cannot be used for new chats or silently restored by editing.

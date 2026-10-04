@@ -58,7 +58,7 @@ The built-in Developer appears in Agents after service startup. It starts with t
 
 Each Developer chat gets a persistent local directory at `<DISPATCH_DATA_DIR>/runtime/workspaces/<conversation ID>`, created when the agent first needs its environment. Chat Details shows the full path. Ask Developer to create a project there, or place existing project files there using your normal local workflow. Archiving the chat or agent does not remove those files. Keep the runtime and workspace paths stable when moving or restoring local state.
 
-Coding tools run on the service machine with the service account's access, including paths outside the working directory. This first setup is for trusted local use on M1 Air; the directory is not a sandbox. Native tool activity and results appear in the conversation. Stop uses Pi's cancellation; an interrupted shell/file operation is not guaranteed to be undone or to execute only once during recovery.
+Coding tools run on the service machine with the service account's access, including paths outside the working directory. This first setup is for trusted local use on M1 Air; the directory is not a sandbox. Bash appears as an open terminal with the command above its live output, then its recorded result and completion status. Select the terminal header to collapse it. Long output scrolls inside the terminal; scroll up to read without following new output. Errors and full-output file paths appear below the output. Debug data exposes raw arguments and native results. Other tools keep a generic disclosure. Stop uses Pi's cancellation; an interrupted shell/file operation is not guaranteed to be undone or to execute only once during recovery.
 
 ## Chat and workspace
 

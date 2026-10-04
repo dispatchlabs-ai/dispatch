@@ -4,6 +4,8 @@
 
 ### Added
 
+- Compact bash terminal presentation with command, native live output, result status, and visible diagnostics in one transcript item; a generic fallback preserves other tools.
+
 - Registered Developer with Pi’s `Coding` extension, native read/write/edit/bash tools, and persistent local workspaces. It inherits the saved default model/thinking values once; basic edits preserve coding capabilities, and the UI shows tools and workspace details.
 - Copied Pi Durable’s example `Coding` prompt extension into a reusable server module, preserving provenance and its MIT license.
 
