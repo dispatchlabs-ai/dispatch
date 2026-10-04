@@ -227,6 +227,7 @@ function TranscriptMessage({ message, activities, agentName, initialSetup = fals
   const [copyError, setCopyError] = useState(false);
   const copiedTimer = useRef<number | null>(null);
   useEffect(() => () => { if (copiedTimer.current) window.clearTimeout(copiedTimer.current); }, []);
+  if (activities.echoes.has(message)) return null;
   const content = typeof message.content === "string" ? [{ type: "text" as const, text: message.content }] : message.content;
   const text = content.filter(part => part.type === "text").map(part => part.text).join("\n\n");
   if (message.role === "system" && initialSetup) return null;

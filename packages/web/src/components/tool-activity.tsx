@@ -1,6 +1,6 @@
 import { Check, ChevronDown, CircleAlert, SquareTerminal, Wrench } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
-import type { ToolActivity } from "../lib/tool-activity";
+import { bashOutput, type ToolActivity } from "../lib/tool-activity";
 import { Spinner } from "./ui";
 
 export function ToolActivityView({ activity }: { activity: ToolActivity }) {
@@ -27,9 +27,7 @@ function BashTerminal({ activity }: { activity: ToolActivity }) {
   const active = label === "Running" || label === "Waiting" || label === "Preparing";
   const diagnostics = activity.diagnostics ?? activity.live?.diagnostics ?? [];
   const content = activity.result?.content ?? [];
-  // Pi appends this exact diagnostic block to model context. Show it once, as diagnostics.
-  const diagnosticText = `<harness>\n${diagnostics.map(item => `[${item.severity}] ${item.message}`).join("\n")}\n</harness>`;
-  const output = activity.result ? content.filter((part, index) => !(diagnostics.length && index === content.length - 1 && part.type === "text" && part.text === diagnosticText)).filter(part => part.type === "text").map(part => part.text).join("\n") : activity.live?.output ?? "";
+  const output = bashOutput(activity);
   useLayoutEffect(() => {
     if (open && following.current && outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight;
   }, [output, open]);

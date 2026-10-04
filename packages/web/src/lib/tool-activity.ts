@@ -15,6 +15,23 @@ export interface ToolActivities {
   calls: Map<ToolCall, ToolActivity>;
   results: Map<ToolResultMessage, ToolActivity | null>;
   extra: ToolActivity[];
+  echoes: Set<Message>;
+}
+
+export function bashOutput(activity: ToolActivity): string {
+  if (!activity.result) return activity.live?.output ?? "";
+  const content = activity.result.content;
+  const diagnostics = activity.diagnostics ?? [];
+  // Pi appends this exact block to model context; the terminal shows diagnostics separately.
+  const diagnosticText = `<harness>\n${diagnostics.map(item => `[${item.severity}] ${item.message}`).join("\n")}\n</harness>`;
+  return content.filter((part, index) => !(diagnostics.length && index === content.length - 1 && part.type === "text" && part.text === diagnosticText)).filter(part => part.type === "text").map(part => part.text).join("\n");
+}
+
+function onlyRepeatsOutput(message: Message, output: string): boolean {
+  if (!output.trim() || message.role !== "assistant" || message.stopReason !== "stop" || message.content.some(part => part.type !== "text")) return false;
+  const text = message.content.filter(part => part.type === "text").map(part => part.text).join("\n\n").trim();
+  const fenced = text.match(/^(`{3,}|~{3,})[^\n]*\n([\s\S]*?)\n\1$/);
+  return (fenced?.[2] ?? text).trim() === output.trim();
 }
 
 // A presentation projection of native entries and live state, rebuilt on each snapshot.
@@ -24,9 +41,15 @@ export function toolActivities(entries: readonly EntryRecord[], live: LiveState)
   const results = new Map<ToolResultMessage, ToolActivity | null>();
   const latest = new Map<string, ToolActivity>();
   const extra: ToolActivity[] = [];
+  const echoes = new Set<Message>();
+  let previousOutput = "";
   for (const entry of entries) {
+    const contextBoundary = entry.kind === "pi.reset" || entry.kind === "pi.compaction";
+    if (contextBoundary) previousOutput = "";
     for (const message of entry.model ?? []) {
       if (message.role === "assistant") {
+        if (onlyRepeatsOutput(message, previousOutput)) echoes.add(message);
+        else previousOutput = "";
         for (const part of message.content) {
           if (part.type !== "toolCall") continue;
           const activity: ToolActivity = { name: part.name, call: part };
@@ -41,8 +64,12 @@ export function toolActivities(entries: readonly EntryRecord[], live: LiveState)
         activity.resultEntryId = entry.id;
         activity.diagnostics = ToolResultEntry.is(entry) ? entry.data.diagnostics : undefined;
         results.set(message, matched ? null : activity);
+        previousOutput = activity.name === "bash" ? bashOutput(activity) : "";
+      } else {
+        previousOutput = "";
       }
     }
+    if (contextBoundary) previousOutput = "";
   }
   for (const slot of live.tools ?? []) {
     const activity = latest.get(slot.callId);
@@ -58,5 +85,5 @@ export function toolActivities(entries: readonly EntryRecord[], live: LiveState)
       if (part.type === "toolCall") calls.set(part, { name: part.name, call: part, preparing: true });
     }
   }
-  return { calls, results, extra };
+  return { calls, results, extra, echoes };
 }

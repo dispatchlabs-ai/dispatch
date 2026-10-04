@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Show bash output once by omitting completed assistant messages that only repeat the preceding terminal output; explanations and native records are preserved.
+
 - Removed raw debug-data disclosures from tool activity while retaining command/output/status and native stored records. Grouped the terminal and follow-up text beneath one agent heading.
 
 ### Added
