@@ -88,7 +88,7 @@ export function AgentSidebar({
                 <span className="sidebar-tag">Default</span>
               ) : null}
             </button>
-            {agent.id !== defaultAgentId && !agent.archived ? (
+            {!agent.archived ? (
               <div className="sidebar-row-actions">
                 <IconButton
                   label={`Edit agent: ${agent.name}`}
@@ -97,13 +97,13 @@ export function AgentSidebar({
                 >
                   <Pencil size={15} />
                 </IconButton>
-                <IconButton
+                {agent.id !== defaultAgentId ? <IconButton
                   label={`Archive agent: ${agent.name}`}
                   disabled={busy}
                   onClick={() => onArchive(agent)}
                 >
                   <Archive size={15} />
-                </IconButton>
+                </IconButton> : null}
               </div>
             ) : null}
           </div>

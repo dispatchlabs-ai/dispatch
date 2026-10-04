@@ -30,6 +30,7 @@ export class RuntimeError extends Error {
 
 export type RuntimeOptions = {
   stateDir: string;
+  companyId: string;
   provider?: string;
   modelId?: string;
   thinkingLevel?: AgentDraft["thinkingLevel"];
@@ -42,17 +43,15 @@ export class DispatchRuntime {
   private harness: Harness;
   private storage: Storage;
   private models: Models;
-  private defaultAgent: AgentDefinition;
   private owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>;
   private commitRevision = 0;
   private closed = false;
 
-  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, defaultAgent: AgentDefinition) {
+  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>) {
     this.harness = harness;
     this.storage = storage;
     this.models = models;
     this.owner = owner;
-    this.defaultAgent = defaultAgent;
     harness.subscribeCommits((publication) => { this.commitRevision = publication.seq; });
   }
 
@@ -65,17 +64,24 @@ export class DispatchRuntime {
       storage = await openNodeSqliteStorage(filename);
       await chmod(filename, 0o600);
       const harness = await Harness.open(storage, { models, registry: createRegistry(), settings: options.settings }, context);
-      const defaultAgent: AgentDefinition = {
-        id: "default", name: "Dispatch", description: "General-purpose conversation assistant.",
-        instructions: "You are Dispatch, a thoughtful assistant helping people solve problems. Be accurate, direct, and useful. Explain uncertainty and never claim to have performed actions you cannot perform.",
-        provider: options.provider ?? "openai",
-        modelId: options.modelId ?? "gpt-6-sol",
-        thinkingLevel: options.thinkingLevel ?? "off", revision: 1, archived: false,
-        createdAt: 1790985600000, updatedAt: 1790985600000,
-      };
-      const runtime = new DispatchRuntime(harness, storage, models, owner, defaultAgent);
-      // A real metadata commit seeds the persisted sequence on reopen before recovery can publish snapshots.
-      await harness.commit(async (tx) => { (await tx.doc(CatalogDoc)).runtimeInstance = randomUUID(); }, context);
+      const runtime = new DispatchRuntime(harness, storage, models, owner);
+      // Seed once and publish a real commit before recovery so snapshots use Pi's persisted sequence.
+      await harness.commit(async (tx) => {
+        const catalog = await tx.doc(CatalogDoc);
+        if (!catalog.agents.some(agent => agent.companyId === options.companyId && agent.id === "default")) {
+          const now = Date.now();
+          const agent: StoredAgent = {
+            id: "default", companyId: options.companyId, name: "Dispatch", description: "General-purpose conversation assistant.",
+            instructions: "You are Dispatch, a thoughtful assistant helping people solve problems. Be accurate, direct, and useful. Explain uncertainty and never claim to have performed actions you cannot perform.",
+            provider: options.provider ?? "openai", modelId: options.modelId ?? "gpt-6-sol",
+            thinkingLevel: options.thinkingLevel ?? "off", revision: 1, archived: false,
+            createdAt: now, updatedAt: now,
+          };
+          runtime.validateAgent(agent);
+          catalog.agents.push(agent);
+        }
+        catalog.runtimeInstance = randomUUID();
+      }, context);
       harness.resume();
       return runtime;
     } catch (error) {
@@ -201,16 +207,20 @@ export class DispatchRuntime {
     return this.getChat(scope, id);
   }
 
+  async getDefaultAgent(companyId: string): Promise<AgentDefinition> {
+    const catalog = await this.harness.snapshot(CatalogDoc, context);
+    return publicAgent(this.findAgent(catalog!, { companyId }, "default"));
+  }
+
   async listAgents(scope: RuntimeScope): Promise<AgentDefinition[]> {
     const catalog = await this.harness.snapshot(CatalogDoc, context);
     const current = new Map<string, AgentDefinition>();
     for (const agent of catalog!.agents) if (agent.companyId === scope.companyId) current.set(agent.id, publicAgent(agent));
-    return [this.defaultAgent, ...current.values()];
+    return [...current.values()];
   }
 
   async saveAgent(scope: RuntimeScope, input: AgentDraft & { id?: string; expectedRevision?: number }): Promise<AgentDefinition> {
     this.validateAgent(input);
-    if (input.id === "default") throw new RuntimeError(400, "The default agent is configured by the service. Create a named agent to customize it.");
     return this.harness.commit(async (tx) => {
       const catalog = await tx.doc(CatalogDoc);
       const prior = input.id ? [...catalog.agents].reverse().find((agent) => agent.id === input.id && agent.companyId === scope.companyId) : undefined;
@@ -253,8 +263,8 @@ export class DispatchRuntime {
     if (!catalog!.chats.some((chat) => chat.id === id && owns(scope, chat))) throw new RuntimeError(404, "Conversation not found.");
   }
 
-  private findAgent(catalog: Catalog, scope: RuntimeScope, id: string) {
-    const agent = id === "default" ? this.defaultAgent : [...catalog.agents].reverse().find((item) => item.id === id && item.companyId === scope.companyId);
+  private findAgent(catalog: Catalog, scope: Pick<RuntimeScope, "companyId">, id: string) {
+    const agent = [...catalog.agents].reverse().find((item) => item.id === id && item.companyId === scope.companyId);
     if (!agent || agent.archived) throw new RuntimeError(404, "Agent not found.");
     return agent;
   }

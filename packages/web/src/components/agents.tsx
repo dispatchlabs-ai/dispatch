@@ -117,11 +117,9 @@ export function AgentsPage({
         </div>
         {!agent.archived ? (
           <div className="button-row agent-actions">
-            {!isDefault ? (
-              <Button variant="ghost" onClick={() => onEdit(agent)}>
-                <Pencil /> Edit
-              </Button>
-            ) : null}
+            <Button variant="ghost" onClick={() => onEdit(agent)}>
+              <Pencil /> Edit
+            </Button>
             <Button
               className="agent-start-chat"
               disabled={creating}
@@ -152,10 +150,6 @@ export function AgentsPage({
               This agent is archived. Existing conversations keep their saved
               configuration.
             </Notice>
-          ) : isDefault ? (
-            <p className="editor-note">
-              Your operator manages this agent’s configuration.
-            </p>
           ) : null}
         </div>
       </div>

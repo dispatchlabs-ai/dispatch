@@ -12,7 +12,7 @@ const config = readConfig();
 await mkdir(config.stateDir, { recursive: true, mode: 0o700 });
 const provider = await openModels();
 const runtime = await DispatchRuntime.open({
-  stateDir: join(config.stateDir, "runtime"), models: provider.models,
+  stateDir: join(config.stateDir, "runtime"), companyId: config.companyId, models: provider.models,
   provider: provider.provider, modelId: provider.modelId, thinkingLevel: provider.thinkingLevel,
 });
 const auth = createAuth({
@@ -24,7 +24,7 @@ const app = createApp({
   auth, runtime, origin: config.origin,
   clientDir: process.env.DISPATCH_SERVE_CLIENT === "false" ? undefined : clientDir,
   configuration: async () => ({
-    company: { id: config.companyId, name: config.companyName }, defaultAgentId: "default", ...await provider.configuration(),
+    company: { id: config.companyId, name: config.companyName }, defaultAgentId: "default", ...await provider.configuration(await runtime.getDefaultAgent(config.companyId)),
   }),
 });
 const server = serve({ fetch: app.fetch, hostname: config.host, port: config.port }, () => {

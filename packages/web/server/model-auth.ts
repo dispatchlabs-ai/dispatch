@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { z } from "zod";
-import type { ModelOption, ThinkingLevel } from "../src/shared/contracts.js";
+import type { AgentDraft, ModelOption, ThinkingLevel } from "../src/shared/contracts.js";
 
 const defaultsSchema = z.object({
   defaultProvider: z.string().optional(),
@@ -24,21 +24,16 @@ export async function openModels(environment: NodeJS.ProcessEnv = process.env) {
     authPath: join(agentDir, "auth.json"), modelsPath: join(agentDir, "models.json"),
     allowModelNetwork: false,
   });
-  const model = models.getModel(provider, modelId);
-  if (!model) throw new Error(`Configured model ${provider}/${modelId} is unavailable. Check DISPATCH_PROVIDER and DISPATCH_MODEL.`);
-  const requestedThinking = environment.DISPATCH_THINKING ?? defaults.defaultThinkingLevel ?? "off";
-  const allowedThinking = getSupportedThinkingLevels(model);
-  if (!allowedThinking.includes(requestedThinking as ThinkingLevel)) {
-    throw new Error(`Model ${provider}/${modelId} does not support thinking level ${requestedThinking}. Choose ${allowedThinking.join(", ")}.`);
-  }
+  const thinkingLevel = (environment.DISPATCH_THINKING ?? defaults.defaultThinkingLevel ?? "off") as ThinkingLevel;
   return {
-    models, provider, modelId, thinkingLevel: requestedThinking as ThinkingLevel,
-    async configuration() {
+    models, provider, modelId, thinkingLevel,
+    async configuration(defaultAgent: Pick<AgentDraft, "provider" | "modelId">) {
+      const model = models.getModel(defaultAgent.provider, defaultAgent.modelId);
       const available = await models.getAvailable();
-      const choices = available.some((item) => item.provider === provider && item.id === modelId) ? available : [model, ...available];
+      const choices = !model || available.some((item) => item.provider === model.provider && item.id === model.id) ? available : [model, ...available];
       return {
         models: choices.map((item): ModelOption => ({ provider: item.provider, id: item.id, name: item.name, reasoning: item.reasoning, thinkingLevels: [...getSupportedThinkingLevels(item)] })),
-        providerReady: models.hasConfiguredAuth(provider),
+        providerReady: models.hasConfiguredAuth(defaultAgent.provider),
       };
     },
   };

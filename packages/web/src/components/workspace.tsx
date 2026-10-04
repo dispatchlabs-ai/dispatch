@@ -280,7 +280,7 @@ export function Workspace() {
 
   function finishAgentEdit(agent?: AgentDefinition) {
     if (agent) { updateAgent(agent); setSelectedAgentId(agent.id); }
-    else void load();
+    if (!agent || agent.id === config?.defaultAgentId) void load();
     setEditingAgent(null);
     requestAnimationFrame(() => document.getElementById("main-workspace")?.focus());
   }
