@@ -268,7 +268,7 @@ export class DispatchRuntime {
     return this.harness.commit(tx => this.shared.post(tx, nativeId(id), `human:${scope.userId}`, input), context);
   }
 
-  async addParticipants(scope: RuntimeScope, id: string, input: AddParticipantsInput, _resolvedPeople: CompanyPerson[] = []) {
+  async addParticipants(scope: RuntimeScope, id: string, input: AddParticipantsInput) {
     requireText(input.requestId, "Request ID", 200);
     await this.authorize(scope, id);
     const people = await Promise.all((input.userIds ?? []).map(userId => this.person(scope.companyId, userId)));

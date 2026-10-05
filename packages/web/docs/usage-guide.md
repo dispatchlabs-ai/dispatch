@@ -1,6 +1,6 @@
 # Dispatch Web usage guide
 
-Dispatch Web provides company sign-in, private conversations on stock Pi Durable, shared named agent definitions, and a branded desktop/mobile workspace. This is a local development implementation. Source/type/build checks are permitted; functional and browser qualification are deferred under the [testing policy](spec.md#testing-policy).
+Dispatch Web provides company sign-in, invite-only shared conversations on stock Pi Durable, shared named agent definitions, and a branded desktop/mobile workspace. This is a local development implementation. Source/type/build checks are permitted; functional and browser qualification are deferred under the [testing policy](spec.md#testing-policy).
 
 ## Start development
 
@@ -46,9 +46,9 @@ The service uses Pi's public `ModelRuntime` from the pinned coding-agent package
 
 When seeding the company's default agent for the first time, explicit `DISPATCH_PROVIDER`, `DISPATCH_MODEL`, and `DISPATCH_THINKING` override Pi's `defaultProvider`, `defaultModel`, and `defaultThinkingLevel`. Without either configuration, the fallback is `openai` / `gpt-6-sol` / `off`; the provider still needs credentials. `DISPATCH_PI_AGENT_DIR` selects a different existing Pi configuration directory. Provider environment credentials supported by Pi can also be supplied to the service. Use Personal Vault's process injection for secrets rather than putting them on the command line or in committed files.
 
-The default agent is chat-only and has no tools. It is saved on first startup and can be edited in Agents just like other definitions; subsequent restarts or changes to the service defaults do not overwrite it. The Agents section creates company-shared definitions with instructions, provider/model, and supported thinking levels. Each save produces a new immutable revision. New conversations copy that configuration; existing conversations remain unchanged. A stale edit returns a conflict. Archived definitions cannot start new chats or be edited; there is no restore operation in this slice.
+The default agent is chat-only and has no tools. It is saved on first startup and can be edited in Agents just like other definitions; subsequent restarts or changes to the service defaults do not overwrite it. The Agents section creates company-shared definitions with instructions, provider/model, and supported thinking levels. Each save produces a new immutable revision. New agent instances copy that configuration; existing instances remain unchanged. A stale edit returns a conflict. Archived definitions cannot start new chats or be edited; there is no restore operation in this slice.
 
-In Agents, New agent is at the top of the sidebar, followed by Find an agent and the saved-agent list. Select an agent to read its description and instructions; the right column shows its saved configuration. Start chat opens a conversation using that revision. Hover or focus an agent's row for Edit and, for non-default agents, Archive; touch layouts keep the actions visible. Archived agents is at the bottom of the sidebar and supports inspection, not restoration. The default agent keeps its Default tag and cannot be archived.
+In Agents, New agent is at the top of the sidebar, followed by Find an agent and the saved-agent list. Select an agent to read its description and instructions; the right column shows its saved configuration. Start chat opens the starting-agent chooser with that definition selected. Hover or focus an agent's row for Edit and, for non-default agents, Archive; touch layouts keep the actions visible. Archived agents is at the bottom of the sidebar and supports inspection, not restoration. The default agent keeps its Default tag and cannot be archived.
 
 New agent opens an editor with the saved default agent's model/thinking values. Fill in Identity, Instructions, and Model; Cancel and Create agent/Save new revision stay below the scrolling form. The right column previews the unsaved draft and distinguishes changes from the saved revision for existing agents. Choosing another agent or starting a new edit asks before discarding unsaved changes. Switching to Chats or Account, hiding a column, or changing screen size preserves the open editor. On phones, Start chat fills its row and the agent view includes a short model/thinking/tools summary; Details exposes the full configuration.
 
@@ -56,7 +56,7 @@ New agent opens an editor with the saved default agent's model/thinking values. 
 
 The built-in Developer appears in Agents after service startup. It starts with the saved default agent's model and thinking level. Select Developer and choose Start chat to use Pi's `read`, `write`, `edit`, and `bash` tools. Its name, description, instructions, model, and thinking level use the normal editor; saving preserves its coding tools and affects new chats only. Archiving it prevents new chats and survives restart.
 
-Each Developer chat gets a persistent local directory at `<DISPATCH_DATA_DIR>/runtime/workspaces/<conversation ID>`, created when the agent first needs its environment. Chat Details shows the full path. Ask Developer to create a project there, or place existing project files there using your normal local workflow. Archiving the chat or agent does not remove those files. Keep the runtime and workspace paths stable when moving or restoring local state.
+Each Developer chat gets a persistent local directory at `<DISPATCH_DATA_DIR>/runtime/workspaces/<conversation ID>`, created when the agent first needs its environment. Participants shows each agent’s full path. Ask Developer to create a project there, or place existing project files there using your normal local workflow. Archiving the chat or agent does not remove those files. Keep the runtime and workspace paths stable when moving or restoring local state.
 
 Coding tools run on the service machine with the service account's access, including paths outside the working directory. This first setup is for trusted local use on M1 Air; the directory is not a sandbox. Tool activity and follow-up text appear under one agent heading. Bash appears as an open terminal with the command above its live output, then its recorded result and completion status. Select the terminal header to collapse it. Long output scrolls inside the terminal; scroll up to read without following new output. Errors and full-output file paths appear below the output. A completed follow-up that only repeats the terminal output is omitted from the display; explanations remain visible. Raw call/result and assistant records remain in Pi’s SQLite storage; tool activity has no debug-data option. Other tools without a custom presenter keep a generic output disclosure. Stop uses Pi's cancellation; an interrupted shell/file operation is not guaranteed to be undone or to execute only once during recovery.
 
@@ -64,21 +64,21 @@ Write and edit appear as open file cards. A write shows the recorded file conten
 
 Read uses the same file card with the number of returned lines and their original range, such as “Read · 7 lines · lines 1–7”. The body shows those exact lines with neutral syntax highlighting and line numbers. Partial reads retain continuation/truncation notices; a partially returned line is labeled. A failed read shows its error rather than counting the error as file content. If the original call is unavailable, numbering is relative to the returned text and the card explains this.
 
-Refreshing also applies these views to existing tool calls. The cards use the original recorded read/write content and edit patch, even if the file later changes. They do not rerun the tools or read files from disk. History outside Pi's active reset/compaction boundaries is not yet loaded by this UI.
+Refreshing also applies these views to existing tool calls. The cards use the original recorded read/write content and edit patch, even if the file later changes. They do not rerun the tools or read files from disk. The shared public log remains available across native context resets and compaction. Private working inputs and reasoning are excluded from browser snapshots.
 
 ## Chat and workspace
 
-Your messages appear on the right; agent replies stay on the left.
+Messages use a shared, left-aligned flow with author names, agent badges and timestamps. Reply opens a thread in the right column, or a full-height phone panel. Replies remain visible to everyone in the conversation.
 
-The message composer formats Markdown as you type or paste: headings, lists, quotes, bold/italic text, links, and code stay editable in place. Copying selected content retains its Markdown formatting. Paste inside a code block keeps the text literal. Desktop Enter sends; Shift+Enter inserts a line. Enter on a touch-primary device inserts a line; use Send to submit. The toolbar contains Send and, during active work, Stop. Drafts stay with each open chat. Messages over 100,000 characters including formatting must be shortened before sending.
+The message composer formats Markdown as you type or paste: headings, lists, quotes, bold/italic text, links, and code stay editable in place. Copying selected content retains its Markdown formatting. Paste inside a code block keeps the text literal. Desktop Enter sends; Shift+Enter inserts a line. Enter on a touch-primary device inserts a line; use Send to submit. The toolbar contains Send and, during active work, Stop. Main-message and individual reply-thread drafts stay with each open chat. Messages over 100,000 characters including formatting must be shortened before sending.
 
-Chats are private to the authenticated user in the installation's company. Open a saved conversation or start one with the default or a named agent. The service returns native Pi entries and streams complete snapshots; the browser derives its display from those records.
+Conversations are visible only to their human members within the installation’s company. New chat opens a chooser for one or more company agents. The participant button opens saved agent configuration and per-agent usage. Add participants invites existing active company people or available agents; newcomers can read the full public history. Each agent has an independent working context. Agents consider messages from humans and other agents and may remain silent. Use Mention to attach a participant’s identity to a message.
 
-- Sending while a response is active adds a native follow-up. Retry a failed network request with the same logical request ID; a changed message gets a new ID. Reusing an ID with different content returns a conflict.
-- Stop cancels the foreground response and queued follow-ups through Pi, preserving committed partial output. Failure and Stop are distinct from completed answers.
+- Sending appends a public message and admits native delivery tasks for the other agent members. Each agent processes its deliveries in order. Retry a failed network request with the same logical request ID; a changed message gets a new ID. Reusing an ID with different content returns a conflict.
+- Stop all cancels admitted deliveries and agent responses through Pi, preserving committed partial output. Messages sent while stopping remain in the composer for retry after Stop finishes; a later message resumes participation. Failure and Stop are distinct from completed answers.
 - Closing a main tab, browser tab, or live connection stops observation only. Pi continues admitted work. Reopening restores the current saved state without replaying every missed event.
 - Restarting the service invokes native Pi recovery. An interrupted provider request can run again from its committed checkpoint, rather than continuing the exact streamed token; another provider charge is possible.
-- The right column follows the active main tab. Chat context exposes its immutable agent configuration and native run/usage data. Narrow screens expose navigation and context through panels; per-chat drafts remain in browser memory while switching layouts and tabs.
+- The right column follows the active main tab. Participants exposes each agent’s saved configuration and usage. Narrow screens expose navigation and context through panels; per-chat drafts remain in browser memory while switching layouts and tabs.
 
 Sessions last at most twelve hours and expire after thirty minutes without an authenticated request. Stream heartbeats do not extend idle expiry. Expiry or revocation ends protected access; agent work remains owned by the service.
 
@@ -88,13 +88,13 @@ Within Chats, the main tab strip appears when multiple conversations are open. C
 
 Above 1100 pixels, use the left rail’s conversations and details icons to hide or show either side. Drag either inner divider to resize it, or focus the divider and use Left/Right (Shift for larger steps) or Home/End. These choices last while the workspace is open; reloading restores the defaults. Phone Menu and Details controls live in the bottom bar and open panels.
 
-Hover or focus a conversation row to open its actions menu on the right. Touch layouts keep the menu button visible. The menu includes Move to project, Pin/Unpin, and Archive/Restore. Pinned conversations stay above the others within each group. Archive hides a conversation from the regular list without deleting it or stopping work; use Archived conversations at the bottom of the sidebar to reopen or restore it. These choices are saved with your account’s conversations.
+Hover or focus a conversation row to open its actions menu on the right. Touch layouts keep the menu button visible. The menu includes Move to project, Pin/Unpin, and Archive/Restore. Pinned conversations stay above the others within each group. Archive hides a conversation from the regular list without deleting it or stopping work; use Archived conversations at the bottom of the sidebar to reopen or restore it. These choices are personal to your account, including when the conversation has other members.
 
 ### Projects
 
 Choose **New project** inside Conversations, enter a name, and select **Create project**. A name is the only project field; projects are private to your account within the company. Names can be reused, and can contain up to 100 characters. Existing chats appear under **Without a project**.
 
-Select a project name to see its conversations in the main area; use the chevron to expand or collapse its sidebar group. Search finds both project names and conversation titles. **New conversation** in the project view starts a chat there with the saved default agent. The sidebar's **New chat** also uses the current project's context (including the project of the active chat); starting from an agent or the welcome view makes an unassigned chat.
+Select a project name to see its conversations in the main area; use the chevron to expand or collapse its sidebar group. Search finds both project names and conversation titles. **New conversation** in the project view opens the starting-agent chooser and keeps that project as the destination. The sidebar's **New chat** also uses the current project's context (including the project of the active chat); starting from an agent or the welcome view makes an unassigned chat.
 
 Choose **Move to project** from a conversation's actions menu, select one destination, and save. **Without a project** removes its membership. A project can contain many conversations, but each conversation belongs to at most one project. Moving keeps its history, current work, chosen agent, and tool directory. Archiving a conversation keeps its project membership; active project counts exclude archived chats.
 
@@ -152,7 +152,7 @@ The state directory contains `auth.sqlite`, `auth.key`, and `runtime/` with Pi s
 
 ## Application API
 
-`POST /api/chats/:id/preferences` accepts any combination of boolean `pinned`/`archived` and nullable `projectId`, and returns the current chat snapshot. Only the owning user may update a conversation; the destination project must belong to that same user/company. `GET /api/chats` includes archived records and project membership so the browser can present active, archived, and grouped lists.
+`POST /api/chats/:id/preferences` accepts any combination of boolean `pinned`/`archived` and nullable `projectId`, and returns the current chat snapshot. Any human member may update their own conversation preferences; the destination project must belong to that same user/company. `GET /api/chats` includes archived records and project membership so the browser can present active, archived, and grouped lists.
 
 `POST /api/projects` accepts `{ requestId, name }` and returns `{ project }`. A project contains `id`, `name`, and `createdAt`. Retrying the same request ID and trimmed name returns the original project; changed content returns 409. `POST /api/chats` accepts optional `projectId` (null or omitted means unassigned). Chat creation retries compare the original creation project, even after the conversation has moved. Names are labels; stable UUIDs identify projects.
 
@@ -162,16 +162,20 @@ All `/api` access requires a fully authenticated session except the authenticati
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /api/config` | Company, default agent, available model choices and supported thinking levels, provider readiness |
-| `GET/POST /api/chats` | List private conversations / create with a request ID |
+| `GET/POST /api/chats` | List conversations you belong to / create with a request ID |
 | `GET/POST /api/projects` | List private projects / create a name-only project with a request ID |
 | `POST /api/chats/:id/preferences` | Set pin/archive flags or assign, move, or remove project membership |
-| `GET /api/chats/:id` | Current native conversation and submission snapshot |
+| `GET /api/chats/:id` | Public messages, participants and sanitized native activity |
 | `POST /api/chats/:id/messages` | Admit a message idempotently; return a snapshot with status 202 |
-| `POST /api/chats/:id/stop` | Native foreground cancellation; return the current snapshot |
+| `POST /api/chats/:id/stop` | Conversation-wide native cancellation; return the current snapshot |
 | `GET /api/chats/:id/events` | SSE `snapshot` events; `session-ended` closes access on invalidation |
+| `GET /api/people` | Active company people available for invitation |
+| `POST /api/chats/:id/participants` | Invite company agents or people with an idempotent request ID |
 | `GET/POST /api/agents` | List company definitions / append a revision using optimistic concurrency |
 | `POST /api/agents/:id/archive` | Archive using the expected revision |
 | `/api/auth/*` | Enrollment, sign-in, recovery, session and factor management, logout |
+
+`POST /api/chats` accepts `agentDefinitionIds` (one or more), or the legacy singular `agentDefinitionId`. Message commands accept `threadId` and participant-ID `mentions`. Invitation commands accept `{ requestId, agentDefinitionIds?, userIds? }`. The service binds public authorship to the authenticated human or native agent instance.
 
 The precise shared types are in `src/shared/contracts.ts` and `src/shared/auth-contracts.ts`. See [runtime.md](runtime.md) for native storage, cancellation, and request identity. The browser never sends an authoritative user or company ID for access checks.
 

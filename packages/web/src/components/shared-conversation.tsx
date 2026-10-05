@@ -21,8 +21,8 @@ function participantName(participant: ConversationParticipant, participants: Con
     ? `${participant.name} · ${participant.id.slice(-6)}` : participant.name;
 }
 
-export function PublicMessage({ message, participants, replies, onThread, outputInActivity = false }: {
-  message: ConversationMessage; participants: ConversationParticipant[]; replies?: number; onThread?: (id: string) => void; outputInActivity?: boolean;
+export function PublicMessage({ message, participants, replies, onThread, outputInActivity = false, continuation = false }: {
+  message: ConversationMessage; participants: ConversationParticipant[]; replies?: number; onThread?: (id: string) => void; outputInActivity?: boolean; continuation?: boolean;
 }) {
   const author = participants.find(participant => participant.id === message.authorId);
   const [copied, setCopied] = useState(false);
@@ -30,10 +30,10 @@ export function PublicMessage({ message, participants, replies, onThread, output
   const timer = useRef<number | null>(null);
   useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
   if (message.kind === "membership") return <p className="membership-event"><UserPlus size={14} aria-hidden="true" /><span>{message.text}</span><time dateTime={new Date(message.createdAt).toISOString()}>{formatTime(message.createdAt)}</time></p>;
-  return <article className={`message shared-message ${outputInActivity ? "activity-echo-actions" : ""}`} aria-label={`Message from ${author?.name || "Former participant"}`} data-message-id={message.id}>
-    {!outputInActivity ? <ParticipantAvatar kind={author?.kind || "human"} name={author?.name || "?"} /> : null}
+  return <article className={`message shared-message ${outputInActivity ? "activity-echo-actions" : continuation ? "activity-continuation" : ""}`} aria-label={`Message from ${author?.name || "Former participant"}`} data-message-id={message.id}>
+    {!outputInActivity && !continuation ? <ParticipantAvatar kind={author?.kind || "human"} name={author?.name || "?"} /> : null}
     <div className="shared-message-body">
-      {!outputInActivity ? <header className="message-heading"><strong>{author ? participantName(author, participants) : "Former participant"}</strong>{author?.kind === "agent" ? <span className="agent-kind-badge">Agent</span> : null}<time dateTime={new Date(message.createdAt).toISOString()}>{formatTime(message.createdAt)}</time></header> : null}
+      {!outputInActivity && !continuation ? <header className="message-heading"><strong>{author ? participantName(author, participants) : "Former participant"}</strong>{author?.kind === "agent" ? <span className="agent-kind-badge">Agent</span> : null}<time dateTime={new Date(message.createdAt).toISOString()}>{formatTime(message.createdAt)}</time></header> : null}
       {!outputInActivity ? <div className="message-content"><Markdown>{message.text}</Markdown></div> : null}
       {message.images?.map((image, index) => <img className="message-image" key={index} src={`data:${image.mimeType};base64,${image.data}`} alt="Image attached to the message" />)}
       {message.mentions.length ? <div className="message-mentions" aria-label="Mentioned participants">{message.mentions.map(id => <span key={id}>@{participants.find(participant => participant.id === id)?.name || "Former participant"}</span>)}</div> : null}
@@ -87,7 +87,7 @@ export function PublicActivity({ activity, participants }: { activity: Participa
   if (generation?.retry) content.push(<p className="run-outcome" role="status" key="retry">Retrying the response…</p>);
   if (!content.length) return null;
   return <section className="participant-activity" aria-label={`${author?.name || "Agent"} activity`}>
-    <div className="activity-author"><ParticipantAvatar kind="agent" name={author?.name || "Agent"} /><strong>{author ? participantName(author, participants) : "Agent"}</strong><span>{generation ? "Responding…" : "Activity"}</span></div>
+    <div className="activity-author"><ParticipantAvatar kind="agent" name={author?.name || "Agent"} /><strong>{author ? participantName(author, participants) : "Agent"}</strong><span>{generation ? "Responding…" : "Activity"}</span><time dateTime={new Date(activity.createdAt).toISOString()}>{formatTime(activity.createdAt)}</time></div>
     {content}
   </section>;
 }
@@ -114,13 +114,14 @@ export function SharedTranscript({ snapshot, threadId = null, onThread }: { snap
     ...snapshot.activities.filter(activity => activity.threadId === threadId).map(activity => ({ kind: "activity" as const, id: activity.id, at: activity.createdAt, activity })),
   ].sort((a, b) => a.at - b.at);
   let date = "";
-  return <>{items.map(item => {
+  return <>{items.map((item, index) => {
+    const previous = items[index - 1];
     const nextDate = new Date(item.at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
     const showDate = nextDate !== date;
     date = nextDate;
     return <div key={`${item.kind}:${item.id}`}>
       {showDate ? <div className="transcript-date"><span>{nextDate}</span></div> : null}
-      {item.kind === "message" ? <PublicMessage message={item.message} participants={snapshot.participants} replies={snapshot.messages.filter(message => message.threadId === item.id).length} onThread={onThread} outputInActivity={repeatsBashOutput(item.message, snapshot.activities)} /> : <PublicActivity activity={item.activity} participants={snapshot.participants} />}
+      {item.kind === "message" ? <PublicMessage message={item.message} participants={snapshot.participants} replies={snapshot.messages.filter(message => message.threadId === item.id).length} onThread={onThread} outputInActivity={repeatsBashOutput(item.message, snapshot.activities)} continuation={!showDate && previous?.kind === "activity" && previous.activity.messageId === item.id} /> : <PublicActivity activity={item.activity} participants={snapshot.participants} />}
     </div>;
   })}</>;
 }

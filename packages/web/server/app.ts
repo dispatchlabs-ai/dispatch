@@ -68,13 +68,7 @@ export function createApp(options: AppOptions) {
   app.post("/api/chats/:id/participants", async (c) => {
     const input = z.object({ requestId, agentDefinitionIds: identities.optional(), userIds: identities.optional() }).strict()
       .refine(value => (value.agentDefinitionIds?.length ?? 0) + (value.userIds?.length ?? 0) > 0).parse(await c.req.json());
-    const principal = c.get("principal");
-    const people = (input.userIds ?? []).map(userId => {
-      const person = auth.getCompanyPerson(principal.companyId, userId);
-      if (!person) throw new RuntimeError(400, "Choose an active person in this company.");
-      return person;
-    });
-    return c.json(await runtime.addParticipants(principal, c.req.param("id"), input, people));
+    return c.json(await runtime.addParticipants(c.get("principal"), c.req.param("id"), input));
   });
   app.post("/api/chats/:id/preferences", async (c) => {
     const input = z.object({ pinned: z.boolean().optional(), archived: z.boolean().optional(), projectId }).strict()

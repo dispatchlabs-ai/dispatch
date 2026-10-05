@@ -780,3 +780,7 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .thread-context .composer-toolbar > .button-row { margin-left: auto; }
 
 .activity-commentary { margin: var(--space-3) 0; }
+.activity-continuation { margin-left: var(--space-12); }
+@media (max-width: 800px) {
+  .activity-continuation, .activity-echo-actions { margin-left: var(--space-10); }
+}

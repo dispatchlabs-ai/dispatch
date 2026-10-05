@@ -1,6 +1,6 @@
 # Dispatch Web implementation handoff
 
-The local implementation covers company authentication, stock Pi Durable chat, the branded desktop/mobile workspace, and named agent definitions. [spec.md](spec.md) defines the current contracts; [usage-guide.md](usage-guide.md) explains operation. The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains product intent and decision history. The accepted shared-conversation design is prepared as [WP-024](#wp-024--shared-conversations); it is not implemented yet.
+The local implementation covers company authentication, stock Pi Durable chat, the branded desktop/mobile workspace, and named agent definitions. [spec.md](spec.md) defines the current contracts; [usage-guide.md](usage-guide.md) explains operation. The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains product intent and decision history. Shared conversations are implemented locally in [WP-024](#wp-024--shared-conversations), with functional qualification deferred.
 
 ## Current testing policy
 
@@ -19,7 +19,7 @@ The original review recorded deviations in readability/contrast, shared design t
 - Use TypeScript, React Router framework SPA mode, React/Vite/Tailwind, and shared Base UI primitives with original Dispatch artwork and local Inter.
 - Keep a persistent Node/Hono service separate from frontend hot reload. One process owns each Pi directory, enforced by an OS-backed SQLite ownership lock without limiting concurrent agents.
 - Use stock Pi Durable 1.0.1 through its public interfaces. Pi owns admission, native entries, execution, cancellation, and recovery. Dispatch owns identity, access checks, transport, and presentation.
-- Serve one company per installation. Users have equal capabilities, private chats, and shared agent definitions. Role-based access control remains future work.
+- Serve one company per installation. Users have equal capabilities, invite-only conversations, private projects, and shared agent definitions. Role-based access control remains future work.
 - Require password/TOTP or a user-verified passkey, with restricted invitation/recovery flows and opaque sessions. The local operator provisions accounts; there is no application administrator role.
 - Keep desktop rail/sidebar/main tabs/full contextual column/bottom bar. Mobile uses navigation and context panels, preserving active work and drafts.
 - Prefer explicit service model configuration, then existing Pi settings/credentials. The first agent has no tools. Named agent revisions are immutable and copied into new chats.
@@ -376,7 +376,7 @@ Implementation and evidence (October 5, 2026):
 
 ## WP-024 — Shared conversations
 
-**Approved for implementation October 5, 2026; in progress.** Chris accepted shared conversations and resolved activation, invitation authority, agent-instance continuity, and join-history access. The [shared-conversation specification](spec.md#shared-conversations) and [maintained decision](https://wiki.dispatchworks.ai/wiki/agent-collaboration-spaces/) are the product basis. This package depends on the existing authenticated native runtime, revisioned company agent definitions, tool presenters, and WP-023 projects.
+**Implemented locally October 5, 2026; functional qualification deferred.** Chris accepted shared conversations and resolved activation, invitation authority, agent-instance continuity, and join-history access. The [shared-conversation specification](spec.md#shared-conversations) and [maintained decision](https://wiki.dispatchworks.ai/wiki/agent-collaboration-spaces/) are the product basis. This package depends on the existing authenticated native runtime, revisioned company agent definitions, tool presenters, and WP-023 projects.
 
 Chris approved the [ImageGen designs](shared-conversation-designs.md) following his Slack reference and authorized implementation with subagents. The package includes the shared message flow, reply threads, starting agents, invitations and phones. Thread replies retain the same conversation membership and agent participation policy; the specification records the concrete contract.
 
@@ -399,4 +399,13 @@ Acceptance criteria for implementation:
 - Apply the spec's UI rules and behavior-preserving source/deslop review. Review actual rendered desktop and 390 px layouts. Record any unverified rule, keyboard/touch behavior, status/recovery flow, or accessibility property honestly.
 - Review the full diff and changed local documentation links; run TypeScript/production checks, `nix build`, and `nix flake check` for the implementation revision. Add or run no tests, smoke checks, or browser acceptance flows under the standing zero-tests policy. Record functional outcomes as unverified unless separately authorized evidence establishes them.
 
-Preparation evidence: the four product policies and this ordered package are documented; no application code or runtime data changed. The Pi example/source audit is architectural evidence only. All implementation acceptance criteria above remain pending.
+Implementation: native shared document/public entries, per-instance bindings, delivery/reporter/Stop tasks, membership APIs and directory, sanitized public snapshots, agent chooser/invitation/mention controls, reply panels and per-thread drafts. Source review covers migration, request identity, transaction ordering, draft lifetime, image preservation, private-context exclusion and cancellation. Final check and layout evidence follows below; functional/API/authentication/recovery/keyboard/touch outcomes remain unverified under the zero-tests policy.
+
+
+Qualification evidence (October 5, 2026):
+
+- Integrated source/deslop review covered the native application boundary, scoped directory/membership checks, native draft lifetime, legacy retry reservations and queued work, Stop admission fencing, image preservation, stream-to-public-answer replacement, safe reset/compaction markers and per-chat supporting-state isolation. Removed a redundant directory lookup at the HTTP boundary; the runtime resolves invitations once against the authenticated company.
+- Frontend/service/tooling TypeScript, production builds, `nix flake check` and `nix build` passed on Apple Silicon. The existing Vite large-chunk warning remains. These checks do not qualify runtime behavior; this revision’s x86-64 Linux build was not run.
+- Rendered desktop and 390×844 stills reviewed the actual existing conversation/tool history and participant panel. Clearly labelled static samples using real components covered populated multi-agent discussion, reply threads, starting-agent choice and invitations; portal chrome in the chooser/invitation samples is a static equivalent. The invitation review found and corrected the Already here mismatch. No sample conversations, participants or messages were inserted into user state.
+- Shared token styles, 12 px minimum type, labelled actions, native/Base UI controls and phone layouts were reviewed in source and stills. Keyboard, touch, IME/virtual keyboard, assistive technology, all empty/error/loading states, focus restoration, contrast measurements, long-history performance, streaming/retry/recovery and multi-user authorization flows remain unverified. No tests, smoke checks, model requests or browser/API acceptance procedures were run.
+- Captures and sample scripts remain in ignored `.local/shared-layout/2026-10-05/` and the UI task worktree’s `.local/shared-layout/`; user-state backup is in the canonical checkout’s `.local/backups/shared-conversations-20261005-182617/`. The local service was updated; Omarchy and the pilot were not changed.
