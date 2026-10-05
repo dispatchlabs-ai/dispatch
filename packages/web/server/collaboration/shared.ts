@@ -497,32 +497,53 @@ async function scanEntries(tx: Tx, conversationId: ConversationId) {
 }
 function reply(value: unknown) { return { content: [{ type: "text" as const, text: JSON.stringify(value) }] }; }
 
-function publicToolEntries(entries: EntryRecord[]): EntryRecord[] {
+function publicActivityEntries(entries: EntryRecord[], memberId: string, publicIds: ReadonlySet<string>): EntryRecord[] {
   return entries.flatMap(entry => {
+    if (isContextBoundary(entry)) {
+      // Boundaries remain visible, but their handoffs and compaction summaries contain private working context.
+      const reason = entry.data && typeof entry.data === "object" && !Array.isArray(entry.data) ? entry.data.reason : undefined;
+      return [{
+        id: entry.id, conversationId: entry.conversationId, kind: entry.kind,
+        ...(entry.head === undefined ? {} : { head: entry.head }),
+        ...(reason === "manual" || reason === "threshold" || reason === "overflow" ? { data: { reason } } : {}),
+      }];
+    }
     if (entry.kind === "pi.tool-result") return entry.model?.some(message => message.role === "toolResult" && !message.toolName.startsWith("conversation_")) ? [entry] : [];
     if (entry.kind !== "pi.assistant") return [];
+    const published = publicIds.has(`answer:${memberId}:${entry.id}`) || publicIds.has(`legacy:${entry.id}`);
     const model = (entry.model ?? []).flatMap(message => message.role === "assistant"
-      ? [publicAssistant(message)] : []);
+      ? [publicAssistant(message, { text: !published, partial: false })] : []);
     return model.some(message => message.content.length) ? [{ id: entry.id, conversationId: entry.conversationId, kind: entry.kind, ...(entry.byTaskId ? { byTaskId: entry.byTaskId } : {}), model }] : [];
   });
 }
-function publicAssistant(message: AssistantMessage): AssistantMessage {
+function publicAssistant(message: AssistantMessage, preview: { text: boolean; partial: boolean }): AssistantMessage {
+  const calls = message.content.filter(part => part.type === "toolCall");
+  const orchestrationOnly = calls.length > 0 && calls.every(call => call.name.startsWith("conversation_"));
+  const text = message.content.flatMap(part => part.type === "text" ? [part.text] : []).join("").trim();
+  const silent = text === "[[silent]]" || (preview.partial && "[[silent]]".startsWith(text));
+  const showText = preview.text && !orchestrationOnly && !silent;
   return {
     role: "assistant", api: message.api, provider: message.provider, model: message.model,
     usage: message.usage, stopReason: message.stopReason, timestamp: message.timestamp,
-    content: message.content.flatMap(part => part.type === "toolCall" && !part.name.startsWith("conversation_")
-      ? [{ type: "toolCall" as const, id: part.id, name: part.name, arguments: part.arguments }] : []),
+    content: message.content.flatMap<AssistantMessage["content"][number]>(part => {
+      if (part.type === "text" && showText) return [{ type: "text" as const, text: part.text }];
+      if (part.type === "toolCall" && !part.name.startsWith("conversation_")) return [{ type: "toolCall" as const, id: part.id, name: part.name, arguments: part.arguments }];
+      return [];
+    }),
   };
 }
 
 function publicLive(live: LiveState): LiveState {
   const result = copyJson(live, { omitUndefinedProperties: true }) as LiveState;
-  if (result.generation?.message) result.generation.message = copyJson(publicAssistant(result.generation.message), { omitUndefinedProperties: true }) as NonNullable<NonNullable<LiveState["generation"]>["message"]>;
+  if (result.generation?.message) result.generation.message = copyJson(publicAssistant(result.generation.message, { text: true, partial: true }), { omitUndefinedProperties: true }) as NonNullable<NonNullable<LiveState["generation"]>["message"]>;
   result.tools = result.tools?.filter(tool => !tool.name.startsWith("conversation_"));
   return result;
 }
 
+function isContextBoundary(entry: EntryRecord) { return entry.kind === "pi.reset" || entry.kind === "pi.compaction"; }
+
 function projectActivities(member: Member, entries: EntryRecord[], live: LiveState, messages: ConversationMessage[]): ParticipantActivity[] {
+  const publicIds = new Set(messages.map(message => message.id));
   const groups: { id: string; createdAt: number; threadId: string | null; entries: EntryRecord[]; answerId?: string }[] = [];
   let group: typeof groups[number] | undefined;
   for (const entry of entries) {
@@ -532,14 +553,17 @@ function projectActivities(member: Member, entries: EntryRecord[], live: LiveSta
       try { const data = JSON.parse(textOf(entry)); threadId = data.incoming?.threadId ?? null; } catch { /* Historical human input. */ }
       group = { id: `${member.id}:${entry.id}`, createdAt: message.timestamp, threadId, entries: [] }; groups.push(group);
     }
+    if (!group && isContextBoundary(entry)) {
+      group = { id: `${member.id}:boundary:${entry.id}`, createdAt: member.joinedAt, threadId: null, entries: [] }; groups.push(group);
+    }
     if (!group) continue;
     group.entries.push(entry);
     if (entry.kind === "pi.assistant" && message?.role === "assistant" && message.stopReason !== "toolUse") group.answerId = messages.find(message => message.id === `answer:${member.id}:${entry.id}` || message.id === `legacy:${entry.id}`)?.id;
   }
   return groups.flatMap((group, index) => {
-    const projected = publicToolEntries(group.entries);
+    const projected = publicActivityEntries(group.entries, member.id, publicIds);
     const current = index === groups.length - 1 ? publicLive(live) : {};
-    if (!projected.length && !current.run && !current.tools?.length) return [];
+    if (!projected.length && !current.run && !current.tools?.length && !current.compactions?.length && !current.generation?.message?.content.length) return [];
     return [{ id: group.id, participantId: member.id, threadId: group.threadId, createdAt: group.createdAt, ...(group.answerId ? { messageId: group.answerId } : {}), entries: projected, live: current, submissions: [] }];
   });
 }
