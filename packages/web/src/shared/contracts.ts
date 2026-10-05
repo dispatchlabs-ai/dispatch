@@ -1,4 +1,4 @@
-import type { ConversationView, EntryRecord, LiveState, SubmissionRecord } from "@earendil-works/pi-durable";
+import type { ConversationView, EntryRecord, LiveState, SubmissionRecord, UsageState } from "@earendil-works/pi-durable";
 
 export interface RuntimeScope {
   companyId: string;
@@ -60,6 +60,7 @@ export interface AgentParticipant extends ParticipantIdentity {
   agentRevision: number;
   status: ParticipantStatus;
   error?: string;
+  usage: UsageState;
   /** Configuration saved for this instance, not the definition's latest revision. */
   agent: AgentDraft & { extensions: string[]; tools: string[]; cwd?: string };
 }
