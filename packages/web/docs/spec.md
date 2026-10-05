@@ -60,7 +60,7 @@ See [NIST's distinction between single-factor and multi-factor cryptographic aut
 
 All users initially have the same application capabilities; there are no differentiated application roles in the initial scope. Users still have individual identities and sessions. Future role-based access control (RBAC) must be possible through a consistent server-side authorization boundary, without changing how users are identified. Role definitions, assignment, and role-management UI are future work.
 
-Each installation serves one company. Accounts have separate identities. Chats are private to their creator within that company; agent definitions are shared within the company. Every service operation receives its company/user scope from the authenticated session. These boundaries do not grant cross-company access.
+Each installation serves one company. Accounts have separate identities. The current implementation keeps chats private to their creator; the accepted [shared-conversation design](#shared-conversations) replaces that rule with explicit membership when implemented. Agent definitions are shared within the company. Every service operation receives its company/user scope from the authenticated session. These boundaries do not grant cross-company access.
 
 ### Enrollment, recovery, and sessions
 
@@ -216,6 +216,39 @@ The editor groups Identity, Instructions, and Model in that order. Instructions 
 - Store project records and nullable chat membership in the existing native Pi session catalog. Existing records without project data remain unassigned; no second database, project Session, or execution engine is introduced. Creation and assignment use Pi atomic commits. Preserve the original creation project separately from mutable membership so retrying chat creation after a move still resolves to the same chat.
 - Creation request IDs are stable across an uncertain retry and conflict on changed content. Names are trimmed, required, and at most 100 characters; stable IDs identify projects, so names need not be unique. Failed operations retain saved state and the form input. Concurrent membership changes use the existing serialized, last-committed preference update contract.
 - Desktop uses the approved groups and project list; narrow screens expose the same controls through the existing navigation panel. Project-name drafts, search, archive selection, and group expansion survive responsive panel remounts. Project name editing, deletion, sharing, additional fields, shared resources/context, and automatic workflows remain outside this slice.
+
+## Shared conversations
+
+**Product decisions accepted October 5, 2026; implementation pending.** A visible conversation is a shared discussion among human and agent participants, with one public history. Each agent participant has a separate native working conversation in the same Pi Session. The [maintained decision and source audit](https://wiki.dispatchworks.ai/wiki/agent-collaboration-spaces/) records the rationale and the limits of Pi's examples. [WP-024](handoff.md#wp-024--shared-conversations) owns the implementation package. The existing single-agent behavior below remains the implementation baseline until that package lands.
+
+### Accepted participant behavior
+
+- Starting a conversation lets the human choose its starting agent participants from available company definitions, including when starting inside a project. Starting from an agent can preselect that definition. Keep the current project assignment and independent tab/draft behavior.
+- All participants can read the public conversation and respond to one another. There is no mandatory coordinator or parent agent through which replies must pass. Public messages identify the actual human or agent instance; a definition name alone is not an identity.
+- Every new public message from another participant, human or agent, causes each agent participant to consider whether to respond. Agents may stay silent. Mentions explicitly request attention; an agent's own message does not cause it to respond to itself. Remaining silent creates no public message and therefore no new reply cycle.
+- Human members can invite humans and agents. Agent participants can invite existing company agents themselves; human invitations remain human actions. Conversations are invite-only within the company. A shared definition or a project assignment does not grant access to a conversation.
+- Developer and other named agents are reusable definitions with many independent instances. Each conversation has its own instances and working context; it does not inherit private working history from another conversation using the same definition. Copy the selected definition revision when creating an instance, preserving the existing immutable-configuration policy.
+- A newly invited human or agent can read the entire public history, including messages from before joining. Model context limits do not delete history or silently turn this into a since-joining view. Private agent working state is distinct from the shared discussion.
+- Projects remain name-only organizational groups. Sharing a conversation does not share its creator's project or unrelated conversations.
+
+### Implementation approach and preservation
+
+The following engineering approach implements the accepted behavior; exact schemas and native transaction boundaries must be confirmed against Pi's public API during WP-024.
+
+- Store membership and instance/configuration references in Pi documents and public messages as native entries with stable message IDs, structured authorship, and optional reply/mention references. Keep each participant's native working conversation in the same existing Session. Introduce no competing transcript database, scheduler, or cross-store coordination layer.
+- On public-message commit, persist the recipients and durable delivery work through native Pi tasks. Use stable message/recipient identities and ordered recipient progress for retries and recovery. Watches refresh presentation; they are not the only record that a message needs delivery. Agent outputs become public messages through the same author-checked path as human posts and can activate other members.
+- Supply full public-history access through native records, with explicit context preparation and retrieval for histories larger than a model window. Preserve author roles when supplying context; another agent's post must not be represented as a new authenticated human instruction. Joining grants history access without creating a public reply for every historical message.
+- Derive access from authenticated company membership plus conversation membership on list, read, write, invitation, Stop and subscription paths. Resolve agent-tool callers from their native instance binding, never from an author ID asserted in message text. An agent can invite only available company definitions into a conversation it already belongs to.
+- Keep project assignment, pinning and archiving as each human's personal organization of the shared discussion. This preserves existing private projects without allowing another member's organizational changes to remove or move the creator's chat.
+- Preserve existing IDs, URLs, public messages, native configuration, working directories, ongoing work and saved project assignments. Existing chats initially retain their human creator and saved agent instance. Do not rewrite their native transcripts or silently cancel work to establish the new representation. Record the actual compatibility strategy before changing persisted behavior.
+- Keep public message history available independently of native active-context compaction/reset boundaries. Preserve each agent's native tool activity and status with its author; do not flatten tool records into invented chat messages or expose private model reasoning. Define the projection and any historical limitations explicitly.
+
+### Failure, control and recovery contracts
+
+- A failed invitation or message leaves committed membership/history intact and retains the human's unsent input. An uncertain retry reuses its logical request ID; changed content with that identity conflicts. Duplicate delivery or reporter recovery must not create duplicate public messages or duplicate agent instances.
+- Service restart reinstalls the required native definitions and resumes stored delivery and agent work through Pi. Browser disconnect stops observation only. Distinguish an agent that is working, silent, stopped, or failed; one participant's failure must not erase other participants' public history or work.
+- Carry Stop into the shared model with explicit scope. The proposed default is a conversation-wide Stop for currently admitted responses and their pending deliveries, preserving public history and committed partial output; a later new message can resume participation. Its implementation must prevent already-pending delivery from immediately restarting the stopped work. Confirm the native cancellation boundary during WP-024 rather than treating one agent's foreground cancellation as a whole-conversation stop.
+- Preserve the existing restriction to local development and trusted local coding access. No new concurrency cap, worker deployment, remote sandbox, autonomous human invitation, or cross-conversation private-memory sharing is implied.
 
 ## Web architecture
 

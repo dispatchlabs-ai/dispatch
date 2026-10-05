@@ -1,6 +1,6 @@
 # Dispatch Web implementation handoff
 
-The local implementation covers company authentication, stock Pi Durable chat, the branded desktop/mobile workspace, and named agent definitions. [spec.md](spec.md) defines the current contracts; [usage-guide.md](usage-guide.md) explains operation. The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains product intent and decision history.
+The local implementation covers company authentication, stock Pi Durable chat, the branded desktop/mobile workspace, and named agent definitions. [spec.md](spec.md) defines the current contracts; [usage-guide.md](usage-guide.md) explains operation. The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains product intent and decision history. The accepted shared-conversation design is prepared as [WP-024](#wp-024--shared-conversations); it is not implemented yet.
 
 ## Current testing policy
 
@@ -373,3 +373,28 @@ Implementation and evidence (October 5, 2026):
 - Rendered layout review covered the authenticated New project form at desktop and 390 px, plus the actual project-list/sidebar components rendered with static sample props at desktop and 390 px. The sample preview had no API writes or interactive handlers. Local screenshots are in `.local/projects-layout/2026-10-05/` in the task worktree.
 - No tests were added or run. Creation/moving persistence, ownership rejection, retries/recovery, live work preservation, keyboard flows, measured contrast, and real-device touch behavior remain functionally unverified under the standing policy. Build/source evidence does not establish runtime correctness.
 - Local development only; no Omarchy deployment was performed.
+
+## WP-024 — Shared conversations
+
+**Prepared October 5, 2026; implementation pending.** Chris accepted shared conversations and resolved activation, invitation authority, agent-instance continuity, and join-history access. The [shared-conversation specification](spec.md#shared-conversations) and [maintained decision](https://wiki.dispatchworks.ai/wiki/agent-collaboration-spaces/) are the product basis. This package depends on the existing authenticated native runtime, revisioned company agent definitions, tool presenters, and WP-023 projects.
+
+Scope: allow humans and independent agent instances to participate in one visible conversation, choose starting agents, invite participants, share attributed public history, and use native Pi delivery/recovery. Keep the existing single runtime and local development environment. No Omarchy deployment, new agent-identity provider, remote sandbox, cross-store protocol, or numerical concurrency cap belongs to this package.
+
+Implementation order within this package:
+
+1. Define the native public-log, membership, instance, delivery and personal-preference records. Resolve the legacy-chat compatibility strategy and native transaction/cancellation boundaries against the pinned public API before implementing persisted changes. Preserve current IDs, saved agent revisions, history, workspaces, project assignments and ongoing work.
+2. Implement the authenticated membership/message APIs, native agent invitation/public-post tools, full-history access, and Pi-owned durable delivery/reporter tasks. Each new public message is considered by other agent members, with silence allowed; stable message/recipient identities handle retries. Apply membership to snapshots and live subscriptions as well as commands.
+3. Implement creation-time agent selection, the participant list and invitation controls, attributed public messages, author-scoped native tool/status presentation, and shared Stop behavior. Preserve existing desktop/mobile workspace, tabs, drafts, project context, and personal pin/archive state. Update the runtime and usage guides to the implemented contracts.
+
+Acceptance criteria for implementation:
+
+- A human can select the starting agent configuration within or outside a project and then invite human or agent members. An agent can bring an available company agent into its conversation; it cannot invite humans or act under a human author's identity.
+- Human and agent participants can address one another in the shared history. There is no mandatory coordinator. Agents consider new messages from others and can remain silent without generating an empty public post or reply cycle.
+- Instances retain independent working contexts and saved configuration revisions. Reusing the Developer definition does not merge private history or working directories across conversations.
+- Joining grants access to all public history, including pre-join messages. Historical access survives native active-context compaction/reset; model-window preparation does not delete the public record. Public authorship and private working context remain distinct.
+- Existing private conversations remain available with their original creator and saved agent. The compatibility strategy preserves native entries, working directories, current work, URLs, drafts and project organization. Sharing a chat does not share a private project or unrelated chats.
+- Source review accounts for failed/uncertain requests, deduplicated delivery and public posting, native restart recovery, provider failures, membership checks, conversation-wide Stop, and browser reconnection. Do not substitute an in-memory observer or another execution engine for native durable work.
+- Apply the spec's UI rules and behavior-preserving source/deslop review. Review actual rendered desktop and 390 px layouts. Record any unverified rule, keyboard/touch behavior, status/recovery flow, or accessibility property honestly.
+- Review the full diff and changed local documentation links; run TypeScript/production checks, `nix build`, and `nix flake check` for the implementation revision. Add or run no tests, smoke checks, or browser acceptance flows under the standing zero-tests policy. Record functional outcomes as unverified unless separately authorized evidence establishes them.
+
+Preparation evidence: the four product policies and this ordered package are documented; no application code or runtime data changed. The Pi example/source audit is architectural evidence only. All implementation acceptance criteria above remain pending.
