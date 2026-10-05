@@ -73,6 +73,8 @@ export interface ConversationMessage {
   authorId: string;
   text: string;
   createdAt: number;
+  /** Native image content retained when projecting existing public messages. */
+  images?: { mimeType: string; data: string }[];
   /** Root public-message ID; replies remain visible to all conversation members. */
   threadId: string | null;
   mentions: string[];
