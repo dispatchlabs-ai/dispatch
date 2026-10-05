@@ -1,4 +1,4 @@
-import type { ConversationView, SubmissionRecord } from "@earendil-works/pi-durable";
+import type { ConversationView, EntryRecord, LiveState, SubmissionRecord } from "@earendil-works/pi-durable";
 
 export interface RuntimeScope {
   companyId: string;
@@ -27,7 +27,66 @@ export interface ChatSummary {
 
 export interface ChatSnapshot {
   conversation: ChatSummary;
+  participants: ConversationParticipant[];
+  messages: ConversationMessage[];
+  activities: ParticipantActivity[];
+  /** Compatibility projection; private participant context is never returned. */
   view: ConversationView;
+  submissions: readonly SubmissionRecord[];
+}
+
+export interface CompanyPerson {
+  id: string;
+  name: string;
+}
+
+export type ParticipantStatus = "idle" | "working" | "silent" | "stopped" | "failed";
+
+interface ParticipantIdentity {
+  id: string;
+  name: string;
+  joinedAt: number;
+}
+
+export interface HumanParticipant extends ParticipantIdentity {
+  kind: "human";
+  userId: string;
+  status: "idle";
+}
+
+export interface AgentParticipant extends ParticipantIdentity {
+  kind: "agent";
+  agentDefinitionId: string;
+  agentRevision: number;
+  status: ParticipantStatus;
+  error?: string;
+  /** Configuration saved for this instance, not the definition's latest revision. */
+  agent: AgentDraft & { extensions: string[]; tools: string[]; cwd?: string };
+}
+
+export type ConversationParticipant = HumanParticipant | AgentParticipant;
+
+export interface ConversationMessage {
+  id: string;
+  kind: "message" | "membership";
+  authorId: string;
+  text: string;
+  createdAt: number;
+  /** Root public-message ID; replies remain visible to all conversation members. */
+  threadId: string | null;
+  mentions: string[];
+}
+
+export interface ParticipantActivity {
+  id: string;
+  participantId: string;
+  threadId: string | null;
+  createdAt: number;
+  /** Public answer associated with this activity, when one has been committed. */
+  messageId?: string;
+  /** Public native tool activity only; excludes private input and thinking. */
+  entries: readonly EntryRecord[];
+  live: LiveState;
   submissions: readonly SubmissionRecord[];
 }
 
@@ -62,6 +121,7 @@ export interface CreateChatInput {
   requestId: string;
   title?: string;
   agentDefinitionId?: string;
+  agentDefinitionIds?: string[];
   projectId?: string | null;
 }
 
@@ -85,6 +145,14 @@ export interface CreateProjectInput {
 export interface SendMessageInput {
   requestId: string;
   text: string;
+  threadId?: string | null;
+  mentions?: string[];
+}
+
+export interface AddParticipantsInput {
+  requestId: string;
+  agentDefinitionIds?: string[];
+  userIds?: string[];
 }
 
 export interface ModelOption {
