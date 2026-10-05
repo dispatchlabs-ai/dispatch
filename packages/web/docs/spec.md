@@ -221,6 +221,8 @@ The editor groups Identity, Instructions, and Model in that order. Instructions 
 
 **Product decisions accepted October 5, 2026; implementation pending.** A visible conversation is a shared discussion among human and agent participants, with one public history. Each agent participant has a separate native working conversation in the same Pi Session. The [maintained decision and source audit](https://wiki.dispatchworks.ai/wiki/agent-collaboration-spaces/) records the rationale and the limits of Pi's examples. [WP-024](handoff.md#wp-024--shared-conversations) owns the implementation package. The existing single-agent behavior below remains the implementation baseline until that package lands.
 
+Chris requested Slack as the conversation screen's visual model on October 5. The [ImageGen concepts](shared-conversation-designs.md) explore compact, consistently left-aligned message rows and a contextual thread/participants panel. These visuals remain proposed; they do not yet replace the implemented UI rules or settle thread-specific runtime behavior.
+
 ### Accepted participant behavior
 
 - Starting a conversation lets the human choose its starting agent participants from available company definitions, including when starting inside a project. Starting from an agent can preselect that definition. Keep the current project assignment and independent tab/draft behavior.
