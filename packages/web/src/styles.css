@@ -778,3 +778,5 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .participant-run > p { margin: var(--space-3) 0; }
 .thread-context .composer-toolbar { flex-wrap: wrap; }
 .thread-context .composer-toolbar > .button-row { margin-left: auto; }
+
+.activity-commentary { margin: var(--space-3) 0; }

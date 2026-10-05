@@ -400,7 +400,7 @@ export function Workspace() {
   const snapshot = active.kind === "chat" ? snapshots[active.chatId] : undefined;
   const connection = active.kind === "chat" ? connections[active.chatId] || "connecting" : null;
   const activeProjectId = active.kind === "project" ? active.projectId : active.kind === "chat" ? chats.find(chat => chat.id === active.chatId)?.projectId ?? null : null;
-  const supporting = (inDrawer = false) => section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : active.kind === "chat" && snapshot ? <SharedContextPanel snapshot={snapshot} models={config?.models ?? []} threadId={threads[active.chatId] ?? null}
+  const supporting = (inDrawer = false) => section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : active.kind === "chat" && snapshot ? <SharedContextPanel key={snapshot.conversation.id} snapshot={snapshot} models={config?.models ?? []} threadId={threads[active.chatId] ?? null}
     mentions={mentions[`${active.chatId}:${threads[active.chatId]}`] ?? []} onMentionsChange={ids => changeMentions(`${active.chatId}:${threads[active.chatId]}`, ids)}
     draft={drafts[threads[active.chatId] ? `${active.chatId}:${threads[active.chatId]}` : active.chatId] || ""}
     pending={pending[`${active.chatId}:${threads[active.chatId]}`]} error={sendErrors[`${active.chatId}:${threads[active.chatId]}`]}

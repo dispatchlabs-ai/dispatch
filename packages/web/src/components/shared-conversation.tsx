@@ -1,3 +1,4 @@
+import type { Message } from "@earendil-works/pi-ai";
 import { Tabs } from "@base-ui/react/tabs";
 import { AtSign, ArrowUp, Check, Copy, LockKeyhole, Reply, RotateCcw, Square, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -5,7 +6,7 @@ import type { AddParticipantsInput, AgentDefinition, AgentParticipant, Applicati
 import { ApiError, errorMessage } from "../lib/api";
 import type { PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
-import { toolActivities, toolOutput } from "../lib/tool-activity";
+import { toolActivities, toolOutput, type ToolActivity } from "../lib/tool-activity";
 import { AgentChoices, ParticipantAvatar } from "./conversation-people";
 import { Markdown } from "./markdown";
 import { MarkdownComposer } from "./markdown-composer";
@@ -50,33 +51,44 @@ export function PublicMessage({ message, participants, replies, onThread, output
 export function PublicActivity({ activity, participants }: { activity: ParticipantActivity; participants: ConversationParticipant[] }) {
   const author = participants.find(participant => participant.id === activity.participantId);
   const tools = useMemo(() => toolActivities(activity.entries, activity.live), [activity.entries, activity.live]);
-  const rendered = new Set<unknown>();
-  const cards = [];
-  for (const entry of activity.entries) for (const message of entry.model ?? []) {
+  const rendered = new Set<ToolActivity>();
+  const content: ReactNode[] = [];
+  function appendTool(tool: ToolActivity | null | undefined, key: string) {
+    if (!tool || rendered.has(tool)) return;
+    rendered.add(tool);
+    content.push(<ToolActivityView key={key} activity={tool} />);
+  }
+  function appendMessage(message: Message, key: string) {
     if (message.role === "toolResult") {
-      const item = tools.results.get(message);
-      if (item && !rendered.has(item)) { rendered.add(item); cards.push(item); }
-    } else if (Array.isArray(message.content)) for (const part of message.content) {
-      if (part.type !== "toolCall") continue;
-      const item = tools.calls.get(part);
-      if (item && !rendered.has(item)) { rendered.add(item); cards.push(item); }
+      appendTool(tools.results.get(message), key);
+    } else if (message.role === "assistant") {
+      const text = message.content.filter(part => part.type === "text").map(part => part.text).join("\n\n");
+      // The server projects public commentary and provisional output only;
+      // committed final answers are rendered from the shared public messages.
+      if (text && !tools.echoes.has(message)) content.push(<div className="activity-commentary" key={`${key}:text`}><Markdown>{text}</Markdown></div>);
+      for (const part of message.content) {
+        if (part.type === "toolCall") appendTool(tools.calls.get(part), `${key}:tool:${part.id}`);
+      }
     }
   }
-  const generation = activity.live.generation?.message;
-  if (generation?.role === "assistant") for (const part of generation.content) {
-    if (part.type !== "toolCall") continue;
-    const item = tools.calls.get(part);
-    if (item && !rendered.has(item)) { rendered.add(item); cards.push(item); }
+  for (const entry of activity.entries) {
+    if (entry.kind === "pi.reset" || entry.kind === "pi.compaction") {
+      content.push(<details className="native-entry" key={entry.id}>
+        <summary>{entry.kind === "pi.reset" ? "Agent working context started" : "Agent working context summarized"}</summary>
+        {entry.data ? <pre>{JSON.stringify(entry.data, null, 2)}</pre> : null}
+      </details>);
+    } else if (!entry.model?.length) {
+      content.push(<details className="native-entry" key={entry.id}><summary>Agent event · technical details</summary><pre>{JSON.stringify({ kind: entry.kind, data: entry.data }, null, 2)}</pre></details>);
+    } else entry.model.forEach((message, index) => appendMessage(message, `${entry.id}:${index}`));
   }
-  cards.push(...tools.extra.filter(item => !rendered.has(item)));
-  const boundaries = activity.entries.filter(entry => entry.kind === "pi.reset" || entry.kind === "pi.compaction");
-  const events = activity.entries.filter(entry => !entry.model?.length && entry.kind !== "pi.reset" && entry.kind !== "pi.compaction");
-  if (!cards.length && !boundaries.length && !events.length) return null;
+  const generation = activity.live.generation;
+  if (generation?.message) appendMessage(generation.message as Message, "live");
+  tools.extra.forEach((tool, index) => appendTool(tool, `extra:${index}`));
+  if (generation?.retry) content.push(<p className="run-outcome" role="status" key="retry">Retrying the response…</p>);
+  if (!content.length) return null;
   return <section className="participant-activity" aria-label={`${author?.name || "Agent"} activity`}>
-    <div className="activity-author"><ParticipantAvatar kind="agent" name={author?.name || "Agent"} /><strong>{author?.name || "Agent"}</strong><span>Activity</span></div>
-    {cards.map((activity, index) => <ToolActivityView key={index} activity={activity} />)}
-    {events.map(entry => <details className="native-entry" key={entry.id}><summary>Agent event · technical details</summary><pre>{JSON.stringify({ kind: entry.kind, data: entry.data }, null, 2)}</pre></details>)}
-    {boundaries.map(entry => <p className="native-entry" key={entry.id}>{entry.kind === "pi.reset" ? "Agent working context started" : "Agent working context summarized"}</p>)}
+    <div className="activity-author"><ParticipantAvatar kind="agent" name={author?.name || "Agent"} /><strong>{author ? participantName(author, participants) : "Agent"}</strong><span>{generation ? "Responding…" : "Activity"}</span></div>
+    {content}
   </section>;
 }
 
