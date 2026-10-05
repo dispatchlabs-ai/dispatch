@@ -1,8 +1,8 @@
 import { Tabs } from "@base-ui/react/tabs";
-import { Bot, ChevronLeft, ChevronRight, CircleHelp, LogOut, Menu, MessageSquare, PanelLeft, PanelRight, Plus, Settings2, X } from "lucide-react";
+import { Bot, ChevronLeft, ChevronRight, CircleHelp, Folder, LogOut, Menu, MessageSquare, PanelLeft, PanelRight, Plus, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router";
-import type { AgentDefinition, ApplicationConfig, ChatSnapshot, ChatSummary, CreateChatInput, SendMessageInput } from "../shared/contracts";
+import type { AgentDefinition, ApplicationConfig, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, SendMessageInput, UpdateChatInput } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
 import { mergeChat, type ConnectionState, type PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
@@ -13,12 +13,23 @@ import { ChatPanel } from "./chat";
 import { ConversationSidebar } from "./conversation-sidebar";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ContextPanel } from "./context-panel";
+import { MoveConversationDialog, ProjectPage } from "./projects";
 import { SecurityPage } from "./security";
 import { Button, IconButton, Modal, Notice, Select, Spinner } from "./ui";
 
-type WorkspaceTab = { id: string; kind: "chat"; chatId: string } | { id: string; kind: "welcome" };
+type WorkspaceTab = { id: string; kind: "chat"; chatId: string } | { id: string; kind: "project"; projectId: string } | { id: string; kind: "welcome" };
 type WorkspaceSection = "chats" | "agents" | "security";
 const welcomeTab: WorkspaceTab = { id: "welcome", kind: "welcome" };
+
+function tabLocation(tab: WorkspaceTab): Record<string, string> {
+  return tab.kind === "chat" ? { chat: tab.chatId } : tab.kind === "project" ? { project: tab.projectId } : {};
+}
+
+function initialTab(params: URLSearchParams): WorkspaceTab {
+  const chatId = params.get("chat");
+  const projectId = params.get("project");
+  return chatId ? { id: `chat:${chatId}`, kind: "chat", chatId } : projectId ? { id: `project:${projectId}`, kind: "project", projectId } : welcomeTab;
+}
 
 export function Workspace() {
   const { state, api, auth, setState } = useSession();
@@ -33,14 +44,20 @@ export function Workspace() {
   const [showArchivedAgents, setShowArchivedAgents] = useState(false);
   const [config, setConfig] = useState<ApplicationConfig | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectName, setProjectName] = useState("");
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [projectError, setProjectError] = useState<string | null>(null);
+  const projectRequest = useRef<CreateProjectInput | null>(null);
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(() => new Set());
+  const [showArchivedChats, setShowArchivedChats] = useState(false);
+  const [movingChat, setMovingChat] = useState<ChatSummary | null>(null);
+  const [updatingChats, setUpdatingChats] = useState<Set<string>>(() => new Set());
   const [agents, setAgents] = useState<AgentDefinition[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tabs, setTabs] = useState<WorkspaceTab[]>(() => {
-    const chatId = searchParams.get("chat");
-    return chatId ? [{ id: `chat:${chatId}`, kind: "chat", chatId }] : [welcomeTab];
-  });
-  const [activeId, setActiveId] = useState(() => searchParams.get("chat") ? `chat:${searchParams.get("chat")}` : "welcome");
+  const [tabs, setTabs] = useState<WorkspaceTab[]>(() => [initialTab(searchParams)]);
+  const [activeId, setActiveId] = useState(() => initialTab(searchParams).id);
   const [snapshots, setSnapshots] = useState<Record<string, ChatSnapshot>>({});
   const [connections, setConnections] = useState<Record<string, ConnectionState>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -53,7 +70,7 @@ export function Workspace() {
   const [contextOpen, setContextOpen] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [detailsVisible, setDetailsVisible] = useState(true);
-  const [preferredSidebarWidth, setSidebarWidth] = useState(244);
+  const [preferredSidebarWidth, setSidebarWidth] = useState(280);
   const [preferredDetailsWidth, setDetailsWidth] = useState(294);
   const [viewportWidth, setViewportWidth] = useState(() => typeof window === "undefined" ? 1440 : window.innerWidth);
   useEffect(() => {
@@ -95,12 +112,14 @@ export function Workspace() {
 
   const load = useCallback(async () => {
     try {
-      const [nextConfig, chatResult, agentResult] = await Promise.all([
+      const [nextConfig, chatResult, agentResult, projectResult] = await Promise.all([
         api<ApplicationConfig>("/api/config"), api<{ chats: ChatSummary[] }>("/api/chats"), api<{ agents: AgentDefinition[] }>("/api/agents"),
+        api<{ projects: Project[] }>("/api/projects"),
       ]);
       setConfig(nextConfig);
       setChats(current => chatResult.chats.reduce(mergeChat, current));
       setAgents(agentResult.agents);
+      setProjects(current => mergeProjects(current, projectResult.projects));
       setError(null);
     } catch (error) { setError(errorMessage(error)); } finally { setLoading(false); }
   }, [api]);
@@ -176,7 +195,7 @@ export function Workspace() {
     if (tab.kind === "chat" && tab.id !== activeId) setConnections(current => ({ ...current, [tab.chatId]: "connecting" }));
     setActiveId(tab.id);
     setNavigationOpen(false);
-    setSearchParams(tab.kind === "chat" ? { chat: tab.chatId } : {}, { replace: true });
+    setSearchParams(tabLocation(tab), { replace: true });
   }
 
   function requestCloseTab(tabId: string) {
@@ -204,17 +223,17 @@ export function Workspace() {
       const selected = next[Math.max(0, Math.min(tabs.findIndex(tab => tab.id === tabId) - 1, next.length - 1))];
       focusId = selected.id;
       setActiveId(selected.id);
-      setSearchParams(selected.kind === "chat" ? { chat: selected.chatId } : {}, { replace: true });
+      setSearchParams(tabLocation(selected), { replace: true });
     }
     requestAnimationFrame(() => {
       (tabList.current?.querySelector<HTMLElement>(`[data-work-tab="${CSS.escape(focusId)}"]`) ?? document.getElementById("main-workspace"))?.focus();
     });
   }
 
-  async function createChat(agentId = config?.defaultAgentId) {
+  async function createChat(agentId = config?.defaultAgentId, projectId: string | null = null) {
     if (creating || !agentId) return;
-    const sameRequest = createRequest.current?.agentDefinitionId === agentId;
-    if (!sameRequest) createRequest.current = { requestId: crypto.randomUUID(), agentDefinitionId: agentId };
+    const sameRequest = createRequest.current?.agentDefinitionId === agentId && (createRequest.current.projectId ?? null) === projectId;
+    if (!sameRequest) createRequest.current = { requestId: crypto.randomUUID(), agentDefinitionId: agentId, projectId };
     setCreating(true); setError(null); setCreateFailed(false);
     try {
       const snapshot = await api<ChatSnapshot>("/api/chats", createRequest.current);
@@ -226,6 +245,57 @@ export function Workspace() {
       if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429) createRequest.current = null;
       else setCreateFailed(true);
     } finally { setCreating(false); }
+  }
+
+  function selectProject(projectId: string) {
+    setShowArchivedChats(false);
+    setCollapsedProjects(current => { const next = new Set(current); next.delete(projectId); return next; });
+    activate({ id: `project:${projectId}`, kind: "project", projectId });
+  }
+
+  async function createProject(): Promise<boolean> {
+    const name = projectName.trim();
+    if (creatingProject || !name) return false;
+    if (projectRequest.current?.name !== name) projectRequest.current = { requestId: crypto.randomUUID(), name };
+    setCreatingProject(true); setProjectError(null);
+    try {
+      const { project } = await api<{ project: Project }>("/api/projects", projectRequest.current);
+      setProjects(current => mergeProjects(current, [project]));
+      projectRequest.current = null;
+      setProjectName(""); setSearch("");
+      selectProject(project.id);
+      requestAnimationFrame(() => document.getElementById("main-workspace")?.focus());
+      return true;
+    } catch (error) {
+      setProjectError(errorMessage(error));
+      if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429) projectRequest.current = null;
+      return false;
+    } finally { setCreatingProject(false); }
+  }
+
+  async function updateChat(id: string, input: UpdateChatInput) {
+    setUpdatingChats(current => new Set(current).add(id));
+    try {
+      onSnapshot(await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(id)}/preferences`, input));
+      const projectId = input.projectId;
+      if (projectId) setCollapsedProjects(current => { const next = new Set(current); next.delete(projectId); return next; });
+      if (input.archived !== undefined) requestAnimationFrame(() => {
+        const sidebar = navigationOpen ? document.querySelector(".dialog-drawer") : document.getElementById("workspace-sidebar");
+        sidebar?.querySelector<HTMLButtonElement>(".sidebar-archive-toggle")?.focus();
+      });
+    } finally {
+      setUpdatingChats(current => { const next = new Set(current); next.delete(id); return next; });
+    }
+  }
+
+  function updateChatAction(id: string, input: UpdateChatInput) {
+    setError(null);
+    void updateChat(id, input).catch(error => setError(errorMessage(error)));
+  }
+
+  function moveChat(chat: ChatSummary) {
+    setNavigationOpen(false);
+    setMovingChat(chat);
   }
 
   async function sendMessage(chatId: string) {
@@ -289,9 +359,20 @@ export function Workspace() {
   const active: WorkspaceTab | { id: string; kind: "agents" | "security" } = section === "chats" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
   const snapshot = active.kind === "chat" ? snapshots[active.chatId] : undefined;
   const connection = active.kind === "chat" ? connections[active.chatId] || "connecting" : null;
+  const activeProjectId = active.kind === "project" ? active.projectId : active.kind === "chat" ? chats.find(chat => chat.id === active.chatId)?.projectId ?? null : null;
   const supporting = (inDrawer = false) => section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : <ContextPanel kind={active.kind} snapshot={snapshot} models={config?.models ?? []} tab={supportTabs[active.id] || "agent"} onTabChange={tab => setSupportTabs(current => ({ ...current, [active.id]: tab }))} />;
   const chatNav = () => selectSection("chats");
-  const conversations = <ConversationSidebar chats={chats} activeChatId={active.kind === "chat" ? active.chatId : undefined} search={search} onSearchChange={setSearch} creating={creating} onSelect={chatId => activate({ id: `chat:${chatId}`, kind: "chat", chatId })} onCreate={() => void createChat()} onUpdate={async (id, input) => onSnapshot(await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(id)}/preferences`, input))} />;
+  const selectChat = (chatId: string) => activate({ id: `chat:${chatId}`, kind: "chat", chatId });
+  const conversations = <ConversationSidebar chats={chats} projects={projects}
+    activeChatId={active.kind === "chat" ? active.chatId : undefined} activeProjectId={active.kind === "project" ? active.projectId : undefined}
+    search={search} onSearchChange={setSearch} creating={creating} updating={updatingChats}
+    showArchived={showArchivedChats} onShowArchivedChange={setShowArchivedChats} collapsedProjects={collapsedProjects}
+    onToggleProject={id => setCollapsedProjects(current => { const next = new Set(current); if (!next.delete(id)) next.add(id); return next; })}
+    newProject={{ name: projectName, busy: creatingProject, error: projectError, compact: viewportWidth <= 1100,
+      onNameChange: name => { setProjectName(name); setProjectError(null); }, onCreate: createProject,
+      onCancel: () => { setProjectName(""); setProjectError(null); projectRequest.current = null; } }}
+    onSelect={selectChat} onSelectProject={selectProject} onCreate={() => void createChat(config?.defaultAgentId, activeProjectId)}
+    onMove={moveChat} onUpdate={updateChatAction} />;
   const sidebar = <>
     <div className="section-sidebar-panel" hidden={section !== "chats"}>{conversations}</div>
     <div className="section-sidebar-panel" hidden={section !== "agents"}>
@@ -336,7 +417,7 @@ export function Workspace() {
         <Brand compact />
       </div>
       <div className="rail-links">
-        <IconButton label="Chats" className={active.kind === "chat" || active.kind === "welcome" ? "active" : ""} aria-current={active.kind === "chat" || active.kind === "welcome" ? "page" : undefined} onClick={chatNav}>
+        <IconButton label="Chats" className={section === "chats" ? "active" : ""} aria-current={section === "chats" ? "page" : undefined} onClick={chatNav}>
           <MessageSquare size={21} />
         </IconButton>
         <IconButton label="Agents" className={active.kind === "agents" ? "active" : ""} aria-current={active.kind === "agents" ? "page" : undefined} onClick={() => selectSection("agents")}>
@@ -374,7 +455,7 @@ export function Workspace() {
               </IconButton> : null}
               <Tabs.List ref={tabList} className="main-tabs" aria-label="Open work" aria-describedby="tab-keyboard-help" activateOnFocus={false} onScroll={updateTabOverflow}>
                 {tabs.map(tab => {
-                  const title = tab.kind === "chat" ? chats.find(chat => chat.id === tab.chatId)?.title || "Conversation" : "Workspace";
+                  const title = tab.kind === "chat" ? chats.find(chat => chat.id === tab.chatId)?.title || "Conversation" : tab.kind === "project" ? projects.find(project => project.id === tab.projectId)?.name || "Project" : "Workspace";
                   return <div key={tab.id} role="presentation" className={`main-tab-item ${tab.id === activeId ? "selected" : ""}`}>
                     <Tabs.Tab value={tab.id} data-work-tab={tab.id} className="main-tab"
                       onKeyDown={event => {
@@ -383,7 +464,7 @@ export function Workspace() {
                           requestCloseTab(tab.id);
                         }
                       }}>
-                      <MessageSquare size={14} />
+                      {tab.kind === "project" ? <Folder size={14} /> : <MessageSquare size={14} />}
                       <span>{title}</span>
                     </Tabs.Tab>
                     {tab.kind !== "welcome" ? <IconButton className="tab-close" tabIndex={-1} label={`Close ${title} (Delete)`} onClick={() => requestCloseTab(tab.id)}>
@@ -398,7 +479,7 @@ export function Workspace() {
             </div>
         </header> : null}
         {error ? <div className="workspace-notice">
-          <Notice>{error}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat(createRequest.current?.agentDefinitionId)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}
+          <Notice>{error}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat(createRequest.current?.agentDefinitionId, createRequest.current?.projectId)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}
         </div> : null}
         <main className="workspace-main" id="main-workspace" tabIndex={-1}>
           <div className="workspace-section" hidden={section !== "chats"}>
@@ -424,6 +505,10 @@ export function Workspace() {
               onSend={() => void sendMessage(tab.chatId)}
               onSnapshot={onSnapshot}
               onConnection={onConnection}
+            /> : tab.kind === "project" ? <ProjectPage
+              project={projects.find(project => project.id === tab.projectId)} chats={chats} creating={creating} updating={updatingChats}
+              onCreate={() => void createChat(config.defaultAgentId, tab.projectId)} onSelect={selectChat}
+              onMove={moveChat} onUpdate={updateChatAction}
             /> : <Welcome
               name={state.user.name} config={config} agents={agents}
               agentId={startingAgentId ?? config.defaultAgentId} onAgentChange={setStartingAgentId}
@@ -445,6 +530,7 @@ export function Workspace() {
         <div className="context-column-content">{supporting()}</div>
       </aside>
     </Tabs.Root>
+    {movingChat ? <MoveConversationDialog key={movingChat.id} chat={movingChat} projects={projects} onClose={() => setMovingChat(null)} onMove={(id, projectId) => updateChat(id, { projectId })} /> : null}
     <Modal title="Discard agent changes?" description="Your unsaved changes will be lost."
       open={pendingAgentAction !== null} onOpenChange={open => { if (!open) setPendingAgentAction(null); }}
       finalFocus={() => document.getElementById("main-workspace")}>
@@ -468,7 +554,7 @@ export function Workspace() {
           <Modal title="Your workspace" description={config.company.name} side="left" open={navigationOpen} onOpenChange={setNavigationOpen} trigger={<Button variant="ghost" className="workspace-action">
             <Menu size={21} /> Menu</Button>}>
             <nav className="mobile-destinations" aria-label="Workspace navigation">
-              <Button variant="ghost" aria-current={active.kind === "chat" || active.kind === "welcome" ? "page" : undefined} onClick={chatNav}>
+              <Button variant="ghost" aria-current={section === "chats" ? "page" : undefined} onClick={chatNav}>
                 <MessageSquare /> Chats</Button>
               <Button variant="ghost" aria-current={active.kind === "agents" ? "page" : undefined} onClick={() => selectSection("agents")}>
                 <Bot /> Agents</Button>
@@ -489,6 +575,12 @@ export function Workspace() {
       <span className="status-user">{state.user.name}</span>
     </footer>
   </div>;
+}
+
+function mergeProjects(current: Project[], incoming: Project[]) {
+  const byId = new Map(current.map(project => [project.id, project]));
+  for (const project of incoming) byId.set(project.id, project);
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function Welcome({ name, config, agents, agentId, onAgentChange, creating, onCreate }: {

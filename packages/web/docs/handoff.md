@@ -354,3 +354,22 @@ Acceptance and evidence:
 - The request remains compatible with the existing optional-field contract and server fallback.
 - `npm run check`, `nix flake check`, and `nix build` passed on Apple Silicon macOS. Source/diff review confirms no service, schema, or security-policy changes.
 - No tests or enrollment ceremonies run under the current zero-tests policy. Rendered desktop/390 px enrollment review remains unverified.
+
+## WP-023 — Projects inside Conversations
+
+**Accepted October 5, 2026:** implement Chris's approved ImageGen desktop design, with a required name only, many conversations per project, and at most one project per conversation. Scope and contracts are in [Projects in Conversations](spec.md#projects-in-conversations). This is local development; Omarchy stays on its existing deployment.
+
+Acceptance criteria:
+
+- New project, collapsible project groups, unassigned conversations, project name/list view, and project-aware New conversation match the approved desktop design and remain available at 390 px.
+- Existing chats remain unassigned. Assign/move/remove membership preserves native history, ongoing work, agent configuration, working directories, open tabs and drafts. Existing pin/archive/restore and search remain usable.
+- Pi owns storage transactions and execution. Both project and chat access enforce company/creator scope. Creation retries retain their original membership identity after later moves; failed operations keep form input and saved state.
+- Review source/deslop, full diff, documentation links, frontend/service/tooling TypeScript, production build, Nix build and flake checks. Record rendered desktop/390 px evidence and all unverified outcomes below; add or run no tests under the standing policy.
+
+Implementation and evidence (October 5, 2026):
+
+- Implemented the project catalog, scoped API, nullable conversation membership, creation-request identity, grouped sidebar, name-only popover, project tabs/list, and move dialog. The approved image is saved with the specification.
+- Source/deslop and full diff review completed. `npm run check`, `nix flake check`, and `nix build` passed on Apple Silicon macOS. Nix did not evaluate other systems; the existing Vite chunk-size advisory remains.
+- Rendered layout review covered the authenticated New project form at desktop and 390 px, plus the actual project-list/sidebar components rendered with static sample props at desktop and 390 px. The sample preview had no API writes or interactive handlers. Local screenshots are in `.local/projects-layout/2026-10-05/` in the task worktree.
+- No tests were added or run. Creation/moving persistence, ownership rejection, retries/recovery, live work preservation, keyboard flows, measured contrast, and real-device touch behavior remain functionally unverified under the standing policy. Build/source evidence does not establish runtime correctness.
+- Local development only; no Omarchy deployment was performed.

@@ -9,14 +9,15 @@ import { configure, createRegistry, defineDoc, Harness, type ConversationId, typ
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
-import type { AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, RuntimeScope, UpdateChatInput } from "../src/shared/contracts.js";
+import type { AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, UpdateChatInput } from "../src/shared/contracts.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { Coding } from "./extensions/coding.js";
 
 const context = BACKGROUND_CONTEXT;
-type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived"> & { pinned?: boolean; archived?: boolean; agentName?: string; companyId: string; userId: string; requestId: string };
+type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { pinned?: boolean; archived?: boolean; agentName?: string; projectId?: string | null; creationProjectId?: string | null; companyId: string; userId: string; requestId: string };
 type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: string; extensions?: string[]; tools?: string[] };
-type Catalog = { chats: StoredChat[]; agents: StoredAgent[]; runtimeInstance?: string };
+type StoredProject = Project & { companyId: string; userId: string; requestId: string };
+type Catalog = { chats: StoredChat[]; agents: StoredAgent[]; projects?: StoredProject[]; runtimeInstance?: string };
 const CatalogDoc = defineDoc<Catalog>({
   kind: "dispatch.catalog", version: 1, scope: "session",
   initial: () => ({ chats: [], agents: [] }),
@@ -125,18 +126,46 @@ export class DispatchRuntime {
     return summaries.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
   }
 
-  async createChat(scope: RuntimeScope, input: { agentDefinitionId?: string; title?: string; requestId: string }): Promise<ChatSnapshot> {
+  async listProjects(scope: RuntimeScope): Promise<Project[]> {
+    const catalog = await this.harness.snapshot(CatalogDoc, context);
+    return (catalog!.projects ?? []).filter(project => owns(scope, project)).map(projectSummary)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async createProject(scope: RuntimeScope, input: CreateProjectInput): Promise<Project> {
+    requireText(input.requestId, "Request ID", 200);
+    const name = input.name.trim();
+    requireText(name, "Project name", 100);
+    return this.harness.commit(async (tx) => {
+      const catalog = await tx.doc(CatalogDoc);
+      if (!catalog.projects) catalog.projects = [];
+      const projects = catalog.projects;
+      const existing = projects.find(project => owns(scope, project) && project.requestId === input.requestId);
+      if (existing) {
+        if (existing.name !== name) throw requestConflict();
+        return projectSummary(existing);
+      }
+      const project = { id: randomUUID(), name, createdAt: Date.now(), companyId: scope.companyId, userId: scope.userId, requestId: input.requestId };
+      projects.push(project);
+      return projectSummary(project);
+    }, context);
+  }
+
+  async createChat(scope: RuntimeScope, input: CreateChatInput): Promise<ChatSnapshot> {
     requireText(input.requestId, "Request ID", 200);
     const title = input.title?.trim() || "New conversation";
+    const projectId = input.projectId ?? null;
     requireText(title, "Title", 200);
     // Admission and catalog insertion share Pi's atomic transaction, including request deduplication.
     const id = await this.harness.commit(async (tx) => {
       const catalog = await tx.doc(CatalogDoc);
       const existing = catalog.chats.find((chat) => owns(scope, chat) && chat.requestId === input.requestId);
       if (existing) {
-        if (existing.title !== title || existing.agentDefinitionId !== (input.agentDefinitionId ?? "default")) throw requestConflict();
+        if (existing.title !== title || existing.agentDefinitionId !== (input.agentDefinitionId ?? "default")
+          || (existing.creationProjectId ?? null) !== projectId) throw requestConflict();
         return existing.id;
       }
+      if (projectId !== null) this.findProject(catalog, scope, projectId);
       const agent = this.findAgent(catalog, scope, input.agentDefinitionId ?? "default");
       this.validateAgent(agent);
       const registry = this.registry.snapshot();
@@ -157,7 +186,7 @@ export class DispatchRuntime {
         ...(agent.extensions?.includes(CodingTools.name) ? { cwd: join(this.owner.directory, "workspaces", String(record.id)) } : {}),
       });
       const id = String(record.id);
-      catalog.chats.push({ id, title, createdAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, agentName: agent.name, companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
+      catalog.chats.push({ id, title, projectId, creationProjectId: projectId, createdAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, agentName: agent.name, companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
       return id;
     }, context);
     return this.getChat(scope, id);
@@ -168,10 +197,20 @@ export class DispatchRuntime {
       const catalog = await tx.doc(CatalogDoc);
       const chat = catalog.chats.find(item => item.id === id && owns(scope, item));
       if (!chat) throw new RuntimeError(404, "Conversation not found.");
+      if (input.projectId !== undefined) {
+        if (input.projectId !== null) this.findProject(catalog, scope, input.projectId);
+        chat.projectId = input.projectId;
+      }
       if (input.pinned !== undefined) chat.pinned = input.pinned;
       if (input.archived !== undefined) chat.archived = input.archived;
     }, context);
     return this.getChat(scope, id);
+  }
+
+  private findProject(catalog: Catalog, scope: RuntimeScope, id: string): StoredProject {
+    const project = catalog.projects?.find(project => project.id === id && owns(scope, project));
+    if (!project) throw new RuntimeError(404, "Project not found.");
+    return project;
   }
 
   async getChat(scope: RuntimeScope, id: string): Promise<ChatSnapshot> {
@@ -349,6 +388,9 @@ function nativeId(id: string): ConversationId {
 }
 
 function owns(scope: RuntimeScope, chat: RuntimeScope) { return scope.companyId === chat.companyId && scope.userId === chat.userId; }
+function projectSummary(project: StoredProject): Project {
+  return { id: project.id, name: project.name, createdAt: project.createdAt };
+}
 function publicAgent({ companyId: _companyId, ...agent }: StoredAgent): AgentDefinition {
   return { ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [] };
 }
@@ -374,5 +416,5 @@ function summary(chat: StoredChat, agentName: string, view: ConversationView, su
   const firstInput = messages.find((message) => message.role === "user");
   const firstText = firstInput?.role === "user" ? (typeof firstInput.content === "string" ? firstInput.content : firstInput.content.filter((part) => part.type === "text").map((part) => part.text).join(" ")) : "";
   const title = chat.title === "New conversation" && firstText ? firstText.slice(0, 80) : chat.title;
-  return { id: chat.id, title, pinned: chat.pinned ?? false, archived: chat.archived ?? false, createdAt: chat.createdAt, updatedAt: lastTimestamp, revision, agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, agentName, status, ...(error ? { error } : {}) };
+  return { id: chat.id, title, projectId: chat.projectId ?? null, pinned: chat.pinned ?? false, archived: chat.archived ?? false, createdAt: chat.createdAt, updatedAt: lastTimestamp, revision, agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, agentName, status, ...(error ? { error } : {}) };
 }

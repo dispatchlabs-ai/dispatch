@@ -15,6 +15,7 @@ type AppOptions = {
   clientDir?: string;
 };
 const requestId = z.string().trim().min(1).max(200);
+const projectId = z.string().uuid().nullable().optional();
 const agentSchema = z.object({
   id: z.string().min(1).max(200).optional(), expectedRevision: z.number().int().positive().optional(),
   name: z.string().trim().min(1).max(100), description: z.string().max(500), instructions: z.string().max(50_000),
@@ -46,15 +47,20 @@ export function createApp(options: AppOptions) {
     await next();
   });
   app.get("/api/config", async (c) => c.json(await options.configuration()));
+  app.get("/api/projects", async (c) => c.json({ projects: await runtime.listProjects(c.get("principal")) }));
+  app.post("/api/projects", async (c) => {
+    const input = z.object({ requestId, name: z.string().trim().min(1).max(100) }).strict().parse(await c.req.json());
+    return c.json({ project: await runtime.createProject(c.get("principal"), input) }, 201);
+  });
   app.get("/api/chats", async (c) => c.json({ chats: await runtime.listChats(c.get("principal")) }));
   app.post("/api/chats", async (c) => {
-    const input = z.object({ requestId, title: z.string().trim().min(1).max(200).optional(), agentDefinitionId: z.string().min(1).max(200).optional() }).strict().parse(await c.req.json());
+    const input = z.object({ requestId, title: z.string().trim().min(1).max(200).optional(), agentDefinitionId: z.string().min(1).max(200).optional(), projectId }).strict().parse(await c.req.json());
     return c.json(await runtime.createChat(c.get("principal"), input), 201);
   });
   app.get("/api/chats/:id", async (c) => c.json(await runtime.getChat(c.get("principal"), c.req.param("id"))));
   app.post("/api/chats/:id/preferences", async (c) => {
-    const input = z.object({ pinned: z.boolean().optional(), archived: z.boolean().optional() }).strict()
-      .refine(value => value.pinned !== undefined || value.archived !== undefined).parse(await c.req.json());
+    const input = z.object({ pinned: z.boolean().optional(), archived: z.boolean().optional(), projectId }).strict()
+      .refine(value => value.pinned !== undefined || value.archived !== undefined || value.projectId !== undefined).parse(await c.req.json());
     return c.json(await runtime.updateChat(c.get("principal"), c.req.param("id"), input));
   });
   app.post("/api/chats/:id/messages", async (c) => {

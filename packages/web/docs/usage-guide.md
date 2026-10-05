@@ -88,7 +88,17 @@ Within Chats, the main tab strip appears when multiple conversations are open. C
 
 Above 1100 pixels, use the left rail’s conversations and details icons to hide or show either side. Drag either inner divider to resize it, or focus the divider and use Left/Right (Shift for larger steps) or Home/End. These choices last while the workspace is open; reloading restores the defaults. Phone Menu and Details controls live in the bottom bar and open panels.
 
-Hover or focus a conversation row to pin/unpin or archive it using the controls on its right. Touch layouts keep these actions visible. Pinned conversations stay above the others. Archive hides a conversation from the regular list without deleting it or stopping work; use Archived conversations at the bottom of the sidebar to reopen or restore it. These choices are saved with your account’s conversations.
+Hover or focus a conversation row to open its actions menu on the right. Touch layouts keep the menu button visible. The menu includes Move to project, Pin/Unpin, and Archive/Restore. Pinned conversations stay above the others within each group. Archive hides a conversation from the regular list without deleting it or stopping work; use Archived conversations at the bottom of the sidebar to reopen or restore it. These choices are saved with your account’s conversations.
+
+### Projects
+
+Choose **New project** inside Conversations, enter a name, and select **Create project**. A name is the only project field; projects are private to your account within the company. Names can be reused, and can contain up to 100 characters. Existing chats appear under **Without a project**.
+
+Select a project name to see its conversations in the main area; use the chevron to expand or collapse its sidebar group. Search finds both project names and conversation titles. **New conversation** in the project view starts a chat there with the saved default agent. The sidebar's **New chat** also uses the current project's context (including the project of the active chat); starting from an agent or the welcome view makes an unassigned chat.
+
+Choose **Move to project** from a conversation's actions menu, select one destination, and save. **Without a project** removes its membership. A project can contain many conversations, but each conversation belongs to at most one project. Moving keeps its history, current work, chosen agent, and tool directory. Archiving a conversation keeps its project membership; active project counts exclude archived chats.
+
+Projects remain inside Chats and can open alongside conversation tabs. On phones, **Menu** opens the same project controls. New-project input remains available if a responsive layout change closes its popover; reopen New project to continue. This first version does not add project descriptions, renaming, deletion, sharing, files, or automatic context sharing. Omarchy still uses its existing deployment until a later authorized update.
 
 ## Checks and builds
 
@@ -142,7 +152,9 @@ The state directory contains `auth.sqlite`, `auth.key`, and `runtime/` with Pi s
 
 ## Application API
 
-`POST /api/chats/:id/preferences` accepts one or both boolean fields `pinned` and `archived` and returns the current chat snapshot. Only the owning user may update a conversation. `GET /api/chats` includes archived records with these flags so the browser can present active and archived lists.
+`POST /api/chats/:id/preferences` accepts any combination of boolean `pinned`/`archived` and nullable `projectId`, and returns the current chat snapshot. Only the owning user may update a conversation; the destination project must belong to that same user/company. `GET /api/chats` includes archived records and project membership so the browser can present active, archived, and grouped lists.
+
+`POST /api/projects` accepts `{ requestId, name }` and returns `{ project }`. A project contains `id`, `name`, and `createdAt`. Retrying the same request ID and trimmed name returns the original project; changed content returns 409. `POST /api/chats` accepts optional `projectId` (null or omitted means unassigned). Chat creation retries compare the original creation project, even after the conversation has moved. Names are labels; stable UUIDs identify projects.
 
 
 All `/api` access requires a fully authenticated session except the authentication flow endpoints. Mutations require same-origin JSON requests. Protected commands validate input; unavailable resources return 404 across identity boundaries.
@@ -151,6 +163,8 @@ All `/api` access requires a fully authenticated session except the authenticati
 | --- | --- |
 | `GET /api/config` | Company, default agent, available model choices and supported thinking levels, provider readiness |
 | `GET/POST /api/chats` | List private conversations / create with a request ID |
+| `GET/POST /api/projects` | List private projects / create a name-only project with a request ID |
+| `POST /api/chats/:id/preferences` | Set pin/archive flags or assign, move, or remove project membership |
 | `GET /api/chats/:id` | Current native conversation and submission snapshot |
 | `POST /api/chats/:id/messages` | Admit a message idempotently; return a snapshot with status 202 |
 | `POST /api/chats/:id/stop` | Native foreground cancellation; return the current snapshot |

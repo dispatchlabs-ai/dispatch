@@ -9,6 +9,7 @@ export type ChatStatus = "idle" | "running" | "stopped" | "failed";
 
 export interface ChatSummary {
   id: string;
+  projectId: string | null;
   /** Native Pi commit sequence used to order all derived observations. */
   revision: number;
   title: string;
@@ -61,11 +62,24 @@ export interface CreateChatInput {
   requestId: string;
   title?: string;
   agentDefinitionId?: string;
+  projectId?: string | null;
 }
 
 export interface UpdateChatInput {
   pinned?: boolean;
   archived?: boolean;
+  projectId?: string | null;
+}
+
+export type Project = {
+  id: string;
+  name: string;
+  createdAt: number;
+};
+
+export interface CreateProjectInput {
+  requestId: string;
+  name: string;
 }
 
 export interface SendMessageInput {

@@ -35,6 +35,14 @@ This local environment has the service account's filesystem, process, and networ
 
 Conversation reads, subscriptions, submission, and cancellation require both the creator's user ID and company ID. Named-definition access requires the company ID. HTTP authentication, account membership, and model credential resolution remain service responsibilities.
 
+## Projects
+
+The existing session-scoped `dispatch.catalog` now holds optional project records and each chat's optional `projectId`. Pre-project records normalize to unassigned without rewriting native history. A project has a stable UUID and a name; its persisted company/user scope follows the same private ownership rule as chats. There is no project Session, root conversation, filesystem workspace, or separate database.
+
+`createProject()` and project-aware `createChat()` run through Pi commits. A membership update validates both records on that same transaction before changing the chat's single nullable reference. This leaves configuration, cwd, native tasks, and transcript entries unchanged. Archived chats retain membership; counts are derived from authorized, active chat summaries.
+
+Creation request IDs are checked within company/user scope. A project's trimmed name is its immutable creation payload in this version. `creationProjectId` separately retains each chat's original creation destination, so a retry after a later move returns the original chat and still rejects genuinely different creation content. Missing historical values mean null. Project names may repeat; only IDs establish membership. No project mutation or deletion API is introduced in this slice.
+
 ## Request identity
 
 Pi removes a cancelled queued input from its inbox, so its terminal submission record cannot always recover the original text. Dispatch keeps SHA-256 input fingerprints in a native conversation-scoped metadata document. The fingerprint is reserved on Pi's serialized commit line before calling its public submission API. It contains no pending/completed operation state and does not own execution. If the service stops between reservation and native admission, a same-payload retry proceeds to normal Pi submission.

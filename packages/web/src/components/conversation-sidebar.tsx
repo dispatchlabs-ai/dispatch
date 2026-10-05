@@ -1,70 +1,89 @@
-import { Archive, ArchiveRestore, Pin, Plus } from "lucide-react";
-import { useRef, useState } from "react";
-import type { ChatSummary, UpdateChatInput } from "../shared/contracts";
-import { errorMessage } from "../lib/api";
+import { Archive, ChevronDown, ChevronRight, Folder, Pin, Plus } from "lucide-react";
+import { useId } from "react";
+import type { ChatSummary, Project, UpdateChatInput } from "../shared/contracts";
 import { statusLabels } from "../lib/chat";
+import { ConversationActions } from "./conversation-actions";
+import { NewProjectButton, type NewProjectProps } from "./projects";
 import { SidebarSearch } from "./sidebar-search";
-import { Button, IconButton, Notice, Spinner } from "./ui";
+import { Button, IconButton, Spinner } from "./ui";
 
 type ConversationSidebarProps = {
   chats: ChatSummary[];
+  projects: Project[];
   activeChatId?: string;
+  activeProjectId?: string;
   search: string;
   onSearchChange: (value: string) => void;
   creating: boolean;
+  updating: ReadonlySet<string>;
+  showArchived: boolean;
+  onShowArchivedChange: (value: boolean) => void;
+  collapsedProjects: ReadonlySet<string>;
+  onToggleProject: (id: string) => void;
+  newProject: NewProjectProps;
   onSelect: (id: string) => void;
+  onSelectProject: (id: string) => void;
   onCreate: () => void;
-  onUpdate: (id: string, input: UpdateChatInput) => Promise<void>;
+  onMove: (chat: ChatSummary) => void;
+  onUpdate: (id: string, input: UpdateChatInput) => void;
 };
 
-export function ConversationSidebar({ chats, activeChatId, search, onSearchChange, creating, onSelect, onCreate, onUpdate }: ConversationSidebarProps) {
-  const archiveToggle = useRef<HTMLButtonElement>(null);
-  const [showArchived, setShowArchived] = useState(false);
-  const [updating, setUpdating] = useState<Set<string>>(() => new Set());
-  const [error, setError] = useState<string | null>(null);
+export function ConversationSidebar({ chats, projects, activeChatId, activeProjectId, search, onSearchChange, creating, updating, showArchived, onShowArchivedChange, collapsedProjects, onToggleProject, newProject, onSelect, onSelectProject, onCreate, onMove, onUpdate }: ConversationSidebarProps) {
+  const groupPrefix = useId();
   const visible = chats.filter(chat => chat.archived === showArchived);
-  const filtered = visible.filter(chat => chat.title.toLowerCase().includes(search.toLowerCase()));
+  const query = search.trim().toLowerCase();
+  const matches = (chat: ChatSummary) => chat.title.toLowerCase().includes(query);
   const archivedCount = chats.filter(chat => chat.archived).length;
+  const groups = projects.map(project => {
+    const members = visible.filter(chat => chat.projectId === project.id);
+    const filtered = project.name.toLowerCase().includes(query) ? members : members.filter(matches);
+    return { project, members, filtered };
+  }).filter(({ project, filtered }) => !query || project.name.toLowerCase().includes(query) || filtered.length);
+  const unassigned = visible.filter(chat => chat.projectId === null).filter(matches);
+  const archived = visible.filter(chat => matches(chat) || projects.some(project => project.id === chat.projectId && project.name.toLowerCase().includes(query)));
 
-  async function update(chat: ChatSummary, input: UpdateChatInput) {
-    setError(null);
-    setUpdating(current => new Set(current).add(chat.id));
-    try {
-      await onUpdate(chat.id, input);
-      if (input.archived !== undefined) requestAnimationFrame(() => archiveToggle.current?.focus());
-    }
-    catch (error) { setError(errorMessage(error)); }
-    finally { setUpdating(current => { const next = new Set(current); next.delete(chat.id); return next; }); }
+  function row(chat: ChatSummary) {
+    return <div key={chat.id} className={`sidebar-row ${chat.id === activeChatId ? "selected" : ""}`}>
+      <button type="button" className="sidebar-select" onClick={() => onSelect(chat.id)} aria-current={chat.id === activeChatId ? "page" : undefined} title={chat.title}>
+        <span>{chat.title}</span>
+        {chat.pinned ? <Pin size={13} aria-label="Pinned" /> : null}
+        <span className={`conversation-dot dot-${chat.status}`} aria-label={statusLabels[chat.status]} />
+      </button>
+      <div className="sidebar-row-actions"><ConversationActions chat={chat} busy={updating.has(chat.id)} onMove={onMove} onUpdate={onUpdate} /></div>
+    </div>;
   }
 
   return <div className="collection-sidebar">
-    <Button className="sidebar-create" onClick={() => { setShowArchived(false); onCreate(); }} disabled={creating}>{creating ? <Spinner /> : <Plus />} New chat</Button>
-    <SidebarSearch label="Find a conversation" value={search} onChange={onSearchChange} />
-    <div className="sidebar-list-heading">
-      <h2>{showArchived ? "Archived" : "Conversations"}</h2>
-      <span>{visible.length}</span>
-    </div>
-    {error ? <Notice>{error}</Notice> : null}
-    <nav className="sidebar-list" aria-label={showArchived ? "Archived conversations" : "Saved conversations"}>
-      {filtered.map(chat => <div key={chat.id} className={`sidebar-row ${chat.id === activeChatId ? "selected" : ""} ${chat.pinned ? "is-pinned" : ""}`}>
-        <button type="button" className="sidebar-select" onClick={() => onSelect(chat.id)} aria-current={chat.id === activeChatId ? "page" : undefined} title={chat.title}>
-          <span>{chat.title}</span>
-          {chat.pinned ? <span className="sr-only">Pinned</span> : null}
-          <span className={`conversation-dot dot-${chat.status}`} aria-label={statusLabels[chat.status]} />
-        </button>
-        <div className="sidebar-row-actions">
-          <IconButton className="conversation-pin" label={`${chat.pinned ? "Unpin" : "Pin"} conversation: ${chat.title}`} disabled={updating.has(chat.id)} onClick={() => void update(chat, { pinned: !chat.pinned })}>
-            <Pin size={15} fill={chat.pinned ? "currentColor" : "none"} />
-          </IconButton>
-          <IconButton label={`${chat.archived ? "Restore" : "Archive"} conversation: ${chat.title}`} disabled={updating.has(chat.id)} onClick={() => void update(chat, { archived: !chat.archived })}>
-            {chat.archived ? <ArchiveRestore size={15} /> : <Archive size={15} />}
-          </IconButton>
+    <Button className="sidebar-create" onClick={() => { onShowArchivedChange(false); onCreate(); }} disabled={creating}>{creating ? <Spinner /> : <Plus />} New chat</Button>
+    <SidebarSearch label="Search conversations" value={search} onChange={onSearchChange} />
+    <div className="sidebar-list-heading"><h2>{showArchived ? "Archived" : "Conversations"}</h2><span>{visible.length}</span></div>
+    {!showArchived ? <NewProjectButton {...newProject} /> : null}
+    <nav className="sidebar-list conversation-groups" aria-label={showArchived ? "Archived conversations" : "Saved conversations"}>
+      {showArchived ? archived.map(row) : <>
+        {groups.map(({ project, members, filtered }) => {
+          const expanded = !!query || !collapsedProjects.has(project.id);
+          const groupId = `${groupPrefix}-${project.id}`;
+          return <div className="project-group" key={project.id}>
+            <div className={`project-group-header ${project.id === activeProjectId ? "selected" : ""}`}>
+              <IconButton className="project-expand" label={`${expanded ? "Collapse" : "Expand"} ${project.name}`} aria-expanded={expanded} aria-controls={groupId} disabled={!!query} onClick={() => onToggleProject(project.id)}>{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</IconButton>
+              <button type="button" className="project-select" onClick={() => onSelectProject(project.id)} aria-current={project.id === activeProjectId ? "page" : undefined} title={project.name}>
+                <Folder size={16} /><span>{project.name}</span><span className="project-group-count">{members.length}</span>
+              </button>
+            </div>
+            <div id={groupId} className="project-group-conversations" hidden={!expanded}>
+              {filtered.map(row)}
+              {!members.length ? <p className="sidebar-empty">No conversations yet</p> : null}
+            </div>
+          </div>;
+        })}
+        <div className={`unassigned-conversations ${projects.length ? "has-projects" : ""}`}>
+          <h3>Without a project</h3>
+          {unassigned.map(row)}
+          {!query && !unassigned.length ? <p className="sidebar-empty">No unassigned conversations.</p> : null}
         </div>
-      </div>)}
-      {!filtered.length ? <p className="sidebar-empty">{search ? "No conversations match your search." : showArchived ? "No archived conversations." : "Your conversations will appear here."}</p> : null}
+      </>}
+      {(showArchived ? !archived.length : query && !groups.length && !unassigned.length) ? <p className="sidebar-empty">{query ? "No conversations or projects match your search." : "No archived conversations."}</p> : null}
     </nav>
-    <Button ref={archiveToggle} variant="ghost" className="sidebar-archive-toggle" onClick={() => setShowArchived(value => !value)}>
-      <Archive size={16} /> {showArchived ? "Back to conversations" : `Archived conversations (${archivedCount})`}
-    </Button>
+    <Button variant="ghost" className="sidebar-archive-toggle" onClick={() => onShowArchivedChange(!showArchived)}><Archive size={16} /> {showArchived ? "Back to conversations" : `Archived conversations (${archivedCount})`}</Button>
   </div>;
 }
