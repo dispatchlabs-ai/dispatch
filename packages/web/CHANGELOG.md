@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Removed the required passkey-name field from signup and recovery enrollment; creation proceeds through the browser or password manager.
+
 - Replaced the plain prompt field with an editable Markdown composer that formats typed and pasted content, copies Markdown, and retains per-chat drafts. Removed the inner focus box and the privacy/status sentence from its toolbar.
 
 - Show bash output once by omitting completed assistant messages that only repeat the preceding terminal output; explanations and native records are preserved.

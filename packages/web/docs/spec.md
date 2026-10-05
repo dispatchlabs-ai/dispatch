@@ -64,7 +64,7 @@ Each installation serves one company. Accounts have separate identities. Chats a
 
 ### Enrollment, recovery, and sessions
 
-An operator provisions an expiring, single-use invitation through the local CLI; there is no public registration or invented application administrator role. The invited user enrolls either a verified passkey or password plus TOTP. Passkey enrollment asks for a recognizable credential name; earlier enrollment requests without that optional field retain the legacy label. A restricted enrollment cookie cannot access chats, agent definitions, or live subscriptions.
+An operator provisions an expiring, single-use invitation through the local CLI; there is no public registration or invented application administrator role. The invited user enrolls either a verified passkey or password plus TOTP. Passkey enrollment proceeds directly to the browser/password-manager ceremony without asking for a credential name. New enrollment requests omit the optional `passkeyName`; the service uses its existing `Passkey` label and still accepts labels from older clients. A restricted enrollment cookie cannot access chats, agent definitions, or live subscriptions.
 
 Password/TOTP enrollment issues one-use recovery codes. Password plus a recovery code starts restricted re-enrollment and revokes existing sessions; it does not restore application access until a fresh factor is verified. An operator can issue a reset invitation after independently establishing account ownership, including for passkey-only accounts. Completing recovery replaces the old sign-in methods.
 
@@ -188,7 +188,7 @@ The editor groups Identity, Instructions, and Model in that order. Instructions 
 ### Actions and defaults
 
 - Do not offer an action the service will reject for a known state. For example, show removal of the last complete sign-in method as unavailable, with the reason.
-- Give credentials recognizable names when they are created, including at enrollment, so the user can tell them apart later.
+- Passkey signup must not require naming the credential. Let the browser/password manager handle creation and storage; credential management belongs in Account and security. This October 5 refinement supersedes the earlier enrollment-label requirement.
 - New agent definitions start from the saved default agent's model and thinking level, not the first catalogue entry.
 
 ### Hierarchy and content

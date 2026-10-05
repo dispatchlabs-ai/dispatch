@@ -250,7 +250,6 @@ function Enrollment({ state }: { state: EnrollmentState }) {
   const { auth, setState } = useSession();
   const { busy, error, run } = useAuthAction();
   const [name, setName] = useState(state.name);
-  const [passkeyName, setPasskeyName] = useState("");
   const [method, setMethod] = useState<"passkey" | "totp">("passkey");
   const [password, setPassword] = useState("");
   const [totp, setTotp] = useState<TotpEnrollment | null>(null);
@@ -275,7 +274,7 @@ function Enrollment({ state }: { state: EnrollmentState }) {
       footer={
         <p>
           {method === "passkey"
-            ? "A passkey uses your device’s PIN, fingerprint, or face to protect your account. Add a second passkey or an authenticator in account settings after signing in."
+            ? "Your browser or password manager will guide you through creating and saving a passkey. Add a second passkey or an authenticator in account settings after signing in."
             : "You’ll use your password and a code from your authenticator app to sign in."}
         </p>
       }
@@ -301,7 +300,7 @@ function Enrollment({ state }: { state: EnrollmentState }) {
               if (method === "passkey") {
                 const { options } = await auth(
                   "/api/auth/enrollment/passkey/options",
-                  { name, passkeyName },
+                  { name },
                 );
                 const response = await startRegistration({
                   optionsJSON: options,
@@ -368,23 +367,6 @@ function Enrollment({ state }: { state: EnrollmentState }) {
               </span>
             </label>
           </fieldset>
-          {method === "passkey" ? (
-            <Field
-              label="Passkey name"
-              hint="Use a name you’ll recognize, such as your device or password manager."
-            >
-              {(props) => (
-                <Input
-                  {...props}
-                  value={passkeyName}
-                  onChange={(event) => setPasskeyName(event.target.value)}
-                  placeholder="My password manager"
-                  required
-                  maxLength={100}
-                />
-              )}
-            </Field>
-          ) : null}
           {method === "totp" ? (
             <Field
               label="Choose a password"
