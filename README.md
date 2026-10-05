@@ -1,8 +1,8 @@
 # Dispatch Web — rebuild
 
-Dispatch Web is a browser workspace for company users, built on stock Pi Durable. The local implementation provides secure sign-in, private durable chats, company-shared agent definitions, and Dispatch's branded desktop/mobile workspace.
+Dispatch Web is a browser workspace for company users, built on stock Pi Durable. The local implementation provides secure sign-in, invite-only shared conversations, company-shared agent definitions, and Dispatch's branded desktop/mobile workspace.
 
-The wider product includes tools, handoffs, background work, and event- or schedule-triggered agents. Those capabilities, RBAC, and internal Omarchy deployment remain later work. The existing pilot is unchanged.
+The wider product includes tools, handoffs, background work, and event- or schedule-triggered agents. Broader integrations, RBAC and additional agent workflows remain later work. Shared-conversation changes are local only; Omarchy and the existing pilot remain on their current versions.
 
 ## Quick start
 
