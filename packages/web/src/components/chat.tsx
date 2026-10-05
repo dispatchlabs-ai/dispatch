@@ -1,17 +1,12 @@
-import type { Message } from "@earendil-works/pi-ai";
-import type { EntryRecord } from "@earendil-works/pi-durable";
-import { ArrowDown, ArrowUp, Check, Copy, MessageSquare, RotateCcw, Square } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ArrowDown, RotateCcw, Square, Users } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChatSnapshot } from "../shared/contracts";
 import { errorMessage } from "../lib/api";
-import { chatLive, statusLabels, type ConnectionState, type PendingMessage } from "../lib/chat";
-import { toolActivities, type ToolActivities } from "../lib/tool-activity";
+import { statusLabels, type ConnectionState, type PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
 import { Brand } from "./brand";
-import { Markdown } from "./markdown";
-import { MarkdownComposer } from "./markdown-composer";
-import { ToolActivityView } from "./tool-activity";
-import { Button, IconButton, Notice, Spinner } from "./ui";
+import { ConversationComposer, SharedTranscript, participantStatus } from "./shared-conversation";
+import { Button, Notice, Spinner } from "./ui";
 
 interface ChatPanelProps {
   chatId: string;
@@ -22,12 +17,16 @@ interface ChatPanelProps {
   pending?: PendingMessage;
   sendError?: string;
   onDraftChange: (text: string) => void;
-  onSend: () => void;
+  mentions: string[];
+  onMentionsChange: (ids: string[]) => void;
+  onSend: (mentions: string[]) => void;
+  onParticipants: () => void;
+  onThread: (id: string) => void;
   onSnapshot: (snapshot: ChatSnapshot) => void;
   onConnection: (chatId: string, state: ConnectionState) => void;
 }
 
-export function ChatPanel({ active: visible, connection, chatId, snapshot, draft, pending, sendError, onDraftChange, onSend, onSnapshot, onConnection }: ChatPanelProps) {
+export function ChatPanel({ active: visible, connection, chatId, snapshot, draft, pending, sendError, mentions, onMentionsChange, onDraftChange, onSend, onParticipants, onThread, onSnapshot, onConnection }: ChatPanelProps) {
   const { api, refreshSession } = useSession();
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -88,32 +87,8 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
     if (!atBottom.current && snapshot) setShowLatest(true);
   }, [snapshot, visible]);
 
-  const live = snapshot ? chatLive(snapshot) : {};
-  const agentName = snapshot?.conversation.agentName || "Agent";
   const running = snapshot?.conversation.status === "running";
-  const entries = snapshot?.view.entries || [];
-  const activities = useMemo(() => toolActivities(entries, live), [entries, live]);
-  const continuations = useMemo(() => {
-    const grouped = new Set<Message>();
-    let previousRole: Message["role"] | undefined;
-    function include(message: Message) {
-      if (message.role === "toolResult") return;
-      if (message.role === "assistant" && previousRole === "assistant") grouped.add(message);
-      previousRole = message.role;
-    }
-    for (const entry of entries) {
-      const contextBoundary = entry.kind === "pi.reset" || entry.kind === "pi.compaction";
-      if (contextBoundary) previousRole = undefined;
-      entry.model?.forEach(include);
-      if (contextBoundary) previousRole = undefined;
-    }
-    if (live.generation?.message) include(live.generation.message as Message);
-    return grouped;
-  }, [entries, live.generation?.message]);
-  const initialSetupId = entries.find(entry => entry.model?.some(message => message.role === "system"))?.id;
-  const hasMessages = entries.some(entry => entry.model?.some(message => message.role === "user" || message.role === "assistant"));
-  const tooLong = draft.length > 100000;
-  const canSend = Boolean(draft.trim() && !tooLong && !pending?.sending && snapshot);
+  const hasMessages = Boolean(snapshot?.messages.length);
 
   function scrollToLatest() {
     if (transcript.current) transcript.current.scrollTop = transcript.current.scrollHeight;
@@ -121,19 +96,19 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
     setShowLatest(false);
   }
 
-  function sendDraft() {
-    if (!canSend) return;
+  function sendDraft(mentions: string[]) {
     scrollToLatest();
-    onSend();
+    onSend(mentions);
   }
 
   return <div className="chat-panel">
     <header className="view-heading">
       <div>
         <h1>{snapshot?.conversation.title || "Conversation"}</h1>
-        <p>{snapshot ? agentName : "Loading agent…"}</p>
+        <p>{snapshot ? "Shared conversation" : "Loading conversation…"}</p>
       </div>
-      <span className={`status-badge status-${snapshot?.conversation.status || "idle"}`}>{snapshot ? statusLabels[snapshot.conversation.status] : "Loading"}</span>
+      <div className="conversation-header-actions"><Button variant="secondary" className="participants-button" onClick={onParticipants} disabled={!snapshot}><Users size={16} />{snapshot?.participants.length ?? 0} participants</Button>
+      <span className={`status-badge status-${snapshot?.conversation.status || "idle"}`}>{snapshot ? statusLabels[snapshot.conversation.status] : "Loading"}</span></div>
     </header>
     {connection === "reconnecting" ? <div className="chat-connection-notice">
       <Notice tone="info">Reconnecting to this conversation. Agent work continues; updates will appear when the connection returns.</Notice>
@@ -161,13 +136,8 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
           <h2>What are we working on?</h2>
           <p>Bring a question, a rough idea, or a problem to work through.</p>
         </div> : null}
-        {entries.map(entry => <TranscriptEntry key={entry.id} entry={entry} activities={activities} continuations={continuations} agentName={agentName} initialSetup={entry.id === initialSetupId} />)}
-        {live.generation?.message ? <TranscriptMessage message={live.generation.message as Message} activities={activities} continuation={continuations.has(live.generation.message as Message)} agentName={agentName} streaming /> : null}
-        {activities.extra.map(activity => <ToolActivityView key={activity.live?.callId} activity={activity} />)}
-        {running && !live.generation?.message && !live.tools?.some(tool => tool.status !== "done") ? <div className="agent-working" role="status">
-          <Spinner label="Agent is working" />
-          <span>{live.generation?.retry ? "Retrying the response…" : "Working on your response…"}</span>
-        </div> : null}
+        {snapshot ? <SharedTranscript snapshot={snapshot} onThread={onThread} /> : null}
+        {snapshot?.participants.filter(member => member.kind === "agent" && member.status === "working").map(member => <div className="agent-working" role="status" key={member.id}><Spinner label={`${member.name} is working`} /><span>{member.name} · {participantStatus[member.status]}</span></div>)}
         {snapshot?.conversation.status === "stopped" ? <p className="run-outcome" role="status">
           <Square size={13} /> Response stopped. You can continue the conversation.</p> : null}
         {snapshot?.conversation.status === "failed" ? <Notice>{snapshot.conversation.error || "The response could not be completed. You can send another message to continue."}</Notice> : null}
@@ -177,96 +147,12 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
       <Button className="latest-button" variant="secondary" onClick={scrollToLatest}>
         <ArrowDown /> Latest messages</Button>
     </div> : null}
-    <div className="composer-area">
-      {pending?.error ? <Notice>{pending.error} Your message is kept here. Retry sends the same message once.</Notice> : sendError ? <Notice>{sendError}</Notice> : null}
-      {stopError ? <Notice>{stopError}</Notice> : null}
-      {tooLong ? <Notice>Shorten your message to 100,000 characters or fewer, including Markdown formatting.</Notice> : null}
-      <form className="composer" onSubmit={event => { event.preventDefault(); sendDraft(); }}>
-        <MarkdownComposer id={`composer-${chatId}`} value={draft} disabled={!snapshot} readOnly={Boolean(pending?.sending)} onChange={onDraftChange} onSend={sendDraft} />
-        <div className="composer-toolbar">
-          <div className="button-row">
-            {running ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
-              setStopping(true); setStopError(null);
-              void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/stop`, {}).then(onSnapshot).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));
-            }}>{stopping ? <Spinner /> : <Square />} Stop</Button> : null}
-            <Button type="submit" className="send-button" disabled={!canSend} aria-label={pending?.error ? "Retry sending message" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}</Button>
-          </div>
-        </div>
-      </form>
-    </div>
+    {stopError ? <Notice>{stopError}</Notice> : null}
+    <ConversationComposer id={`composer-${chatId}`} draft={draft} pending={pending} error={sendError} participants={snapshot?.participants ?? []} mentions={mentions} onMentionsChange={onMentionsChange} disabled={!snapshot} onDraftChange={onDraftChange} onSend={sendDraft}>
+      {running ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
+        setStopping(true); setStopError(null);
+        void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/stop`, {}).then(onSnapshot).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));
+      }}>{stopping ? <Spinner /> : <Square />} Stop all</Button> : null}
+    </ConversationComposer>
   </div>;
-}
-
-function TranscriptEntry({ entry, activities, continuations, agentName, initialSetup }: { entry: EntryRecord; activities: ToolActivities; continuations: Set<Message>; agentName: string; initialSetup: boolean }) {
-  if (initialSetup && entry.model?.every(message => message.role === "system")) return null;
-  if (entry.kind === "pi.reset" || entry.kind === "pi.compaction") {
-    return <details className="native-entry">
-      <summary>{entry.kind === "pi.reset" ? "Conversation context started" : "Earlier context summarized"}</summary>{entry.model?.map((message, index) => <TranscriptMessage key={index} message={message} activities={activities} continuation={continuations.has(message)} agentName={agentName} initialSetup={initialSetup} />)}{entry.data ? <details>
-        <summary>Technical details</summary>
-        <pre>{JSON.stringify(entry.data, null, 2)}
-        </pre>
-      </details> : null}
-    </details>;
-  }
-  if (!entry.model?.length) return <details className="native-entry">
-    <summary>Conversation event · technical details</summary>
-    <pre>{JSON.stringify({ kind: entry.kind, data: entry.data }, null, 2)}
-    </pre>
-  </details>;
-  return <>{entry.model.map((message, index) => <TranscriptMessage key={index} message={message} activities={activities} continuation={continuations.has(message)} agentName={agentName} initialSetup={initialSetup} />)}{entry.data && entry.kind !== "pi.tool-result" ? <details className="native-entry">
-    <summary>Technical entry details</summary>
-    <pre>{JSON.stringify(entry.data, null, 2)}
-    </pre>
-  </details> : null}
-  </>;
-}
-
-function TranscriptMessage({ message, activities, agentName, initialSetup = false, streaming = false, continuation = false }: { message: Message; activities: ToolActivities; continuation?: boolean; agentName: string; initialSetup?: boolean; streaming?: boolean }) {
-  const [copied, setCopied] = useState(false);
-  const [copyError, setCopyError] = useState(false);
-  const copiedTimer = useRef<number | null>(null);
-  useEffect(() => () => { if (copiedTimer.current) window.clearTimeout(copiedTimer.current); }, []);
-  if (activities.echoes.has(message)) return null;
-  const content = typeof message.content === "string" ? [{ type: "text" as const, text: message.content }] : message.content;
-  const text = content.filter(part => part.type === "text").map(part => part.text).join("\n\n");
-  if (message.role === "system" && initialSetup) return null;
-  if (message.role === "system") return <details className="native-entry">
-    <summary>Agent setup changed</summary>{text ? <Markdown>{text}</Markdown> : null}{message.sections ? <details>
-      <summary>Technical setup details</summary>
-      <pre>{JSON.stringify(message.sections, null, 2)}
-      </pre>
-    </details> : null}
-  </details>;
-  if (message.role === "toolResult") {
-    const activity = activities.results.get(message);
-    return activity ? <ToolActivityView activity={activity} /> : null;
-  }
-  return <article className={`message message-${message.role}${continuation ? " message-continuation" : ""}`} aria-label={message.role === "user" ? "Your message" : "Agent response"}>
-    {!continuation ? <div className="message-heading">
-      <span className="message-avatar">{message.role === "assistant" ? <Brand compact decorative /> : <MessageSquare size={15} />}</span>
-      <strong>{message.role === "user" ? "You" : agentName}</strong>{message.timestamp ? <time dateTime={new Date(message.timestamp).toISOString()}>{new Date(message.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-      </time> : null}
-    </div> : null}
-    <div className="message-content">{content.map((part, index) => {
-      if (part.type === "text") return message.role === "user" ? <p className="user-message-text" key={index}>{part.text}</p> : <Markdown key={index}>{part.text}</Markdown>;
-      if (part.type === "thinking") return part.redacted ? <p className="thinking-redacted" key={index}>Reasoning is not available.</p> : <details className="thinking-entry" key={index}>
-        <summary>{streaming ? "Thinking…" : "Reasoning"}</summary>
-        <Markdown>{part.thinking}</Markdown>
-      </details>;
-      if (part.type === "toolCall") {
-        const activity = activities.calls.get(part);
-        return activity ? <ToolActivityView key={part.id} activity={activity} /> : null;
-      }
-      if (part.type === "image") return <img className="message-image" key={index} src={`data:${part.mimeType};base64,${part.data}`} alt="Image attached to the message" />;
-      return null;
-    })}
-      {message.role === "assistant" && message.stopReason === "error" ? <Notice>{message.errorMessage || "This response failed before completing."}</Notice> : null}
-      {message.role === "assistant" && message.stopReason === "aborted" ? <p className="run-outcome">This response was stopped.</p> : null}
-      {!streaming && text ? <div className="message-actions">
-        <IconButton label={copied ? "Copied message" : "Copy message"} onClick={() => {
-          void navigator.clipboard.writeText(text).then(() => { setCopied(true); setCopyError(false); copiedTimer.current = window.setTimeout(() => setCopied(false), 2000); }).catch(() => setCopyError(true));
-        }}>{copied ? <Check size={15} /> : <Copy size={15} />}</IconButton>{copyError ? <span role="status">Couldn’t copy. Select the text to copy it.</span> : null}
-      </div> : null}
-    </div>
-  </article>;
 }

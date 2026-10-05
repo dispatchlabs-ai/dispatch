@@ -54,7 +54,7 @@ export function ConversationSidebar({ chats, projects, activeChatId, activeProje
   }
 
   return <div className="collection-sidebar">
-    <Button className="sidebar-create" onClick={() => { onShowArchivedChange(false); onCreate(); }} disabled={creating}>{creating ? <Spinner /> : <Plus />} New chat</Button>
+    <Button className="sidebar-create" onClick={() => { onShowArchivedChange(false); onCreate(); }} disabled={creating}>{creating ? <Spinner /> : <Plus />} New conversation</Button>
     <SidebarSearch label="Search conversations" value={search} onChange={onSearchChange} />
     <div className="sidebar-list-heading"><h2>{showArchived ? "Archived" : "Conversations"}</h2><span>{visible.length}</span></div>
     {!showArchived ? <NewProjectButton {...newProject} /> : null}

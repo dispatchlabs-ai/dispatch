@@ -10,12 +10,14 @@ import { AgentArchiveDialog, AgentDetails, AgentsPage, agentEditIsDirty, beginAg
 import { AgentSidebar } from "./agent-sidebar";
 import { Brand } from "./brand";
 import { ChatPanel } from "./chat";
+import { NewConversationDialog } from "./conversation-people";
+import { InviteParticipantsDialog, SharedContextPanel } from "./shared-conversation";
 import { ConversationSidebar } from "./conversation-sidebar";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ContextPanel } from "./context-panel";
 import { MoveConversationDialog, ProjectPage } from "./projects";
 import { SecurityPage } from "./security";
-import { Button, IconButton, Modal, Notice, Select, Spinner } from "./ui";
+import { Button, IconButton, Modal, Notice, Spinner } from "./ui";
 
 type WorkspaceTab = { id: string; kind: "chat"; chatId: string } | { id: string; kind: "project"; projectId: string } | { id: string; kind: "welcome" };
 type WorkspaceSection = "chats" | "agents" | "security";
@@ -61,6 +63,7 @@ export function Workspace() {
   const [snapshots, setSnapshots] = useState<Record<string, ChatSnapshot>>({});
   const [connections, setConnections] = useState<Record<string, ConnectionState>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [mentions, setMentions] = useState<Record<string, string[]>>({});
   const [pending, setPending] = useState<Record<string, PendingMessage | undefined>>({});
   const draftVersions = useRef<Record<string, number>>({});
   const messageRequests = useRef<Record<string, { requestId: string; draftVersion: number } | undefined>>({});
@@ -71,7 +74,7 @@ export function Workspace() {
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [detailsVisible, setDetailsVisible] = useState(true);
   const [preferredSidebarWidth, setSidebarWidth] = useState(280);
-  const [preferredDetailsWidth, setDetailsWidth] = useState(294);
+  const [preferredDetailsWidth, setDetailsWidth] = useState(360);
   const [viewportWidth, setViewportWidth] = useState(() => typeof window === "undefined" ? 1440 : window.innerWidth);
   useEffect(() => {
     const updateWidth = () => setViewportWidth(window.innerWidth);
@@ -85,7 +88,9 @@ export function Workspace() {
   const [creating, setCreating] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [search, setSearch] = useState("");
-  const [startingAgentId, setStartingAgentId] = useState<string | null>(null);
+  const [newConversation, setNewConversation] = useState<{ agentIds: string[]; projectId: string | null } | null>(null);
+  const [invitingChatId, setInvitingChatId] = useState<string | null>(null);
+  const [threads, setThreads] = useState<Record<string, string | null>>({});
   const [closingTab, setClosingTab] = useState<string | null>(null);
   const tabList = useRef<HTMLDivElement>(null);
   const [tabOverflow, setTabOverflow] = useState({ before: false, after: false });
@@ -170,13 +175,14 @@ export function Workspace() {
     // A later draft can have identical text; only the submitted edit may be cleared.
     if ((draftVersions.current[chatId] ?? 0) === request.draftVersion) {
       setDrafts(current => ({ ...current, [chatId]: "" }));
+      setMentions(current => ({ ...current, [chatId]: [] }));
     }
     setSendErrors(current => ({ ...current, [chatId]: undefined }));
   }, []);
 
   useEffect(() => {
     for (const [chatId, message] of Object.entries(pending)) {
-      if (message && snapshots[chatId]?.submissions.some(submission => submission.requestId === message.requestId)) {
+      if (message && snapshots[chatId.split(":")[0]]?.submissions.some(submission => submission.requestId === message.requestId)) {
         settleMessage(chatId, message.requestId);
       }
     }
@@ -200,7 +206,7 @@ export function Workspace() {
 
   function requestCloseTab(tabId: string) {
     const tab = tabs.find(item => item.id === tabId);
-    const dirty = tab?.kind === "chat" ? !!drafts[tab.chatId]?.trim() || !!pending[tab.chatId] : false;
+    const dirty = tab?.kind === "chat" ? [...new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions)])].some(key => (key === tab.chatId || key.startsWith(`${tab.chatId}:`)) && (Boolean(drafts[key]?.trim()) || Boolean(pending[key]) || Boolean(mentions[key]?.length))) : false;
     if (dirty) setClosingTab(tabId);
     else closeTab(tabId);
   }
@@ -208,11 +214,15 @@ export function Workspace() {
   function closeTab(tabId: string) {
     const closing = tabs.find(tab => tab.id === tabId);
     if (closing?.kind === "chat") {
-      messageRequests.current[closing.chatId] = undefined;
-      draftVersions.current[closing.chatId] = (draftVersions.current[closing.chatId] ?? 0) + 1;
-      setSendErrors(current => ({ ...current, [closing.chatId]: undefined }));
-      setDrafts(current => ({ ...current, [closing.chatId]: "" }));
-      setPending(current => ({ ...current, [closing.chatId]: undefined }));
+      for (const key of new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions)])) {
+        if (key !== closing.chatId && !key.startsWith(`${closing.chatId}:`)) continue;
+        messageRequests.current[key] = undefined;
+        draftVersions.current[key] = (draftVersions.current[key] ?? 0) + 1;
+        setDrafts(current => ({ ...current, [key]: "" }));
+        setMentions(current => ({ ...current, [key]: [] }));
+        setPending(current => ({ ...current, [key]: undefined }));
+        setSendErrors(current => ({ ...current, [key]: undefined }));
+      }
     }
     setClosingTab(null);
     const remaining = tabs.filter(tab => tab.id !== tabId);
@@ -230,15 +240,22 @@ export function Workspace() {
     });
   }
 
-  async function createChat(agentId = config?.defaultAgentId, projectId: string | null = null) {
-    if (creating || !agentId) return;
-    const sameRequest = createRequest.current?.agentDefinitionId === agentId && (createRequest.current.projectId ?? null) === projectId;
-    if (!sameRequest) createRequest.current = { requestId: crypto.randomUUID(), agentDefinitionId: agentId, projectId };
+  function chooseAgents(agentId = config?.defaultAgentId, projectId: string | null = null) {
+    setNavigationOpen(false);
+    setError(null);
+    setNewConversation({ agentIds: agentId ? [agentId] : [], projectId });
+  }
+
+  async function createChat(agentIds: string[], projectId: string | null = null) {
+    if (creating || !agentIds.length) return;
+    const sameRequest = JSON.stringify(createRequest.current?.agentDefinitionIds) === JSON.stringify(agentIds) && (createRequest.current?.projectId ?? null) === projectId;
+    if (!sameRequest) createRequest.current = { requestId: crypto.randomUUID(), agentDefinitionIds: agentIds, projectId };
     setCreating(true); setError(null); setCreateFailed(false);
     try {
       const snapshot = await api<ChatSnapshot>("/api/chats", createRequest.current);
       onSnapshot(snapshot);
       createRequest.current = null;
+      setNewConversation(null);
       activate({ id: `chat:${snapshot.conversation.id}`, kind: "chat", chatId: snapshot.conversation.id });
     } catch (error) {
       setError(errorMessage(error));
@@ -298,19 +315,42 @@ export function Workspace() {
     setMovingChat(chat);
   }
 
-  async function sendMessage(chatId: string) {
+  function changeMentions(key: string, ids: string[]) {
+    draftVersions.current[key] = (draftVersions.current[key] ?? 0) + 1;
+    messageRequests.current[key] = undefined;
+    setPending(current => ({ ...current, [key]: undefined }));
+    setMentions(current => ({ ...current, [key]: ids }));
+  }
+
+  function changeDraft(key: string, text: string) {
+    draftVersions.current[key] = (draftVersions.current[key] ?? 0) + 1;
+    if (pending[key] && !pending[key]?.sending && pending[key]?.text !== text.trim()) messageRequests.current[key] = undefined;
+    setDrafts(current => ({ ...current, [key]: text }));
+    setSendErrors(current => ({ ...current, [key]: undefined }));
+    setPending(current => current[key] && !current[key]?.sending && current[key]?.text !== text.trim() ? { ...current, [key]: undefined } : current);
+  }
+
+  function openSupporting(chatId: string, threadId: string | null) {
+    setThreads(current => ({ ...current, [chatId]: threadId }));
+    setDetailsVisible(true);
+    if (viewportWidth <= 800) setContextOpen(true);
+    else requestAnimationFrame(() => document.querySelector<HTMLElement>("#details-column .shared-context")?.focus());
+  }
+
+  async function sendMessage(conversationId: string, threadId: string | null = null, mentions: string[] = []) {
+    const chatId = threadId ? `${conversationId}:${threadId}` : conversationId;
     if (pending[chatId]?.sending) return;
     const previous = pending[chatId];
     const text = previous?.text || drafts[chatId]?.trim();
     if (!text) return;
-    const command: SendMessageInput = { requestId: previous?.requestId || crypto.randomUUID(), text };
+    const command: SendMessageInput = { requestId: previous?.requestId || crypto.randomUUID(), text, threadId, mentions: previous?.mentions ?? mentions };
     const priorRequest = messageRequests.current[chatId];
     messageRequests.current[chatId] = priorRequest?.requestId === command.requestId
       ? priorRequest : { requestId: command.requestId, draftVersion: draftVersions.current[chatId] ?? 0 };
     setPending(current => ({ ...current, [chatId]: { ...command, sending: true } }));
     setSendErrors(current => ({ ...current, [chatId]: undefined }));
     try {
-      const snapshot = await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/messages`, command);
+      const snapshot = await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(conversationId)}/messages`, command);
       onSnapshot(snapshot);
       settleMessage(chatId, command.requestId);
     } catch (error) {
@@ -360,7 +400,14 @@ export function Workspace() {
   const snapshot = active.kind === "chat" ? snapshots[active.chatId] : undefined;
   const connection = active.kind === "chat" ? connections[active.chatId] || "connecting" : null;
   const activeProjectId = active.kind === "project" ? active.projectId : active.kind === "chat" ? chats.find(chat => chat.id === active.chatId)?.projectId ?? null : null;
-  const supporting = (inDrawer = false) => section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : <ContextPanel kind={active.kind} snapshot={snapshot} models={config?.models ?? []} tab={supportTabs[active.id] || "agent"} onTabChange={tab => setSupportTabs(current => ({ ...current, [active.id]: tab }))} />;
+  const supporting = (inDrawer = false) => section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : active.kind === "chat" && snapshot ? <SharedContextPanel snapshot={snapshot} models={config?.models ?? []} threadId={threads[active.chatId] ?? null}
+    mentions={mentions[`${active.chatId}:${threads[active.chatId]}`] ?? []} onMentionsChange={ids => changeMentions(`${active.chatId}:${threads[active.chatId]}`, ids)}
+    draft={drafts[threads[active.chatId] ? `${active.chatId}:${threads[active.chatId]}` : active.chatId] || ""}
+    pending={pending[`${active.chatId}:${threads[active.chatId]}`]} error={sendErrors[`${active.chatId}:${threads[active.chatId]}`]}
+    onDraftChange={text => changeDraft(`${active.chatId}:${threads[active.chatId]}`, text)}
+    onSnapshot={onSnapshot} onSend={mentions => void sendMessage(active.chatId, threads[active.chatId] ?? null, mentions)} onInvite={() => setInvitingChatId(active.chatId)}
+    onClose={() => { if (threads[active.chatId]) setThreads(current => ({ ...current, [active.chatId]: null })); else { setDetailsVisible(false); setContextOpen(false); } }} showHeader={!inDrawer}
+    /> : <ContextPanel kind={active.kind} snapshot={snapshot} models={config?.models ?? []} tab={supportTabs[active.id] || "agent"} onTabChange={tab => setSupportTabs(current => ({ ...current, [active.id]: tab }))} />;
   const chatNav = () => selectSection("chats");
   const selectChat = (chatId: string) => activate({ id: `chat:${chatId}`, kind: "chat", chatId });
   const conversations = <ConversationSidebar chats={chats} projects={projects}
@@ -371,7 +418,7 @@ export function Workspace() {
     newProject={{ name: projectName, busy: creatingProject, error: projectError, compact: viewportWidth <= 1100,
       onNameChange: name => { setProjectName(name); setProjectError(null); }, onCreate: createProject,
       onCancel: () => { setProjectName(""); setProjectError(null); projectRequest.current = null; } }}
-    onSelect={selectChat} onSelectProject={selectProject} onCreate={() => void createChat(config?.defaultAgentId, activeProjectId)}
+    onSelect={selectChat} onSelectProject={selectProject} onCreate={() => chooseAgents(config?.defaultAgentId, activeProjectId)}
     onMove={moveChat} onUpdate={updateChatAction} />;
   const sidebar = <>
     <div className="section-sidebar-panel" hidden={section !== "chats"}>{conversations}</div>
@@ -479,7 +526,7 @@ export function Workspace() {
             </div>
         </header> : null}
         {error ? <div className="workspace-notice">
-          <Notice>{error}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat(createRequest.current?.agentDefinitionId, createRequest.current?.projectId)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}
+          <Notice>{error}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat(createRequest.current?.agentDefinitionIds ?? [], createRequest.current?.projectId)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}
         </div> : null}
         <main className="workspace-main" id="main-workspace" tabIndex={-1}>
           <div className="workspace-section" hidden={section !== "chats"}>
@@ -492,27 +539,21 @@ export function Workspace() {
               draft={drafts[tab.chatId] || ""}
               pending={pending[tab.chatId]}
               sendError={sendErrors[tab.chatId]}
-              onDraftChange={text => {
-                draftVersions.current[tab.chatId] = (draftVersions.current[tab.chatId] ?? 0) + 1;
-                if (pending[tab.chatId] && !pending[tab.chatId]?.sending && pending[tab.chatId]?.text !== text.trim()) {
-                  messageRequests.current[tab.chatId] = undefined;
-                }
-                setDrafts(current => ({ ...current, [tab.chatId]: text }));
-                setSendErrors(current => ({ ...current, [tab.chatId]: undefined }));
-                setPending(current => current[tab.chatId] && !current[tab.chatId]?.sending && current[tab.chatId]?.text !== text.trim()
-                  ? { ...current, [tab.chatId]: undefined } : current);
-              }}
-              onSend={() => void sendMessage(tab.chatId)}
+              mentions={mentions[tab.chatId] ?? []}
+              onMentionsChange={ids => changeMentions(tab.chatId, ids)}
+              onDraftChange={text => changeDraft(tab.chatId, text)}
+              onSend={mentions => void sendMessage(tab.chatId, null, mentions)}
+              onParticipants={() => openSupporting(tab.chatId, null)}
+              onThread={id => openSupporting(tab.chatId, id)}
               onSnapshot={onSnapshot}
               onConnection={onConnection}
             /> : tab.kind === "project" ? <ProjectPage
               project={projects.find(project => project.id === tab.projectId)} chats={chats} creating={creating} updating={updatingChats}
-              onCreate={() => void createChat(config.defaultAgentId, tab.projectId)} onSelect={selectChat}
+              onCreate={() => chooseAgents(config.defaultAgentId, tab.projectId)} onSelect={selectChat}
               onMove={moveChat} onUpdate={updateChatAction}
             /> : <Welcome
-              name={state.user.name} config={config} agents={agents}
-              agentId={startingAgentId ?? config.defaultAgentId} onAgentChange={setStartingAgentId}
-              onCreate={agentId => void createChat(agentId)} creating={creating}
+              name={state.user.name} config={config}
+              onCreate={() => chooseAgents()} creating={creating}
             />}
           </Tabs.Panel>)}
           </div>
@@ -520,7 +561,7 @@ export function Workspace() {
             <AgentsPage agent={selectedAgent} editing={editingAgent} config={config} onEditingChange={setEditingAgent}
               onSaved={finishAgentEdit}
               onCancel={() => requestAgentAction(() => finishAgentEdit())} onEdit={editAgent}
-              onStartChat={agentId => void createChat(agentId)} creating={creating} />
+              onStartChat={agentId => chooseAgents(agentId)} creating={creating} />
           </div> : null}
           {visited.security ? <div className="workspace-section" hidden={section !== "security"}><SecurityPage /></div> : null}
         </main>
@@ -530,6 +571,8 @@ export function Workspace() {
         <div className="context-column-content">{supporting()}</div>
       </aside>
     </Tabs.Root>
+    {invitingChatId && snapshots[invitingChatId] ? <InviteParticipantsDialog key={invitingChatId} snapshot={snapshots[invitingChatId]} agents={agents} onSnapshot={onSnapshot} onClose={() => setInvitingChatId(null)} /> : null}
+    {newConversation ? <NewConversationDialog agents={agents} initialAgentIds={newConversation.agentIds} projectName={projects.find(project => project.id === newConversation.projectId)?.name} busy={creating} error={error} onClose={() => setNewConversation(null)} onCreate={ids => void createChat(ids, newConversation.projectId)} /> : null}
     {movingChat ? <MoveConversationDialog key={movingChat.id} chat={movingChat} projects={projects} onClose={() => setMovingChat(null)} onMove={(id, projectId) => updateChat(id, { projectId })} /> : null}
     <Modal title="Discard agent changes?" description="Your unsaved changes will be lost."
       open={pendingAgentAction !== null} onOpenChange={open => { if (!open) setPendingAgentAction(null); }}
@@ -565,7 +608,7 @@ export function Workspace() {
           </Modal>
         </div>
         {active.kind !== "welcome" ? <div className="mobile-context">
-          <Modal title={active.kind === "chat" ? "Conversation details" : section === "agents" ? editingAgent ? "Draft preview" : "Agent details" : "Details"} description={active.kind === "chat" ? snapshot?.conversation.title || "Active conversation" : section === "agents" ? undefined : "For your current view"} side="right" open={contextOpen} onOpenChange={setContextOpen} trigger={<Button variant="ghost" className="workspace-action">
+          <Modal title={active.kind === "chat" ? threads[active.chatId] ? "Thread" : "Participants" : section === "agents" ? editingAgent ? "Draft preview" : "Agent details" : "Details"} description={active.kind === "chat" ? snapshot?.conversation.title || "Active conversation" : section === "agents" ? undefined : "For your current view"} side="right" open={contextOpen} onOpenChange={setContextOpen} trigger={<Button variant="ghost" className="workspace-action">
             <PanelRight size={19} /> Details</Button>}>{supporting(true)}</Modal>
         </div> : null}
       </div>
@@ -583,19 +626,15 @@ function mergeProjects(current: Project[], incoming: Project[]) {
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function Welcome({ name, config, agents, agentId, onAgentChange, creating, onCreate }: {
-  name: string; config: ApplicationConfig; agents: AgentDefinition[]; agentId: string;
-  onAgentChange: (agentId: string) => void; creating: boolean; onCreate: (agentId: string) => void;
+function Welcome({ name, config, creating, onCreate }: {
+  name: string; config: ApplicationConfig; creating: boolean; onCreate: () => void;
 }) {
   return <section className="welcome-view">
     <span className="eyebrow">Hello, {name.split(" ")[0]}</span>
     <h1>Your workspace</h1>
     <p>A question, a plan, a problem to untangle.<br />Start a conversation and make some headway.</p>
     <div className="welcome-actions">
-      <label htmlFor="starting-agent">Start with</label>
-      <Select className="control-select" id="starting-agent" value={agentId} onChange={event => onAgentChange(event.target.value)}>{agents.filter(agent => !agent.archived).map(agent => <option value={agent.id} key={agent.id}>{agent.name}</option>)}
-      </Select>
-      <Button disabled={creating || !agentId} onClick={() => onCreate(agentId)}>{creating ? <Spinner /> : <Plus />} New chat</Button>
+      <Button disabled={creating} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New conversation</Button>
     </div>{!config.providerReady ? <Notice tone="info">The default agent is not connected yet. Choose another configured agent or ask your operator to connect it.</Notice> : null}
     <p className="welcome-footnote">
       <CircleHelp size={14} /> Each conversation starts fresh and keeps its own history.</p>

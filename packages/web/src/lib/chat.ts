@@ -6,6 +6,8 @@ export type ConnectionState = "connecting" | "connected" | "reconnecting" | "err
 export interface PendingMessage {
   requestId: string;
   text: string;
+  threadId?: string | null;
+  mentions?: string[];
   sending: boolean;
   error?: string;
 }

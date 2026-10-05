@@ -18,6 +18,7 @@ import { useEffect, useRef } from "react";
 
 interface MarkdownComposerProps {
   id: string;
+  placeholder?: string;
   value: string;
   disabled: boolean;
   readOnly: boolean;
@@ -42,12 +43,12 @@ export function MarkdownComposer(props: MarkdownComposerProps) {
       <RichTextPlugin ErrorBoundary={LexicalErrorBoundary} contentEditable={<ContentEditable
         id={props.id}
         className="composer-input"
-        aria-label="Message your agent"
+        aria-label={props.placeholder || "Message everyone"}
         aria-multiline="true"
         aria-disabled={props.disabled}
         aria-readonly={props.readOnly}
-        aria-placeholder="Message your agent…"
-        placeholder={<div className="composer-placeholder">Message your agent…</div>}
+        aria-placeholder={props.placeholder || "Message everyone…"}
+        placeholder={<div className="composer-placeholder">{props.placeholder || "Message everyone…"}</div>}
       />} />
     </div>
     <HistoryPlugin />
