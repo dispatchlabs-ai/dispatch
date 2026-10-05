@@ -4,6 +4,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { z } from "zod";
 import type { createAuth, AuthPrincipal } from "./auth.js";
 import { RuntimeError, type DispatchRuntime } from "./runtime.js";
+import { CollaborationError } from "./collaboration/shared.js";
 import type { ApplicationConfig, ChatSnapshot } from "../src/shared/contracts.js";
 
 type Auth = ReturnType<typeof createAuth>;
@@ -16,6 +17,8 @@ type AppOptions = {
 };
 const requestId = z.string().trim().min(1).max(200);
 const projectId = z.string().uuid().nullable().optional();
+const identity = z.string().min(1).max(200);
+const identities = z.array(identity).refine(values => new Set(values).size === values.length, "Choose each participant once.");
 const agentSchema = z.object({
   id: z.string().min(1).max(200).optional(), expectedRevision: z.number().int().positive().optional(),
   name: z.string().trim().min(1).max(100), description: z.string().max(500), instructions: z.string().max(50_000),
@@ -47,6 +50,7 @@ export function createApp(options: AppOptions) {
     await next();
   });
   app.get("/api/config", async (c) => c.json(await options.configuration()));
+  app.get("/api/people", (c) => c.json({ people: auth.listCompanyPeople(c.get("principal").companyId) }));
   app.get("/api/projects", async (c) => c.json({ projects: await runtime.listProjects(c.get("principal")) }));
   app.post("/api/projects", async (c) => {
     const input = z.object({ requestId, name: z.string().trim().min(1).max(100) }).strict().parse(await c.req.json());
@@ -54,17 +58,34 @@ export function createApp(options: AppOptions) {
   });
   app.get("/api/chats", async (c) => c.json({ chats: await runtime.listChats(c.get("principal")) }));
   app.post("/api/chats", async (c) => {
-    const input = z.object({ requestId, title: z.string().trim().min(1).max(200).optional(), agentDefinitionId: z.string().min(1).max(200).optional(), projectId }).strict().parse(await c.req.json());
+    const input = z.object({
+      requestId, title: z.string().trim().min(1).max(200).optional(),
+      agentDefinitionId: identity.optional(), agentDefinitionIds: identities.refine(values => values.length > 0).optional(), projectId,
+    }).strict().refine(value => value.agentDefinitionId === undefined || value.agentDefinitionIds === undefined).parse(await c.req.json());
     return c.json(await runtime.createChat(c.get("principal"), input), 201);
   });
   app.get("/api/chats/:id", async (c) => c.json(await runtime.getChat(c.get("principal"), c.req.param("id"))));
+  app.post("/api/chats/:id/participants", async (c) => {
+    const input = z.object({ requestId, agentDefinitionIds: identities.optional(), userIds: identities.optional() }).strict()
+      .refine(value => (value.agentDefinitionIds?.length ?? 0) + (value.userIds?.length ?? 0) > 0).parse(await c.req.json());
+    const principal = c.get("principal");
+    const people = (input.userIds ?? []).map(userId => {
+      const person = auth.getCompanyPerson(principal.companyId, userId);
+      if (!person) throw new RuntimeError(400, "Choose an active person in this company.");
+      return person;
+    });
+    return c.json(await runtime.addParticipants(principal, c.req.param("id"), input, people));
+  });
   app.post("/api/chats/:id/preferences", async (c) => {
     const input = z.object({ pinned: z.boolean().optional(), archived: z.boolean().optional(), projectId }).strict()
       .refine(value => value.pinned !== undefined || value.archived !== undefined || value.projectId !== undefined).parse(await c.req.json());
     return c.json(await runtime.updateChat(c.get("principal"), c.req.param("id"), input));
   });
   app.post("/api/chats/:id/messages", async (c) => {
-    const input = z.object({ requestId, text: z.string().trim().min(1).max(100_000) }).strict().parse(await c.req.json());
+    const input = z.object({
+      requestId, text: z.string().trim().min(1).max(100_000),
+      threadId: identity.nullable().optional(), mentions: identities.optional(),
+    }).strict().parse(await c.req.json());
     await runtime.submit(c.get("principal"), c.req.param("id"), input);
     return c.json(await runtime.getChat(c.get("principal"), c.req.param("id")), 202);
   });
@@ -92,7 +113,7 @@ export function createApp(options: AppOptions) {
   }
   app.onError((error, c) => {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return c.json({ error: { code: "invalid_request", message: "The request is invalid. Check the fields and try again." } }, 400);
-    if (error instanceof RuntimeError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
+    if (error instanceof RuntimeError || error instanceof CollaborationError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
     console.error("Dispatch request failed:", error);
     return c.json({ error: { code: "internal", message: "The request could not be completed. Try again." } }, 500);
   });

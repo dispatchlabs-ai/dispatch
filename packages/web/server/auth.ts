@@ -16,6 +16,7 @@ import type {
   EnrollmentState,
   SecurityState,
 } from "../src/shared/auth-contracts.js";
+import type { CompanyPerson } from "../src/shared/contracts.js";
 import {
   decryptSecret,
   digest,
@@ -307,6 +308,20 @@ export class AuthService {
 
   isSessionValid(sessionId: string): boolean {
     return this.session(sessionId) !== null;
+  }
+
+  listCompanyPeople(companyId: string): CompanyPerson[] {
+    return this.store.all<CompanyPerson>(
+      "SELECT id, name FROM auth_users WHERE company_id = ? AND status = 'active' ORDER BY name COLLATE NOCASE, id",
+      companyId,
+    );
+  }
+
+  getCompanyPerson(companyId: string, userId: string): CompanyPerson | null {
+    return this.store.one<CompanyPerson>(
+      "SELECT id, name FROM auth_users WHERE company_id = ? AND id = ? AND status = 'active'",
+      companyId, userId,
+    ) ?? null;
   }
 
   revokeSession(sessionId: string): void {
