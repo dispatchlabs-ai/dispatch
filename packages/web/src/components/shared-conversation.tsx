@@ -217,6 +217,8 @@ export function InviteParticipantsDialog({ snapshot, agents, onSnapshot, onClose
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const request = useRef<AddParticipantsInput | null>(null);
+  const joinedDefinitionIds = snapshot.participants.filter(member => member.kind === "agent").map(member => member.agentDefinitionId);
+  const selectedAgentIds = agentIds.filter(id => !joinedDefinitionIds.includes(id));
   useEffect(() => {
     const controller = new AbortController();
     setPeopleError(null);
@@ -225,18 +227,18 @@ export function InviteParticipantsDialog({ snapshot, agents, onSnapshot, onClose
   }, [api, attempt]);
   async function invite() {
     if (busy) return;
-    if (!request.current || JSON.stringify(request.current.agentDefinitionIds) !== JSON.stringify(agentIds) || JSON.stringify(request.current.userIds) !== JSON.stringify(userIds)) request.current = { requestId: crypto.randomUUID(), agentDefinitionIds: agentIds, userIds };
+    if (!request.current || JSON.stringify(request.current.agentDefinitionIds) !== JSON.stringify(selectedAgentIds) || JSON.stringify(request.current.userIds) !== JSON.stringify(userIds)) request.current = { requestId: crypto.randomUUID(), agentDefinitionIds: selectedAgentIds, userIds };
     setBusy(true); setError(null);
     try { onSnapshot(await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(snapshot.conversation.id)}/participants`, request.current)); onClose(); }
     catch (error) { setError(errorMessage(error)); if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429) request.current = null; }
     finally { setBusy(false); }
   }
-  const selected = agentIds.length + userIds.length;
+  const selected = selectedAgentIds.length + userIds.length;
   return <Modal title="Add participants" description={snapshot.conversation.title} open onOpenChange={open => { if (!open && !busy) onClose(); }}>
     <div className="conversation-picker invitation-picker">
       <Tabs.Root value={tab} onValueChange={value => setTab(String(value))}>
         <Tabs.List className="context-tab-list" aria-label="Participant type"><Tabs.Tab value="agents">Agents</Tabs.Tab><Tabs.Tab value="people">People</Tabs.Tab></Tabs.List>
-        <Tabs.Panel value="agents" keepMounted><AgentChoices agents={agents} selected={agentIds} onChange={setAgentIds} disabled={busy} /><p className="field-hint">Each invitation creates a separate agent instance, even if its definition is already here.</p></Tabs.Panel>
+        <Tabs.Panel value="agents" keepMounted><AgentChoices agents={agents} selected={selectedAgentIds} onChange={setAgentIds} disabled={busy} joinedDefinitionIds={joinedDefinitionIds} /></Tabs.Panel>
         <Tabs.Panel value="people" keepMounted><SidebarSearch label="Find a person" value={search} onChange={setSearch} />
           {peopleError ? <><Notice>{peopleError}</Notice><Button variant="secondary" onClick={() => setAttempt(value => value + 1)}>Retry loading people</Button></> : !people ? <Spinner label="Loading people" /> : <div className="participant-choice-list">{people.filter(person => person.name.toLowerCase().includes(search.toLowerCase())).map(person => {
             const joined = snapshot.participants.some(member => member.kind === "human" && member.userId === person.id);
