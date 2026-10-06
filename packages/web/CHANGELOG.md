@@ -16,6 +16,8 @@
 
 ### Added
 
+- Per-agent MCP connections with dedicated identity, tool discovery, native Pi tool execution, connection status and reconnect controls. Developer can use all personal-Wiki article and evidence tools through a separate, operator-provisioned credential; explicitly granted existing instances retain their history and workspaces.
+
 - Invite-only shared conversations with starting-agent selection, human/agent invitations, mentions, full public history and independent agent instances. Native Pi tasks deliver other participants’ messages, permit silence and recover admitted work; Stop all cancels the conversation’s admitted work. Existing conversations retain IDs, history, configuration, workspaces and queued work through migration.
 
 - Name-only projects inside Conversations: collapsible groups, a project conversation view, and a single project assignment per chat through Move to project. Existing chats remain unassigned; Pi stores private project metadata alongside its native conversation state. Desktop and phone layouts share the same controls.

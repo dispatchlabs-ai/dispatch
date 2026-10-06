@@ -66,6 +66,49 @@ Read uses the same file card with the number of returned lines and their origina
 
 Refreshing also applies these views to existing tool calls. The cards use the original recorded read/write content and edit patch, even if the file later changes. They do not rerun the tools or read files from disk. The shared public log remains available across native context resets and compaction. Private working inputs and reasoning are excluded from browser snapshots.
 
+### Developer's Wiki connection
+
+Open **Agents → Developer → Connections** to see the personal Wiki endpoint,
+**Dispatch Developer** identity, connection status and discovered tools. Full access
+covers article search/read/history/preview/save and conversation-trace/attachment
+access. The other named agents retain their own configured capabilities.
+
+The local operator provisions this connection through Palm's
+`infra/playbooks/dispatch-developer-wiki.yml`. It uses a dedicated Wiki signing
+credential and the existing official adapter. The definition editor preserves the
+connection; it does not accept passwords or arbitrary executable commands.
+
+The operator file defaults to `<DISPATCH_DATA_DIR>/agent-connections.json`:
+
+```json
+{
+  "connections": [{
+    "id": "wiki",
+    "agentId": "developer",
+    "name": "Wiki",
+    "endpoint": "https://wiki.chrisreynolds.me/mcp",
+    "identity": "Dispatch Developer",
+    "command": "/absolute/path/to/node",
+    "args": ["/absolute/path/to/agent-mcp.mjs", "/private/path/to/developer-wiki.json"],
+    "instructions": "Consult maintained articles and relevant traces; follow the wiki writing guide before saving.",
+    "applyToExisting": true
+  }]
+}
+```
+
+Paths above are examples; Palm writes the installation's actual paths. Override the
+file path with `DISPATCH_AGENT_CONNECTIONS_FILE`. Restart the service after changing
+the manifest. Keep secrets in the referenced adapter configuration/key store.
+`applyToExisting` grants the connection to existing instances explicitly; it does
+not replace their saved instructions or model. Removing an entry and restarting
+removes that connection from definitions and instances. Upstream revocation is
+still enforced by Wiki independently of this file.
+
+An unavailable connection shows its last discovered tools and a **Reconnect**
+action. A successful initialization establishes the advertised catalog, not that
+all tool operations succeeded. An interrupted write is never automatically replayed;
+inspect its outcome before retrying with Wiki's operation ID rules.
+
 ## Chat and workspace
 
 Messages use a shared, left-aligned flow with author names, agent badges and timestamps. Reply opens a thread in the right column, or a full-height phone panel. Replies remain visible to everyone in the conversation.
@@ -137,6 +180,7 @@ Do not run that service beside the development owner of the same state. Passkeys
 | Variable | Meaning |
 | --- | --- |
 | `DISPATCH_DATA_DIR` | Writable authentication and native Pi state; root launchers default to the repository's `.local/state/dispatch` |
+| `DISPATCH_AGENT_CONNECTIONS_FILE` | Operator per-agent MCP manifest; defaults to `agent-connections.json` inside the state directory |
 | `DISPATCH_WEB_PORT` | Root frontend/built-app port; default 5173; root account links use the same port |
 | `DISPATCH_PORT` | API service port during development or standalone Nix operation; default 3001; root built launcher uses `DISPATCH_WEB_PORT` |
 | `DISPATCH_ORIGIN` | Exact browser origin, without a trailing slash; root launchers default to localhost plus the web port |
@@ -172,6 +216,8 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `GET /api/people` | Active company people available for invitation |
 | `POST /api/chats/:id/participants` | Invite company agents or people with an idempotent request ID |
 | `GET/POST /api/agents` | List company definitions / append a revision using optimistic concurrency |
+| `GET /api/agents/:id/connections` | Read observed per-agent MCP status and the discovered tool catalog |
+| `POST /api/agents/:id/connections/:connection/reconnect` | Retry initialization/discovery for a configured connection; body `{}` |
 | `POST /api/agents/:id/archive` | Archive using the expected revision |
 | `/api/auth/*` | Enrollment, sign-in, recovery, session and factor management, logout |
 

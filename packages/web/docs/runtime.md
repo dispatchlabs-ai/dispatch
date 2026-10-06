@@ -55,3 +55,50 @@ Project creation and assignments use Pi transactions. Creation retries preserve 
 Public posts and invitations retain author-scoped request fingerprints in the native shared document. Matching retries reuse their original result; changed text, thread, mentions or invitation set returns `409`. Public append and native task creation share the same transaction. Native delivery request IDs derive from stable task IDs, so restarting an invocation reuses native admission. Agent tool request IDs derive from native task/call IDs.
 
 All runtime/API behavior remains functionally unqualified under the zero-tests policy. Source review, TypeScript and build evidence are recorded in [WP-024](handoff.md#wp-024--shared-conversations).
+
+## Per-agent MCP connections
+
+`server/mcp.ts` uses stock `@earendil-works/pi-mcp` 1.0.1 with Pi Durable's public
+extension, tool and document APIs. The operator file is
+`DISPATCH_AGENT_CONNECTIONS_FILE`, defaulting to
+`<DISPATCH_DATA_DIR>/agent-connections.json`. Entries belong to an `agentId`; they
+are not company-wide defaults. Only public descriptors enter the agent catalog.
+Commands, adapter arguments and credential file references stay in the operator
+manifest. Secrets must stay in the adapter's credential store, never its arguments.
+
+At startup the runtime restores the last discovered schemas from
+`dispatch.mcp-catalog`, connects each configured adapter, and installs its extension
+before `resume()`. Failed discovery retains the catalog and exposes an unavailable
+status. The authenticated connection view reads process state without making model
+calls. Reconnect retries initialization/discovery. Tool-list notifications refresh
+the catalog and selected tools. `dispatch-mcp-` extension names and `mcp_` tool names
+are reserved for this integration; tool IDs include a stable digest to avoid name
+collisions and respect provider name limits.
+
+Each conversation's `dispatch.mcp-bindings` grants only its definition's connections.
+The tool wrapper checks that binding before making an MCP call. Forks retain the
+binding at their fork point; a newly created task-owned conversation does not gain
+credentials merely by inheriting an extension selection. Application-created agent
+participants are bound explicitly. The company-scoped catalog controls which
+definition can be instantiated. These controls do not isolate the local shell from
+files accessible to the service account.
+
+Definition capability changes create a new revision. `applyToExisting: true` is an
+operator authorization to add that connection to existing instances. Already-bound
+instances receive catalog changes; removal from the manifest removes the binding
+and MCP selections on restart. This preserves other tools, instructions, model,
+reasoning, working directories and native history. An instance retains its original
+definition revision label; its tool list reflects the explicitly updated connection
+access. Basic definition edits preserve connections.
+
+Every remote call uses Pi's native tool task, propagates its cancellation signal,
+and returns MCP text/images, error state and JSON details. All calls are declared
+`replay: "unsafe"`: recovery reports interruption instead of repeating a possibly
+committed external write. Wiki's `operation_id` contract remains available for an
+informed retry. One adapter is shared per configured agent/connection; its identity
+and Wiki run are not per-human or per-Pi-conversation audit identities.
+
+The service closes adapters after Pi stops its work. Wiki's maintained adapter owns
+short-lived access tokens, renewal and run closure. The published third-party
+Durable adapter was not selected because it binds a runtime to one workspace,
+whereas Developer uses separate persistent directories per instance.

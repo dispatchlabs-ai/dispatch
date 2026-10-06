@@ -409,3 +409,63 @@ Qualification evidence (October 5, 2026):
 - Rendered desktop and 390×844 stills reviewed the actual existing conversation/tool history and participant panel. Clearly labelled static samples using real components covered populated multi-agent discussion, reply threads, starting-agent choice and invitations; portal chrome in the chooser/invitation samples is a static equivalent. The invitation review found and corrected the Already here mismatch. No sample conversations, participants or messages were inserted into user state.
 - Shared token styles, 12 px minimum type, labelled actions, native/Base UI controls and phone layouts were reviewed in source and stills. Keyboard, touch, IME/virtual keyboard, assistive technology, all empty/error/loading states, focus restoration, contrast measurements, long-history performance, streaming/retry/recovery and multi-user authorization flows remain unverified. No tests, smoke checks, model requests or browser/API acceptance procedures were run.
 - Captures and sample scripts remain in ignored `.local/shared-layout/2026-10-05/` and the UI task worktree’s `.local/shared-layout/`; user-state backup is in the canonical checkout’s `.local/backups/shared-conversations-20261005-182617/`. The local service was updated; Omarchy and the pilot were not changed.
+
+## WP-025 — Developer's Wiki connection
+
+**Accepted October 5, 2026:** Chris selected per-agent connections and authorized
+Developer's full personal-Wiki MCP access, including existing Developer instances.
+See the [connection specification](spec.md#per-agent-mcp-connections). This package
+uses the current local runtime and preserves the existing Omarchy Dispatch pilot.
+Palm's focused playbook owns the dedicated credential/enrollment and operator
+manifest; Dispatch owns the bridge, public status API and agent UI.
+
+Acceptance criteria and evidence:
+
+- A dedicated **Dispatch Developer** Wiki identity has independent Editor authority
+  and all three read/trace/write scopes. Its private key stays on M1 Air. Enrollment
+  uses the existing application-owned Wiki adapter and does not reuse Codex's key.
+- Developer's definition selects the MCP extension and tools. Existing instances
+  receive the explicitly authorized connection while preserving their model,
+  instructions, working directories and histories. Other definitions do not inherit
+  it. Native Pi documents hold catalog/bindings; Pi owns execution/recovery.
+- Authenticated Agents views show endpoint, identity, current observed connection
+  status, discovered access and actual tools. Reconnect is explicit; failures and
+  stale status remain visible. Secrets do not enter the browser or model context.
+- Source review covers configuration isolation, removed tools/connections, schema
+  discovery failures, credential errors, cancellation, uncertain remote writes and
+  close/reopen ordering. Remote operations use unsafe replay; no substitute durable
+  execution engine or concurrency limit is added.
+- Run source/deslop and full diff review, local documentation links, TypeScript and
+  production builds, `nix build` and `nix flake check`. Review desktop and 390 px
+  layouts. No tests, smoke requests or model-driven tool calls under the standing
+  zero-tests rule. Record observed startup discovery separately from functional
+  qualification of tools, renewal/revocation, interruption/recovery and interaction.
+
+Implementation evidence (October 5, 2026):
+
+- Source/deslop and diff review kept stock Pi responsible for execution, explicit
+  per-conversation bindings for grants, and the maintained Wiki adapter responsible
+  for credential renewal. One shared tool-summary formatter keeps internal provider
+  IDs out of agent detail views; the connection card shows actual remote names.
+- Clean `npm ci`, frontend/service/tooling TypeScript, production builds, Apple
+  Silicon `nix build` and `nix flake check` passed. The existing Vite chunk warning
+  remains; this revision's Linux build was not run. Local documentation links and
+  whitespace checks passed.
+- Palm's focused playbook enrolled the dedicated persistent identity and wrote
+  only Developer's Wiki manifest entry. Ansible 2.21.3 syntax checking passed
+  without connecting to hosts. Normal local startup authenticated as Dispatch
+  Developer and discovered all nine tools. Read-only native metadata shows the
+  `developer/wiki` binding on both existing Developer instances (23 and 97).
+- The actual authenticated Agents page shows Developer revision 2 with Connected,
+  Full access and nine tools; the default definition shows no connections. Desktop
+  1440×1000 and phone 390×844 stills were reviewed, including the expanded catalog.
+  Captures are ignored under the canonical `.local/developer-wiki/2026-10-05/`.
+- Private auth/Pi state was backed up before startup under canonical
+  `.local/backups/developer-wiki-20261005-201104/`. The local app uses its existing
+  state and workspaces. Omarchy's Wiki received the public enrollment; the Omarchy
+  Dispatch application and pilot were not changed.
+- No tests, smoke requests, model prompts or remote tool-operation calls were run.
+  Discovery is observed configuration evidence, not qualification of article/trace
+  operations, writes, token renewal/revocation, cancellation, recovery, Reconnect,
+  keyboard/touch, virtual keyboard, assistive technology or all error/loading
+  states. Contrast and multi-user isolation remain unverified.

@@ -17,6 +17,7 @@ const auth = createAuth({
 });
 const runtime = await DispatchRuntime.open({
   stateDir: join(config.stateDir, "runtime"), companyId: config.companyId, models: provider.models,
+  connectionsFile: config.connectionsFile,
   provider: provider.provider, modelId: provider.modelId, thinkingLevel: provider.thinkingLevel,
   peopleDirectory: {
     list: async (companyId) => auth.listCompanyPeople(companyId),

@@ -1,3 +1,4 @@
+import { describeAgentTools } from "../lib/agent-tools";
 import type { Message } from "@earendil-works/pi-ai";
 import { Tabs } from "@base-ui/react/tabs";
 import { AtSign, ArrowUp, Check, Copy, LockKeyhole, Reply, RotateCcw, Square, UserPlus, X } from "lucide-react";
@@ -191,7 +192,7 @@ export function SharedContextPanel({ snapshot, models, threadId, draft, pending,
         <h3>{participantName(participant, snapshot.participants)}</h3>
         {participant.kind === "agent" ? <>
           <p>This conversation’s independent agent instance.</p>
-          <dl className="context-facts"><div><dt>Based on</dt><dd>{participant.agent.name} · revision {participant.agentRevision}</dd></div><div><dt>Model</dt><dd>{models.find(model => model.id === participant.agent.modelId && model.provider === participant.agent.provider)?.name || participant.agent.modelId}</dd></div><div><dt>Provider</dt><dd>{participant.agent.provider}</dd></div><div><dt>Thinking</dt><dd>{participant.agent.thinkingLevel}</dd></div><div><dt>Tools</dt><dd>{participant.agent.tools.join(", ") || "No tools enabled"}</dd></div>{participant.agent.cwd ? <div><dt>Local workspace</dt><dd>{participant.agent.cwd}</dd></div> : null}</dl>
+          <dl className="context-facts"><div><dt>Based on</dt><dd>{participant.agent.name} · revision {participant.agentRevision}</dd></div><div><dt>Model</dt><dd>{models.find(model => model.id === participant.agent.modelId && model.provider === participant.agent.provider)?.name || participant.agent.modelId}</dd></div><div><dt>Provider</dt><dd>{participant.agent.provider}</dd></div><div><dt>Thinking</dt><dd>{participant.agent.thinkingLevel}</dd></div><div><dt>Tools</dt><dd>{describeAgentTools(participant.agent.tools)}</dd></div>{participant.agent.cwd ? <div><dt>Local workspace</dt><dd>{participant.agent.cwd}</dd></div> : null}</dl>
           {participant.error ? <Notice>{participant.error}</Notice> : null}
           <details><summary>Saved instructions</summary><p className="saved-instructions">{participant.agent.instructions || "No additional instructions."}</p></details>
           <ParticipantRunDetails participant={participant} activities={snapshot.activities} />

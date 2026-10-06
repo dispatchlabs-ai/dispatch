@@ -2,6 +2,7 @@ import { Tabs } from "@base-ui/react/tabs";
 import { Bot, Gauge, LockKeyhole } from "lucide-react";
 import type { ApplicationConfig, ChatSnapshot } from "../shared/contracts";
 import { chatAgent, chatUsage, statusLabels } from "../lib/chat";
+import { describeAgentTools } from "../lib/agent-tools";
 
 export function ContextPanel({ kind, snapshot, models, tab, onTabChange }: {
   kind: "chat" | "project" | "agents" | "security" | "welcome";
@@ -56,7 +57,7 @@ export function ContextPanel({ kind, snapshot, models, tab, onTabChange }: {
         </div>
         <div>
           <dt>Tools</dt>
-          <dd>{Array.isArray(agent.tools) && agent.tools.length ? agent.tools.join(", ") : "No tools enabled"}</dd>
+          <dd>{describeAgentTools(Array.isArray(agent.tools) ? agent.tools : [])}</dd>
         </div>
         {agent.cwd ? <div>
           <dt>Local workspace</dt>

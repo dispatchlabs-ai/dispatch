@@ -13,6 +13,7 @@ import type { AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefini
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { Coding } from "./extensions/coding.js";
 import { SharedConversations, SharedDoc, type Member, type PeopleDirectory } from "./collaboration/shared.js";
+import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
 
 const context = BACKGROUND_CONTEXT;
 type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { pinned?: boolean; archived?: boolean; agentName?: string; projectId?: string | null; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
@@ -32,6 +33,7 @@ export class RuntimeError extends Error {
 export type RuntimeOptions = {
   stateDir: string;
   companyId: string;
+  connectionsFile?: string;
   provider?: string;
   modelId?: string;
   thinkingLevel?: AgentDraft["thinkingLevel"];
@@ -50,8 +52,10 @@ export class DispatchRuntime {
   private closed = false;
   private shared: SharedConversations;
   private peopleDirectory?: PeopleDirectory;
+  private connections: AgentConnections;
 
-  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: RegistryReader, shared: SharedConversations, peopleDirectory?: PeopleDirectory) {
+  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: RegistryReader, shared: SharedConversations, connections: AgentConnections, peopleDirectory?: PeopleDirectory) {
+    this.connections = connections;
     this.shared = shared;
     this.peopleDirectory = peopleDirectory;
     shared.bind(harness, storage);
@@ -66,6 +70,7 @@ export class DispatchRuntime {
   static async open(options: RuntimeOptions) {
     const owner = await acquireRuntimeOwner(options.stateDir);
     let storage: Storage | undefined;
+    let connections: AgentConnections | undefined;
     try {
       const models = options.models ?? productionModels();
       const filename = join(owner.directory, "pi.sqlite");
@@ -77,8 +82,9 @@ export class DispatchRuntime {
       registry.install(shared.extension);
       registry.install(CodingTools);
       registry.install(Coding);
+      connections = await AgentConnections.load(options.connectionsFile ?? join(owner.directory, "agent-connections.json"), registry);
       const harness = await Harness.open(storage, {
-        models, registry, settings: options.settings,
+        models, registry, settings: { ...options.settings, extensions: options.settings?.extensions ?? [shared.extension, CodingTools, Coding] },
         env: async ({ cwd }) => {
           if (!cwd) return undefined;
           await mkdir(cwd, { recursive: true, mode: 0o700 });
@@ -86,7 +92,7 @@ export class DispatchRuntime {
           return new NodeExecutionEnv({ cwd });
         },
       }, context);
-      runtime = new DispatchRuntime(harness, storage, models, owner, registry, shared, options.peopleDirectory);
+      runtime = new DispatchRuntime(harness, storage, models, owner, registry, shared, connections, options.peopleDirectory);
       // Seed once and publish a real commit before recovery so snapshots use Pi's persisted sequence.
       await harness.commit(async (tx) => {
         const catalog = await tx.doc(CatalogDoc);
@@ -117,9 +123,13 @@ export class DispatchRuntime {
         catalog.runtimeInstance = randomUUID();
       }, context);
       await runtime.migrateChats();
+      await connections.open(harness);
+      await runtime.configureConnections(options.companyId);
+      connections.onChanged = () => runtime.configureConnections(options.companyId);
       harness.resume();
       return runtime;
     } catch (error) {
+      await connections?.close();
       await storage?.close(context);
       owner.release();
       throw error;
@@ -294,6 +304,18 @@ export class DispatchRuntime {
     return [...current.values()];
   }
 
+  async agentConnections(scope: RuntimeScope, id: string) {
+    const catalog = await this.harness.snapshot(CatalogDoc, context);
+    if (!catalog!.agents.some(agent => agent.companyId === scope.companyId && agent.id === id)) throw new RuntimeError(404, "Agent not found.");
+    return this.connections.status(id);
+  }
+
+  async reconnectAgentConnection(scope: RuntimeScope, agentId: string, connectionId: string) {
+    const connections = await this.agentConnections(scope, agentId);
+    if (!connections.some(connection => connection.id === connectionId)) throw new RuntimeError(404, "Connection not found.");
+    return this.connections.reconnect(agentId, connectionId);
+  }
+
   async saveAgent(scope: RuntimeScope, input: AgentDraft & { id?: string; expectedRevision?: number }): Promise<AgentDefinition> {
     this.validateAgent(input);
     return this.harness.commit(async (tx) => {
@@ -307,6 +329,7 @@ export class DispatchRuntime {
         id: prior?.id ?? randomUUID(), name: input.name.trim(), description: input.description.trim(),
         instructions: input.instructions, provider: input.provider, modelId: input.modelId, thinkingLevel: input.thinkingLevel,
         extensions: prior?.extensions ?? [], tools: prior?.tools ?? [],
+        ...(prior?.connections ? { connections: prior.connections } : {}),
         revision: (prior?.revision ?? 0) + 1, archived: false, createdAt: prior?.createdAt ?? now, updatedAt: now, companyId: scope.companyId,
       };
       catalog.agents.push(agent);
@@ -330,7 +353,9 @@ export class DispatchRuntime {
   async close() {
     if (this.closed) return;
     this.closed = true;
-    try { await this.harness.close(context); } finally { this.owner.release(); }
+    try { await this.harness.close(context); } finally {
+      try { await this.connections.close(); } finally { this.owner.release(); }
+    }
   }
 
   private async authorize(scope: RuntimeScope, id: string) {
@@ -361,7 +386,36 @@ export class DispatchRuntime {
     const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
     const cwd = agent.extensions?.includes(CodingTools.name) ? join(this.owner.directory, "workspaces", String(record.id)) : undefined;
     await configure(tx, record.id, { model: { provider: agent.provider, modelId: agent.modelId }, instructions: agent.instructions, thinkingLevel: agent.thinkingLevel, extensions, tools, ...(cwd ? { cwd } : {}) });
+    await this.connections.bind(tx, record.id, definitionId);
     return { id: randomUUID(), kind: "agent", name: agent.name, joinedAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, conversationId: record.id, status: "idle", reported: [], agent: { ...publicAgent(agent), ...(cwd ? { cwd } : {}) } };
+  }
+
+  private async configureConnections(companyId: string) {
+    await this.harness.commit(async tx => {
+      const catalog = await tx.doc(CatalogDoc);
+      const latest = new Map<string, StoredAgent>();
+      for (const agent of catalog.agents) if (agent.companyId === companyId) latest.set(agent.id, agent);
+      for (const agent of latest.values()) {
+        const connections = this.connections.forAgent(agent.id);
+        if (!connections.length && !agent.connections?.length) continue;
+        const selection = this.connections.selection(agent.id);
+        const extensions = [...(agent.extensions ?? []).filter(name => !isMcpExtension(name)), ...selection.extensions];
+        const tools = [...(agent.tools ?? []).filter(name => !isMcpTool(name)), ...selection.tools];
+        if (JSON.stringify([agent.connections, agent.extensions, agent.tools]) !== JSON.stringify([connections, extensions, tools])) {
+          catalog.agents.push({ ...agent, connections, extensions, tools, revision: agent.revision + 1, updatedAt: Date.now() });
+        }
+      }
+      for (const chat of catalog.chats.filter(chat => chat.companyId === companyId)) {
+        const room = await tx.doc(SharedDoc, nativeId(chat.id));
+        for (const member of room.members) {
+          if (member.kind !== "agent" || !member.conversationId || !member.agentDefinitionId || !member.agent) continue;
+          if (!this.connections.has(member.agentDefinitionId) && !member.agent.extensions.some(isMcpExtension)) continue;
+          const selection = await this.connections.bind(tx, member.conversationId, member.agentDefinitionId, true);
+          member.agent.extensions = [...member.agent.extensions.filter(name => !isMcpExtension(name)), ...selection.extensions];
+          member.agent.tools = [...member.agent.tools.filter(name => !isMcpTool(name)), ...selection.tools];
+        }
+      }
+    }, context);
   }
 
   private async migrateChats() {

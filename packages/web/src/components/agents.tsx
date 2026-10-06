@@ -8,8 +8,10 @@ import type {
   ThinkingLevel,
 } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
+import { describeAgentTools } from "../lib/agent-tools";
 import { useSession } from "../lib/session";
 import { Button, Field, Input, Modal, Notice, Select, Spinner } from "./ui";
+import { AgentConnectionsPanel } from "./agent-connections";
 
 export type AgentEditing = {
   key: string;
@@ -134,7 +136,7 @@ export function AgentsPage({
         <div className="agent-content-inner">
           <p className="agent-phone-facts">
             {model?.name || agent.modelId || "No model configured"} ·{" "}
-            {thinkingLabel(agent.thinkingLevel)} thinking · {agent.tools.length ? "Coding tools" : "No tools"}
+            {thinkingLabel(agent.thinkingLevel)} thinking · {agent.tools.length ? `${agent.tools.length} tools` : "No tools"}
           </p>
           <p className="agent-description">
             {agent.description || "No description added."}
@@ -145,6 +147,7 @@ export function AgentsPage({
               {agent.instructions || "No additional instructions."}
             </p>
           </section>
+          <AgentConnectionsPanel key={agent.id} agentId={agent.id} />
           {agent.archived ? (
             <Notice tone="info">
               This agent is archived. Existing conversations keep their saved
@@ -322,7 +325,7 @@ export function AgentDetails({
               />
               <div>
                 <dt>Tools</dt>
-                <dd>{saved?.tools.length ? saved.tools.join(", ") : "No tools enabled"}</dd>
+                <dd>{describeAgentTools(saved?.tools ?? [])}</dd>
               </div>
             </dl>
             {contentChanged.length ? (
@@ -543,7 +546,7 @@ function AgentEditor({
         </div>
         <footer className="agent-editor-actions">
           <div className="agent-editor-actions-inner">
-          <p className="editor-note">{agent?.tools.length ? `Tools: ${agent.tools.join(", ")}` : "Conversation only · No tools"}</p>
+          <p className="editor-note">{agent?.tools.length ? `Tools: ${describeAgentTools(agent.tools)}` : "Conversation only · No tools"}</p>
           <div className="button-row">
             <Button variant="secondary" disabled={busy} onClick={onCancel}>
               Cancel

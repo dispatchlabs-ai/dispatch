@@ -109,10 +109,27 @@ export interface AgentDefinition extends AgentDraft {
   /** Operator-registered Pi capabilities, preserved when editing the basic fields. */
   extensions: string[];
   tools: string[];
+  connections?: AgentConnection[];
   revision: number;
   archived: boolean;
   createdAt: number;
   updatedAt: number;
+}
+
+export type AgentConnection = {
+  id: string;
+  name: string;
+  endpoint: string;
+  identity: string;
+  extension: string;
+};
+
+export interface AgentConnectionStatus extends AgentConnection {
+  status: "connected" | "disconnected" | "unavailable";
+  access: "Full access" | "Selected tools";
+  checkedAt: number | null;
+  tools: { name: string; description: string }[];
+  error?: string;
 }
 
 export interface SaveAgentInput extends AgentDraft {

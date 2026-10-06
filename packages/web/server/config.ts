@@ -6,6 +6,7 @@ const environmentSchema = z.object({
   DISPATCH_HOST: z.string().min(1).default("127.0.0.1"),
   DISPATCH_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   DISPATCH_DATA_DIR: z.string().min(1).default(".local/state/dispatch"),
+  DISPATCH_AGENT_CONNECTIONS_FILE: z.string().min(1).optional(),
   DISPATCH_COMPANY_ID: z.string().min(1).max(100).default("dispatch"),
   DISPATCH_COMPANY_NAME: z.string().min(1).max(100).default("Dispatch"),
 });
@@ -28,6 +29,7 @@ export function readConfig(environment: NodeJS.ProcessEnv = process.env) {
     host: parsed.DISPATCH_HOST,
     port: parsed.DISPATCH_PORT,
     stateDir: resolve(parsed.DISPATCH_DATA_DIR),
+    connectionsFile: resolve(parsed.DISPATCH_AGENT_CONNECTIONS_FILE ?? `${parsed.DISPATCH_DATA_DIR}/agent-connections.json`),
     companyId: parsed.DISPATCH_COMPANY_ID,
     companyName: parsed.DISPATCH_COMPANY_NAME,
   };

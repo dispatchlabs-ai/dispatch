@@ -95,6 +95,11 @@ export function createApp(options: AppOptions) {
     });
   });
   app.get("/api/agents", async (c) => c.json({ agents: await runtime.listAgents(c.get("principal")) }));
+  app.get("/api/agents/:id/connections", async (c) => c.json({ connections: await runtime.agentConnections(c.get("principal"), c.req.param("id")) }));
+  app.post("/api/agents/:id/connections/:connection/reconnect", async (c) => {
+    z.object({}).strict().parse(await c.req.json());
+    return c.json({ connections: await runtime.reconnectAgentConnection(c.get("principal"), c.req.param("id"), c.req.param("connection")) });
+  });
   app.post("/api/agents", async (c) => c.json({ agent: await runtime.saveAgent(c.get("principal"), agentSchema.parse(await c.req.json())) }));
   app.post("/api/agents/:id/archive", async (c) => {
     const input = z.object({ expectedRevision: z.number().int().positive() }).strict().parse(await c.req.json());

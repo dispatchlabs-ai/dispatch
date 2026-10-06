@@ -334,6 +334,41 @@ Design the first chat around Pi's public interfaces and the ownership boundaries
 - Use Pi's public `NodeExecutionEnv` and native tool execution, cancellation, and recovery. Local directories organize work; they do **not** isolate the filesystem, subprocesses, network, credentials, or other users' files. Coding tools run with the service account's access. This is an explicitly authorized trusted local development setup, not qualification for shared deployment. Application API ownership checks remain in force.
 - Agent details and draft previews show the selected tools. Chat details show the local workspace and execution boundary. Existing native tool activity/results remain visible in the transcript. Interrupted tools follow Pi's native recovery semantics; shell and file effects are not promised exactly once.
 
+### Per-agent MCP connections
+
+**Accepted October 5, 2026:** connections belong to individual agent definitions.
+Configure Developer with its own **Dispatch Developer** identity on the personal
+Wiki, independent Editor authority, and `wiki:read wiki:trace wiki:write`. Expose
+all nine advertised Wiki tools, including conversation evidence and attachments.
+This grants Wiki MCP operations, not account administration or another wiki's
+authority. Apply this connection explicitly to existing Developer participants,
+preserving their other saved configuration, history and workspaces.
+
+The operator supplies per-agent connection records and private credential
+references. The application uses the official Pi MCP client and Wiki's existing
+signing-key adapter; credentials remain outside model context, browser responses,
+Pi documents and Git. Do not copy Codex's or the interactive Pi client's identity.
+Palm owns the reproducible local enrollment and manifest; Dispatch owns the
+integration. The initial transport is an operator-configured stdio adapter, which
+connects to the Wiki over HTTPS. Browser credential entry and general connection
+editing are outside this slice.
+
+The runtime discovers schemas, installs per-agent Durable extensions before
+resuming work, and saves the non-secret catalog in a native session document.
+Each participating native conversation has an explicit connection binding checked
+on every call. Connections are excluded from harness defaults. A removed manifest
+entry removes its selections at restart; upstream Wiki grants and revocation remain
+authoritative. The trusted local service account is still not an OS sandbox.
+
+Agents → Developer → Connections shows the endpoint, identity, observed connection
+status, discovered access and tool list. Full access means the complete Wiki tool
+catalog was discovered; a stale or unavailable connection is labeled. Failed
+discovery preserves the last catalog for recovery and offers Reconnect. Calls
+forward native errors, results and cancellation; they are unsafe to replay, because
+an interrupted remote write may already have completed. Pi owns tool execution
+and recovery. Sharing this connection among Developer instances shares its Wiki
+principal and adapter run, while Pi histories and workspaces remain independent.
+
 ## Contracts and state ownership
 
 **Accepted ownership boundaries for chat:**
