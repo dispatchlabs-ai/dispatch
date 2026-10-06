@@ -11,6 +11,7 @@ import { ApiError, errorMessage } from "../lib/api";
 import { describeAgentTools } from "../lib/agent-tools";
 import { useSession } from "../lib/session";
 import { Button, Field, Input, Modal, Notice, Select, Spinner } from "./ui";
+import { AgentSkillsEditor, AgentSkillsPanel, type SkillEditing } from "./agent-skills";
 import { AgentConnectionsEditor, AgentConnectionsPanel } from "./agent-connections";
 import { Markdown } from "./markdown";
 import { MarkdownComposer } from "./markdown-composer";
@@ -20,6 +21,7 @@ export type AgentEditing = {
   saved?: AgentDefinition;
   initialDraft: AgentDraft;
   draft: AgentDraft;
+  skillEditing: SkillEditing | null;
   initialConnectionIds: string[];
   connectionIds: string[];
   applyConnectionsToExisting: boolean;
@@ -38,6 +40,7 @@ export function beginAgentEdit(
     modelId: saved?.modelId ?? defaultAgent?.modelId ?? "",
     thinkingLevel: saved?.thinkingLevel ?? defaultAgent?.thinkingLevel ?? "off",
     capabilities: saved?.capabilities ?? [],
+    skills: saved?.skills ?? [],
   };
   const connectionIds = saved?.connections?.filter(connection => connection.source === "managed" || connection.source === "oauth").map(connection => connection.id) ?? [];
   return {
@@ -45,6 +48,7 @@ export function beginAgentEdit(
     saved,
     initialDraft,
     draft: initialDraft,
+    skillEditing: null,
     initialConnectionIds: connectionIds,
     connectionIds,
     applyConnectionsToExisting: false,
@@ -54,7 +58,7 @@ export function beginAgentEdit(
 
 export function agentEditIsDirty(editing: AgentEditing) {
   return JSON.stringify(editing.draft) !== JSON.stringify(editing.initialDraft)
-    || agentConnectionsChanged(editing);
+    || agentConnectionsChanged(editing) || editing.skillEditing !== null;
 }
 
 function agentConnectionsChanged(editing: AgentEditing) {
@@ -152,7 +156,7 @@ export function AgentsPage({
         <div className="agent-content-inner">
           <p className="agent-phone-facts">
             {model?.name || agent.modelId || "No model configured"} ·{" "}
-            {thinkingLabel(agent.thinkingLevel)} thinking · {agent.tools.length ? `${agent.tools.length} tools` : "No tools"}
+            {thinkingLabel(agent.thinkingLevel)} thinking · {agent.tools.length || agent.skills?.length ? `${agent.tools.length + (agent.skills?.length ? 1 : 0)} tools` : "No tools"}
           </p>
           <p className="agent-description">
             {agent.description || "No description added."}
@@ -163,6 +167,7 @@ export function AgentsPage({
               {agent.instructions || "No additional instructions."}
             </Markdown>
           </section>
+          <AgentSkillsPanel selections={agent.skills ?? []} />
           <AgentConnectionsPanel key={agent.id} agentId={agent.id} />
           {agent.archived ? (
             <Notice tone="info">
@@ -339,9 +344,10 @@ export function AgentDetails({
                     : undefined
                 }
               />
+              <DraftFact label="Skills" value={String(current.skills?.length ?? 0)} saved={editing && saved ? String(saved.skills?.length ?? 0) : undefined} />
               <div>
                 <dt>Tools</dt>
-                <dd>{editing ? `${editing.draft.capabilities?.includes("files-and-commands") ? "Files and commands" : "No local tools"} · ${editing.connectionIds.length + (saved?.connections?.filter(connection => connection.source !== "oauth").length ?? 0)} connections` : describeAgentTools(saved?.tools ?? [])}</dd>
+                <dd>{editing ? `${editing.draft.capabilities?.includes("files-and-commands") ? "Files and commands" : "No local tools"} · ${editing.connectionIds.length + (saved?.connections?.filter(connection => connection.source !== "oauth").length ?? 0)} connections` : describeAgentTools([...(saved?.tools ?? []), ...(saved?.skills?.length ? ["load_skill"] : [])])}</dd>
               </div>
             </dl>
             {contentChanged.length ? (
@@ -414,7 +420,7 @@ function AgentEditor({
         className="agent-editor-form"
         onSubmit={(event) => {
           event.preventDefault();
-          if (instructionsTooLong) return;
+          if (instructionsTooLong || editing.skillEditing) return;
           onChange({ ...editing, busy: true });
           setError(null);
           setConflict(false);
@@ -581,6 +587,8 @@ function AgentEditor({
               <summary><strong>Capabilities</strong><span>{draft.capabilities?.includes("files-and-commands") ? "Files and commands" : "Conversation only"}</span></summary>
               <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("files-and-commands") ?? false} onChange={event => update("capabilities", event.target.checked ? ["files-and-commands"] : [])} /><span>Files and commands<small>Read and edit files, and run commands in the agent's working directory. Commands use the Dispatch service account.</small></span></label>
             </details>
+            <AgentSkillsEditor selections={draft.skills ?? []} onChange={skills => update("skills", skills)} busy={busy}
+              editing={editing.skillEditing} onEditingChange={skillEditing => onChange({ ...editing, skillEditing, busy: skillEditing?.busy ?? false })} />
             <AgentConnectionsEditor agent={agent} selectedIds={editing.connectionIds} busy={busy}
               onChange={connectionIds => onChange({ ...editing, connectionIds })}
               applyExisting={editing.applyConnectionsToExisting} onApplyExisting={applyConnectionsToExisting => onChange({ ...editing, applyConnectionsToExisting })}
@@ -594,7 +602,7 @@ function AgentEditor({
             <Button variant="secondary" disabled={busy} onClick={onCancel}>
               Discard
             </Button>
-            <Button type="submit" disabled={busy || !model || conflict || instructionsTooLong || Boolean(agent && !dirty)}>
+            <Button type="submit" disabled={busy || Boolean(editing.skillEditing) || !model || conflict || instructionsTooLong || Boolean(agent && !dirty)}>
               {busy ? <Spinner label="Saving agent" /> : null}
               {agent ? "Save new revision" : "Create agent"}
             </Button>

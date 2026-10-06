@@ -9,9 +9,10 @@ import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, type
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
-import type { AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection } from "../src/shared/contracts.js";
+import type { AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput } from "../src/shared/contracts.js";
 import { isManagedConnection } from "../src/shared/contracts.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
+import { Skills, SkillBindingsDoc } from "./extensions/skills.js";
 import { Coding } from "./extensions/coding.js";
 import { SharedConversations, SharedDoc, type Member, type PeopleDirectory } from "./collaboration/shared.js";
 import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
@@ -22,7 +23,8 @@ const context = BACKGROUND_CONTEXT;
 type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { pinned?: boolean; archived?: boolean; agentName?: string; projectId?: string | null; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
 type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: string; extensions?: string[]; tools?: string[]; savedBy?: string; saveRequestId?: string; saveFingerprint?: string };
 type StoredProject = Project & { companyId: string; userId: string; requestId: string };
-type Catalog = { chats: StoredChat[]; agents: StoredAgent[]; projects?: StoredProject[]; runtimeInstance?: string; connectionOwners?: Record<string, string> };
+type StoredSkill = SkillDefinition & { companyId: string; savedBy: string; requestId: string; fingerprint: string };
+type Catalog = { skills?: StoredSkill[]; chats: StoredChat[]; agents: StoredAgent[]; projects?: StoredProject[]; runtimeInstance?: string; connectionOwners?: Record<string, string> };
 const CatalogDoc = defineDoc<Catalog>({
   kind: "dispatch.catalog", version: 1, scope: "session",
   initial: () => ({ chats: [], agents: [] }),
@@ -90,6 +92,7 @@ export class DispatchRuntime {
       registry.install(shared.extension);
       registry.install(CodingTools);
       registry.install(Coding);
+      registry.install(Skills);
       connections = await AgentConnections.load(options.connectionsFile ?? join(owner.directory, "agent-connections.json"), registry, options.mcpConnections, options.companyId);
       const harness = await Harness.open(storage, {
         models, registry, settings: { ...options.settings, extensions: options.settings?.extensions ?? [shared.extension, CodingTools, Coding] },
@@ -350,6 +353,44 @@ export class DispatchRuntime {
     return [...latestAgents(catalog!, scope.companyId).values()].map(publicAgent);
   }
 
+  async listSkills(scope: RuntimeScope): Promise<SkillDefinition[]> {
+    const catalog = await this.harness.snapshot(CatalogDoc, context);
+    const latest = new Map<string, StoredSkill>();
+    for (const skill of catalog?.skills ?? []) if (skill.companyId === scope.companyId) latest.set(skill.id, skill);
+    return [...latest.values()].map(publicSkill);
+  }
+
+  async getSkill(scope: RuntimeScope, id: string, revision: number): Promise<SkillDefinition> {
+    const catalog = await this.harness.snapshot(CatalogDoc, context);
+    const skill = catalog?.skills?.find(skill => skill.companyId === scope.companyId && skill.id === id && skill.revision === revision);
+    if (!skill) throw new RuntimeError(404, "Skill revision not found.");
+    return publicSkill(skill);
+  }
+
+  async saveSkill(scope: RuntimeScope, input: SaveSkillInput): Promise<SkillDefinition> {
+    const fingerprint = JSON.stringify([input.id, input.expectedRevision, input.name, input.description, input.instructions]);
+    return this.harness.commit(async tx => {
+      const catalog = await tx.doc(CatalogDoc);
+      catalog.skills ??= [];
+      const records = catalog.skills.filter(skill => skill.companyId === scope.companyId);
+      const replay = records.find(skill => skill.savedBy === scope.userId && skill.requestId === input.requestId);
+      if (replay) {
+        if (replay.fingerprint !== fingerprint) throw requestConflict();
+        return publicSkill(replay);
+      }
+      const prior = records.findLast(skill => skill.id === input.id);
+      if (input.id && !prior) throw new RuntimeError(404, "Skill not found.");
+      if (prior && prior.revision !== input.expectedRevision) throw new RuntimeError(409, "The skill has changed. Reload before saving.");
+      const now = Date.now();
+      const skill: StoredSkill = { id: prior?.id ?? randomUUID(), revision: (prior?.revision ?? 0) + 1,
+        name: input.name, description: input.description, instructions: input.instructions,
+        createdAt: prior?.createdAt ?? now, updatedAt: now, companyId: scope.companyId,
+        savedBy: scope.userId, requestId: input.requestId, fingerprint };
+      catalog.skills.push(skill);
+      return publicSkill(skill);
+    }, context);
+  }
+
   async agentConnections(scope: RuntimeScope, id: string) {
     const catalog = await this.harness.snapshot(CatalogDoc, context);
     const agent = latestAgent(catalog!, scope.companyId, id);
@@ -383,7 +424,7 @@ export class DispatchRuntime {
   async saveAgent(scope: RuntimeScope, input: SaveAgentInput): Promise<AgentDefinition> {
     this.validateAgent(input);
     const fingerprint = JSON.stringify([input.id, input.expectedRevision, input.name.trim(), input.description.trim(), input.instructions,
-      input.provider, input.modelId, input.thinkingLevel, input.capabilities?.slice().sort(), input.connectionIds?.slice().sort(), !!input.applyConnectionsToExisting]);
+      input.provider, input.modelId, input.thinkingLevel, input.capabilities?.slice().sort(), input.connectionIds?.slice().sort(), !!input.applyConnectionsToExisting, ...(input.skills === undefined ? [] : [input.skills])]);
     return this.harness.commit(async (tx) => {
       const catalog = await tx.doc(CatalogDoc);
       const priorRequest = input.requestId ? catalog.agents.find(agent => agent.companyId === scope.companyId && agent.savedBy === scope.userId && agent.saveRequestId === input.requestId) : undefined;
@@ -397,6 +438,11 @@ export class DispatchRuntime {
       if (prior && prior.revision !== input.expectedRevision) throw new RuntimeError(409, "The agent has changed. Reload it before saving.");
       const now = Date.now();
       const id = prior?.id ?? randomUUID();
+      const skills = input.skills ?? prior?.skills ?? [];
+      for (const selection of skills) {
+        if (!catalog.skills?.some(skill => skill.companyId === scope.companyId && skill.id === selection.id && skill.revision === selection.revision))
+          throw new RuntimeError(409, "A selected skill revision is unavailable. Reload the skills catalog.");
+      }
       const selectedManaged = input.connectionIds ?? (prior ? managedIds(prior) : []);
       for (const connectionId of selectedManaged) {
         if (!prior || !managedIds(prior).includes(connectionId)) {
@@ -421,7 +467,7 @@ export class DispatchRuntime {
       const agent: StoredAgent = {
         id, name: input.name.trim(), description: input.description.trim(),
         instructions: input.instructions, provider: input.provider, modelId: input.modelId, thinkingLevel: input.thinkingLevel,
-        extensions: [...extensions, ...selection.extensions], tools: [...tools, ...selection.tools], connections: selectedConnections,
+        skills, extensions: [...extensions, ...selection.extensions], tools: [...tools, ...selection.tools], connections: selectedConnections,
         revision: (prior?.revision ?? 0) + 1, archived: false, createdAt: prior?.createdAt ?? now, updatedAt: now, companyId: scope.companyId,
         ...(input.requestId ? { saveRequestId: input.requestId, saveFingerprint: fingerprint, savedBy: scope.userId } : {}),
       };
@@ -487,11 +533,18 @@ export class DispatchRuntime {
       if (!found) throw new RuntimeError(503, `Agent tool ${name} is unavailable.`);
       return found;
     });
+    const snapshots = (agent.skills ?? []).map(selection => {
+      const skill = catalog.skills?.find(skill => skill.companyId === companyId && skill.id === selection.id && skill.revision === selection.revision);
+      if (!skill) throw new RuntimeError(409, "An assigned skill revision is unavailable.");
+      return { id: skill.id, revision: skill.revision, name: skill.name, description: skill.description, instructions: skill.instructions };
+    });
+    if (snapshots.length) { extensions.push(Skills); tools.push(...Skills.tools!); }
     const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
+    if (snapshots.length) (await tx.doc(SkillBindingsDoc, record.id)).skills = snapshots;
     const cwd = agent.extensions?.includes(CodingTools.name) ? this.workspaceDir : undefined;
     await configure(tx, record.id, { model: { provider: agent.provider, modelId: agent.modelId }, instructions: agent.instructions, thinkingLevel: agent.thinkingLevel, extensions, tools, ...(cwd ? { cwd } : {}) });
     await this.connections.bind(tx, record.id, definitionId, false, managedIds(agent));
-    return { id: randomUUID(), kind: "agent", name: agent.name, joinedAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, conversationId: record.id, status: "idle", agent: { ...publicAgent(agent), ...(cwd ? { cwd } : {}) } };
+    return { id: randomUUID(), kind: "agent", name: agent.name, joinedAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, conversationId: record.id, status: "idle", agent: { ...publicAgent(agent), extensions: extensions.map(extension => extension.name), tools: tools.map(tool => tool.name), ...(cwd ? { cwd } : {}) } };
   }
 
   private async configureConnections(companyId: string) {
@@ -623,3 +676,5 @@ function requireText(value: unknown, field: string, max: number, allowEmpty = fa
 }
 
 function requestConflict() { return new RuntimeError(409, "This request ID was already used with different content. Use a new request ID."); }
+
+function publicSkill({ companyId: _company, savedBy: _user, requestId: _request, fingerprint: _fingerprint, ...skill }: StoredSkill): SkillDefinition { return skill; }

@@ -776,3 +776,21 @@ Acceptance evidence:
 - Expanded watcher and speaking-turn transitions without changing statement order, coalescing, cancellation, native task ownership or publication policy. Pi remains the execution/recovery owner.
 - Deslop independently reviewed the five-file implementation diff and reported no blocking findings. Source/deslop review and whitespace checks passed. `nix develop --option eval-cache false --command npm run check`, `nix build --no-link --option eval-cache false`, and `nix flake check --option eval-cache false` passed on Apple Silicon. The existing Vite large-chunk advisory remains; Linux was not built.
 - No tests were added or run under the standing zero-tests policy. Desktop/390 px rendered review was not performed (UI review requirement unverified); no intended rendered change is included. Sending/retry, draft preservation, observation, turn coordination and recovery remain functionally unverified. The live backend was not restarted; no deployment was performed.
+
+## WP-035 — Explicit per-agent text skills
+
+**Authorized October 6, 2026.** Implement the [skills contract](spec.md#explicit-per-agent-skills) with reusable company-scoped immutable text revisions, explicit agent selection, and one native extension. No automatic filesystem discovery or existing-instance migration.
+
+Acceptance criteria:
+
+- Authenticated skill catalog/create/update, revision conflicts and actor/request deduplication use Pi documents in the existing store. Agent revision saves validate company/revision selections and include them in retry identity.
+- The editor supports creating reusable text skills without assigning them, selecting/removing skills and explicitly upgrading revisions. Empty selections preserve the previous behavior. Existing instance snapshots remain unchanged.
+- Atomically bind full immutable text snapshots on participant creation; advertise and load only those snapshots. Register the extension before recovery, but select its tool only for nonempty bindings.
+- Source/deslop review, TypeScript/application builds, Nix builds, whitespace and documentation checks; desktop/390 px rendered review where available. No tests under the standing policy. Runtime, recovery, isolation and interaction outcomes remain unqualified by builds alone.
+- File packages/uploads and script materialization remain deferred; do not claim mutable repository paths are pinned packages. No deployment or running-backend restart is included.
+
+Implementation evidence:
+
+- Pi Durable Expert reviewed native snapshot/configuration atomicity, extension registration before recovery, assigned-only lookup and MCP refresh preservation. Deslop implemented/reviewed the controlled skill editor and shared pinned-revision presentation. Integration review fixed compatibility for pre-upgrade agent-save retry fingerprints and tool summaries for skill-only definitions.
+- TypeScript/frontend/service/tooling and production application builds passed, as did `nix build --no-link` and `nix flake check` on Apple Silicon. Source/deslop, full diff, whitespace and changed-document local-link review passed. The existing Vite large-chunk advisory remains; Linux was not built.
+- No tests, model prompts, live skill saves or API acceptance flows were run. Desktop/390 px rendered review was unavailable in this tool session (UI requirement unverified); contrast, keyboard/assistive technology, touch/virtual keyboards, save/retry/conflict, restart/recovery and access-control behavior remain unqualified by execution. No live backend restart or Omarchy deployment was performed.

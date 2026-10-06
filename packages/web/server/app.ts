@@ -28,6 +28,7 @@ const agentSchema = z.object({
   provider: z.string().min(1).max(100), modelId: z.string().min(1).max(200),
   thinkingLevel: z.enum(["off", "minimal", "low", "medium", "high", "xhigh", "max"]),
   capabilities: z.array(z.literal("files-and-commands")).max(1).optional(),
+  skills: z.array(z.object({ id: z.string().uuid(), revision: z.number().int().positive() }).strict()).max(50).refine(values => new Set(values.map(value => value.id)).size === values.length).optional(),
   connectionIds: z.array(z.string().uuid()).refine(values => new Set(values).size === values.length).optional(),
   applyConnectionsToExisting: z.boolean().optional(), requestId: requestId.optional(),
 }).strict();
@@ -183,6 +184,13 @@ export function createApp(options: AppOptions) {
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-store", "X-Accel-Buffering": "no" },
     });
   });
+  app.get("/api/skills", async (c) => c.json({ skills: await runtime.listSkills(c.get("principal")) }));
+  app.get("/api/skills/:id/revisions/:revision", async (c) => c.json({ skill: await runtime.getSkill(c.get("principal"), z.string().uuid().parse(c.req.param("id")), z.coerce.number().int().positive().parse(c.req.param("revision"))) }));
+  app.post("/api/skills", async (c) => c.json({ skill: await runtime.saveSkill(c.get("principal"), z.object({
+    id: z.string().uuid().optional(), expectedRevision: z.number().int().positive().optional(), requestId,
+    name: z.string().trim().min(1).max(100), description: z.string().trim().min(1).max(500),
+    instructions: z.string().trim().min(1).max(50_000),
+  }).strict().parse(await c.req.json())) }));
   app.get("/api/agents", async (c) => c.json({ agents: await runtime.listAgents(c.get("principal")) }));
   app.get("/api/agents/:id/connections", async (c) => c.json({ connections: await runtime.agentConnections(c.get("principal"), c.req.param("id")) }));
   app.post("/api/agents/:id/connections/:connection/reconnect", async (c) => {

@@ -271,3 +271,11 @@ The runtime pins Pi Durable, Pi AI, Chord, Pi Coding Agent, and Pi MCP to 1.0.4.
 Use exact versions in the owning manifest and commit the root dependency lock. To update `npmDepsHash` in `packages/web/nix/package.nix`, temporarily set `lib.fakeHash`, run `nix build`, replace the placeholder with the reported actual hash, then rebuild. Never commit a placeholder. Toolchain changes through `nix flake update` also require a build.
 
 Omarchy/Palm hosting and its internal HTTPS domain are a later work package. The current pilot at `dispatch.chrisreynolds.me` remains in place. Loopback development cannot be opened directly from a phone; real-device access requires a later reachable environment. CI and release automation are unconfigured. Do not add tests until stable behavior is ready to preserve and Chris resumes that work; future coverage focuses on end-to-end and API tests.
+
+### Agent skills
+
+In the agent editor, Skills lets you create reusable text playbooks and explicitly select revisions for that agent. Creating a skill does not select it. Save the agent revision to apply selected skills to future instances. Editing a skill does not upgrade existing assignments; select the newer revision deliberately. Existing conversation participants retain their copied skill contents.
+
+Only assigned skills are advertised to the model, which can call `load_skill` with the advertised ID. No Files and commands capability is required. Unassigned IDs are rejected by the loader. This is not filesystem isolation for coding agents.
+
+`GET /api/skills` returns the company's latest skill revisions. `POST /api/skills` creates or revises a text skill with name, description, instructions and requestId; updates also require id and expectedRevision. Agent saves accept `skills: [{ id, revision }]` (up to fifty). Text skills do not include uploaded files, package imports or automatically available scripts.

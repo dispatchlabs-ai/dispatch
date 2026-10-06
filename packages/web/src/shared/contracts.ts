@@ -97,6 +97,15 @@ export interface ParticipantActivity {
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
+export type SkillSelection = { id: string; revision: number };
+export type SkillDefinition = SkillSelection & {
+  name: string; description: string; instructions: string; createdAt: number; updatedAt: number;
+};
+export interface SaveSkillInput {
+  id?: string; expectedRevision?: number; requestId: string;
+  name: string; description: string; instructions: string;
+}
+
 export interface AgentDraft {
   name: string;
   description: string;
@@ -106,6 +115,7 @@ export interface AgentDraft {
   thinkingLevel: ThinkingLevel;
   /** Selections from the capabilities installed by this application. */
   capabilities?: ("files-and-commands")[];
+  skills?: SkillSelection[];
 }
 
 export interface AgentDefinition extends AgentDraft {

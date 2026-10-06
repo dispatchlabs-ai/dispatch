@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Reusable company text skills with explicit per-agent revision selections and a native assigned-only loader. New instances copy complete skill snapshots; creation and revision edits never automatically assign or upgrade skills. File packages and uploads remain deferred.
+
 ### Changed
 
 - Removed obsolete single-agent snapshot consumers, consolidated company-scoped latest-agent lookups, and clarified watcher/speaking-turn transitions without changing API compatibility fields or durable execution policy.
