@@ -56,6 +56,8 @@
 
 ### Fixed
 
+- Aligned agent tool activity with human and agent messages using the same avatar and author layout. Terminal/file output stays beneath the author, including after failed responses. Compact bash-output references retain their actions and only follow the same author's adjacent activity.
+
 - Fixed duplicate agent replies when the first native publication marker was lost. Existing duplicates from the same generation resolve to one public reply while retaining raw history and old thread references.
 
 - Made the default agent editable through the shared revisioned editor. Seed its configuration once, preserve saved changes across restarts, and use the latest revision for new chats while keeping existing chats unchanged. Default-agent archiving remains blocked.

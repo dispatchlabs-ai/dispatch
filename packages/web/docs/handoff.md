@@ -652,6 +652,19 @@ Source/deslop and final diff review passed. `nix develop --command npm run check
 
 This qualifies the specific observed local flows above. Multi-user access, live thread tool execution, retry/Stop/restart recovery, assistive technology, measured full-surface contrast, browser zoom/font scaling, physical touch and mobile virtual-keyboard behavior remain unverified. Omarchy and the pilot were not deployed by this package.
 
+### Activity author alignment correction — October 6, 2026
+
+Chris identified that tool activity indented the agent's identity beneath the preceding message. The terminal itself should retain its styled-code-block presentation. This corrects WP-028's author layout for activity; its earlier visual evidence covered generic wiki disclosures and source-reviewed specialized tool output without exercising this failure state.
+
+Public messages and activity now share `ParticipantContent` and the `conversation-entry` layout: equal avatar sizing, the same author text and Agent badge, and a separate content column. Every visible activity group has an author regardless of tool type or response outcome. The old smaller activity-only author treatment and container indentation are removed. Terminal/file renderers, native activity, public message identity and actions remain intact. Exact bash-output references are limited to the immediately preceding associated activity by the same author, with date and image boundaries preserved.
+
+Acceptance evidence:
+
+- Reviewed the actual saved failed conversation through an isolated frontend on port 5174, using the existing authenticated backend without starting another runtime or sending messages. At 1586×910 CSS px, human and both agent avatars align at x=376 with width 44; names/content align at x=436 and names use 15 px text. At 390×844, their avatar/content guides align at x=16/56. Document width equals the viewport in both cases. Existing error and tool output remain visible.
+- Reviewed the saved successful `pwd` conversation, recorded write/read/edit output, and the compact exact-output reference with Reply/Copy actions. Opening that reference's thread retains its original message and full author identity. Desktop and 390 px thread panels were rendered and inspected; no replies, model requests or tool operations were submitted. Captures are ignored under the task worktree's `.local/activity-author-layout/`.
+- Source/deslop and diff review preserve shared native/public history boundaries and reuse existing tokens and controls. `nix develop --command npm run check`, `nix build`, and `nix flake check` passed on Apple Silicon macOS. The existing Vite large-chunk advisory remains; x86-64 Linux was not built. Whitespace and changed-document local links were checked.
+- No automated tests were added or run under the repository policy. This focused manual layout review does not qualify live streaming, new-turn failure/recovery, multi-user behavior, assistive technology, full contrast/zoom/font-scaling checks, physical touch or virtual keyboards. No Omarchy deployment is included.
+
 ## WP-029 — Personal Wiki connections
 
 **Accepted design, October 6, 2026; specification recorded, implementation not started.** Chris accepted personal Wiki sign-in and explicitly delegated, scoped agent access first, with administrator-controlled shared connections later. The [specification](spec.md#personal-wiki-connections) and [product decision](https://wiki.dispatchworks.ai/wiki/agent-runtime-architecture/#section-personal-wiki-connections) own this behavior. The prior [MCP screenshot](agent-mcp-access-design.md) is preserved with its superseded assumptions identified.

@@ -33,6 +33,18 @@ function participantName(participant: ConversationParticipant, participants: Con
     ? `${participant.name} · ${participant.id.slice(-6)}` : participant.name;
 }
 
+function ParticipantContent({ author, participants, createdAt, showAuthor = true, status, children }: {
+  author?: ConversationParticipant; participants: ConversationParticipant[]; createdAt: number; showAuthor?: boolean; status?: string; children: ReactNode;
+}) {
+  return <>
+    {showAuthor ? <ParticipantAvatar kind={author?.kind || "human"} name={author?.name || "?"} /> : null}
+    <div className="participant-body">
+      {showAuthor ? <header className="message-heading"><strong>{author ? participantName(author, participants) : "Former participant"}</strong>{author?.kind === "agent" ? <span className="agent-kind-badge">Agent</span> : null}<time dateTime={new Date(createdAt).toISOString()}>{formatTime(createdAt)}</time>{status ? <span className="activity-status">{status}</span> : null}</header> : null}
+      {children}
+    </div>
+  </>;
+}
+
 export function PublicMessage({ message, participants, replies = [], onThread, outputInActivity = false, selected = false }: {
   message: ConversationMessage; participants: ConversationParticipant[]; replies?: ConversationMessage[]; selected?: boolean; onThread?: (id: string) => void; outputInActivity?: boolean;
 }) {
@@ -45,11 +57,9 @@ export function PublicMessage({ message, participants, replies = [], onThread, o
   const detachedMentions = message.mentions.filter(id => !message.text.includes(`](${mentionUrl(id)})`));
   useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
   if (message.kind === "membership") return <p className="membership-event"><UserPlus size={14} aria-hidden="true" /><span>{message.text}</span><time dateTime={new Date(message.createdAt).toISOString()}>{formatTime(message.createdAt)}</time></p>;
-  return <article className={`message shared-message ${selected ? "is-thread-parent" : ""} ${outputInActivity ? "activity-echo-actions" : ""}`} aria-label={`Message from ${author?.name || "Former participant"}`} data-message-id={message.id}>
-    {!outputInActivity ? <ParticipantAvatar kind={author?.kind || "human"} name={author?.name || "?"} /> : null}
-    <div className="shared-message-body">
+  return <article className={`message conversation-entry shared-message ${selected ? "is-thread-parent" : ""} ${outputInActivity ? "activity-echo-actions" : ""}`} aria-label={`Message from ${author?.name || "Former participant"}`} data-message-id={message.id}>
+    <ParticipantContent author={author} participants={participants} createdAt={message.createdAt} showAuthor={!outputInActivity}>
       {outputInActivity ? <header className="message-heading activity-output-reference">Command output shown above</header> : null}
-      {!outputInActivity ? <header className="message-heading"><strong>{author ? participantName(author, participants) : "Former participant"}</strong>{author?.kind === "agent" ? <span className="agent-kind-badge">Agent</span> : null}<time dateTime={new Date(message.createdAt).toISOString()}>{formatTime(message.createdAt)}</time></header> : null}
       {!outputInActivity ? <div className="message-content"><Markdown mentions={participants.filter(person => message.mentions.includes(person.id))}>{message.text}</Markdown></div> : null}
       {message.images?.map((image, index) => <img className="message-image" key={index} src={`data:${image.mimeType};base64,${image.data}`} alt="Image attached to the message" />)}
       {detachedMentions.length ? <div className="message-mentions" aria-label="Mentioned participants">{detachedMentions.map(id => <span key={id}>@{participants.find(participant => participant.id === id)?.name || "Former participant"}</span>)}</div> : null}
@@ -65,7 +75,7 @@ export function PublicMessage({ message, participants, replies = [], onThread, o
         <span className="thread-summary-count">{replies.length} {replies.length === 1 ? "reply" : "replies"}</span>
         {lastReply ? <span className="thread-summary-time">Last reply <time dateTime={new Date(lastReply.createdAt).toISOString()} title={new Date(lastReply.createdAt).toLocaleString()}>{formatTime(lastReply.createdAt)}</time></span> : null}
       </button> : null}
-    </div>
+    </ParticipantContent>
   </article>;
 }
 
@@ -74,11 +84,9 @@ export function PublicActivity({ activity, participants }: { activity: Participa
   const tools = useMemo(() => toolActivities(activity.entries, activity.live), [activity.entries, activity.live]);
   const rendered = new Set<ToolActivity>();
   const content: ReactNode[] = [];
-  let showAuthor = false;
   function appendTool(tool: ToolActivity | null | undefined, key: string) {
     if (!tool || rendered.has(tool)) return;
     rendered.add(tool);
-    if (["bash", "write", "edit", "read"].includes(tool.name)) showAuthor = true;
     content.push(<ToolActivityView key={key} activity={tool} authorName={author?.name || "Agent"} />);
   }
   function appendMessage(message: Message, key: string) {
@@ -89,7 +97,6 @@ export function PublicActivity({ activity, participants }: { activity: Participa
       // The server projects public commentary and provisional output only;
       // committed final answers are rendered from the shared public messages.
       if (text && !tools.echoes.has(message)) {
-        showAuthor = true;
         content.push(<div className="activity-commentary" key={`${key}:text`}><Markdown>{text}</Markdown></div>);
       }
       for (const part of message.content) {
@@ -99,13 +106,11 @@ export function PublicActivity({ activity, participants }: { activity: Participa
   }
   for (const entry of activity.entries) {
     if (entry.kind === "pi.reset" || entry.kind === "pi.compaction") {
-      showAuthor = true;
       content.push(<details className="native-entry" key={entry.id}>
         <summary>{entry.kind === "pi.reset" ? "Agent working context started" : "Agent working context summarized"}</summary>
         {entry.data ? <pre>{JSON.stringify(entry.data, null, 2)}</pre> : null}
       </details>);
     } else if (!entry.model?.length) {
-      showAuthor = true;
       content.push(<details className="native-entry" key={entry.id}><summary>Agent event · technical details</summary><pre>{JSON.stringify({ kind: entry.kind, data: entry.data }, null, 2)}</pre></details>);
     } else entry.model.forEach((message, index) => appendMessage(message, `${entry.id}:${index}`));
   }
@@ -114,15 +119,15 @@ export function PublicActivity({ activity, participants }: { activity: Participa
   tools.extra.forEach((tool, index) => appendTool(tool, `extra:${index}`));
   if (generation?.retry) content.push(<p className="run-outcome" role="status" key="retry">Retrying the response…</p>);
   if (!content.length) return null;
-  return <section className={`participant-activity ${showAuthor ? "" : "activity-tools-only"}`} aria-label={`${author?.name || "Agent"} activity`}>
-    {showAuthor ? <div className="activity-author"><ParticipantAvatar kind="agent" name={author?.name || "Agent"} /><strong>{author ? participantName(author, participants) : "Agent"}</strong><span>{generation && author?.kind === "agent" ? `${participantStatus[author.status]}…` : "Activity"}</span><time dateTime={new Date(activity.createdAt).toISOString()}>{formatTime(activity.createdAt)}</time></div> : null}
-    {content}
+  return <section className="conversation-entry participant-activity" aria-label={`${author?.name || "Agent"} activity`}>
+    <ParticipantContent author={author} participants={participants} createdAt={activity.createdAt} status={generation && author?.kind === "agent" ? `${participantStatus[author.status]}…` : "Activity"}>
+      {content}
+    </ParticipantContent>
   </section>;
 }
 
-function repeatsBashOutput(message: ConversationMessage, activities: ParticipantActivity[]): boolean {
-  const activity = activities.find(activity => activity.messageId === message.id);
-  if (!activity) return false;
+function repeatsBashOutput(message: ConversationMessage, activity: ParticipantActivity): boolean {
+  if (activity.messageId !== message.id || activity.participantId !== message.authorId || message.images?.length) return false;
   const results = activity.entries.flatMap(entry => entry.model ?? []).filter(message => message.role === "toolResult");
   const last = results.at(-1);
   if (!last || last.toolName !== "bash") return false;
@@ -142,13 +147,14 @@ export function SharedTranscript({ snapshot, threadId = null, activeThreadId = n
     ...snapshot.activities.filter(activity => activity.threadId === threadId).map(activity => ({ kind: "activity" as const, id: activity.id, at: activity.createdAt, activity })),
   ].sort((a, b) => a.at - b.at);
   let date = "";
-  return <>{items.map(item => {
+  return <>{items.map((item, index) => {
     const nextDate = new Date(item.at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
     const showDate = nextDate !== date;
     date = nextDate;
+    const previous = items[index - 1];
     return <div key={`${item.kind}:${item.id}`}>
       {showDate ? <div className="transcript-date"><span>{nextDate}</span></div> : null}
-      {item.kind === "message" ? <PublicMessage message={item.message} participants={snapshot.participants} replies={snapshot.messages.filter(message => message.threadId === item.id)} selected={activeThreadId === item.id || Boolean(activeThreadId && item.message.aliases?.includes(activeThreadId))} onThread={onThread} outputInActivity={repeatsBashOutput(item.message, snapshot.activities)} /> : <PublicActivity activity={item.activity} participants={snapshot.participants} />}
+      {item.kind === "message" ? <PublicMessage message={item.message} participants={snapshot.participants} replies={snapshot.messages.filter(message => message.threadId === item.id)} selected={activeThreadId === item.id || Boolean(activeThreadId && item.message.aliases?.includes(activeThreadId))} onThread={onThread} outputInActivity={!showDate && previous?.kind === "activity" && repeatsBashOutput(item.message, previous.activity)} /> : <PublicActivity activity={item.activity} participants={snapshot.participants} />}
     </div>;
   })}</>;
 }
