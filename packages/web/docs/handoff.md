@@ -651,3 +651,27 @@ Coordinator evidence (October 6, 2026):
 Source/deslop and final diff review passed. `nix develop --command npm run check`, `nix build`, and `nix flake check` passed on Apple Silicon macOS at implementation revision `2628aaa`; later changes record evidence only. Changed local documentation links and whitespace checks passed. No automated tests were added or run. The existing Vite large-chunk advisory remains.
 
 This qualifies the specific observed local flows above. Multi-user access, live thread tool execution, retry/Stop/restart recovery, assistive technology, measured full-surface contrast, browser zoom/font scaling, physical touch and mobile virtual-keyboard behavior remain unverified. Omarchy and the pilot were not deployed by this package.
+
+## WP-029 — Personal Wiki connections
+
+**Accepted design, October 6, 2026; specification recorded, implementation not started.** Chris accepted personal Wiki sign-in and explicitly delegated, scoped agent access first, with administrator-controlled shared connections later. The [specification](spec.md#personal-wiki-connections) and [product decision](https://wiki.dispatchworks.ai/wiki/agent-runtime-architecture/#section-personal-wiki-connections) own this behavior. The prior [MCP screenshot](agent-mcp-access-design.md) is preserved with its superseded assumptions identified.
+
+Depends on WP-025's native connection integration and WP-024's participant/access model. Before code work, settle Agent Wiki's delegated provisioning API and scope/ownership contract; credential protection from coding execution; principal/instance granularity; personal-data audiences in shared conversations; and save/conflict/partial-outcome behavior. Existing remote OAuth and operator enrollment are foundations, not completion of those dependencies. Keep current operator-managed Developer access unchanged until a migration is explicitly specified.
+
+Implementation order:
+
+1. Define and provide the Agent Wiki public API for user-authorized provisioning, credential lifecycle, current-rights enforcement, revocation, and idempotent reconciliation. Agent Wiki owns that implementation and contract.
+2. Add Dispatch's owner-bound connection records, protected credentials, identity mappings, authorization and audit through its service boundary. Preserve native Pi execution and recovery ownership.
+3. Add Settings account authorization and the agent's Add connection/actions flow, with truthful pending, active, expired, failed and revoked states. Resolve shared-use and existing-instance policy before exposing those actions.
+
+Acceptance criteria and evidence to complete with implementation:
+
+- A user authorizes their own verified Wiki account and selects permitted actions without supplying a general admin key or retyping the agent identity. Article and original-evidence access remain distinct.
+- Bindings preserve company, user, upstream issuer/account, agent and instance/run identity. Another user's use or copy of a shared definition receives no personal grant. Invocation, configuration, sharing and output audience checks apply at the service boundary.
+- Credential and execution isolation prevents models, coding tools, other users, browser responses, Pi definition documents, logs and Git from obtaining provisioning or refresh secrets. Distinct agent credentials cannot exceed the current user's rights, delegation or requested scope.
+- Refresh, background work, rights reduction, disconnect and upstream revocation preserve those limits. Denials never fall back to Developer's independent credential. Reauthorization is explicit; prior disclosed content is not claimed to disappear.
+- Retried and interrupted provisioning/rotation/revocation reconcile one logical operation. Partial local/upstream failure remains visible, duplicate grants are avoided, and existing instances change only through explicit authorized application. Access is not pinned by a definition revision.
+- Shared administrator-controlled connections remain a later feature with an explicit workspace/user policy and scoped provisioning ceiling.
+- Review source and the complete diff; run the repository's required TypeScript/build/Nix checks for implementation and review desktop/390 px layouts. Follow the then-current testing policy; today's zero-tests rule remains in force. Record functional, security, recovery and interaction evidence or outstanding qualification here rather than inferring success from builds.
+
+This documentation update establishes design and acceptance criteria only. No OAuth integration, provisioning endpoint, credentials, access grants, runtime change or deployment is implemented or qualified by it.

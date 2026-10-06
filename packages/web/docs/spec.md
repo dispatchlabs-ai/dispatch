@@ -64,6 +64,8 @@ All users initially have the same application capabilities; there are no differe
 
 Each installation serves one company. Accounts have separate identities. Conversation access uses explicit [shared-conversation membership](#shared-conversations). Agent definitions are shared within the company. Every service operation receives its company/user scope from the authenticated session. These boundaries do not grant cross-company access.
 
+The accepted future [personal Wiki connection](#personal-wiki-connections) adds owner-bound resource authorization. Equal application capabilities and permission to edit a shared definition do not confer another user's external credentials or Wiki access. Shared team connections require a later, explicit administration policy.
+
 ### Enrollment, recovery, and sessions
 
 An operator provisions an expiring, single-use invitation through the local CLI; there is no public registration or invented application administrator role. The invited user enrolls either a verified passkey or password plus TOTP. Passkey enrollment proceeds directly to the browser/password-manager ceremony without asking for a credential name. New enrollment requests omit the optional `passkeyName`; the service uses its existing `Passkey` label and still accepts labels from older clients. A restricted enrollment cookie cannot access chats, agent definitions, or live subscriptions.
@@ -418,6 +420,43 @@ forward native errors, results and cancellation; they are unsafe to replay, beca
 an interrupted remote write may already have completed. Pi owns tool execution
 and recovery. Sharing this connection among Developer instances shares its Wiki
 principal and adapter run, while Pi histories and workspaces remain independent.
+
+### Personal Wiki connections
+
+**Accepted design, October 6, 2026; not implemented.** Start with personal connections authorized through the user's own Wiki sign-in. Add shared team connections later as an administrator-controlled option. The [product decision](https://wiki.dispatchworks.ai/wiki/agent-runtime-architecture/#section-personal-wiki-connections) owns this sequence. The existing operator-managed Developer connection above remains the current implementation; this decision does not migrate its credentials, identity, or instances.
+
+#### User workflow and authority
+
+1. In Settings → Connections, the user connects an Agent Wiki instance through its OAuth authorization flow. Show the verified Wiki account, service endpoint, authorized actions, and connection state. Bind the authorization to the authenticated Dispatch company/user and the Wiki issuer/account using stable identifiers, never display names or matching email alone.
+2. In the agent's MCP connections section, **Add connection → select Wiki → permitted actions** selects one of that user's authorized connections. Separate article reading, article editing, and original evidence access; discovered tool names describe available operations and are not permission grants. Do not ask the user to restate the agent's identity. An account chooser is useful only when multiple authorized accounts are available.
+3. Dispatch requests a distinct, scoped agent credential through an authorized Agent Wiki provisioning API. Effective access is bounded by the user's current Wiki rights, the explicit delegation, and the selected agent/run scope. Ownership, a Dispatch login, or a natural-language request does not establish upstream authority. A denial must not fall back to the existing independent Developer credential or any broader account.
+4. Show a pending state until upstream provisioning and the local binding are both confirmed. Display the resulting identity, effective permissions, and connection health. Users can disconnect or reauthorize; a connection failure must not be presented as an active grant.
+
+The personal flow does not require the user to supply a general Wiki administrator API key. OAuth establishes authorization; agent enrollment, credential issuance and lifecycle operations are an Agent Wiki integration contract, not capabilities supplied automatically by every MCP server.
+
+#### Identity, credentials, and use boundaries
+
+- Keep reusable definition revisions separate from accountable agent identities, personal connections, and instance bindings. Copying, sharing, renaming, or editing a definition never copies a personal grant. A connection is owned by one authenticated user; another user selecting the same definition must authorize their own access. Exact upstream principal reuse across one owner's instances remains an implementation decision and must preserve independent ownership and revocation boundaries.
+- Keep provisioning authority, refresh tokens, private keys, and agent credentials in protected service storage outside model context, browser payloads, Pi definition documents, logs, and Git. Give an agent only its narrower effective authority; a backend credential able to issue access is itself privileged even when it cannot read articles directly.
+- Authorize connection management, agent invocation/configuration, and the audience of resulting messages independently. The current shared-definition editor and conversation invitation permissions do not prove permission to use or disclose a personal Wiki's data. Settle the rules for shared conversations, later invitees, edited instructions, tool results, and retained agent memory before enabling these personal bindings in those contexts. Do not infer authorization from company membership.
+- Protect credentials from coding tools and other users' execution environments. The current trusted local service-account filesystem is not an isolation boundary for personal credentials. The implementation package must establish the required execution/credential separation before claiming protection between users.
+- Record the Dispatch company, authorizing user, connection, stable upstream agent identity, participating instance/run, effective scope, and lifecycle outcome without secret values. Pi continues to own execution and recovery; Wiki remains authoritative for its identities, grants, delegations, and revocation.
+
+#### Lifecycle and recovery
+
+Evaluate current user rights and delegation on Wiki requests, including background work. Expired or revoked authority stops affected future access and requires reauthorization where appropriate. Never promote a personal agent to standing team authority when its owner departs. Disconnect disables local use and revokes the connection's derived upstream authority; failures or uncertain revocation remain visible and retryable. Revocation does not erase information already committed to conversations or memory.
+
+Provision, rotate, and revoke operations require attributable, idempotent requests and a way to reconcile uncertain outcomes. A retry must not create duplicate identities or grants. Track local and upstream outcomes separately, and recover partial provisioning without reporting success or silently retaining an unused grant. Definition saves and access changes have separate authority and revision/conflict rules; no cross-service atomic save or permission pinning is implied. Applying access to existing instances requires an explicit authorized choice.
+
+#### Later shared team connections
+
+A Wiki administrator may later authorize one Dispatch workspace to provision standing agent access within an explicit ceiling, with a policy for which users may assign it. A scoped integration credential could bootstrap that connection. Its authority should cover only permitted agent creation, grants, rotation and revocation for identities managed through that connection; it does not imply general Wiki administration or access to unrelated agents. Workspace membership alone is insufficient. Team ownership, transfer, departure, invocation, configuration and output audiences need explicit rules. This mode is deferred from the personal-connection implementation.
+
+#### Implementation gap and unresolved contracts
+
+Source review of Agent Wiki `8d8810c` found human-session/CSRF-protected agent administration, OAuth credential issuance for existing independent agent authority, and operator-side signing-key enrollment. It does not provide the complete unattended, user-delegated provisioning flow above. [Remote OAuth contract](https://github.com/dispatchlabs-ai/agent-wiki/blob/8d8810c44c813137a707e7ce7d87bba983ba6f6b/docs/remote-agents.md), [operator enrollment](https://github.com/dispatchlabs-ai/agent-wiki/blob/8d8810c44c813137a707e7ce7d87bba983ba6f6b/scripts/agent-admin.mjs).
+
+Before implementation, define the delegated provisioning API/authentication/scopes and lifecycle responses; settle principal and instance granularity, protected credential storage/execution, shared-conversation audiences, and conflict/partial-save behavior. Preserve existing grants until an explicit migration is specified. [WP-029](handoff.md#wp-029--personal-wiki-connections) records dependencies and acceptance criteria. The earlier [ImageGen concept](agent-mcp-access-design.md) is historical visual evidence, not the final authorization contract.
 
 ## Contracts and state ownership
 
