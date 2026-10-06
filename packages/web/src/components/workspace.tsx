@@ -254,13 +254,13 @@ export function Workspace() {
     setNewConversation({ agentIds: project?.kind === "shared" ? project.defaultAgentDefinitionIds ?? [] : agentId ? [agentId] : [], projectId });
   }
 
-  async function createChat(agentIds: string[], projectId: string | null = null, retry?: CreateChatInput) {
+  async function createChat(agentIds: string[], projectId: string | null = null, retry?: CreateChatInput, title?: string) {
     if (creating) return;
     const sharedProjectId = projects.find(project => project.id === projectId)?.kind === "shared" ? projectId : null;
     const personalProjectId = sharedProjectId ? null : projectId;
-    const sameRequest = JSON.stringify(createRequest.current?.agentDefinitionIds) === JSON.stringify(agentIds) && (createRequest.current?.projectId ?? null) === personalProjectId && (createRequest.current?.sharedProjectId ?? null) === sharedProjectId;
+    const sameRequest = createRequest.current?.title === title && JSON.stringify(createRequest.current?.agentDefinitionIds) === JSON.stringify(agentIds) && (createRequest.current?.projectId ?? null) === personalProjectId && (createRequest.current?.sharedProjectId ?? null) === sharedProjectId;
     if (retry) createRequest.current = retry;
-    else if (!sameRequest) createRequest.current = { requestId: crypto.randomUUID(), agentDefinitionIds: agentIds, projectId: personalProjectId, sharedProjectId };
+    else if (!sameRequest) createRequest.current = { requestId: crypto.randomUUID(), agentDefinitionIds: agentIds, projectId: personalProjectId, sharedProjectId, title };
     setCreating(true); setError(null); setCreateFailed(false);
     try {
       const snapshot = await api<ChatSnapshot>("/api/chats", createRequest.current);
@@ -613,7 +613,7 @@ export function Workspace() {
       </aside>
     </Tabs.Root>
     {invitingChatId && snapshots[invitingChatId] ? <InviteParticipantsDialog key={invitingChatId} snapshot={snapshots[invitingChatId]} agents={agents} onSnapshot={onSnapshot} onClose={() => setInvitingChatId(null)} /> : null}
-    {newConversation ? <NewConversationDialog agents={agents} initialAgentIds={newConversation.agentIds} projectName={projects.find(project => project.id === newConversation.projectId)?.name} busy={creating} error={error} onClose={() => setNewConversation(null)} onCreate={ids => void createChat(ids, newConversation.projectId)} /> : null}
+    {newConversation ? <NewConversationDialog agents={agents} initialAgentIds={newConversation.agentIds} projectName={projects.find(project => project.id === newConversation.projectId)?.name} busy={creating} error={error} onClose={() => setNewConversation(null)} onCreate={(ids, title) => void createChat(ids, newConversation.projectId, undefined, title)} /> : null}
     {renamingChat ? <RenameConversationDialog key={renamingChat.id} chat={renamingChat} onClose={() => setRenamingChat(null)} onRename={saveChatTitle} /> : null}
     {movingChat ? <MoveConversationDialog key={movingChat.id} chat={movingChat} projects={projects} onClose={() => setMovingChat(null)} onMove={(id, projectId) => updateChat(id, { projectId })} /> : null}
     <Modal title="Discard agent changes?" description="Your unsaved changes will be lost."

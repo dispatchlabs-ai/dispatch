@@ -2,7 +2,7 @@ import { BookOpen, Bot, Check, CodeXml, Compass, Sparkles, UserRound } from "luc
 import { useState } from "react";
 import type { AgentDefinition } from "../shared/contracts";
 import { SidebarSearch } from "./sidebar-search";
-import { Button, Modal, Notice, Spinner } from "./ui";
+import { Button, Field, Input, Modal, Notice, Spinner } from "./ui";
 
 export function ParticipantAvatar({ kind, name }: { kind: "human" | "agent"; name: string }) {
   const words = name.trim().split(/\s+/);
@@ -36,17 +36,19 @@ export function AgentChoices({ agents, selected, onChange, disabled = false, joi
 
 export function NewConversationDialog({ agents, initialAgentIds, projectName, busy, error, onClose, onCreate }: {
   agents: AgentDefinition[]; initialAgentIds: string[]; projectName?: string; busy: boolean; error?: string | null;
-  onClose: () => void; onCreate: (agentIds: string[]) => void;
+  onClose: () => void; onCreate: (agentIds: string[], title?: string) => void;
 }) {
   const [selected, setSelected] = useState(initialAgentIds);
+  const [name, setName] = useState("");
   return <Modal title="New conversation" description={projectName ? `Project: ${projectName}` : "Without a project"} open onOpenChange={open => { if (!open && !busy) onClose(); }}>
     <div className="conversation-picker">
+      <Field label="Name (optional)" hint="Leave blank to name it from the first message.">{props => <Input {...props} value={name} onChange={event => setName(event.target.value)} maxLength={200} disabled={busy} placeholder="Conversation name" />}</Field>
       <p>Choose agents to start with. You can add people and agents later.</p>
       <AgentChoices agents={agents} selected={selected} onChange={setSelected} disabled={busy} />
       {error ? <Notice>{error}</Notice> : null}
       <footer className="picker-actions"><span>{selected.length} {selected.length === 1 ? "agent" : "agents"} selected</span><div className="button-row">
         <Button variant="secondary" disabled={busy} onClick={onClose}>Cancel</Button>
-        <Button disabled={busy} onClick={() => onCreate(selected)}>{busy ? <Spinner /> : null} Start conversation</Button>
+        <Button disabled={busy} onClick={() => onCreate(selected, name.trim() || undefined)}>{busy ? <Spinner /> : null} Start conversation</Button>
       </div></footer>
     </div>
   </Modal>;

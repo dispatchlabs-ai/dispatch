@@ -245,6 +245,12 @@ The editor groups Identity, Instructions, and Model in that order. Instructions 
 
 **Accepted October 6, 2026:** conversation actions offer Rename in Dispatch only. Any authenticated human member may change the shared display title; this is not a personal preference.
 
+**Creation naming, accepted October 6, 2026:** the starting-agent chooser includes an optional conversation name, including project and agent-start entry points.
+
+- Trim the name; a nonempty name is limited to 200 characters and becomes the shared display title. Blank or whitespace-only input keeps the existing unnamed-conversation behavior: “New conversation” until the first message supplies a preview.
+- Explicit names, including the literal “New conversation”, are not replaced by the first message. Save the explicit display title atomically with creation while retaining the immutable creation title for retry comparisons. New records also retain whether the creation name was explicit, so an omitted name and literal “New conversation” are distinct retry inputs; legacy records keep their previous comparison behavior.
+- Keep the name draft and selected agents on failure. An uncertain creation retry replays its original request, including title and project selection, rather than creating a second conversation with changed input. Successful creation or cancellation clears the chooser draft.
+
 - `POST /api/chats/:id/title` accepts `{ title: string }`, trims surrounding whitespace, requires 1–200 characters, and returns `ChatSnapshot`. Apply the existing company/membership boundary; inaccessible conversations return 404.
 - Persist a display-title override in the native catalog while retaining the immutable creation title for creation-retry comparisons. Older conversations retain their existing title fallback. An explicit “New conversation” override is a literal title, not a request to derive one from the first message.
 - Rename updates conversation labels throughout Dispatch, including navigation, headers, project lists and search. It does not change IDs, messages, agent context/configuration, project membership, working directories or running work.

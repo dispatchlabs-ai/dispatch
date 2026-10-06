@@ -843,3 +843,21 @@ Implementation review:
 - Final integrated `nix develop --option eval-cache false --command npm run check`, `nix build --no-link --option eval-cache false`, and `nix flake check --option eval-cache false` passed on Apple Silicon. Source/deslop review findings were rechecked by both reviewers and resolved; full diff, whitespace and changed-document local targets were reviewed. The pre-existing large-chunk advisory remains; x86-64 Linux was not built.
 
 - Rebased over the concurrently published conversation display-title rename feature. Preserved rename UI/API and its creation-title identity; rename now uses the same current project participation check inside its mutation transaction, with its action disabled for read-only project observers.
+
+## WP-038 — Name a conversation at creation
+
+**Authorized October 6, 2026.** Add optional naming to the starting-agent chooser, preserving the existing unnamed fallback, project assignment and independent tabs/drafts. See the [display-title contract](spec.md#conversation-display-titles). Depends on WP-036 display titles and WP-037 creation retry handling.
+
+Acceptance criteria:
+
+- All creation entry points expose the optional name with trimmed 1–200-character validation for nonempty input. Empty/whitespace-only input keeps the current automatic-title behavior; explicit “New conversation” remains literal after messages arrive.
+- Persist an explicit display-title override atomically at creation. Preserve immutable creation-title retry comparisons, adding an immutable explicit-name flag on new records while retaining legacy replay compatibility. Preserve company/project authorization and native Pi execution ownership; no Pi schema or execution-lifecycle change.
+- Creation failures retain name/agent drafts. Uncertain retries replay the original title, agent and project request; cancellation or success clears the chooser draft. Project default-agent selection remains intact.
+- Apply source/deslop/runtime review, TypeScript/application and Nix builds, full diff/whitespace and changed-document local-link checks. Record their actual results here; builds do not qualify runtime behavior.
+- No tests under the standing policy. Desktop/390 px rendered review, contrast, keyboard/focus/assistive technology, touch, name validation, failure/retry, first-message behavior and restart/persistence remain unverified unless separately observed. No live backend restart or deployment is included.
+
+Implementation evidence:
+
+- Deslop source-reviewed the controlled name field, failed-input retention, changed-name request identity and exact saved-request retries; no blocking findings or useful simplifications remained. Pi Durable Expert identified the omitted-name versus explicit “New conversation” replay ambiguity and rechecked its fix: immutable `creationTitleExplicit` distinguishes new requests independently of mutable display titles, including shared-project creation, while legacy records retain prior replay behavior.
+- Documentation diff/whitespace review and 54 local documentation file targets passed. Deployer ran integrated `nix develop --command npm run check`, `nix build`, and `nix flake check` with the explicit-name retry fix included; all passed on Apple Silicon. The existing Vite large-chunk advisory remains; Linux was not built.
+- Rendered desktop/390 px review was unavailable and captures were requested from Chris. UI properties and the functional outcomes above remain unverified by execution. No tests, live backend restart or deployment were performed for this package.

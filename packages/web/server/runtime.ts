@@ -21,7 +21,7 @@ import { TurnsDoc } from "./collaboration/turns.js";
 import type { McpConnections } from "./mcp-connections.js";
 
 const context = BACKGROUND_CONTEXT;
-type StoredChat = Omit<ChatSummary, "sharedProjectId" | "canParticipate" | "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { creationFingerprint?: string; displayTitle?: string; pinned?: boolean; archived?: boolean; agentName?: string; projectId?: string | null; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
+type StoredChat = Omit<ChatSummary, "sharedProjectId" | "canParticipate" | "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { creationFingerprint?: string; creationTitleExplicit?: boolean; displayTitle?: string; pinned?: boolean; archived?: boolean; agentName?: string; projectId?: string | null; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
 type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: string; extensions?: string[]; tools?: string[]; savedBy?: string; saveRequestId?: string; saveFingerprint?: string };
 type StoredProject = Project & { companyId: string; userId: string; requestId: string };
 type StoredSkill = SkillDefinition & { companyId: string; savedBy: string; requestId: string; fingerprint: string };
@@ -236,6 +236,7 @@ export class DispatchRuntime {
 
   async createChat(scope: RuntimeScope, input: CreateChatInput): Promise<ChatSnapshot> {
     requireText(input.requestId, "Request ID", 200);
+    const explicitTitle = Boolean(input.title?.trim());
     const title = input.title?.trim() || "New conversation";
     const projectId = input.projectId ?? null;
     const requestedAgents = input.agentDefinitionIds ?? (input.agentDefinitionId ? [input.agentDefinitionId] : undefined);
@@ -254,7 +255,7 @@ export class DispatchRuntime {
           : creationFingerprint === undefined && existing.title === title
             && JSON.stringify([...(existing.creationAgentIds ?? [existing.agentDefinitionId])].sort()) === JSON.stringify([...agentIds].sort())
             && (existing.creationProjectId ?? null) === projectId;
-        if (!matches) throw requestConflict();
+        if (!matches || (existing.creationTitleExplicit !== undefined && existing.creationTitleExplicit !== explicitTitle)) throw requestConflict();
         return existing.id;
       }
       if (input.sharedProjectId) {
@@ -267,7 +268,7 @@ export class DispatchRuntime {
       await this.shared.initialize(tx, record.id, scope.companyId, human, agentIds, { projectId, pinned: false, archived: false }, input.sharedProjectId ?? undefined);
       const first = agentIds.length ? this.findAgent(catalog, scope, agentIds[0]) : undefined;
       const id = String(record.id);
-      catalog.chats.push({ ...(creationFingerprint ? { creationFingerprint } : {}), id, title, projectId, creationProjectId: projectId, creationAgentIds: agentIds, createdAt: Date.now(), agentDefinitionId: first?.id ?? "", agentRevision: first?.revision ?? 0, agentName: first?.name ?? "People", companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
+      catalog.chats.push({ ...(creationFingerprint ? { creationFingerprint } : {}), id, title, creationTitleExplicit: explicitTitle, ...(explicitTitle ? { displayTitle: title } : {}), projectId, creationProjectId: projectId, creationAgentIds: agentIds, createdAt: Date.now(), agentDefinitionId: first?.id ?? "", agentRevision: first?.revision ?? 0, agentName: first?.name ?? "People", companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
       return id;
     }, context);
     return this.getChat(scope, id);
