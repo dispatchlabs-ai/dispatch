@@ -2,6 +2,8 @@
 
 October 6, 2026. Chris requested new ImageGen images using Claude's independent review of the [original proposal](agent-definition-design.md). These four images revise the design; they do not implement new controls or settle the assignment contract. The original images remain available for comparison.
 
+Chris subsequently requested a clearer MCP management flow. The [full-length MCP access concept](agent-mcp-access-design.md) replaces the passive Connections summary below with Add connection, server and identity details, available tools, and an explicit new/existing-instance access choice. These earlier images remain as the preceding design iteration.
+
 ## Desktop editor
 
 [![Revised desktop editor](assets/agent-definition-v2-2026-10-06/01-agent-editor-desktop.png)](assets/agent-definition-v2-2026-10-06/01-agent-editor-desktop.png)
