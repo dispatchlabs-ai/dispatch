@@ -438,6 +438,14 @@ OAuth uses discovered same-origin endpoints, dynamic public-client registration,
 
 This section supersedes the earlier five-field-only editor and prohibition on browser connection management. The operator-managed Developer credential is preserved. Project assignment continues through the current conversation participant flow; the separate assignment sketch remains unresolved. The accepted future personal delegation/provisioning contract below is preserved separately. [WP-030](handoff.md#wp-030--agent-editor-and-existing-wiki-authorization) owns evidence and remaining qualification.
 
+### Markdown agent instructions
+
+**Accepted October 6, 2026:** agent Instructions use the same live Markdown editing as the message composer and remain rendered in the saved agent view. Reuse the Lexical editor's headings, lists, quotes, emphasis, links and code, plain-text Markdown paste, Markdown copy/cut, and undo support. Instructions use document editing: Enter adds a paragraph or list item, Shift+Enter adds a line, and neither submits the form. Conversation mentions and Send/Stop controls remain specific to messages.
+
+Drafts, saved revisions and Pi configuration continue to store Markdown strings. Editing may normalize Markdown spelling; merely opening an existing definition must not rewrite it. The existing 50,000-character limit applies to serialized Markdown. Longer drafts stay editable with a field error and cannot save until shortened. Preserve the current draft, discard, busy, conflict and explicit revision-save contracts; there is no autosave or new draft persistence.
+
+The saved agent reading surface and conversation setup instructions use the existing safe Markdown renderer. Raw HTML is not executed, unsafe URLs are filtered, and images remain links. Plain-text instructions remain readable; existing agent content is not migrated or rewritten. Keep the reading surface, shared focus treatment, visible label and hint/error associations, and responsive scrolling editor. [WP-032](handoff.md#wp-032--markdown-agent-instructions) records checks and remaining qualification.
+
 ### Generic MCP connection setup
 
 **Correction October 6, 2026; WP-031.** Chris identified the Wiki-specific connection setup as a mistake: the editor and Settings must provide generic MCP connections. WP-030's hard-coded endpoint, scope choices, Wiki identity calls, tool labels and access badge were implementation overfitting, not an intended provider restriction. This section supersedes those parts while preserving its editor, ownership, staged-save and existing-instance contracts. Wiki-specific provisioning remains the separate future integration below.

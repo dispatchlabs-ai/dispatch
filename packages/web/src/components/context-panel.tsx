@@ -3,6 +3,7 @@ import { Bot, Gauge, LockKeyhole } from "lucide-react";
 import type { ApplicationConfig, ChatSnapshot } from "../shared/contracts";
 import { chatAgent, chatUsage, statusLabels } from "../lib/chat";
 import { describeAgentTools } from "../lib/agent-tools";
+import { Markdown } from "./markdown";
 
 export function ContextPanel({ kind, snapshot, models, tab, onTabChange }: {
   kind: "chat" | "project" | "agents" | "security" | "welcome";
@@ -66,7 +67,7 @@ export function ContextPanel({ kind, snapshot, models, tab, onTabChange }: {
       </dl>
       <section className="context-section">
         <h3>Instructions</h3>
-        <p className="saved-instructions">{agent.instructions || "No additional instructions."}</p>
+        <Markdown>{agent.instructions || "No additional instructions."}</Markdown>
       </section>
       <p className="privacy-note">
         <LockKeyhole size={13} /> Only your account can open this conversation in Dispatch.</p>

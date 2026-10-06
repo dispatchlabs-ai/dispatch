@@ -12,6 +12,8 @@ import { describeAgentTools } from "../lib/agent-tools";
 import { useSession } from "../lib/session";
 import { Button, Field, Input, Modal, Notice, Select, Spinner } from "./ui";
 import { AgentConnectionsEditor, AgentConnectionsPanel } from "./agent-connections";
+import { Markdown } from "./markdown";
+import { MarkdownComposer } from "./markdown-composer";
 
 export type AgentEditing = {
   key: string;
@@ -157,9 +159,9 @@ export function AgentsPage({
           </p>
           <section className="agent-instructions">
             <h2>Instructions</h2>
-            <p className="saved-instructions">
+            <Markdown>
               {agent.instructions || "No additional instructions."}
-            </p>
+            </Markdown>
           </section>
           <AgentConnectionsPanel key={agent.id} agentId={agent.id} />
           {agent.archived ? (
@@ -385,6 +387,7 @@ function AgentEditor({
   const [capabilitiesOpen] = useState(() => typeof window === "undefined" || window.innerWidth > 600);
   const saveRequest = useRef<{ fingerprint: string; requestId: string } | null>(null);
   const dirty = agentEditIsDirty(editing);
+  const instructionsTooLong = draft.instructions.length > 50000;
   const model = config.models.find(
     (model) => model.provider === draft.provider && model.id === draft.modelId,
   );
@@ -411,6 +414,7 @@ function AgentEditor({
         className="agent-editor-form"
         onSubmit={(event) => {
           event.preventDefault();
+          if (instructionsTooLong) return;
           onChange({ ...editing, busy: true });
           setError(null);
           setConflict(false);
@@ -479,21 +483,23 @@ function AgentEditor({
             <div className="agent-instructions-field">
               <Field
                 label="Instructions"
-                hint="How should this agent approach the work? Describe its role and what makes a useful result."
+                hint="Describe its role and what makes a useful result. Markdown formats as you type or paste."
                 hintPosition="before"
+                error={instructionsTooLong ? "Shorten instructions to 50,000 characters or fewer, including Markdown formatting." : undefined}
               >
                 {(props) => (
-                  <textarea
-                    {...props}
-                    disabled={busy}
-                    rows={12}
-                    maxLength={50000}
-                    value={draft.instructions}
-                    onChange={(event) =>
-                      update("instructions", event.target.value)
-                    }
-                    placeholder="e.g. Compare sources, explain uncertainty, and cite the evidence."
-                  />
+                  <div className="composer agent-instructions-editor">
+                    <MarkdownComposer
+                      {...props}
+                      mode="document"
+                      label="Instructions"
+                      disabled={busy}
+                      readOnly={false}
+                      value={draft.instructions}
+                      onChange={(instructions) => update("instructions", instructions)}
+                      placeholder="e.g. Compare sources, explain uncertainty, and cite the evidence."
+                    />
+                  </div>
                 )}
               </Field>
             </div>
@@ -588,7 +594,7 @@ function AgentEditor({
             <Button variant="secondary" disabled={busy} onClick={onCancel}>
               Discard
             </Button>
-            <Button type="submit" disabled={busy || !model || conflict || Boolean(agent && !dirty)}>
+            <Button type="submit" disabled={busy || !model || conflict || instructionsTooLong || Boolean(agent && !dirty)}>
               {busy ? <Spinner label="Saving agent" /> : null}
               {agent ? "Save new revision" : "Create agent"}
             </Button>

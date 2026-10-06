@@ -223,7 +223,7 @@ export function SharedContextPanel({ snapshot, models, threadId, draft, pending,
           <p>This conversation’s independent agent instance.</p>
           <dl className="context-facts"><div><dt>Based on</dt><dd>{participant.agent.name} · revision {participant.agentRevision}</dd></div><div><dt>Model</dt><dd>{models.find(model => model.id === participant.agent.modelId && model.provider === participant.agent.provider)?.name || participant.agent.modelId}</dd></div><div><dt>Provider</dt><dd>{participant.agent.provider}</dd></div><div><dt>Thinking</dt><dd>{participant.agent.thinkingLevel}</dd></div><div><dt>Tools</dt><dd>{describeAgentTools(participant.agent.tools)}</dd></div>{participant.agent.cwd ? <div><dt>Local workspace</dt><dd>{participant.agent.cwd}</dd></div> : null}</dl>
           {participant.error ? <Notice>{participant.error}</Notice> : null}
-          <details><summary>Saved instructions</summary><p className="saved-instructions">{participant.agent.instructions || "No additional instructions."}</p></details>
+          <details><summary>Saved instructions</summary><Markdown>{participant.agent.instructions || "No additional instructions."}</Markdown></details>
           <ParticipantRunDetails participant={participant} activities={snapshot.activities} />
           <p>Coding tools use the service machine’s access. This workspace is not a sandbox.</p>
         </> : <p>Human participant since {new Date(participant.joinedAt).toLocaleDateString()}.</p>}

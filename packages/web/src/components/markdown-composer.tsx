@@ -1,7 +1,7 @@
 import { $isCodeNode, CodeNode } from "@lexical/code";
 import { LinkNode } from "@lexical/link";
 import { ListItemNode, ListNode } from "@lexical/list";
-import { $convertFromMarkdownString, $convertSelectionToMarkdownString, $convertToMarkdownString, $generateNodesFromMarkdownString } from "@lexical/markdown";
+import { $convertFromMarkdownString, $convertSelectionToMarkdownString, $convertToMarkdownString, $generateNodesFromMarkdownString, TRANSFORMERS, type Transformer } from "@lexical/markdown";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
@@ -19,22 +19,31 @@ import type { MentionParticipant } from "../lib/mentions";
 import { $getMentionIds, MentionNode, mentionTransformers } from "./mention-node";
 import { MentionsPlugin } from "./mentions";
 
-interface MarkdownComposerProps {
+type MarkdownComposerProps = {
   id: string;
+  label?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: true;
   placeholder?: string;
   value: string;
   disabled: boolean;
   readOnly: boolean;
   onChange: (value: string) => void;
+} & ({ mode: "document" } | {
+  mode?: "message";
   onSend: () => void;
   participants: MentionParticipant[];
   mentions: string[];
   onMentionsChange: (ids: string[]) => void;
   toolbar: ReactNode;
-}
+});
+
+const noMentions: string[] = [];
 
 export function MarkdownComposer(props: MarkdownComposerProps) {
-  const transformers = useMemo(() => mentionTransformers(props.participants), [props.participants]);
+  const conversation = props.mode === "document" ? undefined : props;
+  const participants = conversation?.participants;
+  const transformers = useMemo(() => participants ? mentionTransformers(participants) : TRANSFORMERS, [participants]);
   return <LexicalComposer initialConfig={{
     namespace: props.id,
     nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, CodeNode, LinkNode, MentionNode],
@@ -52,9 +61,11 @@ export function MarkdownComposer(props: MarkdownComposerProps) {
         id={props.id}
         className="composer-input"
         role="textbox"
-        aria-autocomplete="list"
-        aria-haspopup="listbox"
-        aria-label={props.placeholder || "Message everyone"}
+        aria-autocomplete={conversation ? "list" : undefined}
+        aria-haspopup={conversation ? "listbox" : undefined}
+        aria-label={props.label || props.placeholder || "Message everyone"}
+        aria-describedby={props["aria-describedby"]}
+        aria-invalid={props["aria-invalid"]}
         aria-multiline="true"
         aria-disabled={props.disabled}
         aria-readonly={props.readOnly}
@@ -62,17 +73,22 @@ export function MarkdownComposer(props: MarkdownComposerProps) {
         placeholder={<div className="composer-placeholder">{props.placeholder || "Message everyone…"}</div>}
       />} />
     </div>
-    <div className="composer-toolbar">{props.toolbar}</div>
+    {conversation ? <div className="composer-toolbar">{conversation.toolbar}</div> : null}
     <HistoryPlugin />
     <ListPlugin />
     <LinkPlugin />
     <MarkdownShortcutPlugin transformers={transformers} />
-    <MentionsPlugin people={props.participants} />
+    {conversation ? <MentionsPlugin people={conversation.participants} /> : null}
     <ComposerSync {...props} transformers={transformers} />
   </LexicalComposer>;
 }
 
-function ComposerSync({ value, disabled, readOnly, onChange, onSend, mentions, onMentionsChange, transformers }: MarkdownComposerProps & { transformers: ReturnType<typeof mentionTransformers> }) {
+function ComposerSync(props: MarkdownComposerProps & { transformers: Transformer[] }) {
+  const { value, disabled, readOnly, onChange, transformers } = props;
+  const conversation = props.mode === "document" ? undefined : props;
+  const mentions = conversation?.mentions ?? noMentions;
+  const onSend = conversation?.onSend;
+  const onMentionsChange = conversation?.onMentionsChange;
   const [editor] = useLexicalComposerContext();
   const lastValue = useRef(value);
   const lastMentions = useRef(mentions);
@@ -90,6 +106,7 @@ function ComposerSync({ value, disabled, readOnly, onChange, onSend, mentions, o
   }, [editor, value, mentions, transformers]);
 
   useEffect(() => {
+    if (!onMentionsChange) return;
     const ids = editor.read("latest", $getMentionIds);
     if (ids.join("\n") !== lastMentions.current.join("\n")) {
       lastMentions.current = ids;
@@ -97,18 +114,21 @@ function ComposerSync({ value, disabled, readOnly, onChange, onSend, mentions, o
     }
   }, [editor, value, mentions, onMentionsChange]);
 
-  useEffect(() => editor.registerCommand(KEY_ENTER_COMMAND, event => {
-    if (!event || event.isComposing || editor.isComposing()) return false;
-    if (event.shiftKey) {
+  useEffect(() => {
+    if (!onSend) return;
+    return editor.registerCommand(KEY_ENTER_COMMAND, event => {
+      if (!event || event.isComposing || editor.isComposing()) return false;
+      if (event.shiftKey) {
+        event.preventDefault();
+        // Use normal rich-text Enter so lists continue and new lines accept Markdown blocks.
+        return editor.dispatchCommand(INSERT_PARAGRAPH_COMMAND, undefined);
+      }
+      if (!window.matchMedia("(pointer: fine)").matches) return false;
       event.preventDefault();
-      // Use normal rich-text Enter so lists continue and new lines accept Markdown blocks.
-      return editor.dispatchCommand(INSERT_PARAGRAPH_COMMAND, undefined);
-    }
-    if (!window.matchMedia("(pointer: fine)").matches) return false;
-    event.preventDefault();
-    if (!disabled && !readOnly) onSend();
-    return true;
-  }, COMMAND_PRIORITY_NORMAL), [editor, disabled, readOnly, onSend]);
+      if (!disabled && !readOnly) onSend();
+      return true;
+    }, COMMAND_PRIORITY_NORMAL);
+  }, [editor, disabled, readOnly, onSend]);
 
   useEffect(() => editor.registerCommand(PASTE_COMMAND, event => {
     if (!(event instanceof ClipboardEvent) || !event.clipboardData) return false;
@@ -142,7 +162,7 @@ function ComposerSync({ value, disabled, readOnly, onChange, onSend, mentions, o
       lastValue.current = markdown;
       onChange(markdown);
     }
-    if (ids.join("\n") !== lastMentions.current.join("\n")) {
+    if (onMentionsChange && ids.join("\n") !== lastMentions.current.join("\n")) {
       lastMentions.current = ids;
       onMentionsChange(ids);
     }
