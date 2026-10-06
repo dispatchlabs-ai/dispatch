@@ -794,3 +794,21 @@ Implementation evidence:
 - Pi Durable Expert reviewed native snapshot/configuration atomicity, extension registration before recovery, assigned-only lookup and MCP refresh preservation. Deslop implemented/reviewed the controlled skill editor and shared pinned-revision presentation. Integration review fixed compatibility for pre-upgrade agent-save retry fingerprints and tool summaries for skill-only definitions.
 - TypeScript/frontend/service/tooling and production application builds passed, as did `nix build --no-link` and `nix flake check` on Apple Silicon. Source/deslop, full diff, whitespace and changed-document local-link review passed. The existing Vite large-chunk advisory remains; Linux was not built.
 - No tests, model prompts, live skill saves or API acceptance flows were run. Desktop/390 px rendered review was unavailable in this tool session (UI requirement unverified); contrast, keyboard/assistive technology, touch/virtual keyboards, save/retry/conflict, restart/recovery and access-control behavior remain unqualified by execution. No live backend restart or Omarchy deployment was performed.
+
+Focused manual acceptance, October 6, 2026 (after implementation):
+
+Chris explicitly requested testing the live conversation's proposed skills checks. This authorizes the focused manual observations below; it does not lift the general automated-test deferral. Tested application revision `e49905c16e9d9aafced847d5daec96e75e4161a5` on M1 Air at `http://localhost:5173`, using the existing development service and native Pi runtime. Two clearly named QA agents used GPT-6.1 Sol with Low thinking, no coding tools or MCP connections, and synthetic release facts in separate conversations.
+
+| Check | Observed result |
+| --- | --- |
+| Explicit assignment | Creating the reusable release-checklist skill left agent A with no assigned skills. Assignment required a separate selection and agent save. |
+| Assigned loading | A called `load_skill` and received release-checklist revision 1; its answer used the required Changes/Risks/Rollback headings and `CHECKLIST-V1` marker (conversation `2162`). |
+| Empty assignment | B's participant details showed no enabled tools. The same release request reported the skill unavailable without inventing its contents (conversation `2196`). |
+| Assigned-only enforcement | After assigning B only a separate notes-formatting skill, a new B instance was explicitly asked to load A's exact skill ID. The actual tool call failed with “This skill is not assigned to this agent instance.” No checklist instructions were returned (conversation `2223`). |
+| Explicit upgrade | Saving release-checklist revision 2 left A pinned to revision 1. The editor offered Upgrade; selecting it and saving A created the updated definition. |
+| Existing-instance pinning | The original A instance was asked to call `load_skill` again after the upgrade. Its fresh tool result still reported revision 1 and its answer ended with `CHECKLIST-V1` (conversation `2162`). |
+| New-instance revision | A newly created A instance loaded revision 2 and answered with `CHECKLIST-V2` (conversation `2330`). The tool's result details confirmed the revision independently of the generated answer. |
+
+The release-checklist fixture is `e5a7b5ae-4755-4fbe-9a1e-afb427214ce5`; fixture names include `QA` and `2026-10-06`. Desktop controls and a 390 × 844 px rendering of the skill editor/library and tool result were inspected; the phone document width and scroll width both measured 390 px. The fixtures and conversations remain available for inspection. Private screenshots and focused UI-state captures are retained in the canonical checkout's gitignored `.local/skills-acceptance-20261006/` directory.
+
+No defects were observed in these checks. This evidence qualifies explicit selection, normal saves, assigned-only lookup and revision pinning for the exercised same-company scenarios. Cross-company isolation, request deduplication/conflicts/retry, removal, in-flight or restart recovery, exhaustive keyboard/assistive-technology support, physical touch devices and Omarchy remain untested. No application source changed, no automated tests or repeat builds were run, and the live backend was not restarted during these checks. Documentation diff, whitespace and local-link review apply to this evidence update.
