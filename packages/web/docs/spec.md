@@ -233,6 +233,19 @@ Chris requested Slack as the conversation screen's visual model, approved the [I
 - A newly invited human or agent can read the entire public history, including messages from before joining. Model context limits do not delete history or silently turn this into a since-joining view. Private agent working state is distinct from the shared discussion.
 - Projects remain name-only organizational groups. Sharing a conversation does not share its creator's project or unrelated conversations.
 
+### Listen before responding
+
+**Accepted October 5, 2026:** agents listen while another participant is composing, then read the intervening public messages and decide whether a contribution is useful. The [maintained decision](https://wiki.dispatchworks.ai/wiki/agent-collaboration-spaces/#section-listen-before-responding) and [WP-026](handoff.md#wp-026--listen-before-responding) own this refinement to immediate independent activation.
+
+- Coordinate one speaking turn across the visible conversation, including its reply threads. Humans always remain free to type and send. This is a conversation rule, not a global agent or tool concurrency cap.
+- A mention gives a waiting agent priority. Equally eligible agents use message-dependent ordering, so registration order gives Dispatch no permanent first-speaker privilege. Existing older waiting opportunities otherwise take precedence.
+- Wait through native Pi tasks and keep claims in native documents. Recheck human presence and owner-task receipts on acquisition. Stop, cancellation, failures and restart must not leave an abandoned claim blocking other participants.
+- Before each provider request, supply fresh attributed public history, including messages received while waiting or running tools. Coalesce already-considered queued deliveries without losing an admitted native submission on recovery. Full history and images remain available through `conversation_history`; bounded excerpts never replace that history.
+- Release the speaking turn when the response calls tools or enters native provider retry. Safe spoken updates accompanying ordinary tool calls become public messages before release, so peers can read them while the author works; control-only commentary stays private. Tools can run concurrently with another agent's response. The next model request takes another turn and reconsiders the latest discussion. Deliberate `conversation_post` calls also take turns and refuse stale prepared text after another participant has posted.
+- If a human starts composing or posts while an agent prepares its final answer, the next boundary asks the agent to listen and reconsider. Superseded drafts remain private native history, excluded from public activity and Stop preservation. Native work is not forcibly interrupted for typing presence.
+- Main and thread composers send authenticated presence without draft text. Each mounted composer has an independent sequence, so a delayed heartbeat cannot overwrite its newer pause. Client inactivity, blur, send, hidden tabs and unmount clear presence; a six-second service expiry also clears disconnected clients through a native task. A failed presence request must not disable sending.
+- Show Listening, Responding and Working as distinct agent states; show other humans' typing activity. Stop remains available while agents wait. Preserve the existing composer, draft, thread and member-access contracts.
+
 ### Threads and participant presentation
 
 - A reply stores the root public-message ID and remains part of the conversation's public history. It has the same membership and full-history access as the main discussion; there are no private thread members. Every other agent member considers new replies with their thread context. An agent's response defaults to the triggering thread and may deliberately post to the main discussion.

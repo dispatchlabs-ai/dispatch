@@ -40,7 +40,7 @@ export interface CompanyPerson {
   name: string;
 }
 
-export type ParticipantStatus = "idle" | "working" | "silent" | "stopped" | "failed";
+export type ParticipantStatus = "idle" | "working" | "listening" | "responding" | "silent" | "stopped" | "failed";
 
 interface ParticipantIdentity {
   id: string;
@@ -51,7 +51,7 @@ interface ParticipantIdentity {
 export interface HumanParticipant extends ParticipantIdentity {
   kind: "human";
   userId: string;
-  status: "idle";
+  status: "idle" | "typing";
 }
 
 export interface AgentParticipant extends ParticipantIdentity {

@@ -22,7 +22,7 @@ Coding tools have the service account’s filesystem, process and network access
 
 ## Public messages and native delivery
 
-A public post and its recipient delivery tasks are committed atomically. Other agent members receive native `dispatch.shared-delivery` tasks, each waiting for that recipient’s preceding task. The task submits an idempotent native input and waits for its native settlement. Pi owns execution and recovery; Dispatch adds no numeric concurrency cap, polling coordinator or in-memory work queue.
+A public post and its recipient delivery tasks are committed atomically. Other agent members receive native `dispatch.shared-delivery` tasks, each waiting for that recipient’s preceding task. The task submits an idempotent native input and waits for its native settlement. Already-considered queued messages coalesce; an existing native receipt is joined before considering a delivery skippable. Pi owns execution and recovery; Dispatch adds no global numeric concurrency cap or in-memory work queue.
 
 Notifications contain attributed public data, incoming thread context and a bounded recent-history excerpt. The agent can read all earlier history with `conversation_history`, including before joining and across native reset/compaction. Pagination and long-message text offsets bound individual model results without deleting history. Images are delivered as native image content rather than base64 inside JSON history text.
 
@@ -32,9 +32,19 @@ Browser snapshots expose public messages, participant identity/saved configurati
 
 `watchChat()` observes native commit publications across the participating streams and publishes replacement snapshots. Notifications can coalesce; there is no replay cursor promise. Closing a watcher stops observation only. Session expiry and revocation close protected subscriptions while admitted work continues.
 
+## Listening and speaking turns
+
+`server/collaboration/turns.ts` defines the native `dispatch.conversation-turns` document, `dispatch.wait-for-turn` task and `dispatch.composing-expiry` task. The room document records waiting tickets, a speaker and ordered human composing signals. Public-message admission prequeues available agent participants together; mentions have priority, then older opportunities, then a stable message/participant hash rather than registration order. Actual generation or public-post tasks bind these tickets to their native lifetimes.
+
+Generation hooks acquire a turn before a provider request and append a fresh, attributed, bounded public-history notice to that request. A task-scoped `dispatch.listening-request` document retains the preparation cursor; a successful provider response advances the participant's consideration cursor. Spoken updates that accompany ordinary tool calls become idempotent public messages before the turn is released, so peers can read them while the author works. Control-only commentary stays private. Tool rounds and provider errors release the turn. A final answer is published in the same transaction as its freshness check and turn release; native task IDs deduplicate that publication across recovery. Native gate tasks use Pi's cancellable clock to recheck claims and presence every 200 ms; they remove claims whose owner task is terminal or aborted. No detached host scheduler owns progress.
+
+At a final-answer boundary, intervening messages or active human composing cause native continuation with refreshed context. Superseded generation IDs exclude the draft from public activity and Stop preservation, without changing its private native history. `conversation_post` also acquires a turn and rejects arguments made stale by another participant's message. Generation hooks normally treat errors as nonfatal in Pi; the application cancels the native generation if coordination fails, so a hook failure cannot bypass the gate.
+
+Main and thread composers publish only `{ clientId, sequence, active }` to the member-protected composing endpoint. Client events pulse at most every 1.5 seconds; 3.5 seconds without input clears activity, as do blur, send, hidden tabs and unmount. Each server receipt expires after six seconds, and a native expiry task publishes its removal even without further browser traffic. Independent client IDs prevent one composer from clearing another; sequence tombstones reject older delayed signals. Presence has no draft text and is not message history. Listening, Responding and Working derive from the native queue, claim and agent activity.
+
 ## Stop and recovery
 
-Stop increments a persisted admission epoch and creates a native `dispatch.shared-stop` task. The task aborts and joins admitted delivery tasks, then aborts the agent conversations. It retains committed partial output without waking other agents, marks the instances stopped and clears the admission fence. Messages and invitations receive a retryable conflict while stopping. A later message can resume participation.
+Stop increments a persisted admission epoch, clears speaking claims and creates a native `dispatch.shared-stop` task. The task aborts and joins admitted delivery tasks, then aborts the agent conversations and their owned gate tasks. It retains committed partial output without waking other agents, excludes superseded drafts, marks the instances stopped and clears the admission fence. Messages and invitations receive a retryable conflict while stopping. A later message can resume participation.
 
 The Stop task and delivery chain recover through Pi. A failed Stop remains fenced and can be retried. Provider failure and cancellation remain distinct participant statuses. Recovery can retry a provider generation from its committed checkpoint, so token-exact continuation and exactly-once billing are not promised. Native coding-tool replay policies likewise do not promise exactly-once shell/file effects.
 

@@ -1,12 +1,13 @@
 import { describeAgentTools } from "../lib/agent-tools";
 import type { Message } from "@earendil-works/pi-ai";
 import { Tabs } from "@base-ui/react/tabs";
-import { AtSign, ArrowUp, Check, Copy, LockKeyhole, Reply, RotateCcw, Square, UserPlus, X } from "lucide-react";
+import { AtSign, ArrowUp, Check, Copy, Ear, LockKeyhole, Pencil, Reply, RotateCcw, Square, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { AddParticipantsInput, AgentDefinition, AgentParticipant, ApplicationConfig, ChatSnapshot, CompanyPerson, ConversationMessage, ConversationParticipant, ParticipantActivity } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
 import type { PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
+import { useComposingPresence } from "../lib/composing";
 import { toolActivities, toolOutput, type ToolActivity } from "../lib/tool-activity";
 import { AgentChoices, ParticipantAvatar } from "./conversation-people";
 import { Markdown } from "./markdown";
@@ -15,7 +16,16 @@ import { SidebarSearch } from "./sidebar-search";
 import { ToolActivityView } from "./tool-activity";
 import { Button, IconButton, Modal, Notice, Select, Spinner } from "./ui";
 
-export const participantStatus = { idle: "Following", working: "Working", silent: "Following", stopped: "Stopped", failed: "Needs attention" };
+export const participantStatus = { idle: "Following", working: "Working", listening: "Listening", responding: "Responding", typing: "Typing", silent: "Following", stopped: "Stopped", failed: "Needs attention" };
+
+export function ConversationPresence({ participants }: { participants: ConversationParticipant[] }) {
+  const { state } = useSession();
+  const userId = state?.state === "authenticated" ? state.user.id : undefined;
+  return <div className="conversation-presence" role="status" aria-live="polite">{participants.filter(member => member.kind === "human" ? member.status === "typing" && member.userId !== userId : ["working", "listening", "responding"].includes(member.status)).map(member => <div className="agent-working" key={member.id}>
+    {member.status === "listening" ? <Ear size={15} aria-hidden="true" /> : member.status === "typing" ? <Pencil size={15} aria-hidden="true" /> : <Spinner label={`${member.name} is ${participantStatus[member.status].toLowerCase()}`} />}
+    <span>{member.name} · {participantStatus[member.status]}</span>
+  </div>)}</div>;
+}
 
 function participantName(participant: ConversationParticipant, participants: ConversationParticipant[]) {
   return participants.some(other => other.id !== participant.id && other.name === participant.name)
@@ -88,7 +98,7 @@ export function PublicActivity({ activity, participants }: { activity: Participa
   if (generation?.retry) content.push(<p className="run-outcome" role="status" key="retry">Retrying the response…</p>);
   if (!content.length) return null;
   return <section className="participant-activity" aria-label={`${author?.name || "Agent"} activity`}>
-    <div className="activity-author"><ParticipantAvatar kind="agent" name={author?.name || "Agent"} /><strong>{author ? participantName(author, participants) : "Agent"}</strong><span>{generation ? "Responding…" : "Activity"}</span><time dateTime={new Date(activity.createdAt).toISOString()}>{formatTime(activity.createdAt)}</time></div>
+    <div className="activity-author"><ParticipantAvatar kind="agent" name={author?.name || "Agent"} /><strong>{author ? participantName(author, participants) : "Agent"}</strong><span>{generation && author?.kind === "agent" ? `${participantStatus[author.status]}…` : "Activity"}</span><time dateTime={new Date(activity.createdAt).toISOString()}>{formatTime(activity.createdAt)}</time></div>
     {content}
   </section>;
 }
@@ -129,18 +139,20 @@ export function SharedTranscript({ snapshot, threadId = null, onThread }: { snap
 
 function formatTime(timestamp: number) { return new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
 
-export function ConversationComposer({ id, draft, pending, error, participants, mentions, onMentionsChange, onDraftChange, onSend, thread = false, disabled = false, children }: {
-  id: string; draft: string; pending?: PendingMessage; error?: string; participants: ConversationParticipant[]; mentions: string[];
+export function ConversationComposer({ id, chatId, active = true, draft, pending, error, participants, mentions, onMentionsChange, onDraftChange, onSend, thread = false, disabled = false, children }: {
+  id: string; chatId: string; active?: boolean; draft: string; pending?: PendingMessage; error?: string; participants: ConversationParticipant[]; mentions: string[];
   onMentionsChange: (ids: string[]) => void; onDraftChange: (text: string) => void; onSend: (mentions: string[]) => void;
   thread?: boolean; disabled?: boolean; children?: ReactNode;
 }) {
   const tooLong = draft.length > 100000;
   const canSend = Boolean(draft.trim() && !tooLong && !pending?.sending && !disabled);
-  const send = () => { if (canSend) onSend(mentions); };
+  const composing = useComposingPresence(chatId, active && !disabled && !pending?.sending);
+  const send = () => { if (canSend) { composing.clear(); onSend(mentions); } };
   return <div className="composer-area">
     {pending?.error ? <Notice>{pending.error} Your message is kept here. Retry sends the same message once.</Notice> : error ? <Notice>{error}</Notice> : null}
     {tooLong ? <Notice>Shorten your message to 100,000 characters or fewer, including Markdown formatting.</Notice> : null}
-    <form className="composer" onSubmit={event => { event.preventDefault(); send(); }}>
+    {composing.unavailable ? <p className="run-outcome" role="status">Typing status is unavailable. You can still send your message.</p> : null}
+    <form className="composer" onInput={composing.pulse} onCompositionStart={composing.pulse} onCompositionUpdate={composing.pulse} onPaste={composing.pulse} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) composing.clear(); }} onSubmit={event => { event.preventDefault(); send(); }}>
       <MarkdownComposer id={id} value={draft} disabled={disabled} readOnly={Boolean(pending?.sending)} onChange={onDraftChange} onSend={send} placeholder={thread ? "Reply to thread…" : "Message everyone…"} />
       {mentions.length ? <div className="composer-mentions">{mentions.map(participantId => <Button key={participantId} variant="ghost" disabled={pending?.sending} onClick={() => onMentionsChange(mentions.filter(id => id !== participantId))} aria-label={`Remove mention of ${participants.find(person => person.id === participantId)?.name || "participant"}`}>@{participants.find(person => person.id === participantId)?.name || "Participant"}<X size={12} /></Button>)}</div> : null}
       <div className="composer-toolbar">
@@ -174,8 +186,9 @@ export function SharedContextPanel({ snapshot, models, threadId, draft, pending,
         {root ? <PublicMessage message={root} participants={snapshot.participants} /> : <Notice>The original message is not available.</Notice>}
         <p className="thread-reply-count">{snapshot.messages.filter(message => message.threadId === threadId).length} replies</p>
         <SharedTranscript snapshot={snapshot} threadId={threadId} />
+        <ConversationPresence participants={snapshot.participants} />
       </div>
-      <ConversationComposer id={`thread-${snapshot.conversation.id}-${threadId}`} draft={draft} pending={pending} error={error} participants={snapshot.participants} mentions={mentions} onMentionsChange={onMentionsChange} onDraftChange={onDraftChange} onSend={onSend} thread>
+      <ConversationComposer id={`thread-${snapshot.conversation.id}-${threadId}`} chatId={snapshot.conversation.id} draft={draft} pending={pending} error={error} participants={snapshot.participants} mentions={mentions} onMentionsChange={onMentionsChange} onDraftChange={onDraftChange} onSend={onSend} thread>
         {snapshot.conversation.status === "running" ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
           setStopping(true); setStopError(null);
           void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(snapshot.conversation.id)}/stop`, {}).then(onSnapshot).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));
@@ -185,7 +198,7 @@ export function SharedContextPanel({ snapshot, models, threadId, draft, pending,
     </> : <div className="participants-body">
       <Button className="invite-participants" variant="secondary" onClick={onInvite}><UserPlus size={18} /> Add participants</Button>
       <div className="participant-list">{snapshot.participants.map(member => <button type="button" className={`participant-row ${participant?.id === member.id ? "selected" : ""}`} key={member.id} onClick={() => setSelectedId(member.id)} aria-pressed={participant?.id === member.id}>
-        <ParticipantAvatar kind={member.kind} name={member.name} /><span className="participant-choice-copy"><strong>{participantName(member, snapshot.participants)}</strong><span>{member.kind === "agent" ? `Agent · ${participantStatus[member.status]}` : state?.state === "authenticated" && state.user.id === member.userId ? "You" : "Person"}</span></span>
+        <ParticipantAvatar kind={member.kind} name={member.name} /><span className="participant-choice-copy"><strong>{participantName(member, snapshot.participants)}</strong><span>{member.kind === "agent" ? `Agent · ${participantStatus[member.status]}` : `${state?.state === "authenticated" && state.user.id === member.userId ? "You" : "Person"}${member.status === "typing" ? " · Typing" : ""}`}</span></span>
       </button>)}</div>
       <p className="history-access"><LockKeyhole size={14} /> Everyone here can read the full public history.</p>
       {participant ? <section className="participant-details">

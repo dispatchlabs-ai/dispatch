@@ -87,6 +87,11 @@ export function createApp(options: AppOptions) {
     z.object({}).strict().parse(await c.req.json());
     return c.json(await runtime.stop(c.get("principal"), c.req.param("id")));
   });
+  app.post("/api/chats/:id/composing", async (c) => {
+    const input = z.object({ clientId: z.string().uuid(), sequence: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), active: z.boolean() }).strict().parse(await c.req.json());
+    await runtime.composing(c.get("principal"), c.req.param("id"), input);
+    return c.json({ ok: true });
+  });
   app.get("/api/chats/:id/events", async (c) => {
     const principal = c.get("principal");
     const watch = await runtime.watchChat(principal, c.req.param("id"));

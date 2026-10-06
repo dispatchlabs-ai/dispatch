@@ -2,10 +2,10 @@ import { ArrowDown, RotateCcw, Square, Users } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChatSnapshot } from "../shared/contracts";
 import { errorMessage } from "../lib/api";
-import { statusLabels, type ConnectionState, type PendingMessage } from "../lib/chat";
+import { chatStatusLabel, type ConnectionState, type PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
 import { Brand } from "./brand";
-import { ConversationComposer, SharedTranscript, participantStatus } from "./shared-conversation";
+import { ConversationComposer, ConversationPresence, SharedTranscript } from "./shared-conversation";
 import { Button, Notice, Spinner } from "./ui";
 
 interface ChatPanelProps {
@@ -108,7 +108,7 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
         <p>{snapshot ? "Shared conversation" : "Loading conversation…"}</p>
       </div>
       <div className="conversation-header-actions"><Button variant="secondary" className="participants-button" onClick={onParticipants} disabled={!snapshot}><Users size={16} />{snapshot?.participants.length ?? 0} participants</Button>
-      <span className={`status-badge status-${snapshot?.conversation.status || "idle"}`}>{snapshot ? statusLabels[snapshot.conversation.status] : "Loading"}</span></div>
+      <span className={`status-badge status-${snapshot?.conversation.status || "idle"}`}>{snapshot ? chatStatusLabel(snapshot) : "Loading"}</span></div>
     </header>
     {connection === "reconnecting" ? <div className="chat-connection-notice">
       <Notice tone="info">Reconnecting to this conversation. Agent work continues; updates will appear when the connection returns.</Notice>
@@ -137,7 +137,7 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
           <p>Bring a question, a rough idea, or a problem to work through.</p>
         </div> : null}
         {snapshot ? <SharedTranscript snapshot={snapshot} onThread={onThread} /> : null}
-        {snapshot?.participants.filter(member => member.kind === "agent" && member.status === "working").map(member => <div className="agent-working" role="status" key={member.id}><Spinner label={`${member.name} is working`} /><span>{member.name} · {participantStatus[member.status]}</span></div>)}
+        {snapshot ? <ConversationPresence participants={snapshot.participants} /> : null}
         {snapshot?.conversation.status === "stopped" ? <p className="run-outcome" role="status">
           <Square size={13} /> Response stopped. You can continue the conversation.</p> : null}
         {snapshot?.conversation.status === "failed" ? <Notice>{snapshot.conversation.error || "The response could not be completed. You can send another message to continue."}</Notice> : null}
@@ -148,7 +148,7 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
         <ArrowDown /> Latest messages</Button>
     </div> : null}
     {stopError ? <Notice>{stopError}</Notice> : null}
-    <ConversationComposer id={`composer-${chatId}`} draft={draft} pending={pending} error={sendError} participants={snapshot?.participants ?? []} mentions={mentions} onMentionsChange={onMentionsChange} disabled={!snapshot} onDraftChange={onDraftChange} onSend={sendDraft}>
+    <ConversationComposer id={`composer-${chatId}`} chatId={chatId} active={visible} draft={draft} pending={pending} error={sendError} participants={snapshot?.participants ?? []} mentions={mentions} onMentionsChange={onMentionsChange} disabled={!snapshot} onDraftChange={onDraftChange} onSend={sendDraft}>
       {running ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
         setStopping(true); setStopError(null);
         void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/stop`, {}).then(onSnapshot).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));

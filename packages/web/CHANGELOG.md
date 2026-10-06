@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Agents listen before responding, refresh their shared context after waits and tool work, and can stay silent when another participant has covered the request. Native Pi speaking turns prioritize mentions, coalesce considered deliveries and release during background work. Main and thread composers publish expiring typing presence without draft text; participant states distinguish Listening, Responding and Working.
+
 - Replaced left/right chat bubbles with a shared author-attributed flow, reply threads, participant context and independent thread drafts. Project, pin and archive preferences are personal to each human member.
 
 - Removed the required passkey-name field from signup and recovery enrollment; creation proceeds through the browser or password manager.

@@ -117,6 +117,8 @@ The message composer formats Markdown as you type or paste: headings, lists, quo
 
 Conversations are visible only to their human members within the installation’s company. New conversation opens a chooser for one or more company agents. The participant button opens saved agent configuration and per-agent usage. Add participants invites existing active company people or available agents; newcomers can read the full public history. Each agent has an independent working context. Agents consider messages from humans and other agents and may remain silent. Use Mention to attach a participant’s identity to a message.
 
+While another participant is composing, agents show **Listening**. An agent with the speaking turn shows **Responding**; **Working** means it can continue tools without holding that turn. Agents read what changed before responding again and may stay silent if there is nothing useful to add. Mentions give an agent first opportunity when the conversation is free. Human typing and sending are always available, and abandoned typing indicators expire automatically. This policy spans the conversation and its reply threads.
+
 - Sending appends a public message and admits native delivery tasks for the other agent members. Each agent processes its deliveries in order. Retry a failed network request with the same logical request ID; a changed message gets a new ID. Reusing an ID with different content returns a conflict.
 - Stop all cancels admitted deliveries and agent responses through Pi, preserving committed partial output. Messages sent while stopping remain in the composer for retry after Stop finishes; a later message resumes participation. Failure and Stop are distinct from completed answers.
 - Closing a main tab, browser tab, or live connection stops observation only. Pi continues admitted work. Reopening restores the current saved state without replaying every missed event.
@@ -212,6 +214,7 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `GET /api/chats/:id` | Public messages, participants and sanitized native activity |
 | `POST /api/chats/:id/messages` | Admit a message idempotently; return a snapshot with status 202 |
 | `POST /api/chats/:id/stop` | Conversation-wide native cancellation; return the current snapshot |
+| `POST /api/chats/:id/composing` | Publish expiring human typing presence; no draft text |
 | `GET /api/chats/:id/events` | SSE `snapshot` events; `session-ended` closes access on invalidation |
 | `GET /api/people` | Active company people available for invitation |
 | `POST /api/chats/:id/participants` | Invite company agents or people with an idempotent request ID |
@@ -222,6 +225,8 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `/api/auth/*` | Enrollment, sign-in, recovery, session and factor management, logout |
 
 `POST /api/chats` accepts `agentDefinitionIds` (one or more), or the legacy singular `agentDefinitionId`. Message commands accept `threadId` and participant-ID `mentions`. Invitation commands accept `{ requestId, agentDefinitionIds?, userIds? }`. The service binds public authorship to the authenticated human or native agent instance.
+
+The composing command accepts `{ clientId, sequence, active }`, where each mounted composer uses its own UUID and increasing sequence number. It returns `{ ok: true }`. Only authenticated conversation members may publish presence; the service derives their identity. A true signal expires six seconds after receipt. Sending messages is independent of presence updates, and failed presence must not disable Send.
 
 The precise shared types are in `src/shared/contracts.ts` and `src/shared/auth-contracts.ts`. See [runtime.md](runtime.md) for native storage, cancellation, and request identity. The browser never sends an authoritative user or company ID for access checks.
 

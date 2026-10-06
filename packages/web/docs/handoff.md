@@ -1,6 +1,6 @@
 # Dispatch Web implementation handoff
 
-The local implementation covers company authentication, stock Pi Durable chat, the branded desktop/mobile workspace, and named agent definitions. [spec.md](spec.md) defines the current contracts; [usage-guide.md](usage-guide.md) explains operation. The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains product intent and decision history. Shared conversations are implemented locally in [WP-024](#wp-024--shared-conversations), with functional qualification deferred.
+The local implementation covers company authentication, stock Pi Durable chat, the branded desktop/mobile workspace, and named agent definitions. [spec.md](spec.md) defines the current contracts; [usage-guide.md](usage-guide.md) explains operation. The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains product intent and decision history. Shared conversations are implemented locally in [WP-024](#wp-024--shared-conversations); [WP-026](#wp-026--listen-before-responding) adds listening and speaking turns. Functional qualification remains deferred.
 
 ## Current testing policy
 
@@ -469,3 +469,24 @@ Implementation evidence (October 5, 2026):
   operations, writes, token renewal/revocation, cancellation, recovery, Reconnect,
   keyboard/touch, virtual keyboard, assistive technology or all error/loading
   states. Contrast and multi-user isolation remain unverified.
+
+## WP-026 — Listen before responding
+
+**Implemented, October 5, 2026; functional qualification deferred.** Chris accepted the [listen-first behavior](https://wiki.dispatchworks.ai/wiki/agent-collaboration-spaces/#section-listen-before-responding) and instructed implementation. This package depends on WP-024 and preserves the local-only and zero-tests policies.
+
+Scope: native speaking-turn coordination, fresh shared context at every model request, coalesced consideration, independent background tool work, expiring human composing presence, and truthful participant states. Existing public history, native admissions, participant configuration, membership, drafts, threads and Stop remain intact. No Omarchy deployment or new execution engine is included.
+
+Acceptance criteria and evidence:
+
+- Source review must cover atomic competing claims, mention priority, non-fixed default order, fresh context after waits/tools, silence, deliberate posts, duplicate deliveries, admitted-submission recovery, cancellation/failure cleanup and Stop. Claims and waits belong to native Pi documents/tasks; ordinary tools do not retain the conversational turn.
+- Human typing never blocks human sending. Review identity binding, multiple composers, out-of-order pulses, inactivity/disconnection expiry and independent draft lifetime. Presence contains no draft text and uses the same authenticated membership boundary as other chat commands.
+- Review Listening/Responding/Working and human typing on rendered desktop and 390 px screens, using labelled static samples when necessary. Record unmeasured contrast, keyboard/touch, assistive technology, real-device and functional outcomes as unverified.
+- Complete source/deslop and diff review, local documentation-link checks, TypeScript/client/service/tooling and production builds, `nix build` and `nix flake check`. Do not add or run tests, model requests, smoke checks or browser/API acceptance procedures.
+- Record the exact publication and canonical synchronization result and local service update, preserving existing user state. Functional multi-user, streaming, provider failure, presence expiry and restart behavior remain unqualified without execution evidence.
+
+Qualification evidence (October 5, 2026):
+
+- Source/deslop review covered competing claims, mention ordering, fresh context, coalesced delivery, resumed native admissions, ordered human presence, Stop and owner-task cleanup. Public progress precedes tool execution, and final publication shares its freshness-check transaction. A shared recent-history formatter and shared presence component avoid duplicate behavior.
+- Frontend/service/tooling TypeScript, production builds, Apple Silicon `nix build` and `nix flake check` passed before integration. The integration revision will receive the same checks before publication. The existing Vite large-chunk warning remains; x86-64 Linux was not built.
+- Desktop and 390×844 phone stills reviewed actual components with clearly labelled inactive samples for Listening, Responding, Working and human Typing, including participant details. Captures remain in the task worktree's ignored `.local/listen-layout/`; no sample messages were inserted into user state. Shared styling and labelled controls were reviewed. Keyboard/touch, IME, virtual keyboard, assistive technology, measured contrast, real-device behavior and all error/loading states remain unverified.
+- No tests, smoke checks, model requests or browser/API acceptance procedures were run. Functional turn ordering, multi-user access, streaming, presence expiry, provider failure and restart recovery remain unqualified. Publication and the local service update are recorded after integration; Omarchy is outside this package.

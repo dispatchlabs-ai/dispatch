@@ -14,6 +14,7 @@ import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { Coding } from "./extensions/coding.js";
 import { SharedConversations, SharedDoc, type Member, type PeopleDirectory } from "./collaboration/shared.js";
 import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
+import { TurnsDoc } from "./collaboration/turns.js";
 
 const context = BACKGROUND_CONTEXT;
 type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { pinned?: boolean; archived?: boolean; agentName?: string; projectId?: string | null; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
@@ -233,7 +234,7 @@ export class DispatchRuntime {
       const preference = room.preferences[scope.userId];
       const first = presentation.messages.find(message => message.kind === "message");
       const agents = presentation.participants.filter(member => member.kind === "agent");
-      const status = agents.some(agent => agent.status === "working") ? "running" : agents.some(agent => agent.status === "failed") ? "failed" : agents.some(agent => agent.status === "stopped") ? "stopped" : "idle";
+      const status = agents.some(agent => ["working", "listening", "responding"].includes(agent.status)) ? "running" : agents.some(agent => agent.status === "failed") ? "failed" : agents.some(agent => agent.status === "stopped") ? "stopped" : "idle";
       const error = agents.find(agent => agent.status === "failed")?.error;
       const conversation: ChatSummary = {
         id, title: chat.title === "New conversation" && first?.text ? first.text.slice(0, 80) : chat.title,
@@ -276,6 +277,11 @@ export class DispatchRuntime {
     requireText(input.text, "Message", 100_000);
     await this.authorize(scope, id);
     return this.harness.commit(tx => this.shared.post(tx, nativeId(id), `human:${scope.userId}`, input), context);
+  }
+
+  async composing(scope: RuntimeScope, id: string, input: { clientId: string; sequence: number; active: boolean }) {
+    await this.authorize(scope, id);
+    await this.harness.commit(tx => this.shared.turns.composing(tx, nativeId(id), `human:${scope.userId}`, input.clientId, input.sequence, input.active), context);
   }
 
   async addParticipants(scope: RuntimeScope, id: string, input: AddParticipantsInput) {
@@ -422,6 +428,7 @@ export class DispatchRuntime {
     const catalog = (await this.harness.snapshot(CatalogDoc, context))!;
     for (const chat of catalog.chats) {
       const roomId = nativeId(chat.id);
+      await this.harness.commit(async tx => { await tx.doc(TurnsDoc, roomId); }, context);
       if ((await this.harness.snapshot(SharedDoc, roomId, context))?.companyId) continue;
       // Preserve orphaned historical authors without authorizing any new human identity.
       const human = await this.peopleDirectory?.get(chat.companyId, chat.userId) ?? { id: chat.userId, name: "Former member" };
