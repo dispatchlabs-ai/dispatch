@@ -517,7 +517,11 @@ Chris asked for a deslop pass after reviewing the duplicate-reply cause. The sha
 - Run historical duplicate repair once per existing room before native resume; retain raw entries and old aliases, remove obsolete publication lists, and mark new rooms current. Normal publication must not use content-based deduplication.
 - Review source and all affected callers, run TypeScript/production builds, Apple Silicon `nix build` and `nix flake check`, and inspect the diff and local links. Review the existing conversation on desktop and 390 px after the local update. No tests, synthetic messages, model requests or browser/API acceptance procedures under the standing policy.
 
-Implementation, publication and observed local evidence will be recorded after the checks and update. Future-turn, interruption, concurrency, migration/restart and device interactions remain functionally unqualified.
+[Implementation f5de4b2](https://github.com/dispatchlabs-ai/dispatch-web-next/commit/f5de4b2e028ef76bae01426683771f46d76af2fe) was pushed normally to private `main`, verified remotely and fast-forwarded into the clean canonical checkout. Source/deslop review, TypeScript/production builds, Apple Silicon `nix build` and `nix flake check`, whitespace and 32 local documentation links passed.
+
+The canonical M1 Air service was restarted after a private state backup at `.local/backups/publication-cleanup-20261006-062053/dispatch`. Read-only metadata from the existing Pi database showed all five rooms at history version 1 with the obsolete member fields removed. All 89 raw entries retained the same SHA-256 digest, and existing message aliases were unchanged. The existing conversation rendered on desktop and at 390 px; captures remain private in `.local/publication-cleanup/desktop.jpg` and `phone.jpg` in the canonical checkout. This is evidence of the observed local migration and saved-history rendering only.
+
+No tests, synthetic messages, model requests or browser/API acceptance procedures ran. Future-turn publication, interruption, concurrency, broader migration/restart behavior and device interactions remain functionally unqualified. The existing Vite chunk-size advisory remains; this revision was not built on x86-64 Linux or deployed to Omarchy or the pilot.
 
 ## WP-027 — Inline mentions
 
