@@ -1,6 +1,6 @@
 # Durable conversation runtime
 
-The service owns `DispatchRuntime` in `server/runtime.ts` and its collaboration extension in `server/collaboration/shared.ts`. Both use stock `@earendil-works/pi-durable` 1.0.1 public interfaces. Authentication supplies company/user scope; model credentials remain on the service.
+The service owns `DispatchRuntime` in `server/runtime.ts` and its collaboration extension in `server/collaboration/shared.ts`. Both use stock `@earendil-works/pi-durable` 1.0.4 public interfaces. Authentication supplies company/user scope; model credentials remain on the service.
 
 ## Storage and lifetime
 
@@ -72,7 +72,7 @@ All runtime/API behavior remains functionally unqualified under the zero-tests p
 
 ## Per-agent MCP connections
 
-`server/mcp.ts` uses stock `@earendil-works/pi-mcp` 1.0.1 with Pi Durable's public
+`server/mcp.ts` uses stock `@earendil-works/pi-mcp` 1.0.4 with Pi Durable's public
 extension, tool and document APIs. The operator file is
 `DISPATCH_AGENT_CONNECTIONS_FILE`, defaulting to
 `<DISPATCH_DATA_DIR>/agent-connections.json`. Entries belong to an `agentId`; they

@@ -27,7 +27,7 @@ Follow [CONTRIBUTING.md](CONTRIBUTING.md) for work packages, source review, perm
 - [Specification](packages/web/docs/spec.md), [implementation handoff](packages/web/docs/handoff.md), and [changelog](packages/web/CHANGELOG.md)
 - [Repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/)
 - [Dispatch Web product history](https://wiki.chrisreynolds.me/wiki/dispatch-web/) and [Pi Durable capabilities](https://wiki.chrisreynolds.me/wiki/pi-durable-capabilities/)
-- [Pi Durable documentation](https://github.com/earendil-works/pi/tree/v1.0.1/packages/durable)
+- [Pi Durable documentation](https://github.com/earendil-works/pi/tree/v1.0.4/packages/durable)
 - [Existing Dispatch Web repository and Omarchy pilot](https://github.com/dispatchlabs-ai/dispatch-web)
 
 CI and release automation are unconfigured. Reserved directories do not imply a test framework or configured automation.

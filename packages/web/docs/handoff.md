@@ -18,7 +18,7 @@ The original review recorded deviations in readability/contrast, shared design t
 
 - Use TypeScript, React Router framework SPA mode, React/Vite/Tailwind, and shared Base UI primitives with original Dispatch artwork and local Inter.
 - Keep a persistent Node/Hono service separate from frontend hot reload. One process owns each Pi directory, enforced by an OS-backed SQLite ownership lock without limiting concurrent agents.
-- Use stock Pi Durable 1.0.1 through its public interfaces. Pi owns admission, native entries, execution, cancellation, and recovery. Dispatch owns identity, access checks, transport, and presentation.
+- Use stock Pi Durable 1.0.4 through its public interfaces. Pi owns admission, native entries, execution, cancellation, and recovery. Dispatch owns identity, access checks, transport, and presentation.
 - Serve one company per installation. Users have equal capabilities, invite-only conversations, private projects, and shared agent definitions. Role-based access control remains future work.
 - Require password/TOTP or a user-verified passkey, with restricted invitation/recovery flows and opaque sessions. The local operator provisions accounts; there is no application administrator role.
 - Keep desktop rail/sidebar/main tabs/full contextual column/bottom bar. Mobile uses navigation and context panels, preserving active work and drafts.
@@ -720,3 +720,15 @@ Acceptance criteria and evidence:
 - Rendered the isolated frontend against the unchanged local service at 1440×1000 and 390×844. Reviewed Pi Durable's saved instructions and an unsaved layout sample containing headings, lists, emphasis, a quote, inline/fenced code and a link. The phone document width was 390 px; the fixed save bar remained visible. Captures are ignored in `.local/agent-markdown/`. The temporary draft was discarded without saving a definition or sending a message, and the preview tab was closed.
 - TypeScript/frontend/service/tooling checks, production builds, `nix build` and `nix flake check` passed on Apple Silicon macOS. Commands used the repository Nix shell with command-local `--option eval-cache false`. The pre-existing Vite chunk-size advisory remains; x86-64 Linux was not built. Source/deslop and final diff review retain one shared editor with an explicit document mode and the existing Markdown renderer; changed-document links were checked. Participant saved instructions use that renderer too; this supporting panel was source-reviewed but not included in the layout captures.
 - No tests were added or run under the repository's zero-tests policy. Still-layout review does not qualify editing, paste/copy/cut, undo, keyboard/IME, screen readers, save/conflict/recovery, physical touch, zoom/font scaling or measured contrast; these remain unverified. No Omarchy deployment is included.
+
+## Dependency maintenance — Pi 1.0.4
+
+**October 6, 2026.** Chris requested the newest published Pi Durable dependency after the local shared conversation reported an upstream Codex WebSocket authentication error. The npm `latest` release was 1.0.4. The package manifest and lock now align Pi Durable, Pi AI, Chord, Pi Coding Agent, and Pi MCP at 1.0.4, including their Pi transitive packages. The Nix dependency hash and current-version documentation are updated; historical 1.0.1 implementation evidence remains unchanged.
+
+Acceptance evidence:
+
+- Reviewed upstream 1.0.2–1.0.4 release notes and the installed public interfaces. Dispatch uses the stock `NodeExecutionEnv`, so the newer file-reader, watcher and argv-execution requirements need no custom-environment changes. The application uses no renamed Azure provider imports. No application code or execution-ownership changes were required.
+- Source review confirmed Pi's persisted per-conversation provider session IDs, including native initialization for older conversations, and the upstream OAuth refresh correction. These changes do not establish that the reported WebSocket authentication error is fixed.
+- The lockfile changes only Pi packages; `npm ls` resolves all directly used Pi packages to one aligned 1.0.4 version. The installation audit reported no vulnerabilities.
+- Source/deslop and full diff review, whitespace, 64 changed-document local link targets, `nix develop --command npm run check`, `nix build --no-link`, and `nix flake check` passed on Apple Silicon. The existing Vite large-chunk advisory remains. x86-64 Linux was not built.
+- No tests, model requests, credential changes, or browser acceptance flows were run under the current zero-tests policy. Runtime recovery, OAuth renewal, tool behavior and resolution of the observed error remain functionally unverified. The upgrade targets local development; Omarchy is not deployed.
