@@ -2,6 +2,8 @@
 
 October 6, 2026. Requested visual exploration, not an approved implementation package. The two images were generated with the built-in ImageGen tool and visually inspected. The existing implementation was checked at `98d2ad20553a51fb15465224cc7b820bac450473`, using installed `@earendil-works/pi-durable` **1.0.1**.
 
+After Claude's independent review, Chris requested [revised concepts](agent-definition-design-v2.md): a simpler desktop/phone editor, a separate assignment sketch, and an updated mapping graphic. This original proposal and its source-backed storage detail are retained; the revised proposal leaves assignment ownership and storage scope explicitly open.
+
 The design separates reusable expertise from a particular project's goal, inputs, collaborators, and output location. Saving a definition and adding its selected revision to a project are separate actions. The numbered groups in the editor match the technical graphic.
 
 - [Agent editor](assets/agent-definition-2026-10-06/01-agent-editor.png)
