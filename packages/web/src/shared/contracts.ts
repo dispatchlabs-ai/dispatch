@@ -104,11 +104,13 @@ export interface AgentDraft {
   provider: string;
   modelId: string;
   thinkingLevel: ThinkingLevel;
+  /** Selections from the capabilities installed by this application. */
+  capabilities?: ("files-and-commands")[];
 }
 
 export interface AgentDefinition extends AgentDraft {
   id: string;
-  /** Operator-registered Pi capabilities, preserved when editing the basic fields. */
+  /** Native extension selections stored with this revision. */
   extensions: string[];
   tools: string[];
   connections?: AgentConnection[];
@@ -124,6 +126,7 @@ export type AgentConnection = {
   endpoint: string;
   identity: string;
   extension: string;
+  source?: "operator" | "oauth";
 };
 
 export interface AgentConnectionStatus extends AgentConnection {
@@ -132,11 +135,34 @@ export interface AgentConnectionStatus extends AgentConnection {
   checkedAt: number | null;
   tools: { name: string; description: string }[];
   error?: string;
+  scopes?: WikiScope[];
+  authorization?: WikiAuthorizationState;
+}
+
+export type WikiScope = "wiki:read" | "wiki:write" | "wiki:trace";
+export type WikiAuthorizationState = "pending" | "authorized" | "reauthorize" | "revoking" | "revoked" | "error";
+
+export interface WikiConnection extends AgentConnectionStatus {
+  createdAt: number;
+  canManage: boolean;
+  usedBy: { id: string; name: string }[];
+}
+
+export interface ConnectWikiInput {
+  requestId: string;
+  name: string;
+  endpoint: string;
+  scopes: WikiScope[];
+  connectionId?: string;
 }
 
 export interface SaveAgentInput extends AgentDraft {
   id?: string;
   expectedRevision?: number;
+  /** OAuth connections selected for this definition; operator connections stay operator-owned. */
+  connectionIds?: string[];
+  applyConnectionsToExisting?: boolean;
+  requestId?: string;
 }
 
 export interface CreateChatInput {

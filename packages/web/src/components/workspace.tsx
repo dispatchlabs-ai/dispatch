@@ -17,10 +17,11 @@ import { ColumnResizeHandle } from "./column-resize-handle";
 import { ContextPanel } from "./context-panel";
 import { MoveConversationDialog, ProjectPage } from "./projects";
 import { SecurityPage } from "./security";
+import { WikiConnectionsPage } from "./wiki-connections";
 import { Button, IconButton, Modal, Notice, Spinner } from "./ui";
 
 type WorkspaceTab = { id: string; kind: "chat"; chatId: string } | { id: string; kind: "project"; projectId: string } | { id: string; kind: "welcome" };
-type WorkspaceSection = "chats" | "agents" | "security";
+type WorkspaceSection = "chats" | "agents" | "security" | "connections";
 const welcomeTab: WorkspaceTab = { id: "welcome", kind: "welcome" };
 
 function tabLocation(tab: WorkspaceTab): Record<string, string> {
@@ -36,8 +37,8 @@ function initialTab(params: URLSearchParams): WorkspaceTab {
 export function Workspace() {
   const { state, api, auth, setState } = useSession();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [section, setSection] = useState<WorkspaceSection>("chats");
-  const [visited, setVisited] = useState({ agents: false, security: false });
+  const [section, setSection] = useState<WorkspaceSection>(searchParams.get("section") === "connections" ? "connections" : "chats");
+  const [visited, setVisited] = useState({ agents: false, security: false, connections: searchParams.get("section") === "connections" });
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [editingAgent, setEditingAgent] = useState<AgentEditing | null>(null);
   const [pendingAgentAction, setPendingAgentAction] = useState<(() => void) | null>(null);
@@ -190,6 +191,8 @@ export function Workspace() {
 
   function selectSection(next: WorkspaceSection) {
     setSection(next);
+    if (next === "connections") { setOtherDetailsVisible(false); setSearchParams({ section: "connections" }, { replace: true }); }
+    else if (searchParams.has("section")) setSearchParams({}, { replace: true });
     if (next !== "chats") setVisited(current => ({ ...current, [next]: true }));
     setNavigationOpen(false);
     setContextOpen(false);
@@ -382,6 +385,7 @@ export function Workspace() {
 
   function editAgent(agent?: AgentDefinition) {
     requestAgentAction(() => {
+      setOtherDetailsVisible(false);
       setEditingAgent(beginAgentEdit(agent, agents.find(item => item.id === config?.defaultAgentId)));
       if (agent) setSelectedAgentId(agent.id);
       else { setAgentSearch(""); setShowArchivedAgents(false); }
@@ -396,8 +400,8 @@ export function Workspace() {
   }
 
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId) ?? agents.find(agent => agent.id === config?.defaultAgentId);
-  const active: WorkspaceTab | { id: string; kind: "agents" | "security" } = section === "chats" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
-  const detailsVisible = active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : otherDetailsVisible;
+  const active: WorkspaceTab | { id: string; kind: "agents" | "security" | "connections" } = section === "chats" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
+  const detailsVisible = active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : active.kind === "connections" ? false : otherDetailsVisible;
   const detailsWidth = Math.min(preferredDetailsWidth ?? (active.kind === "chat" ? 440 : 360), detailsMax);
   function setDetailsVisible(visible: boolean) {
     if (active.kind === "chat") setChatDetailsVisible(current => ({ ...current, [active.chatId]: visible }));
@@ -418,7 +422,7 @@ export function Workspace() {
       setContextOpen(false);
       requestAnimationFrame(() => document.getElementById(`participants-${active.chatId}`)?.focus());
     }} showHeader={!inDrawer}
-    /> : <ContextPanel kind={active.kind} snapshot={snapshot} models={config?.models ?? []} tab={supportTabs[active.id] || "agent"} onTabChange={tab => setSupportTabs(current => ({ ...current, [active.id]: tab }))} />;
+    /> : <ContextPanel kind={active.kind === "connections" ? "security" : active.kind} snapshot={snapshot} models={config?.models ?? []} tab={supportTabs[active.id] || "agent"} onTabChange={tab => setSupportTabs(current => ({ ...current, [active.id]: tab }))} />;
   const chatNav = () => selectSection("chats");
   const selectChat = (chatId: string) => activate({ id: `chat:${chatId}`, kind: "chat", chatId });
   const conversations = <ConversationSidebar chats={chats} projects={projects}
@@ -436,20 +440,22 @@ export function Workspace() {
     <div className="section-sidebar-panel" hidden={section !== "agents"}>
       <AgentSidebar agents={agents} defaultAgentId={config?.defaultAgentId}
         selectedAgentId={editingAgent?.saved?.id ?? selectedAgent?.id}
-        editing={editingAgent ? editingAgent.saved ? true : "new" : false} busy={editingAgent?.busy ?? false}
+        editing={editingAgent ? editingAgent.saved ? agentEditIsDirty(editingAgent) : "new" : false} busy={editingAgent?.busy ?? false}
         search={agentSearch} onSearchChange={setAgentSearch} showArchived={showArchivedAgents} onShowArchivedChange={setShowArchivedAgents}
         onCreate={() => editAgent()}
         onSelect={id => requestAgentAction(() => { setEditingAgent(null); setSelectedAgentId(id); })}
         onEdit={editAgent}
         onArchive={agent => requestAgentAction(() => { setEditingAgent(null); setArchivingAgent(agent); })} />
     </div>
-    {section === "security" ? <div className="section-sidebar">
-      <h2>Account</h2>
-      <nav aria-label="Account settings">
-        {[['passkeys', 'Passkeys'], ['password', 'Password & authenticator'], ['sessions', 'Active sessions']].map(([id, label]) => <Button key={id} variant="ghost" onClick={() => {
+    {section === "security" || section === "connections" ? <div className="section-sidebar">
+      <h2>Settings</h2>
+      <nav aria-label="Settings">
+        <Button variant="ghost" aria-current={section === "connections" ? "page" : undefined} onClick={() => selectSection("connections")}>Connections</Button>
+        <Button variant="ghost" aria-current={section === "security" ? "page" : undefined} onClick={() => selectSection("security")}>Account and security</Button>
+        {section === "security" ? [['passkeys', 'Passkeys'], ['password', 'Password & authenticator'], ['sessions', 'Active sessions']].map(([id, label]) => <Button key={id} variant="ghost" onClick={() => {
           setNavigationOpen(false);
           requestAnimationFrame(() => document.getElementById(`account-${id}`)?.scrollIntoView({ block: "start" }));
-        }}>{label}</Button>)}
+        }}>{label}</Button>) : null}
       </nav>
     </div> : null}
   </>;
@@ -486,12 +492,12 @@ export function Workspace() {
         <IconButton className="sidebar-toggle" label={sidebarVisible ? "Hide sidebar" : "Show sidebar"} aria-expanded={sidebarVisible} aria-controls="workspace-sidebar" onClick={() => setSidebarVisible(value => !value)}>
           <PanelLeft size={19} />
         </IconButton>
-        <IconButton className="details-toggle" label={detailsVisible ? "Hide details" : "Show details"} aria-expanded={detailsVisible} aria-controls="details-column" onClick={() => setDetailsVisible(!detailsVisible)}>
+        {section !== "connections" ? <IconButton className="details-toggle" label={detailsVisible ? "Hide details" : "Show details"} aria-expanded={detailsVisible} aria-controls="details-column" onClick={() => setDetailsVisible(!detailsVisible)}>
           <PanelRight size={19} />
-        </IconButton>
+        </IconButton> : null}
       </div>
       <div className="rail-account">
-        <IconButton label="Account and security" className={active.kind === "security" ? "active" : ""} aria-current={active.kind === "security" ? "page" : undefined} onClick={() => selectSection("security")}>
+        <IconButton label="Settings" className={section === "security" || section === "connections" ? "active" : ""} aria-current={section === "security" || section === "connections" ? "page" : undefined} onClick={() => selectSection("connections")}>
           <Settings2 size={20} />
         </IconButton>
         <IconButton label="Sign out" disabled={signingOut} onClick={() => void signOut()}>{signingOut ? <Spinner /> : <LogOut size={19} />}</IconButton>
@@ -571,10 +577,11 @@ export function Workspace() {
           </div>
           {visited.agents ? <div className="workspace-section" hidden={section !== "agents"}>
             <AgentsPage agent={selectedAgent} editing={editingAgent} config={config} onEditingChange={setEditingAgent}
-              onSaved={finishAgentEdit}
+              onSaved={finishAgentEdit} onConnectionsSettings={() => selectSection("connections")}
               onCancel={() => requestAgentAction(() => finishAgentEdit())} onEdit={editAgent}
               onStartChat={agentId => chooseAgents(agentId)} creating={creating} />
           </div> : null}
+          {visited.connections ? <div className="workspace-section" hidden={section !== "connections"}><WikiConnectionsPage /></div> : null}
           {visited.security ? <div className="workspace-section" hidden={section !== "security"}><SecurityPage /></div> : null}
         </main>
       </div>
@@ -613,13 +620,13 @@ export function Workspace() {
                 <MessageSquare /> Chats</Button>
               <Button variant="ghost" aria-current={active.kind === "agents" ? "page" : undefined} onClick={() => selectSection("agents")}>
                 <Bot /> Agents</Button>
-              <Button variant="ghost" aria-current={active.kind === "security" ? "page" : undefined} onClick={() => selectSection("security")}>
-                <Settings2 /> Account</Button>
+              <Button variant="ghost" aria-current={section === "security" || section === "connections" ? "page" : undefined} onClick={() => selectSection("connections")}>
+                <Settings2 /> Settings</Button>
             </nav>{sidebar}<Button className="mobile-signout" variant="ghost" onClick={() => void signOut()} disabled={signingOut}>
               <LogOut /> Sign out</Button>
           </Modal>
         </div>
-        {active.kind !== "welcome" ? <div className="mobile-context">
+        {active.kind !== "welcome" && active.kind !== "connections" ? <div className="mobile-context">
           <Modal title={active.kind === "chat" ? threads[active.chatId] ? "Thread" : "Participants" : section === "agents" ? editingAgent ? "Draft preview" : "Agent details" : "Details"} description={active.kind === "chat" ? snapshot?.conversation.title || "Active conversation" : section === "agents" ? undefined : "For your current view"} side="right" open={contextOpen} onOpenChange={setContextOpen} trigger={<Button variant="ghost" className="workspace-action">
             <PanelRight size={19} /> Details</Button>}>{supporting(true)}</Modal>
         </div> : null}

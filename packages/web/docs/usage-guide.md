@@ -109,6 +109,18 @@ action. A successful initialization establishes the advertised catalog, not that
 all tool operations succeeded. An interrupted write is never automatically replayed;
 inspect its outcome before retrying with Wiki's operation ID rules.
 
+### Connect an existing Wiki agent
+
+1. Create the agent and its grants in Agent Wiki's own UI first.
+2. Open **Settings → Connections → Connect Wiki**, enter its HTTPS MCP address, and choose article/evidence permissions. Continue to the Wiki, sign in, and authorize the existing agent. Dispatch shows its returned identity; no API key needs to be pasted.
+3. In **Agents → Edit → MCP connections → Add connection**, choose that authorization (or connect a new one directly). Review the sharing notice and select whether connection changes apply only to new instances or also to existing ones. **Save new revision** commits the selection. Authorization alone does not add access to a definition.
+
+Connections are reserved for one definition and use the existing Wiki agent's standing rights. Every participant in the agent's conversations may receive Wiki content, including later invitees; teammates can edit the shared definition. This interim flow does not implement delegated personal Wiki permissions. The original operator-managed Developer connection stays visible and is still managed through its manifest.
+
+**Discard** abandons staged definition changes. An unused authorization remains in Settings, where its owner can disconnect it. Disconnect disables access for every bound instance and attempts upstream revocation; retry when revocation remains pending. **Authorize again** renews the same identity and scope ceiling. Use a separate connection to change identity or permissions, then save the desired instance scope. Article and original-evidence access remain independently limited by Wiki grants.
+
+The editor's Files and commands capability selects native local coding tools for future instances. Existing instances retain their saved configuration, except an explicitly applied MCP connection change. Switching between editor and Settings preserves the draft; reloading or ending the sign-in session does not. No API-based Wiki agent registration is performed.
+
 ## Chat and workspace
 
 Messages use a compact, left-aligned flow with distinct participant avatars, author names, agent badges and timestamps. Hover a message or focus its actions to reveal Reply in thread and Copy; narrow and touch layouts keep these actions visible. An existing reply summary shows its participants, count, and last reply. Reply opens the thread beside its highlighted parent, or in a full-height phone panel. Replies remain visible to everyone in the conversation.

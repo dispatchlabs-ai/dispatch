@@ -9,18 +9,19 @@ import { configure, createRegistry, defineDoc, Harness, type ConversationId, typ
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
-import type { AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, UpdateChatInput } from "../src/shared/contracts.js";
+import type { AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, SaveAgentInput, UpdateChatInput, WikiConnection } from "../src/shared/contracts.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { Coding } from "./extensions/coding.js";
 import { SharedConversations, SharedDoc, type Member, type PeopleDirectory } from "./collaboration/shared.js";
 import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
 import { TurnsDoc } from "./collaboration/turns.js";
+import type { WikiConnections } from "./wiki-connections.js";
 
 const context = BACKGROUND_CONTEXT;
 type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { pinned?: boolean; archived?: boolean; agentName?: string; projectId?: string | null; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
-type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: string; extensions?: string[]; tools?: string[] };
+type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: string; extensions?: string[]; tools?: string[]; savedBy?: string; saveRequestId?: string; saveFingerprint?: string };
 type StoredProject = Project & { companyId: string; userId: string; requestId: string };
-type Catalog = { chats: StoredChat[]; agents: StoredAgent[]; projects?: StoredProject[]; runtimeInstance?: string };
+type Catalog = { chats: StoredChat[]; agents: StoredAgent[]; projects?: StoredProject[]; runtimeInstance?: string; connectionOwners?: Record<string, string> };
 const CatalogDoc = defineDoc<Catalog>({
   kind: "dispatch.catalog", version: 1, scope: "session",
   initial: () => ({ chats: [], agents: [] }),
@@ -35,6 +36,7 @@ export type RuntimeOptions = {
   stateDir: string;
   companyId: string;
   connectionsFile?: string;
+  wikiConnections?: WikiConnections;
   provider?: string;
   modelId?: string;
   thinkingLevel?: AgentDraft["thinkingLevel"];
@@ -54,6 +56,7 @@ export class DispatchRuntime {
   private shared: SharedConversations;
   private peopleDirectory?: PeopleDirectory;
   private connections: AgentConnections;
+  private wiki?: WikiConnections;
 
   private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: RegistryReader, shared: SharedConversations, connections: AgentConnections, peopleDirectory?: PeopleDirectory) {
     this.connections = connections;
@@ -73,6 +76,7 @@ export class DispatchRuntime {
     let storage: Storage | undefined;
     let connections: AgentConnections | undefined;
     try {
+      options.wikiConnections?.recoverInterruptedRenewals();
       const models = options.models ?? productionModels();
       const filename = join(owner.directory, "pi.sqlite");
       storage = await openNodeSqliteStorage(filename);
@@ -83,7 +87,7 @@ export class DispatchRuntime {
       registry.install(shared.extension);
       registry.install(CodingTools);
       registry.install(Coding);
-      connections = await AgentConnections.load(options.connectionsFile ?? join(owner.directory, "agent-connections.json"), registry);
+      connections = await AgentConnections.load(options.connectionsFile ?? join(owner.directory, "agent-connections.json"), registry, options.wikiConnections, options.companyId);
       const harness = await Harness.open(storage, {
         models, registry, settings: { ...options.settings, extensions: options.settings?.extensions ?? [shared.extension, CodingTools, Coding] },
         env: async ({ cwd }) => {
@@ -94,6 +98,7 @@ export class DispatchRuntime {
         },
       }, context);
       runtime = new DispatchRuntime(harness, storage, models, owner, registry, shared, connections, options.peopleDirectory);
+      runtime.wiki = options.wikiConnections;
       // Seed once and publish a real commit before recovery so snapshots use Pi's persisted sequence.
       await harness.commit(async (tx) => {
         const catalog = await tx.doc(CatalogDoc);
@@ -312,33 +317,91 @@ export class DispatchRuntime {
 
   async agentConnections(scope: RuntimeScope, id: string) {
     const catalog = await this.harness.snapshot(CatalogDoc, context);
-    if (!catalog!.agents.some(agent => agent.companyId === scope.companyId && agent.id === id)) throw new RuntimeError(404, "Agent not found.");
-    return this.connections.status(id);
+    const agent = [...catalog!.agents].reverse().find(agent => agent.companyId === scope.companyId && agent.id === id);
+    if (!agent) throw new RuntimeError(404, "Agent not found.");
+    return this.connections.status(id, wikiIds(agent));
   }
 
   async reconnectAgentConnection(scope: RuntimeScope, agentId: string, connectionId: string) {
     const connections = await this.agentConnections(scope, agentId);
     if (!connections.some(connection => connection.id === connectionId)) throw new RuntimeError(404, "Connection not found.");
-    return this.connections.reconnect(agentId, connectionId);
+    return this.connections.reconnect(agentId, connectionId, connections.filter(connection => connection.source === "oauth").map(connection => connection.id));
   }
 
-  async saveAgent(scope: RuntimeScope, input: AgentDraft & { id?: string; expectedRevision?: number }): Promise<AgentDefinition> {
+  async listWikiConnections(scope: RuntimeScope): Promise<WikiConnection[]> {
+    const catalog = await this.harness.snapshot(CatalogDoc, context);
+    const latest = new Map<string, StoredAgent>();
+    for (const agent of catalog!.agents) if (agent.companyId === scope.companyId) latest.set(agent.id, agent);
+    return (this.wiki?.list(scope.companyId) ?? []).filter(record => record.ownerId === scope.userId || catalog!.connectionOwners?.[record.id])
+      .map(record => {
+        const assigned = catalog!.connectionOwners?.[record.id];
+        const agent = assigned ? latest.get(assigned) : undefined;
+        return { ...(this.connections.wikiStatus(record.id) ?? { id: record.id, name: record.name, endpoint: record.endpoint, identity: record.identity,
+          extension: `dispatch-mcp-oauth-${record.id}`, status: "disconnected" as const, access: "Selected tools" as const, checkedAt: null, tools: [], source: "oauth" as const }),
+          authorization: record.authorization, scopes: record.scopes, createdAt: record.createdAt, canManage: record.ownerId === scope.userId,
+          usedBy: agent ? [{ id: agent.id, name: agent.name }] : [], ...(record.error ? { error: record.error } : {}) };
+      });
+  }
+
+  async refreshWikiConnections(id?: string) { await this.connections.reloadWiki(id); }
+
+  async saveAgent(scope: RuntimeScope, input: SaveAgentInput): Promise<AgentDefinition> {
     this.validateAgent(input);
+    const fingerprint = JSON.stringify([input.id, input.expectedRevision, input.name.trim(), input.description.trim(), input.instructions,
+      input.provider, input.modelId, input.thinkingLevel, input.capabilities?.slice().sort(), input.connectionIds?.slice().sort(), !!input.applyConnectionsToExisting]);
     return this.harness.commit(async (tx) => {
       const catalog = await tx.doc(CatalogDoc);
+      const priorRequest = input.requestId ? catalog.agents.find(agent => agent.companyId === scope.companyId && agent.savedBy === scope.userId && agent.saveRequestId === input.requestId) : undefined;
+      if (priorRequest) {
+        if (priorRequest.saveFingerprint !== fingerprint) throw requestConflict();
+        return publicAgent(priorRequest);
+      }
       const prior = input.id ? [...catalog.agents].reverse().find((agent) => agent.id === input.id && agent.companyId === scope.companyId) : undefined;
       if (input.id && !prior) throw new RuntimeError(404, "Agent not found.");
       if (prior?.archived) throw new RuntimeError(409, "This agent is archived. Create a new agent to use its configuration again.");
       if (prior && prior.revision !== input.expectedRevision) throw new RuntimeError(409, "The agent has changed. Reload it before saving.");
       const now = Date.now();
+      const id = prior?.id ?? randomUUID();
+      const selectedWiki = input.connectionIds ?? (prior ? wikiIds(prior) : []);
+      for (const connectionId of selectedWiki) {
+        if (!prior || !wikiIds(prior).includes(connectionId)) {
+          if (!this.wiki) throw new RuntimeError(503, "Wiki connections are unavailable.");
+          this.wiki.requireAssignment(scope, connectionId);
+        }
+        const owner = catalog.connectionOwners?.[connectionId];
+        if (owner && owner !== id) throw new RuntimeError(409, "That Wiki authorization belongs to another agent. Authorize a separate connection for this agent.");
+      }
+      const selectedConnections = this.connections.forAgent(id, selectedWiki);
+      if (selectedWiki.some(connectionId => !selectedConnections.some(connection => connection.id === connectionId && connection.source === "oauth"))) throw new RuntimeError(409, "A selected connection is unavailable. Refresh its authorization before saving.");
+      catalog.connectionOwners ??= {};
+      for (const connectionId of selectedWiki) catalog.connectionOwners[connectionId] = id;
+      const selection = this.connections.selection(id, selectedWiki);
+      let extensions = (prior?.extensions ?? []).filter(name => !isMcpExtension(name));
+      let tools = (prior?.tools ?? []).filter(name => !isMcpTool(name));
+      if (input.capabilities !== undefined) {
+        extensions = extensions.filter(name => name !== Coding.name && name !== CodingTools.name);
+        tools = tools.filter(name => !["read", "write", "edit", "bash"].includes(name));
+        if (input.capabilities.includes("files-and-commands")) { extensions.push(Coding.name, CodingTools.name); tools.push("read", "write", "edit", "bash"); }
+      }
       const agent: StoredAgent = {
-        id: prior?.id ?? randomUUID(), name: input.name.trim(), description: input.description.trim(),
+        id, name: input.name.trim(), description: input.description.trim(),
         instructions: input.instructions, provider: input.provider, modelId: input.modelId, thinkingLevel: input.thinkingLevel,
-        extensions: prior?.extensions ?? [], tools: prior?.tools ?? [],
-        ...(prior?.connections ? { connections: prior.connections } : {}),
+        extensions: [...extensions, ...selection.extensions], tools: [...tools, ...selection.tools], connections: selectedConnections,
         revision: (prior?.revision ?? 0) + 1, archived: false, createdAt: prior?.createdAt ?? now, updatedAt: now, companyId: scope.companyId,
+        ...(input.requestId ? { saveRequestId: input.requestId, saveFingerprint: fingerprint, savedBy: scope.userId } : {}),
       };
       catalog.agents.push(agent);
+      if (input.applyConnectionsToExisting && prior) {
+        for (const chat of catalog.chats.filter(chat => chat.companyId === scope.companyId)) {
+          const room = await tx.doc(SharedDoc, nativeId(chat.id));
+          for (const member of room.members) {
+            if (member.kind !== "agent" || member.agentDefinitionId !== id || !member.conversationId || !member.agent) continue;
+            const connected = await this.connections.bind(tx, member.conversationId, id, true, selectedWiki, true);
+            member.agent.extensions = [...member.agent.extensions.filter(name => !isMcpExtension(name)), ...connected.extensions];
+            member.agent.tools = [...member.agent.tools.filter(name => !isMcpTool(name)), ...connected.tools];
+          }
+        }
+      }
       return publicAgent(agent);
     }, context);
   }
@@ -392,7 +455,7 @@ export class DispatchRuntime {
     const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
     const cwd = agent.extensions?.includes(CodingTools.name) ? join(this.owner.directory, "workspaces", String(record.id)) : undefined;
     await configure(tx, record.id, { model: { provider: agent.provider, modelId: agent.modelId }, instructions: agent.instructions, thinkingLevel: agent.thinkingLevel, extensions, tools, ...(cwd ? { cwd } : {}) });
-    await this.connections.bind(tx, record.id, definitionId);
+    await this.connections.bind(tx, record.id, definitionId, false, wikiIds(agent));
     return { id: randomUUID(), kind: "agent", name: agent.name, joinedAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, conversationId: record.id, status: "idle", agent: { ...publicAgent(agent), ...(cwd ? { cwd } : {}) } };
   }
 
@@ -402,13 +465,14 @@ export class DispatchRuntime {
       const latest = new Map<string, StoredAgent>();
       for (const agent of catalog.agents) if (agent.companyId === companyId) latest.set(agent.id, agent);
       for (const agent of latest.values()) {
-        const connections = this.connections.forAgent(agent.id);
+        const connections = this.connections.forAgent(agent.id, wikiIds(agent));
         if (!connections.length && !agent.connections?.length) continue;
-        const selection = this.connections.selection(agent.id);
+        const selection = this.connections.selection(agent.id, wikiIds(agent));
         const extensions = [...(agent.extensions ?? []).filter(name => !isMcpExtension(name)), ...selection.extensions];
         const tools = [...(agent.tools ?? []).filter(name => !isMcpTool(name)), ...selection.tools];
         if (JSON.stringify([agent.connections, agent.extensions, agent.tools]) !== JSON.stringify([connections, extensions, tools])) {
-          catalog.agents.push({ ...agent, connections, extensions, tools, revision: agent.revision + 1, updatedAt: Date.now() });
+          const { saveRequestId: _request, saveFingerprint: _fingerprint, savedBy: _savedBy, ...configuration } = agent;
+          catalog.agents.push({ ...configuration, connections, extensions, tools, revision: agent.revision + 1, updatedAt: Date.now() });
         }
       }
       for (const chat of catalog.chats.filter(chat => chat.companyId === companyId)) {
@@ -474,9 +538,10 @@ function owns(scope: RuntimeScope, chat: RuntimeScope) { return scope.companyId 
 function projectSummary(project: StoredProject): Project {
   return { id: project.id, name: project.name, createdAt: project.createdAt };
 }
-function publicAgent({ companyId: _companyId, ...agent }: StoredAgent): AgentDefinition {
-  return { ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [] };
+function publicAgent({ companyId: _companyId, savedBy: _savedBy, saveRequestId: _request, saveFingerprint: _fingerprint, ...agent }: StoredAgent): AgentDefinition {
+  return { ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [], capabilities: agent.extensions?.includes(CodingTools.name) ? ["files-and-commands"] : [] };
 }
+function wikiIds(agent: Pick<AgentDefinition, "connections">) { return (agent.connections ?? []).filter(connection => connection.source === "oauth").map(connection => connection.id); }
 function requireText(value: unknown, field: string, max: number, allowEmpty = false): asserts value is string {
   if (typeof value !== "string" || (!allowEmpty && !value.trim()) || value.length > max) throw new RuntimeError(400, `${field} must be ${allowEmpty ? "at most" : "between 1 and"} ${max} characters.`);
 }

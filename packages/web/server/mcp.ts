@@ -4,9 +4,10 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { JsonRepresentation, JsonValue } from "@earendil-works/chord";
 import { Type } from "@earendil-works/pi-ai";
 import { AgentDoc, defineDoc, defineExtension, defineTool, section, type ConversationId, type Harness, type Registry, type Tx } from "@earendil-works/pi-durable";
-import { McpClient, StdioTransport, toLlmContent, type Tool } from "@earendil-works/pi-mcp";
+import { McpClient, StdioTransport, StreamableHttpTransport, toLlmContent, type Tool } from "@earendil-works/pi-mcp";
 import { z } from "zod";
 import type { AgentConnection, AgentConnectionStatus } from "../src/shared/contracts.js";
+import type { WikiConnections, WikiConnectionRecord } from "./wiki-connections.js";
 
 const context = BACKGROUND_CONTEXT;
 const id = z.string().regex(/^[a-z][a-z0-9_-]*$/).max(40);
@@ -19,7 +20,7 @@ const connectionSchema = z.object({
   /** Explicit operator decision to grant this connection to already-running instances. */
   applyToExisting: z.boolean().default(false),
 }).strict();
-type ConnectionConfig = z.infer<typeof connectionSchema>;
+type ConnectionConfig = z.infer<typeof connectionSchema> | { id: string; agentId: "oauth"; name: string; endpoint: string; identity: string; instructions: string; applyToExisting: false; source: "oauth" };
 type Catalog = { connections: Record<string, { tools: JsonRepresentation<Tool>[]; instructions: string; checkedAt: number }> };
 const CatalogDoc = defineDoc<Catalog>({ kind: "dispatch.mcp-catalog", version: 1, scope: "session", initial: () => ({ connections: {} }) });
 const BindingDoc = defineDoc<{ connections: string[] }>({
@@ -36,25 +37,49 @@ export class AgentConnections {
   private closed = false;
   onChanged: () => Promise<void> = async () => {};
 
-  private constructor(configs: ConnectionConfig[], registry: Registry) {
-    this.connections = configs.map(config => new McpConnection(config, registry, async connection => {
+  private constructor(configs: ConnectionConfig[], private readonly registry: Registry, private readonly wiki?: WikiConnections, private readonly companyId?: string) {
+    this.connections = configs.map(config => this.create(config));
+    this.syncWiki();
+  }
+
+  private create(config: ConnectionConfig) {
+    return new McpConnection(config, this.registry, async connection => {
       if (this.closed) return;
       await this.harness.commit(async tx => {
         const catalog = await tx.doc(CatalogDoc);
         catalog.connections[connection.key] = connection.catalog;
       }, context);
       await this.onChanged();
-    }));
+    }, "source" in config ? this.wiki : undefined);
   }
 
-  static async load(filename: string, registry: Registry) {
+  private syncWiki() {
+    if (!this.wiki || !this.companyId) return;
+    for (const record of this.wiki.list(this.companyId)) {
+      if (this.connections.some(connection => connection.isWiki && connection.config.id === record.id)) continue;
+      this.connections.push(this.create({ id: record.id, agentId: "oauth", name: record.name, endpoint: record.endpoint,
+        identity: record.identity, instructions: "", applyToExisting: false, source: "oauth" }));
+    }
+  }
+
+  async reloadWiki(id?: string) {
+    this.syncWiki();
+    const saved = await this.harness.snapshot(CatalogDoc, context);
+    for (const connection of this.connections.filter(item => item.isWiki && (!id || item.config.id === id))) {
+      connection.restore(saved?.connections[connection.key]);
+      await connection.reconnect().catch(() => {});
+    }
+    await this.onChanged();
+  }
+
+  static async load(filename: string, registry: Registry, wiki?: WikiConnections, companyId?: string) {
     let raw: string;
     try { raw = await readFile(filename, "utf8"); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return new AgentConnections([], registry); throw error; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return new AgentConnections([], registry, wiki, companyId); throw error; }
     const configs = z.object({ connections: z.array(connectionSchema) }).strict().parse(JSON.parse(raw)).connections;
     const keys = configs.map(config => `${config.agentId}/${config.id}`);
     if (new Set(keys).size !== keys.length) throw new Error("Each agent MCP connection must have a unique ID.");
-    return new AgentConnections(configs, registry);
+    return new AgentConnections(configs, registry, wiki, companyId);
   }
 
   async open(harness: Harness) {
@@ -65,24 +90,30 @@ export class AgentConnections {
     await Promise.all(this.connections.map(connection => connection.connect().catch(() => {})));
   }
 
-  forAgent(agentId: string): AgentConnection[] { return this.connections.filter(connection => connection.config.agentId === agentId).map(connection => connection.descriptor()); }
-  status(agentId: string): AgentConnectionStatus[] { return this.connections.filter(connection => connection.config.agentId === agentId).map(connection => connection.status()); }
-  async reconnect(agentId: string, id: string) {
-    const connection = this.connections.find(item => item.config.agentId === agentId && item.config.id === id);
+  private selected(agentId: string, wikiIds: string[] = []) {
+    return this.connections.filter(connection => connection.isWiki ? wikiIds.includes(connection.config.id) : connection.config.agentId === agentId);
+  }
+  forAgent(agentId: string, wikiIds: string[] = []): AgentConnection[] { return this.selected(agentId, wikiIds).map(connection => connection.descriptor()); }
+  status(agentId: string, wikiIds: string[] = []): AgentConnectionStatus[] { return this.selected(agentId, wikiIds).map(connection => connection.status()); }
+  wikiStatus(id: string) { return this.connections.find(connection => connection.isWiki && connection.config.id === id)?.status(); }
+  async reconnect(agentId: string, id: string, wikiIds: string[] = []) {
+    const connection = this.selected(agentId, wikiIds).find(item => item.config.id === id);
     if (!connection) throw new Error("MCP connection not found.");
-    await connection.connect().catch(() => {});
-    return this.status(agentId);
+    await connection.reconnect().catch(() => {});
+    return this.status(agentId, wikiIds);
   }
   has(agentId: string) { return this.connections.some(connection => connection.config.agentId === agentId); }
 
-  selection(agentId: string) {
-    const connections = this.connections.filter(connection => connection.config.agentId === agentId);
+  selection(agentId: string, wikiIds: string[] = []) {
+    const connections = this.selected(agentId, wikiIds);
     return { extensions: connections.map(connection => connection.extensionName), tools: connections.flatMap(connection => connection.toolNames()) };
   }
 
-  async bind(tx: Tx, conversationId: ConversationId, agentId: string, existing = false) {
+  async bind(tx: Tx, conversationId: ConversationId, agentId: string, existing = false, wikiIds: string[] = [], applyWiki = false) {
     const binding = await tx.doc(BindingDoc, conversationId);
-    const connections = this.connections.filter(connection => connection.config.agentId === agentId && (!existing || connection.config.applyToExisting || binding.connections.includes(connection.key)));
+    const connections = this.connections.filter(connection => connection.isWiki
+      ? (existing && !applyWiki ? binding.connections.includes(connection.key) : wikiIds.includes(connection.config.id))
+      : connection.config.agentId === agentId && (!existing || connection.config.applyToExisting || binding.connections.includes(connection.key)));
     binding.connections = connections.map(connection => connection.key);
     const agent = await tx.doc(AgentDoc, conversationId);
     const extensions = connections.map(connection => connection.extensionName);
@@ -109,20 +140,27 @@ class McpConnection {
   private error?: string;
   catalog: Catalog["connections"][string] = { tools: [], instructions: "", checkedAt: 0 };
 
-  constructor(readonly config: ConnectionConfig, private readonly registry: Registry, private readonly changed: (connection: McpConnection) => Promise<void>) {
+  constructor(readonly config: ConnectionConfig, private readonly registry: Registry, private readonly changed: (connection: McpConnection) => Promise<void>, private readonly wiki?: WikiConnections) {
     this.key = `${config.agentId}/${config.id}`;
     this.extensionName = `dispatch-mcp-${config.agentId}-${config.id}`;
   }
 
+  get isWiki() { return !!this.wiki; }
+
+  private get wikiRecord(): WikiConnectionRecord | undefined { return this.wiki?.record(this.config.id); }
+
   descriptor(): AgentConnection {
-    return { id: this.config.id, name: this.config.name, endpoint: this.config.endpoint, identity: this.config.identity, extension: this.extensionName };
+    return { id: this.config.id, name: this.config.name, endpoint: this.config.endpoint, identity: this.wikiRecord?.identity || this.config.identity, extension: this.extensionName, source: this.wiki ? "oauth" : "operator" };
   }
 
   status(): AgentConnectionStatus {
     const names = this.catalog.tools.map(tool => tool.name);
-    return { ...this.descriptor(), status: this.error ? "unavailable" : this.client?.connectionState === "connected" ? "connected" : "disconnected",
+    const wiki = this.wikiRecord;
+    return { ...this.descriptor(), status: this.error || (wiki && wiki.authorization !== "authorized") ? "unavailable" : this.client?.connectionState === "connected" ? "connected" : "disconnected",
       access: wikiTools.every(name => names.includes(name)) ? "Full access" : "Selected tools", checkedAt: this.catalog.checkedAt || null,
-      tools: this.catalog.tools.map(tool => ({ name: tool.name, description: tool.description ?? "" })), ...(this.error ? { error: this.error } : {}) };
+      tools: this.catalog.tools.map(tool => ({ name: tool.name, description: tool.description ?? "" })),
+      ...(wiki ? { scopes: wiki.scopes, authorization: wiki.authorization } : {}),
+      ...(wiki?.error || this.error ? { error: wiki?.error || this.error } : {}) };
   }
 
   toolNames() { return this.catalog.tools.map(tool => this.toolName(tool.name)); }
@@ -139,10 +177,18 @@ class McpConnection {
 
   connect(): Promise<void> {
     if (this.closed) return Promise.reject(new Error("MCP connection is closed."));
+    if (this.wiki && this.wikiRecord?.authorization !== "authorized") return Promise.reject(new Error("Authorize this Wiki connection in Settings → Connections."));
     if (this.connecting) return this.connecting;
     if (this.client?.connectionState === "connected" && !this.error) return Promise.resolve();
     this.connecting = this.open().finally(() => { this.connecting = undefined; });
     return this.connecting;
+  }
+
+  async reconnect() {
+    if (this.connecting) await this.connecting.catch(() => {});
+    await this.client?.close();
+    this.client = undefined;
+    return this.connect();
   }
 
   private async open() {
@@ -152,7 +198,12 @@ class McpConnection {
     client.onClose(() => { if (!this.closed) this.error = `${this.config.name} disconnected. The next tool call will reconnect.`; });
     client.onNotification("notifications/tools/list_changed", () => { void this.discover(client).catch(() => { this.error = "The tool list could not be refreshed."; }); });
     try {
-      await client.connect(new StdioTransport({ command: this.config.command, args: this.config.args, inheritEnv: false, stderr: "pipe" }));
+      if (this.wiki) {
+        await this.wiki.identify(this.config.id);
+        await client.connect(new StreamableHttpTransport({ url: this.config.endpoint, authProvider: this.wiki.authProvider(this.config.id), fetch: (input, init) => this.wiki!.fetch(this.config.id, input, init) }));
+      } else if ("command" in this.config) {
+        await client.connect(new StdioTransport({ command: this.config.command, args: this.config.args, inheritEnv: false, stderr: "pipe" }));
+      }
       await this.discover(client);
     } catch {
       await client.close().catch(() => {});
@@ -166,9 +217,10 @@ class McpConnection {
     if (this.closed || this.client !== client) return;
     if (new Set(tools.map(tool => tool.name)).size !== tools.length) throw new Error("MCP returned duplicate tool names.");
     const instructions = client.instructions ?? "";
-    if (tools.some(tool => tool.name.startsWith("wiki.")) && !instructions.includes(`Authenticated agent: ${this.config.identity}. Definition `)) {
+    if (!this.wiki && tools.some(tool => tool.name.startsWith("wiki.")) && !instructions.includes(`Authenticated agent: ${this.config.identity}. Definition `)) {
       throw new Error("The wiki authenticated a different agent identity.");
     }
+    this.wiki?.setIdentity(this.config.id, instructions);
     this.catalog = { tools: JSON.parse(JSON.stringify(tools)) as JsonRepresentation<Tool>[], instructions, checkedAt: Date.now() };
     this.error = undefined;
     this.install();

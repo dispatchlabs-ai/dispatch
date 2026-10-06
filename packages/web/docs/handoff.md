@@ -675,3 +675,20 @@ Acceptance criteria and evidence to complete with implementation:
 - Review source and the complete diff; run the repository's required TypeScript/build/Nix checks for implementation and review desktop/390 px layouts. Follow the then-current testing policy; today's zero-tests rule remains in force. Record functional, security, recovery and interaction evidence or outstanding qualification here rather than inferring success from builds.
 
 This documentation update establishes design and acceptance criteria only. No OAuth integration, provisioning endpoint, credentials, access grants, runtime change or deployment is implemented or qualified by it.
+
+
+## WP-030 — Agent editor and existing Wiki authorization
+
+**Implemented October 6, 2026.** Chris authorized the revised editor and MCP screens while deferring Agent Wiki API-based agent registration. The [specification](spec.md#agent-editor-and-existing-wiki-authorization) records the interim standing-agent authority, owner-controlled authorization and explicit shared-definition audience. WP-029 remains unimplemented. Project assignment retains the current conversation flow.
+
+Implementation: the desktop/phone editor, Settings → Connections, `server/wiki-connections.ts`, existing native MCP bindings, and actor-bound idempotent revision saves. Existing operator credentials are preserved. No Agent Wiki code or infrastructure deployment is part of this package.
+
+Acceptance criteria and evidence:
+
+- Source reviewed: compact identity, large instructions, collapsible model/capabilities, only the installed Files and commands option, read-only connection identity, friendly/exact tool names, truthful revision/dirty states, and one fixed save bar. Desktop details are optional and initially hidden in the editor.
+- Source reviewed: drafts include capabilities and connection selections; additions/removals are staged with an explicit new-only/existing-instance choice. Saves preserve immutable prior definitions and unrelated instance configuration, retain revision conflicts, and deduplicate same-request retries in Pi's native commit.
+- Source reviewed: OAuth metadata/issuer/callback/PKCE/state validation, a same-origin callback relay preserving Strict session cookies, authenticated same-agent verification, encrypted secrets, owner checks, per-definition connection reservation, scoped credential use, rotation uncertainty, and serialized authorize/disconnect transitions. Revocation is not claimed complete before Wiki responds. Native tasks retain unsafe external-write replay semantics.
+- Rendered on the actual local service at 1440×1000 and 390×844: editor identity/instructions, fixed actions, capability/model summaries, the existing connected operator card and its nine friendly tool names, Settings empty state, and the Wiki authorization form. Captures remain in the task checkout's ignored `.local/agent-editor/`. The local sign-in used the existing saved passkey. No agent definition, grant, or message was submitted for this visual review.
+- Visual review corrected a misleading pristine-draft Unsaved badge. Startup surfaced a strict-JSON migration issue; source now omits optional idempotency properties instead of inserting `undefined` into native documents, and the local service reopened successfully.
+- Required final checks: source/deslop review, TypeScript/production builds, Apple Silicon `nix build`, `nix flake check`, changed-document links, and whitespace/diff review. Record final publication evidence here before completion.
+- Functional/security qualification remains unverified under the current zero-tests policy: OAuth consent/callback end to end, permissions/revocation/renewal, save/retry/conflict/existing-instance behavior, multi-user boundaries, keyboard/assistive technology, zoom/font scaling, physical touch and virtual-keyboard behavior. Static captures and builds do not establish those outcomes. No tests were added or run; no new Wiki authorization was created. Omarchy was not deployed.

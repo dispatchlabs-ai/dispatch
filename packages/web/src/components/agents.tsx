@@ -1,5 +1,5 @@
 import { ArrowRight, Archive, Pencil } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type {
   AgentDefinition,
   AgentDraft,
@@ -11,13 +11,16 @@ import { ApiError, errorMessage } from "../lib/api";
 import { describeAgentTools } from "../lib/agent-tools";
 import { useSession } from "../lib/session";
 import { Button, Field, Input, Modal, Notice, Select, Spinner } from "./ui";
-import { AgentConnectionsPanel } from "./agent-connections";
+import { AgentConnectionsEditor, AgentConnectionsPanel } from "./agent-connections";
 
 export type AgentEditing = {
   key: string;
   saved?: AgentDefinition;
   initialDraft: AgentDraft;
   draft: AgentDraft;
+  initialConnectionIds: string[];
+  connectionIds: string[];
+  applyConnectionsToExisting: boolean;
   busy: boolean;
 };
 
@@ -32,20 +35,28 @@ export function beginAgentEdit(
     provider: saved?.provider ?? defaultAgent?.provider ?? "",
     modelId: saved?.modelId ?? defaultAgent?.modelId ?? "",
     thinkingLevel: saved?.thinkingLevel ?? defaultAgent?.thinkingLevel ?? "off",
+    capabilities: saved?.capabilities ?? [],
   };
+  const connectionIds = saved?.connections?.filter(connection => connection.source === "oauth").map(connection => connection.id) ?? [];
   return {
     key: crypto.randomUUID(),
     saved,
     initialDraft,
     draft: initialDraft,
+    initialConnectionIds: connectionIds,
+    connectionIds,
+    applyConnectionsToExisting: false,
     busy: false,
   };
 }
 
 export function agentEditIsDirty(editing: AgentEditing) {
-  return (Object.keys(editing.initialDraft) as (keyof AgentDraft)[]).some(
-    (key) => editing.draft[key] !== editing.initialDraft[key],
-  );
+  return JSON.stringify(editing.draft) !== JSON.stringify(editing.initialDraft)
+    || agentConnectionsChanged(editing);
+}
+
+function agentConnectionsChanged(editing: AgentEditing) {
+  return JSON.stringify([...editing.connectionIds].sort()) !== JSON.stringify([...editing.initialConnectionIds].sort());
 }
 
 function thinkingLabel(level: ThinkingLevel) {
@@ -62,6 +73,7 @@ export function AgentsPage({
   onEdit,
   onStartChat,
   creating,
+  onConnectionsSettings,
 }: {
   agent?: AgentDefinition;
   editing: AgentEditing | null;
@@ -72,6 +84,7 @@ export function AgentsPage({
   onEdit: (agent: AgentDefinition) => void;
   onStartChat: (agentId: string) => void;
   creating: boolean;
+  onConnectionsSettings: () => void;
 }) {
   if (editing)
     return (
@@ -82,6 +95,7 @@ export function AgentsPage({
         onChange={onEditingChange}
         onCancel={onCancel}
         onSaved={onSaved}
+        onConnectionsSettings={onConnectionsSettings}
       />
     );
 
@@ -283,7 +297,7 @@ export function AgentDetails({
             <div className="context-title">
               <h2>{current.name || "Untitled agent"}</h2>
               <span className="revision-badge">
-                {editing ? "Unsaved" : `Revision ${saved!.revision}`}
+                {editing ? agentEditIsDirty(editing) ? "Unsaved changes" : "Draft" : `Revision ${saved!.revision}`}
               </span>
             </div>
             {editing ? (
@@ -325,7 +339,7 @@ export function AgentDetails({
               />
               <div>
                 <dt>Tools</dt>
-                <dd>{describeAgentTools(saved?.tools ?? [])}</dd>
+                <dd>{editing ? `${editing.draft.capabilities?.includes("files-and-commands") ? "Files and commands" : "No local tools"} · ${editing.connectionIds.length + (saved?.connections?.filter(connection => connection.source !== "oauth").length ?? 0)} connections` : describeAgentTools(saved?.tools ?? [])}</dd>
               </div>
             </dl>
             {contentChanged.length ? (
@@ -355,17 +369,22 @@ function AgentEditor({
   onChange,
   onSaved,
   onCancel,
+  onConnectionsSettings,
 }: {
   editing: AgentEditing;
   config: ApplicationConfig;
   onChange: (editing: AgentEditing) => void;
   onSaved: (agent: AgentDefinition) => void;
   onCancel: () => void;
+  onConnectionsSettings: () => void;
 }) {
   const { api } = useSession();
   const { saved: agent, draft, busy } = editing;
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
+  const [capabilitiesOpen] = useState(() => typeof window === "undefined" || window.innerWidth > 600);
+  const saveRequest = useRef<{ fingerprint: string; requestId: string } | null>(null);
+  const dirty = agentEditIsDirty(editing);
   const model = config.models.find(
     (model) => model.provider === draft.provider && model.id === draft.modelId,
   );
@@ -378,13 +397,15 @@ function AgentEditor({
     <section className="agent-editor agent-view">
       <header className="view-heading agent-heading">
         <div>
-          <h1>{agent ? `Edit ${agent.name}` : "New agent"}</h1>
+          <p className="page-eyebrow">Agents / {agent?.name || "New agent"}</p>
+          <h1>{agent ? "Edit definition" : "New agent"}</h1>
           <p>
             {agent
-              ? `Saving creates revision ${agent.revision + 1}. Existing chats keep their current setup.`
+              ? `Based on revision ${agent.revision}. Saving creates a new revision.`
               : "Shared with your company"}
           </p>
         </div>
+        <span className="revision-badge">{dirty ? "Unsaved changes" : agent ? `Revision ${agent.revision}` : "Draft"}</span>
       </header>
       <form
         className="agent-editor-form"
@@ -395,10 +416,15 @@ function AgentEditor({
           setConflict(false);
           const input: SaveAgentInput = {
             ...draft,
+            connectionIds: editing.connectionIds,
+            applyConnectionsToExisting: agentConnectionsChanged(editing) && editing.applyConnectionsToExisting,
             ...(agent
               ? { id: agent.id, expectedRevision: agent.revision }
               : {}),
           };
+          const fingerprint = JSON.stringify(input);
+          if (saveRequest.current?.fingerprint !== fingerprint) saveRequest.current = { fingerprint, requestId: crypto.randomUUID() };
+          input.requestId = saveRequest.current.requestId;
           void api<{ agent: AgentDefinition }>("/api/agents", input)
             .then(({ agent }) => onSaved(agent))
             .catch((error) => {
@@ -414,7 +440,7 @@ function AgentEditor({
               <Notice>
                 {error}
                 {conflict
-                  ? " Your changes are still here. Copy anything you want to keep, then cancel and reopen the latest revision."
+                  ? " Your changes are still here. Copy anything you want to keep, then discard and reopen the latest revision."
                   : ""}
               </Notice>
             ) : null}
@@ -460,7 +486,7 @@ function AgentEditor({
                   <textarea
                     {...props}
                     disabled={busy}
-                    rows={10}
+                    rows={12}
                     maxLength={50000}
                     value={draft.instructions}
                     onChange={(event) =>
@@ -471,8 +497,10 @@ function AgentEditor({
                 )}
               </Field>
             </div>
+            <details className="agent-settings-section">
+              <summary><strong>Model</strong><span>{model?.name || draft.modelId || "Not configured"} · {thinkingLabel(draft.thinkingLevel)} thinking</span></summary>
             <fieldset disabled={busy} className="agent-form-section">
-              <legend>Model</legend>
+              <legend className="sr-only">Model settings</legend>
               <div className="form-columns">
                 <Field label="Model">
                   {(props) => (
@@ -542,16 +570,25 @@ function AgentEditor({
                 </Field>
               </div>
             </fieldset>
+            </details>
+            <details className="agent-settings-section" open={capabilitiesOpen}>
+              <summary><strong>Capabilities</strong><span>{draft.capabilities?.includes("files-and-commands") ? "Files and commands" : "Conversation only"}</span></summary>
+              <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("files-and-commands") ?? false} onChange={event => update("capabilities", event.target.checked ? ["files-and-commands"] : [])} /><span>Files and commands<small>Read and edit files, and run commands in the agent's working directory. Commands use the Dispatch service account.</small></span></label>
+            </details>
+            <AgentConnectionsEditor agent={agent} selectedIds={editing.connectionIds} busy={busy}
+              onChange={connectionIds => onChange({ ...editing, connectionIds })}
+              applyExisting={editing.applyConnectionsToExisting} onApplyExisting={applyConnectionsToExisting => onChange({ ...editing, applyConnectionsToExisting })}
+              onSettings={onConnectionsSettings} />
           </div>
         </div>
         <footer className="agent-editor-actions">
           <div className="agent-editor-actions-inner">
-          <p className="editor-note">{agent?.tools.length ? `Tools: ${describeAgentTools(agent.tools)}` : "Conversation only · No tools"}</p>
+          <p className="editor-note">{agentConnectionsChanged(editing) && editing.applyConnectionsToExisting ? "Connection changes also apply to existing instances." : "Existing instances keep their saved configuration."}</p>
           <div className="button-row">
             <Button variant="secondary" disabled={busy} onClick={onCancel}>
-              Cancel
+              Discard
             </Button>
-            <Button type="submit" disabled={busy || !model || conflict}>
+            <Button type="submit" disabled={busy || !model || conflict || Boolean(agent && !dirty)}>
               {busy ? <Spinner label="Saving agent" /> : null}
               {agent ? "Save new revision" : "Create agent"}
             </Button>

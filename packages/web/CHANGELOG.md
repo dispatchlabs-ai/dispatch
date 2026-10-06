@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Rebuilt agent editing around compact identity, dominant instructions, model/capability summaries, staged MCP changes and one revision-save bar on desktop and phones. Added Settings authorization for existing Wiki agents, owner-managed disconnect/renewal, explicit application to existing instances, and retry-safe revision saves. API-based Wiki agent registration and delegated personal access remain deferred.
+
 - Refined Conversations around consistent left alignment, compact messages and navigation, contextual reply/copy actions, data-backed reply summaries, distinct agent avatars, and readable tool disclosures. Threads and participants open a contextual panel on demand; main and thread composers retain their own destinations and drafts.
 
 - Simplified shared reply publication to one successful-final publisher. Removed separate published-reply lists and consolidated interruption recovery and message identity checks. Historical duplicate repair now runs once during migration. Existing history and thread references remain intact.
