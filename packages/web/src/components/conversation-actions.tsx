@@ -1,11 +1,12 @@
 import { Menu } from "@base-ui/react/menu";
-import { Archive, ArchiveRestore, FolderInput, MoreHorizontal, Pin } from "lucide-react";
+import { Archive, ArchiveRestore, FolderInput, MoreHorizontal, Pencil, Pin } from "lucide-react";
 import type { ChatSummary, UpdateChatInput } from "../shared/contracts";
 import { IconButton } from "./ui";
 
-export function ConversationActions({ chat, busy, onMove, onUpdate }: {
+export function ConversationActions({ chat, busy, onMove, onRename, onUpdate }: {
   chat: ChatSummary;
   busy: boolean;
+  onRename: (chat: ChatSummary) => void;
   onMove: (chat: ChatSummary) => void;
   onUpdate: (id: string, input: UpdateChatInput) => void;
 }) {
@@ -14,6 +15,7 @@ export function ConversationActions({ chat, busy, onMove, onUpdate }: {
     <Menu.Portal>
       <Menu.Positioner className="menu-positioner" sideOffset={6} align="end" collisionPadding={12}>
         <Menu.Popup className="action-menu">
+          <Menu.Item onClick={() => onRename(chat)}><Pencil size={16} /> Rename conversation</Menu.Item>
           <Menu.Item onClick={() => onMove(chat)}><FolderInput size={16} /> Move to project</Menu.Item>
           <Menu.Item onClick={() => onUpdate(chat.id, { pinned: !chat.pinned })}><Pin size={16} /> {chat.pinned ? "Unpin" : "Pin"} conversation</Menu.Item>
           <Menu.Item onClick={() => onUpdate(chat.id, { archived: !chat.archived })}>

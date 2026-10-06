@@ -12,6 +12,7 @@ import { Brand } from "./brand";
 import { ChatPanel } from "./chat";
 import { NewConversationDialog } from "./conversation-people";
 import { InviteParticipantsDialog, SharedContextPanel } from "./shared-conversation";
+import { RenameConversationDialog } from "./rename-conversation-dialog";
 import { ConversationSidebar } from "./conversation-sidebar";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ContextPanel } from "./context-panel";
@@ -54,6 +55,7 @@ export function Workspace() {
   const projectRequest = useRef<CreateProjectInput | null>(null);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(() => new Set());
   const [showArchivedChats, setShowArchivedChats] = useState(false);
+  const [renamingChat, setRenamingChat] = useState<ChatSummary | null>(null);
   const [movingChat, setMovingChat] = useState<ChatSummary | null>(null);
   const [updatingChats, setUpdatingChats] = useState<Set<string>>(() => new Set());
   const [agents, setAgents] = useState<AgentDefinition[]>([]);
@@ -304,6 +306,15 @@ export function Workspace() {
     void updateChat(id, input).catch(error => setError(errorMessage(error)));
   }
 
+  function renameChat(chat: ChatSummary) {
+    setNavigationOpen(false);
+    setRenamingChat(chat);
+  }
+
+  async function saveChatTitle(id: string, title: string) {
+    onSnapshot(await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(id)}/title`, { title }));
+  }
+
   function moveChat(chat: ChatSummary) {
     setNavigationOpen(false);
     setMovingChat(chat);
@@ -425,7 +436,7 @@ export function Workspace() {
       onNameChange: name => { setProjectName(name); setProjectError(null); }, onCreate: createProject,
       onCancel: () => { setProjectName(""); setProjectError(null); projectRequest.current = null; } }}
     onSelect={selectChat} onSelectProject={selectProject} onCreate={() => chooseAgents(config?.defaultAgentId, activeProjectId)}
-    onMove={moveChat} onUpdate={updateChatAction} />;
+    onMove={moveChat} onRename={renameChat} onUpdate={updateChatAction} />;
   const sidebar = <>
     <div className="section-sidebar-panel" hidden={section !== "chats"}>{conversations}</div>
     <div className="section-sidebar-panel" hidden={section !== "agents"}>
@@ -559,7 +570,7 @@ export function Workspace() {
             /> : tab.kind === "project" ? <ProjectPage
               project={projects.find(project => project.id === tab.projectId)} chats={chats} creating={creating} updating={updatingChats}
               onCreate={() => chooseAgents(config.defaultAgentId, tab.projectId)} onSelect={selectChat}
-              onMove={moveChat} onUpdate={updateChatAction}
+              onMove={moveChat} onRename={renameChat} onUpdate={updateChatAction}
             /> : <Welcome
               name={state.user.name} config={config}
               onCreate={() => chooseAgents()} creating={creating}
@@ -583,6 +594,7 @@ export function Workspace() {
     </Tabs.Root>
     {invitingChatId && snapshots[invitingChatId] ? <InviteParticipantsDialog key={invitingChatId} snapshot={snapshots[invitingChatId]} agents={agents} onSnapshot={onSnapshot} onClose={() => setInvitingChatId(null)} /> : null}
     {newConversation ? <NewConversationDialog agents={agents} initialAgentIds={newConversation.agentIds} projectName={projects.find(project => project.id === newConversation.projectId)?.name} busy={creating} error={error} onClose={() => setNewConversation(null)} onCreate={ids => void createChat(ids, newConversation.projectId)} /> : null}
+    {renamingChat ? <RenameConversationDialog key={renamingChat.id} chat={renamingChat} onClose={() => setRenamingChat(null)} onRename={saveChatTitle} /> : null}
     {movingChat ? <MoveConversationDialog key={movingChat.id} chat={movingChat} projects={projects} onClose={() => setMovingChat(null)} onMove={(id, projectId) => updateChat(id, { projectId })} /> : null}
     <Modal title="Discard agent changes?" description="Your unsaved changes will be lost."
       open={pendingAgentAction !== null} onOpenChange={open => { if (!open) setPendingAgentAction(null); }}

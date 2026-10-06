@@ -24,11 +24,12 @@ type ConversationSidebarProps = {
   onSelect: (id: string) => void;
   onSelectProject: (id: string) => void;
   onCreate: () => void;
+  onRename: (chat: ChatSummary) => void;
   onMove: (chat: ChatSummary) => void;
   onUpdate: (id: string, input: UpdateChatInput) => void;
 };
 
-export function ConversationSidebar({ chats, projects, activeChatId, activeProjectId, search, onSearchChange, creating, updating, showArchived, onShowArchivedChange, collapsedProjects, onToggleProject, newProject, onSelect, onSelectProject, onCreate, onMove, onUpdate }: ConversationSidebarProps) {
+export function ConversationSidebar({ chats, projects, activeChatId, activeProjectId, search, onSearchChange, creating, updating, showArchived, onShowArchivedChange, collapsedProjects, onToggleProject, newProject, onSelect, onSelectProject, onCreate, onMove, onRename, onUpdate }: ConversationSidebarProps) {
   const groupPrefix = useId();
   const visible = chats.filter(chat => chat.archived === showArchived);
   const query = search.trim().toLowerCase();
@@ -48,7 +49,7 @@ export function ConversationSidebar({ chats, projects, activeChatId, activeProje
         {chat.pinned ? <Pin size={13} aria-label="Pinned" /> : null}
         <span className={`conversation-dot dot-${chat.status}`} aria-label={statusLabels[chat.status]} />
       </button>
-      <div className="sidebar-row-actions"><ConversationActions chat={chat} busy={updating.has(chat.id)} onMove={onMove} onUpdate={onUpdate} /></div>
+      <div className="sidebar-row-actions"><ConversationActions chat={chat} busy={updating.has(chat.id)} onMove={onMove} onRename={onRename} onUpdate={onUpdate} /></div>
     </div>;
   }
 

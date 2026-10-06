@@ -40,13 +40,14 @@ export function NewProjectButton({ name, busy, error, compact, onNameChange, onC
   </Popover.Root>;
 }
 
-export function ProjectPage({ project, chats, creating, updating, onCreate, onSelect, onMove, onUpdate }: {
+export function ProjectPage({ project, chats, creating, updating, onCreate, onSelect, onMove, onRename, onUpdate }: {
   project?: Project;
   chats: ChatSummary[];
   creating: boolean;
   updating: ReadonlySet<string>;
   onCreate: () => void;
   onSelect: (id: string) => void;
+  onRename: (chat: ChatSummary) => void;
   onMove: (chat: ChatSummary) => void;
   onUpdate: (id: string, input: UpdateChatInput) => void;
 }) {
@@ -65,7 +66,7 @@ export function ProjectPage({ project, chats, creating, updating, onCreate, onSe
           <span>{chat.title}</span>
           <time dateTime={new Date(chat.updatedAt).toISOString()}>{conversationDate(chat.updatedAt)}</time>
         </button>
-        <ConversationActions chat={chat} busy={updating.has(chat.id)} onMove={onMove} onUpdate={onUpdate} />
+        <ConversationActions chat={chat} busy={updating.has(chat.id)} onMove={onMove} onRename={onRename} onUpdate={onUpdate} />
       </li>)}
     </ul> : <div className="project-empty"><p>No conversations yet.</p><p>Start a conversation here, or move one from its actions menu.</p></div>}
   </section>;
