@@ -37,7 +37,7 @@ export function beginAgentEdit(
     thinkingLevel: saved?.thinkingLevel ?? defaultAgent?.thinkingLevel ?? "off",
     capabilities: saved?.capabilities ?? [],
   };
-  const connectionIds = saved?.connections?.filter(connection => connection.source === "oauth").map(connection => connection.id) ?? [];
+  const connectionIds = saved?.connections?.filter(connection => connection.source === "managed" || connection.source === "oauth").map(connection => connection.id) ?? [];
   return {
     key: crypto.randomUUID(),
     saved,

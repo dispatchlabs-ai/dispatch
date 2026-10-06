@@ -69,9 +69,9 @@ Refreshing also applies these views to existing tool calls. The cards use the or
 ### Developer's Wiki connection
 
 Open **Agents → Developer → Connections** to see the personal Wiki endpoint,
-**Dispatch Developer** identity, connection status and discovered tools. Full access
-covers article search/read/history/preview/save and conversation-trace/attachment
-access. The other named agents retain their own configured capabilities.
+**Dispatch Developer** identity, connection status and discovered tools. Its configured
+Wiki grants cover article search/read/history/preview/save and conversation-trace/attachment
+access; discovery itself does not prove those grants. The other named agents retain their own configured capabilities.
 
 The local operator provisions this connection through Palm's
 `infra/playbooks/dispatch-developer-wiki.yml`. It uses a dedicated Wiki signing
@@ -109,17 +109,20 @@ action. A successful initialization establishes the advertised catalog, not that
 all tool operations succeeded. An interrupted write is never automatically replayed;
 inspect its outcome before retrying with Wiki's operation ID rules.
 
-### Connect an existing Wiki agent
+### Connect an MCP server
 
-1. Create the agent and its grants in Agent Wiki's own UI first.
-2. Open **Settings → Connections → Connect Wiki**, enter its HTTPS MCP address, and choose article/evidence permissions. Continue to the Wiki, sign in, and authorize the existing agent. Dispatch shows its returned identity; no API key needs to be pasted.
-3. In **Agents → Edit → MCP connections → Add connection**, choose that authorization (or connect a new one directly). Review the sharing notice and select whether connection changes apply only to new instances or also to existing ones. **Save new revision** commits the selection. Authorization alone does not add access to a definition.
+1. Open **Settings → Connections → Connect server**, or **Agents → Edit → MCP connections → Add connection → Connect another server**.
+2. Enter a name and the server's Streamable HTTP URL. HTTPS endpoints can use any path; HTTP is supported only on loopback. Choose the authentication method documented by the provider: **OAuth**, **Bearer token**, **Custom headers**, or **No authentication**. Token and header values are entered in password fields and stored encrypted by the service.
+3. For OAuth, continue to the provider's sign-in/consent window. **Advanced OAuth settings** accepts optional space-separated scopes and a registered client ID/secret when automatic client registration is unavailable; it shows the callback URL to register. Blank scopes use the server's advertised requirements. Dispatch does not assume a Wiki account or create an upstream agent.
+4. Choose the connection in the agent editor, review the shared-conversation notice, and choose new instances only or new and existing instances. **Save new revision** commits the selection. Connecting alone does not grant an agent access.
 
-Connections are reserved for one definition and use the existing Wiki agent's standing rights. Every participant in the agent's conversations may receive Wiki content, including later invitees; teammates can edit the shared definition. This interim flow does not implement delegated personal Wiki permissions. The original operator-managed Developer connection stays visible and is still managed through its manifest.
+Connections are reserved for one definition and use the configured provider authority. Participants, including later invitees, can receive connected content; teammates can edit the shared definition. This is not the future delegated personal-Wiki permission model. MCP server/tool names and OAuth scopes are shown when available; a discovered tool list does not prove permission to perform every operation. Existing operator-managed connections remain on their definitions and are edited through their manifest.
 
-**Discard** abandons staged definition changes. An unused authorization remains in Settings, where its owner can disconnect it. Disconnect disables access for every bound instance and attempts upstream revocation; retry when revocation remains pending. **Authorize again** renews the same identity and scope ceiling. Use a separate connection to change identity or permissions, then save the desired instance scope. Article and original-evidence access remain independently limited by Wiki grants.
+**Discard** abandons staged definition changes. An unused connection remains in Settings. **Disconnect** disables future Dispatch access for all bound instances. For OAuth providers that advertise revocation, it also revokes the tokens; retry a pending revocation. Without that endpoint, or for pasted credentials, Dispatch removes its stored credentials and tells you to revoke them with the provider separately. Reauthorization keeps the scope ceiling; use a new connection to change endpoint, authentication method or permissions.
 
-The editor's Files and commands capability selects native local coding tools for future instances. Existing instances retain their saved configuration, except an explicitly applied MCP connection change. Switching between editor and Settings preserves the draft; reloading or ending the sign-in session does not. No API-based Wiki agent registration is performed.
+Existing Wiki authorizations retain their identity check and bindings during migration. A newly connected Wiki uses the same generic MCP setup as other services, with its own consent screen and grants deciding access. API-based Wiki agent registration is still deferred.
+
+The editor's Files and commands capability selects native local coding tools for future instances. Existing instances retain their saved configuration, except an explicitly applied MCP connection change. Switching between editor and Settings preserves the draft; reloading or ending the sign-in session does not.
 
 ## Chat and workspace
 

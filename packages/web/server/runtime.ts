@@ -9,13 +9,14 @@ import { configure, createRegistry, defineDoc, Harness, type ConversationId, typ
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
-import type { AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, SaveAgentInput, UpdateChatInput, WikiConnection } from "../src/shared/contracts.js";
+import type { AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection } from "../src/shared/contracts.js";
+import { isManagedConnection } from "../src/shared/contracts.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { Coding } from "./extensions/coding.js";
 import { SharedConversations, SharedDoc, type Member, type PeopleDirectory } from "./collaboration/shared.js";
 import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
 import { TurnsDoc } from "./collaboration/turns.js";
-import type { WikiConnections } from "./wiki-connections.js";
+import type { McpConnections } from "./mcp-connections.js";
 
 const context = BACKGROUND_CONTEXT;
 type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { pinned?: boolean; archived?: boolean; agentName?: string; projectId?: string | null; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
@@ -36,7 +37,7 @@ export type RuntimeOptions = {
   stateDir: string;
   companyId: string;
   connectionsFile?: string;
-  wikiConnections?: WikiConnections;
+  mcpConnections?: McpConnections;
   provider?: string;
   modelId?: string;
   thinkingLevel?: AgentDraft["thinkingLevel"];
@@ -56,7 +57,7 @@ export class DispatchRuntime {
   private shared: SharedConversations;
   private peopleDirectory?: PeopleDirectory;
   private connections: AgentConnections;
-  private wiki?: WikiConnections;
+  private managed?: McpConnections;
 
   private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: RegistryReader, shared: SharedConversations, connections: AgentConnections, peopleDirectory?: PeopleDirectory) {
     this.connections = connections;
@@ -76,7 +77,7 @@ export class DispatchRuntime {
     let storage: Storage | undefined;
     let connections: AgentConnections | undefined;
     try {
-      options.wikiConnections?.recoverInterruptedRenewals();
+      options.mcpConnections?.initialize();
       const models = options.models ?? productionModels();
       const filename = join(owner.directory, "pi.sqlite");
       storage = await openNodeSqliteStorage(filename);
@@ -87,7 +88,7 @@ export class DispatchRuntime {
       registry.install(shared.extension);
       registry.install(CodingTools);
       registry.install(Coding);
-      connections = await AgentConnections.load(options.connectionsFile ?? join(owner.directory, "agent-connections.json"), registry, options.wikiConnections, options.companyId);
+      connections = await AgentConnections.load(options.connectionsFile ?? join(owner.directory, "agent-connections.json"), registry, options.mcpConnections, options.companyId);
       const harness = await Harness.open(storage, {
         models, registry, settings: { ...options.settings, extensions: options.settings?.extensions ?? [shared.extension, CodingTools, Coding] },
         env: async ({ cwd }) => {
@@ -98,7 +99,7 @@ export class DispatchRuntime {
         },
       }, context);
       runtime = new DispatchRuntime(harness, storage, models, owner, registry, shared, connections, options.peopleDirectory);
-      runtime.wiki = options.wikiConnections;
+      runtime.managed = options.mcpConnections;
       // Seed once and publish a real commit before recovery so snapshots use Pi's persisted sequence.
       await harness.commit(async (tx) => {
         const catalog = await tx.doc(CatalogDoc);
@@ -319,31 +320,32 @@ export class DispatchRuntime {
     const catalog = await this.harness.snapshot(CatalogDoc, context);
     const agent = [...catalog!.agents].reverse().find(agent => agent.companyId === scope.companyId && agent.id === id);
     if (!agent) throw new RuntimeError(404, "Agent not found.");
-    return this.connections.status(id, wikiIds(agent));
+    return this.connections.status(id, managedIds(agent));
   }
 
   async reconnectAgentConnection(scope: RuntimeScope, agentId: string, connectionId: string) {
     const connections = await this.agentConnections(scope, agentId);
     if (!connections.some(connection => connection.id === connectionId)) throw new RuntimeError(404, "Connection not found.");
-    return this.connections.reconnect(agentId, connectionId, connections.filter(connection => connection.source === "oauth").map(connection => connection.id));
+    return this.connections.reconnect(agentId, connectionId, connections.filter(isManagedConnection).map(connection => connection.id));
   }
 
-  async listWikiConnections(scope: RuntimeScope): Promise<WikiConnection[]> {
+  async listMcpConnections(scope: RuntimeScope): Promise<ManagedConnection[]> {
     const catalog = await this.harness.snapshot(CatalogDoc, context);
     const latest = new Map<string, StoredAgent>();
     for (const agent of catalog!.agents) if (agent.companyId === scope.companyId) latest.set(agent.id, agent);
-    return (this.wiki?.list(scope.companyId) ?? []).filter(record => record.ownerId === scope.userId || catalog!.connectionOwners?.[record.id])
+    return (this.managed?.list(scope.companyId) ?? []).filter(record => record.ownerId === scope.userId || catalog!.connectionOwners?.[record.id])
       .map(record => {
         const assigned = catalog!.connectionOwners?.[record.id];
         const agent = assigned ? latest.get(assigned) : undefined;
-        return { ...(this.connections.wikiStatus(record.id) ?? { id: record.id, name: record.name, endpoint: record.endpoint, identity: record.identity,
-          extension: `dispatch-mcp-oauth-${record.id}`, status: "disconnected" as const, access: "Selected tools" as const, checkedAt: null, tools: [], source: "oauth" as const }),
-          authorization: record.authorization, scopes: record.scopes, createdAt: record.createdAt, canManage: record.ownerId === scope.userId,
+        return { ...(this.connections.managedStatus(record.id) ?? { id: record.id, name: record.name, endpoint: record.endpoint, identity: record.identity,
+          extension: `dispatch-mcp-oauth-${record.id}`, status: "disconnected" as const, checkedAt: null, tools: [], source: "managed" as const }),
+          authorization: record.authorization, authentication: record.authentication, scopes: record.scopes, createdAt: record.createdAt, canManage: record.ownerId === scope.userId,
+          ...(record.disconnectNotice ? { disconnectNotice: record.disconnectNotice } : {}),
           usedBy: agent ? [{ id: agent.id, name: agent.name }] : [], ...(record.error ? { error: record.error } : {}) };
       });
   }
 
-  async refreshWikiConnections(id?: string) { await this.connections.reloadWiki(id); }
+  async refreshMcpConnections(id?: string) { await this.connections.reloadManaged(id); }
 
   async saveAgent(scope: RuntimeScope, input: SaveAgentInput): Promise<AgentDefinition> {
     this.validateAgent(input);
@@ -362,20 +364,20 @@ export class DispatchRuntime {
       if (prior && prior.revision !== input.expectedRevision) throw new RuntimeError(409, "The agent has changed. Reload it before saving.");
       const now = Date.now();
       const id = prior?.id ?? randomUUID();
-      const selectedWiki = input.connectionIds ?? (prior ? wikiIds(prior) : []);
-      for (const connectionId of selectedWiki) {
-        if (!prior || !wikiIds(prior).includes(connectionId)) {
-          if (!this.wiki) throw new RuntimeError(503, "Wiki connections are unavailable.");
-          this.wiki.requireAssignment(scope, connectionId);
+      const selectedManaged = input.connectionIds ?? (prior ? managedIds(prior) : []);
+      for (const connectionId of selectedManaged) {
+        if (!prior || !managedIds(prior).includes(connectionId)) {
+          if (!this.managed) throw new RuntimeError(503, "MCP connections are unavailable.");
+          this.managed.requireAssignment(scope, connectionId);
         }
         const owner = catalog.connectionOwners?.[connectionId];
-        if (owner && owner !== id) throw new RuntimeError(409, "That Wiki authorization belongs to another agent. Authorize a separate connection for this agent.");
+        if (owner && owner !== id) throw new RuntimeError(409, "That connection belongs to another agent. Add a separate connection for this agent.");
       }
-      const selectedConnections = this.connections.forAgent(id, selectedWiki);
-      if (selectedWiki.some(connectionId => !selectedConnections.some(connection => connection.id === connectionId && connection.source === "oauth"))) throw new RuntimeError(409, "A selected connection is unavailable. Refresh its authorization before saving.");
+      const selectedConnections = this.connections.forAgent(id, selectedManaged);
+      if (selectedManaged.some(connectionId => !selectedConnections.some(connection => connection.id === connectionId && isManagedConnection(connection)))) throw new RuntimeError(409, "A selected connection is unavailable. Update it in Settings before saving.");
       catalog.connectionOwners ??= {};
-      for (const connectionId of selectedWiki) catalog.connectionOwners[connectionId] = id;
-      const selection = this.connections.selection(id, selectedWiki);
+      for (const connectionId of selectedManaged) catalog.connectionOwners[connectionId] = id;
+      const selection = this.connections.selection(id, selectedManaged);
       let extensions = (prior?.extensions ?? []).filter(name => !isMcpExtension(name));
       let tools = (prior?.tools ?? []).filter(name => !isMcpTool(name));
       if (input.capabilities !== undefined) {
@@ -396,7 +398,7 @@ export class DispatchRuntime {
           const room = await tx.doc(SharedDoc, nativeId(chat.id));
           for (const member of room.members) {
             if (member.kind !== "agent" || member.agentDefinitionId !== id || !member.conversationId || !member.agent) continue;
-            const connected = await this.connections.bind(tx, member.conversationId, id, true, selectedWiki, true);
+            const connected = await this.connections.bind(tx, member.conversationId, id, true, selectedManaged, true);
             member.agent.extensions = [...member.agent.extensions.filter(name => !isMcpExtension(name)), ...connected.extensions];
             member.agent.tools = [...member.agent.tools.filter(name => !isMcpTool(name)), ...connected.tools];
           }
@@ -455,7 +457,7 @@ export class DispatchRuntime {
     const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
     const cwd = agent.extensions?.includes(CodingTools.name) ? join(this.owner.directory, "workspaces", String(record.id)) : undefined;
     await configure(tx, record.id, { model: { provider: agent.provider, modelId: agent.modelId }, instructions: agent.instructions, thinkingLevel: agent.thinkingLevel, extensions, tools, ...(cwd ? { cwd } : {}) });
-    await this.connections.bind(tx, record.id, definitionId, false, wikiIds(agent));
+    await this.connections.bind(tx, record.id, definitionId, false, managedIds(agent));
     return { id: randomUUID(), kind: "agent", name: agent.name, joinedAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, conversationId: record.id, status: "idle", agent: { ...publicAgent(agent), ...(cwd ? { cwd } : {}) } };
   }
 
@@ -465,9 +467,9 @@ export class DispatchRuntime {
       const latest = new Map<string, StoredAgent>();
       for (const agent of catalog.agents) if (agent.companyId === companyId) latest.set(agent.id, agent);
       for (const agent of latest.values()) {
-        const connections = this.connections.forAgent(agent.id, wikiIds(agent));
+        const connections = this.connections.forAgent(agent.id, managedIds(agent));
         if (!connections.length && !agent.connections?.length) continue;
-        const selection = this.connections.selection(agent.id, wikiIds(agent));
+        const selection = this.connections.selection(agent.id, managedIds(agent));
         const extensions = [...(agent.extensions ?? []).filter(name => !isMcpExtension(name)), ...selection.extensions];
         const tools = [...(agent.tools ?? []).filter(name => !isMcpTool(name)), ...selection.tools];
         if (JSON.stringify([agent.connections, agent.extensions, agent.tools]) !== JSON.stringify([connections, extensions, tools])) {
@@ -541,7 +543,7 @@ function projectSummary(project: StoredProject): Project {
 function publicAgent({ companyId: _companyId, savedBy: _savedBy, saveRequestId: _request, saveFingerprint: _fingerprint, ...agent }: StoredAgent): AgentDefinition {
   return { ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [], capabilities: agent.extensions?.includes(CodingTools.name) ? ["files-and-commands"] : [] };
 }
-function wikiIds(agent: Pick<AgentDefinition, "connections">) { return (agent.connections ?? []).filter(connection => connection.source === "oauth").map(connection => connection.id); }
+function managedIds(agent: Pick<AgentDefinition, "connections">) { return (agent.connections ?? []).filter(isManagedConnection).map(connection => connection.id); }
 function requireText(value: unknown, field: string, max: number, allowEmpty = false): asserts value is string {
   if (typeof value !== "string" || (!allowEmpty && !value.trim()) || value.length > max) throw new RuntimeError(400, `${field} must be ${allowEmpty ? "at most" : "between 1 and"} ${max} characters.`);
 }

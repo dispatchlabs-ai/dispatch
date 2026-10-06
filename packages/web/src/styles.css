@@ -492,6 +492,18 @@ input::placeholder, textarea::placeholder { color: var(--color-muted); }
 .connection-application { border-top: 1px solid var(--color-border); padding-top: var(--space-4); }
 .connection-application legend, .connection-permissions legend { font-size: var(--text-sm); font-weight: 650; }
 .connection-dialog-form, .connection-picker, .connections-page-inner { display: grid; gap: var(--space-5); min-width: 0; }
+.connection-advanced { border-top: 1px solid var(--color-border); padding-top: var(--space-4); }
+.connection-advanced summary { cursor: pointer; font-size: var(--text-sm); font-weight: 600; }
+.connection-advanced > .field, .connection-advanced > p { margin-top: var(--space-4); }
+.connection-advanced code { overflow-wrap: anywhere; }
+.connection-header-fields { border: 0; padding: 0; margin: 0; display: grid; gap: var(--space-3); min-width: 0; }
+.connection-header-fields legend { font-size: var(--text-sm); font-weight: 600; margin-bottom: var(--space-2); }
+.connection-header-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: var(--space-2); align-items: end; }
+.connection-header-row > .icon-button { margin-bottom: var(--space-1); }
+@media (max-width: 600px) {
+  .connection-header-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .connection-header-row > .field:first-child { grid-column: 1 / -1; }
+}
 .connection-auth-link { text-decoration: underline; min-height: 44px; align-content: center; }
 .connections-page-inner { max-width: 1040px; }
 .connections-page .view-heading { padding-inline: var(--agent-gutter); gap: var(--space-4); flex-wrap: wrap; }

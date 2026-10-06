@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Corrected MCP connection setup to be provider-neutral: remote Streamable HTTP with OAuth, bearer tokens, custom headers or no authentication; server-supplied tool labels; migration of existing Wiki credentials/bindings; explicit local-only disconnect when provider revocation is unavailable. Wiki principal provisioning remains separate future work.
 - Rebuilt agent editing around compact identity, dominant instructions, model/capability summaries, staged MCP changes and one revision-save bar on desktop and phones. Added Settings authorization for existing Wiki agents, owner-managed disconnect/renewal, explicit application to existing instances, and retry-safe revision saves. API-based Wiki agent registration and delegated personal access remain deferred.
 
 - Refined Conversations around consistent left alignment, compact messages and navigation, contextual reply/copy actions, data-backed reply summaries, distinct agent avatars, and readable tool disclosures. Threads and participants open a contextual panel on demand; main and thread composers retain their own destinations and drafts.

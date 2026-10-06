@@ -7,7 +7,8 @@ import { AgentDoc, defineDoc, defineExtension, defineTool, section, type Convers
 import { McpClient, StdioTransport, StreamableHttpTransport, toLlmContent, type Tool } from "@earendil-works/pi-mcp";
 import { z } from "zod";
 import type { AgentConnection, AgentConnectionStatus } from "../src/shared/contracts.js";
-import type { WikiConnections, WikiConnectionRecord } from "./wiki-connections.js";
+import type { McpConnections, ManagedConnectionRecord } from "./mcp-connections.js";
+import { verifyLegacyOperatorIdentity } from "./legacy-wiki-connection.js";
 
 const context = BACKGROUND_CONTEXT;
 const id = z.string().regex(/^[a-z][a-z0-9_-]*$/).max(40);
@@ -20,26 +21,26 @@ const connectionSchema = z.object({
   /** Explicit operator decision to grant this connection to already-running instances. */
   applyToExisting: z.boolean().default(false),
 }).strict();
+// Retain the historical oauth namespace so stored bindings and tool IDs survive migration.
 type ConnectionConfig = z.infer<typeof connectionSchema> | { id: string; agentId: "oauth"; name: string; endpoint: string; identity: string; instructions: string; applyToExisting: false; source: "oauth" };
-type Catalog = { connections: Record<string, { tools: JsonRepresentation<Tool>[]; instructions: string; checkedAt: number }> };
+type Catalog = { connections: Record<string, { tools: JsonRepresentation<Tool>[]; instructions: string; checkedAt: number; serverName?: string }> };
 const CatalogDoc = defineDoc<Catalog>({ kind: "dispatch.mcp-catalog", version: 1, scope: "session", initial: () => ({ connections: {} }) });
 const BindingDoc = defineDoc<{ connections: string[] }>({
   kind: "dispatch.mcp-bindings", version: 1, scope: "conversation", history: "rewindable", fork: "asOf", initial: () => ({ connections: [] }),
 });
-const wikiTools = ["wiki.search", "wiki.read", "wiki.history", "wiki.traceSearch", "wiki.traces", "wiki.trace", "wiki.file", "wiki.preview", "wiki.save"];
 export const isMcpExtension = (name: string) => name.startsWith("dispatch-mcp-");
 export const isMcpTool = (name: string) => name.startsWith("mcp_");
 
-/** Operator-managed connections belong to individual definitions; secrets never enter Pi documents or HTTP responses. */
+/** Explicit per-definition bindings; credentials never enter native documents. */
 export class AgentConnections {
   private readonly connections: McpConnection[];
   private harness!: Harness;
   private closed = false;
   onChanged: () => Promise<void> = async () => {};
 
-  private constructor(configs: ConnectionConfig[], private readonly registry: Registry, private readonly wiki?: WikiConnections, private readonly companyId?: string) {
+  private constructor(configs: ConnectionConfig[], private readonly registry: Registry, private readonly managed?: McpConnections, private readonly companyId?: string) {
     this.connections = configs.map(config => this.create(config));
-    this.syncWiki();
+    this.syncManaged();
   }
 
   private create(config: ConnectionConfig) {
@@ -50,36 +51,36 @@ export class AgentConnections {
         catalog.connections[connection.key] = connection.catalog;
       }, context);
       await this.onChanged();
-    }, "source" in config ? this.wiki : undefined);
+    }, "source" in config ? this.managed : undefined);
   }
 
-  private syncWiki() {
-    if (!this.wiki || !this.companyId) return;
-    for (const record of this.wiki.list(this.companyId)) {
-      if (this.connections.some(connection => connection.isWiki && connection.config.id === record.id)) continue;
+  private syncManaged() {
+    if (!this.managed || !this.companyId) return;
+    for (const record of this.managed.list(this.companyId)) {
+      if (this.connections.some(connection => connection.isManaged && connection.config.id === record.id)) continue;
       this.connections.push(this.create({ id: record.id, agentId: "oauth", name: record.name, endpoint: record.endpoint,
         identity: record.identity, instructions: "", applyToExisting: false, source: "oauth" }));
     }
   }
 
-  async reloadWiki(id?: string) {
-    this.syncWiki();
+  async reloadManaged(id?: string) {
+    this.syncManaged();
     const saved = await this.harness.snapshot(CatalogDoc, context);
-    for (const connection of this.connections.filter(item => item.isWiki && (!id || item.config.id === id))) {
+    for (const connection of this.connections.filter(item => item.isManaged && (!id || item.config.id === id))) {
       connection.restore(saved?.connections[connection.key]);
       await connection.reconnect().catch(() => {});
     }
     await this.onChanged();
   }
 
-  static async load(filename: string, registry: Registry, wiki?: WikiConnections, companyId?: string) {
+  static async load(filename: string, registry: Registry, managed?: McpConnections, companyId?: string) {
     let raw: string;
     try { raw = await readFile(filename, "utf8"); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return new AgentConnections([], registry, wiki, companyId); throw error; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return new AgentConnections([], registry, managed, companyId); throw error; }
     const configs = z.object({ connections: z.array(connectionSchema) }).strict().parse(JSON.parse(raw)).connections;
     const keys = configs.map(config => `${config.agentId}/${config.id}`);
     if (new Set(keys).size !== keys.length) throw new Error("Each agent MCP connection must have a unique ID.");
-    return new AgentConnections(configs, registry, wiki, companyId);
+    return new AgentConnections(configs, registry, managed, companyId);
   }
 
   async open(harness: Harness) {
@@ -90,29 +91,29 @@ export class AgentConnections {
     await Promise.all(this.connections.map(connection => connection.connect().catch(() => {})));
   }
 
-  private selected(agentId: string, wikiIds: string[] = []) {
-    return this.connections.filter(connection => connection.isWiki ? wikiIds.includes(connection.config.id) : connection.config.agentId === agentId);
+  private selected(agentId: string, managedIds: string[] = []) {
+    return this.connections.filter(connection => connection.isManaged ? managedIds.includes(connection.config.id) : connection.config.agentId === agentId);
   }
-  forAgent(agentId: string, wikiIds: string[] = []): AgentConnection[] { return this.selected(agentId, wikiIds).map(connection => connection.descriptor()); }
-  status(agentId: string, wikiIds: string[] = []): AgentConnectionStatus[] { return this.selected(agentId, wikiIds).map(connection => connection.status()); }
-  wikiStatus(id: string) { return this.connections.find(connection => connection.isWiki && connection.config.id === id)?.status(); }
-  async reconnect(agentId: string, id: string, wikiIds: string[] = []) {
-    const connection = this.selected(agentId, wikiIds).find(item => item.config.id === id);
+  forAgent(agentId: string, managedIds: string[] = []): AgentConnection[] { return this.selected(agentId, managedIds).map(connection => connection.descriptor()); }
+  status(agentId: string, managedIds: string[] = []): AgentConnectionStatus[] { return this.selected(agentId, managedIds).map(connection => connection.status()); }
+  managedStatus(id: string) { return this.connections.find(connection => connection.isManaged && connection.config.id === id)?.status(); }
+  async reconnect(agentId: string, id: string, managedIds: string[] = []) {
+    const connection = this.selected(agentId, managedIds).find(item => item.config.id === id);
     if (!connection) throw new Error("MCP connection not found.");
     await connection.reconnect().catch(() => {});
-    return this.status(agentId, wikiIds);
+    return this.status(agentId, managedIds);
   }
   has(agentId: string) { return this.connections.some(connection => connection.config.agentId === agentId); }
 
-  selection(agentId: string, wikiIds: string[] = []) {
-    const connections = this.selected(agentId, wikiIds);
+  selection(agentId: string, managedIds: string[] = []) {
+    const connections = this.selected(agentId, managedIds);
     return { extensions: connections.map(connection => connection.extensionName), tools: connections.flatMap(connection => connection.toolNames()) };
   }
 
-  async bind(tx: Tx, conversationId: ConversationId, agentId: string, existing = false, wikiIds: string[] = [], applyWiki = false) {
+  async bind(tx: Tx, conversationId: ConversationId, agentId: string, existing = false, managedIds: string[] = [], applyManaged = false) {
     const binding = await tx.doc(BindingDoc, conversationId);
-    const connections = this.connections.filter(connection => connection.isWiki
-      ? (existing && !applyWiki ? binding.connections.includes(connection.key) : wikiIds.includes(connection.config.id))
+    const connections = this.connections.filter(connection => connection.isManaged
+      ? (existing && !applyManaged ? binding.connections.includes(connection.key) : managedIds.includes(connection.config.id))
       : connection.config.agentId === agentId && (!existing || connection.config.applyToExisting || binding.connections.includes(connection.key)));
     binding.connections = connections.map(connection => connection.key);
     const agent = await tx.doc(AgentDoc, conversationId);
@@ -140,27 +141,30 @@ class McpConnection {
   private error?: string;
   catalog: Catalog["connections"][string] = { tools: [], instructions: "", checkedAt: 0 };
 
-  constructor(readonly config: ConnectionConfig, private readonly registry: Registry, private readonly changed: (connection: McpConnection) => Promise<void>, private readonly wiki?: WikiConnections) {
+  constructor(readonly config: ConnectionConfig, private readonly registry: Registry, private readonly changed: (connection: McpConnection) => Promise<void>, private readonly managed?: McpConnections) {
     this.key = `${config.agentId}/${config.id}`;
     this.extensionName = `dispatch-mcp-${config.agentId}-${config.id}`;
   }
 
-  get isWiki() { return !!this.wiki; }
+  get isManaged() { return !!this.managed; }
 
-  private get wikiRecord(): WikiConnectionRecord | undefined { return this.wiki?.record(this.config.id); }
+  private get managedRecord(): ManagedConnectionRecord | undefined { return this.managed?.record(this.config.id); }
 
   descriptor(): AgentConnection {
-    return { id: this.config.id, name: this.config.name, endpoint: this.config.endpoint, identity: this.wikiRecord?.identity || this.config.identity, extension: this.extensionName, source: this.wiki ? "oauth" : "operator" };
+    const record = this.managedRecord;
+    return { id: this.config.id, name: this.config.name, endpoint: this.config.endpoint, identity: record?.identity || this.config.identity,
+      extension: this.extensionName, source: this.managed ? "managed" : "operator",
+      ...(record?.serverName || this.catalog.serverName ? { serverName: record?.serverName || this.catalog.serverName } : {}) };
   }
 
   status(): AgentConnectionStatus {
-    const names = this.catalog.tools.map(tool => tool.name);
-    const wiki = this.wikiRecord;
-    return { ...this.descriptor(), status: this.error || (wiki && wiki.authorization !== "authorized") ? "unavailable" : this.client?.connectionState === "connected" ? "connected" : "disconnected",
-      access: wikiTools.every(name => names.includes(name)) ? "Full access" : "Selected tools", checkedAt: this.catalog.checkedAt || null,
-      tools: this.catalog.tools.map(tool => ({ name: tool.name, description: tool.description ?? "" })),
-      ...(wiki ? { scopes: wiki.scopes, authorization: wiki.authorization } : {}),
-      ...(wiki?.error || this.error ? { error: wiki?.error || this.error } : {}) };
+    const managed = this.managedRecord;
+    return { ...this.descriptor(), status: this.error || (managed && managed.authorization !== "authorized") ? "unavailable" : this.client?.connectionState === "connected" ? "connected" : "disconnected",
+      checkedAt: this.catalog.checkedAt || null,
+      tools: this.catalog.tools.map(tool => ({ name: tool.name, description: tool.description ?? "", ...(tool.title || tool.annotations?.title ? { title: tool.title || tool.annotations?.title } : {}) })),
+      ...(managed ? { scopes: managed.scopes, authentication: managed.authentication, authorization: managed.authorization,
+        ...(managed.disconnectNotice ? { disconnectNotice: managed.disconnectNotice } : {}) } : {}),
+      ...(managed?.error || this.error ? { error: managed?.error || this.error } : {}) };
   }
 
   toolNames() { return this.catalog.tools.map(tool => this.toolName(tool.name)); }
@@ -177,7 +181,7 @@ class McpConnection {
 
   connect(): Promise<void> {
     if (this.closed) return Promise.reject(new Error("MCP connection is closed."));
-    if (this.wiki && this.wikiRecord?.authorization !== "authorized") return Promise.reject(new Error("Authorize this Wiki connection in Settings → Connections."));
+    if (this.managed && this.managedRecord?.authorization !== "authorized") return Promise.reject(new Error("Connect this server in Settings → Connections."));
     if (this.connecting) return this.connecting;
     if (this.client?.connectionState === "connected" && !this.error) return Promise.resolve();
     this.connecting = this.open().finally(() => { this.connecting = undefined; });
@@ -198,9 +202,9 @@ class McpConnection {
     client.onClose(() => { if (!this.closed) this.error = `${this.config.name} disconnected. The next tool call will reconnect.`; });
     client.onNotification("notifications/tools/list_changed", () => { void this.discover(client).catch(() => { this.error = "The tool list could not be refreshed."; }); });
     try {
-      if (this.wiki) {
-        await this.wiki.identify(this.config.id);
-        await client.connect(new StreamableHttpTransport({ url: this.config.endpoint, authProvider: this.wiki.authProvider(this.config.id), fetch: (input, init) => this.wiki!.fetch(this.config.id, input, init) }));
+      if (this.managed) {
+        await this.managed.beforeConnect(this.config.id);
+        await client.connect(new StreamableHttpTransport({ url: this.config.endpoint, authProvider: this.managed.authProvider(this.config.id), fetch: (input, init) => this.managed!.fetch(this.config.id, input, init) }));
       } else if ("command" in this.config) {
         await client.connect(new StdioTransport({ command: this.config.command, args: this.config.args, inheritEnv: false, stderr: "pipe" }));
       }
@@ -213,15 +217,14 @@ class McpConnection {
   }
 
   private async discover(client: McpClient) {
-    const tools = await client.listTools();
+    const tools = client.serverCapabilities?.tools ? await client.listTools() : [];
     if (this.closed || this.client !== client) return;
     if (new Set(tools.map(tool => tool.name)).size !== tools.length) throw new Error("MCP returned duplicate tool names.");
     const instructions = client.instructions ?? "";
-    if (!this.wiki && tools.some(tool => tool.name.startsWith("wiki.")) && !instructions.includes(`Authenticated agent: ${this.config.identity}. Definition `)) {
-      throw new Error("The wiki authenticated a different agent identity.");
-    }
-    this.wiki?.setIdentity(this.config.id, instructions);
-    this.catalog = { tools: JSON.parse(JSON.stringify(tools)) as JsonRepresentation<Tool>[], instructions, checkedAt: Date.now() };
+    if (!this.managed) verifyLegacyOperatorIdentity(this.config.identity, instructions, tools.map(tool => tool.name));
+    const serverName = client.serverInfo?.title || client.serverInfo?.name || "";
+    this.managed?.recordServer(this.config.id, serverName, instructions);
+    this.catalog = { tools: JSON.parse(JSON.stringify(tools)) as JsonRepresentation<Tool>[], instructions, checkedAt: Date.now(), ...(serverName ? { serverName } : {}) };
     this.error = undefined;
     this.install();
     await this.changed(this);
@@ -231,7 +234,7 @@ class McpConnection {
     this.registry.install(defineExtension({
       name: this.extensionName,
       sections: [section(`mcp_${createHash("sha256").update(this.key).digest("hex").slice(0, 12)}`, () => [
-        `Connection: ${this.config.name}. Wiki/service URL: ${this.config.endpoint}. Use its tools under your assigned identity.`,
+        `Connection: ${this.config.name}. MCP server: ${this.config.endpoint}. Use its tools within the connection's granted access.`,
         this.config.instructions, this.catalog.instructions,
       ].filter(Boolean).join("\n\n"))],
       tools: this.catalog.tools.map(tool => defineTool({

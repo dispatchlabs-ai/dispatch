@@ -6,14 +6,14 @@ import type { createAuth, AuthPrincipal } from "./auth.js";
 import { RuntimeError, type DispatchRuntime } from "./runtime.js";
 import { CollaborationError } from "./collaboration/shared.js";
 import type { ApplicationConfig, ChatSnapshot } from "../src/shared/contracts.js";
-import { WikiConnectionError, type WikiConnections } from "./wiki-connections.js";
+import { ConnectionError, type McpConnections } from "./mcp-connections.js";
 import { randomToken } from "./auth/crypto.js";
 
 type Auth = ReturnType<typeof createAuth>;
 type AppOptions = {
   auth: Auth;
   runtime: DispatchRuntime;
-  wikiConnections: WikiConnections;
+  mcpConnections: McpConnections;
   origin: string;
   configuration: () => Promise<ApplicationConfig>;
   clientDir?: string;
@@ -31,6 +31,28 @@ const agentSchema = z.object({
   connectionIds: z.array(z.string().uuid()).refine(values => new Set(values).size === values.length).optional(),
   applyConnectionsToExisting: z.boolean().optional(), requestId: requestId.optional(),
 }).strict();
+const connectionBase = {
+  requestId, name: z.string().trim().min(1).max(100), endpoint: z.url().max(2048), connectionId: z.string().uuid().optional(),
+};
+const credentialValue = z.string().min(1).max(16_384).refine(value => !/[\r\n]/.test(value), "Credentials cannot contain newlines.");
+const customHeaders = z.record(z.string().regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/), credentialValue)
+  .refine(headers => Object.keys(headers).length > 0, "Add an authentication header.")
+  .refine(headers => {
+    const names = Object.keys(headers).map(name => name.toLowerCase());
+    return new Set(names).size === names.length && names.every(name => !["host", "connection", "content-length", "transfer-encoding", "accept", "content-type", "mcp-session-id", "mcp-protocol-version", "last-event-id"].includes(name));
+  }, "Use unique authentication headers; transport and MCP session headers are managed by Dispatch.");
+const connectionSchema = z.preprocess(value => {
+  // Keep in-progress clients from the previous editor compatible during rollout.
+  if (value && typeof value === "object" && !("authentication" in value)) return { ...value, authentication: "oauth" };
+  return value;
+}, z.discriminatedUnion("authentication", [
+  z.object({ ...connectionBase, authentication: z.literal("oauth"),
+    scopes: z.array(z.string().min(1).max(1000).regex(/^[\x21\x23-\x5B\x5D-\x7E]+$/)).optional(),
+    clientId: z.string().trim().min(1).max(2048).optional(), clientSecret: credentialValue.optional() }).strict(),
+  z.object({ ...connectionBase, authentication: z.literal("bearer"), token: credentialValue }).strict(),
+  z.object({ ...connectionBase, authentication: z.literal("headers"), headers: customHeaders }).strict(),
+  z.object({ ...connectionBase, authentication: z.literal("none") }).strict(),
+]));
 
 export function createApp(options: AppOptions) {
   const { auth, runtime } = options;
@@ -47,7 +69,7 @@ export function createApp(options: AppOptions) {
     const nonce = randomToken();
     c.header("Cache-Control", "no-store");
     c.header("Content-Security-Policy", `default-src 'none'; connect-src 'self'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; base-uri 'none'; frame-ancestors 'none'`);
-    return c.html(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wiki connection · Dispatch</title><style nonce="${nonce}">body{font:16px system-ui;color:#10243f;max-width:34rem;margin:12vh auto;padding:2rem;line-height:1.6}a{color:#1d3d6a}button{font:inherit;padding:.6rem 1rem}</style><h1 id="heading">Connecting your Wiki</h1><p id="message" role="status">Confirming authorization…</p><p><a href="/?section=connections" target="_blank" rel="noopener">Open Dispatch</a></p><button id="retry" disabled>Try again</button><script nonce="${nonce}">
+    return c.html(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MCP connection · Dispatch</title><style nonce="${nonce}">body{font:16px system-ui;color:#10243f;max-width:34rem;margin:12vh auto;padding:2rem;line-height:1.6}a{color:#1d3d6a}button{font:inherit;padding:.6rem 1rem}</style><h1 id="heading">Connecting your server</h1><p id="message" role="status">Confirming authorization…</p><p><a href="/?section=connections" target="_blank" rel="noopener">Open Dispatch</a></p><button id="retry" disabled>Try again</button><script nonce="${nonce}">
       const response=location.search.slice(1);
       history.replaceState(null,"","/api/connections/oauth/callback");
       const button=document.getElementById("retry");
@@ -57,10 +79,10 @@ export function createApp(options: AppOptions) {
           const reply=await fetch("/api/connections/oauth/complete",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({response})});
           const result=await reply.json();
           if(!reply.ok)throw new Error(result.error?.message||"Authorization could not be confirmed.");
-          document.getElementById("heading").textContent=result.authorized?"Wiki authorized":"Connection needs attention";
+          document.getElementById("heading").textContent=result.authorized?"Connection authorized":"Connection needs attention";
           document.getElementById("message").textContent=result.message;
           button.hidden=result.authorized;
-          if(window.opener){window.opener.postMessage({type:"dispatch-wiki-authorized"},${JSON.stringify(options.origin)});if(result.authorized)window.close();}
+          if(window.opener){window.opener.postMessage({type:"dispatch-mcp-authorized"},${JSON.stringify(options.origin)});window.opener.postMessage({type:"dispatch-wiki-authorized"},${JSON.stringify(options.origin)});if(result.authorized)window.close();}
         }catch(error){document.getElementById("heading").textContent="Connection needs attention";document.getElementById("message").textContent=error.message+" Open Dispatch to sign in if needed, then try again here.";}
         finally{button.disabled=false;}
       }
@@ -82,36 +104,35 @@ export function createApp(options: AppOptions) {
     await next();
   });
   app.get("/api/config", async (c) => c.json(await options.configuration()));
-  app.get("/api/connections", async c => c.json({ connections: await runtime.listWikiConnections(c.get("principal")) }));
+  app.get("/api/connections", async c => c.json({ connections: await runtime.listMcpConnections(c.get("principal")) }));
   app.post("/api/connections/authorize", async c => {
-    const input = z.object({ requestId, name: z.string().trim().min(1).max(100), endpoint: z.url().max(2048),
-      scopes: z.array(z.enum(["wiki:read", "wiki:write", "wiki:trace"])).min(1).max(3), connectionId: z.string().uuid().optional() }).strict().parse(await c.req.json());
-    const result = await options.wikiConnections.start(c.get("principal"), input);
-    await runtime.refreshWikiConnections(result.id);
+    const input = connectionSchema.parse(await c.req.json());
+    const result = await options.mcpConnections.start(c.get("principal"), input);
+    await runtime.refreshMcpConnections(result.id);
     return c.json(result);
   });
   app.post("/api/connections/oauth/complete", async c => {
     const input = z.object({ response: z.string().max(16_384) }).strict().parse(await c.req.json());
-    const result = await options.wikiConnections.complete(c.get("principal"), new URLSearchParams(input.response));
-    await runtime.refreshWikiConnections(result.id);
+    const result = await options.mcpConnections.complete(c.get("principal"), new URLSearchParams(input.response));
+    await runtime.refreshMcpConnections(result.id);
     return c.json({ authorized: result.authorized, message: result.authorized
-      ? "Wiki authorization is complete. Return to Dispatch to save the connection on your agent."
-      : "Wiki authorization was not completed. Return to Dispatch to try again." });
+      ? "Authorization is complete. Return to Dispatch to save the connection on your agent."
+      : "Authorization was not completed. Return to Dispatch to try again." });
   });
   app.post("/api/connections/:id/disconnect", async c => {
     z.object({}).strict().parse(await c.req.json());
-    const available = await runtime.listWikiConnections(c.get("principal"));
-    if (!available.some(item => item.id === c.req.param("id") && item.canManage)) throw new WikiConnectionError(404, "Connection not found.");
-    try { await options.wikiConnections.revoke(c.get("principal"), c.req.param("id")); }
-    finally { await runtime.refreshWikiConnections(c.req.param("id")); }
-    return c.json({ connections: await runtime.listWikiConnections(c.get("principal")) });
+    const available = await runtime.listMcpConnections(c.get("principal"));
+    if (!available.some(item => item.id === c.req.param("id") && item.canManage)) throw new ConnectionError(404, "Connection not found.");
+    try { await options.mcpConnections.revoke(c.get("principal"), c.req.param("id")); }
+    finally { await runtime.refreshMcpConnections(c.req.param("id")); }
+    return c.json({ connections: await runtime.listMcpConnections(c.get("principal")) });
   });
   app.post("/api/connections/:id/reconnect", async c => {
     z.object({}).strict().parse(await c.req.json());
-    const available = await runtime.listWikiConnections(c.get("principal"));
-    if (!available.some(item => item.id === c.req.param("id"))) throw new WikiConnectionError(404, "Connection not found.");
-    await runtime.refreshWikiConnections(c.req.param("id"));
-    return c.json({ connections: await runtime.listWikiConnections(c.get("principal")) });
+    const available = await runtime.listMcpConnections(c.get("principal"));
+    if (!available.some(item => item.id === c.req.param("id"))) throw new ConnectionError(404, "Connection not found.");
+    await runtime.refreshMcpConnections(c.req.param("id"));
+    return c.json({ connections: await runtime.listMcpConnections(c.get("principal")) });
   });
   app.get("/api/people", (c) => c.json({ people: auth.listCompanyPeople(c.get("principal").companyId) }));
   app.get("/api/projects", async (c) => c.json({ projects: await runtime.listProjects(c.get("principal")) }));
@@ -180,7 +201,7 @@ export function createApp(options: AppOptions) {
   }
   app.onError((error, c) => {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return c.json({ error: { code: "invalid_request", message: "The request is invalid. Check the fields and try again." } }, 400);
-    if (error instanceof RuntimeError || error instanceof CollaborationError || error instanceof WikiConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
+    if (error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
     console.error("Dispatch request failed:", error);
     return c.json({ error: { code: "internal", message: "The request could not be completed. Try again." } }, 500);
   });

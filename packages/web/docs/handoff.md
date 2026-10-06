@@ -681,7 +681,7 @@ This documentation update establishes design and acceptance criteria only. No OA
 
 **Implemented October 6, 2026.** Chris authorized the revised editor and MCP screens while deferring Agent Wiki API-based agent registration. The [specification](spec.md#agent-editor-and-existing-wiki-authorization) records the interim standing-agent authority, owner-controlled authorization and explicit shared-definition audience. WP-029 remains unimplemented. Project assignment retains the current conversation flow.
 
-Implementation: the desktop/phone editor, Settings → Connections, `server/wiki-connections.ts`, existing native MCP bindings, and actor-bound idempotent revision saves. Existing operator credentials are preserved. No Agent Wiki code or infrastructure deployment is part of this package.
+Historical implementation (connection setup superseded by WP-031): the desktop/phone editor, Settings → Connections, `server/wiki-connections.ts`, existing native MCP bindings, and actor-bound idempotent revision saves. Existing operator credentials are preserved. No Agent Wiki code or infrastructure deployment is part of this package.
 
 Acceptance criteria and evidence:
 
@@ -692,3 +692,17 @@ Acceptance criteria and evidence:
 - Visual review corrected a misleading pristine-draft Unsaved badge. Startup surfaced a strict-JSON migration issue; source now omits optional idempotency properties instead of inserting `undefined` into native documents, and the local service reopened successfully.
 - Source/deslop and diff review passed. `nix develop --command npm run check`, `nix build`, and `nix flake check` passed on Apple Silicon at implementation revision `2610226`. Changed-document local links and whitespace checks passed. The existing Vite large-chunk advisory remains; x86-64 Linux was not built for this package. This subsequent documentation change records the evidence only.
 - Functional/security qualification remains unverified under the current zero-tests policy: OAuth consent/callback end to end, permissions/revocation/renewal, save/retry/conflict/existing-instance behavior, multi-user boundaries, keyboard/assistive technology, zoom/font scaling, physical touch and virtual-keyboard behavior. Static captures and builds do not establish those outcomes. No tests were added or run; no new Wiki authorization was created. Omarchy was not deployed.
+
+
+## WP-031 — Generic MCP connections
+
+**October 6, 2026 correction to WP-030.** Chris identified Wiki-specific setup as an implementation mistake. Generic MCP is the intended connection layer; provider-specific provisioning remains separate. The [specification](spec.md#generic-mcp-connection-setup) supersedes WP-030's provider restrictions without changing its editor, owner/reservation or instance-application contract.
+
+Implementation includes generic remote Streamable HTTP setup, OAuth discovery with optional registered clients, bearer tokens, custom headers and unauthenticated servers; server-supplied tool names; honest local-versus-provider disconnect state; and migration of existing Wiki records/bindings with their identity check isolated as compatibility behavior. The official MCP SDK supplies OAuth primitives; stock Pi MCP/Durable retain tool execution and recovery.
+
+Acceptance evidence:
+
+- Source review covers generic URL/authentication validation, encrypted credentials and retry fingerprints, issuer/PKCE/session/callback binding, scope ceilings, single rotating-refresh exchange, ordered disconnect and renewal, migration after runtime ownership, and compatibility with existing definition/binding IDs.
+- TypeScript and application builds passed. Nix build/flake checks, final diff review and rendered desktop/390 px captures are pending at this drafting point.
+- No functional, security or migration tests were added or run under the current zero-tests policy. Real-provider OAuth consent, token/header connection, renewal/revocation, migration/restart, shared access and instance application remain unqualified. Screenshots establish layout only; keyboard, assistive technology, measured contrast, zoom/font scaling, physical touch and virtual-keyboard behavior remain unverified.
+- No new provider grant or Wiki principal is created for review. Omarchy is not deployed. The user's live editor is preserved while the correction is prepared in a separate worktree and frontend preview.

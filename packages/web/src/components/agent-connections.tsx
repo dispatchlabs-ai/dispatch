@@ -1,10 +1,11 @@
 import { CheckCircle2, Link2, Plus, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { AgentConnectionStatus, AgentDefinition } from "../shared/contracts";
+import { isManagedConnection } from "../shared/contracts";
 import { errorMessage } from "../lib/api";
 import { useSession } from "../lib/session";
 import { Button, Modal, Notice, Spinner } from "./ui";
-import { ConnectWikiDialog, scopeLabels, useWikiConnections } from "./wiki-connections";
+import { ConnectMcpDialog, authenticationLabels, useMcpConnections } from "./mcp-connections";
 
 export function AgentConnectionsPanel({ agentId }: { agentId: string }) {
   const { api } = useSession();
@@ -40,8 +41,6 @@ export function AgentConnectionsPanel({ agentId }: { agentId: string }) {
   </section>;
 }
 
-const toolLabels: Record<string, string> = { "wiki.read": "Read a page", "wiki.search": "Search the Wiki", "wiki.save": "Save a page", "wiki.history": "Page history", "wiki.traceSearch": "Search original evidence", "wiki.trace": "Read original evidence", "wiki.traces": "List original evidence", "wiki.file": "Read an attached file", "wiki.preview": "Preview a page" };
-
 export function ConnectionCard({ connection, stale = false, busy = false, pending = false, onReconnect, onRemove }: { connection: AgentConnectionStatus; stale?: boolean; busy?: boolean; pending?: boolean; onReconnect?: () => void; onRemove?: () => void }) {
   const connected = connection.status === "connected" && !stale;
   return <article className="connection-card">
@@ -54,18 +53,20 @@ export function ConnectionCard({ connection, stale = false, busy = false, pendin
     <p className="connection-endpoint">{connection.endpoint}</p>
     {pending ? <p className="pending-connection">Pending addition · Save to apply</p> : null}
     <dl className="connection-facts">
-      <div><dt>Permissions</dt><dd>{connection.scopes?.map(scope => scopeLabels[scope]).join(" · ") || (connection.checkedAt ? connection.access : "Not discovered yet")}</dd></div>
-      <div><dt>Wiki identity</dt><dd>{connection.identity || "Available after authorization"}</dd></div>
+      <div><dt>Authentication</dt><dd>{connection.authentication ? authenticationLabels[connection.authentication] : "Managed by your operator"}</dd></div>
+      {connection.serverName ? <div><dt>Server</dt><dd>{connection.serverName}</dd></div> : null}
+      {connection.identity ? <div><dt>Identity</dt><dd>{connection.identity}</dd></div> : null}
+      {connection.scopes?.length ? <div><dt>Authorized scopes</dt><dd>{connection.scopes.join(" · ")}</dd></div> : null}
     </dl>
     {connection.error && !stale ? <Notice tone="error">{connection.error}</Notice> : null}
     {connection.checkedAt ? <details className="connection-tools">
       <summary>{connection.tools.length} available tools</summary>
-      <table><thead><tr><th scope="col">Tool</th><th scope="col">Identifier</th></tr></thead><tbody>{connection.tools.map(tool => <tr key={tool.name}><td>{toolLabels[tool.name] || tool.description || tool.name}</td><td><code>{tool.name}</code></td></tr>)}</tbody></table>
+      <table><thead><tr><th scope="col">Tool</th><th scope="col">Identifier</th></tr></thead><tbody>{connection.tools.map(tool => <tr key={tool.name}><td>{tool.title || tool.name}</td><td><code>{tool.name}</code></td></tr>)}</tbody></table>
       <p>Discovered {new Date(connection.checkedAt).toLocaleString()}.</p>
-      {connection.source === "oauth" ? <p>Wiki grants still determine which operations are allowed.</p> : null}
+      <p>The server determines which operations are permitted. Discovered tools are not permission grants.</p>
     </details> : null}
     <div className="connection-card-actions">
-      {connection.source !== "oauth" ? <span className="field-hint">Managed by your operator</span> : null}
+      {!isManagedConnection(connection) ? <span className="field-hint">Managed by your operator</span> : null}
       {!connected && onReconnect ? <Button variant="secondary" disabled={busy} onClick={onReconnect}>{busy ? <Spinner /> : <RefreshCw />} Reconnect</Button> : null}
       {onRemove ? <Button variant="ghost" disabled={busy} onClick={onRemove}>Remove from agent</Button> : null}
     </div>
@@ -77,13 +78,13 @@ export function AgentConnectionsEditor({ agent, selectedIds, onChange, applyExis
   applyExisting: boolean; onApplyExisting: (value: boolean) => void; busy: boolean; onSettings: () => void;
 }) {
   const { api } = useSession();
-  const { connections, error, refresh } = useWikiConnections();
+  const { connections, error, refresh } = useMcpConnections();
   const [operator, setOperator] = useState<AgentConnectionStatus[]>([]);
   const [operatorError, setOperatorError] = useState("");
   const [operatorAttempt, setOperatorAttempt] = useState(0);
   const [choosing, setChoosing] = useState(false);
   const [authorizing, setAuthorizing] = useState(false);
-  const savedIds = agent?.connections?.filter(connection => connection.source === "oauth").map(connection => connection.id) ?? [];
+  const savedIds = agent?.connections?.filter(isManagedConnection).map(connection => connection.id) ?? [];
   const changed = JSON.stringify([...savedIds].sort()) !== JSON.stringify([...selectedIds].sort());
   useEffect(() => {
     if (!agent) return;
@@ -92,7 +93,7 @@ export function AgentConnectionsEditor({ agent, selectedIds, onChange, applyExis
     const load = async () => {
       try {
         const result = await api<{ connections: AgentConnectionStatus[] }>(`/api/agents/${encodeURIComponent(agent.id)}/connections`, undefined, controller.signal);
-        if (!controller.signal.aborted) { setOperator(result.connections.filter(connection => connection.source !== "oauth")); setOperatorError(""); }
+        if (!controller.signal.aborted) { setOperator(result.connections.filter(connection => !isManagedConnection(connection))); setOperatorError(""); }
       } catch (error) { if (!controller.signal.aborted) setOperatorError(errorMessage(error)); }
       if (!controller.signal.aborted) timer = setTimeout(() => { void load(); }, 15_000);
     };
@@ -115,15 +116,15 @@ export function AgentConnectionsEditor({ agent, selectedIds, onChange, applyExis
     {changed ? <fieldset className="connection-application" disabled={busy}><legend>Apply connection changes</legend>
       <label className="choice-row"><input type="radio" name="connection-application" checked={!applyExisting} onChange={() => onApplyExisting(false)} /><span>New agent instances only<small>Existing conversations keep their current connections.</small></span></label>
       {agent ? <label className="choice-row"><input type="radio" name="connection-application" checked={applyExisting} onChange={() => onApplyExisting(true)} /><span>New and existing instances<small>Update connections in this agent's existing conversations. Other settings stay at their saved revision.</small></span></label> : null}
-      <p className="field-hint">This shared agent uses the Wiki identity's standing access. People in its conversations can receive Wiki content, and teammates can edit its instructions.</p>
+      <p className="field-hint">People in this shared agent's conversations can receive content from its connected services, and teammates can edit its instructions.</p>
     </fieldset> : null}
-    {choosing ? <Modal title="Add a Wiki connection" description="Choose an authorization for this agent. Each connection is reserved for one agent definition; its instances share the existing Wiki identity." open onOpenChange={setChoosing}>
-      <div className="connection-picker">{available.map(connection => <Button variant="secondary" key={connection.id} onClick={() => { onChange([...selectedIds, connection.id]); setChoosing(false); }}>{connection.name} · {connection.identity}</Button>)}
-        {!available.length ? <p>No unused authorized connections are available.</p> : null}
-        <Notice tone="info">Saving gives this company-shared agent access. Its conversations can share Wiki content with every participant, including people invited later.</Notice>
-        <Button onClick={() => { setChoosing(false); setAuthorizing(true); }}><Plus /> Connect another Wiki identity</Button>
+    {choosing ? <Modal title="Add an MCP connection" description="Choose a connection for this agent or connect another server. Each connection is reserved for one agent definition and shared by its instances." open onOpenChange={setChoosing}>
+      <div className="connection-picker">{available.map(connection => <Button variant="secondary" key={connection.id} onClick={() => { onChange([...selectedIds, connection.id]); setChoosing(false); }}>{connection.name} · {connection.identity || connection.serverName || connection.endpoint}</Button>)}
+        {!available.length ? <p>No unused connections are available.</p> : null}
+        <Notice tone="info">Saving gives this company-shared agent access. Its conversations can share connected content with every participant, including people invited later.</Notice>
+        <Button onClick={() => { setChoosing(false); setAuthorizing(true); }}><Plus /> Connect another server</Button>
       </div>
     </Modal> : null}
-    {authorizing ? <ConnectWikiDialog onClose={() => { setAuthorizing(false); refresh(); }} onAuthorized={id => { onChange([...selectedIds, id]); setAuthorizing(false); refresh(); }} /> : null}
+    {authorizing ? <ConnectMcpDialog onClose={() => { setAuthorizing(false); refresh(); }} onConnected={id => { onChange([...selectedIds, id]); setAuthorizing(false); refresh(); }} /> : null}
   </section>;
 }

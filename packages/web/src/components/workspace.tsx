@@ -17,7 +17,7 @@ import { ColumnResizeHandle } from "./column-resize-handle";
 import { ContextPanel } from "./context-panel";
 import { MoveConversationDialog, ProjectPage } from "./projects";
 import { SecurityPage } from "./security";
-import { WikiConnectionsPage } from "./wiki-connections";
+import { McpConnectionsPage } from "./mcp-connections";
 import { Button, IconButton, Modal, Notice, Spinner } from "./ui";
 
 type WorkspaceTab = { id: string; kind: "chat"; chatId: string } | { id: string; kind: "project"; projectId: string } | { id: string; kind: "welcome" };
@@ -581,7 +581,7 @@ export function Workspace() {
               onCancel={() => requestAgentAction(() => finishAgentEdit())} onEdit={editAgent}
               onStartChat={agentId => chooseAgents(agentId)} creating={creating} />
           </div> : null}
-          {visited.connections ? <div className="workspace-section" hidden={section !== "connections"}><WikiConnectionsPage /></div> : null}
+          {visited.connections ? <div className="workspace-section" hidden={section !== "connections"}><McpConnectionsPage /></div> : null}
           {visited.security ? <div className="workspace-section" hidden={section !== "security"}><SecurityPage /></div> : null}
         </main>
       </div>

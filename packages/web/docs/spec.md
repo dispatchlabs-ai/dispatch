@@ -413,8 +413,7 @@ entry removes its selections at restart; upstream Wiki grants and revocation rem
 authoritative. The trusted local service account is still not an OS sandbox.
 
 Agents → Developer → Connections shows the endpoint, identity, observed connection
-status, discovered access and tool list. Full access means the complete Wiki tool
-catalog was discovered; a stale or unavailable connection is labeled. Failed
+status and discovered tool list. Tool discovery does not establish permission grants; a stale or unavailable connection is labeled. Failed
 discovery preserves the last catalog for recovery and offers Reconnect. Calls
 forward native errors, results and cancellation; they are unsafe to replay, because
 an interrupted remote write may already have completed. Pi owns tool execution
@@ -423,7 +422,7 @@ principal and adapter run, while Pi histories and workspaces remain independent.
 
 ### Agent editor and existing Wiki authorization
 
-**Accepted October 6, 2026; WP-030.** Implement the revised desktop/phone definition editor and MCP management screen now, using Agent Wiki's existing browser-authorized OAuth flow for an already-created agent. API-based Wiki agent registration remains deferred. This interim flow uses the existing independent Wiki agent's standing rights; it does not implement the delegated personal-access contract below or its future shared-administration platform.
+**Historical WP-030 implementation, October 6, 2026; connection setup corrected by WP-031 below.** Implement the revised desktop/phone definition editor and MCP management screen now, using Agent Wiki's existing browser-authorized OAuth flow for an already-created agent. API-based Wiki agent registration remains deferred. This interim flow uses the existing independent Wiki agent's standing rights; it does not implement the delegated personal-access contract below or its future shared-administration platform.
 
 The editor groups compact Identity, dominant Instructions, collapsible Model, installed Capabilities, and MCP connections. Files and commands selects the existing native coding extension; do not show illustrative capabilities that are not installed. The default desktop editor hides the optional details column. A fixed action bar offers Discard and one Create agent/Save new revision action; unchanged saved definitions cannot be resaved. Revision and unsaved labels reflect the actual draft. All draft fields, capability choices, and staged connection changes survive section changes. Existing discard and revision-conflict guards apply to the complete draft. Drafts are not persisted across reload or expired sign-in.
 
@@ -438,6 +437,20 @@ The connection's authorizing user owns credential management and first assignmen
 OAuth uses discovered same-origin endpoints, dynamic public-client registration, exact callback URLs, PKCE S256 and one-use state bound to the Dispatch user/session/company and Wiki issuer. Encrypted token material stays in service-owned `connections.sqlite` with a separate private key; Pi receives only public connection descriptors, schemas and explicit instance bindings. Identity verification completes before authorization becomes usable. Refresh is serialized per credential and an uncertain rotation requires reauthorization instead of replay. Interrupted verification remains manageable in Settings. Reauthorization retains the same upstream identity and scope ceiling; changing either requires a new connection. Disconnect disables local access and revokes upstream authorization; a failed upstream revocation stays visibly pending with a retry. New/existing instance credentials are not per-human Wiki audit identities. Revocation does not erase already disclosed messages.
 
 This section supersedes the earlier five-field-only editor and prohibition on browser connection management. The operator-managed Developer credential is preserved. Project assignment continues through the current conversation participant flow; the separate assignment sketch remains unresolved. The accepted future personal delegation/provisioning contract below is preserved separately. [WP-030](handoff.md#wp-030--agent-editor-and-existing-wiki-authorization) owns evidence and remaining qualification.
+
+### Generic MCP connection setup
+
+**Correction October 6, 2026; WP-031.** Chris identified the Wiki-specific connection setup as a mistake: the editor and Settings must provide generic MCP connections. WP-030's hard-coded endpoint, scope choices, Wiki identity calls, tool labels and access badge were implementation overfitting, not an intended provider restriction. This section supersedes those parts while preserving its editor, ownership, staged-save and existing-instance contracts. Wiki-specific provisioning remains the separate future integration below.
+
+Settings → Connections and the agent's Add connection accept a display name, a remote Streamable HTTP endpoint, and OAuth, bearer-token, custom authentication-header, or no-authentication settings. HTTPS is required except for HTTP loopback addresses. Endpoints may have arbitrary paths and query parameters; credentials belong in the protected authentication fields. Existing operator-managed stdio connections remain supported by their manifest. Browser setup does not launch local commands.
+
+OAuth uses the MCP authorization discovery flow, including a separately hosted authorization server, PKCE S256, and a session-bound callback. Request scopes from an explicit optional list or the server's challenge/resource metadata. Register a public OAuth client when supported; otherwise accept a provider-registered client ID and optional secret. Do not prescribe Wiki scopes or call provider-specific identity APIs for new connections. Display MCP server names and tool titles/identifiers from discovery, observed connectivity, auth method and returned OAuth scopes. MCP has no universal account-identity endpoint; omit an unverified identity. Discovered tools never establish “Full access.”
+
+Store tokens, OAuth client secrets, header values and pending OAuth material encrypted in service-owned storage. Only the owner manages credentials and first assignment; each connection remains reserved for one shared definition. Agent instances share that connection's authority and conversation participants may receive its content. Save applies staged choices to new instances or explicitly selected existing instances as in WP-030; this does not establish the future personal delegation boundary or isolate credentials from local coding tools.
+
+Refresh only an existing OAuth grant, retaining rotating-refresh uncertainty handling. A denial requiring additional scopes needs a new connection and explicit instance application, not automatic expansion. Disconnect stops local use first. Revoke OAuth tokens when the provider advertises a revocation endpoint; a failed attempt stays pending for retry. When revocation is unsupported, or when using token/header credentials, report local removal and the need to revoke provider access separately. Never imply local disconnect has revoked an upstream grant.
+
+Migrate existing Wiki OAuth rows without changing connection IDs, definition reservations, conversation bindings or credentials. Preserve their existing same-Wiki-agent verification only in a legacy compatibility adapter. Keep the operator-provisioned Developer identity intact. No generic connection creates a Wiki principal. [WP-031](handoff.md#wp-031--generic-mcp-connections) records verification and remaining qualification.
 
 ### Personal Wiki connections
 

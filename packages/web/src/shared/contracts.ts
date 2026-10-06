@@ -126,40 +126,50 @@ export type AgentConnection = {
   endpoint: string;
   identity: string;
   extension: string;
-  source?: "operator" | "oauth";
+  /** oauth is retained when reading older saved definitions. */
+  source?: "operator" | "managed" | "oauth";
+  serverName?: string;
 };
 
 export interface AgentConnectionStatus extends AgentConnection {
   status: "connected" | "disconnected" | "unavailable";
-  access: "Full access" | "Selected tools";
   checkedAt: number | null;
-  tools: { name: string; description: string }[];
+  tools: { name: string; title?: string; description: string }[];
   error?: string;
-  scopes?: WikiScope[];
-  authorization?: WikiAuthorizationState;
+  scopes?: string[];
+  authentication?: ConnectionAuthentication;
+  authorization?: ConnectionAuthorizationState;
+  disconnectNotice?: string;
 }
 
-export type WikiScope = "wiki:read" | "wiki:write" | "wiki:trace";
-export type WikiAuthorizationState = "pending" | "authorized" | "reauthorize" | "revoking" | "revoked" | "error";
+export type ConnectionAuthentication = "oauth" | "bearer" | "headers" | "none";
+export type ConnectionAuthorizationState = "pending" | "authorized" | "reauthorize" | "revoking" | "revoked" | "error";
 
-export interface WikiConnection extends AgentConnectionStatus {
+export interface ManagedConnection extends AgentConnectionStatus {
   createdAt: number;
   canManage: boolean;
   usedBy: { id: string; name: string }[];
 }
 
-export interface ConnectWikiInput {
+export type ConnectMcpInput = {
   requestId: string;
   name: string;
   endpoint: string;
-  scopes: WikiScope[];
   connectionId?: string;
-}
+} & (
+  | { authentication: "oauth"; scopes?: string[]; clientId?: string; clientSecret?: string }
+  | { authentication: "bearer"; token: string }
+  | { authentication: "headers"; headers: Record<string, string> }
+  | { authentication: "none" }
+);
+
+export type ConnectMcpResult = { id: string; authorizationUrl?: string };
+export const isManagedConnection = (connection: AgentConnection) => connection.source === "managed" || connection.source === "oauth";
 
 export interface SaveAgentInput extends AgentDraft {
   id?: string;
   expectedRevision?: number;
-  /** OAuth connections selected for this definition; operator connections stay operator-owned. */
+  /** Managed connections selected for this definition; operator connections stay operator-owned. */
   connectionIds?: string[];
   applyConnectionsToExisting?: boolean;
   requestId?: string;

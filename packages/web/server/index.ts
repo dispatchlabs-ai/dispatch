@@ -7,7 +7,7 @@ import { createApp } from "./app.js";
 import { readConfig } from "./config.js";
 import { openModels } from "./model-auth.js";
 import { DispatchRuntime } from "./runtime.js";
-import { WikiConnections } from "./wiki-connections.js";
+import { McpConnections } from "./mcp-connections.js";
 
 const config = readConfig();
 await mkdir(config.stateDir, { recursive: true, mode: 0o700 });
@@ -16,20 +16,20 @@ const auth = createAuth({
   databasePath: join(config.stateDir, "auth.sqlite"), secretPath: join(config.stateDir, "auth.key"),
   origin: config.origin, rpId: config.rpId, companyId: config.companyId, companyName: config.companyName,
 });
-const wikiConnections = new WikiConnections(join(config.stateDir, "connections.sqlite"), join(config.stateDir, "connections.key"), config.origin);
+const mcpConnections = new McpConnections(join(config.stateDir, "connections.sqlite"), join(config.stateDir, "connections.key"), config.origin);
 const runtime = await DispatchRuntime.open({
   stateDir: join(config.stateDir, "runtime"), companyId: config.companyId, models: provider.models,
   connectionsFile: config.connectionsFile,
-  wikiConnections,
+  mcpConnections,
   provider: provider.provider, modelId: provider.modelId, thinkingLevel: provider.thinkingLevel,
   peopleDirectory: {
     list: async (companyId) => auth.listCompanyPeople(companyId),
     get: async (companyId, userId) => auth.getCompanyPerson(companyId, userId),
   },
-}).catch(async error => { await wikiConnections.close(); auth.close(); throw error; });
+}).catch(async error => { await mcpConnections.close(); auth.close(); throw error; });
 const clientDir = process.env.DISPATCH_CLIENT_DIR ?? resolve(dirname(fileURLToPath(import.meta.url)), "../../client");
 const app = createApp({
-  auth, runtime, wikiConnections, origin: config.origin,
+  auth, runtime, mcpConnections, origin: config.origin,
   clientDir: process.env.DISPATCH_SERVE_CLIENT === "false" ? undefined : clientDir,
   configuration: async () => ({
     company: { id: config.companyId, name: config.companyName }, defaultAgentId: "default", ...await provider.configuration(await runtime.getDefaultAgent(config.companyId)),
@@ -44,7 +44,7 @@ async function shutdown() {
   shuttingDown = true;
   server.close();
   await runtime.close();
-  await wikiConnections.close();
+  await mcpConnections.close();
   auth.close();
   if ("closeAllConnections" in server) server.closeAllConnections();
 }
