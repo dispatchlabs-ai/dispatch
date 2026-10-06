@@ -72,9 +72,10 @@ export function Workspace() {
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [detailsVisible, setDetailsVisible] = useState(true);
+  const [otherDetailsVisible, setOtherDetailsVisible] = useState(true);
+  const [chatDetailsVisible, setChatDetailsVisible] = useState<Record<string, boolean>>({});
   const [preferredSidebarWidth, setSidebarWidth] = useState(280);
-  const [preferredDetailsWidth, setDetailsWidth] = useState(360);
+  const [preferredDetailsWidth, setDetailsWidth] = useState<number | null>(null);
   const [viewportWidth, setViewportWidth] = useState(() => typeof window === "undefined" ? 1440 : window.innerWidth);
   useEffect(() => {
     const updateWidth = () => setViewportWidth(window.innerWidth);
@@ -84,7 +85,6 @@ export function Workspace() {
   const sidebarMax = Math.max(200, Math.min(420, Math.floor(viewportWidth * .25)));
   const detailsMax = Math.max(240, Math.min(480, Math.floor(viewportWidth * .3)));
   const sidebarWidth = Math.min(preferredSidebarWidth, sidebarMax);
-  const detailsWidth = Math.min(preferredDetailsWidth, detailsMax);
   const [creating, setCreating] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [search, setSearch] = useState("");
@@ -332,7 +332,7 @@ export function Workspace() {
 
   function openSupporting(chatId: string, threadId: string | null) {
     setThreads(current => ({ ...current, [chatId]: threadId }));
-    setDetailsVisible(true);
+    setChatDetailsVisible(current => ({ ...current, [chatId]: true }));
     if (viewportWidth <= 800) setContextOpen(true);
     else requestAnimationFrame(() => document.querySelector<HTMLElement>("#details-column .shared-context")?.focus());
   }
@@ -397,6 +397,12 @@ export function Workspace() {
 
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId) ?? agents.find(agent => agent.id === config?.defaultAgentId);
   const active: WorkspaceTab | { id: string; kind: "agents" | "security" } = section === "chats" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
+  const detailsVisible = active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : otherDetailsVisible;
+  const detailsWidth = Math.min(preferredDetailsWidth ?? (active.kind === "chat" ? 440 : 360), detailsMax);
+  function setDetailsVisible(visible: boolean) {
+    if (active.kind === "chat") setChatDetailsVisible(current => ({ ...current, [active.chatId]: visible }));
+    else setOtherDetailsVisible(visible);
+  }
   const snapshot = active.kind === "chat" ? snapshots[active.chatId] : undefined;
   const connection = active.kind === "chat" ? connections[active.chatId] || "connecting" : null;
   const activeProjectId = active.kind === "project" ? active.projectId : active.kind === "chat" ? chats.find(chat => chat.id === active.chatId)?.projectId ?? null : null;
@@ -406,7 +412,12 @@ export function Workspace() {
     pending={pending[`${active.chatId}:${threads[active.chatId]}`]} error={sendErrors[`${active.chatId}:${threads[active.chatId]}`]}
     onDraftChange={text => changeDraft(`${active.chatId}:${threads[active.chatId]}`, text)}
     onSnapshot={onSnapshot} onSend={mentions => void sendMessage(active.chatId, threads[active.chatId] ?? null, mentions)} onInvite={() => setInvitingChatId(active.chatId)}
-    onClose={() => { if (threads[active.chatId]) setThreads(current => ({ ...current, [active.chatId]: null })); else { setDetailsVisible(false); setContextOpen(false); } }} showHeader={!inDrawer}
+    onClose={() => {
+      setThreads(current => ({ ...current, [active.chatId]: null }));
+      setDetailsVisible(false);
+      setContextOpen(false);
+      requestAnimationFrame(() => document.getElementById(`participants-${active.chatId}`)?.focus());
+    }} showHeader={!inDrawer}
     /> : <ContextPanel kind={active.kind} snapshot={snapshot} models={config?.models ?? []} tab={supportTabs[active.id] || "agent"} onTabChange={tab => setSupportTabs(current => ({ ...current, [active.id]: tab }))} />;
   const chatNav = () => selectSection("chats");
   const selectChat = (chatId: string) => activate({ id: `chat:${chatId}`, kind: "chat", chatId });
@@ -475,7 +486,7 @@ export function Workspace() {
         <IconButton className="sidebar-toggle" label={sidebarVisible ? "Hide sidebar" : "Show sidebar"} aria-expanded={sidebarVisible} aria-controls="workspace-sidebar" onClick={() => setSidebarVisible(value => !value)}>
           <PanelLeft size={19} />
         </IconButton>
-        <IconButton className="details-toggle" label={detailsVisible ? "Hide details" : "Show details"} aria-expanded={detailsVisible} aria-controls="details-column" onClick={() => setDetailsVisible(value => !value)}>
+        <IconButton className="details-toggle" label={detailsVisible ? "Hide details" : "Show details"} aria-expanded={detailsVisible} aria-controls="details-column" onClick={() => setDetailsVisible(!detailsVisible)}>
           <PanelRight size={19} />
         </IconButton>
       </div>
@@ -543,6 +554,7 @@ export function Workspace() {
               onMentionsChange={ids => changeMentions(tab.chatId, ids)}
               onDraftChange={text => changeDraft(tab.chatId, text)}
               onSend={mentions => void sendMessage(tab.chatId, null, mentions)}
+              activeThreadId={(viewportWidth <= 800 ? contextOpen : chatDetailsVisible[tab.chatId]) ? threads[tab.chatId] : null}
               onParticipants={() => openSupporting(tab.chatId, null)}
               onThread={id => openSupporting(tab.chatId, id)}
               onSnapshot={onSnapshot}

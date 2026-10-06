@@ -20,13 +20,14 @@ interface ChatPanelProps {
   mentions: string[];
   onMentionsChange: (ids: string[]) => void;
   onSend: (mentions: string[]) => void;
+  activeThreadId?: string | null;
   onParticipants: () => void;
   onThread: (id: string) => void;
   onSnapshot: (snapshot: ChatSnapshot) => void;
   onConnection: (chatId: string, state: ConnectionState) => void;
 }
 
-export function ChatPanel({ active: visible, connection, chatId, snapshot, draft, pending, sendError, mentions, onMentionsChange, onDraftChange, onSend, onParticipants, onThread, onSnapshot, onConnection }: ChatPanelProps) {
+export function ChatPanel({ active: visible, connection, chatId, snapshot, draft, pending, sendError, mentions, onMentionsChange, onDraftChange, onSend, activeThreadId, onParticipants, onThread, onSnapshot, onConnection }: ChatPanelProps) {
   const { api, refreshSession } = useSession();
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -101,14 +102,14 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
     onSend(mentions);
   }
 
-  return <div className="chat-panel">
+  return <div className="chat-panel shared-chat-panel">
     <header className="view-heading">
       <div>
         <h1>{snapshot?.conversation.title || "Conversation"}</h1>
         <p>{snapshot ? "Shared conversation" : "Loading conversation…"}</p>
       </div>
-      <div className="conversation-header-actions"><Button variant="secondary" className="participants-button" onClick={onParticipants} disabled={!snapshot}><Users size={16} />{snapshot?.participants.length ?? 0} participants</Button>
-      <span className={`status-badge status-${snapshot?.conversation.status || "idle"}`}>{snapshot ? chatStatusLabel(snapshot) : "Loading"}</span></div>
+      <div className="conversation-header-actions"><Button variant="secondary" className="participants-button" id={`participants-${chatId}`} onClick={onParticipants} disabled={!snapshot}><Users size={16} />{snapshot?.participants.length ?? 0} participants</Button>
+      {snapshot?.conversation.status !== "idle" ? <span className={`status-badge status-${snapshot?.conversation.status || "idle"}`}>{snapshot ? chatStatusLabel(snapshot) : "Loading"}</span> : null}</div>
     </header>
     {connection === "reconnecting" ? <div className="chat-connection-notice">
       <Notice tone="info">Reconnecting to this conversation. Agent work continues; updates will appear when the connection returns.</Notice>
@@ -136,7 +137,7 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
           <h2>What are we working on?</h2>
           <p>Bring a question, a rough idea, or a problem to work through.</p>
         </div> : null}
-        {snapshot ? <SharedTranscript snapshot={snapshot} onThread={onThread} /> : null}
+        {snapshot ? <SharedTranscript snapshot={snapshot} activeThreadId={activeThreadId} onThread={onThread} /> : null}
         {snapshot ? <ConversationPresence participants={snapshot.participants} /> : null}
         {snapshot?.conversation.status === "stopped" ? <p className="run-outcome" role="status">
           <Square size={13} /> Response stopped. You can continue the conversation.</p> : null}
@@ -148,7 +149,7 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
         <ArrowDown /> Latest messages</Button>
     </div> : null}
     {stopError ? <Notice>{stopError}</Notice> : null}
-    <ConversationComposer id={`composer-${chatId}`} chatId={chatId} active={visible} draft={draft} pending={pending} error={sendError} participants={snapshot?.participants ?? []} mentions={mentions} onMentionsChange={onMentionsChange} disabled={!snapshot} onDraftChange={onDraftChange} onSend={sendDraft}>
+    <ConversationComposer id={`composer-${chatId}`} conversationTitle={snapshot?.conversation.title} chatId={chatId} active={visible} draft={draft} pending={pending} error={sendError} participants={snapshot?.participants ?? []} mentions={mentions} onMentionsChange={onMentionsChange} disabled={!snapshot} onDraftChange={onDraftChange} onSend={sendDraft}>
       {running ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
         setStopping(true); setStopError(null);
         void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/stop`, {}).then(onSnapshot).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));

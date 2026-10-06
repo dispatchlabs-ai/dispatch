@@ -33,11 +33,10 @@ export function ConversationSidebar({ chats, projects, activeChatId, activeProje
   const visible = chats.filter(chat => chat.archived === showArchived);
   const query = search.trim().toLowerCase();
   const matches = (chat: ChatSummary) => chat.title.toLowerCase().includes(query);
-  const archivedCount = chats.filter(chat => chat.archived).length;
   const groups = projects.map(project => {
     const members = visible.filter(chat => chat.projectId === project.id);
     const filtered = project.name.toLowerCase().includes(query) ? members : members.filter(matches);
-    return { project, members, filtered };
+    return { project, filtered };
   }).filter(({ project, filtered }) => !query || project.name.toLowerCase().includes(query) || filtered.length);
   const unassigned = visible.filter(chat => chat.projectId === null).filter(matches);
   const archived = visible.filter(chat => matches(chat) || projects.some(project => project.id === chat.projectId && project.name.toLowerCase().includes(query)));
@@ -53,37 +52,35 @@ export function ConversationSidebar({ chats, projects, activeChatId, activeProje
     </div>;
   }
 
-  return <div className="collection-sidebar">
-    <Button className="sidebar-create" onClick={() => { onShowArchivedChange(false); onCreate(); }} disabled={creating}>{creating ? <Spinner /> : <Plus />} New conversation</Button>
+  return <div className="collection-sidebar conversation-sidebar">
+    <Button variant="secondary" className="sidebar-create" onClick={() => { onShowArchivedChange(false); onCreate(); }} disabled={creating}>{creating ? <Spinner /> : <Plus />} New conversation</Button>
     <SidebarSearch label="Search conversations" value={search} onChange={onSearchChange} />
-    <div className="sidebar-list-heading"><h2>{showArchived ? "Archived" : "Conversations"}</h2><span>{visible.length}</span></div>
+    <div className="sidebar-list-heading"><h2>{showArchived ? "Archived" : "Conversations"}</h2></div>
     {!showArchived ? <NewProjectButton {...newProject} /> : null}
     <nav className="sidebar-list conversation-groups" aria-label={showArchived ? "Archived conversations" : "Saved conversations"}>
       {showArchived ? archived.map(row) : <>
-        {groups.map(({ project, members, filtered }) => {
+        {groups.map(({ project, filtered }) => {
           const expanded = !!query || !collapsedProjects.has(project.id);
           const groupId = `${groupPrefix}-${project.id}`;
           return <div className="project-group" key={project.id}>
             <div className={`project-group-header ${project.id === activeProjectId ? "selected" : ""}`}>
               <IconButton className="project-expand" label={`${expanded ? "Collapse" : "Expand"} ${project.name}`} aria-expanded={expanded} aria-controls={groupId} disabled={!!query} onClick={() => onToggleProject(project.id)}>{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</IconButton>
               <button type="button" className="project-select" onClick={() => onSelectProject(project.id)} aria-current={project.id === activeProjectId ? "page" : undefined} title={project.name}>
-                <Folder size={16} /><span>{project.name}</span><span className="project-group-count">{members.length}</span>
+                <Folder size={16} /><span>{project.name}</span>
               </button>
             </div>
             <div id={groupId} className="project-group-conversations" hidden={!expanded}>
               {filtered.map(row)}
-              {!members.length ? <p className="sidebar-empty">No conversations yet</p> : null}
             </div>
           </div>;
         })}
-        <div className={`unassigned-conversations ${projects.length ? "has-projects" : ""}`}>
+        {unassigned.length > 0 ? <div className={`unassigned-conversations ${projects.length ? "has-projects" : ""}`}>
           <h3>Without a project</h3>
           {unassigned.map(row)}
-          {!query && !unassigned.length ? <p className="sidebar-empty">No unassigned conversations.</p> : null}
-        </div>
+        </div> : null}
       </>}
       {(showArchived ? !archived.length : query && !groups.length && !unassigned.length) ? <p className="sidebar-empty">{query ? "No conversations or projects match your search." : "No archived conversations."}</p> : null}
     </nav>
-    <Button variant="ghost" className="sidebar-archive-toggle" onClick={() => onShowArchivedChange(!showArchived)}><Archive size={16} /> {showArchived ? "Back to conversations" : `Archived conversations (${archivedCount})`}</Button>
+    <Button variant="ghost" className="sidebar-archive-toggle" onClick={() => onShowArchivedChange(!showArchived)}><Archive size={16} /> {showArchived ? "Back to conversations" : "Archived conversations"}</Button>
   </div>;
 }
