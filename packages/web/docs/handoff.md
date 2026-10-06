@@ -582,3 +582,15 @@ states. This supersedes the initial WP-027 shortcut criterion above.
 Review the source/diff and actual rendered desktop/390 px layouts, and run the
 repository TypeScript/build/Nix checks. The standing zero-tests policy remains;
 interaction, assistive technology, measured contrast and real devices are unverified.
+
+[Implementation `2c6fd7c`](https://github.com/dispatchlabs-ai/dispatch-web-next/commit/2c6fd7c81833553fcb2a407a857cd508bb0144d0)
+passed source/deslop review, 44 local documentation links, whitespace checks,
+TypeScript/production builds, Apple Silicon `nix build` and `nix flake check`.
+It was pushed normally to private main, verified there, and synchronized to the
+clean canonical checkout under both integration locks. The existing local frontend
+hot-reloaded; the persistent service and saved state were not restarted or changed.
+The actual empty composer was reviewed at 1440 px and 390 px: no mention shortcut,
+an arrow-only action at the right, and the existing phone touch target. Ignored
+captures remain in canonical `.local/composer-toolbar-20261006/`. No messages,
+tests or acceptance procedures ran. The existing Vite chunk-size advisory remains;
+x86-64 Linux, Omarchy and the pilot were not updated or qualified.
