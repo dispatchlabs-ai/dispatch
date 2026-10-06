@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Coding agents now start in the configured workspace (`DISPATCH_WORKSPACE_DIR`), defaulting to the repository root in local launchers. Idle instances using the old generated folders migrate on startup; custom paths, unfinished work, history, and old files are preserved.
+
 - Agent Instructions now use the shared live Markdown editor with document-style Enter behavior and retain rendered formatting in saved views. Markdown storage and revision saves are preserved; oversized instructions remain editable with a visible save-blocking error.
 - Updated Pi Durable and the directly used Pi AI, Chord, Coding Agent, and MCP packages from 1.0.1 to 1.0.4, with matching dependency locks and Nix inputs. This includes upstream provider-session affinity, OAuth refresh, and file/tool fixes; resolution of the observed WebSocket authentication error remains unverified.
 

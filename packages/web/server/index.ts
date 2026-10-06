@@ -19,7 +19,7 @@ const auth = createAuth({
 const mcpConnections = new McpConnections(join(config.stateDir, "connections.sqlite"), join(config.stateDir, "connections.key"), config.origin);
 const runtime = await DispatchRuntime.open({
   stateDir: join(config.stateDir, "runtime"), companyId: config.companyId, models: provider.models,
-  connectionsFile: config.connectionsFile,
+  connectionsFile: config.connectionsFile, workspaceDir: config.workspaceDir,
   mcpConnections,
   provider: provider.provider, modelId: provider.modelId, thinkingLevel: provider.thinkingLevel,
   peopleDirectory: {

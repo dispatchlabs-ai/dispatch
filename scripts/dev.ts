@@ -9,6 +9,7 @@ const environment = {
   ...process.env,
   DISPATCH_ORIGIN: process.env.DISPATCH_ORIGIN ?? `http://localhost:${webPort}`,
   DISPATCH_DATA_DIR: process.env.DISPATCH_DATA_DIR ?? resolve(root, ".local/state/dispatch"),
+  DISPATCH_WORKSPACE_DIR: process.env.DISPATCH_WORKSPACE_DIR ?? root,
   DISPATCH_PORT: apiPort,
   DISPATCH_HOST: "127.0.0.1",
   DISPATCH_SERVE_CLIENT: "false",

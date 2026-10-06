@@ -745,3 +745,21 @@ Acceptance evidence:
 - The lockfile changes only Pi packages; `npm ls` resolves all directly used Pi packages to one aligned 1.0.4 version. The installation audit reported no vulnerabilities.
 - Source/deslop and full diff review, whitespace, 64 changed-document local link targets, `nix develop --command npm run check`, `nix build --no-link`, and `nix flake check` passed on Apple Silicon. The existing Vite large-chunk advisory remains. x86-64 Linux was not built.
 - No tests, model requests, credential changes, or browser acceptance flows were run under the current zero-tests policy. Runtime recovery, OAuth renewal, tool behavior and resolution of the observed error remain functionally unverified. The upgrade targets local development; Omarchy is not deployed.
+
+## WP-033 — Agents start in the configured workspace
+
+**Accepted October 6, 2026.** Chris requested the workspace correction after Developer and Pi Durable Expert traced their empty numbered directories to Dispatch’s participant-creation code. This supersedes WP-017’s per-agent directory default while preserving the accepted local execution boundary.
+
+Acceptance criteria:
+
+- Add `DISPATCH_WORKSPACE_DIR` independently of writable runtime state. Root development/built launchers explicitly default it to the repository root; standalone service uses its launch directory. Resolve relative overrides once in service configuration and reject missing/non-directory targets.
+- New coding participants, including agents invited to an existing room, receive that directory through native Pi configuration. The existing participant details and Coding prompt use the same saved cwd. Project grouping remains name-only.
+- Before recovery, migrate idle native cwd values only when they exactly match the generated legacy path. Keep displayed participant paths in the same native transaction. Preserve custom paths, models, instructions, history, and files. Defer unfinished room tasks, agent tasks, or inbox items until a later idle startup; do not retarget recovered commands.
+- Keep native Pi execution/recovery and existing access checks. No automatic clone, worktree creation, cleanup, or concurrency limits. Document shared-checkout coordination and explicit worktree selection.
+- Apply source/deslop review, local documentation link/whitespace checks, TypeScript/application builds, `nix build`, and `nix flake check`. No tests or model prompts under the standing policy; migration/tool/recovery functional qualification remains deferred.
+
+October 6 implementation evidence:
+
+- Source/deslop and full diff review confirmed one workspace selection passed through both root launchers, service configuration, new participant creation, and the narrow legacy migration. Migration uses stock Pi documents/configuration and scans for unfinished native tasks before recovery; it changes no execution or concurrency ownership.
+- `nix develop --option eval-cache false --command npm run check`, `nix build --no-link`, and `nix flake check` passed on Apple Silicon. Whitespace and 50 local documentation link targets passed. The existing Vite chunk-size advisory remains; Linux was not built.
+- No tests, model prompts, or browser acceptance flows were run under the standing policy. New-agent tool execution, explicit overrides, custom-path preservation, busy migration deferral, and recovery remain functionally unqualified. This work targets the M1 Air development service; Omarchy is not deployed.

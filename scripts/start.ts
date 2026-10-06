@@ -11,6 +11,7 @@ const child = spawn(process.execPath, ["packages/web/build/service/server/index.
     DISPATCH_PORT: port,
     DISPATCH_ORIGIN: process.env.DISPATCH_ORIGIN ?? `http://localhost:${port}`,
     DISPATCH_DATA_DIR: process.env.DISPATCH_DATA_DIR ?? resolve(root, ".local/state/dispatch"),
+    DISPATCH_WORKSPACE_DIR: process.env.DISPATCH_WORKSPACE_DIR ?? root,
   },
 });
 child.on("error", (error) => { console.error(error.message); process.exitCode = 1; });

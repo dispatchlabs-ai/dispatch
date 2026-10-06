@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir } from "node:fs/promises";
+import { chmod, mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, getSupportedThinkingLevels, type Models } from "@earendil-works/pi-ai/models";
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
-import { configure, createRegistry, defineDoc, Harness, type ConversationId, type HarnessSettings, type RegistryReader, type Storage, type Tx } from "@earendil-works/pi-durable";
+import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, type ConversationId, type HarnessSettings, type RegistryReader, type Storage, type Tx } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
@@ -35,6 +35,7 @@ export class RuntimeError extends Error {
 
 export type RuntimeOptions = {
   stateDir: string;
+  workspaceDir: string;
   companyId: string;
   connectionsFile?: string;
   mcpConnections?: McpConnections;
@@ -59,7 +60,7 @@ export class DispatchRuntime {
   private connections: AgentConnections;
   private managed?: McpConnections;
 
-  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: RegistryReader, shared: SharedConversations, connections: AgentConnections, peopleDirectory?: PeopleDirectory) {
+  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: RegistryReader, shared: SharedConversations, connections: AgentConnections, private readonly workspaceDir: string, peopleDirectory?: PeopleDirectory) {
     this.connections = connections;
     this.shared = shared;
     this.peopleDirectory = peopleDirectory;
@@ -73,6 +74,7 @@ export class DispatchRuntime {
   }
 
   static async open(options: RuntimeOptions) {
+    if (!(await stat(options.workspaceDir)).isDirectory()) throw new Error("DISPATCH_WORKSPACE_DIR must point to an existing directory.");
     const owner = await acquireRuntimeOwner(options.stateDir);
     let storage: Storage | undefined;
     let connections: AgentConnections | undefined;
@@ -98,7 +100,7 @@ export class DispatchRuntime {
           return new NodeExecutionEnv({ cwd });
         },
       }, context);
-      runtime = new DispatchRuntime(harness, storage, models, owner, registry, shared, connections, options.peopleDirectory);
+      runtime = new DispatchRuntime(harness, storage, models, owner, registry, shared, connections, options.workspaceDir, options.peopleDirectory);
       runtime.managed = options.mcpConnections;
       // Seed once and publish a real commit before recovery so snapshots use Pi's persisted sequence.
       await harness.commit(async (tx) => {
@@ -130,6 +132,7 @@ export class DispatchRuntime {
         catalog.runtimeInstance = randomUUID();
       }, context);
       await runtime.migrateChats();
+      await runtime.migrateWorkspaces(options.companyId);
       await connections.open(harness);
       await runtime.configureConnections(options.companyId);
       connections.onChanged = () => runtime.configureConnections(options.companyId);
@@ -455,7 +458,7 @@ export class DispatchRuntime {
       return found;
     });
     const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
-    const cwd = agent.extensions?.includes(CodingTools.name) ? join(this.owner.directory, "workspaces", String(record.id)) : undefined;
+    const cwd = agent.extensions?.includes(CodingTools.name) ? this.workspaceDir : undefined;
     await configure(tx, record.id, { model: { provider: agent.provider, modelId: agent.modelId }, instructions: agent.instructions, thinkingLevel: agent.thinkingLevel, extensions, tools, ...(cwd ? { cwd } : {}) });
     await this.connections.bind(tx, record.id, definitionId, false, managedIds(agent));
     return { id: randomUUID(), kind: "agent", name: agent.name, joinedAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, conversationId: record.id, status: "idle", agent: { ...publicAgent(agent), ...(cwd ? { cwd } : {}) } };
@@ -488,6 +491,27 @@ export class DispatchRuntime {
         }
       }
     }, context);
+  }
+
+  private async migrateWorkspaces(companyId: string) {
+    const catalog = (await this.harness.snapshot(CatalogDoc, context))!;
+    for (const chat of catalog.chats.filter(chat => chat.companyId === companyId)) {
+      await this.harness.commit(async tx => {
+        const roomId = nativeId(chat.id);
+        const room = await tx.doc(SharedDoc, roomId);
+        // Recovered deliveries and tools must keep the directory they were admitted against.
+        if (await hasUnfinishedTasks(tx, roomId)) return;
+        for (const member of room.members) {
+          if (!member.conversationId || !member.agent?.extensions.includes(CodingTools.name)) continue;
+          const native = await tx.doc(AgentDoc, member.conversationId);
+          if (native.cwd !== join(this.owner.directory, "workspaces", String(member.conversationId))) continue;
+          if ((await tx.doc(InboxDoc, member.conversationId)).items.length) continue;
+          if (await hasUnfinishedTasks(tx, member.conversationId)) continue;
+          await configure(tx, member.conversationId, { cwd: this.workspaceDir });
+          member.agent.cwd = this.workspaceDir;
+        }
+      }, context);
+    }
   }
 
   private async migrateChats() {
@@ -529,6 +553,13 @@ function productionModels() {
   models.setProvider(openaiProvider());
   models.setProvider(anthropicProvider());
   return models;
+}
+
+async function hasUnfinishedTasks(tx: Tx, conversationId: ConversationId) {
+  for (const status of ["pending", "running", "waiting", "completing"] as const) {
+    if ((await tx.scanTasks({ conversationId, status }, 1)).items.length) return true;
+  }
+  return false;
 }
 
 function nativeId(id: string): ConversationId {

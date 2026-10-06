@@ -58,7 +58,11 @@ Instructions format Markdown while you type or paste, using the same editor as c
 
 The built-in Developer appears in Agents after service startup. It starts with the saved default agent's model and thinking level. Select Developer and choose Start chat to use Pi's `read`, `write`, `edit`, and `bash` tools. Its name, description, instructions, model, and thinking level use the normal editor; saving preserves its coding tools and affects new chats only. Archiving it prevents new chats and survives restart.
 
-Each Developer chat gets a persistent local directory at `<DISPATCH_DATA_DIR>/runtime/workspaces/<conversation ID>`, created when the agent first needs its environment. Participants shows each agent’s full path. Ask Developer to create a project there, or place existing project files there using your normal local workflow. Archiving the chat or agent does not remove those files. Keep the runtime and workspace paths stable when moving or restoring local state.
+New agents with coding tools start in the configured workspace, so they can use the project already on disk. Root `npm run dev`, `npm start`, and `npm run preview` default to this repository root. Set `DISPATCH_WORKSPACE_DIR=/absolute/path/to/project` before starting the service to choose another existing checkout or Git worktree. A standalone service defaults to its launch directory. Missing or non-directory workspaces fail startup. Participants shows the saved absolute path; conversation project labels do not change it.
+
+On startup, idle existing agents still using Dispatch’s generated `runtime/workspaces/<conversation ID>` folders switch to the configured workspace. Their history, other settings, and old files stay intact, including any repository cloned into an old folder. Custom working directories are preserved. Unfinished deliveries, native tasks, or queued input retain their old directory for recovery; restart again after they finish to apply the migration. Later workspace-setting changes affect new agents and still-eligible legacy instances only.
+
+Agents sharing a checkout must coordinate edits and Git operations. Use separate Git worktrees for parallel coding, and set the workspace explicitly when launching a separate instance with its own state directory. Dispatch does not create worktrees or clone repositories automatically.
 
 Coding tools run on the service machine with the service account's access, including paths outside the working directory. This first setup is for trusted local use on M1 Air; the directory is not a sandbox. Tool activity and follow-up text appear under one agent heading. Bash appears as an open terminal with the command above its live output, then its recorded result and completion status. Select the terminal header to collapse it. Long output scrolls inside the terminal; scroll up to read without following new output. Errors and full-output file paths appear below the output. A completed follow-up that only repeats the terminal output is omitted from the display; explanations remain visible. Raw call/result and assistant records remain in Pi’s SQLite storage; tool activity has no debug-data option. Other tools without a custom presenter keep a generic output disclosure. Stop uses Pi's cancellation; an interrupted shell/file operation is not guaranteed to be undone or to execute only once during recovery.
 
@@ -208,6 +212,7 @@ Do not run that service beside the development owner of the same state. Passkeys
 
 | Variable | Meaning |
 | --- | --- |
+| `DISPATCH_WORKSPACE_DIR` | Existing directory for new coding agents; root launchers default to the repository root, standalone service to its launch directory. Relative values resolve from the service launch directory. |
 | `DISPATCH_DATA_DIR` | Writable authentication and native Pi state; root launchers default to the repository's `.local/state/dispatch` |
 | `DISPATCH_AGENT_CONNECTIONS_FILE` | Operator per-agent MCP manifest; defaults to `agent-connections.json` inside the state directory |
 | `DISPATCH_WEB_PORT` | Root frontend/built-app port; default 5173; root account links use the same port |
