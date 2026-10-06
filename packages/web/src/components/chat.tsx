@@ -105,7 +105,7 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
   return <div className="chat-panel shared-chat-panel">
     <header className="view-heading">
       <div>
-        <h1>{snapshot?.conversation.title || "Conversation"}</h1>
+        <h1 title={snapshot?.conversation.title || "Conversation"}>{snapshot?.conversation.title || "Conversation"}</h1>
         <p>{snapshot ? "Shared conversation" : "Loading conversation…"}</p>
       </div>
       <div className="conversation-header-actions"><Button variant="secondary" className="participants-button" id={`participants-${chatId}`} onClick={onParticipants} disabled={!snapshot}><Users size={16} />{snapshot?.participants.length ?? 0} participants</Button>
