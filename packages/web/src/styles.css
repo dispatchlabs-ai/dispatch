@@ -72,7 +72,7 @@
   --conversation-inset: var(--space-8);
   --conversation-avatar: 44px;
   --conversation-gap: var(--space-4);
-  --conversation-header-height: 76px;
+  --conversation-header-height: 77px;
 }
 
 * { box-sizing: border-box; }
