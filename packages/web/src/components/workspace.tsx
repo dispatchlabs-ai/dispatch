@@ -16,6 +16,7 @@ import { RenameConversationDialog } from "./rename-conversation-dialog";
 import { ConversationSidebar } from "./conversation-sidebar";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ContextPanel } from "./context-panel";
+import { ProjectSettings, type ProjectEditing } from "./project-settings";
 import { MoveConversationDialog, ProjectPage } from "./projects";
 import { SecurityPage } from "./security";
 import { McpConnectionsPage } from "./mcp-connections";
@@ -48,6 +49,7 @@ export function Workspace() {
   const [showArchivedAgents, setShowArchivedAgents] = useState(false);
   const [config, setConfig] = useState<ApplicationConfig | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [projectEditing, setProjectEditing] = useState<Record<string, ProjectEditing | null>>({});
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectName, setProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
@@ -124,9 +126,10 @@ export function Workspace() {
         api<{ projects: Project[] }>("/api/projects"),
       ]);
       setConfig(nextConfig);
-      setChats(current => chatResult.chats.reduce(mergeChat, current));
+      setChats(chatResult.chats);
+      setSnapshots(current => Object.fromEntries(Object.entries(current).filter(([id]) => chatResult.chats.some(chat => chat.id === id))));
       setAgents(agentResult.agents);
-      setProjects(current => mergeProjects(current, projectResult.projects));
+      setProjects(projectResult.projects);
       setError(null);
     } catch (error) { setError(errorMessage(error)); } finally { setLoading(false); }
   }, [api]);
@@ -152,15 +155,20 @@ export function Workspace() {
     return () => document.removeEventListener("visibilitychange", refresh);
   }, [load]);
 
-  const hasRunningChats = chats.some(chat => chat.status === "running");
   useEffect(() => {
-    if (!hasRunningChats) return;
+
     const timer = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      void api<{ chats: ChatSummary[] }>("/api/chats").then(result => setChats(current => result.chats.reduce(mergeChat, current))).catch(() => { });
+      void load();
     }, 15_000);
     return () => window.clearInterval(timer);
-  }, [hasRunningChats, api]);
+  }, [load]);
+
+  const onAccessLost = useCallback((id: string) => {
+    setSnapshots(current => { const next = { ...current }; delete next[id]; return next; });
+    setChats(current => current.filter(chat => chat.id !== id));
+    void load();
+  }, [load]);
 
   const onSnapshot = useCallback((snapshot: ChatSnapshot) => {
     setSnapshots(current => current[snapshot.conversation.id]?.conversation.revision > snapshot.conversation.revision
@@ -203,12 +211,14 @@ export function Workspace() {
   function requestCloseTab(tabId: string) {
     const tab = tabs.find(item => item.id === tabId);
     const dirty = tab?.kind === "chat" ? [...new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions)])].some(key => (key === tab.chatId || key.startsWith(`${tab.chatId}:`)) && (Boolean(drafts[key]?.trim()) || Boolean(pending[key]) || Boolean(mentions[key]?.length))) : false;
-    if (dirty) setClosingTab(tabId);
+    if (tab?.kind === "project" && projectEditing[tab.projectId]?.busy) return;
+    if (dirty || (tab?.kind === "project" && projectEditing[tab.projectId])) setClosingTab(tabId);
     else closeTab(tabId);
   }
 
   function closeTab(tabId: string) {
     const closing = tabs.find(tab => tab.id === tabId);
+    if (closing?.kind === "project") setProjectEditing(current => ({ ...current, [closing.projectId]: null }));
     if (closing?.kind === "chat") {
       for (const key of new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions)])) {
         if (key !== closing.chatId && !key.startsWith(`${closing.chatId}:`)) continue;
@@ -239,13 +249,18 @@ export function Workspace() {
   function chooseAgents(agentId = config?.defaultAgentId, projectId: string | null = null) {
     setNavigationOpen(false);
     setError(null);
-    setNewConversation({ agentIds: agentId ? [agentId] : [], projectId });
+    const project = projects.find(item => item.id === projectId);
+    if (project?.canParticipate === false) return;
+    setNewConversation({ agentIds: project?.kind === "shared" ? project.defaultAgentDefinitionIds ?? [] : agentId ? [agentId] : [], projectId });
   }
 
-  async function createChat(agentIds: string[], projectId: string | null = null) {
-    if (creating || !agentIds.length) return;
-    const sameRequest = JSON.stringify(createRequest.current?.agentDefinitionIds) === JSON.stringify(agentIds) && (createRequest.current?.projectId ?? null) === projectId;
-    if (!sameRequest) createRequest.current = { requestId: crypto.randomUUID(), agentDefinitionIds: agentIds, projectId };
+  async function createChat(agentIds: string[], projectId: string | null = null, retry?: CreateChatInput) {
+    if (creating) return;
+    const sharedProjectId = projects.find(project => project.id === projectId)?.kind === "shared" ? projectId : null;
+    const personalProjectId = sharedProjectId ? null : projectId;
+    const sameRequest = JSON.stringify(createRequest.current?.agentDefinitionIds) === JSON.stringify(agentIds) && (createRequest.current?.projectId ?? null) === personalProjectId && (createRequest.current?.sharedProjectId ?? null) === sharedProjectId;
+    if (retry) createRequest.current = retry;
+    else if (!sameRequest) createRequest.current = { requestId: crypto.randomUUID(), agentDefinitionIds: agentIds, projectId: personalProjectId, sharedProjectId };
     setCreating(true); setError(null); setCreateFailed(false);
     try {
       const snapshot = await api<ChatSnapshot>("/api/chats", createRequest.current);
@@ -269,7 +284,7 @@ export function Workspace() {
   async function createProject(): Promise<boolean> {
     const name = projectName.trim();
     if (creatingProject || !name) return false;
-    if (projectRequest.current?.name !== name) projectRequest.current = { requestId: crypto.randomUUID(), name };
+    if (projectRequest.current?.name !== name) projectRequest.current = { requestId: crypto.randomUUID(), name, kind: "shared" };
     setCreatingProject(true); setProjectError(null);
     try {
       const { project } = await api<{ project: Project }>("/api/projects", projectRequest.current);
@@ -545,7 +560,7 @@ export function Workspace() {
             </div>
         </header> : null}
         {error ? <div className="workspace-notice">
-          <Notice>{error}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat(createRequest.current?.agentDefinitionIds ?? [], createRequest.current?.projectId)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}
+          <Notice>{error}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat([], null, createRequest.current ?? undefined)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}
         </div> : null}
         <main className="workspace-main" id="main-workspace" tabIndex={-1}>
           <div className="workspace-section" hidden={section !== "chats"}>
@@ -567,10 +582,15 @@ export function Workspace() {
               onThread={id => openSupporting(tab.chatId, id)}
               onSnapshot={onSnapshot}
               onConnection={onConnection}
+              onAccessLost={onAccessLost}
             /> : tab.kind === "project" ? <ProjectPage
               project={projects.find(project => project.id === tab.projectId)} chats={chats} creating={creating} updating={updatingChats}
               onCreate={() => chooseAgents(config.defaultAgentId, tab.projectId)} onSelect={selectChat}
               onMove={moveChat} onRename={renameChat} onUpdate={updateChatAction}
+              settings={projects.find(project => project.id === tab.projectId)?.kind === "shared" ? <ProjectSettings
+                project={projects.find(project => project.id === tab.projectId)!} agents={agents}
+                editing={projectEditing[tab.projectId] ?? null} onEditingChange={editing => setProjectEditing(current => ({ ...current, [tab.projectId]: editing }))}
+                onSaved={project => { setProjects(current => mergeProjects(current, [project])); void load(); }} /> : undefined}
             /> : <Welcome
               name={state.user.name} config={config}
               onCreate={() => chooseAgents()} creating={creating}

@@ -1,6 +1,6 @@
 import { Popover } from "@base-ui/react/popover";
 import { FolderPlus, Pin, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ChatSummary, Project, UpdateChatInput } from "../shared/contracts";
 import { errorMessage } from "../lib/api";
 import { ConversationActions } from "./conversation-actions";
@@ -25,7 +25,8 @@ export function NewProjectButton({ name, busy, error, compact, onNameChange, onC
     <Popover.Portal>
       <Popover.Positioner className="project-popover-positioner" side={compact ? "bottom" : "right"} align="start" sideOffset={10} collisionPadding={16}>
         <Popover.Popup className="project-popover" finalFocus={() => created.current ? document.getElementById("main-workspace") : true}>
-          <Popover.Title>New project</Popover.Title>
+          <Popover.Title>New shared project</Popover.Title>
+          <p>Starts with only you as manager. Add members in project settings; members can read its full history.</p>
           <form onSubmit={async event => { event.preventDefault(); if (await onCreate()) { created.current = true; setOpen(false); } }}>
             <Field label="Name">{props => <Input {...props} value={name} onChange={event => onNameChange(event.target.value)} placeholder="Project name" required maxLength={100} disabled={busy} />}</Field>
             {error ? <Notice>{error}</Notice> : null}
@@ -40,7 +41,8 @@ export function NewProjectButton({ name, busy, error, compact, onNameChange, onC
   </Popover.Root>;
 }
 
-export function ProjectPage({ project, chats, creating, updating, onCreate, onSelect, onMove, onRename, onUpdate }: {
+export function ProjectPage({ project, chats, creating, updating, onCreate, onSelect, onMove, onRename, onUpdate, settings }: {
+  settings?: ReactNode;
   project?: Project;
   chats: ChatSummary[];
   creating: boolean;
@@ -55,9 +57,10 @@ export function ProjectPage({ project, chats, creating, updating, onCreate, onSe
   const visible = chats.filter(chat => chat.projectId === project.id && !chat.archived);
   return <section className="project-page">
     <header className="project-page-header">
-      <div><p className="eyebrow">Project</p><h1>{project.name}</h1></div>
-      <Button disabled={creating} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New conversation</Button>
+      <div><p className="eyebrow">{project.kind === "shared" ? "Shared project" : "Personal grouping"}</p><h1>{project.name}</h1></div>
+      <Button disabled={creating || project.canParticipate === false} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New conversation</Button>
     </header>
+    {settings}
     <p className="project-conversation-count">{visible.length} {visible.length === 1 ? "conversation" : "conversations"}</p>
     {visible.length ? <ul className="project-conversations">
       {visible.map(chat => <li key={chat.id}>
@@ -68,7 +71,7 @@ export function ProjectPage({ project, chats, creating, updating, onCreate, onSe
         </button>
         <ConversationActions chat={chat} busy={updating.has(chat.id)} onMove={onMove} onRename={onRename} onUpdate={onUpdate} />
       </li>)}
-    </ul> : <div className="project-empty"><p>No conversations yet.</p><p>Start a conversation here, or move one from its actions menu.</p></div>}
+    </ul> : <div className="project-empty"><p>No conversations yet.</p><p>{project.kind === "shared" ? "Project members can start a conversation here. Existing conversations cannot be moved into shared projects." : "Start a conversation here, or move one from its actions menu."}</p></div>}
   </section>;
 }
 
@@ -91,7 +94,7 @@ export function MoveConversationDialog({ chat, projects, onClose, onMove }: {
     }}>
       <Field label="Project">{props => <Select {...props} value={destination} disabled={busy} onChange={event => setDestination(event.target.value)}>
         <option value="">Without a project</option>
-        {projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
+        {projects.filter(project => project.kind !== "shared").map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
       </Select>}</Field>
       {error ? <Notice>{error}</Notice> : null}
       <div className="button-row project-form-actions">

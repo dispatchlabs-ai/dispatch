@@ -9,9 +9,10 @@ import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, type
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
-import type { AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput } from "../src/shared/contracts.js";
+import type { AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
 import { isManagedConnection } from "../src/shared/contracts.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
+import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
 import { Skills, SkillBindingsDoc } from "./extensions/skills.js";
 import { Coding } from "./extensions/coding.js";
 import { SharedConversations, SharedDoc, type Member, type PeopleDirectory } from "./collaboration/shared.js";
@@ -20,7 +21,7 @@ import { TurnsDoc } from "./collaboration/turns.js";
 import type { McpConnections } from "./mcp-connections.js";
 
 const context = BACKGROUND_CONTEXT;
-type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { displayTitle?: string; pinned?: boolean; archived?: boolean; agentName?: string; projectId?: string | null; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
+type StoredChat = Omit<ChatSummary, "sharedProjectId" | "canParticipate" | "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { creationFingerprint?: string; displayTitle?: string; pinned?: boolean; archived?: boolean; agentName?: string; projectId?: string | null; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
 type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: string; extensions?: string[]; tools?: string[]; savedBy?: string; saveRequestId?: string; saveFingerprint?: string };
 type StoredProject = Project & { companyId: string; userId: string; requestId: string };
 type StoredSkill = SkillDefinition & { companyId: string; savedBy: string; requestId: string; fingerprint: string };
@@ -38,6 +39,7 @@ export class RuntimeError extends Error {
 export type RuntimeOptions = {
   stateDir: string;
   workspaceDir: string;
+  readAllProjectUserIds?: string[];
   companyId: string;
   connectionsFile?: string;
   mcpConnections?: McpConnections;
@@ -61,6 +63,7 @@ export class DispatchRuntime {
   private peopleDirectory?: PeopleDirectory;
   private connections: AgentConnections;
   private managed?: McpConnections;
+  private readAllProjectUserIds = new Set<string>();
 
   private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: RegistryReader, shared: SharedConversations, connections: AgentConnections, private readonly workspaceDir: string, peopleDirectory?: PeopleDirectory) {
     this.connections = connections;
@@ -105,6 +108,7 @@ export class DispatchRuntime {
       }, context);
       runtime = new DispatchRuntime(harness, storage, models, owner, registry, shared, connections, options.workspaceDir, options.peopleDirectory);
       runtime.managed = options.mcpConnections;
+      runtime.readAllProjectUserIds = new Set(options.readAllProjectUserIds ?? []);
       // Seed once and publish a real commit before recovery so snapshots use Pi's persisted sequence.
       await harness.commit(async (tx) => {
         const catalog = await tx.doc(CatalogDoc);
@@ -151,37 +155,82 @@ export class DispatchRuntime {
 
   async listChats(scope: RuntimeScope): Promise<ChatSummary[]> {
     const catalog = await this.harness.snapshot(CatalogDoc, context);
-    const visible = [];
+    const summaries: ChatSummary[] = [];
     for (const chat of catalog!.chats.filter(chat => chat.companyId === scope.companyId)) {
-      const state = await this.harness.snapshot(SharedDoc, nativeId(chat.id), context);
-      if (state?.members.some(member => member.userId === scope.userId)) visible.push(chat);
+      try { summaries.push((await this.getChat(scope, chat.id)).conversation); }
+      catch (error) { if (!(error instanceof Error && "status" in error && error.status === 404)) throw error; }
     }
-    const summaries = await Promise.all(visible.map(async chat => (await this.getChat(scope, chat.id)).conversation));
     return summaries.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
   }
 
   async listProjects(scope: RuntimeScope): Promise<Project[]> {
-    const catalog = await this.harness.snapshot(CatalogDoc, context);
-    return (catalog!.projects ?? []).filter(project => owns(scope, project)).map(projectSummary)
-      .sort((a, b) => a.name.localeCompare(b.name));
+    return this.harness.commit(async tx => {
+      const catalog = await tx.doc(CatalogDoc);
+      const shared = await tx.doc(ProjectsDoc);
+      return [...(catalog.projects ?? []).filter(project => owns(scope, project)).map(projectSummary),
+        ...Object.values(shared.projects).filter(project => projectAccess(project, scope, this.readAll(scope)).read).map(project => this.projectSummary(project, scope))]
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }, context);
+  }
+
+  private readAll(scope: RuntimeScope) { return this.readAllProjectUserIds.has(scope.userId); }
+
+  private projectSummary(project: SharedProjectRecord, scope: RuntimeScope): Project {
+    const access = projectAccess(project, scope, this.readAll(scope));
+    return { id: project.id, name: project.name, createdAt: project.createdAt, kind: "shared", revision: project.revision,
+      members: project.members.map(({ userId, role }) => ({ userId, role })), defaultAgentDefinitionIds: [...project.defaultAgentDefinitionIds], canManage: access.manage, canParticipate: access.participate };
   }
 
   async createProject(scope: RuntimeScope, input: CreateProjectInput): Promise<Project> {
     requireText(input.requestId, "Request ID", 200);
     const name = input.name.trim();
     requireText(name, "Project name", 100);
-    return this.harness.commit(async (tx) => {
-      const catalog = await tx.doc(CatalogDoc);
-      if (!catalog.projects) catalog.projects = [];
-      const projects = catalog.projects;
-      const existing = projects.find(project => owns(scope, project) && project.requestId === input.requestId);
-      if (existing) {
-        if (existing.name !== name) throw requestConflict();
-        return projectSummary(existing);
+    return this.harness.commit(async tx => {
+      if (input.kind === "shared") {
+        const doc = await tx.doc(ProjectsDoc);
+        const key = JSON.stringify([scope.companyId, scope.userId, "create", input.requestId]);
+        const fingerprint = JSON.stringify([name, input.kind]);
+        const prior = doc.requests[key];
+        if (prior) {
+          if (prior.fingerprint !== fingerprint) throw requestConflict();
+          const project = await requireProjectAccess(tx, scope, prior.projectId, "read", this.readAll(scope));
+          return this.projectSummary(project, scope);
+        }
+        const now = Date.now();
+        const project: SharedProjectRecord = { id: randomUUID(), name, companyId: scope.companyId, createdBy: scope.userId,
+          createdAt: now, updatedAt: now, revision: 1, members: [{ userId: scope.userId, role: "manager" }], defaultAgentDefinitionIds: ["default"] };
+        doc.projects[project.id] = project; doc.requests[key] = { fingerprint, projectId: project.id };
+        return this.projectSummary(project, scope);
       }
+      // Preserve pre-upgrade create requests as private organizational groups.
+      const catalog = await tx.doc(CatalogDoc);
+      catalog.projects ??= [];
+      const existing = catalog.projects.find(project => owns(scope, project) && project.requestId === input.requestId);
+      if (existing) { if (existing.name !== name) throw requestConflict(); return projectSummary(existing); }
       const project = { id: randomUUID(), name, createdAt: Date.now(), companyId: scope.companyId, userId: scope.userId, requestId: input.requestId };
-      projects.push(project);
+      catalog.projects.push(project);
       return projectSummary(project);
+    }, context);
+  }
+
+  async saveProject(scope: RuntimeScope, id: string, input: SaveProjectInput): Promise<Project> {
+    await Promise.all(input.members.map(member => this.person(scope.companyId, member.userId)));
+    return this.harness.commit(async tx => {
+      const current = await requireProjectAccess(tx, scope, id, "manage", this.readAll(scope));
+      const doc = await tx.doc(ProjectsDoc);
+      const key = JSON.stringify([scope.companyId, scope.userId, id, input.requestId]);
+      const fingerprint = JSON.stringify([input.expectedRevision, input.name, input.members, input.defaultAgentDefinitionIds]);
+      if (doc.requests[key]) {
+        if (doc.requests[key].fingerprint !== fingerprint) throw requestConflict();
+        return this.projectSummary(current, scope);
+      }
+      if (current.revision !== input.expectedRevision) throw new RuntimeError(409, "Project changed. Reload before saving.");
+      const catalog = await tx.doc(CatalogDoc);
+      for (const agentId of input.defaultAgentDefinitionIds) this.findAgent(catalog, scope, agentId);
+      const project: SharedProjectRecord = { ...current, name: input.name, members: input.members, defaultAgentDefinitionIds: input.defaultAgentDefinitionIds,
+        revision: current.revision + 1, updatedAt: Date.now() };
+      doc.projects[id] = project; doc.requests[key] = { fingerprint, projectId: project.id };
+      return this.projectSummary(project, scope);
     }, context);
   }
 
@@ -189,7 +238,10 @@ export class DispatchRuntime {
     requireText(input.requestId, "Request ID", 200);
     const title = input.title?.trim() || "New conversation";
     const projectId = input.projectId ?? null;
-    const agentIds = [...new Set(input.agentDefinitionIds ?? [input.agentDefinitionId ?? "default"])];
+    const requestedAgents = input.agentDefinitionIds ?? (input.agentDefinitionId ? [input.agentDefinitionId] : undefined);
+    let agentIds = [...new Set(requestedAgents ?? ["default"])];
+    if (input.sharedProjectId && projectId !== null) throw new RuntimeError(400, "Choose either a shared project or a personal grouping.");
+    const creationFingerprint = input.sharedProjectId ? JSON.stringify([title, input.sharedProjectId, requestedAgents ?? null]) : undefined;
     for (const agentId of agentIds) requireText(agentId, "Agent ID", 200);
     requireText(title, "Title", 200);
     const human = await this.person(scope.companyId, scope.userId);
@@ -197,16 +249,25 @@ export class DispatchRuntime {
       const catalog = await tx.doc(CatalogDoc);
       const existing = catalog.chats.find(chat => owns(scope, chat) && chat.requestId === input.requestId);
       if (existing) {
-        if (existing.title !== title || JSON.stringify([...(existing.creationAgentIds ?? [existing.agentDefinitionId])].sort()) !== JSON.stringify([...agentIds].sort()) || (existing.creationProjectId ?? null) !== projectId) throw requestConflict();
+        const matches = existing.creationFingerprint !== undefined
+          ? existing.creationFingerprint === creationFingerprint
+          : creationFingerprint === undefined && existing.title === title
+            && JSON.stringify([...(existing.creationAgentIds ?? [existing.agentDefinitionId])].sort()) === JSON.stringify([...agentIds].sort())
+            && (existing.creationProjectId ?? null) === projectId;
+        if (!matches) throw requestConflict();
         return existing.id;
+      }
+      if (input.sharedProjectId) {
+        const project = await requireProjectAccess(tx, scope, input.sharedProjectId, "participate", this.readAll(scope));
+        agentIds = [...new Set(requestedAgents ?? project.defaultAgentDefinitionIds)];
       }
       if (projectId !== null) this.findProject(catalog, scope, projectId);
       for (const agentId of agentIds) this.validateAgent(this.findAgent(catalog, scope, agentId));
       const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
-      await this.shared.initialize(tx, record.id, scope.companyId, human, agentIds, { projectId, pinned: false, archived: false });
+      await this.shared.initialize(tx, record.id, scope.companyId, human, agentIds, { projectId, pinned: false, archived: false }, input.sharedProjectId ?? undefined);
       const first = agentIds.length ? this.findAgent(catalog, scope, agentIds[0]) : undefined;
       const id = String(record.id);
-      catalog.chats.push({ id, title, projectId, creationProjectId: projectId, creationAgentIds: agentIds, createdAt: Date.now(), agentDefinitionId: first?.id ?? "", agentRevision: first?.revision ?? 0, agentName: first?.name ?? "People", companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
+      catalog.chats.push({ ...(creationFingerprint ? { creationFingerprint } : {}), id, title, projectId, creationProjectId: projectId, creationAgentIds: agentIds, createdAt: Date.now(), agentDefinitionId: first?.id ?? "", agentRevision: first?.revision ?? 0, agentName: first?.name ?? "People", companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
       return id;
     }, context);
     return this.getChat(scope, id);
@@ -216,9 +277,10 @@ export class DispatchRuntime {
     await this.authorize(scope, id);
     await this.harness.commit(async tx => {
       const catalog = await tx.doc(CatalogDoc);
-      const room = await tx.doc(SharedDoc, nativeId(id));
-      const preference = room.preferences[scope.userId];
+      const room = await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
+      const preference = room.preferences[scope.userId] ??= { projectId: null, pinned: false, archived: false };
       if (input.projectId !== undefined) {
+        if (room.sharedProjectId) throw new RuntimeError(400, "Shared-project conversations cannot be moved through personal preferences.");
         if (input.projectId !== null) this.findProject(catalog, scope, input.projectId);
         preference.projectId = input.projectId;
       }
@@ -235,8 +297,8 @@ export class DispatchRuntime {
     await this.harness.commit(async tx => {
       const catalog = await tx.doc(CatalogDoc);
       const chat = catalog.chats.find(item => item.id === id && item.companyId === scope.companyId);
-      const room = await tx.doc(SharedDoc, nativeId(id));
-      if (!chat || room.companyId !== scope.companyId || !room.members.some(member => member.userId === scope.userId)) throw new RuntimeError(404, "Conversation not found.");
+      await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
+      if (!chat) throw new RuntimeError(404, "Conversation not found.");
       // Keep the creation title intact for request replay; this override is presentation only.
       chat.displayTitle = title;
     }, context);
@@ -255,17 +317,18 @@ export class DispatchRuntime {
     return this.harness.commit(async tx => {
       const catalog = await tx.doc(CatalogDoc);
       const chat = catalog.chats.find(item => item.id === id && item.companyId === scope.companyId)!;
-      const room = await tx.doc(SharedDoc, nativeId(id));
-      if (!room.members.some(member => member.userId === scope.userId)) throw new RuntimeError(404, "Conversation not found.");
+      const room = await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
       const presentation = await this.shared.presentation(tx, nativeId(id));
-      const preference = room.preferences[scope.userId];
+      const preference = room.preferences[scope.userId] ?? { projectId: null, pinned: false, archived: false };
+      const access = room.sharedProjectId ? projectAccess((await tx.doc(ProjectsDoc)).projects[room.sharedProjectId], scope, this.readAll(scope)) : { participate: true };
       const first = presentation.messages.find(message => message.kind === "message");
       const agents = presentation.participants.filter(member => member.kind === "agent");
       const status = agents.some(agent => ["working", "listening", "responding"].includes(agent.status)) ? "running" : agents.some(agent => agent.status === "failed") ? "failed" : agents.some(agent => agent.status === "stopped") ? "stopped" : "idle";
       const error = agents.find(agent => agent.status === "failed")?.error;
       const conversation: ChatSummary = {
         id, title: chat.displayTitle ?? (chat.title === "New conversation" && first?.text ? first.text.slice(0, 80) : chat.title),
-        projectId: preference.projectId, pinned: preference.pinned, archived: preference.archived,
+        sharedProjectId: room.sharedProjectId ?? null, canParticipate: access.participate,
+        projectId: room.sharedProjectId ?? preference.projectId, pinned: preference.pinned, archived: preference.archived,
         createdAt: chat.createdAt, updatedAt: presentation.messages.reduce((latest, message) => Math.max(latest, message.createdAt), chat.createdAt), revision: this.commitRevision,
         agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, agentName: chat.agentName ?? "Saved agent", status,
         ...(error ? { error } : {}),
@@ -316,6 +379,10 @@ export class DispatchRuntime {
     });
     return {
       get value() { return value; },
+      deliver: (emit: () => void) => this.harness.commit(async tx => {
+        await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
+        emit();
+      }, context),
       start: (next: (snapshot: ChatSnapshot) => Promise<void>) => {
         listener = next;
         dirty = true;
@@ -336,25 +403,40 @@ export class DispatchRuntime {
     requireText(input.requestId, "Request ID", 200);
     requireText(input.text, "Message", 100_000);
     await this.authorize(scope, id);
-    return this.harness.commit(tx => this.shared.post(tx, nativeId(id), `human:${scope.userId}`, input), context);
+    const person = await this.person(scope.companyId, scope.userId);
+    return this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
+      await this.shared.ensureHuman(tx, nativeId(id), person);
+      return this.shared.post(tx, nativeId(id), `human:${scope.userId}`, input);
+    }, context);
   }
 
   async composing(scope: RuntimeScope, id: string, input: { clientId: string; sequence: number; active: boolean }) {
     await this.authorize(scope, id);
-    await this.harness.commit(tx => this.shared.turns.composing(tx, nativeId(id), `human:${scope.userId}`, input.clientId, input.sequence, input.active), context);
+    const person = await this.person(scope.companyId, scope.userId);
+    await this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
+      await this.shared.ensureHuman(tx, nativeId(id), person);
+      await this.shared.turns.composing(tx, nativeId(id), `human:${scope.userId}`, input.clientId, input.sequence, input.active);
+    }, context);
   }
 
   async addParticipants(scope: RuntimeScope, id: string, input: AddParticipantsInput) {
     requireText(input.requestId, "Request ID", 200);
     await this.authorize(scope, id);
     const people = await Promise.all((input.userIds ?? []).map(userId => this.person(scope.companyId, userId)));
-    await this.harness.commit(tx => this.shared.invite(tx, nativeId(id), `human:${scope.userId}`, input, people), context);
+    const person = await this.person(scope.companyId, scope.userId);
+    await this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
+      await this.shared.ensureHuman(tx, nativeId(id), person);
+      await this.shared.invite(tx, nativeId(id), `human:${scope.userId}`, input, people);
+    }, context);
     return this.getChat(scope, id);
   }
 
   async stop(scope: RuntimeScope, id: string) {
     await this.authorize(scope, id);
-    await this.shared.stop(nativeId(id));
+    await this.shared.stop(nativeId(id), async tx => { await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope)); });
     return this.getChat(scope, id);
   }
 
@@ -524,7 +606,7 @@ export class DispatchRuntime {
   }
 
   private async authorize(scope: RuntimeScope, id: string) {
-    await this.shared.authorized(scope, nativeId(id));
+    await this.harness.commit(async tx => { await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope)); }, context);
   }
 
   private async person(companyId: string, userId: string): Promise<CompanyPerson> {
@@ -680,7 +762,7 @@ function nativeId(id: string): ConversationId {
 
 function owns(scope: RuntimeScope, chat: RuntimeScope) { return scope.companyId === chat.companyId && scope.userId === chat.userId; }
 function projectSummary(project: StoredProject): Project {
-  return { id: project.id, name: project.name, createdAt: project.createdAt };
+  return { id: project.id, name: project.name, createdAt: project.createdAt, kind: "personal", canManage: false, canParticipate: true };
 }
 function publicAgent({ companyId: _companyId, savedBy: _savedBy, saveRequestId: _request, saveFingerprint: _fingerprint, ...agent }: StoredAgent): AgentDefinition {
   return { ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [], capabilities: agent.extensions?.includes(CodingTools.name) ? ["files-and-commands"] : [] };

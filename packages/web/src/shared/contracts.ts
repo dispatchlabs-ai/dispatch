@@ -8,6 +8,8 @@ export interface RuntimeScope {
 export type ChatStatus = "idle" | "running" | "stopped" | "failed";
 
 export interface ChatSummary {
+  sharedProjectId?: string | null;
+  canParticipate?: boolean;
   id: string;
   projectId: string | null;
   /** Native Pi commit sequence used to order all derived observations. */
@@ -191,6 +193,7 @@ export interface CreateChatInput {
   agentDefinitionId?: string;
   agentDefinitionIds?: string[];
   projectId?: string | null;
+  sharedProjectId?: string | null;
 }
 
 export interface UpdateChatInput {
@@ -199,13 +202,26 @@ export interface UpdateChatInput {
   projectId?: string | null;
 }
 
+export type ProjectMember = { userId: string; role: "manager" | "member" };
+export interface SaveProjectInput {
+  requestId: string; expectedRevision: number; name: string;
+  members: ProjectMember[]; defaultAgentDefinitionIds: string[];
+}
+
 export type Project = {
+  kind?: "personal" | "shared";
+  revision?: number;
+  members?: ProjectMember[];
+  defaultAgentDefinitionIds?: string[];
+  canManage?: boolean;
+  canParticipate?: boolean;
   id: string;
   name: string;
   createdAt: number;
 };
 
 export interface CreateProjectInput {
+  kind?: "shared";
   requestId: string;
   name: string;
 }

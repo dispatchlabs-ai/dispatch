@@ -46,7 +46,7 @@ export function NewConversationDialog({ agents, initialAgentIds, projectName, bu
       {error ? <Notice>{error}</Notice> : null}
       <footer className="picker-actions"><span>{selected.length} {selected.length === 1 ? "agent" : "agents"} selected</span><div className="button-row">
         <Button variant="secondary" disabled={busy} onClick={onClose}>Cancel</Button>
-        <Button disabled={busy || !selected.length} onClick={() => onCreate(selected)}>{busy ? <Spinner /> : null} Start conversation</Button>
+        <Button disabled={busy} onClick={() => onCreate(selected)}>{busy ? <Spinner /> : null} Start conversation</Button>
       </div></footer>
     </div>
   </Modal>;

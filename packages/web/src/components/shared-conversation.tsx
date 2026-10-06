@@ -210,19 +210,19 @@ export function SharedContextPanel({ snapshot, models, threadId, draft, pending,
         <SharedTranscript snapshot={snapshot} threadId={root?.id ?? threadId} />
         <ConversationPresence participants={snapshot.participants} />
       </div>
-      <ConversationComposer id={`thread-${snapshot.conversation.id}-${threadId}`} chatId={snapshot.conversation.id} draft={draft} pending={pending} error={error} participants={snapshot.participants} mentions={mentions} onMentionsChange={onMentionsChange} onDraftChange={onDraftChange} onSend={onSend} thread>
-        {snapshot.conversation.status === "running" ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
+      <ConversationComposer id={`thread-${snapshot.conversation.id}-${threadId}`} chatId={snapshot.conversation.id} draft={draft} pending={pending} error={error} participants={snapshot.participants} mentions={mentions} onMentionsChange={onMentionsChange} onDraftChange={onDraftChange} onSend={onSend} disabled={snapshot.conversation.canParticipate === false} thread>
+        {snapshot.conversation.status === "running" && snapshot.conversation.canParticipate !== false ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
           setStopping(true); setStopError(null);
           void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(snapshot.conversation.id)}/stop`, {}).then(onSnapshot).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));
         }}>{stopping ? <Spinner /> : <Square size={14} />} Stop all</Button> : null}
       </ConversationComposer>
       {stopError ? <Notice>{stopError}</Notice> : null}
     </> : <div className="participants-body">
-      <Button className="invite-participants" variant="secondary" onClick={onInvite}><UserPlus size={18} /> Add participants</Button>
+      <Button className="invite-participants" variant="secondary" disabled={snapshot.conversation.canParticipate === false} onClick={onInvite}><UserPlus size={18} /> Add participants</Button>
       <div className="participant-list">{snapshot.participants.map(member => <button type="button" className={`participant-row ${participant?.id === member.id ? "selected" : ""}`} key={member.id} onClick={() => setSelectedId(member.id)} aria-pressed={participant?.id === member.id}>
         <ParticipantAvatar kind={member.kind} name={member.name} /><span className="participant-choice-copy"><strong>{participantName(member, snapshot.participants)}</strong><span>{member.kind === "agent" ? `Agent · ${participantStatus[member.status]}` : `${state?.state === "authenticated" && state.user.id === member.userId ? "You" : "Person"}${member.status === "typing" ? " · Typing" : ""}`}</span></span>
       </button>)}</div>
-      <p className="history-access"><LockKeyhole size={14} /> Everyone here can read the full public history.</p>
+      <p className="history-access"><LockKeyhole size={14} /> {snapshot.conversation.sharedProjectId ? "Current project members can read the full history. Listed authors may include former members." : "Everyone here can read the full public history."}</p>
       {participant ? <section className="participant-details">
         <h3>{participantName(participant, snapshot.participants)}</h3>
         {participant.kind === "agent" ? <>
@@ -286,7 +286,7 @@ export function InviteParticipantsDialog({ snapshot, agents, onSnapshot, onClose
   return <Modal title="Add participants" description={snapshot.conversation.title} open onOpenChange={open => { if (!open && !busy) onClose(); }}>
     <div className="conversation-picker invitation-picker">
       <Tabs.Root value={tab} onValueChange={value => setTab(String(value))}>
-        <Tabs.List className="context-tab-list" aria-label="Participant type"><Tabs.Tab value="agents">Agents</Tabs.Tab><Tabs.Tab value="people">People</Tabs.Tab></Tabs.List>
+        <Tabs.List className="context-tab-list" aria-label="Participant type"><Tabs.Tab value="agents">Agents</Tabs.Tab><Tabs.Tab value="people" disabled={Boolean(snapshot.conversation.sharedProjectId)}>People</Tabs.Tab></Tabs.List>
         <Tabs.Panel value="agents" keepMounted><AgentChoices agents={agents} selected={selectedAgentIds} onChange={setAgentIds} disabled={busy} joinedDefinitionIds={joinedDefinitionIds} /></Tabs.Panel>
         <Tabs.Panel value="people" keepMounted><SidebarSearch label="Find a person" value={search} onChange={setSearch} />
           {peopleError ? <><Notice>{peopleError}</Notice><Button variant="secondary" onClick={() => setAttempt(value => value + 1)}>Retry loading people</Button></> : !people ? <Spinner label="Loading people" /> : <div className="participant-choice-list">{people.filter(person => person.name.toLowerCase().includes(search.toLowerCase())).map(person => {
@@ -295,7 +295,7 @@ export function InviteParticipantsDialog({ snapshot, agents, onSnapshot, onClose
           })}{!people.some(person => person.name.toLowerCase().includes(search.toLowerCase())) ? <p className="collection-empty">No people match your search.</p> : null}</div>}
         </Tabs.Panel>
       </Tabs.Root>
-      <p className="history-access"><LockKeyhole size={15} /> New participants can read the full conversation history.</p>
+      <p className="history-access"><LockKeyhole size={15} /> {snapshot.conversation.sharedProjectId ? "Add people through project settings. New agent participants can read the full project conversation history." : "New participants can read the full conversation history."}</p>
       {error ? <Notice>{error} You can retry this invitation.</Notice> : null}
       <footer className="picker-actions"><span>{selected} selected</span><div className="button-row"><Button variant="secondary" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy || !selected} onClick={() => void invite()}>{busy ? <Spinner /> : <UserPlus size={16} />} Add {selected === 1 ? "participant" : "participants"}</Button></div></footer>
     </div>

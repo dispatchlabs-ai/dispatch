@@ -1,7 +1,7 @@
 import { ArrowDown, RotateCcw, Square, Users } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChatSnapshot } from "../shared/contracts";
-import { errorMessage } from "../lib/api";
+import { ApiError, errorMessage } from "../lib/api";
 import { chatStatusLabel, type ConnectionState, type PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
 import { Brand } from "./brand";
@@ -24,10 +24,11 @@ interface ChatPanelProps {
   onParticipants: () => void;
   onThread: (id: string) => void;
   onSnapshot: (snapshot: ChatSnapshot) => void;
+  onAccessLost: (chatId: string) => void;
   onConnection: (chatId: string, state: ConnectionState) => void;
 }
 
-export function ChatPanel({ active: visible, connection, chatId, snapshot, draft, pending, sendError, mentions, onMentionsChange, onDraftChange, onSend, activeThreadId, onParticipants, onThread, onSnapshot, onConnection }: ChatPanelProps) {
+export function ChatPanel({ active: visible, connection, chatId, snapshot, draft, pending, sendError, mentions, onMentionsChange, onDraftChange, onSend, activeThreadId, onParticipants, onThread, onSnapshot, onConnection, onAccessLost }: ChatPanelProps) {
   const { api, refreshSession } = useSession();
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -70,15 +71,19 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
       stream.onerror = () => {
         if (!active) return;
         onConnection(chatId, "reconnecting");
+        void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}`, undefined, controller.signal).then(next => { if (active) onSnapshot(next); }).catch(error => {
+          if (active && error instanceof ApiError && [403, 404].includes(error.status)) { stream?.close(); onAccessLost(chatId); setLoadError("Conversation unavailable or access removed."); }
+        });
         void refreshSession().catch(() => { });
       };
     }).catch(error => {
       if (!active) return;
+      if (error instanceof ApiError && [403, 404].includes(error.status)) onAccessLost(chatId);
       setLoadError(errorMessage(error));
       onConnection(chatId, "error");
     });
     return () => { active = false; controller.abort(); stream?.close(); };
-  }, [visible, chatId, attempt, api, refreshSession, onSnapshot, onConnection]);
+  }, [visible, chatId, attempt, api, refreshSession, onSnapshot, onConnection, onAccessLost]);
 
   useLayoutEffect(() => {
     if (!visible) return;
@@ -149,8 +154,8 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
         <ArrowDown /> Latest messages</Button>
     </div> : null}
     {stopError ? <Notice>{stopError}</Notice> : null}
-    <ConversationComposer id={`composer-${chatId}`} conversationTitle={snapshot?.conversation.title} chatId={chatId} active={visible} draft={draft} pending={pending} error={sendError} participants={snapshot?.participants ?? []} mentions={mentions} onMentionsChange={onMentionsChange} disabled={!snapshot} onDraftChange={onDraftChange} onSend={sendDraft}>
-      {running ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
+    <ConversationComposer id={`composer-${chatId}`} conversationTitle={snapshot?.conversation.title} chatId={chatId} active={visible} draft={draft} pending={pending} error={sendError} participants={snapshot?.participants ?? []} mentions={mentions} onMentionsChange={onMentionsChange} disabled={!snapshot || snapshot.conversation.canParticipate === false} onDraftChange={onDraftChange} onSend={sendDraft}>
+      {running && snapshot?.conversation.canParticipate !== false ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
         setStopping(true); setStopError(null);
         void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/stop`, {}).then(onSnapshot).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));
       }}>{stopping ? <Spinner /> : <Square />} Stop all</Button> : null}

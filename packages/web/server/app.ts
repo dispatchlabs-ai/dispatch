@@ -3,6 +3,7 @@ import { bodyLimit } from "hono/body-limit";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { z } from "zod";
 import type { createAuth, AuthPrincipal } from "./auth.js";
+import { ProjectAccessError } from "./project-access.js";
 import { RuntimeError, type DispatchRuntime } from "./runtime.js";
 import { CollaborationError } from "./collaboration/shared.js";
 import type { ApplicationConfig, ChatSnapshot } from "../src/shared/contracts.js";
@@ -138,14 +139,22 @@ export function createApp(options: AppOptions) {
   app.get("/api/people", (c) => c.json({ people: auth.listCompanyPeople(c.get("principal").companyId) }));
   app.get("/api/projects", async (c) => c.json({ projects: await runtime.listProjects(c.get("principal")) }));
   app.post("/api/projects", async (c) => {
-    const input = z.object({ requestId, name: z.string().trim().min(1).max(100) }).strict().parse(await c.req.json());
+    const input = z.object({ requestId, name: z.string().trim().min(1).max(100), kind: z.literal("shared").optional() }).strict().parse(await c.req.json());
     return c.json({ project: await runtime.createProject(c.get("principal"), input) }, 201);
+  });
+  app.post("/api/projects/:id", async c => {
+    const input = z.object({ requestId, expectedRevision: z.number().int().positive(), name: z.string().trim().min(1).max(100),
+      members: z.array(z.object({ userId: identity, role: z.enum(["manager", "member"]) }).strict()).min(1).max(1000)
+        .refine(members => new Set(members.map(member => member.userId)).size === members.length && members.some(member => member.role === "manager"), "Choose unique members and retain at least one manager."),
+      defaultAgentDefinitionIds: identities.max(50),
+    }).strict().parse(await c.req.json());
+    return c.json({ project: await runtime.saveProject(c.get("principal"), c.req.param("id"), input) });
   });
   app.get("/api/chats", async (c) => c.json({ chats: await runtime.listChats(c.get("principal")) }));
   app.post("/api/chats", async (c) => {
     const input = z.object({
       requestId, title: z.string().trim().min(1).max(200).optional(),
-      agentDefinitionId: identity.optional(), agentDefinitionIds: identities.refine(values => values.length > 0).optional(), projectId,
+      agentDefinitionId: identity.optional(), agentDefinitionIds: identities.max(50).optional(), projectId, sharedProjectId: z.string().uuid().nullable().optional(),
     }).strict().refine(value => value.agentDefinitionId === undefined || value.agentDefinitionIds === undefined).parse(await c.req.json());
     return c.json(await runtime.createChat(c.get("principal"), input), 201);
   });
@@ -213,7 +222,7 @@ export function createApp(options: AppOptions) {
   }
   app.onError((error, c) => {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return c.json({ error: { code: "invalid_request", message: "The request is invalid. Check the fields and try again." } }, 400);
-    if (error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
+    if (error instanceof ProjectAccessError || error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
     console.error("Dispatch request failed:", error);
     return c.json({ error: { code: "internal", message: "The request could not be completed. Try again." } }, 500);
   });
@@ -246,29 +255,38 @@ function snapshotStream(watch: ChatWatch, isValid: () => boolean, signal: AbortS
     close();
     return false;
   }
-  function flush() {
-    if (!valid() || !pending || (controller.desiredSize ?? 0) <= 0) return;
-    controller.enqueue(encoder.encode(`event: snapshot\ndata: ${JSON.stringify(pending)}\n\n`));
+  let flushing = false;
+  async function flush() {
+    if (flushing || !valid() || !pending || (controller.desiredSize ?? 0) <= 0) return;
+    flushing = true;
+    const snapshot = pending;
     pending = undefined;
+    try {
+      await watch.deliver(() => {
+        if (valid()) controller.enqueue(encoder.encode(`event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`));
+      });
+    } catch { close(); }
+    finally { flushing = false; }
+    if (pending && !stopped) void flush();
   }
   return new ReadableStream<Uint8Array>({
     start(streamController) {
       controller = streamController;
       heartbeat = setInterval(() => {
         if (!valid()) return;
-        if (pending) flush();
+        if (pending) void flush();
         else if ((controller.desiredSize ?? 0) > 0) controller.enqueue(encoder.encode(": heartbeat\n\n"));
       }, 15_000);
       unsubscribe = onRevocation(() => { valid(); });
       signal.addEventListener("abort", close, { once: true });
       if (signal.aborted) { close(); return; }
       void watch.closed.then(close, close);
-      flush();
+      void flush();
       if (stopped) return;
-      try { watch.start(async (snapshot) => { if (!stopped) { pending = snapshot; flush(); } }); }
+      try { watch.start(async (snapshot) => { if (!stopped) { pending = snapshot; void flush(); } }); }
       catch { close(); }
     },
-    pull() { flush(); },
+    pull() { return flush(); },
     async cancel() {
       if (stopped) return;
       stopped = true;

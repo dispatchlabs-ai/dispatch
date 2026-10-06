@@ -10,6 +10,7 @@ import {
 import type {
   AgentParticipant, ConversationMessage, ConversationParticipant, ParticipantActivity, SendMessageInput, RuntimeScope,
 } from "../../src/shared/contracts.js";
+import { requireProjectAccess, type ProjectAction } from "../project-access.js";
 import { ConversationTurns, humansComposing, TurnsDoc } from "./turns.js";
 
 const context = BACKGROUND_CONTEXT;
@@ -28,7 +29,7 @@ export type Member = {
 };
 type Presentation = { participants: ConversationParticipant[]; messages: ConversationMessage[]; activities: ParticipantActivity[] };
 type SharedState = {
-  companyId: string; legacyCreatorId?: string; legacyQueued?: Record<string, string>; members: Member[]; epoch: number; stopping?: TaskId;
+  companyId: string; sharedProjectId?: string; legacyCreatorId?: string; legacyQueued?: Record<string, string>; members: Member[]; epoch: number; stopping?: TaskId;
   preferences: Record<string, { projectId: string | null; pinned: boolean; archived: boolean }>;
   requests: Record<string, { hash: string; messageId?: string }>;
   deliveries: TaskId[];
@@ -379,10 +380,12 @@ export class SharedConversations {
     else if (agent.tools) agent.tools.remove = agent.tools.remove.filter(name => !names.includes(name));
   }
 
-  async initialize(tx: Tx, roomId: ConversationId, companyId: string, human: Person, agentIds: string[], preferences: { projectId: string | null; pinned: boolean; archived: boolean }) {
+  async initialize(tx: Tx, roomId: ConversationId, companyId: string, human: Person, agentIds: string[], preferences: { projectId: string | null; pinned: boolean; archived: boolean }, sharedProjectId?: string) {
+    if (sharedProjectId !== undefined) await requireProjectAccess(tx, { companyId, userId: human.id }, sharedProjectId, "participate");
     const room = await tx.doc(SharedDoc, roomId);
     await tx.doc(TurnsDoc, roomId);
     room.companyId = companyId;
+    if (sharedProjectId !== undefined) room.sharedProjectId = sharedProjectId;
     room.members.push({ id: `human:${human.id}`, kind: "human", userId: human.id, name: human.name, joinedAt: Date.now(), status: "idle" });
     room.preferences[human.id] = preferences;
     for (const definitionId of agentIds) await this.addAgent(tx, roomId, definitionId);
@@ -445,10 +448,33 @@ export class SharedConversations {
     return binding;
   }
 
-  async authorized(scope: RuntimeScope, roomId: ConversationId) {
-    const room = await this.harness.snapshot(SharedDoc, roomId, context);
-    if (!room || room.companyId !== scope.companyId || !room.members.some(item => item.userId === scope.userId)) throw new CollaborationError(404, "Conversation not found.");
+  /** Authorize on the same commit line as the protected read or mutation. Historical authors are not project ACLs. */
+  async authorize(tx: Tx, scope: RuntimeScope, roomId: ConversationId, action: ProjectAction = "read", readAllProjects = false) {
+    const room = await tx.doc(SharedDoc, roomId);
+    if (room.companyId !== scope.companyId) throw new CollaborationError(404, "Conversation not found.");
+    if (room.sharedProjectId !== undefined) {
+      await requireProjectAccess(tx, scope, room.sharedProjectId, action, readAllProjects);
+    } else if (!room.members.some(item => item.kind === "human" && item.userId === scope.userId)) {
+      throw new CollaborationError(404, "Conversation not found.");
+    }
     return room;
+  }
+
+  async authorized(scope: RuntimeScope, roomId: ConversationId, action: ProjectAction = "read", readAllProjects = false) {
+    return this.harness.commit(async tx => copyJson(await this.authorize(tx, scope, roomId, action, readAllProjects), { omitUndefinedProperties: true }), context);
+  }
+
+  /** Materialize attribution only for an authorized participant; a read-all observer does not become a member. */
+  async ensureHuman(tx: Tx, roomId: ConversationId, person: Person) {
+    const room = await tx.doc(SharedDoc, roomId);
+    await this.authorize(tx, { companyId: room.companyId, userId: person.id }, roomId, "participate");
+    let member = room.members.find(member => member.kind === "human" && member.userId === person.id);
+    if (!member) {
+      member = { id: `human:${person.id}`, kind: "human", userId: person.id, name: person.name, joinedAt: Date.now(), status: "idle" };
+      room.members.push(member);
+    }
+    room.preferences[person.id] ??= { projectId: null, pinned: false, archived: false };
+    return member;
   }
 
   async messages(roomId: ConversationId, ctx = context): Promise<MessageData[]> {
@@ -489,7 +515,9 @@ export class SharedConversations {
   async post(tx: Tx, roomId: ConversationId, authorId: string, input: SendMessageInput): Promise<ConversationMessage> {
     if (!input.text.trim()) throw new CollaborationError(400, "Message must not be empty.");
     const room = await tx.doc(SharedDoc, roomId);
-    if (!room.members.some(item => item.id === authorId)) throw new CollaborationError(403, "Conversation membership is required.");
+    const author = room.members.find(item => item.id === authorId);
+    if (!author) throw new CollaborationError(403, "Conversation membership is required.");
+    if (author.kind === "human") await this.authorize(tx, { companyId: room.companyId, userId: author.userId! }, roomId, "participate");
     const oldSubmission = await tx.submissionByRequest(roomId, input.requestId);
     const entries = await scanEntries(tx, roomId);
     const messages = projectMessages(entries, room.messageAliases);
@@ -543,6 +571,8 @@ export class SharedConversations {
     const room = await tx.doc(SharedDoc, roomId);
     const author = room.members.find(member => member.id === authorId);
     if (!author) throw new CollaborationError(403, "Conversation membership is required.");
+    if (author.kind === "human") await this.authorize(tx, { companyId: room.companyId, userId: author.userId! }, roomId, "participate");
+    if (room.sharedProjectId !== undefined && input.userIds?.length) throw new CollaborationError(403, "Manage project membership to grant access to this conversation.");
     if (author.kind === "agent" && input.userIds?.length) throw new CollaborationError(403, "Agents cannot invite humans.");
     const key = digest([authorId, "invite", input.requestId]);
     const hash = digest({ agents: [...new Set(input.agentDefinitionIds ?? [])].sort(), people: [...new Set(input.userIds ?? [])].sort() });
@@ -569,8 +599,9 @@ export class SharedConversations {
     if (added.length) await tx.appendEntry(PublicEntry, roomId, { data: { id: randomUUID(), kind: "membership", authorId, text: `Invited ${added.map(member => member.name).join(", ")}`, createdAt: Date.now(), threadId: null, mentions: added.map(member => member.id) } });
   }
 
-  async stop(roomId: ConversationId) {
+  async stop(roomId: ConversationId, authorize?: (tx: Tx) => Promise<unknown>) {
     const id = await this.harness.commit(async tx => {
+      await authorize?.(tx);
       const room = await tx.doc(SharedDoc, roomId);
       if (room.stopping) {
         const previous = await tx.task(room.stopping);

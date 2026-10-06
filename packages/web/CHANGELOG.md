@@ -6,6 +6,8 @@
 
 - Rename shared conversation display titles from conversation actions, without changing messages, agent context, workspaces or creation-retry identity.
 
+- Shared projects with current manager/member access, full-history conversations, configurable default agents, and operator-designated read-all access. Legacy personal groups and invite-only conversations retain their audiences; audience-changing transfers are not enabled. Stream delivery checks current project access on the native transaction line. Application checks do not establish isolation for shared coding tools or credentials.
+
 - Reusable company text skills with explicit per-agent revision selections and a native assigned-only loader. New instances copy complete skill snapshots; creation and revision edits never automatically assign or upgrade skills. File packages and uploads remain deferred.
 
 ### Changed
