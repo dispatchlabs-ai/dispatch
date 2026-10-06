@@ -2,7 +2,7 @@ import { describeAgentTools } from "../lib/agent-tools";
 import type { Message } from "@earendil-works/pi-ai";
 import { Tabs } from "@base-ui/react/tabs";
 import { ArrowUp, Check, Copy, Ear, LockKeyhole, Pencil, Reply, RotateCcw, Square, UserPlus, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { AddParticipantsInput, AgentDefinition, AgentParticipant, ApplicationConfig, ChatSnapshot, CompanyPerson, ConversationMessage, ConversationParticipant, ParticipantActivity } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
 import type { PendingMessage } from "../lib/chat";
@@ -140,8 +140,17 @@ function repeatsBashOutput(message: ConversationMessage, activity: ParticipantAc
   return Boolean(output && (fenced?.[2] ?? text).trim() === output);
 }
 
-export function SharedTranscript({ snapshot, threadId = null, activeThreadId = null, onThread }: { snapshot: ChatSnapshot; threadId?: string | null; activeThreadId?: string | null; onThread?: (id: string) => void }) {
-  const messages = snapshot.messages.filter(message => message.threadId === threadId);
+export const SharedTranscript = memo(function SharedTranscript({ snapshot, threadId = null, activeThreadId = null, onThread }: { snapshot: ChatSnapshot; threadId?: string | null; activeThreadId?: string | null; onThread?: (id: string) => void }) {
+  const messagesByThread = useMemo(() => {
+    const groups = new Map<string | null, ConversationMessage[]>();
+    for (const message of snapshot.messages) {
+      const group = groups.get(message.threadId);
+      if (group) group.push(message);
+      else groups.set(message.threadId, [message]);
+    }
+    return groups;
+  }, [snapshot.messages]);
+  const messages = messagesByThread.get(threadId) ?? [];
   const items = [
     ...messages.map(message => ({ kind: "message" as const, id: message.id, at: message.createdAt, message })),
     ...snapshot.activities.filter(activity => activity.threadId === threadId).map(activity => ({ kind: "activity" as const, id: activity.id, at: activity.createdAt, activity })),
@@ -154,10 +163,10 @@ export function SharedTranscript({ snapshot, threadId = null, activeThreadId = n
     const previous = items[index - 1];
     return <div key={`${item.kind}:${item.id}`}>
       {showDate ? <div className="transcript-date"><span>{nextDate}</span></div> : null}
-      {item.kind === "message" ? <PublicMessage message={item.message} participants={snapshot.participants} replies={snapshot.messages.filter(message => message.threadId === item.id)} selected={activeThreadId === item.id || Boolean(activeThreadId && item.message.aliases?.includes(activeThreadId))} onThread={onThread} outputInActivity={!showDate && previous?.kind === "activity" && repeatsBashOutput(item.message, previous.activity)} /> : <PublicActivity activity={item.activity} participants={snapshot.participants} />}
+      {item.kind === "message" ? <PublicMessage message={item.message} participants={snapshot.participants} replies={messagesByThread.get(item.id)} selected={activeThreadId === item.id || Boolean(activeThreadId && item.message.aliases?.includes(activeThreadId))} onThread={onThread} outputInActivity={!showDate && previous?.kind === "activity" && repeatsBashOutput(item.message, previous.activity)} /> : <PublicActivity activity={item.activity} participants={snapshot.participants} />}
     </div>;
   })}</>;
-}
+});
 
 function formatTime(timestamp: number) { return new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
 

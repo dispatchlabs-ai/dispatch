@@ -18,6 +18,8 @@
 
 ### Changed
 
+- Memoized unchanged conversation transcripts and indexed replies once per message-array change, keeping synchronous draft and send-settlement behavior. Browser latency improvement remains unmeasured; see [WP-039](docs/handoff.md#wp-039--composer-render-isolation).
+
 - Removed obsolete single-agent snapshot consumers, consolidated company-scoped latest-agent lookups, and clarified watcher/speaking-turn transitions without changing API compatibility fields or durable execution policy.
 
 - Coding agents now start in the configured workspace (`DISPATCH_WORKSPACE_DIR`), defaulting to the repository root in local launchers. Idle instances using the old generated folders migrate on startup; custom paths, unfinished work, history, and old files are preserved.

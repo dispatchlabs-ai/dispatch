@@ -350,12 +350,12 @@ export function Workspace() {
     setPending(current => current[key] && !current[key]?.sending && current[key]?.text !== text.trim() ? { ...current, [key]: undefined } : current);
   }
 
-  function openSupporting(chatId: string, threadId: string | null) {
+  const openSupporting = useCallback((chatId: string, threadId: string | null) => {
     setThreads(current => ({ ...current, [chatId]: threadId }));
     setChatDetailsVisible(current => ({ ...current, [chatId]: true }));
     if (viewportWidth <= 800) setContextOpen(true);
     else requestAnimationFrame(() => document.querySelector<HTMLElement>("#details-column .shared-context")?.focus());
-  }
+  }, [viewportWidth]);
 
   async function sendMessage(conversationId: string, threadId: string | null = null, mentions: string[] = []) {
     const chatId = threadId ? `${conversationId}:${threadId}` : conversationId;
@@ -579,7 +579,7 @@ export function Workspace() {
               onSend={mentions => void sendMessage(tab.chatId, null, mentions)}
               activeThreadId={(viewportWidth <= 800 ? contextOpen : chatDetailsVisible[tab.chatId]) ? threads[tab.chatId] : null}
               onParticipants={() => openSupporting(tab.chatId, null)}
-              onThread={id => openSupporting(tab.chatId, id)}
+              onThread={openSupporting}
               onSnapshot={onSnapshot}
               onConnection={onConnection}
               onAccessLost={onAccessLost}

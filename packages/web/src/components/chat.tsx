@@ -1,5 +1,5 @@
 import { ArrowDown, RotateCcw, Square, Users } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChatSnapshot } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
 import { chatStatusLabel, type ConnectionState, type PendingMessage } from "../lib/chat";
@@ -22,7 +22,7 @@ interface ChatPanelProps {
   onSend: (mentions: string[]) => void;
   activeThreadId?: string | null;
   onParticipants: () => void;
-  onThread: (id: string) => void;
+  onThread: (chatId: string, id: string) => void;
   onSnapshot: (snapshot: ChatSnapshot) => void;
   onAccessLost: (chatId: string) => void;
   onConnection: (chatId: string, state: ConnectionState) => void;
@@ -30,6 +30,7 @@ interface ChatPanelProps {
 
 export function ChatPanel({ active: visible, connection, chatId, snapshot, draft, pending, sendError, mentions, onMentionsChange, onDraftChange, onSend, activeThreadId, onParticipants, onThread, onSnapshot, onConnection, onAccessLost }: ChatPanelProps) {
   const { api, refreshSession } = useSession();
+  const openThread = useCallback((id: string) => onThread(chatId, id), [chatId, onThread]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [stopping, setStopping] = useState(false);
@@ -142,7 +143,7 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
           <h2>What are we working on?</h2>
           <p>Bring a question, a rough idea, or a problem to work through.</p>
         </div> : null}
-        {snapshot ? <SharedTranscript snapshot={snapshot} activeThreadId={activeThreadId} onThread={onThread} /> : null}
+        {snapshot ? <SharedTranscript snapshot={snapshot} activeThreadId={activeThreadId} onThread={openThread} /> : null}
         {snapshot ? <ConversationPresence participants={snapshot.participants} /> : null}
         {snapshot?.conversation.status === "stopped" ? <p className="run-outcome" role="status">
           <Square size={13} /> Response stopped. You can continue the conversation.</p> : null}
