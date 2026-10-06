@@ -507,6 +507,18 @@ The local launcher shut down gracefully, and existing state was backed up under 
 
 No tests or browser/API acceptance procedures ran. This is observed repair of the existing conversation plus build/source/layout evidence; future-turn publication, concurrency, broader restart recovery, thread interactions, keyboard/touch and real-device behavior remain unqualified. The existing Vite chunk-size advisory remains. This revision was not built on x86-64 Linux or deployed to Omarchy or the pilot.
 
+### Publication simplification — October 6, 2026
+
+Chris asked for a deslop pass after reviewing the duplicate-reply cause. The shared public log remains an application-defined Pi entry stream, distinct from agent working transcripts; this clarification corrects any implication that the UI directly renders only the built-in transcript.
+
+- Keep successful final publication solely in `onYield`, where freshness and public append share a transaction. Delivery completion only updates status; it retains unpublished committed native output when the submission fails or is aborted.
+- Remove `reported` and `finalized` member lists. Use persisted public message identities for publication checks, visible activity and interrupted-output retention. Final/progress checks share native generation identity; interrupted output retains native entry identity. Keep superseded-generation exclusions because those drafts have no public entry.
+- Share interrupted-output selection between delivery failure and Stop. Preserve the native legacy reporter for work admitted before shared-conversation migration. Keep native task definitions, request receipts, membership boundaries, author/thread attribution and Stop fences intact.
+- Run historical duplicate repair once per existing room before native resume; retain raw entries and old aliases, remove obsolete publication lists, and mark new rooms current. Normal publication must not use content-based deduplication.
+- Review source and all affected callers, run TypeScript/production builds, Apple Silicon `nix build` and `nix flake check`, and inspect the diff and local links. Review the existing conversation on desktop and 390 px after the local update. No tests, synthetic messages, model requests or browser/API acceptance procedures under the standing policy.
+
+Implementation, publication and observed local evidence will be recorded after the checks and update. Future-turn, interruption, concurrency, migration/restart and device interactions remain functionally unqualified.
+
 ## WP-027 — Inline mentions
 
 **Accepted October 5, 2026:** Chris rejected the detached Mention dropdown and

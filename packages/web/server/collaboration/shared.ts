@@ -23,8 +23,8 @@ export type Member = {
   userId?: string; agentDefinitionId?: string; agentRevision?: number; conversationId?: ConversationId;
   agent?: { [K in keyof AgentParticipant["agent"]]: AgentParticipant["agent"][K] };
   status: "idle" | "working" | "listening" | "silent" | "stopped" | "failed"; error?: string;
-  threadId?: string | null; lastDelivery?: TaskId; reported: string[];
-  activeDelivery?: TaskId; consideredThrough?: string; superseded?: TaskId[]; finalized?: TaskId[];
+  threadId?: string | null; lastDelivery?: TaskId;
+  activeDelivery?: TaskId; consideredThrough?: string; superseded?: TaskId[];
 };
 type Presentation = { participants: ConversationParticipant[]; messages: ConversationMessage[]; activities: ParticipantActivity[] };
 type SharedState = {
@@ -33,10 +33,11 @@ type SharedState = {
   requests: Record<string, { hash: string; messageId?: string }>;
   deliveries: TaskId[];
   messageAliases?: Record<string, string>;
+  replyHistoryVersion?: 1;
 };
 export const SharedDoc = defineDoc<SharedState>({
   kind: "dispatch.shared-conversation", version: 1, scope: "conversation", history: "latest", fork: "initial",
-  initial: () => ({ companyId: "", members: [], epoch: 0, preferences: {}, requests: {}, deliveries: [] }),
+  initial: () => ({ companyId: "", members: [], epoch: 0, preferences: {}, requests: {}, deliveries: [], replyHistoryVersion: 1 }),
 });
 const LegacyFingerprints = defineDoc<{ fingerprints: Record<string, string> }>({
   kind: "dispatch.request-fingerprints", version: 1, scope: "conversation", history: "latest", fork: "initial", initial: () => ({ fingerprints: {} }),
@@ -119,37 +120,23 @@ export class SharedConversations {
         const submitted = prior ? (await this.harness.submission(prior.id, ctx))! : await conversation.submit({ type: "input", requestId: `dispatch-delivery:${task.id}`, content: [{ type: "text", text: notification }, ...(incoming.images ?? []).map(image => ({ type: "image" as const, ...image }))], whenBusy: "followUp" }, ctx);
         const settled = await submitted.wait(ctx);
         await runtime.commit(async tx => {
-          // Read the answer before appending a public entry (Pi forbids table reads after writes).
-          const entries = settled.status === "unanswered" ? await scanEntries(tx, member.conversationId!) : [];
-          const answer = settled.type === "input" && settled.status === "done" ? await tx.entry(settled.answer) : undefined;
           const room = await tx.doc(SharedDoc, task.input.roomId);
           const target = room.members.find(item => item.id === member.id)!;
           if (room.epoch !== task.input.epoch || room.stopping) return terminal();
           await this.turns.release(tx, task.input.roomId, member.id);
           delete target.activeDelivery;
           if (settled.status === "unanswered") {
-            for (const entry of entries) {
-              const message = entry.model?.[0];
-              if (!settled.entry || Number(entry.id) <= Number(settled.entry) || entry.kind !== "pi.assistant" || message?.role !== "assistant" || message.stopReason === "toolUse" || target.reported.includes(String(entry.id)) || (entry.byTaskId && (target.superseded?.includes(entry.byTaskId) || target.finalized?.includes(entry.byTaskId)))) continue;
-              target.reported.push(String(entry.id));
-              const content = nativeContent(entry);
-              const { text } = content;
-              if ((text && text !== "[[silent]]") || content.images?.length) await this.append(tx, task.input.roomId, { id: `answer:${member.id}:${entry.id}`, kind: "message", authorId: member.id, ...content, createdAt: message.timestamp, threadId: incoming.threadId, mentions: [] });
-            }
+            const entries = await scanEntries(tx, member.conversationId!);
+            const publicIds = new Set((await scanEntries(tx, task.input.roomId)).filter(PublicEntry.is).map(entry => entry.data.id));
+            const interrupted = entries.filter(entry => settled.entry && Number(entry.id) > Number(settled.entry));
+            for (const message of unpublishedReplies(interrupted, target, publicIds)) await this.append(tx, task.input.roomId, message);
             target.status = settled.reason === "aborted" ? "stopped" : "failed";
             if (target.status === "failed") target.error = typeof settled.detail === "string" ? settled.detail : `Response ended: ${settled.reason}.`;
             return terminal();
           }
-          target.status = "idle";
-          if (answer && !target.reported.includes(String(answer.id)) && !(answer.byTaskId && target.finalized?.includes(answer.byTaskId))) {
-            target.reported.push(String(answer.id));
-            const content = nativeContent(answer);
-            const { text } = content;
-            if ((text && text !== "[[silent]]") || content.images?.length) {
-              await this.append(tx, task.input.roomId, { id: `answer:${member.id}:${answer.id}`, kind: "message", authorId: member.id, ...content, createdAt: Date.now(), threadId: incoming.threadId, mentions: [] });
-              target.status = "idle";
-            } else target.status = "silent";
-          }
+          // Successful finals belong to onYield; completion only records the participant's status.
+          const answer = settled.type === "input" && settled.status === "done" ? await tx.entry(settled.answer) : undefined;
+          target.status = answer && !hasPublicContent(nativeContent(answer)) ? "silent" : "idle";
           return terminal();
         }, ctx);
       } },
@@ -175,16 +162,9 @@ export class SharedConversations {
           await this.turns.release(tx, task.input.roomId, member.id);
           member.status = settlement.status;
           if (settlement.error) member.error = settlement.error; else delete member.error;
-          for (const entry of entries) {
-            if (Number(entry.id) <= task.input.afterEntry || member.reported.includes(String(entry.id))) continue;
-            if (entry.kind !== "pi.assistant") continue;
-            const message = entry.model?.[0];
-            if (message?.role !== "assistant" || message.stopReason === "toolUse" || (entry.byTaskId && (member.superseded?.includes(entry.byTaskId) || member.finalized?.includes(entry.byTaskId)))) continue;
-            member.reported.push(String(entry.id));
-            const content = nativeContent(entry);
-            const { text } = content;
-            if ((text && text !== "[[silent]]") || content.images?.length) await this.append(tx, task.input.roomId, { id: `legacy:${entry.id}`, kind: "message", authorId: member.id, ...content, createdAt: message.timestamp, threadId: null, mentions: [] });
-          }
+          const publicIds = new Set(entries.filter(PublicEntry.is).map(entry => entry.data.id));
+          const pending = entries.filter(entry => Number(entry.id) > task.input.afterEntry);
+          for (const message of unpublishedReplies(pending, member, publicIds, true)) await this.append(tx, task.input.roomId, message);
           return terminal();
         }, ctx);
       } },
@@ -329,7 +309,7 @@ export class SharedConversations {
               const text = publicAssistant(message, { text: true, partial: false }).content.flatMap(part => part.type === "text" ? [part.text] : []).join("").trim();
               if (humansComposing(turns) || hasNewMessages(messages, preparation.through, member.id)) {
                 if (!member.superseded?.includes(api.taskId)) member.superseded = [...(member.superseded ?? []), api.taskId];
-              } else if (text && !messages.some(item => item.id === `progress:${member.id}:${api.taskId}`)) {
+              } else if (text && !publishedGeneration(new Set(messages.map(item => item.id)), member.id, api.taskId)) {
                 // Peers must be able to read a spoken update before its author releases the turn to run tools.
                 await this.append(tx, binding.roomId!, { id: `progress:${member.id}:${api.taskId}`, kind: "message", authorId: member.id, text, createdAt: message.timestamp, threadId: member.threadId ?? null, mentions: [] });
               }
@@ -348,16 +328,14 @@ export class SharedConversations {
             const messages = projectMessages(await scanEntries(tx, binding.roomId!), room.messageAliases);
             if (room.stopping) throw new Error("The conversation is stopping.");
             await this.turns.release(tx, binding.roomId!, member.id, api.taskId);
-            if (member.finalized?.includes(api.taskId)) return false;
+            if (publishedGeneration(new Set(messages.map(message => message.id)), member.id, api.taskId)) return false;
             if (humansComposing(turns) || hasNewMessages(messages, preparation.through, member.id)) {
               if (!member.superseded?.includes(api.taskId)) member.superseded = [...(member.superseded ?? []), api.taskId];
               return true;
             }
             // Check freshness and publish atomically; a human can post between this hook and native settlement.
-            // Assign the complete array: native drafts copy assigned values before tracking later mutations.
-            member.finalized = [...(member.finalized ?? []), api.taskId];
             const content = nativeContent({ model: [answer] });
-            if ((content.text && content.text !== "[[silent]]") || content.images?.length) {
+            if (hasPublicContent(content)) {
               await this.append(tx, binding.roomId!, { id: `final:${member.id}:${api.taskId}`, kind: "message", authorId: member.id, ...content, createdAt: answer.timestamp, threadId: member.threadId ?? null, mentions: [] });
             }
             return false;
@@ -405,7 +383,7 @@ export class SharedConversations {
     const room = await tx.doc(SharedDoc, roomId);
     await tx.doc(TurnsDoc, roomId);
     room.companyId = companyId;
-    room.members.push({ id: `human:${human.id}`, kind: "human", userId: human.id, name: human.name, joinedAt: Date.now(), status: "idle", reported: [] });
+    room.members.push({ id: `human:${human.id}`, kind: "human", userId: human.id, name: human.name, joinedAt: Date.now(), status: "idle" });
     room.preferences[human.id] = preferences;
     for (const definitionId of agentIds) await this.addAgent(tx, roomId, definitionId);
   }
@@ -431,7 +409,7 @@ export class SharedConversations {
     room.legacyCreatorId = `human:${human.id}`;
     room.legacyQueued = {};
     room.companyId = companyId;
-    room.members = [{ id: `human:${human.id}`, kind: "human", userId: human.id, name: human.name, joinedAt: legacy.joinedAt, status: "idle", reported: [] }, legacy];
+    room.members = [{ id: `human:${human.id}`, kind: "human", userId: human.id, name: human.name, joinedAt: legacy.joinedAt, status: "idle" }, legacy];
     legacy = room.members[1];
     room.preferences[human.id] = preferences;
     const binding = await tx.doc(BindingDoc, roomId); binding.roomId = roomId; binding.participantId = legacy.id;
@@ -443,7 +421,6 @@ export class SharedConversations {
       const content = nativeContent(entry);
       const { text } = content;
       if (!text && !content.images?.length) continue;
-      if (message.role === "assistant") legacy.reported.push(String(entry.id));
       await tx.appendEntry(PublicEntry, roomId, { data: { id: `legacy:${entry.id}`, kind: "message", authorId: message.role === "user" ? `human:${human.id}` : legacy.id, ...content, createdAt: message.timestamp, threadId: null, mentions: [] } });
     }
     for (const item of inbox.items) {
@@ -481,36 +458,32 @@ export class SharedConversations {
     return projectMessages(entries.reverse(), room?.messageAliases);
   }
 
-  /** Preserve raw history while reconciling replies published by both the final hook and delivery. */
-  async repairPublishedReplies(tx: Tx, roomId: ConversationId) {
+  /** One-time compatibility for the earlier dual-publisher implementation; raw entries stay intact. */
+  async migrateReplyHistory(tx: Tx, roomId: ConversationId) {
     const room = await tx.doc(SharedDoc, roomId);
-    if (!room.companyId) return;
+    if (!room.companyId || room.replyHistoryVersion === 1) return;
     const messages = (await scanEntries(tx, roomId)).filter(PublicEntry.is).map(entry => entry.data);
     const byId = new Map(messages.map(message => [message.id, message]));
     const aliases = { ...room.messageAliases };
-    for (const member of room.members) {
-      if (!member.conversationId) continue;
-      const finalized = new Set(member.finalized);
-      const prefix = `final:${member.id}:`;
-      for (const message of messages) {
-        if (message.authorId !== member.id || !message.id.startsWith(prefix)) continue;
-        const taskId = Number(message.id.slice(prefix.length)) as TaskId;
-        const task = await tx.task(taskId);
-        if (task?.kind === GenerationTask.definition.name && task.conversationId === member.conversationId) finalized.add(taskId);
+    for (const member of room.members as (Member & { finalized?: TaskId[]; reported?: string[] })[]) {
+      if (member.conversationId) {
+        for (const entry of await scanEntries(tx, member.conversationId)) {
+          if (entry.kind !== "pi.assistant" || !entry.byTaskId) continue;
+          const original = byId.get(`final:${member.id}:${entry.byTaskId}`);
+          const duplicate = byId.get(`answer:${member.id}:${entry.id}`) ?? byId.get(`legacy:${entry.id}`);
+          if (!original || !duplicate || original.authorId !== member.id || duplicate.authorId !== member.id || original.threadId !== duplicate.threadId || original.text !== duplicate.text || JSON.stringify(original.images) !== JSON.stringify(duplicate.images)) continue;
+          const task = await tx.task(entry.byTaskId);
+          if (task?.kind === GenerationTask.definition.name && task.conversationId === member.conversationId) aliases[duplicate.id] = original.id;
+        }
       }
-      if (finalized.size !== (member.finalized?.length ?? 0)) member.finalized = [...finalized];
-      for (const entry of await scanEntries(tx, member.conversationId)) {
-        if (entry.kind !== "pi.assistant" || !entry.byTaskId || !finalized.has(entry.byTaskId)) continue;
-        const original = byId.get(`final:${member.id}:${entry.byTaskId}`);
-        const duplicate = byId.get(`answer:${member.id}:${entry.id}`) ?? byId.get(`legacy:${entry.id}`);
-        if (!original || !duplicate || original.authorId !== duplicate.authorId || original.threadId !== duplicate.threadId || original.text !== duplicate.text || JSON.stringify(original.images) !== JSON.stringify(duplicate.images)) continue;
-        aliases[duplicate.id] = original.id;
-      }
+      delete member.finalized;
+      delete member.reported;
     }
-    if (Object.keys(aliases).length !== Object.keys(room.messageAliases ?? {}).length) room.messageAliases = aliases;
+    room.messageAliases = aliases;
     for (const member of room.members) {
       if (member.consideredThrough && aliases[member.consideredThrough]) member.consideredThrough = aliases[member.consideredThrough];
     }
+    room.replyHistoryVersion = 1;
   }
 
   async post(tx: Tx, roomId: ConversationId, authorId: string, input: SendMessageInput): Promise<ConversationMessage> {
@@ -583,7 +556,7 @@ export class SharedConversations {
       if (room.members.some(member => member.userId === id)) continue;
       const person = people.find(person => person.id === id);
       if (!person) throw new CollaborationError(404, "Person is unavailable.");
-      const member: Member = { id: `human:${id}`, kind: "human", userId: id, name: person.name, joinedAt: Date.now(), status: "idle", reported: [] };
+      const member: Member = { id: `human:${id}`, kind: "human", userId: id, name: person.name, joinedAt: Date.now(), status: "idle" };
       room.members.push(member); added.push(member);
       room.preferences[id] = { projectId: null, pinned: false, archived: false };
     }
@@ -625,17 +598,12 @@ export class SharedConversations {
 
   private async preserveOutput(tx: Tx, roomId: ConversationId) {
     const room = await tx.doc(SharedDoc, roomId);
+    const publicIds = new Set((await scanEntries(tx, roomId)).filter(PublicEntry.is).map(entry => entry.data.id));
     const streams = await Promise.all(room.members.filter(member => member.conversationId).map(async member => ({ member, entries: await scanEntries(tx, member.conversationId!) })));
     for (const { member, entries } of streams) {
-      for (const entry of entries) {
-        const message = entry.model?.[0];
-        if (entry.kind !== "pi.assistant" || message?.role !== "assistant" || message.stopReason === "toolUse" || member.reported.includes(String(entry.id)) || (entry.byTaskId && (member.superseded?.includes(entry.byTaskId) || member.finalized?.includes(entry.byTaskId)))) continue;
-        member.reported.push(String(entry.id));
-        const content = nativeContent(entry);
-        const { text } = content;
-        if ((!text || text === "[[silent]]") && !content.images?.length) continue;
+      for (const message of unpublishedReplies(entries, member, publicIds)) {
         // Stop retains committed output, without waking other participants back up.
-        await tx.appendEntry(PublicEntry, roomId, { data: { id: `answer:${member.id}:${entry.id}`, kind: "message", authorId: member.id, ...content, createdAt: message.timestamp, threadId: member.threadId ?? null, mentions: [] } });
+        await tx.appendEntry(PublicEntry, roomId, { data: message });
       }
     }
   }
@@ -652,7 +620,7 @@ export class SharedConversations {
       if (owner && !owner.abortRequested && owner.state.status !== "terminal") activeTickets.add(ticket.key);
     }
     for (const member of room.members) {
-      const { conversationId, reported: _reported, lastDelivery: _last, threadId, activeDelivery: _delivery, consideredThrough: _through, superseded: _superseded, finalized: _finalized, ...participant } = member;
+      const { conversationId, lastDelivery: _last, threadId, activeDelivery: _delivery, consideredThrough: _through, superseded: _superseded, ...participant } = member;
       if (conversationId) {
         const live = await tx.doc(LiveDoc, conversationId);
         if (live.run) participant.status = "working";
@@ -696,6 +664,28 @@ function projectMessages(entries: EntryRecord[], aliases: Record<string, string>
   }));
 }
 
+function publishedGeneration(publicIds: ReadonlySet<string>, participantId: string, taskId?: TaskId) {
+  if (taskId === undefined) return undefined;
+  return [`final:${participantId}:${taskId}`, `progress:${participantId}:${taskId}`].find(id => publicIds.has(id));
+}
+
+function publishedReply(publicIds: ReadonlySet<string>, participantId: string, entry: EntryRecord) {
+  return publishedGeneration(publicIds, participantId, entry.byTaskId)
+    || [`answer:${participantId}:${entry.id}`, `legacy:${entry.id}`].find(id => publicIds.has(id));
+}
+
+function unpublishedReplies(entries: EntryRecord[], member: Member, publicIds: ReadonlySet<string>, legacy = false): MessageData[] {
+  return entries.flatMap(entry => {
+    const message = entry.model?.[0];
+    if (entry.kind !== "pi.assistant" || message?.role !== "assistant" || message.stopReason === "toolUse") return [];
+    if (publishedReply(publicIds, member.id, entry) || (entry.byTaskId && member.superseded?.includes(entry.byTaskId))) return [];
+    const content = nativeContent(entry);
+    if (!hasPublicContent(content)) return [];
+    return [{ id: legacy ? `legacy:${entry.id}` : `answer:${member.id}:${entry.id}`, kind: "message", authorId: member.id,
+      ...content, createdAt: message.timestamp, threadId: member.threadId ?? null, mentions: [] }];
+  });
+}
+
 function publicActivityEntries(entries: EntryRecord[], member: Member, publicIds: ReadonlySet<string>): EntryRecord[] {
   return entries.flatMap(entry => {
     if (isContextBoundary(entry)) {
@@ -709,7 +699,7 @@ function publicActivityEntries(entries: EntryRecord[], member: Member, publicIds
     }
     if (entry.kind === "pi.tool-result") return entry.model?.some(message => message.role === "toolResult" && !message.toolName.startsWith("conversation_")) ? [entry] : [];
     if (entry.kind !== "pi.assistant") return [];
-    const published = publicIds.has(`answer:${member.id}:${entry.id}`) || publicIds.has(`legacy:${entry.id}`) || (entry.byTaskId && (publicIds.has(`progress:${member.id}:${entry.byTaskId}`) || member.finalized?.includes(entry.byTaskId)));
+    const published = publishedReply(publicIds, member.id, entry);
     const superseded = entry.byTaskId && member.superseded?.includes(entry.byTaskId);
     const model = (entry.model ?? []).flatMap(message => message.role === "assistant"
       ? [publicAssistant(message, { text: !published && !superseded, partial: false })] : []);
@@ -762,11 +752,11 @@ function projectActivities(member: Member, entries: EntryRecord[], live: LiveSta
     }
     if (!group) continue;
     group.entries.push(entry);
-    if (entry.kind === "pi.assistant" && message?.role === "assistant" && message.stopReason !== "toolUse") group.answerId = messages.find(message => message.id === `answer:${member.id}:${entry.id}` || message.id === `legacy:${entry.id}` || (entry.byTaskId && message.id === `final:${member.id}:${entry.byTaskId}`))?.id;
+    if (entry.kind === "pi.assistant" && message?.role === "assistant" && message.stopReason !== "toolUse") group.answerId = publishedReply(publicIds, member.id, entry);
   }
   return groups.flatMap((group, index) => {
     const projected = publicActivityEntries(group.entries, member, publicIds);
-    const current = index === groups.length - 1 ? publicLive(live, showText && (!live.run || (!member.superseded?.includes(live.run.taskId) && !member.finalized?.includes(live.run.taskId) && !publicIds.has(`progress:${member.id}:${live.run.taskId}`)))) : {};
+    const current = index === groups.length - 1 ? publicLive(live, showText && (!live.run || (!member.superseded?.includes(live.run.taskId) && !publishedGeneration(publicIds, member.id, live.run.taskId)))) : {};
     if (!projected.length && !current.run && !current.tools?.length && !current.compactions?.length && !current.generation?.message?.content.length) return [];
     return [{ id: group.id, participantId: member.id, threadId: group.threadId, createdAt: group.createdAt, ...(group.answerId ? { messageId: group.answerId } : {}), entries: projected, live: current, submissions: [] }];
   });
@@ -775,6 +765,9 @@ function projectActivities(member: Member, entries: EntryRecord[], live: LiveSta
 function nativeContent(entry: Pick<EntryRecord, "model">): Pick<MessageData, "text" | "images"> {
   const images = (entry.model ?? []).flatMap(message => typeof message.content === "string" ? [] : message.content.flatMap(part => part.type === "image" ? [{ mimeType: part.mimeType, data: part.data }] : []));
   return { text: textOf(entry).trim(), ...(images.length ? { images } : {}) };
+}
+function hasPublicContent(content: Pick<MessageData, "text" | "images">) {
+  return Boolean((content.text && content.text !== "[[silent]]") || content.images?.length);
 }
 function messageMetadata({ images, ...message }: MessageData) {
   return { ...message, ...(images?.length ? { images: images.map(({ mimeType }) => ({ mimeType })), imageCount: images.length } : {}) };

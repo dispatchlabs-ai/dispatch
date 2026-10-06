@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Simplified shared reply publication to one successful-final publisher. Removed separate published-reply lists and consolidated interruption recovery and message identity checks. Historical duplicate repair now runs once during migration. Existing history and thread references remain intact.
+
 - Removed the redundant composer `@` shortcut and restored the compact arrow-only Send button in messages and replies. Inline mentions still open by typing `@`.
 
 - Mention people and agents directly in messages and replies: type `@`, filter the participant picker, and insert a highlighted name with the keyboard or pointer. The detached mention dropdown and separate draft chips are replaced by inline tokens that retain participant identity through editing and draft switching.

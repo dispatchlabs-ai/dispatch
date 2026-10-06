@@ -393,7 +393,7 @@ export class DispatchRuntime {
     const cwd = agent.extensions?.includes(CodingTools.name) ? join(this.owner.directory, "workspaces", String(record.id)) : undefined;
     await configure(tx, record.id, { model: { provider: agent.provider, modelId: agent.modelId }, instructions: agent.instructions, thinkingLevel: agent.thinkingLevel, extensions, tools, ...(cwd ? { cwd } : {}) });
     await this.connections.bind(tx, record.id, definitionId);
-    return { id: randomUUID(), kind: "agent", name: agent.name, joinedAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, conversationId: record.id, status: "idle", reported: [], agent: { ...publicAgent(agent), ...(cwd ? { cwd } : {}) } };
+    return { id: randomUUID(), kind: "agent", name: agent.name, joinedAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, conversationId: record.id, status: "idle", agent: { ...publicAgent(agent), ...(cwd ? { cwd } : {}) } };
   }
 
   private async configureConnections(companyId: string) {
@@ -428,14 +428,14 @@ export class DispatchRuntime {
     const catalog = (await this.harness.snapshot(CatalogDoc, context))!;
     for (const chat of catalog.chats) {
       const roomId = nativeId(chat.id);
-      await this.harness.commit(async tx => { await tx.doc(TurnsDoc, roomId); await this.shared.repairPublishedReplies(tx, roomId); }, context);
+      await this.harness.commit(async tx => { await tx.doc(TurnsDoc, roomId); await this.shared.migrateReplyHistory(tx, roomId); }, context);
       if ((await this.harness.snapshot(SharedDoc, roomId, context))?.companyId) continue;
       // Preserve orphaned historical authors without authorizing any new human identity.
       const human = await this.peopleDirectory?.get(chat.companyId, chat.userId) ?? { id: chat.userId, name: "Former member" };
       const conversation = (await this.harness.conversation(roomId, context))!;
       const native = await conversation.agent(context);
       const definition = catalog.agents.find(agent => agent.companyId === chat.companyId && agent.id === chat.agentDefinitionId && agent.revision === chat.agentRevision);
-      const legacy: Member = { id: `agent:${chat.id}`, kind: "agent", name: chat.agentName ?? definition?.name ?? "Saved agent", joinedAt: chat.createdAt, agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, conversationId: roomId, status: "idle", reported: [], agent: { name: chat.agentName ?? definition?.name ?? "Saved agent", description: definition?.description ?? "", instructions: native.instructions ?? "", provider: native.model?.provider ?? "", modelId: native.model?.modelId ?? "", thinkingLevel: native.thinkingLevel ?? "off", extensions: native.extensions.map(extension => extension.name), tools: native.tools.map(tool => tool.name), ...(native.cwd ? { cwd: native.cwd } : {}) } };
+      const legacy: Member = { id: `agent:${chat.id}`, kind: "agent", name: chat.agentName ?? definition?.name ?? "Saved agent", joinedAt: chat.createdAt, agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, conversationId: roomId, status: "idle", agent: { name: chat.agentName ?? definition?.name ?? "Saved agent", description: definition?.description ?? "", instructions: native.instructions ?? "", provider: native.model?.provider ?? "", modelId: native.model?.modelId ?? "", thinkingLevel: native.thinkingLevel ?? "off", extensions: native.extensions.map(extension => extension.name), tools: native.tools.map(tool => tool.name), ...(native.cwd ? { cwd: native.cwd } : {}) } };
       await this.harness.commit(tx => this.shared.migrate(tx, roomId, human, legacy, chat.companyId, { projectId: chat.projectId ?? null, pinned: chat.pinned ?? false, archived: chat.archived ?? false }), context);
     }
   }
