@@ -540,6 +540,8 @@ Qualification evidence (October 5, 2026):
   active-option and controlled-list relationships.
 - Clean `npm ci`, frontend/service/tooling TypeScript and production builds
   (`npm run check`), Apple Silicon `nix build` and `nix flake check` passed.
+  The integrated revision also passed 44 local documentation-link checks and
+  whitespace/diff review.
   The direct Floating UI dependency is pinned with the existing transitive version
   and the Nix dependency hash is updated. The Vite chunk-size advisory remains.
 - Actual menu/editor/message components were reviewed in inactive desktop
@@ -552,3 +554,18 @@ Qualification evidence (October 5, 2026):
   retry/remount behavior, virtual keyboards, assistive technology, measured contrast,
   real devices and the full loading/error matrix remain functionally unverified.
   This revision was not built on x86-64 Linux or deployed to Omarchy/the pilot.
+
+[Implementation `1e72b47`](https://github.com/dispatchlabs-ai/dispatch-web-next/commit/1e72b47fdb06a4e3b4139d1d463ac450fe12501d)
+was reconciled with the duplicate-reply correction and passed the required
+TypeScript/build/Nix checks again before publication. It was pushed normally to
+private remote `main`, verified there, and fast-forwarded into the clean canonical
+M1 Air checkout under both repository integration locks.
+
+The previous local launcher shut down gracefully. Existing state was backed up to
+canonical `.local/backups/inline-mentions-20261005-210407/`, `npm ci` installed the
+updated lockfile, and the normal development launcher restarted with the same
+state/workspaces. Startup reported the service on `127.0.0.1:3001` and Vite on
+localhost:5173. The refreshed workspace exposes the new Mention someone shortcut;
+no message was entered or sent. Canonical `.local/inline-mentions/` retains the
+startup record and ignored captures. This observation does not qualify the
+interactive picker behavior.
