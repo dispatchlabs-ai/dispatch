@@ -712,7 +712,7 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .shared-message .markdown > :last-child { margin-bottom: 0; }
 .shared-message .message-heading strong { overflow-wrap: anywhere; }
 .agent-kind-badge { background: var(--color-navy-soft); color: var(--color-navy); border-radius: var(--space-1); padding: 0 var(--space-1); font-size: var(--text-xs); font-weight: 500; }
-.shared-message .shared-message-actions { position: absolute; top: 0; right: 0; z-index: 1; margin: 0; padding: var(--space-half); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); box-shadow: var(--shadow-sm); opacity: 0; pointer-events: none; }
+.shared-message .shared-message-actions { position: absolute; top: calc(-1 * var(--space-2)); right: 0; z-index: 1; margin: 0; padding: var(--space-half); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); box-shadow: var(--shadow-sm); opacity: 0; pointer-events: none; }
 .shared-message:hover .shared-message-actions, .shared-message:focus-within .shared-message-actions { opacity: 1; pointer-events: auto; }
 .shared-message-actions .icon-button { width: 32px; height: 32px; }
 .thread-link { min-height: 28px; padding: var(--space-1); font-size: var(--text-xs); }
@@ -866,9 +866,9 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 @media (max-width: 1250px) {
   .shared-chat-panel { --conversation-inset: var(--space-5); }
 }
-@media (pointer: coarse), (max-width: 800px) {
-  .shared-message .shared-message-actions { opacity: 1; pointer-events: auto; box-shadow: none; }
-  .shared-message .message-heading { padding-right: 100px; }
+@media (pointer: coarse), (max-width: 1100px) {
+  .shared-message .shared-message-actions { top: var(--space-1); opacity: 1; pointer-events: auto; box-shadow: none; }
+  .shared-message .message-heading { min-height: 44px; padding-right: 100px; }
   .shared-message-actions .icon-button, .thread-summary { min-width: 44px; min-height: 44px; }
   .conversation-sidebar .sidebar-select { min-height: 44px; }
 }
@@ -883,7 +883,8 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .participant-agent { position: relative; }
 .participant-agent[data-identity="1"] { background: var(--color-navy-soft); }
 .participant-agent[data-identity="2"] { background: var(--color-success-soft); }
-.participant-agent[data-identity="3"] { background: var(--color-warning-soft); }
+.participant-agent[data-identity="3"] { background: var(--color-aqua-soft); }
+.participant-agent[data-identity="4"] { background: var(--color-navy-soft); }
 .agent-avatar-initials { position: absolute; bottom: -2px; right: -3px; min-width: 16px; padding: 0 var(--space-half); border: 1px solid var(--color-border); border-radius: var(--space-1); background: var(--color-surface); color: var(--color-navy); font-size: var(--text-xs); line-height: 1.2; }
 .participant-activity .tool-entry { margin: var(--space-2) 0; padding: 0; border: 0; border-radius: 0; }
 .participant-activity .tool-entry > summary { min-height: 28px; padding: var(--space-1) 0; line-height: 1.5; }
@@ -893,3 +894,10 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 @media (pointer: coarse), (max-width: 800px) {
   .participant-activity .tool-entry > summary { min-height: 44px; flex-wrap: wrap; }
 }
+
+.tool-entry > summary > svg:first-child { transform: rotate(-90deg); }
+.tool-entry > summary > svg.tool-chevron-open { transform: none; }
+.shared-message.activity-echo-actions .shared-message-body { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.shared-message.activity-echo-actions .activity-output-reference { min-height: 0; margin: 0; padding: 0; color: var(--color-muted); font-size: var(--text-xs); }
+.shared-message.activity-echo-actions .shared-message-actions { position: static; opacity: 1; pointer-events: auto; border: 0; background: transparent; box-shadow: none; }
+.shared-message.activity-echo-actions .thread-summary, .shared-message.activity-echo-actions .message-copy-error { flex-basis: 100%; }
