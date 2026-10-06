@@ -492,3 +492,13 @@ Qualification evidence (October 5, 2026):
 - No tests, smoke checks, model requests or browser/API acceptance procedures were run. Functional turn ordering, multi-user access, streaming, presence expiry, provider failure and restart recovery remain unqualified. These limits remain after the normal local startup.
 
 - [Implementation `ba71416`](https://github.com/dispatchlabs-ai/dispatch-web-next/commit/ba7141673354f17f40225244814a924296f37cbf) was pushed normally to private remote `main`; remote equality was verified and the clean canonical M1 Air checkout fast-forwarded under the repository integration locks. The existing local launcher shut down gracefully, and state was backed up under canonical `.local/backups/listen-first-20261005-202329/` before restarting against the same state and workspaces. Startup reports the service on `127.0.0.1:3001` and Vite on localhost:5173. This is startup evidence, not functional qualification. Omarchy and the pilot were not updated.
+
+### Duplicate reply correction — October 5, 2026
+
+Chris reported two identical public replies per agent. Read-only inspection of the existing conversation found matching `final:<participant>:<generation>` and `answer:<participant>:<entry>` publications. The native document history recorded an empty first finalized array: chained assignment and push mutated the pre-copy array, so delivery could not see the first marker. The same pattern affected the first superseded marker.
+
+- Assign complete finalized/superseded arrays in native transactions. Reconstruct missing final markers from owned generation records on startup; alias an older duplicate only when its native generation, author, thread and content match. Preserve raw entries, native admissions and replies, and accept old message IDs in history, open threads and saved-draft posting. Do not collapse deliberate repeated text.
+- Use one public-message projection for snapshots and agent history/context. Keep original request fingerprints and existing membership boundaries. Review these changes with the source/deslop procedure and inspect the final diff and local documentation links.
+- Run TypeScript/production builds, Apple Silicon `nix build` and `nix flake check`; inspect the existing repaired conversation on desktop and 390 px. No synthetic messages, model requests, tests or API/browser acceptance procedures. Record observed repair and layout evidence separately from unverified future-turn, restart, concurrency and interaction behavior.
+
+Implementation and publication evidence will be recorded after the checks and local update.

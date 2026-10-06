@@ -428,7 +428,7 @@ export class DispatchRuntime {
     const catalog = (await this.harness.snapshot(CatalogDoc, context))!;
     for (const chat of catalog.chats) {
       const roomId = nativeId(chat.id);
-      await this.harness.commit(async tx => { await tx.doc(TurnsDoc, roomId); }, context);
+      await this.harness.commit(async tx => { await tx.doc(TurnsDoc, roomId); await this.shared.repairPublishedReplies(tx, roomId); }, context);
       if ((await this.harness.snapshot(SharedDoc, roomId, context))?.companyId) continue;
       // Preserve orphaned historical authors without authorizing any new human identity.
       const human = await this.peopleDirectory?.get(chat.companyId, chat.userId) ?? { id: chat.userId, name: "Former member" };

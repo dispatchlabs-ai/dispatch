@@ -69,6 +69,8 @@ export type ConversationParticipant = HumanParticipant | AgentParticipant;
 
 export interface ConversationMessage {
   id: string;
+  /** Prior IDs of the same native reply; preserved for thread and history references. */
+  aliases?: string[];
   kind: "message" | "membership";
   authorId: string;
   text: string;

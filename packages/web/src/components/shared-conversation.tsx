@@ -174,7 +174,7 @@ export function SharedContextPanel({ snapshot, models, threadId, draft, pending,
   const [stopError, setStopError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const participant = snapshot.participants.find(member => member.id === selectedId) ?? snapshot.participants.find(member => member.kind === "agent");
-  const root = snapshot.messages.find(message => message.id === threadId);
+  const root = snapshot.messages.find(message => message.id === threadId || (threadId && message.aliases?.includes(threadId)));
   const scroller = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   useEffect(() => { atBottom.current = true; }, [threadId]);
@@ -184,8 +184,8 @@ export function SharedContextPanel({ snapshot, models, threadId, draft, pending,
     {threadId ? <>
       <div className="thread-transcript" ref={scroller} onScroll={event => { const element = event.currentTarget; atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100; }}>
         {root ? <PublicMessage message={root} participants={snapshot.participants} /> : <Notice>The original message is not available.</Notice>}
-        <p className="thread-reply-count">{snapshot.messages.filter(message => message.threadId === threadId).length} replies</p>
-        <SharedTranscript snapshot={snapshot} threadId={threadId} />
+        <p className="thread-reply-count">{snapshot.messages.filter(message => message.threadId === (root?.id ?? threadId)).length} replies</p>
+        <SharedTranscript snapshot={snapshot} threadId={root?.id ?? threadId} />
         <ConversationPresence participants={snapshot.participants} />
       </div>
       <ConversationComposer id={`thread-${snapshot.conversation.id}-${threadId}`} chatId={snapshot.conversation.id} draft={draft} pending={pending} error={error} participants={snapshot.participants} mentions={mentions} onMentionsChange={onMentionsChange} onDraftChange={onDraftChange} onSend={onSend} thread>

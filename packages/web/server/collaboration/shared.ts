@@ -32,6 +32,7 @@ type SharedState = {
   preferences: Record<string, { projectId: string | null; pinned: boolean; archived: boolean }>;
   requests: Record<string, { hash: string; messageId?: string }>;
   deliveries: TaskId[];
+  messageAliases?: Record<string, string>;
 };
 export const SharedDoc = defineDoc<SharedState>({
   kind: "dispatch.shared-conversation", version: 1, scope: "conversation", history: "latest", fork: "initial",
@@ -47,7 +48,7 @@ const ListeningRequest = defineDoc<{ through?: string }>({
   kind: "dispatch.listening-request", version: 1, scope: "task", initial: () => ({}),
 });
 type MessageData = {
-  id: string; kind: "message" | "membership"; authorId: string; text: string; createdAt: number;
+  id: string; aliases?: string[]; kind: "message" | "membership"; authorId: string; text: string; createdAt: number;
   threadId: string | null; mentions: string[]; images?: { mimeType: string; data: string }[];
 };
 export const PublicEntry = defineEntry<MessageData>("dispatch.public-message");
@@ -85,7 +86,7 @@ export class SharedConversations {
           await runtime.commit(() => terminal(), ctx); return;
         }
         const messages = await this.messages(task.input.roomId, ctx);
-        const incoming = messages.find(message => message.id === task.input.messageId);
+        const incoming = messages.find(message => message.id === task.input.messageId || message.aliases?.includes(task.input.messageId));
         if (!incoming) throw new Error("The public message for this delivery is missing.");
         const prior = await this.harness.commit(tx => tx.submissionByRequest(member.conversationId!, `dispatch-delivery:${task.id}`), ctx);
         // A restored admitted submission must be joined even when its request already advanced the listening cursor.
@@ -220,7 +221,7 @@ export class SharedConversations {
         const binding = await this.binding(api.conversationId, ctx);
         const messages = await this.messages(binding.roomId!, ctx);
         if (args.messageId) {
-          const message = messages.find(message => message.id === args.messageId);
+          const message = messages.find(message => message.id === args.messageId || message.aliases?.includes(args.messageId!));
           if (!message) throw new CollaborationError(404, "Public message not found.");
           const start = args.textOffset ?? 0;
           return { content: [{ type: "text" as const, text: JSON.stringify({ ...messageMetadata(message), text: message.text.slice(start, start + 12_000), textOffset: start, textLength: message.text.length, nextTextOffset: start + 12_000 < message.text.length ? start + 12_000 : null }) }, ...(message.images ?? []).map(image => ({ type: "image" as const, ...image }))] };
@@ -254,7 +255,7 @@ export class SharedConversations {
         const message = await api.commit(async tx => {
           const room = await tx.doc(SharedDoc, binding.roomId!);
           const member = room.members.find(item => item.id === binding.participantId)!;
-          const messages = (await scanEntries(tx, binding.roomId!)).filter(PublicEntry.is).map(entry => entry.data);
+          const messages = projectMessages(await scanEntries(tx, binding.roomId!), room.messageAliases);
           const turns = await tx.doc(TurnsDoc, binding.roomId!);
           // Tool arguments were drafted before waiting. Do not publish them after the conversation has changed.
           if (humansComposing(turns) || hasNewMessages(messages, member.consideredThrough, member.id)) {
@@ -296,7 +297,7 @@ export class SharedConversations {
             const room = await tx.doc(SharedDoc, binding.roomId!);
             if (room.stopping) throw new Error("The conversation is stopping.");
             const member = room.members.find(item => item.id === binding.participantId)!;
-            const messages = (await scanEntries(tx, binding.roomId!)).filter(PublicEntry.is).map(entry => entry.data);
+            const messages = projectMessages(await scanEntries(tx, binding.roomId!), room.messageAliases);
             const since = member.consideredThrough ? messages.findIndex(message => message.id === member.consideredThrough) + 1 : 0;
             const unseen = messages.slice(since).filter(message => message.authorId !== member.id);
             member.status = "working";
@@ -323,11 +324,11 @@ export class SharedConversations {
             if (successful) member.consideredThrough = preparation.through;
             const usesTools = message.stopReason === "toolUse" && message.content.some(part => part.type === "toolCall");
             if (usesTools) {
-              const messages = (await scanEntries(tx, binding.roomId!)).filter(PublicEntry.is).map(entry => entry.data);
+              const messages = projectMessages(await scanEntries(tx, binding.roomId!), room.messageAliases);
               const turns = await tx.doc(TurnsDoc, binding.roomId!);
               const text = publicAssistant(message, { text: true, partial: false }).content.flatMap(part => part.type === "text" ? [part.text] : []).join("").trim();
               if (humansComposing(turns) || hasNewMessages(messages, preparation.through, member.id)) {
-                if (!member.superseded?.includes(api.taskId)) (member.superseded ??= []).push(api.taskId);
+                if (!member.superseded?.includes(api.taskId)) member.superseded = [...(member.superseded ?? []), api.taskId];
               } else if (text && !messages.some(item => item.id === `progress:${member.id}:${api.taskId}`)) {
                 // Peers must be able to read a spoken update before its author releases the turn to run tools.
                 await this.append(tx, binding.roomId!, { id: `progress:${member.id}:${api.taskId}`, kind: "message", authorId: member.id, text, createdAt: message.timestamp, threadId: member.threadId ?? null, mentions: [] });
@@ -344,16 +345,17 @@ export class SharedConversations {
             const member = room.members.find(item => item.id === binding.participantId)!;
             const turns = await tx.doc(TurnsDoc, binding.roomId!);
             const preparation = await tx.doc(ListeningRequest, api.taskId);
-            const messages = (await scanEntries(tx, binding.roomId!)).filter(PublicEntry.is).map(entry => entry.data);
+            const messages = projectMessages(await scanEntries(tx, binding.roomId!), room.messageAliases);
             if (room.stopping) throw new Error("The conversation is stopping.");
             await this.turns.release(tx, binding.roomId!, member.id, api.taskId);
             if (member.finalized?.includes(api.taskId)) return false;
             if (humansComposing(turns) || hasNewMessages(messages, preparation.through, member.id)) {
-              if (!member.superseded?.includes(api.taskId)) (member.superseded ??= []).push(api.taskId);
+              if (!member.superseded?.includes(api.taskId)) member.superseded = [...(member.superseded ?? []), api.taskId];
               return true;
             }
             // Check freshness and publish atomically; a human can post between this hook and native settlement.
-            (member.finalized ??= []).push(api.taskId);
+            // Assign the complete array: native drafts copy assigned values before tracking later mutations.
+            member.finalized = [...(member.finalized ?? []), api.taskId];
             const content = nativeContent({ model: [answer] });
             if ((content.text && content.text !== "[[silent]]") || content.images?.length) {
               await this.append(tx, binding.roomId!, { id: `final:${member.id}:${api.taskId}`, kind: "message", authorId: member.id, ...content, createdAt: answer.timestamp, threadId: member.threadId ?? null, mentions: [] });
@@ -475,7 +477,40 @@ export class SharedConversations {
   async messages(roomId: ConversationId, ctx = context): Promise<MessageData[]> {
     const entries: EntryRecord[] = []; let cursor: Cursor | undefined;
     do { const page = await this.storage.scanEntries({ conversationId: roomId }, 200, cursor, ctx); entries.push(...page.items); cursor = page.next; } while (cursor);
-    return entries.reverse().filter(PublicEntry.is).map(entry => entry.data);
+    const room = await this.harness.snapshot(SharedDoc, roomId, ctx);
+    return projectMessages(entries.reverse(), room?.messageAliases);
+  }
+
+  /** Preserve raw history while reconciling replies published by both the final hook and delivery. */
+  async repairPublishedReplies(tx: Tx, roomId: ConversationId) {
+    const room = await tx.doc(SharedDoc, roomId);
+    if (!room.companyId) return;
+    const messages = (await scanEntries(tx, roomId)).filter(PublicEntry.is).map(entry => entry.data);
+    const byId = new Map(messages.map(message => [message.id, message]));
+    const aliases = { ...room.messageAliases };
+    for (const member of room.members) {
+      if (!member.conversationId) continue;
+      const finalized = new Set(member.finalized);
+      const prefix = `final:${member.id}:`;
+      for (const message of messages) {
+        if (message.authorId !== member.id || !message.id.startsWith(prefix)) continue;
+        const taskId = Number(message.id.slice(prefix.length)) as TaskId;
+        const task = await tx.task(taskId);
+        if (task?.kind === GenerationTask.definition.name && task.conversationId === member.conversationId) finalized.add(taskId);
+      }
+      if (finalized.size !== (member.finalized?.length ?? 0)) member.finalized = [...finalized];
+      for (const entry of await scanEntries(tx, member.conversationId)) {
+        if (entry.kind !== "pi.assistant" || !entry.byTaskId || !finalized.has(entry.byTaskId)) continue;
+        const original = byId.get(`final:${member.id}:${entry.byTaskId}`);
+        const duplicate = byId.get(`answer:${member.id}:${entry.id}`) ?? byId.get(`legacy:${entry.id}`);
+        if (!original || !duplicate || original.authorId !== duplicate.authorId || original.threadId !== duplicate.threadId || original.text !== duplicate.text || JSON.stringify(original.images) !== JSON.stringify(duplicate.images)) continue;
+        aliases[duplicate.id] = original.id;
+      }
+    }
+    if (Object.keys(aliases).length !== Object.keys(room.messageAliases ?? {}).length) room.messageAliases = aliases;
+    for (const member of room.members) {
+      if (member.consideredThrough && aliases[member.consideredThrough]) member.consideredThrough = aliases[member.consideredThrough];
+    }
   }
 
   async post(tx: Tx, roomId: ConversationId, authorId: string, input: SendMessageInput): Promise<ConversationMessage> {
@@ -484,7 +519,7 @@ export class SharedConversations {
     if (!room.members.some(item => item.id === authorId)) throw new CollaborationError(403, "Conversation membership is required.");
     const oldSubmission = await tx.submissionByRequest(roomId, input.requestId);
     const entries = await scanEntries(tx, roomId);
-    const messages = entries.filter(PublicEntry.is).map(entry => entry.data);
+    const messages = projectMessages(entries, room.messageAliases);
     const normalized = { text: input.text, threadId: input.threadId ?? null, mentions: [...new Set(input.mentions ?? [])].sort() };
     const key = digest([authorId, input.requestId]); const hash = digest(normalized);
     const prior = room.requests[key];
@@ -499,9 +534,11 @@ export class SharedConversations {
     }
     if (prior) {
       if (prior.hash !== hash) throw new CollaborationError(409, "This request ID was already used with different content.");
-      return messages.find(message => message.id === prior.messageId)!;
+      return messages.find(message => message.id === prior.messageId || message.aliases?.includes(prior.messageId!))!;
     }
     if (room.stopping) throw new CollaborationError(409, "Conversation is stopping. Retry after Stop finishes.");
+    // Keep the original request fingerprint, but accept a saved draft targeting a reconciled duplicate.
+    if (normalized.threadId) normalized.threadId = room.messageAliases?.[normalized.threadId] ?? normalized.threadId;
     if (normalized.threadId && !messages.some(message => message.id === normalized.threadId && message.threadId === null && message.kind === "message")) throw new CollaborationError(400, "Reply thread not found.");
     if (normalized.mentions.some(id => !room.members.some(member => member.id === id))) throw new CollaborationError(400, "Mentioned participant is not in this conversation.");
     const message: MessageData = { id: randomUUID(), kind: "message", authorId, createdAt: Date.now(), ...normalized };
@@ -608,7 +645,7 @@ export class SharedConversations {
     const turns = await tx.doc(TurnsDoc, roomId);
     const activities: ParticipantActivity[] = [];
     const participants: ConversationParticipant[] = [];
-    const messages = await this.messages(roomId);
+    const messages = projectMessages(await scanEntries(tx, roomId), room.messageAliases);
     const activeTickets = new Set<string>();
     for (const ticket of [...turns.queue, ...(turns.speaker ? [turns.speaker] : [])]) {
       const owner = await tx.task(ticket.owner);
@@ -648,6 +685,16 @@ async function scanEntries(tx: Tx, conversationId: ConversationId) {
   return entries.reverse();
 }
 function reply(value: unknown) { return { content: [{ type: "text" as const, text: JSON.stringify(value) }] }; }
+
+function projectMessages(entries: EntryRecord[], aliases: Record<string, string> = {}): MessageData[] {
+  const priorIds = new Map<string, string[]>();
+  for (const [alias, id] of Object.entries(aliases)) priorIds.set(id, [...(priorIds.get(id) ?? []), alias]);
+  return entries.filter(PublicEntry.is).map(entry => entry.data).filter(message => !aliases[message.id]).map(message => ({
+    ...message,
+    ...(priorIds.has(message.id) ? { aliases: priorIds.get(message.id)! } : {}),
+    threadId: message.threadId ? aliases[message.threadId] ?? message.threadId : null,
+  }));
+}
 
 function publicActivityEntries(entries: EntryRecord[], member: Member, publicIds: ReadonlySet<string>): EntryRecord[] {
   return entries.flatMap(entry => {
@@ -703,7 +750,11 @@ function projectActivities(member: Member, entries: EntryRecord[], live: LiveSta
     const message = entry.model?.[0];
     if (entry.kind === "pi.user" && message?.role === "user") {
       let threadId: string | null = null;
-      try { const data = JSON.parse(textOf(entry)); threadId = data.incoming?.threadId ?? null; } catch { /* Historical human input. */ }
+      try {
+        const data = JSON.parse(textOf(entry));
+        threadId = data.incoming?.threadId ?? null;
+        if (threadId) threadId = messages.find(message => message.id === threadId || message.aliases?.includes(threadId!))?.id ?? threadId;
+      } catch { /* Historical human input. */ }
       group = { id: `${member.id}:${entry.id}`, createdAt: message.timestamp, threadId, entries: [] }; groups.push(group);
     }
     if (!group && isContextBoundary(entry)) {

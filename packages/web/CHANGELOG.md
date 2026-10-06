@@ -42,6 +42,8 @@
 
 ### Fixed
 
+- Fixed duplicate agent replies when the first native publication marker was lost. Existing duplicates from the same generation resolve to one public reply while retaining raw history and old thread references.
+
 - Made the default agent editable through the shared revisioned editor. Seed its configuration once, preserve saved changes across restarts, and use the latest revision for new chats while keeping existing chats unchanged. Default-agent archiving remains blocked.
 
 - Reworked Agents hierarchy and alignment, promoted Start chat, grouped editor fields with persistent actions, and added a live draft preview. Sidebar navigation now confirms before discarding unsaved agent changes. Improved phone facts/navigation, compact editor controls, and shared select/example styling; unified Chats/Agents header dividers and model labels.

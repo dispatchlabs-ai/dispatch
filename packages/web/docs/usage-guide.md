@@ -228,6 +228,8 @@ All `/api` access requires a fully authenticated session except the authenticati
 
 The composing command accepts `{ clientId, sequence, active }`, where each mounted composer uses its own UUID and increasing sequence number. It returns `{ ok: true }`. Only authenticated conversation members may publish presence; the service derives their identity. A true signal expires six seconds after receipt. Sending messages is independent of presence updates, and failed presence must not disable Send.
 
+A public message can include `aliases`, prior IDs for a reconciled duplicate of the same native reply. History lookup and reply targets accept those IDs; the visible history retains one message and combines its replies. Raw native records remain intact.
+
 The precise shared types are in `src/shared/contracts.ts` and `src/shared/auth-contracts.ts`. See [runtime.md](runtime.md) for native storage, cancellation, and request identity. The browser never sends an authoritative user or company ID for access checks.
 
 ## Dependency updates and later deployment
