@@ -1,20 +1,21 @@
 import { describeAgentTools } from "../lib/agent-tools";
 import type { Message } from "@earendil-works/pi-ai";
 import { Tabs } from "@base-ui/react/tabs";
-import { AtSign, ArrowUp, Check, Copy, Ear, LockKeyhole, Pencil, Reply, RotateCcw, Square, UserPlus, X } from "lucide-react";
+import { ArrowUp, Check, Copy, Ear, LockKeyhole, Pencil, Reply, RotateCcw, Square, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { AddParticipantsInput, AgentDefinition, AgentParticipant, ApplicationConfig, ChatSnapshot, CompanyPerson, ConversationMessage, ConversationParticipant, ParticipantActivity } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
 import type { PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
 import { useComposingPresence } from "../lib/composing";
+import { mentionUrl } from "../lib/mentions";
 import { toolActivities, toolOutput, type ToolActivity } from "../lib/tool-activity";
 import { AgentChoices, ParticipantAvatar } from "./conversation-people";
 import { Markdown } from "./markdown";
 import { MarkdownComposer } from "./markdown-composer";
 import { SidebarSearch } from "./sidebar-search";
 import { ToolActivityView } from "./tool-activity";
-import { Button, IconButton, Modal, Notice, Select, Spinner } from "./ui";
+import { Button, IconButton, Modal, Notice, Spinner } from "./ui";
 
 export const participantStatus = { idle: "Following", working: "Working", listening: "Listening", responding: "Responding", typing: "Typing", silent: "Following", stopped: "Stopped", failed: "Needs attention" };
 
@@ -39,15 +40,16 @@ export function PublicMessage({ message, participants, replies, onThread, output
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const timer = useRef<number | null>(null);
+  const detachedMentions = message.mentions.filter(id => !message.text.includes(`](${mentionUrl(id)})`));
   useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
   if (message.kind === "membership") return <p className="membership-event"><UserPlus size={14} aria-hidden="true" /><span>{message.text}</span><time dateTime={new Date(message.createdAt).toISOString()}>{formatTime(message.createdAt)}</time></p>;
   return <article className={`message shared-message ${outputInActivity ? "activity-echo-actions" : continuation ? "activity-continuation" : ""}`} aria-label={`Message from ${author?.name || "Former participant"}`} data-message-id={message.id}>
     {!outputInActivity && !continuation ? <ParticipantAvatar kind={author?.kind || "human"} name={author?.name || "?"} /> : null}
     <div className="shared-message-body">
       {!outputInActivity && !continuation ? <header className="message-heading"><strong>{author ? participantName(author, participants) : "Former participant"}</strong>{author?.kind === "agent" ? <span className="agent-kind-badge">Agent</span> : null}<time dateTime={new Date(message.createdAt).toISOString()}>{formatTime(message.createdAt)}</time></header> : null}
-      {!outputInActivity ? <div className="message-content"><Markdown>{message.text}</Markdown></div> : null}
+      {!outputInActivity ? <div className="message-content"><Markdown mentions={participants.filter(person => message.mentions.includes(person.id))}>{message.text}</Markdown></div> : null}
       {message.images?.map((image, index) => <img className="message-image" key={index} src={`data:${image.mimeType};base64,${image.data}`} alt="Image attached to the message" />)}
-      {message.mentions.length ? <div className="message-mentions" aria-label="Mentioned participants">{message.mentions.map(id => <span key={id}>@{participants.find(participant => participant.id === id)?.name || "Former participant"}</span>)}</div> : null}
+      {detachedMentions.length ? <div className="message-mentions" aria-label="Mentioned participants">{detachedMentions.map(id => <span key={id}>@{participants.find(participant => participant.id === id)?.name || "Former participant"}</span>)}</div> : null}
       <div className="message-actions">
         {onThread ? <Button variant="ghost" className="thread-link" onClick={() => onThread(message.threadId || message.id)}><Reply size={14} />{replies ? `${replies} ${replies === 1 ? "reply" : "replies"}` : "Reply"}</Button> : null}
         <IconButton label={copied ? "Copied message" : "Copy message"} onClick={() => {
@@ -153,12 +155,10 @@ export function ConversationComposer({ id, chatId, active = true, draft, pending
     {tooLong ? <Notice>Shorten your message to 100,000 characters or fewer, including Markdown formatting.</Notice> : null}
     {composing.unavailable ? <p className="run-outcome" role="status">Typing status is unavailable. You can still send your message.</p> : null}
     <form className="composer" onInput={composing.pulse} onCompositionStart={composing.pulse} onCompositionUpdate={composing.pulse} onPaste={composing.pulse} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) composing.clear(); }} onSubmit={event => { event.preventDefault(); send(); }}>
-      <MarkdownComposer id={id} value={draft} disabled={disabled} readOnly={Boolean(pending?.sending)} onChange={onDraftChange} onSend={send} placeholder={thread ? "Reply to thread…" : "Message everyone…"} />
-      {mentions.length ? <div className="composer-mentions">{mentions.map(participantId => <Button key={participantId} variant="ghost" disabled={pending?.sending} onClick={() => onMentionsChange(mentions.filter(id => id !== participantId))} aria-label={`Remove mention of ${participants.find(person => person.id === participantId)?.name || "participant"}`}>@{participants.find(person => person.id === participantId)?.name || "Participant"}<X size={12} /></Button>)}</div> : null}
-      <div className="composer-toolbar">
-        <label className="mention-select"><AtSign size={16} aria-hidden="true" /><span className="sr-only">Mention a participant</span><Select value="" disabled={disabled || pending?.sending} onChange={event => { if (event.target.value) onMentionsChange([...mentions, event.target.value]); }}><option value="">Mention</option>{participants.filter(participant => !mentions.includes(participant.id)).map(participant => <option key={participant.id} value={participant.id}>{participant.name}{participant.kind === "agent" ? ` · Agent ${participant.id.slice(-6)}` : " · Person"}</option>)}</Select></label>
-        <div className="button-row">{children}<Button type="submit" className="send-button" disabled={!canSend} aria-label={pending?.error ? "Retry sending message" : thread ? "Send reply" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}<span>Send</span></Button></div>
-      </div>
+      <MarkdownComposer id={id} value={draft} disabled={disabled} readOnly={Boolean(pending?.sending)} onChange={onDraftChange} onSend={send}
+        participants={participants} mentions={mentions} onMentionsChange={onMentionsChange} placeholder={thread ? "Reply to thread…" : "Message everyone…"}
+        toolbar={<div className="button-row">{children}<Button type="submit" className="send-button" disabled={!canSend} aria-label={pending?.error ? "Retry sending message" : thread ? "Send reply" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}<span>Send</span></Button></div>}
+      />
     </form>
     {thread ? <p className="thread-visibility"><LockKeyhole size={12} /> Replies are visible to everyone in this conversation.</p> : null}
   </div>;

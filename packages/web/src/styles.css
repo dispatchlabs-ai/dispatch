@@ -736,12 +736,8 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .thread-reply-count { font-size: var(--text-xs); color: var(--color-muted); padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); }
 .thread-visibility { margin-top: var(--space-2); }
 .thread-context .transcript-date { margin: var(--space-3) 0; }
-.message-mentions, .composer-mentions { display: flex; flex-wrap: wrap; gap: var(--space-1); color: var(--color-navy); font-size: var(--text-xs); }
+.message-mentions { display: flex; flex-wrap: wrap; gap: var(--space-1); color: var(--color-navy); font-size: var(--text-xs); }
 .message-mentions > span { background: var(--color-navy-soft); padding: var(--space-half) var(--space-1); border-radius: var(--space-1); }
-.composer-mentions { padding: 0 var(--space-3); }
-.composer-mentions .button { font-size: var(--text-xs); min-height: 28px; padding: var(--space-1); background: var(--color-navy-soft); }
-.mention-select { display: flex; align-items: center; gap: var(--space-1); color: var(--color-muted); min-width: 0; }
-.mention-select select { max-width: 120px; padding: var(--space-2); padding-right: var(--space-6); font-size: var(--text-xs); }
 .composer-toolbar { justify-content: space-between; }
 .composer .send-button { width: auto; gap: var(--space-1); padding: var(--space-2) var(--space-3); }
 .composer .send-button span { font-size: var(--text-xs); }
@@ -770,7 +766,7 @@ input::placeholder, textarea::placeholder { opacity: 1; }
   .invitation-picker .picker-actions { margin-top: auto; }
 }
 @media (pointer: coarse), (max-width: 800px) {
-  .thread-link, .composer-mentions .button, .mention-select select { min-height: 44px; }
+  .thread-link { min-height: 44px; }
 }
 .dialog-drawer:has(.shared-context) { display: flex; flex-direction: column; }
 .dialog-drawer:has(.shared-context) .dialog-heading { flex-shrink: 0; }
@@ -809,4 +805,22 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 @media (max-width: 600px) {
   .connection-card { padding: var(--space-4); }
   .connection-facts { grid-template-columns: 1fr; }
+}
+
+.inline-mention { color: var(--color-navy); background: var(--color-navy-soft); border-radius: var(--space-1); padding: 0 var(--space-half); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.mention-menu-anchor { z-index: 70; }
+.mention-menu-positioner > .mention-menu { position: fixed; visibility: hidden; }
+.mention-menu { width: min(360px, calc(100vw - 24px)); max-height: 320px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; border: 1px solid var(--color-control-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-foreground); box-shadow: var(--shadow-md); text-align: left; }
+.mention-menu-heading { padding: var(--space-3) var(--space-4) var(--space-2); font-size: var(--text-xs); font-weight: 650; color: var(--color-muted); }
+.mention-options { list-style: none; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-1); margin: 0; }
+.mention-option { display: flex; align-items: center; gap: var(--space-3); min-height: 48px; padding: var(--space-2) var(--space-3); border-radius: var(--space-1); cursor: pointer; font-size: var(--text-sm); }
+.mention-option.selected { background: var(--color-navy-soft); box-shadow: inset 3px 0 var(--color-navy); }
+.mention-option .participant-avatar { width: 28px; height: 28px; flex: 0 0 28px; font-size: var(--text-xs); border-radius: var(--space-1); }
+.mention-option-name { flex: 1; min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.mention-option-kind { font-size: var(--text-xs); color: var(--color-muted); }
+.mention-option-selected { flex: 0 0 auto; color: var(--color-navy); }
+.mention-no-results { padding: var(--space-4) var(--space-3); color: var(--color-muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.mention-menu-hint { display: flex; gap: var(--space-3); padding: var(--space-2) var(--space-4); border-top: 1px solid var(--color-border); color: var(--color-muted); font-size: var(--text-xs); }
+@media (pointer: coarse), (max-width: 600px) {
+  .mention-menu-hint, .mention-option-selected { display: none; }
 }

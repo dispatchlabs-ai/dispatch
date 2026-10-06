@@ -506,3 +506,49 @@ Chris reported two identical public replies per agent. Read-only inspection of t
 The local launcher shut down gracefully, and existing state was backed up under canonical `.local/backups/duplicate-replies-20261005-205033/` before restarting against the same state and workspaces. Read-only inspection of existing native records confirmed both duplicate pairs received canonical aliases and the missing final markers were restored. The existing conversation then displayed one reply per agent on desktop and at 390 px; ignored captures are in canonical `.local/duplicate-replies/`. Static component captures in task-worktree `.local/duplicate-layout/` also cover a reply thread opened through an older alias. Raw entries were preserved. No new messages or model requests were sent.
 
 No tests or browser/API acceptance procedures ran. This is observed repair of the existing conversation plus build/source/layout evidence; future-turn publication, concurrency, broader restart recovery, thread interactions, keyboard/touch and real-device behavior remain unqualified. The existing Vite chunk-size advisory remains. This revision was not built on x86-64 Linux or deployed to Omarchy or the pilot.
+
+## WP-027 — Inline mentions
+
+**Accepted October 5, 2026:** Chris rejected the detached Mention dropdown and
+requested Slack's inline mention UI. This replaces the WP-024 composer control
+under the [inline mention contract](spec.md#inline-mentions), preserving shared
+membership, listen-first participation, typing presence and message retry behavior.
+
+Acceptance criteria and evidence:
+
+- `@` at the caret opens a filtered list of current people and agents in both main
+  and reply composers. The toolbar uses a small `@` shortcut. Selection inserts an
+  inline identity token; it does not send, add a detached chip or invite someone.
+- Lexical owns selection, native typeahead keyboard handling, token editing and
+  undo/redo. Floating UI positions the list against the caret and the visible
+  viewport. Shared components and token styles cover desktop and phone layouts.
+- Source review covers Enter/Tab versus Send, Escape/blur, empty results, IME and
+  code/link/email boundaries; token deletion, copy/paste, duplicate names, draft
+  remounts, historical messages and retry identity. Only IDs retained in the editor
+  are submitted. No native runtime or server authorization behavior changes.
+- Run the permitted source/deslop, TypeScript, production build, `nix build`,
+  `nix flake check`, diff and local documentation checks. Review actual components
+  in desktop and 390 px stills. No tests, smoke requests, model prompts or browser
+  acceptance procedures under the standing zero-tests rule.
+
+Qualification evidence (October 5, 2026):
+
+- Source/deslop review covered the editor, Markdown import/export, message rendering,
+  draft/mention callbacks and the existing request contract. Lexical owns keyboard
+  navigation and atomic editing; Floating UI supplies caret/viewport positioning.
+  The composer retains multiline textbox semantics and the native typeahead's
+  active-option and controlled-list relationships.
+- Clean `npm ci`, frontend/service/tooling TypeScript and production builds
+  (`npm run check`), Apple Silicon `nix build` and `nix flake check` passed.
+  The direct Floating UI dependency is pinned with the existing transitive version
+  and the Nix dependency hash is updated. The Vite chunk-size advisory remains.
+- Actual menu/editor/message components were reviewed in inactive desktop
+  (1440×1000) and phone (390×844) layouts. Stills cover suggestions, a filtered
+  reply picker, empty results and selected inline names; captures remain in the
+  task worktree's ignored `.local/mentions-layout/`. These are static layout
+  samples, not evidence of live caret positioning or selection behavior.
+- No tests, smoke checks, model requests or browser/API acceptance procedures ran.
+  Keyboard/touch selection, IME, copy/paste and undo, actual positioning/scrolling,
+  retry/remount behavior, virtual keyboards, assistive technology, measured contrast,
+  real devices and the full loading/error matrix remain functionally unverified.
+  This revision was not built on x86-64 Linux or deployed to Omarchy/the pilot.

@@ -138,6 +138,33 @@ Each mounted chat owns its editor and undo history; workspace drafts and submitt
 
 The composer has one outer focus indicator, grows with its contents up to a scrolling bound, and has no privacy/status sentence in the toolbar. Send and Stop retain their existing state and accessible labels. Desktop Enter sends, Shift+Enter adds a line, and touch-primary Enter adds a line; IME composition must not submit. The existing 100,000-character limit applies to serialized Markdown: longer drafts remain editable, show an error, and cannot send until shortened.
 
+### Inline mentions
+
+**Accepted October 5, 2026:** Chris rejected the detached Mention dropdown and
+requested Slack's inline mention interaction. In main messages and replies, typing
+`@` opens a participant picker at the caret; typing a name filters it. An `@` icon
+offers the same insertion shortcut. The menu shows people and agents already in
+the conversation with their avatars and names, and distinguishes duplicate names.
+It does not invite anyone or add broadcast mentions such as `@everyone`.
+
+Arrow keys move through suggestions; Enter or Tab selects the highlighted person
+without sending, and Escape closes the picker. Pointer/touch selection inserts the
+same highlighted inline token. Shift+Enter still creates a paragraph, and IME
+composition cannot select or send accidentally. An empty result stays explicit;
+Enter does not send while that empty picker is open. Email addresses, links and
+code do not trigger suggestions. The popup prefers the space above the caret and
+fits the viewport, including a phone's visible viewport.
+
+The selected identity is an atomic Lexical text node. Deleting its token removes
+that mention; undo/redo restores it with its identity. Drafts remain Markdown,
+using `[@Name](mention:<encoded participant ID>)` internally so identity survives
+draft switching and copying between compatible conversation contexts. Importing a
+reference to someone outside the current conversation yields ordinary text.
+Submitted `mentions` contains only IDs of remaining mention nodes. Public messages
+render authorized references inline; older messages with detached mention metadata
+retain their historical badges. Mention selection requests attention under the
+existing participation policy and does not change authorship or access.
+
 ## UI implementation rules
 
 **Accepted October 3, 2026, from the [UI/UX review](ui-ux-review.md), under Chris's authorization to update the rules.** These rules make the accepted branding, desktop/mobile, and workspace requirements checkable by source review and rendered screens. Items marked **Proposed** are new security or product decisions that still need Chris's confirmation.
@@ -251,7 +278,7 @@ Chris requested Slack as the conversation screen's visual model, approved the [I
 
 - A reply stores the root public-message ID and remains part of the conversation's public history. It has the same membership and full-history access as the main discussion; there are no private thread members. Every other agent member considers new replies with their thread context. An agent's response defaults to the triggering thread and may deliberately post to the main discussion.
 - The main column shows top-level messages and reply counts. Opening a thread shows its root and ordered replies in the contextual column with an independent reply composer. The header's participant control switches that same column to members and saved instance details. A narrow screen presents these as a full-height supporting surface.
-- Mentions reference participant IDs. Selecting a participant inserts its readable name in the text and identifies that member in the submitted message; a mention requests attention without changing access or requiring an answer. Plain text cannot impersonate a participant.
+- Mentions reference participant IDs through the [inline picker](#inline-mentions). Selecting a participant inserts its readable name in the text and identifies that member in the submitted message; a mention requests attention without changing access or requiring an answer. Plain text cannot impersonate a participant.
 - Keep main and thread drafts, request identities and scroll state associated with their conversation/root. Navigation, responsive remounts and late acknowledgements must not discard or overwrite newer input. Closing a conversation with either draft asks before discarding it.
 - New conversation lets the user select one or more active company agent definitions. The saved default can be initially selected; starting from an agent preselects that definition. Human invitations choose existing active company accounts and grant access to this conversation only.
 
