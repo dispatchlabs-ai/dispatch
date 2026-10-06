@@ -36,6 +36,8 @@ When the workflows are ready to lock in, prioritize end-to-end tests and API tes
 
 Resume test work only after there is enough useful, stable behavior worth preserving; the current implementation stage remains test-free. This policy supersedes earlier instructions in the handoff and contribution workflow to add tests with every implementation slice or run browser acceptance tests now. A successful type check or build does not establish that runtime behavior has been verified.
 
+**October 6 focused exception:** Chris explicitly requested coordinator-led use of the local development site to validate the conversation layout refinement. Manual browser interaction and rendered desktop/phone comparison are authorized for [WP-028](handoff.md#wp-028--conversation-layout-refinement). This does not authorize adding or running automated tests or qualify unrelated runtime workflows. Record the specific observed outcomes and remaining limitations.
+
 ## Company access and authentication
 
 **Accepted October 3, 2026.** Dispatch Web is a tool for companies. Access requires an authenticated user session with two-factor authentication (2FA). Support both time-based one-time passwords (TOTP) from authenticator apps and passkeys using WebAuthn/FIDO2.
@@ -280,6 +282,8 @@ Chris requested Slack as the conversation screen's visual model, approved the [I
 - Show Listening, Responding and Working as distinct agent states; show other humans' typing activity. Stop remains available while agents wait. Preserve the existing composer, draft, thread and member-access contracts.
 
 ### Threads and participant presentation
+
+**October 6 layout refinement accepted:** the [conversation layout criteria and images](conversation-layout-refinements.md#implementation-acceptance-criteria) define the implementation target. Conversations default to a closed context area; opening a thread or participants uses that area without shifting the main content's left guide. Compact messages expose contextual actions and persistent data-backed reply summaries. Distinct participant identities, readable tool disclosures, and destination-specific composers retain the existing authorship, thread, mention, and draft contracts below. [WP-028](handoff.md#wp-028--conversation-layout-refinement) owns implementation and browser qualification.
 
 - A reply stores the root public-message ID and remains part of the conversation's public history. It has the same membership and full-history access as the main discussion; there are no private thread members. Every other agent member considers new replies with their thread context. An agent's response defaults to the triggering thread and may deliberately post to the main discussion.
 - The main column shows top-level messages and reply counts. Opening a thread shows its root and ordered replies in the contextual column with an independent reply composer. The header's participant control switches that same column to members and saved instance details. A narrow screen presents these as a full-height supporting surface.

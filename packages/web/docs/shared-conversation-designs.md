@@ -38,4 +38,4 @@ Generated with the built-in ImageGen tool. The [prompt set](assets/shared-conver
 
 The generated still images were visually reviewed for layout, authorship, copy and consistency. They are raster design references, not rendered application screens: keyboard/touch behavior, accessibility, measured contrast, responsiveness and runtime behavior are unverified. The generation task changed no application code, runtime data, deployment or test policy and ran no tests. Subsequent implementation evidence belongs to WP-024.
 
-The [October 6 layout refinement concepts](conversation-layout-refinements.md) propose a denser conversation layout and contextual thread presentation. Those later concepts remain drafts for review.
+Chris approved the [October 6 layout refinement concepts and criteria](conversation-layout-refinements.md) for coordinated implementation and manual validation in the local browser. [WP-028](handoff.md#wp-028--conversation-layout-refinement) records the resulting evidence.

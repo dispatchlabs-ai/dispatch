@@ -1,6 +1,6 @@
 # Conversation layout refinement concepts
 
-**Draft for review, October 6, 2026.** Chris requested a comparison of Slack and the current Dispatch Conversations screen, then asked for ImageGen images that closely represent the proposed browser result. These concepts refine the [previously approved shared-conversation design](shared-conversation-designs.md); they are not implementation approval or evidence of running application behavior.
+**Approved for implementation, October 6, 2026.** Chris requested a comparison of Slack and the current Dispatch Conversations screen, followed by ImageGen references and an implementation checklist. He then instructed the coordinator to implement the plan using subagents and validate it by using the local development site. These concepts refine the [previously approved shared-conversation design](shared-conversation-designs.md). [WP-028](handoff.md#wp-028--conversation-layout-refinement) records implementation and observed browser evidence.
 
 ## Main conversation
 
@@ -14,9 +14,9 @@ Use consistent left alignment for the header, message avatars, and composer. Red
 
 The same workspace opens the selected message's thread in the right panel. The parent message, replies, activity, and thread composer remain visually connected. The main conversation keeps its own composer and header. Participants remain accessible from the header; selecting an agent can reveal its configuration.
 
-## Proposed implementation acceptance criteria
+## Implementation acceptance criteria
 
-Chris requested this checklist on October 6 to make the intended visual changes reviewable against the generated designs. These are proposed implementation outcomes; adding the checklist does not implement or approve the code changes. Each item requires comparison with a rendered screen before it can be marked visually complete.
+Chris requested this checklist on October 6 to make the intended visual changes reviewable against the generated designs, then approved implementation. Each item requires comparison with a rendered screen before it can be marked visually complete.
 
 | ID | Change and purpose | Observable acceptance condition |
 | --- | --- | --- |
@@ -41,7 +41,7 @@ Use equivalent content shapes: several short messages, a multiline message, dist
 
 For each V01–V12 item, record matched, deviated with reason, or unverified. The generated images contain small alignment inconsistencies; the shared-guide and shared-token rules above resolve those inconsistencies. Do not reproduce accidental raster offsets or hardcode the illustrative messages, counts, names, or timestamps.
 
-Static review also needs a narrower desktop and the repository-required 390 px phone render to reveal clipping and overflow. These desktop mockups do not define a new phone composition. Keyboard/touch behavior, focus, scroll recovery, and sending behavior require separate permitted evidence and cannot be established by screenshots. Follow the repository's current zero-tests policy; this checklist does not authorize running tests. A successful build is code validation, while visual completion requires the rendered comparison described here.
+Review also needs a narrower desktop and the repository-required 390 px phone render to reveal clipping and overflow. These desktop mockups do not define a new phone composition. Chris explicitly authorized manual browser use to validate this implementation; keyboard/touch behavior, focus, scroll recovery, and sending behavior require observed interaction evidence and cannot be established by screenshots. The restriction on adding or running automated tests remains. A successful build is code validation, while visual completion requires the rendered comparison described here.
 
 ## Scope and review
 
@@ -49,4 +49,4 @@ These desktop concepts retain Dispatch's light navy/aqua identity, project group
 
 Generated with the built-in ImageGen tool using the [recorded prompt set](assets/conversation-layout-2026-10-06/prompts.json). Source attachments are not committed. Names, sample messages, timestamps, and statuses are illustrative, not records of new agent actions.
 
-Images are raster implementation references, not rendered browser captures or pixel specifications. Visual review covers alignment, density, readable text, and consistency between states. Interaction, keyboard and touch access, responsive layouts, measured contrast, and runtime behavior remain unverified. This task changes design documentation only and runs no tests.
+Images are raster implementation references, not rendered browser captures or pixel specifications. Their original generation task changed design documentation only. Implementation qualification, including alignment, density, readable text, consistency, interaction, responsiveness, contrast, and remaining limitations, belongs to [WP-028](handoff.md#wp-028--conversation-layout-refinement).

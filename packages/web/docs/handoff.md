@@ -610,3 +610,19 @@ an arrow-only action at the right, and the existing phone touch target. Ignored
 captures remain in canonical `.local/composer-toolbar-20261006/`. No messages,
 tests or acceptance procedures ran. The existing Vite chunk-size advisory remains;
 x86-64 Linux, Omarchy and the pilot were not updated or qualified.
+
+## WP-028 — Conversation layout refinement
+
+**Accepted October 6, 2026; implementation and browser review in progress.** Chris approved the [refinement images and V01–V12 criteria](conversation-layout-refinements.md), requested coordinated implementation with subagents, and explicitly required the coordinator to validate it by using the local development site. The [maintained design decision](https://wiki.dispatchworks.ai/wiki/agent-collaboration-spaces/#section-october-6-conversation-layout-refinement) records the scope and focused manual-browser exception to the prior zero-tests policy. Automated tests remain deferred.
+
+This package depends on shared conversations, project navigation, inline mentions, and the existing tool presenters. It changes browser presentation and context controls, preserving native Pi ownership, membership, public-message identity, retry/draft state, listening behavior, and specialized Bash/file output.
+
+Acceptance criteria:
+
+- Match V01–V12 against both rendered reference states: shared alignment, useful width, compact messages, contextual actions, real reply summaries, selected threads, two composers, participant inspection, compact navigation, distinct identities, readable activity, and shared styling.
+- Use the actual local application at a recorded desktop viewport and zoom; compare the same conversation before and after. Review a narrower desktop and 390 px phone layout, including overflow, touch targets, and context presentation.
+- Manually exercise the relevant browser flows: open/close threads and participants, inspect an agent, expand activity, expose message actions with pointer/keyboard, select an inline mention, preserve main/thread drafts across navigation and layout changes, and verify reply-summary data through an explicitly labelled local review conversation where needed.
+- Run source/deslop review, integrated TypeScript and production builds, Apple Silicon Nix build/flake checks, diff review, and local documentation-link checks. Keep screenshots and review artifacts in ignored local storage.
+- Record matched, deviated with reason, or unverified for each visual criterion. Keep actual browser observations distinct from source/build evidence and from broader runtime or real-device qualification.
+
+Evidence will be recorded here after the integrated coordinator review. No automated tests are added by this package.
