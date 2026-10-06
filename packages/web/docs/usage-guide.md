@@ -164,7 +164,9 @@ Within Chats, the main tab strip appears when multiple conversations are open. C
 
 Above 1100 pixels, use the left rail’s conversations and details icons to hide or show either side. Drag either inner divider to resize it, or focus the divider and use Left/Right (Shift for larger steps) or Home/End. These choices last while the workspace is open; reloading restores the defaults. Phone Menu and Details controls live in the bottom bar and open panels.
 
-Hover or focus a conversation row to open its actions menu on the right. Touch layouts keep the menu button visible. The menu includes Move to project, Pin/Unpin, and Archive/Restore. Pinned conversations stay above the others within each group. Archive hides a conversation from the regular list without deleting it or stopping work; use Archived conversations at the bottom of the sidebar to reopen or restore it. These choices are personal to your account, including when the conversation has other members.
+Hover or focus a conversation row to open its actions menu on the right. Touch layouts keep the menu button visible. The menu includes Rename, Move to project, Pin/Unpin, and Archive/Restore. Pinned conversations stay above the others within each group. Archive hides a conversation from the regular list without deleting it or stopping work; use Archived conversations at the bottom of the sidebar to reopen or restore it. Pin, archive and project choices are personal to your account, including when the conversation has other members.
+
+Choose **Rename** from a conversation's actions menu (including archived and project lists), edit its current title, and select **Save name**. Titles are trimmed and must contain 1–200 characters. **Cancel** leaves the title unchanged; a failed save keeps your input and shows an error. Unlike pin, archive and project choices, the new title is shared with all members. It changes only Dispatch's display labels, not messages, agent context or tool directories.
 
 ### Projects
 
@@ -232,6 +234,8 @@ The state directory contains `auth.sqlite`, `auth.key`, and `runtime/` with Pi s
 
 `POST /api/chats/:id/preferences` accepts any combination of boolean `pinned`/`archived` and nullable `projectId`, and returns the current chat snapshot. Any human member may update their own conversation preferences; the destination project must belong to that same user/company. `GET /api/chats` includes archived records and project membership so the browser can present active, archived, and grouped lists.
 
+`POST /api/chats/:id/title` accepts `{ title: string }` (trimmed, 1–200 characters) and returns `ChatSnapshot`. Any authenticated human member may rename the shared display title. The original creation title is preserved so renaming does not invalidate creation retries.
+
 `POST /api/projects` accepts `{ requestId, name }` and returns `{ project }`. A project contains `id`, `name`, and `createdAt`. Retrying the same request ID and trimmed name returns the original project; changed content returns 409. `POST /api/chats` accepts optional `projectId` (null or omitted means unassigned). Chat creation retries compare the original creation project, even after the conversation has moved. Names are labels; stable UUIDs identify projects.
 
 
@@ -242,6 +246,7 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `GET /api/config` | Company, default agent, available model choices and supported thinking levels, provider readiness |
 | `GET/POST /api/chats` | List conversations you belong to / create with a request ID |
 | `GET/POST /api/projects` | List private projects / create a name-only project with a request ID |
+| `POST /api/chats/:id/title` | Rename the shared Dispatch display title |
 | `POST /api/chats/:id/preferences` | Set pin/archive flags or assign, move, or remove project membership |
 | `GET /api/chats/:id` | Public messages, participants and sanitized native activity |
 | `POST /api/chats/:id/messages` | Admit a message idempotently; return a snapshot with status 202 |

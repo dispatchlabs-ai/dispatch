@@ -812,3 +812,18 @@ Chris explicitly requested testing the live conversation's proposed skills check
 The release-checklist fixture is `e5a7b5ae-4755-4fbe-9a1e-afb427214ce5`; fixture names include `QA` and `2026-10-06`. Desktop controls and a 390 × 844 px rendering of the skill editor/library and tool result were inspected; the phone document width and scroll width both measured 390 px. The fixtures and conversations remain available for inspection. Private screenshots and focused UI-state captures are retained in the canonical checkout's gitignored `.local/skills-acceptance-20261006/` directory.
 
 No defects were observed in these checks. This evidence qualifies explicit selection, normal saves, assigned-only lookup and revision pinning for the exercised same-company scenarios. Cross-company isolation, request deduplication/conflicts/retry, removal, in-flight or restart recovery, exhaustive keyboard/assistive-technology support, physical touch devices and Omarchy remain untested. No application source changed, no automated tests or repeat builds were run, and the live backend was not restarted during these checks. Documentation diff, whitespace and local-link review apply to this evidence update.
+
+
+## WP-036 — Dispatch conversation renaming
+
+**Accepted October 6, 2026:** add Rename to existing conversation actions, as Dispatch display metadata only. See the [display-title contract](spec.md#conversation-display-titles). Depends on shared conversation membership and the existing sidebar/project action menus.
+
+Acceptance criteria:
+
+- Any authenticated human member can save a shared, trimmed 1–200-character title through `POST /api/chats/:id/title`; enforce company/membership access and return the current `ChatSnapshot`.
+- Persist a separate native catalog display-title override. Preserve immutable creation-title comparisons, existing automatic-title fallback for unrenamed records, and literal explicit titles including “New conversation”.
+- Sidebar, archive and project menus expose Rename with current title, Save name/Cancel, validation and retained input on failure. Saved titles propagate to navigation, headers, search and project lists without changing IDs, messages, context, workspaces or execution.
+- Apply source/deslop review, TypeScript and production/Nix builds, diff/whitespace and local documentation-link checks. No tests are authorized. Record actual integration evidence here before claiming completion.
+- Desktop and 390 px rendered layout, contrast, keyboard/focus/assistive technology, touch, failure recovery, persistence/restart, authorization and creation retries remain unverified by execution. No backend restart or deployment is implied.
+
+Documentation preparation: reviewed the in-progress endpoint/runtime and shared dialog source against the agreed contract; documentation diff, whitespace and local file links checked. Integration/build evidence is pending.

@@ -4,6 +4,8 @@
 
 ### Added
 
+- Rename shared conversation display titles from conversation actions, without changing messages, agent context, workspaces or creation-retry identity.
+
 - Reusable company text skills with explicit per-agent revision selections and a native assigned-only loader. New instances copy complete skill snapshots; creation and revision edits never automatically assign or upgrade skills. File packages and uploads remain deferred.
 
 ### Changed

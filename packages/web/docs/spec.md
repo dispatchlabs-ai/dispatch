@@ -241,6 +241,16 @@ The editor groups Identity, Instructions, and Model in that order. Instructions 
 
 - Under the [testing policy](#testing-policy), record UI properties that were not checked (contrast, device behaviour, keyboard flows) as unverified in [handoff.md](handoff.md). Do not describe them as implemented facts in the spec, README, or changelog.
 
+## Conversation display titles
+
+**Accepted October 6, 2026:** conversation actions offer Rename in Dispatch only. Any authenticated human member may change the shared display title; this is not a personal preference.
+
+- `POST /api/chats/:id/title` accepts `{ title: string }`, trims surrounding whitespace, requires 1–200 characters, and returns `ChatSnapshot`. Apply the existing company/membership boundary; inaccessible conversations return 404.
+- Persist a display-title override in the native catalog while retaining the immutable creation title for creation-retry comparisons. Older conversations retain their existing title fallback. An explicit “New conversation” override is a literal title, not a request to derive one from the first message.
+- Rename updates conversation labels throughout Dispatch, including navigation, headers, project lists and search. It does not change IDs, messages, agent context/configuration, project membership, working directories or running work.
+- Sidebar, archive and project actions open the same dialog with the current display title and Save/Cancel. Reject blank or oversized titles. A failed save retains the draft and saved title and displays an error; Cancel leaves the saved title unchanged.
+- Functional and rendered UI qualification remain subject to the [testing policy](#testing-policy); record evidence and unresolved UI checks in [handoff.md](handoff.md).
+
 ## Projects in Conversations
 
 **Accepted October 5, 2026:** implement the approved [desktop design](assets/projects-desktop.png) locally. A project requires only a name. Many conversations may belong to one project; each conversation belongs to at most one project or remains unassigned. Additional project fields remain unspecified.
