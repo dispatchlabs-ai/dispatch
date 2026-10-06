@@ -37,3 +37,5 @@ The conversation remains a single readable message column. Participants and crea
 Generated with the built-in ImageGen tool. The [prompt set](assets/shared-conversations/prompts.json) records the final concepts and focused refinements. The user's Slack screenshot was a visual reference only; its conversation content and original attachment are not stored here. The earlier [approved project design](assets/projects-desktop.png) supplied Dispatch's visual language.
 
 The generated still images were visually reviewed for layout, authorship, copy and consistency. They are raster design references, not rendered application screens: keyboard/touch behavior, accessibility, measured contrast, responsiveness and runtime behavior are unverified. The generation task changed no application code, runtime data, deployment or test policy and ran no tests. Subsequent implementation evidence belongs to WP-024.
+
+The [October 6 layout refinement concepts](conversation-layout-refinements.md) propose a denser conversation layout and contextual thread presentation. Those later concepts remain drafts for review.
