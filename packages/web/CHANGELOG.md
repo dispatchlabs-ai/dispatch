@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Prevent unchanged parent drafts from rebuilding the Markdown editor during typing; isolate thread editor state by composer ID. The recorded stale-update path was source reviewed; post-fix typing and rendered UI remain unverified. See [composer regression evidence](docs/handoff.md#october-6-2026--composer-draft-synchronization-regression).
+
 ### Added
 
 - Optional conversation naming in the starting-agent chooser, retaining unnamed first-message previews and preserving explicit names on creation retries and subsequent messages.

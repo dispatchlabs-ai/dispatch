@@ -14,7 +14,7 @@ import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { $findMatchingParent, $getSelection, $isRangeSelection, $isTextNode, CLEAR_HISTORY_COMMAND, COMMAND_PRIORITY_HIGH, COMMAND_PRIORITY_NORMAL, COPY_COMMAND, CUT_COMMAND, INSERT_PARAGRAPH_COMMAND, KEY_ENTER_COMMAND, PASTE_COMMAND, SKIP_DOM_SELECTION_TAG } from "lexical";
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
 import type { MentionParticipant } from "../lib/mentions";
 import { $getMentionIds, MentionNode, mentionTransformers } from "./mention-node";
 import { MentionsPlugin } from "./mentions";
@@ -44,7 +44,7 @@ export function MarkdownComposer(props: MarkdownComposerProps) {
   const conversation = props.mode === "document" ? undefined : props;
   const participants = conversation?.participants;
   const transformers = useMemo(() => participants ? mentionTransformers(participants) : TRANSFORMERS, [participants]);
-  return <LexicalComposer initialConfig={{
+  return <LexicalComposer key={props.id} initialConfig={{
     namespace: props.id,
     nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, CodeNode, LinkNode, MentionNode],
     editorState: () => $convertFromMarkdownString(props.value, transformers, undefined, true),
@@ -91,11 +91,16 @@ function ComposerSync(props: MarkdownComposerProps & { transformers: Transformer
   const onMentionsChange = conversation?.onMentionsChange;
   const [editor] = useLexicalComposerContext();
   const lastValue = useRef(value);
+  const lastParentValue = useRef(value);
   const lastMentions = useRef(mentions);
 
   useEffect(() => { editor.setEditable(!disabled && !readOnly); }, [editor, disabled, readOnly]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    // Metadata changes are not draft replacements. Consume parent changes during
+    // commit, before another keystroke can make this render's value stale.
+    if (value === lastParentValue.current) return;
+    lastParentValue.current = value;
     if (value === lastValue.current) return;
     lastValue.current = value;
     lastMentions.current = mentions;
