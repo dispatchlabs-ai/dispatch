@@ -261,24 +261,57 @@ export class DispatchRuntime {
     await this.authorize(scope, id);
     let value = await this.getChat(scope, id);
     let listener: ((snapshot: ChatSnapshot) => Promise<void>) | undefined;
-    let running = false; let dirty = false; let stopped = false;
+    let running = false;
+    let dirty = false;
+    let stopped = false;
     let finish!: (value: { reason: "stopped" | "listener_error" | "session_closed" }) => void;
     const closed = new Promise<{ reason: "stopped" | "listener_error" | "session_closed" }>(resolve => { finish = resolve; });
     const drain = async () => {
       if (running || stopped || !listener) return;
       running = true;
       try {
-        while (dirty && !stopped) { dirty = false; value = await this.getChat(scope, id); await listener(value); }
-      } catch { stopped = true; unsubscribe(); unsubscribeClose(); finish({ reason: "listener_error" }); }
-      finally { running = false; }
+        // Coalesce publications while the current snapshot or listener is pending.
+        while (dirty && !stopped) {
+          dirty = false;
+          value = await this.getChat(scope, id);
+          await listener(value);
+        }
+      } catch {
+        stopped = true;
+        unsubscribe();
+        unsubscribeClose();
+        finish({ reason: "listener_error" });
+      } finally {
+        running = false;
+      }
     };
     const unsubscribe = this.harness.subscribeCommits(publication => {
       // Read-only snapshots produce no changes and cannot recursively wake themselves.
       if (!publication.changes.length || stopped) return;
-      dirty = true; void drain();
+      dirty = true;
+      void drain();
     });
-    const unsubscribeClose = this.harness.subscribeClose(() => { stopped = true; unsubscribe(); finish({ reason: "session_closed" }); });
-    return { get value() { return value; }, start: (next: (snapshot: ChatSnapshot) => Promise<void>) => { listener = next; dirty = true; void drain(); }, stop: async () => { stopped = true; unsubscribe(); unsubscribeClose(); finish({ reason: "stopped" }); return closed; }, closed };
+    const unsubscribeClose = this.harness.subscribeClose(() => {
+      stopped = true;
+      unsubscribe();
+      finish({ reason: "session_closed" });
+    });
+    return {
+      get value() { return value; },
+      start: (next: (snapshot: ChatSnapshot) => Promise<void>) => {
+        listener = next;
+        dirty = true;
+        void drain();
+      },
+      stop: async () => {
+        stopped = true;
+        unsubscribe();
+        unsubscribeClose();
+        finish({ reason: "stopped" });
+        return closed;
+      },
+      closed,
+    };
   }
 
   async submit(scope: RuntimeScope, id: string, input: SendMessageInput) {
@@ -314,14 +347,12 @@ export class DispatchRuntime {
 
   async listAgents(scope: RuntimeScope): Promise<AgentDefinition[]> {
     const catalog = await this.harness.snapshot(CatalogDoc, context);
-    const current = new Map<string, AgentDefinition>();
-    for (const agent of catalog!.agents) if (agent.companyId === scope.companyId) current.set(agent.id, publicAgent(agent));
-    return [...current.values()];
+    return [...latestAgents(catalog!, scope.companyId).values()].map(publicAgent);
   }
 
   async agentConnections(scope: RuntimeScope, id: string) {
     const catalog = await this.harness.snapshot(CatalogDoc, context);
-    const agent = [...catalog!.agents].reverse().find(agent => agent.companyId === scope.companyId && agent.id === id);
+    const agent = latestAgent(catalog!, scope.companyId, id);
     if (!agent) throw new RuntimeError(404, "Agent not found.");
     return this.connections.status(id, managedIds(agent));
   }
@@ -334,8 +365,7 @@ export class DispatchRuntime {
 
   async listMcpConnections(scope: RuntimeScope): Promise<ManagedConnection[]> {
     const catalog = await this.harness.snapshot(CatalogDoc, context);
-    const latest = new Map<string, StoredAgent>();
-    for (const agent of catalog!.agents) if (agent.companyId === scope.companyId) latest.set(agent.id, agent);
+    const latest = latestAgents(catalog!, scope.companyId);
     return (this.managed?.list(scope.companyId) ?? []).filter(record => record.ownerId === scope.userId || catalog!.connectionOwners?.[record.id])
       .map(record => {
         const assigned = catalog!.connectionOwners?.[record.id];
@@ -361,7 +391,7 @@ export class DispatchRuntime {
         if (priorRequest.saveFingerprint !== fingerprint) throw requestConflict();
         return publicAgent(priorRequest);
       }
-      const prior = input.id ? [...catalog.agents].reverse().find((agent) => agent.id === input.id && agent.companyId === scope.companyId) : undefined;
+      const prior = input.id ? latestAgent(catalog, scope.companyId, input.id) : undefined;
       if (input.id && !prior) throw new RuntimeError(404, "Agent not found.");
       if (prior?.archived) throw new RuntimeError(409, "This agent is archived. Create a new agent to use its configuration again.");
       if (prior && prior.revision !== input.expectedRevision) throw new RuntimeError(409, "The agent has changed. Reload it before saving.");
@@ -415,7 +445,7 @@ export class DispatchRuntime {
     if (id === "default") throw new RuntimeError(400, "The default agent cannot be archived.");
     return this.harness.commit(async (tx) => {
       const catalog = await tx.doc(CatalogDoc);
-      const prior = [...catalog.agents].reverse().find((agent) => agent.id === id && agent.companyId === scope.companyId);
+      const prior = latestAgent(catalog, scope.companyId, id);
       if (!prior) throw new RuntimeError(404, "Agent not found.");
       if (prior.revision !== expectedRevision) throw new RuntimeError(409, "The agent has changed. Reload it before archiving.");
       const agent = { ...prior, revision: prior.revision + 1, archived: true, updatedAt: Date.now() };
@@ -467,8 +497,7 @@ export class DispatchRuntime {
   private async configureConnections(companyId: string) {
     await this.harness.commit(async tx => {
       const catalog = await tx.doc(CatalogDoc);
-      const latest = new Map<string, StoredAgent>();
-      for (const agent of catalog.agents) if (agent.companyId === companyId) latest.set(agent.id, agent);
+      const latest = latestAgents(catalog, companyId);
       for (const agent of latest.values()) {
         const connections = this.connections.forAgent(agent.id, managedIds(agent));
         if (!connections.length && !agent.connections?.length) continue;
@@ -531,7 +560,7 @@ export class DispatchRuntime {
   }
 
   private findAgent(catalog: Catalog, scope: Pick<RuntimeScope, "companyId">, id: string) {
-    const agent = [...catalog.agents].reverse().find((item) => item.id === id && item.companyId === scope.companyId);
+    const agent = latestAgent(catalog, scope.companyId, id);
     if (!agent || agent.archived) throw new RuntimeError(404, "Agent not found.");
     return agent;
   }
@@ -546,6 +575,20 @@ export class DispatchRuntime {
     if (!model) throw new RuntimeError(400, "This model is not available from the configured providers.");
     if (!getSupportedThinkingLevels(model).includes(agent.thinkingLevel)) throw new RuntimeError(400, "This model does not support the selected thinking level.");
   }
+}
+
+// Catalog revisions are append-only. Keep archived latest revisions in the lookup;
+// callers decide whether their operation permits an archived definition.
+function latestAgent(catalog: Catalog, companyId: string, id: string) {
+  return catalog.agents.findLast(agent => agent.companyId === companyId && agent.id === id);
+}
+
+function latestAgents(catalog: Catalog, companyId: string) {
+  const latest = new Map<string, StoredAgent>();
+  for (const agent of catalog.agents) {
+    if (agent.companyId === companyId) latest.set(agent.id, agent);
+  }
+  return latest;
 }
 
 function productionModels() {

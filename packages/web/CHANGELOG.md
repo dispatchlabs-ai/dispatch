@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Removed obsolete single-agent snapshot consumers, consolidated company-scoped latest-agent lookups, and clarified watcher/speaking-turn transitions without changing API compatibility fields or durable execution policy.
+
 - Coding agents now start in the configured workspace (`DISPATCH_WORKSPACE_DIR`), defaulting to the repository root in local launchers. Idle instances using the old generated folders migrate on startup; custom paths, unfinished work, history, and old files are preserved.
 
 - Agent Instructions now use the shared live Markdown editor with document-style Enter behavior and retain rendered formatting in saved views. Markdown storage and revision saves are preserved; oversized instructions remain editable with a visible save-blocking error.

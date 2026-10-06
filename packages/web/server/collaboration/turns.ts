@@ -36,8 +36,14 @@ export class ConversationTurns {
           if (remaining.length !== turns.queue.length) turns.queue = remaining;
           if (turns.speaker && !active(turns.speaker)) delete turns.speaker;
           const ticket = turns.queue.find(item => item.key === task.input.key);
-          if (turns.speaker?.key === task.input.key) { done = true; return completed(); }
-          if (!ticket) { done = true; return { status: "terminal", outcome: { status: "aborted" } }; }
+          if (turns.speaker?.key === task.input.key) {
+            done = true;
+            return completed();
+          }
+          if (!ticket) {
+            done = true;
+            return { status: "terminal", outcome: { status: "aborted" } };
+          }
           const first = [...turns.queue].sort(compareTickets)[0];
           if (!turns.speaker && !humansComposing(turns) && first?.key === ticket.key) {
             turns.speaker = ticket;
@@ -69,7 +75,10 @@ export class ConversationTurns {
         await runtime.commit(async tx => {
           const turns = await tx.doc(TurnsDoc, task.input.roomId);
           const presence = turns.presence[task.input.client];
-          if (!presence || presence.expiry !== task.id) { done = true; return completed(); }
+          if (!presence || presence.expiry !== task.id) {
+            done = true;
+            return completed();
+          }
           if (presence.until <= runtime.now()) {
             presence.until = 0;
             delete presence.expiry;
@@ -87,7 +96,10 @@ export class ConversationTurns {
   async enqueue(tx: Tx, roomId: ConversationId, participantId: string, owner: TaskId, messageId: string, priority: boolean, order: number) {
     const turns = await tx.doc(TurnsDoc, roomId);
     const queued = turns.queue.find(ticket => ticket.participantId === participantId);
-    if (queued) { queued.priority ||= priority; return; }
+    if (queued) {
+      queued.priority ||= priority;
+      return;
+    }
     if (turns.speaker?.participantId === participantId) return;
     turns.queue.push({ key: String(owner), participantId, owner, priority, order, tie: createHash("sha256").update(`${messageId}:${participantId}`).digest("hex") });
   }
@@ -113,7 +125,9 @@ export class ConversationTurns {
         ticket = turns.queue.at(-1)!;
       }
       // A prequeued later delivery can depend on this one. Retain its priority, but bind it to the active work.
-      ticket.key = String(requester); ticket.owner = owner; ticket.requester = requester;
+      ticket.key = String(requester);
+      ticket.owner = owner;
+      ticket.requester = requester;
       ticket.priority ||= priority;
       const id = await tx.createTask(this.wait, { roomId, key: ticket.key }, { conversationId, ownership: { kind: "task", taskId: requester } });
       ticket.gate = id;

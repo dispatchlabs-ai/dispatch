@@ -1,4 +1,3 @@
-import type { AgentState, LiveState, UsageState } from "@earendil-works/pi-durable";
 import type { ChatSnapshot, ChatSummary } from "../shared/contracts";
 
 export type ConnectionState = "connecting" | "connected" | "reconnecting" | "error";
@@ -10,18 +9,6 @@ export interface PendingMessage {
   mentions?: string[];
   sending: boolean;
   error?: string;
-}
-
-export function chatAgent(snapshot: ChatSnapshot): AgentState {
-  return (snapshot.view.docs["pi.agent"] as AgentState | undefined) || {};
-}
-
-export function chatLive(snapshot: ChatSnapshot): LiveState {
-  return (snapshot.view.docs["pi.live"] as LiveState | undefined) || {};
-}
-
-export function chatUsage(snapshot: ChatSnapshot): UsageState {
-  return (snapshot.view.docs["pi.usage"] as UsageState | undefined) || { models: {}, tools: {} };
 }
 
 export function mergeChat(chats: ChatSummary[], update: ChatSummary): ChatSummary[] {

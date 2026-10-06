@@ -69,7 +69,6 @@ export function Workspace() {
   const draftVersions = useRef<Record<string, number>>({});
   const messageRequests = useRef<Record<string, { requestId: string; draftVersion: number } | undefined>>({});
   const [sendErrors, setSendErrors] = useState<Record<string, string | undefined>>({});
-  const [supportTabs, setSupportTabs] = useState<Record<string, string>>({});
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
@@ -180,14 +179,6 @@ export function Workspace() {
     }
     setSendErrors(current => ({ ...current, [chatId]: undefined }));
   }, []);
-
-  useEffect(() => {
-    for (const [chatId, message] of Object.entries(pending)) {
-      if (message && snapshots[chatId.split(":")[0]]?.submissions.some(submission => submission.requestId === message.requestId)) {
-        settleMessage(chatId, message.requestId);
-      }
-    }
-  }, [pending, snapshots, settleMessage]);
 
   function selectSection(next: WorkspaceSection) {
     setSection(next);
@@ -422,7 +413,7 @@ export function Workspace() {
       setContextOpen(false);
       requestAnimationFrame(() => document.getElementById(`participants-${active.chatId}`)?.focus());
     }} showHeader={!inDrawer}
-    /> : <ContextPanel kind={active.kind === "connections" ? "security" : active.kind} snapshot={snapshot} models={config?.models ?? []} tab={supportTabs[active.id] || "agent"} onTabChange={tab => setSupportTabs(current => ({ ...current, [active.id]: tab }))} />;
+    /> : <ContextPanel kind={active.kind === "connections" ? "security" : active.kind} />;
   const chatNav = () => selectSection("chats");
   const selectChat = (chatId: string) => activate({ id: `chat:${chatId}`, kind: "chat", chatId });
   const conversations = <ConversationSidebar chats={chats} projects={projects}
