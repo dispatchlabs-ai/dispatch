@@ -20,7 +20,7 @@ import { TurnsDoc } from "./collaboration/turns.js";
 import type { McpConnections } from "./mcp-connections.js";
 
 const context = BACKGROUND_CONTEXT;
-type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { pinned?: boolean; archived?: boolean; agentName?: string; projectId?: string | null; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
+type StoredChat = Omit<ChatSummary, "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { displayTitle?: string; pinned?: boolean; archived?: boolean; agentName?: string; projectId?: string | null; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
 type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: string; extensions?: string[]; tools?: string[]; savedBy?: string; saveRequestId?: string; saveFingerprint?: string };
 type StoredProject = Project & { companyId: string; userId: string; requestId: string };
 type StoredSkill = SkillDefinition & { companyId: string; savedBy: string; requestId: string; fingerprint: string };
@@ -228,6 +228,21 @@ export class DispatchRuntime {
     return this.getChat(scope, id);
   }
 
+  async renameChat(scope: RuntimeScope, id: string, title: string): Promise<ChatSnapshot> {
+    title = title.trim();
+    requireText(title, "Title", 200);
+    await this.authorize(scope, id);
+    await this.harness.commit(async tx => {
+      const catalog = await tx.doc(CatalogDoc);
+      const chat = catalog.chats.find(item => item.id === id && item.companyId === scope.companyId);
+      const room = await tx.doc(SharedDoc, nativeId(id));
+      if (!chat || room.companyId !== scope.companyId || !room.members.some(member => member.userId === scope.userId)) throw new RuntimeError(404, "Conversation not found.");
+      // Keep the creation title intact for request replay; this override is presentation only.
+      chat.displayTitle = title;
+    }, context);
+    return this.getChat(scope, id);
+  }
+
   private findProject(catalog: Catalog, scope: RuntimeScope, id: string): StoredProject {
     const project = catalog.projects?.find(project => project.id === id && owns(scope, project));
     if (!project) throw new RuntimeError(404, "Project not found.");
@@ -249,7 +264,7 @@ export class DispatchRuntime {
       const status = agents.some(agent => ["working", "listening", "responding"].includes(agent.status)) ? "running" : agents.some(agent => agent.status === "failed") ? "failed" : agents.some(agent => agent.status === "stopped") ? "stopped" : "idle";
       const error = agents.find(agent => agent.status === "failed")?.error;
       const conversation: ChatSummary = {
-        id, title: chat.title === "New conversation" && first?.text ? first.text.slice(0, 80) : chat.title,
+        id, title: chat.displayTitle ?? (chat.title === "New conversation" && first?.text ? first.text.slice(0, 80) : chat.title),
         projectId: preference.projectId, pinned: preference.pinned, archived: preference.archived,
         createdAt: chat.createdAt, updatedAt: presentation.messages.reduce((latest, message) => Math.max(latest, message.createdAt), chat.createdAt), revision: this.commitRevision,
         agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, agentName: chat.agentName ?? "Saved agent", status,

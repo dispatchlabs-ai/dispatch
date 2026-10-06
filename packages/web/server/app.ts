@@ -150,6 +150,10 @@ export function createApp(options: AppOptions) {
     return c.json(await runtime.createChat(c.get("principal"), input), 201);
   });
   app.get("/api/chats/:id", async (c) => c.json(await runtime.getChat(c.get("principal"), c.req.param("id"))));
+  app.post("/api/chats/:id/title", async (c) => {
+    const input = z.object({ title: z.string().trim().min(1).max(200) }).strict().parse(await c.req.json());
+    return c.json(await runtime.renameChat(c.get("principal"), c.req.param("id"), input.title));
+  });
   app.post("/api/chats/:id/participants", async (c) => {
     const input = z.object({ requestId, agentDefinitionIds: identities.optional(), userIds: identities.optional() }).strict()
       .refine(value => (value.agentDefinitionIds?.length ?? 0) + (value.userIds?.length ?? 0) > 0).parse(await c.req.json());
