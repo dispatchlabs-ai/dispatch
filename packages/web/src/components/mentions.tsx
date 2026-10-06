@@ -3,14 +3,13 @@ import { $isCodeNode } from "@lexical/code";
 import { $isLinkNode } from "@lexical/link";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { LexicalTypeaheadMenuPlugin, MenuOption, type MenuRenderFn, type TriggerFn } from "@lexical/react/LexicalTypeaheadMenuPlugin";
-import { $createTextNode, $findMatchingParent, $getRoot, $getSelection, $isRangeSelection, $isTextNode, BLUR_COMMAND, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_HIGH, KEY_ENTER_COMMAND, KEY_ESCAPE_COMMAND } from "lexical";
-import { AtSign, CornerDownLeft } from "lucide-react";
+import { $createTextNode, $findMatchingParent, $getSelection, $isRangeSelection, $isTextNode, BLUR_COMMAND, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_HIGH, KEY_ENTER_COMMAND, KEY_ESCAPE_COMMAND } from "lexical";
+import { CornerDownLeft } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { mentionLabel, type MentionParticipant } from "../lib/mentions";
 import { $createMentionNode } from "./mention-node";
 import { ParticipantAvatar } from "./conversation-people";
-import { IconButton } from "./ui";
 
 class MentionOption extends MenuOption {
   constructor(readonly person: MentionParticipant, readonly label: string) { super(person.id); }
@@ -26,20 +25,6 @@ const matchMention: TriggerFn = (text, editor) => {
   const query = match[1];
   return { leadOffset: text.length - query.length - 1, matchingString: query, replaceableString: `@${query}` };
 };
-
-export function MentionButton({ disabled }: { disabled: boolean }) {
-  const [editor] = useLexicalComposerContext();
-  return <IconButton label="Mention someone" disabled={disabled} onPointerDown={event => event.preventDefault()} onClick={() => {
-    editor.focus(() => editor.update(() => {
-      const selection = $getSelection();
-      const target = $isRangeSelection(selection) ? selection : $getRoot().selectEnd();
-      const start = target.isBackward() ? target.focus : target.anchor;
-      const node = start.getNode();
-      const preceding = $isTextNode(node) ? node.getTextContent().slice(0, start.offset) : "";
-      target.insertText(preceding && !/[\s(]$/.test(preceding) ? " @" : "@");
-    }));
-  }}><AtSign size={18} /></IconButton>;
-}
 
 type MenuProps = Parameters<MenuRenderFn<MentionOption>>[1];
 

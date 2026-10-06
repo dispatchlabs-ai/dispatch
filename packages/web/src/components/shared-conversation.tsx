@@ -157,7 +157,7 @@ export function ConversationComposer({ id, chatId, active = true, draft, pending
     <form className="composer" onInput={composing.pulse} onCompositionStart={composing.pulse} onCompositionUpdate={composing.pulse} onPaste={composing.pulse} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) composing.clear(); }} onSubmit={event => { event.preventDefault(); send(); }}>
       <MarkdownComposer id={id} value={draft} disabled={disabled} readOnly={Boolean(pending?.sending)} onChange={onDraftChange} onSend={send}
         participants={participants} mentions={mentions} onMentionsChange={onMentionsChange} placeholder={thread ? "Reply to thread…" : "Message everyone…"}
-        toolbar={<div className="button-row">{children}<Button type="submit" className="send-button" disabled={!canSend} aria-label={pending?.error ? "Retry sending message" : thread ? "Send reply" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}<span>Send</span></Button></div>}
+        toolbar={<div className="button-row">{children}<Button type="submit" className="send-button" disabled={!canSend} aria-label={pending?.error ? "Retry sending message" : thread ? "Send reply" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}</Button></div>}
       />
     </form>
     {thread ? <p className="thread-visibility"><LockKeyhole size={12} /> Replies are visible to everyone in this conversation.</p> : null}

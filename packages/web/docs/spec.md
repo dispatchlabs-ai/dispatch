@@ -142,10 +142,15 @@ The composer has one outer focus indicator, grows with its contents up to a scro
 
 **Accepted October 5, 2026:** Chris rejected the detached Mention dropdown and
 requested Slack's inline mention interaction. In main messages and replies, typing
-`@` opens a participant picker at the caret; typing a name filters it. An `@` icon
-offers the same insertion shortcut. The menu shows people and agents already in
-the conversation with their avatars and names, and distinguishes duplicate names.
+`@` opens a participant picker at the caret; typing a name filters it. The menu
+shows people and agents already in the conversation with their avatars and names,
+and distinguishes duplicate names.
 It does not invite anyone or add broadcast mentions such as `@everyone`.
+
+**Refined October 6, 2026:** remove the redundant toolbar `@` shortcut and restore
+the compact arrow-only Send button in main messages and replies. The accessible
+send/reply/retry labels and sending/retry icons remain. Typing `@` still opens the
+inline picker. This supersedes the initial toolbar shortcut and visible Send text.
 
 Arrow keys move through suggestions; Enter or Tab selects the highlighted person
 without sending, and Escape closes the picker. Pointer/touch selection inserts the

@@ -17,7 +17,7 @@ import { $findMatchingParent, $getSelection, $isRangeSelection, $isTextNode, CLE
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { MentionParticipant } from "../lib/mentions";
 import { $getMentionIds, MentionNode, mentionTransformers } from "./mention-node";
-import { MentionButton, MentionsPlugin } from "./mentions";
+import { MentionsPlugin } from "./mentions";
 
 interface MarkdownComposerProps {
   id: string;
@@ -62,10 +62,7 @@ export function MarkdownComposer(props: MarkdownComposerProps) {
         placeholder={<div className="composer-placeholder">{props.placeholder || "Message everyone…"}</div>}
       />} />
     </div>
-    <div className="composer-toolbar">
-      <MentionButton disabled={props.disabled || props.readOnly} />
-      {props.toolbar}
-    </div>
+    <div className="composer-toolbar">{props.toolbar}</div>
     <HistoryPlugin />
     <ListPlugin />
     <LinkPlugin />

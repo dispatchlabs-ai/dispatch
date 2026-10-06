@@ -569,3 +569,16 @@ localhost:5173. The refreshed workspace exposes the new Mention someone shortcut
 no message was entered or sent. Canonical `.local/inline-mentions/` retains the
 startup record and ignored captures. This observation does not qualify the
 interactive picker behavior.
+
+### Composer toolbar refinement — October 6, 2026
+
+Chris requested removing the redundant `@` toolbar button and restoring the former
+arrow-only Send button. Remove the shortcut component and its unused imports, the
+visible Send text, and the later width/alignment overrides so the existing compact
+button and phone touch-target styles apply again. Preserve the shared main/reply
+composer, typing-triggered mention menu, accessible action labels, and sending/retry
+states. This supersedes the initial WP-027 shortcut criterion above.
+
+Review the source/diff and actual rendered desktop/390 px layouts, and run the
+repository TypeScript/build/Nix checks. The standing zero-tests policy remains;
+interaction, assistive technology, measured contrast and real devices are unverified.

@@ -113,15 +113,15 @@ inspect its outcome before retrying with Wiki's operation ID rules.
 
 Messages use a shared, left-aligned flow with author names, agent badges and timestamps. Reply opens a thread in the right column, or a full-height phone panel. Replies remain visible to everyone in the conversation.
 
-The message composer formats Markdown as you type or paste: headings, lists, quotes, bold/italic text, links, and code stay editable in place. Copying selected content retains its Markdown formatting. Paste inside a code block keeps the text literal. Desktop Enter sends; Shift+Enter inserts a line. Enter on a touch-primary device inserts a line; use Send to submit. The toolbar contains Send and, during active work, Stop. Main-message and individual reply-thread drafts stay with each open chat. Messages over 100,000 characters including formatting must be shortened before sending.
+The message composer formats Markdown as you type or paste: headings, lists, quotes, bold/italic text, links, and code stay editable in place. Copying selected content retains its Markdown formatting. Paste inside a code block keeps the text literal. Desktop Enter sends; Shift+Enter inserts a line. Enter on a touch-primary device inserts a line; use Send to submit. The toolbar contains an arrow-only Send button and, during active work, Stop. Main-message and individual reply-thread drafts stay with each open chat. Messages over 100,000 characters including formatting must be shortened before sending.
 
 Conversations are visible only to their human members within the installation’s company. New conversation opens a chooser for one or more company agents. The participant button opens saved agent configuration and per-agent usage. Add participants invites existing active company people or available agents; newcomers can read the full public history. Each agent has an independent working context. Agents consider messages from humans and other agents and may remain silent.
 
 To mention someone, type **@** in a message or reply and start typing their name.
 Select a suggestion with the arrow keys and Enter/Tab, or click/tap the person.
-The name appears highlighted within your text. The **@** toolbar icon opens the
-same picker at your cursor. Escape dismisses it; deleting the highlighted name
-removes the mention. Enter selects a suggestion while the picker is open, then
+The name appears highlighted within your text. Escape dismisses the picker;
+deleting the highlighted name removes the mention. Enter selects a suggestion
+while the picker is open, then
 returns to its normal send behavior. Only current participants appear. Mentioning
 someone requests attention without inviting them or changing access.
 
