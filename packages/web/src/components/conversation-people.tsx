@@ -1,11 +1,15 @@
-import { Bot, Check, UserRound } from "lucide-react";
+import { BookOpen, Bot, Check, CodeXml, Compass, Sparkles, UserRound } from "lucide-react";
 import { useState } from "react";
 import type { AgentDefinition } from "../shared/contracts";
 import { SidebarSearch } from "./sidebar-search";
 import { Button, Modal, Notice, Spinner } from "./ui";
 
 export function ParticipantAvatar({ kind, name }: { kind: "human" | "agent"; name: string }) {
-  return <span className={`participant-avatar participant-${kind}`} aria-hidden="true">{kind === "agent" ? <Bot size={20} /> : name.trim() ? name.trim().slice(0, 1).toUpperCase() : <UserRound size={20} />}</span>;
+  const words = name.trim().split(/\s+/);
+  const initials = (words.length > 1 ? words.map(part => part[0]).slice(0, 2).join("") : name.trim().slice(0, 2)).toUpperCase();
+  const identity = Array.from(name).reduce((hash, character) => (hash * 31 + character.charCodeAt(0)) >>> 0, 0) % 5;
+  const AgentIcon = [Compass, Sparkles, BookOpen, Bot, CodeXml][identity];
+  return <span className={`participant-avatar participant-${kind}`} data-identity={identity} aria-hidden="true">{kind === "agent" ? <><AgentIcon size={20} /><span className="agent-avatar-initials">{initials}</span></> : initials ? initials.slice(0, 1) : <UserRound size={20} />}</span>;
 }
 
 export function AgentChoices({ agents, selected, onChange, disabled = false, joinedDefinitionIds = [] }: {

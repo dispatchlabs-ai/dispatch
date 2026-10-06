@@ -5,10 +5,10 @@ import { Spinner } from "./ui";
 
 const FileDiff = lazy(() => import("./file-diff"));
 
-export function ToolActivityView({ activity }: { activity: ToolActivity }) {
+export function ToolActivityView({ activity, authorName }: { activity: ToolActivity; authorName?: string }) {
   if (activity.name === "bash") return <BashTerminal activity={activity} />;
   if (activity.name === "write" || activity.name === "edit" || activity.name === "read") return <FileTool activity={activity} />;
-  return <DefaultTool activity={activity} />;
+  return <DefaultTool activity={activity} authorName={authorName} />;
 }
 
 function status(activity: ToolActivity) {
@@ -121,11 +121,29 @@ class DiffBoundary extends Component<{ children: ReactNode; fallback: ReactNode 
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
-// Keep other tools generic until their individual presentations are designed.
-function DefaultTool({ activity }: { activity: ToolActivity }) {
+function toolSummary(activity: ToolActivity, completed: boolean) {
+  // MCP names include the connection ID and a hash; match the registered wiki operation.
+  if (/^mcp_.+_wiki_search_[a-f0-9]{10}$/.test(activity.name)) return completed ? "searched the wiki" : "Wiki search";
+  if (/^mcp_.+_wiki_read_[a-f0-9]{10}$/.test(activity.name)) return completed ? "read the wiki" : "Wiki read";
+  if (/^mcp_.+_wiki_save_[a-f0-9]{10}$/.test(activity.name)) return "Wiki save";
+  if (activity.name === "conversation_history") return completed ? "read conversation history" : "Conversation history";
+  if (activity.name === "conversation_post") return "Conversation post";
+  if (activity.name === "conversation_invite_agent") return "Agent invitation tools";
+  return "Tool activity";
+}
+
+function DefaultTool({ activity, authorName }: { activity: ToolActivity; authorName?: string }) {
   const [open, setOpen] = useState(false);
-  return <details className={`tool-entry ${activity.result?.isError ? "tool-error" : ""}`} onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary><Wrench size={15} />{activity.name}<span>{status(activity)}</span></summary>
-    {open && (activity.result ? activity.result.content.map((part, index) => part.type === "text" ? <pre key={index}>{part.text}</pre> : <img className="message-image" key={index} src={`data:${part.mimeType};base64,${part.data}`} alt="Image returned by the tool" />) : activity.live?.output ? <pre>{activity.live.output}</pre> : null)}
+  const label = status(activity);
+  const diagnostics = activity.diagnostics ?? activity.live?.diagnostics ?? [];
+  return <details className={`tool-entry ${label === "Failed" ? "tool-error" : ""}`} onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary><ChevronDown size={14} className={open ? "tool-chevron-open" : ""} /><Wrench size={15} /><span className="tool-summary-label">{authorName ? `${authorName} · ` : ""}{toolSummary(activity, label === "Completed")}</span><span className="tool-summary-status">{label}</span></summary>
+    {open ? <div className="tool-technical-details">
+      <p><strong>Tool</strong> <code>{activity.name}</code></p>
+      {activity.call ? <details><summary>Arguments</summary><pre>{JSON.stringify(activity.call.arguments, null, 2)}</pre></details> : null}
+      {activity.result ? activity.result.content.map((part, index) => part.type === "text" ? <pre key={index}>{part.text}</pre> : <img className="message-image" key={index} src={`data:${part.mimeType};base64,${part.data}`} alt="Image returned by the tool" />) : activity.live?.output ? <pre>{activity.live.output}</pre> : null}
+      {activity.result?.details !== undefined ? <details><summary>Result details</summary><pre>{JSON.stringify(activity.result.details, null, 2)}</pre></details> : null}
+      {diagnostics.map((item, index) => <p className="tool-diagnostic" key={index}><CircleAlert size={14} /><span>{item.message}</span></p>)}
+    </div> : null}
   </details>;
 }

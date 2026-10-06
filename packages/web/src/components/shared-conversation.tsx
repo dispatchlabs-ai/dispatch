@@ -33,30 +33,37 @@ function participantName(participant: ConversationParticipant, participants: Con
     ? `${participant.name} · ${participant.id.slice(-6)}` : participant.name;
 }
 
-export function PublicMessage({ message, participants, replies, onThread, outputInActivity = false, continuation = false }: {
-  message: ConversationMessage; participants: ConversationParticipant[]; replies?: number; onThread?: (id: string) => void; outputInActivity?: boolean; continuation?: boolean;
+export function PublicMessage({ message, participants, replies = [], onThread, outputInActivity = false, selected = false }: {
+  message: ConversationMessage; participants: ConversationParticipant[]; replies?: ConversationMessage[]; selected?: boolean; onThread?: (id: string) => void; outputInActivity?: boolean;
 }) {
   const author = participants.find(participant => participant.id === message.authorId);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const timer = useRef<number | null>(null);
+  const replyAuthors = [...new Set(replies.map(reply => reply.authorId))].map(id => participants.find(participant => participant.id === id)).filter((participant): participant is ConversationParticipant => Boolean(participant));
+  const lastReply = replies.reduce<ConversationMessage | undefined>((last, reply) => !last || reply.createdAt > last.createdAt ? reply : last, undefined);
   const detachedMentions = message.mentions.filter(id => !message.text.includes(`](${mentionUrl(id)})`));
   useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
   if (message.kind === "membership") return <p className="membership-event"><UserPlus size={14} aria-hidden="true" /><span>{message.text}</span><time dateTime={new Date(message.createdAt).toISOString()}>{formatTime(message.createdAt)}</time></p>;
-  return <article className={`message shared-message ${outputInActivity ? "activity-echo-actions" : continuation ? "activity-continuation" : ""}`} aria-label={`Message from ${author?.name || "Former participant"}`} data-message-id={message.id}>
-    {!outputInActivity && !continuation ? <ParticipantAvatar kind={author?.kind || "human"} name={author?.name || "?"} /> : null}
+  return <article tabIndex={0} className={`message shared-message ${selected ? "is-thread-parent" : ""} ${outputInActivity ? "activity-echo-actions" : ""}`} aria-label={`Message from ${author?.name || "Former participant"}`} data-message-id={message.id}>
+    {!outputInActivity ? <ParticipantAvatar kind={author?.kind || "human"} name={author?.name || "?"} /> : null}
     <div className="shared-message-body">
-      {!outputInActivity && !continuation ? <header className="message-heading"><strong>{author ? participantName(author, participants) : "Former participant"}</strong>{author?.kind === "agent" ? <span className="agent-kind-badge">Agent</span> : null}<time dateTime={new Date(message.createdAt).toISOString()}>{formatTime(message.createdAt)}</time></header> : null}
+      {!outputInActivity ? <header className="message-heading"><strong>{author ? participantName(author, participants) : "Former participant"}</strong>{author?.kind === "agent" ? <span className="agent-kind-badge">Agent</span> : null}<time dateTime={new Date(message.createdAt).toISOString()}>{formatTime(message.createdAt)}</time></header> : null}
       {!outputInActivity ? <div className="message-content"><Markdown mentions={participants.filter(person => message.mentions.includes(person.id))}>{message.text}</Markdown></div> : null}
       {message.images?.map((image, index) => <img className="message-image" key={index} src={`data:${image.mimeType};base64,${image.data}`} alt="Image attached to the message" />)}
       {detachedMentions.length ? <div className="message-mentions" aria-label="Mentioned participants">{detachedMentions.map(id => <span key={id}>@{participants.find(participant => participant.id === id)?.name || "Former participant"}</span>)}</div> : null}
-      <div className="message-actions">
-        {onThread ? <Button variant="ghost" className="thread-link" onClick={() => onThread(message.threadId || message.id)}><Reply size={14} />{replies ? `${replies} ${replies === 1 ? "reply" : "replies"}` : "Reply"}</Button> : null}
+      <div className="message-actions shared-message-actions" aria-label="Message actions">
+        {onThread ? <IconButton label="Reply in thread" onClick={() => onThread(message.threadId || message.id)}><Reply size={15} /></IconButton> : null}
         <IconButton label={copied ? "Copied message" : "Copy message"} onClick={() => {
           void navigator.clipboard.writeText(message.text).then(() => { setCopied(true); setCopyError(false); timer.current = window.setTimeout(() => setCopied(false), 2000); }).catch(() => setCopyError(true));
         }}>{copied ? <Check size={15} /> : <Copy size={15} />}</IconButton>
-        {copyError ? <span role="status">Couldn’t copy. Select the text to copy it.</span> : null}
       </div>
+      {copyError ? <p className="message-copy-error" role="status">Couldn’t copy. Select the text to copy it.</p> : null}
+      {replies.length && onThread ? <button type="button" className="thread-summary" onClick={() => onThread(message.id)} aria-label={`${replies.length} ${replies.length === 1 ? "reply" : "replies"}${replyAuthors.length ? ` from ${replyAuthors.map(author => author.name).join(", ")}` : ""}`} aria-expanded={selected}>
+        <span className="thread-summary-avatars" aria-hidden="true">{replyAuthors.slice(0, 3).map(author => <ParticipantAvatar key={author.id} kind={author.kind} name={author.name} />)}</span>
+        <span className="thread-summary-count">{replies.length} {replies.length === 1 ? "reply" : "replies"}</span>
+        {lastReply ? <span className="thread-summary-time">Last reply <time dateTime={new Date(lastReply.createdAt).toISOString()} title={new Date(lastReply.createdAt).toLocaleString()}>{formatTime(lastReply.createdAt)}</time></span> : null}
+      </button> : null}
     </div>
   </article>;
 }
@@ -66,10 +73,12 @@ export function PublicActivity({ activity, participants }: { activity: Participa
   const tools = useMemo(() => toolActivities(activity.entries, activity.live), [activity.entries, activity.live]);
   const rendered = new Set<ToolActivity>();
   const content: ReactNode[] = [];
+  let showAuthor = false;
   function appendTool(tool: ToolActivity | null | undefined, key: string) {
     if (!tool || rendered.has(tool)) return;
     rendered.add(tool);
-    content.push(<ToolActivityView key={key} activity={tool} />);
+    if (["bash", "write", "edit", "read"].includes(tool.name)) showAuthor = true;
+    content.push(<ToolActivityView key={key} activity={tool} authorName={author?.name || "Agent"} />);
   }
   function appendMessage(message: Message, key: string) {
     if (message.role === "toolResult") {
@@ -78,7 +87,10 @@ export function PublicActivity({ activity, participants }: { activity: Participa
       const text = message.content.filter(part => part.type === "text").map(part => part.text).join("\n\n");
       // The server projects public commentary and provisional output only;
       // committed final answers are rendered from the shared public messages.
-      if (text && !tools.echoes.has(message)) content.push(<div className="activity-commentary" key={`${key}:text`}><Markdown>{text}</Markdown></div>);
+      if (text && !tools.echoes.has(message)) {
+        showAuthor = true;
+        content.push(<div className="activity-commentary" key={`${key}:text`}><Markdown>{text}</Markdown></div>);
+      }
       for (const part of message.content) {
         if (part.type === "toolCall") appendTool(tools.calls.get(part), `${key}:tool:${part.id}`);
       }
@@ -86,11 +98,13 @@ export function PublicActivity({ activity, participants }: { activity: Participa
   }
   for (const entry of activity.entries) {
     if (entry.kind === "pi.reset" || entry.kind === "pi.compaction") {
+      showAuthor = true;
       content.push(<details className="native-entry" key={entry.id}>
         <summary>{entry.kind === "pi.reset" ? "Agent working context started" : "Agent working context summarized"}</summary>
         {entry.data ? <pre>{JSON.stringify(entry.data, null, 2)}</pre> : null}
       </details>);
     } else if (!entry.model?.length) {
+      showAuthor = true;
       content.push(<details className="native-entry" key={entry.id}><summary>Agent event · technical details</summary><pre>{JSON.stringify({ kind: entry.kind, data: entry.data }, null, 2)}</pre></details>);
     } else entry.model.forEach((message, index) => appendMessage(message, `${entry.id}:${index}`));
   }
@@ -99,8 +113,8 @@ export function PublicActivity({ activity, participants }: { activity: Participa
   tools.extra.forEach((tool, index) => appendTool(tool, `extra:${index}`));
   if (generation?.retry) content.push(<p className="run-outcome" role="status" key="retry">Retrying the response…</p>);
   if (!content.length) return null;
-  return <section className="participant-activity" aria-label={`${author?.name || "Agent"} activity`}>
-    <div className="activity-author"><ParticipantAvatar kind="agent" name={author?.name || "Agent"} /><strong>{author ? participantName(author, participants) : "Agent"}</strong><span>{generation && author?.kind === "agent" ? `${participantStatus[author.status]}…` : "Activity"}</span><time dateTime={new Date(activity.createdAt).toISOString()}>{formatTime(activity.createdAt)}</time></div>
+  return <section className={`participant-activity ${showAuthor ? "" : "activity-tools-only"}`} aria-label={`${author?.name || "Agent"} activity`}>
+    {showAuthor ? <div className="activity-author"><ParticipantAvatar kind="agent" name={author?.name || "Agent"} /><strong>{author ? participantName(author, participants) : "Agent"}</strong><span>{generation && author?.kind === "agent" ? `${participantStatus[author.status]}…` : "Activity"}</span><time dateTime={new Date(activity.createdAt).toISOString()}>{formatTime(activity.createdAt)}</time></div> : null}
     {content}
   </section>;
 }
@@ -120,31 +134,30 @@ function repeatsBashOutput(message: ConversationMessage, activities: Participant
   return Boolean(output && (fenced?.[2] ?? text).trim() === output);
 }
 
-export function SharedTranscript({ snapshot, threadId = null, onThread }: { snapshot: ChatSnapshot; threadId?: string | null; onThread?: (id: string) => void }) {
+export function SharedTranscript({ snapshot, threadId = null, activeThreadId = null, onThread }: { snapshot: ChatSnapshot; threadId?: string | null; activeThreadId?: string | null; onThread?: (id: string) => void }) {
   const messages = snapshot.messages.filter(message => message.threadId === threadId);
   const items = [
     ...messages.map(message => ({ kind: "message" as const, id: message.id, at: message.createdAt, message })),
     ...snapshot.activities.filter(activity => activity.threadId === threadId).map(activity => ({ kind: "activity" as const, id: activity.id, at: activity.createdAt, activity })),
   ].sort((a, b) => a.at - b.at);
   let date = "";
-  return <>{items.map((item, index) => {
-    const previous = items[index - 1];
+  return <>{items.map(item => {
     const nextDate = new Date(item.at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
     const showDate = nextDate !== date;
     date = nextDate;
     return <div key={`${item.kind}:${item.id}`}>
       {showDate ? <div className="transcript-date"><span>{nextDate}</span></div> : null}
-      {item.kind === "message" ? <PublicMessage message={item.message} participants={snapshot.participants} replies={snapshot.messages.filter(message => message.threadId === item.id).length} onThread={onThread} outputInActivity={repeatsBashOutput(item.message, snapshot.activities)} continuation={!showDate && previous?.kind === "activity" && previous.activity.messageId === item.id} /> : <PublicActivity activity={item.activity} participants={snapshot.participants} />}
+      {item.kind === "message" ? <PublicMessage message={item.message} participants={snapshot.participants} replies={snapshot.messages.filter(message => message.threadId === item.id)} selected={activeThreadId === item.id || Boolean(activeThreadId && item.message.aliases?.includes(activeThreadId))} onThread={onThread} outputInActivity={repeatsBashOutput(item.message, snapshot.activities)} /> : <PublicActivity activity={item.activity} participants={snapshot.participants} />}
     </div>;
   })}</>;
 }
 
 function formatTime(timestamp: number) { return new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
 
-export function ConversationComposer({ id, chatId, active = true, draft, pending, error, participants, mentions, onMentionsChange, onDraftChange, onSend, thread = false, disabled = false, children }: {
+export function ConversationComposer({ id, chatId, active = true, draft, pending, error, participants, mentions, onMentionsChange, onDraftChange, onSend, thread = false, conversationTitle, disabled = false, children }: {
   id: string; chatId: string; active?: boolean; draft: string; pending?: PendingMessage; error?: string; participants: ConversationParticipant[]; mentions: string[];
   onMentionsChange: (ids: string[]) => void; onDraftChange: (text: string) => void; onSend: (mentions: string[]) => void;
-  thread?: boolean; disabled?: boolean; children?: ReactNode;
+  thread?: boolean; conversationTitle?: string; disabled?: boolean; children?: ReactNode;
 }) {
   const tooLong = draft.length > 100000;
   const canSend = Boolean(draft.trim() && !tooLong && !pending?.sending && !disabled);
@@ -156,7 +169,7 @@ export function ConversationComposer({ id, chatId, active = true, draft, pending
     {composing.unavailable ? <p className="run-outcome" role="status">Typing status is unavailable. You can still send your message.</p> : null}
     <form className="composer" onInput={composing.pulse} onCompositionStart={composing.pulse} onCompositionUpdate={composing.pulse} onPaste={composing.pulse} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) composing.clear(); }} onSubmit={event => { event.preventDefault(); send(); }}>
       <MarkdownComposer id={id} value={draft} disabled={disabled} readOnly={Boolean(pending?.sending)} onChange={onDraftChange} onSend={send}
-        participants={participants} mentions={mentions} onMentionsChange={onMentionsChange} placeholder={thread ? "Reply to thread…" : "Message everyone…"}
+        participants={participants} mentions={mentions} onMentionsChange={onMentionsChange} placeholder={thread ? "Reply to thread…" : conversationTitle ? `Message ${conversationTitle}…` : "Message conversation…"}
         toolbar={<div className="button-row">{children}<Button type="submit" className="send-button" disabled={!canSend} aria-label={pending?.error ? "Retry sending message" : thread ? "Send reply" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}</Button></div>}
       />
     </form>
@@ -173,8 +186,10 @@ export function SharedContextPanel({ snapshot, models, threadId, draft, pending,
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const participant = snapshot.participants.find(member => member.id === selectedId) ?? snapshot.participants.find(member => member.kind === "agent");
+  const participant = snapshot.participants.find(member => member.id === selectedId);
+  useEffect(() => { setSelectedId(null); }, [snapshot.conversation.id, threadId]);
   const root = snapshot.messages.find(message => message.id === threadId || (threadId && message.aliases?.includes(threadId)));
+  const replyCount = snapshot.messages.filter(message => message.threadId === (root?.id ?? threadId)).length;
   const scroller = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   useEffect(() => { atBottom.current = true; }, [threadId]);
@@ -184,7 +199,7 @@ export function SharedContextPanel({ snapshot, models, threadId, draft, pending,
     {threadId ? <>
       <div className="thread-transcript" ref={scroller} onScroll={event => { const element = event.currentTarget; atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100; }}>
         {root ? <PublicMessage message={root} participants={snapshot.participants} /> : <Notice>The original message is not available.</Notice>}
-        <p className="thread-reply-count">{snapshot.messages.filter(message => message.threadId === (root?.id ?? threadId)).length} replies</p>
+        <p className="thread-reply-count">{replyCount} {replyCount === 1 ? "reply" : "replies"}</p>
         <SharedTranscript snapshot={snapshot} threadId={root?.id ?? threadId} />
         <ConversationPresence participants={snapshot.participants} />
       </div>
