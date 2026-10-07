@@ -1079,16 +1079,16 @@ Implementation evidence (October 7):
 
 ## WP-046 — Permissioned agent management
 
-**Specification requested October 7, 2026; implementation not authorized by this documentation request.** Depends on the current immutable definition catalog, trusted native participant bindings and Pi Durable 1.0.4 public document/commit interfaces. Scope follows [permissioned agent management](spec.md#permissioned-agent-management). Doctor is the selected trial editor, not an already authorized principal.
+**Implementation authorized October 7, 2026; in progress.** Chris subsequently requested execution through completion after the documentation-only package. Developer owns implementation, Pi Durable Expert and Security own their source reviews, and Documenter owns documentation. No grant or successful Doctor edit is established by this authorization. Depends on the current immutable definition catalog, trusted native participant bindings and Pi Durable 1.0.4 public document/commit interfaces. Scope follows [permissioned agent management](spec.md#permissioned-agent-management). Doctor is the selected trial editor, not an already authorized principal.
 
-Before implementation:
+Before enabling grants:
 - Resolve the spec's open choices: target and immutable IDs/effective privileges, direct saves versus proposals, human grant administration and grant validity across Doctor revisions.
 - Confirm the narrow trial allowlist. Do not provision grants, change Doctor/target configuration, run evals or start model calls as part of this documentation package.
 
-Implementation scope, once authorized:
+Implementation scope:
 - Shared identity-aware read/save service operations and narrow native tools; no borrowed human session, loopback API dependency or MCP server requirement.
 - Dedicated grant document and separately authorized human grant writer, with grant-change audit. Keep agent-edit paths unable to mutate grants.
-- Atomic authorization/target eligibility, expected-revision validation, immutable save, agent attribution and deduplication receipt. Retain human saves and company isolation without treating agent identity as a human user ID.
+- Atomic authorization/target eligibility, expected-revision validation, immutable save, agent attribution and deduplication receipt. Retain all existing definition validation, including instruction-length limits, human saves and company isolation without treating agent identity as a human user ID.
 - No existing-instance rollout, permission expansion, self-editing or skill/connection/capability changes. Document restoration as a new revision, not history replacement.
 
 Acceptance criteria:
@@ -1098,7 +1098,7 @@ Acceptance criteria:
 - Record attributable before/after definition and grant changes; demonstrate the restoration contract through source review while execution remains deferred. If proposals are selected, specify candidate identity, diff review, promotion authorization and stale-base handling before implementing them.
 - Apply source/deslop review, TypeScript/application and applicable Nix builds for implementation, full diff/whitespace and changed-link checks. Any UI must satisfy desktop/390 px review rules. The zero-tests policy remains active; runtime, security, replay/revocation and actual Doctor edits remain unqualified until separately authorized and observed. No deployment is included.
 
-Documentation evidence: architecture checked against the current `saveAgent`, human-session API and native collaboration-tool pattern, and installed Pi Durable 1.0.4 public configuration/document contracts. This package adds no executable code and grants no rights. Documentation diff/deslop and whitespace review passed; relative link paths in both changed documents and the new cross-link anchors were checked. No tests, model calls, builds or runtime qualification were performed for this documentation-only change.
+Initial documentation-only evidence (`8635def`): architecture checked against the then-current `saveAgent`, human-session API and native collaboration-tool pattern, and installed Pi Durable 1.0.4 public configuration/document contracts. That publication added no executable code and granted no rights. Documentation diff/deslop and whitespace review passed; relative link paths in both changed documents and the new cross-link anchors were checked. No tests, model calls, builds or runtime qualification were performed for this documentation-only change.
 
 ## Agent archive response correction — October 7, 2026
 

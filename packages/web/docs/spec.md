@@ -445,7 +445,7 @@ Design the first chat around Pi's public interfaces and the ownership boundaries
 
 ### Permissioned agent management
 
-**Direction accepted; specification requested October 7, 2026. Not implemented.** Chris wants explicitly authorized agents to modify other agents as a foundation for eval-driven improvement, and has created **Doctor** as the first trial editor. This request authorizes documentation, not a grant, agent mutation, trial execution or deployment. Product context remains the [repository decision record](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/); [WP-046](handoff.md#wp-046--permissioned-agent-management) tracks the implementation scope and unresolved choices.
+**Direction accepted; implementation authorized October 7, 2026. In progress, not qualified.** Chris wants explicitly authorized agents to modify other agents as a foundation for eval-driven improvement, and has created **Doctor** as the first trial editor. The initial request authorized documentation only; Chris subsequently requested execution through completion. Grants remain disabled pending the trial choices below; this status does not establish trial execution or deployment. Product context remains the [repository decision record](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/); [WP-046](handoff.md#wp-046--permissioned-agent-management) tracks the implementation scope and unresolved choices.
 
 #### Management boundary and identity
 
@@ -472,7 +472,7 @@ The separate document is an application authorization boundary, not isolation fr
 
 #### Doctor trial: proposed narrow scope
 
-Before enabling the trial, Chris must choose the target and publication mode. The recommended first target is a disposable, low-privilege definition with no MCP connections, file/command or other privileged capabilities, assigned skills, or management grants. Bind Doctor and the target by immutable IDs; do not seed rights by matching names. The recommended initial edit allowlist is instructions, provider/model and thinking, retaining normal model/thinking validation. Creation, archive, self-editing, skill edits/assignment, capability or connection assignment, credential changes, grant changes and live rollout are outside this trial.
+Before enabling the trial, Chris must choose the target and publication mode. The recommended first target is a disposable, low-privilege definition with no MCP connections, file/command or other privileged capabilities, assigned skills, or management grants. Bind Doctor and the target by immutable IDs; do not seed rights by matching names. The recommended initial edit allowlist is instructions, provider/model and thinking, retaining all existing definition validation, including instruction-length limits and normal model/thinking validation. Creation, archive, self-editing, skill edits/assignment, capability or connection assignment, credential changes, grant changes and live rollout are outside this trial.
 
 **Open decisions, not implicit approvals:**
 - Confirm Doctor's definition ID and the disposable target's ID and effective privileges; no target was selected in the discussion.
