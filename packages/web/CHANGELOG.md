@@ -2,6 +2,8 @@
 
 ## Unreleased — preserved contribution review
 
+- Add opt-in OpenAI image generation/editing and separately assigned skill guidance, with workspace output records and explicit interrupted-request uncertainty.
+
 - Preserve prepared contributions and their speaking reservation through final review/publication while other work continues. Human typing pauses publication without discarding drafts.
 - Explicit posts report pending until sibling tools finish; stable publication receipts, native successor checks and Stop cleanup cover the new ownership boundary. Runtime qualification remains pending.
 

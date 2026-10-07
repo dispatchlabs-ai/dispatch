@@ -347,7 +347,7 @@ export function AgentDetails({
               <DraftFact label="Skills" value={String(current.skills?.length ?? 0)} saved={editing && saved ? String(saved.skills?.length ?? 0) : undefined} />
               <div>
                 <dt>Tools</dt>
-                <dd>{editing ? `${editing.draft.capabilities?.includes("files-and-commands") ? "Files and commands" : "No local tools"} · ${editing.connectionIds.length + (saved?.connections?.filter(connection => connection.source !== "oauth").length ?? 0)} connections` : describeAgentTools([...(saved?.tools ?? []), ...(saved?.skills?.length ? ["load_skill"] : [])])}</dd>
+                <dd>{editing ? `${describeCapabilities(editing.draft.capabilities)} · ${editing.connectionIds.length + (saved?.connections?.filter(connection => connection.source !== "oauth").length ?? 0)} connections` : describeAgentTools([...(saved?.tools ?? []), ...(saved?.skills?.length ? ["load_skill"] : [])])}</dd>
               </div>
             </dl>
             {contentChanged.length ? (
@@ -584,8 +584,9 @@ function AgentEditor({
             </fieldset>
             </details>
             <details className="agent-settings-section" open={capabilitiesOpen}>
-              <summary><strong>Capabilities</strong><span>{draft.capabilities?.includes("files-and-commands") ? "Files and commands" : "Conversation only"}</span></summary>
-              <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("files-and-commands") ?? false} onChange={event => update("capabilities", event.target.checked ? ["files-and-commands"] : [])} /><span>Files and commands<small>Read and edit files, and run commands in the agent's working directory. Commands use the Dispatch service account.</small></span></label>
+              <summary><strong>Capabilities</strong><span>{describeCapabilities(draft.capabilities)}</span></summary>
+              <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("files-and-commands") ?? false} onChange={event => update("capabilities", event.target.checked ? [...(draft.capabilities ?? []), "files-and-commands"] : (draft.capabilities ?? []).filter(capability => capability !== "files-and-commands"))} /><span>Files and commands<small>Read and edit files, and run commands in the agent's working directory. Commands use the Dispatch service account.</small></span></label>
+              <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("image-generation") ?? false} onChange={event => update("capabilities", event.target.checked ? [...(draft.capabilities ?? []), "image-generation"] : (draft.capabilities ?? []).filter(capability => capability !== "image-generation"))} /><span>Image generation<small>OpenAI · paid generation and editing</small></span></label>
             </details>
             <AgentSkillsEditor selections={draft.skills ?? []} onChange={skills => update("skills", skills)} busy={busy}
               editing={editing.skillEditing} onEditingChange={skillEditing => onChange({ ...editing, skillEditing, busy: skillEditing?.busy ?? false })} />
@@ -612,4 +613,8 @@ function AgentEditor({
       </form>
     </section>
   );
+}
+
+function describeCapabilities(capabilities: AgentDraft["capabilities"]) {
+  return capabilities?.map(capability => capability === "files-and-commands" ? "Files and commands" : "Image generation").join(", ") || "Conversation only";
 }

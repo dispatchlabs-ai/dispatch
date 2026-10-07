@@ -15,12 +15,15 @@ import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata } 
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
 import { Skills, SkillBindingsDoc } from "./extensions/skills.js";
+import { imageGenerationSkill } from "./skills/image-generation.js";
+import { createImageGen } from "./extensions/image-gen.js";
 import { Coding } from "./extensions/coding.js";
 import { SharedConversations, SharedDoc, type Member, type PeopleDirectory } from "./collaboration/shared.js";
 import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
 import type { McpConnections } from "./mcp-connections.js";
 
 const context = BACKGROUND_CONTEXT;
+const IMAGE_GENERATION_SKILL_ID = "d6f5a67d-5c7b-4813-910f-b29d97d29cd1";
 type StoredChat = Omit<ChatSummary, "sharedProjectId" | "canParticipate" | "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { creationFingerprint?: string; creationTitleExplicit?: boolean; displayTitle?: string; pinned?: boolean; archived?: boolean; agentName?: string; projectId?: string | null; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
 type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: string; extensions?: string[]; tools?: string[]; savedBy?: string; saveRequestId?: string; saveFingerprint?: string };
 type StoredProject = Project & { companyId: string; userId: string; requestId: string };
@@ -97,6 +100,7 @@ export class DispatchRuntime {
       registry.install(CodingTools);
       registry.install(Coding);
       registry.install(Skills);
+      registry.install(createImageGen(models));
       connections = await AgentConnections.load(options.connectionsFile ?? join(owner.directory, "agent-connections.json"), registry, options.mcpConnections, options.companyId);
       const harness = await Harness.open(storage, {
         models, registry, settings: { ...options.settings, extensions: options.settings?.extensions ?? [shared.extension, CodingTools, Coding] },
@@ -135,6 +139,15 @@ export class DispatchRuntime {
             provider: defaults.provider, modelId: defaults.modelId, thinkingLevel: defaults.thinkingLevel,
             extensions: [Coding.name, CodingTools.name], tools: ["read", "write", "edit", "bash"],
             revision: 1, archived: false, createdAt: now, updatedAt: now,
+          });
+        }
+        catalog.skills ??= [];
+        if (!catalog.skills.some(skill => skill.companyId === options.companyId && skill.id === IMAGE_GENERATION_SKILL_ID)) {
+          const now = Date.now();
+          catalog.skills.push({
+            ...imageGenerationSkill, id: IMAGE_GENERATION_SKILL_ID, companyId: options.companyId,
+            revision: 1, createdAt: now, updatedAt: now, savedBy: "system",
+            requestId: "seed:image-generation", fingerprint: "seed:image-generation:1",
           });
         }
         catalog.runtimeInstance = randomUUID();
@@ -600,9 +613,10 @@ export class DispatchRuntime {
       let extensions = (prior?.extensions ?? []).filter(name => !isMcpExtension(name));
       let tools = (prior?.tools ?? []).filter(name => !isMcpTool(name));
       if (input.capabilities !== undefined) {
-        extensions = extensions.filter(name => name !== Coding.name && name !== CodingTools.name);
-        tools = tools.filter(name => !["read", "write", "edit", "bash"].includes(name));
+        extensions = extensions.filter(name => name !== Coding.name && name !== CodingTools.name && name !== "dispatch-image-gen");
+        tools = tools.filter(name => !["read", "write", "edit", "bash", "generate_image"].includes(name));
         if (input.capabilities.includes("files-and-commands")) { extensions.push(Coding.name, CodingTools.name); tools.push("read", "write", "edit", "bash"); }
+        if (input.capabilities.includes("image-generation")) { extensions.push("dispatch-image-gen"); tools.push("generate_image"); }
       }
       const agent: StoredAgent = {
         id, name: input.name.trim(), description: input.description.trim(),
@@ -681,7 +695,7 @@ export class DispatchRuntime {
     if (snapshots.length) { extensions.push(Skills); tools.push(...Skills.tools!); }
     const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
     if (snapshots.length) (await tx.doc(SkillBindingsDoc, record.id)).skills = snapshots;
-    const cwd = agent.extensions?.includes(CodingTools.name) ? this.workspaceDir : undefined;
+    const cwd = agent.extensions?.some(name => name === CodingTools.name || name === "dispatch-image-gen") ? this.workspaceDir : undefined;
     await configure(tx, record.id, { model: { provider: agent.provider, modelId: agent.modelId }, instructions: agent.instructions, thinkingLevel: agent.thinkingLevel, extensions, tools, ...(cwd ? { cwd } : {}) });
     await this.connections.bind(tx, record.id, definitionId, false, managedIds(agent));
     return { id: randomUUID(), kind: "agent", name: agent.name, joinedAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, conversationId: record.id, status: "idle", agent: { ...publicAgent(agent), extensions: extensions.map(extension => extension.name), tools: tools.map(tool => tool.name), ...(cwd ? { cwd } : {}) } };
@@ -815,7 +829,7 @@ function projectSummary(project: StoredProject): Project {
   return { id: project.id, name: project.name, createdAt: project.createdAt, kind: "personal", canManage: false, canParticipate: true };
 }
 function publicAgent({ companyId: _companyId, savedBy: _savedBy, saveRequestId: _request, saveFingerprint: _fingerprint, ...agent }: StoredAgent): AgentDefinition {
-  return { ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [], capabilities: agent.extensions?.includes(CodingTools.name) ? ["files-and-commands"] : [] };
+  return { ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [], capabilities: [...(agent.extensions?.includes(CodingTools.name) ? ["files-and-commands" as const] : []), ...(agent.extensions?.includes("dispatch-image-gen") ? ["image-generation" as const] : [])] };
 }
 function managedIds(agent: Pick<AgentDefinition, "connections">) { return (agent.connections ?? []).filter(isManagedConnection).map(connection => connection.id); }
 function requireText(value: unknown, field: string, max: number, allowEmpty = false): asserts value is string {
