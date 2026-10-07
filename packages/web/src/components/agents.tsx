@@ -13,6 +13,7 @@ import { useSession } from "../lib/session";
 import { Button, Field, Input, Modal, Notice, Select, Spinner } from "./ui";
 import { AgentSkillsEditor, AgentSkillsPanel, type SkillEditing } from "./agent-skills";
 import { AgentConnectionsEditor, AgentConnectionsPanel } from "./agent-connections";
+import { AgentEvaluation } from "./agent-evaluation";
 import { Markdown } from "./markdown";
 import { MarkdownComposer } from "./markdown-composer";
 
@@ -80,7 +81,9 @@ export function AgentsPage({
   onStartChat,
   creating,
   onConnectionsSettings,
+  onEvaluationGuardChange,
 }: {
+  onEvaluationGuardChange: (guard: { dirty: boolean; busy: boolean }) => void;
   agent?: AgentDefinition;
   editing: AgentEditing | null;
   config: ApplicationConfig;
@@ -167,6 +170,7 @@ export function AgentsPage({
               {agent.instructions || "No additional instructions."}
             </Markdown>
           </section>
+          <AgentEvaluation key={agent.id} agentId={agent.id} readOnly={agent.archived} onGuardChange={onEvaluationGuardChange} />
           <AgentSkillsPanel selections={agent.skills ?? []} />
           <AgentConnectionsPanel key={agent.id} agentId={agent.id} />
           {agent.archived ? (

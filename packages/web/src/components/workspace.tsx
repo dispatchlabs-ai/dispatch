@@ -43,6 +43,7 @@ export function Workspace() {
   const [section, setSection] = useState<WorkspaceSection>(searchParams.get("section") === "connections" ? "connections" : "chats");
   const [visited, setVisited] = useState({ agents: false, security: false, connections: searchParams.get("section") === "connections" });
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [evaluationGuard, setEvaluationGuard] = useState({ dirty: false, busy: false });
   const [editingAgent, setEditingAgent] = useState<AgentEditing | null>(null);
   const [pendingAgentAction, setPendingAgentAction] = useState<(() => void) | null>(null);
   const [archivingAgent, setArchivingAgent] = useState<AgentDefinition | null>(null);
@@ -409,7 +410,8 @@ export function Workspace() {
   function updateAgent(agent: AgentDefinition) { setAgents(current => [agent, ...current.filter(item => item.id !== agent.id)].sort((a, b) => a.name.localeCompare(b.name))); }
 
   function requestAgentAction(action: () => void) {
-    if (editingAgent?.busy) return;
+    if (editingAgent?.busy || evaluationGuard.busy) return;
+    if (evaluationGuard.dirty && !window.confirm("Discard evaluation changes?")) return;
     setNavigationOpen(false);
     if (editingAgent && agentEditIsDirty(editingAgent)) setPendingAgentAction(() => action);
     else action();
@@ -621,7 +623,7 @@ export function Workspace() {
           </Tabs.Panel>)}
           </div>
           {visited.agents ? <div className="workspace-section" hidden={section !== "agents"}>
-            <AgentsPage agent={selectedAgent} editing={editingAgent} config={config} onEditingChange={setEditingAgent}
+            <AgentsPage onEvaluationGuardChange={setEvaluationGuard} agent={selectedAgent} editing={editingAgent} config={config} onEditingChange={setEditingAgent}
               onSaved={finishAgentEdit} onConnectionsSettings={() => selectSection("connections")}
               onCancel={() => requestAgentAction(() => finishAgentEdit())} onEdit={editAgent}
               onStartChat={agentId => chooseAgents(agentId)} creating={creating} />

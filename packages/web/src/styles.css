@@ -971,3 +971,27 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .message-attachment { display: flex; align-items: center; gap: var(--space-2); max-width: 100%; overflow-wrap: anywhere; }
 .message-attachment img { width: 80px; height: 64px; object-fit: cover; border-radius: var(--radius-sm); }
 @media (max-width: 800px) { .draft-attachment .icon-button, .attachment-picker .icon-button { min-width: 44px; min-height: 44px; } }
+
+.agent-evaluation { border-top: 1px solid var(--color-border); padding-top: var(--space-6); }
+.evaluation-heading { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.evaluation-fields { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: var(--space-4); }
+.evaluation-group { display: grid; gap: var(--space-4); min-width: 0; }
+.evaluation-item { min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-4); display: grid; gap: var(--space-4); }
+.evaluation-item legend { padding: 0 var(--space-2); font-weight: 600; }
+.evaluation-check { display: flex; align-items: center; gap: var(--space-3); min-height: 44px; overflow-wrap: anywhere; }
+.evaluation-check input { flex: 0 0 auto; width: 20px; height: 20px; }
+.evaluation-criteria { border: 0; min-width: 0; padding: 0; }
+.evaluation-private { border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+.evaluation-private summary { cursor: pointer; min-height: 44px; font-weight: 600; }
+.evaluation-private .field + .field { margin-top: var(--space-4); }
+.evaluation-actions { margin-top: var(--space-4); }
+.agent-evaluation > form > .field { margin-top: var(--space-4); }
+.agent-evaluation > .field { margin: var(--space-4) 0; }
+.evaluation-summary { margin: var(--space-4) 0; }
+.evaluation-summary dt { font-weight: 600; margin-top: var(--space-3); }
+.evaluation-summary dd, .evaluation-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.evaluation-summary dd { margin: var(--space-1) 0 0; }
+.evaluation-saved-item { border-bottom: 1px solid var(--color-border); padding: var(--space-3) 0; }
+.evaluation-saved-item > summary { cursor: pointer; min-height: 44px; overflow-wrap: anywhere; }
+.evaluation-artifact { display: grid; gap: var(--space-2); min-width: 0; }
+.agent-evaluation h3 { margin-top: var(--space-5); }
