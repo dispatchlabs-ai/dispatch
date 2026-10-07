@@ -1,0 +1,42 @@
+# AWS deployment runbook
+
+**Status: provisional, October 7, 2026.** This runbook supports [WP-041](handoff.md#wp-041--generic-aws-container-deployment), not a claim of deployability. Target ECS Fargate, ALB and S3 Files. Exact module/image commands and results must be reconciled with the delivered interfaces before use. The application owns this generic procedure; installation-specific plans, secret references and evidence belong in the caller's infrastructure repository.
+
+## Before applying
+
+1. Pin the application image by registry digest and the module by an immutable revision. Record Linux architecture, source revision, Terraform/OpenTofu and AWS provider versions. Validate the example with both engines; use one engine consistently for the installation's state.
+2. Select the final HTTPS origin and certificate before enrollment. The origin hostname determines the passkey relying-party ID; changing domains requires passkey re-enrollment. Supply caller-owned network, cluster and filesystem inputs; verify outbound access for image/log delivery, storage and model/MCP providers.
+3. Review the concrete plan and estimated recurring cost, including ALB, tasks, storage and logs. Reject unexpected replacements/deletions. Review storage retention and eventual teardown separately; do not assume destroying infrastructure preserves data. Apply only after authorization for that plan.
+4. Review task ingress from the ALB only, HTTPS/redirect behavior, health check `/`, one service task and stop-before-start deployment. Confirm SIGTERM drainage fits the task's shutdown allowance. Keep ECS Exec disabled unless an explicit operator procedure authorizes temporary enablement and its additional permissions.
+5. Review execution-role permissions separately from the application task role. Coding tools can obtain task-role credentials, so installation access-point scope must be enforced and qualified. Do not add general AWS administration or backup-read permissions for convenience.
+
+## Persistent state and bootstrap
+
+The proposed image/module contract is UID/GID 65532 with one access point at `/data`, `DISPATCH_DATA_DIR=/data/state`, `DISPATCH_WORKSPACE_DIR=/data/workspace`, and `HOME=/data/home`; writable ephemeral `/tmp` and a read-only image root. Confirm these against the actual delivered interfaces. The service must initialize writable home/workspace directories before startup. Do not treat ephemeral task storage as persistence.
+
+Start with fresh company state. Never copy a personal development state directory, provider authorization or personal MCP credentials into a shared installation. Agree which repositories, tools and external identities may be shared. Coding workspaces are not sandboxes: agents can access all service-readable files, including other users' secrets and task-role credentials.
+
+Provision deployment-specific model credentials and operator MCP configuration through the reviewed runtime mechanism, not image layers, command arguments, source control or plaintext Terraform values. Provider credentials may live in the configured Pi agent directory (default `$HOME/.pi/agent`); environment-based provider authorization supported by Pi is a separate operator choice. Record which mechanism is actually used without recording secret values.
+
+For enrollment, use the packaged `dispatch-auth` CLI with the same origin/company/data settings; see [account provisioning](usage-guide.md#first-account-and-sign-in). The Fargate operator invocation is pending implementation. Stop the service, scale it to zero and confirm every prior task is STOPPED before any enrollment, recovery, backup or integrity task opening its databases. `dispatch-auth` does not take the runtime lock; authentication opens and modifies state before service ownership admission, and shutdown releases that lock before all stores close. MCP database initialization occurs after admission. Never use lock release alone as evidence of complete process exit. Generated invitation links are secrets: deliver privately to their intended owners and never retain them in plan logs or deployment evidence. There is no default password.
+
+## First-deployment gate
+
+Use an isolated access point/prefix and disposable accounts/credentials. Follow [SQLite qualification](aws-sqlite-qualification.md); retain stop-before-start even if overlap exclusion passes. Confirm separate filesystem clients, abrupt termination, integrity and application continuity, backup/restore and task-role negative authorization checks. Do not publish credentials, invite links, account data or authenticated captures as evidence.
+
+Record exact module/image/provider revisions, client topology, stop/exit timestamps, observations and failures in WP-041 or link sanitized evidence from the installation root. Successful builds, healthy ALB targets and prior Palm experiments do not establish this application's storage safety. Failures block real-data enrollment until resolved; do not relax the lock or switch to ephemeral storage to make deployment green.
+
+## Upgrade and rollback
+
+1. Review the new image/module plan and migration compatibility. Record the last known-good image digest and restorable backup. Do not assume an older image can read migrated state.
+2. Stop admission, scale service to zero and confirm all tasks using this store have exited. A stop request is not evidence of exit. Disable independent maintenance/qualification tasks and scheduled replacements before touching files.
+3. Take a complete stopped-service backup. Apply the reviewed replacement with no overlapping writer; restore the service to one task and observe health, sign-in, MCP credentials, attachments and committed conversations.
+4. If startup/recovery fails, scale to zero and confirm exit again. Revert to the known-compatible digest, or restore the matching complete backup to an isolated empty destination before starting its matching image. Restoring older state discards subsequent writes; obtain operator approval for that loss. Never point two running services at the restored store.
+
+## Backup and restore
+
+Preserve the complete `DISPATCH_DATA_DIR`: `auth.sqlite` plus `auth.key`, `connections.sqlite` plus `connections.key`, operator connection configuration, and the entire `runtime/` tree including Pi metadata and attachment blobs. Also preserve the workspace, configured Pi agent directory/provider authorization and any separately referenced operator credential files under their own restricted backup policy. Capture installation configuration and image/module pins without secret values. SQLite keys, databases and blobs form one restore set; rebuilding the image cannot recover missing keys or attachments.
+
+For simple file-copy backups, stop every writer and confirm exit first. Preserve file ownership/modes and complete SQLite files/journals; do not copy only selected database files from a live mount. Encrypt backups, restrict restore access and avoid giving the application task unnecessary access to the backup destination. The storage-copy/operator mechanism must be verified for S3 Files; a raw backing-bucket copy is not assumed to be a consistent filesystem backup.
+
+Restore into an empty isolated destination with the complete matched set and original ownership, then start exactly one compatible task. Perform integrity and application-continuity checks using the qualification procedure before directing users to it. Retain the original store untouched until recovery is accepted. Delete temporary qualification data and credentials only after confirmed task exit and an explicit cleanup decision.
