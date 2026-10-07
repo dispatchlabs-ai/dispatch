@@ -1,10 +1,13 @@
 import { createHash } from "node:crypto";
 import { Client, types } from "pg";
 import { migrate } from "./migrations.js";
+import { verifyWorkerAccess } from "./worker-access.js";
 
 export type PostgresStorageOptions = {
   connectionString: string;
   storeId: string;
+  /** Only backend-provisioned, RLS-bound workers use this mode; no schema migration privileges. */
+  access?: "worker";
 };
 export type PostgresValue = null | number | string;
 export interface PostgresExecutor {
@@ -76,11 +79,12 @@ export class PostgresDatabase implements PostgresExecutor {
     const database = new PostgresDatabase(client, options.storeId);
     try {
       await client.connect();
+      if (options.access === "worker") await verifyWorkerAccess(client, options.storeId);
       // Fixed 64-bit digest; collisions conservatively reject an unrelated store, never share it.
       const key = createHash("sha256").update(`dispatch-pi-store:${options.storeId}`).digest().readBigInt64BE().toString();
       const lock = await client.query<{ acquired: boolean }>("SELECT pg_try_advisory_lock($1::bigint) AS acquired", [key]);
       if (!lock.rows[0]?.acquired) throw new Error("This PostgreSQL Pi store already has an owner");
-      await migrate(client);
+      if (options.access !== "worker") await migrate(client);
       await client.query(
         "INSERT INTO dispatch_pi.durable_metadata (store_id, next_id, next_seq) VALUES ($1, 2, 1) ON CONFLICT (store_id) DO NOTHING",
         [options.storeId],
