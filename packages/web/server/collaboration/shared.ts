@@ -101,7 +101,7 @@ export class SharedConversations {
   readonly turns = new ConversationTurns();
   readonly contributions = new Contributions(this.turns);
 
-  constructor(private readonly createAgent: (tx: Tx, roomId: ConversationId, companyId: string, definitionId: string) => Promise<Member>, private readonly attachments: AttachmentStore, management: Parameters<typeof managementTools>[0]) {
+  constructor(private readonly createAgent: (tx: Tx, roomId: ConversationId, companyId: string, definitionId: string, revision?: number) => Promise<Member>, private readonly attachments: AttachmentStore, management: Parameters<typeof managementTools>[0]) {
     this.definitionOfDoneExtension = createDefinitionOfDone(async (tx, instanceId) => {
       const binding = await tx.doc(BindingDoc, instanceId);
       if (!binding.roomId || !binding.participantId) throw new CollaborationError(403, "Agent binding is unavailable.");
@@ -373,6 +373,11 @@ export class SharedConversations {
       execute: async (args, api, ctx) => {
         const binding = await this.binding(api.conversationId, ctx);
         if (!args.agentDefinitionId) return reply(await this.availableAgents((await api.snapshot(SharedDoc, binding.roomId!, ctx))!.companyId));
+        const requestId = `tool:${api.taskId}:${api.callId}`;
+        if (this.inviteRemote) {
+          await this.inviteRemote(api.conversationId, requestId, [args.agentDefinitionId]);
+          return reply({ invited: args.agentDefinitionId });
+        }
         await api.commit(async tx => {
           await this.invite(tx, binding.roomId!, binding.participantId!, { requestId: `tool:${api.taskId}:${api.callId}`, agentDefinitionIds: [args.agentDefinitionId!] }, []);
         }, ctx);
@@ -487,6 +492,7 @@ export class SharedConversations {
     });
   }
 
+  inviteRemote?: (instanceId: ConversationId, requestId: string, definitionIds: string[]) => Promise<void>;
   availableAgents: (companyId: string) => Promise<unknown> = async () => [];
   bind(harness: Harness, storage: Storage) {
     this.harness = harness; this.storage = storage; this.turns.bind(harness); this.contributions.bind(harness);
@@ -631,9 +637,9 @@ export class SharedConversations {
     for (const definitionId of agentIds) await this.addAgent(tx, roomId, definitionId);
   }
 
-  async addAgent(tx: Tx, roomId: ConversationId, definitionId: string, options: Pick<CreateAgentInstanceInput, "name" | "instructions"> = {}) {
+  async addAgent(tx: Tx, roomId: ConversationId, definitionId: string, options: Pick<CreateAgentInstanceInput, "name" | "instructions"> = {}, revision?: number) {
     const room = await tx.doc(SharedDoc, roomId);
-    const member = await this.createAgent(tx, roomId, room.companyId, definitionId);
+    const member = await this.createAgent(tx, roomId, room.companyId, definitionId, revision);
     if (options.name) member.name = options.name;
     if (options.instructions) {
       member.instanceInstructions = options.instructions;
