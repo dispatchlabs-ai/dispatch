@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — local PostgreSQL storage
+
+- Add an opt-in PostgreSQL adapter for Pi Durable 1.0.4, with isolated logical stores, atomic batches, document history and a dedicated single-owner connection. SQLite remains the default; existing state is not migrated.
+- Document separate-state PostgreSQL 17 container and Homebrew setups. Authentication, connections and attachments remain local; distributed workers, automatic takeover and AWS deployment are not implemented. Runtime qualification remains pending.
+
 ## Unreleased — preserved contribution review
 
 - Preserve prepared contributions and their speaking reservation through final review/publication while other work continues. Human typing pauses publication without discarding drafts.

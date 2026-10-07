@@ -20,6 +20,7 @@ const mcpConnections = new McpConnections(join(config.stateDir, "connections.sql
 const runtime = await DispatchRuntime.open({
   stateDir: join(config.stateDir, "runtime"), companyId: config.companyId, models: provider.models,
   readAllProjectUserIds: config.readAllProjectUserIds,
+  piStorage: config.piStorage,
   connectionsFile: config.connectionsFile, workspaceDir: config.workspaceDir,
   mcpConnections,
   provider: provider.provider, modelId: provider.modelId, thinkingLevel: provider.thinkingLevel,

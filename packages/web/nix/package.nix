@@ -23,7 +23,7 @@ buildNpmPackage {
     ];
   };
 
-  npmDepsHash = "sha256-Ej7xKlXAgW4HBA5siKnm0Dn58FEB3aQjMVXNTE3Rezc=";
+  npmDepsHash = "sha256-xiEzjJPrS+kpjZgAF5dQGzYHIMAybyTiwBO86TF21iA=";
   npmBuildScript = "build";
 
   doCheck = true;
@@ -47,6 +47,7 @@ buildNpmPackage {
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-auth" \
       --add-flags "$app/packages/web/build/service/server/auth-cli.js"
     mkdir -p "$out/share/dispatch-web"
+    cp packages/web/server/storage/postgres/NOTICE "$out/share/dispatch-web/postgres-storage-NOTICE"
     ln -s "$app/packages/web/build/client" "$out/share/dispatch-web/client"
     runHook postInstall
   '';

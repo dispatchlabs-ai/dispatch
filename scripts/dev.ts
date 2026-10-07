@@ -14,6 +14,9 @@ const environment = {
   DISPATCH_HOST: "127.0.0.1",
   DISPATCH_SERVE_CLIENT: "false",
 };
+if (process.env.DISPATCH_PI_STORAGE === "postgres" && !process.env.DISPATCH_DATA_DIR) {
+  throw new Error("PostgreSQL development requires an explicit separate DISPATCH_DATA_DIR");
+}
 const children: ChildProcess[] = [];
 let stopping = false;
 function stop(exitCode = 0) {
