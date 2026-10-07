@@ -10,6 +10,8 @@
 
 ### Added
 
+- Generic Terraform/OpenTofu ECS Fargate, HTTPS ALB and S3 Files service module, Linux Nix OCI recipe, and disposable-state deployment/recovery runbooks. Source/schema and Apple Silicon build checks passed; Linux artifact and live AWS qualification remain pending.
+
 - Backend dependency watching during local development, with graceful sequential restarts and unchanged frontend hot reload; documented background start, log and stop commands.
 
 - Composer + menu for files/images, pasted-image previews, independent main/thread attachment drafts and attachment-only messages. Uploads become shared conversation assets immediately; removing a preview does not delete them. Verified raster images use native delivery; UTF-8 text has scoped reads, while PDF/Office/binary files remain download-only. Implementation qualification is tracked in [WP-040](docs/handoff.md#wp-040--composer-files-and-images).

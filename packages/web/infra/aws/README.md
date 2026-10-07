@@ -45,7 +45,7 @@ Task permissions allow S3 Files mount/write only through the declared access poi
 
 Direct S3 reads bypass POSIX permissions: `0700`/`0600` protect the mounted filesystem path, not IAM-authorized object reads. The entire backing prefix is secrets-bearing, including `/data/home/.pi/agent/auth.json`; object readers and backup operators can read credentials. `GetObjectVersion` can retrieve noncurrent versions, including deleted attachments or old credentials. Callers must explicitly accept that retention or configure appropriate bucket version lifecycle rules; revoking a credential at its issuer remains necessary.
 
-Default task egress permits all IPv4 traffic to support caller-selected model/MCP endpoints. Narrow `egress_rules` for the installation after accounting for DNS, HTTPS and the chosen storage connectivity; the default is not an egress isolation boundary.
+Default task egress permits all IPv4 traffic to support caller-selected model/MCP endpoints. Narrow `egress_rules` for the installation after accounting for DNS, HTTPS and TCP 2049 to the storage mount-target security group (plus reciprocal mount-target ingress from the task group); the default is not an egress isolation boundary.
 
 ## Operations and qualification
 
