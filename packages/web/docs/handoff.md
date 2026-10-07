@@ -1075,3 +1075,27 @@ Implementation evidence (October 7):
 - Nix-shell `npm run check`, Apple Silicon `nix build` and `nix flake check`, and staged/working whitespace checks passed after the final source cleanup. Linux builds were not run. No tests or live provider calls were made for this implementation.
 - PNG validation is bounded structural inspection including IHDR/IDAT/IEND, not pixel decompression or CRC qualification. Atomic rename prevents partial final filenames, not orphan temporary files, partially completed runs or power-loss data loss. Workspace path checks do not provide isolation from concurrent service-account filesystem mutation. Metadata contains prompts and reference paths; protect workspace backups.
 - No new image-generation/review screen was added. The existing agent editor gains one capability checkbox. Rendered desktop/390 px review, keyboard/touch/contrast and functional acceptance remain unverified; captures are needed before claiming UI qualification. No live service integration or deployment has occurred.
+
+
+## WP-046 — Permissioned agent management
+
+**Specification requested October 7, 2026; implementation not authorized by this documentation request.** Depends on the current immutable definition catalog, trusted native participant bindings and Pi Durable 1.0.4 public document/commit interfaces. Scope follows [permissioned agent management](spec.md#permissioned-agent-management). Doctor is the selected trial editor, not an already authorized principal.
+
+Before implementation:
+- Resolve the spec's open choices: target and immutable IDs/effective privileges, direct saves versus proposals, human grant administration and grant validity across Doctor revisions.
+- Confirm the narrow trial allowlist. Do not provision grants, change Doctor/target configuration, run evals or start model calls as part of this documentation package.
+
+Implementation scope, once authorized:
+- Shared identity-aware read/save service operations and narrow native tools; no borrowed human session, loopback API dependency or MCP server requirement.
+- Dedicated grant document and separately authorized human grant writer, with grant-change audit. Keep agent-edit paths unable to mutate grants.
+- Atomic authorization/target eligibility, expected-revision validation, immutable save, agent attribution and deduplication receipt. Retain human saves and company isolation without treating agent identity as a human user ID.
+- No existing-instance rollout, permission expansion, self-editing or skill/connection/capability changes. Document restoration as a new revision, not history replacement.
+
+Acceptance criteria:
+- Source/security review covers forged caller/target IDs, cross-company reads/writes, absent/revoked grants, forbidden fields, changed target privileges, editor revisions, human-versus-agent principal handling and every grant-writing path.
+- Source/Pi review covers stale revisions, concurrent human edits/revocation, identical versus changed retries, crash before/after commit, cancellation after save and restart receipt recovery. No duplicate revision may result from replay of one committed operation. Existing participant configuration must remain unchanged.
+- Review threat boundaries for Doctor and the target, including unrestricted host tools and access to application state; tool exposure or cwd cannot establish isolation. Keep eval evidence untrusted and independently access-controlled.
+- Record attributable before/after definition and grant changes; demonstrate the restoration contract through source review while execution remains deferred. If proposals are selected, specify candidate identity, diff review, promotion authorization and stale-base handling before implementing them.
+- Apply source/deslop review, TypeScript/application and applicable Nix builds for implementation, full diff/whitespace and changed-link checks. Any UI must satisfy desktop/390 px review rules. The zero-tests policy remains active; runtime, security, replay/revocation and actual Doctor edits remain unqualified until separately authorized and observed. No deployment is included.
+
+Documentation evidence: architecture checked against the current `saveAgent`, human-session API and native collaboration-tool pattern, and installed Pi Durable 1.0.4 public configuration/document contracts. This package adds no executable code and grants no rights. Documentation diff/deslop and whitespace review passed; relative link paths in both changed documents and the new cross-link anchors were checked. No tests, model calls, builds or runtime qualification were performed for this documentation-only change.
