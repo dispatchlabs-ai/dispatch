@@ -828,7 +828,8 @@ function projectSummary(project: StoredProject): Project {
   return { id: project.id, name: project.name, createdAt: project.createdAt, kind: "personal", canManage: false, canParticipate: true };
 }
 function publicAgent({ companyId: _companyId, savedBy: _savedBy, saveRequestId: _request, saveFingerprint: _fingerprint, ...agent }: StoredAgent): AgentDefinition {
-  return { ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [], capabilities: [...(agent.extensions?.includes(CodingTools.name) ? ["files-and-commands" as const] : []), ...(agent.extensions?.includes("dispatch-image-gen") ? ["image-generation" as const] : [])] };
+  // Nested catalog values may be transaction proxies; detach before the transaction settles.
+  return JSON.parse(JSON.stringify({ ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [], capabilities: [...(agent.extensions?.includes(CodingTools.name) ? ["files-and-commands" as const] : []), ...(agent.extensions?.includes("dispatch-image-gen") ? ["image-generation" as const] : [])] })) as AgentDefinition;
 }
 function managedIds(agent: Pick<AgentDefinition, "connections">) { return (agent.connections ?? []).filter(isManagedConnection).map(connection => connection.id); }
 function requireText(value: unknown, field: string, max: number, allowEmpty = false): asserts value is string {
