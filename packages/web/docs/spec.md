@@ -192,6 +192,10 @@ existing participation policy and does not change authorship or access.
 
 **Accepted October 3, 2026, from the [UI/UX review](ui-ux-review.md), under Chris's authorization to update the rules.** These rules make the accepted branding, desktop/mobile, and workspace requirements checkable by source review and rendered screens. Items marked **Proposed** are new security or product decisions that still need Chris's confirmation.
 
+### UI copy
+
+**Accepted October 7, 2026:** no long explanatory sentences or paragraphs in routine UI. Use concise labels and actionable status/error text; put detailed explanations in documentation. Do not add prose that narrates obvious controls or implementation details. This applies to menus, toolbars, form hints and notices—not user-authored messages or document content. [Deslop review](../../../.pi/prompts/deslop.md) must check this rule before completing UI work.
+
 ### Tokens and readability
 
 - Define reusable design values (colours, the type scale, the spacing scale, radii, shadows, and status colours) once as tokens in the shared stylesheet, and reference them from components. Derive tints and status colours from the [brand token reference](#existing-brand-references), and record any deliberate departure (for example, a darker status colour chosen for contrast) beside the token. One-off structural geometry, such as a column width or a breakpoint, does not need a token.

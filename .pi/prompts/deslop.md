@@ -13,6 +13,7 @@ Look for simpler representations and direct code:
 - Question generic machinery, configuration, adapters, and extension points with no accepted use case.
 - Put validation at actual trust boundaries. Within trusted code, use precise types and established invariants instead of speculative fallbacks for impossible states.
 - Preserve explanations of intent and constraints; remove comments that only narrate obvious code.
+- For UI changes, apply the spec’s [UI copy rule](../../packages/web/docs/spec.md#ui-copy): no long explanatory sentences or paragraphs in routine UI. Prefer concise labels and actionable status/error text; put detailed explanations in documentation. Preserve user-authored content.
 - Keep stock Pi Durable responsible for durable execution and recovery. Simplification must preserve the specified application/runtime boundary.
 
 Preserve supported behavior, public contracts, persisted data, security checks, and meaningful failure handling. Before removing something apparently unused, check its callers, documentation, generated entry points, and extension/compatibility role. Do not weaken tests to make a simplification pass or introduce an abstraction just to reduce line count.
