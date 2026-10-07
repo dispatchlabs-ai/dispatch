@@ -121,10 +121,12 @@ variable "s3_files_prefix" {
         endswith(var.s3_files_prefix, "/") &&
         !strcontains(var.s3_files_prefix, "//") &&
         !strcontains(var.s3_files_prefix, "..") &&
+        !strcontains(var.s3_files_prefix, "*") &&
+        !strcontains(var.s3_files_prefix, "?") &&
         trimspace(var.s3_files_prefix) == var.s3_files_prefix
       )
     )
-    error_message = "s3_files_prefix must be empty for a bucket-root filesystem or a relative prefix ending in /, without whitespace, //, or .. components."
+    error_message = "s3_files_prefix must be empty for a bucket-root filesystem or a relative prefix ending in /, without whitespace, wildcards (* or ?), //, or .. components."
   }
 }
 

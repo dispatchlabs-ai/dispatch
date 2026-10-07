@@ -285,9 +285,9 @@ locals {
       },
     ]
     environment = [
-      for name in sort(keys(merge(var.environment, local.reserved_environment))) : {
+      for name, value in merge(var.environment, local.reserved_environment) : {
         name  = name
-        value = merge(var.environment, local.reserved_environment)[name]
+        value = value
       }
     ]
     secrets = [
