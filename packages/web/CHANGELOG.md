@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — agent evaluation profiles
+
+- Add independently versioned evaluation profiles, criteria and standalone cases to saved agent definitions, with immutable history, conflict checks and retry receipts. Keep evaluator-only material out of operating instructions.
+- Preserve archived profile access and company boundaries. This slice edits evaluation definitions; it does not execute cases, assess real conversations or produce results.
+
 ## Unreleased — image editing and visual verification
 
 - Stop injecting `input_fidelity` into GPT Image 2/2.5 edits, including when older skill snapshots request it; retain explicit supported legacy-model values.

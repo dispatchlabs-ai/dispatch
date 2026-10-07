@@ -10,6 +10,7 @@ import type { ApplicationConfig, ChatSnapshot } from "../src/shared/contracts.js
 import { ConnectionError, type McpConnections } from "./mcp-connections.js";
 import { AttachmentError, readAttachmentUpload } from "./attachments.js";
 import { ATTACHMENT_MAX_COUNT } from "../src/shared/contracts.js";
+import { EvaluationError, parseEvaluationRevision } from "./evaluations.js";
 import { ManagementError } from "./agent-grants.js";
 import { randomToken } from "./auth/crypto.js";
 
@@ -233,6 +234,9 @@ export function createApp(options: AppOptions) {
   app.get("/api/agent-management/grants", async c => c.json(await runtime.managementGrants(c.get("principal"))));
   app.post("/api/agent-management/grants", async c => c.json({ grant: await runtime.saveManagementGrant(c.get("principal"), await c.req.json()) }));
   app.get("/api/agents", async (c) => c.json({ agents: await runtime.listAgents(c.get("principal")) }));
+  app.get("/api/agents/:id/evaluation", async c => c.json(await runtime.evaluationProfile(c.get("principal"), c.req.param("id"))));
+  app.get("/api/agents/:id/evaluation/revisions/:revision", async c => c.json({ profile: await runtime.evaluationProfileRevision(c.get("principal"), c.req.param("id"), parseEvaluationRevision(c.req.param("revision"))) }));
+  app.post("/api/agents/:id/evaluation", async c => c.json({ profile: await runtime.saveEvaluationProfile(c.get("principal"), c.req.param("id"), await c.req.json()) }));
   app.get("/api/agents/:id/connections", async (c) => c.json({ connections: await runtime.agentConnections(c.get("principal"), c.req.param("id")) }));
   app.post("/api/agents/:id/connections/:connection/reconnect", async (c) => {
     z.object({}).strict().parse(await c.req.json());
@@ -250,7 +254,7 @@ export function createApp(options: AppOptions) {
   }
   app.onError((error, c) => {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return c.json({ error: { code: "invalid_request", message: "The request is invalid. Check the fields and try again." } }, 400);
-    if (error instanceof ManagementError || error instanceof AttachmentError || error instanceof ProjectAccessError || error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
+    if (error instanceof EvaluationError || error instanceof ManagementError || error instanceof AttachmentError || error instanceof ProjectAccessError || error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
     console.error("Dispatch request failed:", error);
     return c.json({ error: { code: "internal", message: "The request could not be completed. Try again." } }, 500);
   });
