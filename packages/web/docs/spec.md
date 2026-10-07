@@ -1,6 +1,6 @@
 # Dispatch Web specification
 
-**Status: current local application contracts, with explicitly separated future designs.** The implementation includes company authentication, shared conversations and threads, named agent definitions, local coding tools, generic MCP connections, explicit skills, shared projects with membership/default agents, message attachments, opt-in image generation and agent-prepared attachments, and opt-in PostgreSQL Pi storage. The branded workspace targets desktop and mobile browsers. Distributed workers, remote sandboxes, personal Wiki delegation, schedules and broader application RBAC remain future work. Implementation does not establish functional qualification; evidence and outstanding checks belong in [handoff.md](handoff.md).
+**Status: current local application contracts, with explicitly separated future designs.** The implementation includes company authentication, shared conversations and threads, named agent definitions, local coding tools, generic MCP connections, explicit skills, shared projects with membership/default agents, message attachments, opt-in image generation and agent-prepared attachments, and opt-in PostgreSQL Pi storage. The branded workspace targets desktop and mobile browsers. Distributed workers, remote sandboxes, personal Wiki delegation, permissioned agent management, schedules and broader application RBAC remain future work. Implementation does not establish functional qualification; evidence and outstanding checks belong in [handoff.md](handoff.md).
 
 ## Reading this specification
 
@@ -107,7 +107,7 @@ See [NIST's distinction between single-factor and multi-factor cryptographic aut
 
 All authenticated users have the same baseline application capabilities and independent identities/sessions. Resource-specific authority still applies: shared projects distinguish managers from members, connection credentials have an owner, and conversation participation requires current access. These are current authorization requirements, not future RBAC. Broader application roles and role-management UI remain future work through the same server-side authorization boundary.
 
-Each installation serves one company. Accounts have separate identities. Unbound conversation access uses explicit [shared-conversation membership](#shared-conversations); conversations in a shared project use [current project policy](#shared-project-access-and-default-agents). Agent definitions are shared within the company. Every service operation receives its company/user scope from the authenticated session. These boundaries do not grant cross-company access.
+Each installation serves one company. Accounts have separate identities. Unbound conversation access uses explicit [shared-conversation membership](#shared-conversations); conversations in a shared project use [current project policy](#shared-project-access-and-default-agents). Agent definitions are shared within the company. Human-facing service operations receive their company/user scope from the authenticated session. The planned [agent-management operations](#permissioned-agent-management) instead resolve an agent principal from its trusted native instance binding; they must not borrow a human session or user identity. These boundaries do not grant cross-company access.
 
 The accepted future [personal Wiki connection](#personal-wiki-connections) adds owner-bound resource authorization. Equal application capabilities and permission to edit a shared definition do not confer another user's external credentials or Wiki access. Shared team connections require a later, explicit administration policy.
 
@@ -453,6 +453,45 @@ After chat, add named agent definitions and the ability to start independent con
 Continue adding Pi Durable capabilities in focused feature slices: tools and integrations, delegation and handoffs, background work, event- and schedule-triggered work, and the broader native configuration surface. These remain product goals. Their order after named definitions and their detailed workflows are unresolved; the [capability assessment](https://wiki.chrisreynolds.me/wiki/pi-durable-capabilities/) records the native foundations and application responsibilities.
 
 Design the first chat around Pi's public interfaces and the ownership boundaries below. Add later features' detailed behavior and UI when their use cases are agreed. The right column remains available for specified supporting views; chat-first scope does not invent content for it.
+
+### Permissioned agent management
+
+**Direction accepted; specification requested October 7, 2026. Not implemented.** Chris wants explicitly authorized agents to modify other agents as a foundation for eval-driven improvement, and has created **Doctor** as the first trial editor. This request authorizes documentation, not a grant, agent mutation, trial execution or deployment. Product context remains the [repository decision record](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/); [WP-046](handoff.md#wp-046--permissioned-agent-management) tracks the implementation scope and unresolved choices.
+
+#### Management boundary and identity
+
+- Put validation, authorization and definition mutation in shared Dispatch service operations. Human API handlers and narrow native agent tools use that boundary; a later Dispatch MCP server can expose the same operations. Do not require loopback HTTP, give agents browser sessions, or introduce a generic unrestricted Dispatch API tool. MCP is transport, not authority.
+- Resolve the acting company, definition ID, instance and saved revision from trusted native conversation bindings. Neither a display name such as Doctor nor a caller-supplied identity establishes authority. Record the actual acting instance/revision, not the latest definition revision or a borrowed human `userId`.
+- Deny agent management by default. Grants identify the acting definition, permitted target definitions, editable fields and permitted action (read, direct save, or proposal where supported). Tool visibility is not a security check: enforce current rights at the service boundary on each operation, including reads. Revocation must affect existing instances without waiting for a new conversation.
+- Agent grants do not imply human RBAC, cross-company access, permission to edit oneself or another privileged editor, or access to private conversations/eval evidence. Source evidence retains its own access rules. Tools return only authorized definition information, never credentials.
+
+#### Grants and atomic mutation
+
+Keep grants outside editable agent configuration in a dedicated application document, using stock Pi Durable public document/commit interfaces. A separate database is not required. Agent-management operations may read but must never write grants; grant creation, narrowing and revocation use a separate human-authorized operation. Audit grant changes with actor, time and before/after state. The exact human grant-management surface and authorization policy must be settled before implementation; do not invent an administrator role in the current equal-access product.
+
+For a new mutation, read the current grant, current target revision and target eligibility in the same native commit that appends the immutable definition revision, attribution and deduplication receipt. A grant revoked before that commit must prevent the mutation; revocation cannot undo an already committed save. Do not authorize from an earlier snapshot, cache or prompt. Revalidate target privilege at save time, so a human adding connections or management rights after trial setup does not silently turn Doctor's grant into authority over a privileged target. Preserve fields outside the explicit edit allowlist and reject unknown or forbidden fields rather than accepting a full unrestricted definition replacement.
+
+The separate document is an application authorization boundary, not isolation from trusted service code or unrestricted host shell access. Both Doctor and its target need an execution/tool configuration consistent with the trial: agents able to modify service files, persistent state or credentials can bypass an API-only restriction. A working directory is not a sandbox.
+
+#### Revision, retry and rollout contracts
+
+- Require an expected target revision and stable operation ID for every agent save. Bind deduplication to the trusted actor and company; persist a canonical request fingerprint. The same operation and payload return the original committed outcome without another revision; reuse with a different payload conflicts. A stale expected revision conflicts rather than silently overwriting newer work.
+- Record acting identity/instance/revision, operation ID, target, before/after revisions, authorized change, reason and available supporting eval references. Do not require an eval service before the first permissioned edit. Untrusted eval text is evidence, never a grant or instruction to the management service.
+- A native tool may be declared replay-safe only when the revision and receipt are committed atomically and interrupted re-execution cannot duplicate the mutation. Derive transport retry identity from durable call identity. A failed delivery after commit must not prompt a new operation ID. Returning an already committed receipt after revocation does not authorize a new write; receipt access still requires authorized caller identity. Stop does not roll back a committed revision. Pi owns tool execution/cancellation/recovery, not Dispatch's authorization policy.
+- A definition save affects newly created instances only. No live rollout is granted by the management tool. Reject `applyConnectionsToExisting` and equivalent rollout arguments; preserve the separate existing human connection-rollout feature. A future live-rollout operation requires its own authority and lifecycle contract, rather than silently applying all definition fields with native `configure()`.
+- Restore an earlier configuration by saving a new immutable revision with the **current** expected revision, recording which historical revision supplied the restored values. Never move the revision counter backward or overwrite history. This restores future-instance configuration, not existing instances or external side effects.
+
+#### Doctor trial: proposed narrow scope
+
+Before enabling the trial, Chris must choose the target and publication mode. The recommended first target is a disposable, low-privilege definition with no MCP connections, file/command or other privileged capabilities, assigned skills, or management grants. Bind Doctor and the target by immutable IDs; do not seed rights by matching names. The recommended initial edit allowlist is instructions, provider/model and thinking, retaining normal model/thinking validation. Creation, archive, self-editing, skill edits/assignment, capability or connection assignment, credential changes, grant changes and live rollout are outside this trial.
+
+**Open decisions, not implicit approvals:**
+- Confirm Doctor's definition ID and the disposable target's ID and effective privileges; no target was selected in the discussion.
+- Choose direct saves within the grant or human-reviewed proposals. Proposal storage, diff review and promotion are a separate workflow if selected; neither a proposal service nor an automated eval gate is a prerequisite already accepted for the narrow direct-save design.
+- Specify the human grant-management workflow and whether grants remain valid across edits to Doctor itself. Audit the acting revision regardless; do not let editing a privileged editor become an unnoticed delegation path.
+- Any revision-rate policy requires a separate decision; no arbitrary limit is adopted here.
+
+The longer-term improvement loop is evaluate a pinned revision, propose a candidate, evaluate it, authorize promotion, then monitor and restore if needed. Tool/capability expansion, automated evaluation/promotion, scheduling, external-agent MCP access and live rollout remain later work. Prompt or skill editing can redirect a target's existing authority; adding capabilities such as `files-and-commands` grants host execution, not merely model tuning. Evaluate those later rights independently rather than expanding the trial grant automatically. The existing testing policy still applies; naming Doctor as a trial agent does not authorize tests or live model calls.
 
 ### Reusable Coding extension
 
