@@ -8,6 +8,8 @@
 
 ### Added
 
+- Composer + menu for files/images, pasted-image previews, independent main/thread attachment drafts and attachment-only messages. Uploads become shared conversation assets immediately; removing a preview does not delete them. Verified raster images use native delivery; UTF-8 text has scoped reads, while PDF/Office/binary files remain download-only. Implementation qualification is tracked in [WP-040](docs/handoff.md#wp-040--composer-files-and-images).
+
 - Optional conversation naming in the starting-agent chooser, retaining unnamed first-message previews and preserving explicit names on creation retries and subsequent messages.
 
 - Rename shared conversation display titles from conversation actions, without changing messages, agent context, workspaces or creation-retry identity.

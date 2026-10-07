@@ -142,6 +142,18 @@ Each mounted chat owns its editor and undo history; workspace drafts and submitt
 
 The composer has one outer focus indicator, grows with its contents up to a scrolling bound, and has no privacy/status sentence in the toolbar. Send and Stop retain their existing state and accessible labels. Desktop Enter sends, Shift+Enter adds a line, and touch-primary Enter adds a line; IME composition must not submit. The existing 100,000-character limit applies to serialized Markdown: longer drafts remain editable, show an error, and cannot send until shortened.
 
+### Message attachments
+
+**Accepted October 6, 2026:** main and thread composers gain an extensible lower-left **+** menu, initially for files and images. Pasting an image adds an attachment rather than losing it to the Markdown text-paste handler. A top-left preview row shows small raster thumbnails or named file tiles, upload state, and removal controls. Text-only Markdown editing remains unchanged; drag-and-drop is outside this slice. [WP-040](handoff.md#wp-040--composer-files-and-images) owns implementation and qualification.
+
+Attachments are separate from serialized Markdown. Limits are 10 MiB per file, 25 MiB total per message, and 10 attachments. Attachment-only messages are allowed. Upload failures remain visible and must not cause a partial send; acknowledged sends clear only the submitted draft version, preserving newer text and attachments. Main and individual thread drafts retain independent attachment references while switching open chats/layouts; reload persistence is not promised.
+
+Successful uploads immediately become conversation assets readable by authorized conversation members, including before Send. The picker discloses this sharing and retention. Removing a draft preview removes its reference, **not** the stored asset; assets remain with the conversation to avoid cleanup races with durable recovery. Only the uploader may attach an asset to a new message in its owning conversation. Reuse across messages is allowed; duplicate references within a message are rejected.
+
+The service authenticates and authorizes conversation access before parsing upload bodies. Storage uses generated IDs, not filenames; names are capped, sanitized display metadata. Stored MIME comes from server content inspection, not client declarations. Raster/text claims and known signatures (such as PDF/ZIP) reject incompatible declarations; unknown binary uses `application/octet-stream` and remains download-only. Text classification requires successful UTF-8 decoding; JSON/XML/code use a safe canonical text MIME and download disposition rather than their declared subtype. This does not promise full Office/container parsing. Only the upload route receives a larger body limit; other API routes retain the existing 256 KiB limit. Send requests carry bounded `attachmentIds`, never raw bytes, and idempotency includes attachment identity. Public snapshots carry attachment metadata. Reads recheck current conversation access and return `nosniff`; downloads are the default.
+
+Only verified PNG/JPEG/GIF/WebP may render inline and enter native Pi image delivery/history. Validated UTF-8 files are readable through the scoped `conversation_attachment` tool with bounded, paginated reads and visible truncation. Other formats are download-only: accepting PDF, Office or binary files does not imply agent understanding. SVG never renders inline. Provider-side image encoding remains within native delivery, not browser message requests. Precise route/metadata details are maintained in the [usage guide](usage-guide.md#application-api).
+
 ### Inline mentions
 
 **Accepted October 5, 2026:** Chris rejected the detached Mention dropdown and

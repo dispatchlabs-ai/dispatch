@@ -136,7 +136,11 @@ Messages use a compact, left-aligned flow with distinct participant avatars, aut
 
 Conversations initially use the workspace with the context panel closed. Open participants from the header, then select a person or agent for details. Close the context panel to restore the conversation's width. The main composer names its conversation; each thread has a separate Reply to thread composer. Generic tool activity uses a readable summary and observed status; expand it for the original tool identifier, arguments, and results. Native command and file presentations remain available.
 
-The message composer formats Markdown as you type or paste: headings, lists, quotes, bold/italic text, links, and code stay editable in place. Copying selected content retains its Markdown formatting. Paste inside a code block keeps the text literal. Desktop Enter sends; Shift+Enter inserts a line. Enter on a touch-primary device inserts a line; use Send to submit. The toolbar contains an arrow-only Send button and, during active work, Stop. Main-message and individual reply-thread drafts stay with each open chat. Messages over 100,000 characters including formatting must be shortened before sending.
+The message composer formats Markdown as you type or paste: headings, lists, quotes, bold/italic text, links, and code stay editable in place. Copying selected content retains its Markdown formatting. Paste inside a code block keeps the text literal. Desktop Enter sends; Shift+Enter inserts a line. Enter on a touch-primary device inserts a line; use Send to submit. The toolbar contains a lower-left + attachment menu, an arrow-only Send button and, during active work, Stop. Main-message and individual reply-thread drafts stay with each open chat. Messages over 100,000 characters including formatting must be shortened before sending.
+
+Use **+** to pick files/images, or paste an image into the message or reply composer. The top-left preview row shows image thumbnails or named files; remove a preview to leave it out of the message. Wait for uploads to finish before sending; a message may contain attachments without text. Limits are 10 files, 10 MiB per file and 25 MiB total per message. Main and thread drafts remain separate; they are not saved across reloads.
+
+**Uploading shares the file immediately with authorized conversation members, before Send.** Removing a preview does not delete the uploaded file; it remains a conversation asset. Verified PNG/JPEG/GIF/WebP images can reach agents as images, and validated UTF-8 files can be read through their attachment tool. Other files, including PDF/Office/binary formats, are download-only; upload does not mean an agent can interpret them. SVG is not displayed inline. See [the attachment contract](spec.md#message-attachments).
 
 Conversations are visible only to their human members within the installation’s company. New conversation opens a chooser for one or more company agents and an optional conversation name. Enter a name of up to 200 characters (surrounding whitespace is trimmed), or leave it blank to use the existing first-message preview. An explicit name stays as entered, including “New conversation”; it is shared with other members and can be changed later with Rename. A failed creation keeps the name and selected agents for retry. Selecting an agent in Participants opens its saved configuration and per-agent usage. Add participants invites existing active company people or available agents; newcomers can read the full public history. Each agent has an independent working context. Agents consider messages from humans and other agents and may remain silent.
 
@@ -239,7 +243,7 @@ The state directory contains `auth.sqlite`, `auth.key`, and `runtime/` with Pi s
 `POST /api/projects` accepts `{ requestId, name }` and returns `{ project }`. A project contains `id`, `name`, and `createdAt`. Retrying the same request ID and trimmed name returns the original project; changed content returns 409. `POST /api/chats` accepts optional `projectId` (null or omitted means unassigned). Chat creation retries compare the original creation project, even after the conversation has moved. Names are labels; stable UUIDs identify projects.
 
 
-All `/api` access requires a fully authenticated session except the authentication flow endpoints. Mutations require same-origin JSON requests. Protected commands validate input; unavailable resources return 404 across identity boundaries.
+All `/api` access requires a fully authenticated session except the authentication flow endpoints. Mutations require same-origin requests; bodies are JSON except multipart attachment uploads. Protected commands validate input; unavailable resources return 404 across identity boundaries.
 
 | Endpoint | Purpose |
 | --- | --- |
@@ -250,6 +254,8 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `POST /api/chats/:id/preferences` | Set pin/archive flags or assign, move, or remove project membership |
 | `GET /api/chats/:id` | Public messages, participants and sanitized native activity |
 | `POST /api/chats/:id/messages` | Admit a message idempotently; return a snapshot with status 202 |
+| `POST /api/chats/:id/attachments` | Upload one multipart `file`; return `{ attachment }` |
+| `GET /api/chats/:id/attachments/:attachmentId` | Session/access-checked image or download |
 | `POST /api/chats/:id/stop` | Conversation-wide native cancellation; return the current snapshot |
 | `POST /api/chats/:id/composing` | Publish expiring human typing presence; no draft text |
 | `GET /api/chats/:id/events` | SSE `snapshot` events; `session-ended` closes access on invalidation |
@@ -262,6 +268,8 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `/api/auth/*` | Enrollment, sign-in, recovery, session and factor management, logout |
 
 `POST /api/chats` accepts `agentDefinitionIds` (one or more), or the legacy singular `agentDefinitionId`. Message commands accept `threadId` and participant-ID `mentions`. Invitation commands accept `{ requestId, agentDefinitionIds?, userIds? }`. The service binds public authorship to the authenticated human or native agent instance.
+
+Attachment uploads return `{ attachment: Attachment }`, where metadata contains `id`, `name`, `mimeType`, `size` (bytes), `kind` (`image`, `text` or `file`) and a session/access-checked `url`. Send commands accept `attachmentIds` (at most 10 unique IDs, 25 MiB total), scoped to the same conversation and uploaded by the sender. Their Markdown `text` may be empty when attachments are present. Uploaded IDs may be reused in later messages by their uploader; duplicate IDs within one message are rejected. Retries retain both the send request ID and attachment IDs; changing attachment identity under the same request ID returns a conflict. Message snapshots include `attachments`. Shared limits and metadata are exported from `src/shared/contracts.ts`.
 
 The composing command accepts `{ clientId, sequence, active }`, where each mounted composer uses its own UUID and increasing sequence number. It returns `{ ok: true }`. Only authenticated conversation members may publish presence; the service derives their identity. A true signal expires six seconds after receipt. Sending messages is independent of presence updates, and failed presence must not disable Send.
 
