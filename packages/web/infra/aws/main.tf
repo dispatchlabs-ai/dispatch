@@ -44,7 +44,7 @@ resource "aws_cloudwatch_log_group" "this" {
 
 resource "aws_security_group" "this" {
   name_prefix = "${var.name}-dispatch-"
-  description = "Agent Dispatch HTTP ingress and controlled task egress."
+  description = "Agent Dispatch HTTP ingress and caller-configurable task egress."
   vpc_id      = var.vpc_id
 
   ingress {

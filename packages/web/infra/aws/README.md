@@ -39,9 +39,13 @@ See `variables.tf` for all inputs, validation and defaults; `outputs.tf` defines
 
 The container runs as 65532:65532 with a read-only root and dropped capabilities. `/data` is the access point root `/dispatch/NAME/data`; `/data/state`, `/data/workspace` and `/data/home` hold state, coding workspace and provider home respectively. `/tmp` is ephemeral. Back up the entire access-point tree, including encryption keys and provider credentials; a database-only backup is insufficient.
 
-Non-secret `environment` values enter infrastructure state. `secret_environment` accepts exact Secrets Manager/SSM ARNs, not secret values; ECS injects resolved values at runtime. Never put secrets into `environment` or image layers. Runtime-critical environment names cannot be overridden. Coding agents share service-account access to files and runtime credentials; this is not tenant or project execution isolation.
+Non-secret `environment` values enter infrastructure state. `secret_environment` accepts exact Secrets Manager/SSM ARNs, not secret values; ECS injects resolved values at runtime. Never put secrets into `environment` or image layers. Runtime-critical environment names cannot be overridden. Injected environment secrets are readable by every coding agent shell; do not inject a credential that should be withheld from a conversation. Coding agents share service-account access to files and runtime credentials; this is not tenant or project execution isolation.
 
 Task permissions allow S3 Files mount/write only through the declared access point, plus read/version-read/list under its exact backing S3 prefix following the Wiki pattern. The execution role separately owns image pull, log writes and declared secret reads/decryption. ECR authentication requires a wildcard resource; repository pulls are scoped. ECS Exec is disabled. The caller owns filesystem/bucket resource policies, storage encryption/KMS policy, mount-target connectivity and backups; these must agree with the task role and security group outputs.
+
+Direct S3 reads bypass POSIX permissions: `0700`/`0600` protect the mounted filesystem path, not IAM-authorized object reads. The entire backing prefix is secrets-bearing, including `/data/home/.pi/agent/auth.json`; object readers and backup operators can read credentials. `GetObjectVersion` can retrieve noncurrent versions, including deleted attachments or old credentials. Callers must explicitly accept that retention or configure appropriate bucket version lifecycle rules; revoking a credential at its issuer remains necessary.
+
+Default task egress permits all IPv4 traffic to support caller-selected model/MCP endpoints. Narrow `egress_rules` for the installation after accounting for DNS, HTTPS and the chosen storage connectivity; the default is not an egress isolation boundary.
 
 ## Operations and qualification
 
