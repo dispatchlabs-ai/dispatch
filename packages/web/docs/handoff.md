@@ -887,7 +887,7 @@ Post-publication feedback, October 6: after `3859775` was applied locally, Chris
 
 ## WP-040 — Composer files and images
 
-**Authorized October 6, 2026:** Chris requested a lower-left extensible + control for files/images, direct image paste, and top-left prompt previews. The [attachment contract](spec.md#message-attachments) records the agreed limits, audience, retention, supported agent content and request boundaries. Drag-and-drop is not required. Implementation is in progress; this entry is not evidence of deployment or working browser behavior.
+**Authorized October 6, 2026:** Chris requested a lower-left extensible + control for files/images, direct image paste, and top-left prompt previews. The [attachment contract](spec.md#message-attachments) records the agreed limits, audience, retention, supported agent content and request boundaries. Drag-and-drop is not required. Implemented and integrated for source review at `6d7826b`; this entry is not evidence of deployment or working browser behavior.
 
 Acceptance criteria and evidence:
 
@@ -897,4 +897,11 @@ Acceptance criteria and evidence:
 - Preserve attachment identity through native admission, retries, delivery/history and recovery. Native image blocks use only verified raster formats, capped at 4 MiB/image and 8 MiB/delivery or history/tool read with explicit omission IDs and preserved originals; validated UTF-8 text reads use the scoped attachment tool; binary/PDF/Office remain download-only.
 - Apply integrated source/deslop/security review, TypeScript/application checks, `nix build`, `nix flake check`, whitespace and changed-document links. No tests under the standing policy. Review rendered desktop and 390 px states when available; keyboard/focus, clipboard, touch/virtual keyboard, upload failure, draft/send races, access revocation, provider delivery and restart/recovery remain unverified unless separately observed.
 
-Pending evidence: implementation, integrated source/security review and build checks. No tests or runtime qualification are claimed. Product intent belongs at wiki.dispatchworks.ai; no wiki publication is claimed from this tool session.
+Implementation evidence:
+
+- Documentation was reconciled with integrated `6d7826b`: separate Markdown/attachment drafts, corrected chat upload/download routes, metadata-only sends, immediate sharing disclosure, scoped text reads, download-only SVG and model-image caps match the maintained contract. Local file-link and new heading checks passed.
+- Deslop's integrated source review found no further blockers after the empty-selection retry guard, visible paste disclosure and Unicode-valid filename truncation were fixed. Security confirmed the integrated upload/read/send boundaries, safe serving, scoped tool, image budgets and server-classified previews at `6d7826b`, with no blockers. These are source findings, not exercised access or recovery outcomes.
+- Upload parsing is byte-bounded but buffers multiple representations; peak memory and concurrent-upload capacity are not profiled. Each upload retry can create another retained asset; removing a preview is not cleanup. No TTL, deduplication or automatic orphan sweep is promised. Blobs are flushed before native metadata admission; crashes can leave an unreferenced blob. Backups must retain the complete runtime directory with native metadata and attachment blobs.
+- Deployer independently passed integrated `nix develop -c npm run check`, `nix flake check`, `nix build`, and working/staged/branch diff checks at `6d7826b` on Apple Silicon; Linux was skipped. Logs remain ignored in the integration worktree’s `.local/attachment-integrated-*.log`. No tests or runtime qualification are claimed. Rendered desktop/390 px review is unavailable in this session; captures are needed. Clipboard, keyboard/focus/assistive technology, contrast, touch/virtual keyboards, upload failures, draft/send races, provider acceptance, membership/revocation and restart/recovery remain unverified by execution. No live service restart or deployment is included.
+
+Product intent belongs at wiki.dispatchworks.ai; no wiki publication is claimed from this tool session.
