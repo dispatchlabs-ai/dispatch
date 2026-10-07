@@ -54,6 +54,12 @@ Retain the ARM64 AWS target and a multi-platform OCI index with separately built
 
 The earlier single-service SQLite + S3 Files module is a prepared, source-reviewed candidate, **not this worker/Postgres topology**. Its [runbook](aws-deployment.md) and [SQLite qualification procedure](aws-sqlite-qualification.md) remain applicable only to that candidate and existing storage-specific evidence. See [WP-041](handoff.md#wp-041--generic-aws-container-deployment) for implementation history and outstanding evidence. Before real-data use, qualify the selected storage, ownership, interrupted-work recovery, authorization and backup/restore through an explicitly scoped work package. Prior Palm results, local image checks and source publication do not qualify the new target.
 
+### Single-server container rehearsal
+
+**Requested October 7, 2026; not implemented or qualified.** Provide a new generic Terraform module for an isolated single-Linux-server rehearsal of the AWS application boundaries above, preserving the native installations and the PostgreSQL trial. The proposed implementation uses Docker Engine and Compose for stable web/API, PostgreSQL and worker-launcher services; the launcher manages per-conversation worker containers at runtime, not through a Terraform apply per conversation. This is not an ECS infrastructure emulator or a replacement for ARM64/AWS qualification.
+
+Caller roots supply the host, instance identity, immutable image pins and restricted secret-file references. Palm owns host prerequisites and DNS/HTTPS integration. Keep Docker privileges confined to the launcher, not conversation workers. Preserve disposable worker workspaces and exclusive executor ownership; uncertain lifecycle outcomes require reconciliation, not permission to create another executor. The application split, lifecycle contract and acceptance criteria require a reviewed work package before implementation.
+
 ### Local PostgreSQL adapter slice
 
 **Requested October 7, 2026; opt-in implementation with focused Palm trial evidence.** [WP-042](handoff.md#wp-042--local-postgresql-pi-storage-adapter) implements Pi Durable 1.0.4's public asynchronous `Storage` interface with PostgreSQL and an opt-in local setup using either a small container or Homebrew PostgreSQL. SQLite remains the default; use separate disposable development state rather than migrating existing installations.
