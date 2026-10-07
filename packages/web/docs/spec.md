@@ -30,13 +30,21 @@ October 7 development update: frontend-only edits continue to avoid Pi restarts.
 
 Internal deployment on Omarchy, reachable over the Palm network at an HTTPS domain, is a later work package. The current `dispatch.chrisreynolds.me` pilot, DNS, and services remain in place. Local HTTP on loopback is the development endpoint, not an internal hosted site. Application deployment configuration will belong to this repository; machine prerequisites remain owned by Palm.
 
+### AWS container deployment target
+
+**Accepted October 7, 2026; not implemented or deployment-qualified.** Target ECS Fargate behind an ALB, with S3 Files persistent storage, following the Agent-Wiki deployment pattern. Add a Nix-built OCI image around the existing application package; the current Nix output is not a container image. Demonstrate reusable deployment module compatibility with both Terraform and OpenTofu; keep it independent of installation-specific accounts, domains, credentials, state backends and private repositories. Installation roots supply those values and pin the module and application artifact separately. Preserve local development and the existing pilot.
+
+Retain one active runtime owner per store and stop-before-start replacement. Before real data, qualify this application's databases and state on the selected storage with disposable data: concurrent use, ownership exclusion across separate tasks, interrupted writes, replacement recovery, SQLite integrity and backup/restore. Include authentication, MCP credential decryption, attachment retrieval and conversation continuity; the runtime lock alone does not protect startup of every application database. [Prior Palm qualification](https://wiki.chrisreynolds.me/wiki/portable-application-deployment/#section-limits-and-everyday-team-use) is supporting evidence, not this application's qualification. Exact module interfaces, release publication and deployment evidence remain pending.
+
 ## Testing policy
 
 **Accepted October 3, 2026.** Do not add or run tests at the current stage. Make enough implementation progress to establish useful, stable behavior before investing in regression coverage. During this exploratory stage, use source review, TypeScript checks, and builds; record functional outcomes that remain unverified.
 
+**October 7 scoped exception:** Chris requested first-deployment SQLite qualification for the AWS container target above. Focused deployment/storage checks with disposable data are authorized for that work; this does not authorize a broad application test suite or qualify the deployment by itself.
+
 When the workflows are ready to lock in, prioritize end-to-end tests and API tests that protect observable behavior and service contracts. These are the kinds of tests Chris wants in this codebase. Unit tests and tests that mirror implementation details are not the default; do not add them merely for coverage. Any exception needs a concrete benefit that the preferred test types cannot provide. Do not preemptively build a test framework or add test maintenance work while the product is still changing quickly.
 
-Resume test work only after there is enough useful, stable behavior worth preserving; the current implementation stage remains test-free. This policy supersedes earlier instructions in the handoff and contribution workflow to add tests with every implementation slice or run browser acceptance tests now. A successful type check or build does not establish that runtime behavior has been verified.
+Resume test work only after there is enough useful, stable behavior worth preserving; application regression tests remain deferred outside the scoped exceptions above. This policy supersedes earlier instructions in the handoff and contribution workflow to add tests with every implementation slice or run browser acceptance tests now. A successful type check or build does not establish that runtime behavior has been verified.
 
 **October 6 focused exception:** Chris explicitly requested coordinator-led use of the local development site to validate the conversation layout refinement. Manual browser interaction and rendered desktop/phone comparison are authorized for [WP-028](handoff.md#wp-028--conversation-layout-refinement). This does not authorize adding or running automated tests or qualify unrelated runtime workflows. Record the specific observed outcomes and remaining limitations.
 
