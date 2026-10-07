@@ -2,7 +2,6 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { lstat, readFile, writeFile, chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
-import { PostgresStorage } from "./postgres/storage.js";
 import type { PostgresStorageOptions } from "./postgres/database.js";
 
 export type PiStorageConfig = { kind: "sqlite" } | ({ kind: "postgres" } & PostgresStorageOptions);
@@ -28,6 +27,8 @@ export async function openPiStorage(directory: string, config: PiStorageConfig) 
   }
   if (await exists(sqlite)) throw new Error("PostgreSQL mode requires a separate runtime directory without pi.sqlite; migration is not supported");
   const url = new URL(config.connectionString);
+  // Prevent PGPORT from silently selecting a different database endpoint than the marker.
+  url.port ||= "5432";
   // No passwords, usernames or TLS parameters in the local identity marker.
   const identity = JSON.stringify({ storeId: config.storeId, endpoint: `${url.hostname}:${url.port || "5432"}${url.pathname}` });
   if (await exists(marker)) {
@@ -38,5 +39,6 @@ export async function openPiStorage(directory: string, config: PiStorageConfig) 
     // Bind before opening remote state; a failed attempt remains explicitly PostgreSQL-only.
     await writeFile(marker, identity, { flag: "wx", mode: 0o600 });
   }
-  return PostgresStorage.open(config);
+  const { PostgresStorage } = await import("./postgres/storage.js");
+  return PostgresStorage.open({ ...config, connectionString: url.toString() });
 }

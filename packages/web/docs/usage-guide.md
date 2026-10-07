@@ -46,7 +46,7 @@ By default, the root development, account, and built-app commands share `.local/
 
 **Opt-in implementation; runtime qualification pending.** See the [adapter work package](handoff.md#wp-042--local-postgresql-pi-storage-adapter) for integration/check evidence. PostgreSQL is opt-in Pi storage, not an AWS deployment or a switch to distributed workers. The current application still owns one runtime/store. Authentication, managed connection credentials and attachment bytes remain in local application state.
 
-Use PostgreSQL 17 and a dedicated development database. Choose **one** setup below; do not replace an existing database service or reuse installation data. These commands are procedures, not recorded execution evidence.
+Use PostgreSQL 17 and a dedicated development database owned by the connecting role. The adapter creates/version-checks its `dispatch_pi` schema at open, so that role needs schema/table creation privileges. Choose **one** setup below; do not replace an existing database service or reuse installation data. These commands are procedures, not recorded execution evidence.
 
 #### Container
 
