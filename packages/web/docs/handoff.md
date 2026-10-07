@@ -22,6 +22,14 @@ Acceptance: frontend-only edits do not restart Pi; edits to loaded backend depen
 
 Evidence: source/deslop review confirmed that backend imports exclude frontend components, Node 24.21.0's watcher awaits the prior child's exit, and the service uses its existing graceful shutdown. `nix develop --command npm run check`, `nix build --no-link`, and `nix flake check` passed on Apple Silicon. The existing Vite chunk-size advisory remains; Linux was not built. Diff/whitespace review, 74 local file links and the new documentation anchor passed. Automatic reload, shutdown during active tool work and native recovery were not exercised; build/source checks do not qualify them.
 
+## Backend provider cleanup — October 7, 2026
+
+Chris requested diagnosis and correction of repeated local reload outages. A controlled shutdown confirmed that HTTP, databases, runtime ownership and child processes closed, but four cached model WebSockets and their five-minute idle timers kept Node alive. Calling Pi's public `cleanupSessionResources()` released those timers and allowed natural process exit. This supersedes the earlier assumption that the existing shutdown covered every process resource.
+
+The service now calls that public cleanup after its sole runtime has drained and before remaining application resources close. It does not force exit, impose concurrency limits, change stored work, or replace Pi recovery. Frontend HMR remains independent; backend imports still trigger a process restart.
+
+Acceptance: source/deslop review, TypeScript/application builds, Apple Silicon Nix build/flake checks, diff/documentation review, and a focused observation that the corrected local backend exits and its replacement serves the existing workspace. The requested fix authorizes this specific operational reload verification; no test suite or additional model request is introduced. Source/deslop review, Nix-shell TypeScript/application builds, Apple Silicon `nix build --no-link` and `nix flake check`, whitespace review and 103 documentation file links passed. The change uses the existing public cleanup directly, without a new shutdown abstraction. Operational reload results are pending deployment. Broader interrupted-tool recovery and Linux execution remain unqualified.
+
 ## Decisions and ownership
 
 - Use TypeScript, React Router framework SPA mode, React/Vite/Tailwind, and shared Base UI primitives with original Dispatch artwork and local Inter.

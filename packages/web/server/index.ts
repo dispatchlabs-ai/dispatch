@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
+import { cleanupSessionResources } from "@earendil-works/pi-ai";
 import { createAuth } from "./auth.js";
 import { createApp } from "./app.js";
 import { readConfig } from "./config.js";
@@ -46,6 +47,8 @@ async function shutdown() {
   shuttingDown = true;
   server.close();
   await runtime.close();
+  // This process owns one runtime; release all provider caches after its work drains.
+  cleanupSessionResources();
   await mcpConnections.close();
   auth.close();
   if ("closeAllConnections" in server) server.closeAllConnections();

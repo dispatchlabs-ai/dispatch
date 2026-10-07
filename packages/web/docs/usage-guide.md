@@ -14,7 +14,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173`. The development launcher runs Vite on localhost and the API/Pi service on `127.0.0.1:3001`, proxying `/api` through Vite. Frontend-only edits hot reload without restarting Pi. Node watches the service entry point and its imported modules, including the shared contracts used by the service. Changes to those files send SIGTERM and wait for the old backend to exit before starting its replacement against the same state. The frontend stays running through that brief backend interruption. Pi owns recovery of interrupted native work; a restart is not an uninterrupted model or tool session. Browser disconnection does not restart the Pi owner.
+Open `http://localhost:5173`. The development launcher runs Vite on localhost and the API/Pi service on `127.0.0.1:3001`, proxying `/api` through Vite. Frontend-only edits hot reload without restarting Pi. Node watches the service entry point and its imported modules, including the shared contracts used by the service. Changes to those files send SIGTERM and wait for the old backend to exit before starting its replacement against the same state. Shutdown drains Pi work and releases provider session resources, including cached model WebSockets and their idle timers, before the old process exits. The frontend stays running through that brief backend interruption. Pi owns recovery of interrupted native work; a restart is not an uninterrupted model or tool session. Browser disconnection does not restart the Pi owner.
 
 Changes to launcher settings, environment variables, or the MCP manifest still require a manual launcher restart. Stop development before installing changed dependencies.
 
