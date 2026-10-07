@@ -7,11 +7,11 @@ type Ticket = {
 };
 type Presence = { participantId: string; sequence: number; until: number; expiry?: TaskId };
 type Turns = {
-  publicationOnly?: boolean; queue: Ticket[]; speaker?: Ticket; sequence: number; presence: Record<string, Presence>;
+  publicationOnly?: boolean; contributionOwned?: boolean; queue: Ticket[]; speaker?: Ticket; sequence: number; presence: Record<string, Presence>;
 };
 export const TurnsDoc = defineDoc<Turns>({
   kind: "dispatch.conversation-turns", version: 1, scope: "conversation", history: "latest", fork: "initial",
-  initial: () => ({ publicationOnly: true, queue: [], sequence: 0, presence: {} }),
+  initial: () => ({ publicationOnly: true, contributionOwned: true, queue: [], sequence: 0, presence: {} }),
 });
 
 /** Conversation etiquette, persisted and waited on by native Pi tasks. Tool execution stays independent. */
@@ -37,6 +37,7 @@ export class ConversationTurns {
           if (turns.speaker && !active(turns.speaker)) delete turns.speaker;
           const ticket = turns.queue.find(item => item.key === task.input.key);
           if (turns.speaker?.key === task.input.key) {
+            if (humansComposing(turns)) return;
             done = true;
             return completed();
           }
@@ -95,11 +96,12 @@ export class ConversationTurns {
 
   async migrate(tx: Tx, roomId: ConversationId) {
     const turns = await tx.doc(TurnsDoc, roomId);
-    if (turns.publicationOnly) return;
-    // Old request/delivery reservations are etiquette only; native work is untouched.
+    if (turns.contributionOwned) return;
+    // Upgrade request/delivery and generation-owned claims once; native work is untouched.
     turns.queue = [];
     delete turns.speaker;
     turns.publicationOnly = true;
+    turns.contributionOwned = true;
   }
 
   async acquire(roomId: ConversationId, participantId: string, owner: TaskId, requester: TaskId, conversationId: ConversationId, ctx: Context, priority = false) {
@@ -109,8 +111,11 @@ export class ConversationTurns {
       const turns = await tx.doc(TurnsDoc, roomId);
       if (turns.speaker?.requester === requester) {
         if (!humansComposing(turns)) return turns.speaker.gate!;
-        turns.queue.push({ ...turns.speaker });
-        delete turns.speaker;
+        const prior = turns.speaker.gate ? await tx.task(turns.speaker.gate) : undefined;
+        if (prior && prior.state.status !== "terminal") return prior.id;
+        const id = await tx.createTask(this.wait, { roomId, key: turns.speaker.key }, { conversationId, ownership: { kind: "task", taskId: requester } });
+        turns.speaker.gate = id;
+        return id;
       }
       let ticket = turns.queue.find(item => item.requester === requester) ?? turns.queue.find(item => item.participantId === participantId && !item.requester);
       if (ticket?.requester === requester && ticket.gate) {
