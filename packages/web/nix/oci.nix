@@ -1,5 +1,6 @@
 { lib, dockerTools, buildEnv, writeShellScript, bashInteractive, coreutils, findutils
-, gnugrep, gnused, gawk, git, ripgrep, nodejs_24, cacert, web, sourceRevision }:
+, gnugrep, gnused, gawk, git, ripgrep, nodejs_24, cacert, web, sourceRevision
+, disposableWorkspace ? false }:
 
 let
   entrypoint = writeShellScript "dispatch-container" ''
@@ -15,7 +16,7 @@ let
     pathsToLink = [ "/bin" "/etc/ssl/certs" ];
   };
 in dockerTools.buildLayeredImage {
-  name = "dispatch-web";
+  name = if disposableWorkspace then "dispatch-workers" else "dispatch-web";
   tag = builtins.substring 0 12 sourceRevision;
   contents = [ runtime ];
   fakeRootCommands = ''
@@ -23,6 +24,11 @@ in dockerTools.buildLayeredImage {
     chmod 0755 ./data
     chown 65532:65532 ./data
     chmod 1777 ./tmp
+    ${lib.optionalString disposableWorkspace ''
+      mkdir -p ./workspace
+      chown 65532:65532 ./workspace
+      chmod 0700 ./workspace
+    ''}
   '';
   config = {
     User = "65532:65532";
@@ -41,8 +47,10 @@ in dockerTools.buildLayeredImage {
       "DISPATCH_WORKSPACE_DIR=/data/workspace"
     ];
     ExposedPorts."3001/tcp" = { };
-    # Preserve writable temporary storage when the task uses a read-only root.
-    Volumes."/tmp" = { };
+    # Native OCI retains its existing read-only-root convention. Conversation workers
+    # must not create anonymous volumes: their entire writable layer is disposable.
+    # Stable services using this variant can supply explicit tmpfs mounts in Compose.
+    Volumes = lib.optionalAttrs (!disposableWorkspace) { "/tmp" = { }; };
     Labels = {
       "org.opencontainers.image.title" = "Dispatch Web";
       "org.opencontainers.image.source" = "https://github.com/dispatchlabs-ai/dispatch-web-next";
