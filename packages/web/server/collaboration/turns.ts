@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { Context } from "@earendil-works/chord";
 import { defineDoc, defineTask, type ConversationId, type Harness, type TaskId, type Tx } from "@earendil-works/pi-durable";
 
@@ -8,11 +7,11 @@ type Ticket = {
 };
 type Presence = { participantId: string; sequence: number; until: number; expiry?: TaskId };
 type Turns = {
-  queue: Ticket[]; speaker?: Ticket; sequence: number; presence: Record<string, Presence>;
+  publicationOnly?: boolean; queue: Ticket[]; speaker?: Ticket; sequence: number; presence: Record<string, Presence>;
 };
 export const TurnsDoc = defineDoc<Turns>({
   kind: "dispatch.conversation-turns", version: 1, scope: "conversation", history: "latest", fork: "initial",
-  initial: () => ({ queue: [], sequence: 0, presence: {} }),
+  initial: () => ({ publicationOnly: true, queue: [], sequence: 0, presence: {} }),
 });
 
 /** Conversation etiquette, persisted and waited on by native Pi tasks. Tool execution stays independent. */
@@ -27,10 +26,11 @@ export class ConversationTurns {
           const turns = await tx.doc(TurnsDoc, task.input.roomId);
           // Owner receipts release abandoned claims after faults, cancellation or recovery.
           const owners = new Map(await Promise.all([...turns.queue, ...(turns.speaker ? [turns.speaker] : [])]
-            .map(async ticket => [ticket.owner, await tx.task(ticket.owner)] as const)));
+            .flatMap(ticket => [ticket.owner, ...(ticket.requester ? [ticket.requester] : [])]).map(async id => [id, await tx.task(id)] as const)));
           const active = (ticket: Ticket) => {
             const owner = owners.get(ticket.owner);
-            return owner && !owner.abortRequested && owner.state.status !== "terminal";
+            const requester = ticket.requester ? owners.get(ticket.requester) : owner;
+            return owner && !owner.abortRequested && owner.state.status !== "terminal" && requester && !requester.abortRequested && requester.state.status !== "terminal";
           };
           const remaining = turns.queue.filter(active);
           if (remaining.length !== turns.queue.length) turns.queue = remaining;
@@ -93,15 +93,13 @@ export class ConversationTurns {
 
   bind(harness: Harness) { this.harness = harness; }
 
-  async enqueue(tx: Tx, roomId: ConversationId, participantId: string, owner: TaskId, messageId: string, priority: boolean, order: number) {
+  async migrate(tx: Tx, roomId: ConversationId) {
     const turns = await tx.doc(TurnsDoc, roomId);
-    const queued = turns.queue.find(ticket => ticket.participantId === participantId);
-    if (queued) {
-      queued.priority ||= priority;
-      return;
-    }
-    if (turns.speaker?.participantId === participantId) return;
-    turns.queue.push({ key: String(owner), participantId, owner, priority, order, tie: createHash("sha256").update(`${messageId}:${participantId}`).digest("hex") });
+    if (turns.publicationOnly) return;
+    // Old request/delivery reservations are etiquette only; native work is untouched.
+    turns.queue = [];
+    delete turns.speaker;
+    turns.publicationOnly = true;
   }
 
   async acquire(roomId: ConversationId, participantId: string, owner: TaskId, requester: TaskId, conversationId: ConversationId, ctx: Context, priority = false) {

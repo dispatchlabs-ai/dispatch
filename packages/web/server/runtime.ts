@@ -18,7 +18,6 @@ import { Skills, SkillBindingsDoc } from "./extensions/skills.js";
 import { Coding } from "./extensions/coding.js";
 import { SharedConversations, SharedDoc, type Member, type PeopleDirectory } from "./collaboration/shared.js";
 import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
-import { TurnsDoc } from "./collaboration/turns.js";
 import type { McpConnections } from "./mcp-connections.js";
 
 const context = BACKGROUND_CONTEXT;
@@ -343,6 +342,13 @@ export class DispatchRuntime {
 
   async watchChat(scope: RuntimeScope, id: string) {
     await this.authorize(scope, id);
+    const streams = new Set<ConversationId>([nativeId(id)]);
+    const updateStreams = async () => {
+      const room = await this.harness.snapshot(SharedDoc, nativeId(id), context);
+      streams.clear(); streams.add(nativeId(id));
+      for (const member of room?.members ?? []) if (member.conversationId) streams.add(member.conversationId);
+    };
+    await updateStreams();
     let value = await this.getChat(scope, id);
     let listener: ((snapshot: ChatSnapshot) => Promise<void>) | undefined;
     let running = false;
@@ -357,6 +363,7 @@ export class DispatchRuntime {
         // Coalesce publications while the current snapshot or listener is pending.
         while (dirty && !stopped) {
           dirty = false;
+          await updateStreams();
           value = await this.getChat(scope, id);
           await listener(value);
         }
@@ -371,7 +378,15 @@ export class DispatchRuntime {
     };
     const unsubscribe = this.harness.subscribeCommits(publication => {
       // Read-only snapshots produce no changes and cannot recursively wake themselves.
-      if (!publication.changes.length || stopped) return;
+      if (stopped) return;
+      const relevant = publication.changes.some(change => {
+        if (change.type === "document" || change.type === "document.copy") {
+          return change.conversationId ? streams.has(change.conversationId) : change.record.kind === CatalogDoc.definition.kind || change.record.kind === ProjectsDoc.definition.kind;
+        }
+        const stream = change.type === "conversation" ? change.value.id : change.value.conversationId;
+        return stream !== undefined && streams.has(stream);
+      });
+      if (!relevant) return;
       dirty = true;
       void drain();
     });
@@ -726,7 +741,7 @@ export class DispatchRuntime {
     for (const chat of catalog.chats) {
       const roomId = nativeId(chat.id);
       await this.harness.commit(async tx => {
-        await tx.doc(TurnsDoc, roomId);
+        await this.shared.turns.migrate(tx, roomId);
         await this.shared.migrateReplyHistory(tx, roomId);
         // Collaboration tools are application capabilities, including bounded attachment reads.
         for (const member of (await tx.doc(SharedDoc, roomId)).members) {

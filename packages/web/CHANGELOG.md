@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — independent agent work
+
+- Separate concurrent model/tool work from public speaking admission; keep unadmitted prose private, including Stop/failure output.
+- Scope conversation observation and reuse unchanged committed histories. Runtime performance and recovery qualification remain pending.
+
 ## Unreleased
 
 - Removed the attachment explanation paragraphs from the + menu and below the composer.

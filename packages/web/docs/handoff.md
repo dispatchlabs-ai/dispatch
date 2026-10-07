@@ -943,3 +943,16 @@ Readiness evidence, October 7:
 - Remaining installation gates: Linux image builder and execution, renewed operator AWS SSO, final domain/certificate, caller storage/network inputs and bootstrap transport, reviewed consumer plan/cost, explicit apply authorization, then focused disposable-state recovery/restore/IAM and two-user/ALB qualification. No real-data readiness is claimed.
 
 - Integrated candidate through `90429e0`: TypeScript/application production checks, Apple Silicon `nix build`/`nix flake check`, both-engine schema validation and whitespace passed. Deslop review identified IAM glob characters in the backing prefix; `85942aa` rejects them and simplifies environment-map iteration. Security exposure documentation is included. Omarchy Linux builder reachability was subsequently confirmed by Deployer; actual OCI build/inspection remains pending, superseding the earlier missing-builder report.
+
+## Independent work and public contribution correction — October 7, 2026
+
+Implemented and source-reviewed, following Chris's concurrency diagnosis and Pi Durable Expert's design approval. This corrects WP-026's overly broad gate; its historical evidence remains above.
+
+Scope: concurrent provider/tool work, publication-only speaking claims, private unadmitted prose in live/committed/Stop/failure paths, and scoped observation with bounded committed-entry caching. Startup discards obsolete etiquette reservations without cancelling native admitted work. Requester and owner receipts fence abandoned claims. Public receipts and human presence checks remain atomic; stale claims release before successor reconsideration. Stale-post retries under contention remain possible.
+
+Acceptance and evidence:
+- Source review covers silence, explicit progress, final publication/replay, cancellation, Stop/failure privacy, upgrade and native recovery. Independent Pi Durable Expert re-review found no remaining blocking source findings and independently passed the Nix-shell application check.
+- Observation must retain membership/project-access wakeups and delivery-time authorization. Cache committed immutable entry records plus message/activity-group projections separately from live overlays, never transaction drafts; invalidate on entry commits and clear on close.
+- Nix-shell `npm run check` passed (TypeScript and production builds). Apple Silicon Nix build/flake checks passed again after review corrections; whitespace and final diff/deslop review passed. Source simplification removes unused prose switches and new superseded-ID accumulation; historical stored IDs remain compatible. Runtime/usage guidance now reflects publication-only admission.
+- No tests, model requests or browser/API acceptance checks run under the current policy. Runtime concurrency, stale-post rates, restart/cancellation and rendered desktop/390 px states remain unverified. No measured performance improvement claimed.
+- Work is isolated in `dispatch-web-next-concurrency` on `fix/independent-agent-work`; canonical checkout and running service are unchanged. Source review approved integration; publication and loaded revision will be recorded after safe local replacement.
