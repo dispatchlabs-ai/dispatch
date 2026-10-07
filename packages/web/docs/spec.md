@@ -462,9 +462,19 @@ Continue adding Pi Durable capabilities in focused feature slices: tools and int
 
 Design the first chat around Pi's public interfaces and the ownership boundaries below. Add later features' detailed behavior and UI when their use cases are agreed. The right column remains available for specified supporting views; chat-first scope does not invent content for it.
 
+### Doctor agent health review
+
+**Product intent clarified October 7, 2026; not implemented.** Doctor is intended to review how an agent performs in conversations, on request and potentially automatically or on a schedule. The agent screen is the home for this workflow: an agent-specific conversation log, review evidence and suggestions. WP-046 below implements permissioned definition editing only; it does not deliver this agent-health experience. Completion of its narrow work package must not be reported as completion of Doctor.
+
+Doctor needs an execution integration similar to the existing `agent-eval` repository, not only prompt guidance. Inspect that repository before choosing a capability, skill or service boundary. The requested outcome is strong evidence about agent behavior, not merely Doctor's narrative assessment. Evidence should be traceable to the reviewed conversations/configurations and evaluation inputs/results, with reproducibility and limitations specified in the integration contract; no evaluator can establish unlimited certainty from a finite sample.
+
+The proposed conversation log and suggestions must preserve source access rules: company-shared agent definitions do not make all conversations or private native traces company-readable. Review access and the audience for saved evidence/suggestions require their own explicit contract, separate from definition-edit grants.
+
+**Design remains open:** conversation coverage and revision attribution, evaluation interface/provenance, review triggers and schedule policy, saved finding/suggestion schema and UI, and authorization for evidence access and applying suggestions. Detailed work packages follow inspection and agreement. No eval execution, review UI, conversation index, scheduling or verified health report is established by this specification clarification. The existing testing policy remains unchanged.
+
 ### Permissioned agent management
 
-**Direction accepted; implemented October 7, 2026. Runtime behavior not qualified.** Chris wants explicitly authorized agents to modify other agents as a foundation for eval-driven improvement, and has created **Doctor** as the first trial editor. The initial request authorized documentation only; Chris subsequently requested execution through completion. Grants remain disabled pending the trial choices below; this status does not establish trial execution or deployment. Product context remains the [repository decision record](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/); [WP-046](handoff.md#wp-046--permissioned-agent-management) tracks the implementation scope and unresolved choices.
+**Direction accepted; implemented October 7, 2026. Runtime behavior not qualified.** Chris wants explicitly authorized agents to modify other agents as one foundation for the [Doctor health-review workflow](#doctor-agent-health-review), and has created **Doctor**. WP-046 treated Doctor as its proposed editing-trial principal, not as a completed health-review service. The initial request authorized documentation only; Chris subsequently requested execution through completion. Grants remain disabled pending the trial choices below; this status does not establish trial execution or deployment. Product context remains the [repository decision record](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/); [WP-046](handoff.md#wp-046--permissioned-agent-management) tracks the implementation scope and unresolved choices.
 
 #### Management boundary and identity
 
