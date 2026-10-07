@@ -32,7 +32,7 @@ Record exact module/image/provider revisions, client topology, stop/exit timesta
 1. Review the new image/module plan and migration compatibility. Record the last known-good image digest and restorable backup. Do not assume an older image can read migrated state.
 2. Stop admission, scale service to zero and confirm all tasks using this store have exited. A stop request is not evidence of exit. Disable independent maintenance/qualification tasks and scheduled replacements before touching files.
 3. Take a complete stopped-service backup. Apply the reviewed replacement with no overlapping writer; restore the service to one task and observe health, sign-in, MCP credentials, attachments and committed conversations.
-4. If startup/recovery fails, scale to zero and confirm exit again. Revert to the known-compatible digest, or restore the matching complete backup to an isolated empty destination before starting its matching image. Restoring older state discards subsequent writes; obtain operator approval for that loss. Never point two running services at the restored store.
+4. If startup/recovery fails, scale to zero and confirm exit again. Preserve the newer store privately before rollback. Revert only to a digest proven compatible with that store, or restore the matching complete pre-upgrade backup to an isolated empty destination before starting its matching image. Restoring older state discards subsequent writes; obtain operator approval for that loss. Never point two running services at the restored store.
 
 ## Backup and restore
 
