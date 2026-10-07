@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Removed the attachment explanation paragraphs from the + menu and below the composer.
+
 ### Fixed
 
 - Prevent unchanged parent drafts from rebuilding the Markdown editor during typing; isolate thread editor state by composer ID. The recorded stale-update path was source reviewed; post-fix typing and rendered UI remain unverified. See [composer regression evidence](docs/handoff.md#october-6-2026--composer-draft-synchronization-regression).

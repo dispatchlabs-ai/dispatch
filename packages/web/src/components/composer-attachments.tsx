@@ -28,7 +28,6 @@ export function AttachmentPicker({ disabled, onAddFiles }: { disabled: boolean; 
         <Menu.Popup className="action-menu attachment-menu">
           <Menu.Item onClick={() => files.current?.click()}><FilePlus size={16} /> Add files</Menu.Item>
           <Menu.Item onClick={() => images.current?.click()}><ImagePlus size={16} /> Add images</Menu.Item>
-          <p className="attachment-sharing-note">Uploads are shared with conversation members immediately and retained even if removed from your draft.</p>
         </Menu.Popup>
       </Menu.Positioner></Menu.Portal>
     </Menu.Root>

@@ -917,3 +917,5 @@ Product intent belongs at wiki.dispatchworks.ai; no wiki publication is claimed 
 ### October 7, 2026 — Attachment UI copy correction
 
 Chris requested completely removing the long sharing/retention sentences from the attachment menu and below the composer. This supersedes WP-040's original visible-disclosure criterion, not the immediate-sharing/retention contract. Security confirmed that the prose is not an access control. Keep the boundary in the [usage guide](usage-guide.md#chat-and-workspace), preserve file/image picking, paste, previews, removal/retry and concise status/error labels. Source/build and rendered desktop/390 px evidence for this correction remain pending; no deployment or functional verification is implied.
+
+Source/deslop review, TypeScript/production builds, Apple Silicon Nix build/flake checks and whitespace checks passed for the October 7 paragraph removal. No tests ran. Updated desktop/390 px rendered review remains unverified; new captures are needed.

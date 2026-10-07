@@ -200,7 +200,6 @@ export function ConversationComposer({ id, chatId, active = true, draft, pending
         toolbar={<><AttachmentPicker disabled={disabled || Boolean(pending?.sending)} onAddFiles={addFiles} /><div className="button-row">{children}<Button type="submit" className="send-button" disabled={!canSend} aria-label={pending?.error ? "Retry sending message" : thread ? "Send reply" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}</Button></div></>}
       />
     </form>
-    <p className="attachment-sharing-note">Files picked or pasted here are shared immediately with conversation members and retained, even when removed from the draft.</p>
     {thread ? <p className="thread-visibility"><LockKeyhole size={12} /> Replies are visible to everyone in this conversation.</p> : null}
   </div>;
 }
