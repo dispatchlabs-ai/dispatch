@@ -17,6 +17,11 @@
               inherit web;
               sourceRevision = self.rev or self.dirtyRev or "uncommitted";
             };
+            workers-oci = pkgs.callPackage ./packages/web/nix/oci.nix {
+              inherit web;
+              sourceRevision = self.rev or self.dirtyRev or "uncommitted";
+              disposableWorkspace = true;
+            };
           };
           checks.web = web;
           devShells.default = pkgs.mkShell {
