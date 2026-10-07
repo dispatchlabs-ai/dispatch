@@ -85,7 +85,7 @@ export class SharedConversations {
   readonly turns = new ConversationTurns();
   readonly contributions = new Contributions(this.turns);
 
-  constructor(private readonly createAgent: (tx: Tx, roomId: ConversationId, companyId: string, definitionId: string) => Promise<Member>, private readonly attachments: AttachmentStore, management: Parameters<typeof managementTools>[0]) {
+  constructor(private readonly createAgent: (tx: Tx, roomId: ConversationId, companyId: string, definitionId: string, revision?: number) => Promise<Member>, private readonly attachments: AttachmentStore, management: Parameters<typeof managementTools>[0]) {
     this.delivery = defineTask<{
       roomId: ConversationId; participantId: string; messageId: string; epoch: number; previous?: TaskId;
     }, { phase: "deliver" }, null>({
@@ -316,6 +316,11 @@ export class SharedConversations {
       execute: async (args, api, ctx) => {
         const binding = await this.binding(api.conversationId, ctx);
         if (!args.agentDefinitionId) return reply(await this.availableAgents((await api.snapshot(SharedDoc, binding.roomId!, ctx))!.companyId));
+        const requestId = `tool:${api.taskId}:${api.callId}`;
+        if (this.inviteRemote) {
+          await this.inviteRemote(api.conversationId, requestId, [args.agentDefinitionId]);
+          return reply({ invited: args.agentDefinitionId });
+        }
         await api.commit(async tx => {
           await this.invite(tx, binding.roomId!, binding.participantId!, { requestId: `tool:${api.taskId}:${api.callId}`, agentDefinitionIds: [args.agentDefinitionId!] }, []);
         }, ctx);
@@ -429,6 +434,7 @@ export class SharedConversations {
     });
   }
 
+  inviteRemote?: (instanceId: ConversationId, requestId: string, definitionIds: string[]) => Promise<void>;
   availableAgents: (companyId: string) => Promise<unknown> = async () => [];
   bind(harness: Harness, storage: Storage) {
     this.harness = harness; this.storage = storage; this.turns.bind(harness); this.contributions.bind(harness);
@@ -569,9 +575,9 @@ export class SharedConversations {
     for (const definitionId of agentIds) await this.addAgent(tx, roomId, definitionId);
   }
 
-  async addAgent(tx: Tx, roomId: ConversationId, definitionId: string) {
+  async addAgent(tx: Tx, roomId: ConversationId, definitionId: string, revision?: number) {
     const room = await tx.doc(SharedDoc, roomId);
-    const member = await this.createAgent(tx, roomId, room.companyId, definitionId);
+    const member = await this.createAgent(tx, roomId, room.companyId, definitionId, revision);
     await this.enable(tx, member.conversationId!);
     const binding = await tx.doc(BindingDoc, member.conversationId!);
     binding.roomId = roomId; binding.participantId = member.id;
