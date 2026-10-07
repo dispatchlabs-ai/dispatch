@@ -7,6 +7,7 @@ export interface PendingMessage {
   text: string;
   threadId?: string | null;
   mentions?: string[];
+  attachmentIds?: string[];
   sending: boolean;
   error?: string;
 }

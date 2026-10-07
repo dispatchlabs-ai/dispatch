@@ -1,3 +1,4 @@
+import { useAttachmentDrafts, emptyAttachments } from "../lib/attachments";
 import { Tabs } from "@base-ui/react/tabs";
 import { Bot, ChevronLeft, ChevronRight, CircleHelp, Folder, LogOut, Menu, MessageSquare, PanelLeft, PanelRight, Plus, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
@@ -177,6 +178,15 @@ export function Workspace() {
   }, []);
   const onConnection = useCallback((chatId: string, connection: ConnectionState) => setConnections(current => ({ ...current, [chatId]: connection })), []);
 
+  const attachmentDrafts = useAttachmentDrafts(key => {
+    draftVersions.current[key] = (draftVersions.current[key] ?? 0) + 1;
+    messageRequests.current[key] = undefined;
+    setPending(current => ({ ...current, [key]: undefined }));
+    setSendErrors(current => ({ ...current, [key]: undefined }));
+  });
+  const clearAttachments = useRef(attachmentDrafts.clear);
+  clearAttachments.current = attachmentDrafts.clear;
+
   const settleMessage = useCallback((chatId: string, requestId: string) => {
     const request = messageRequests.current[chatId];
     if (request?.requestId !== requestId) return;
@@ -184,6 +194,7 @@ export function Workspace() {
     setPending(current => current[chatId]?.requestId === requestId ? { ...current, [chatId]: undefined } : current);
     // A later draft can have identical text; only the submitted edit may be cleared.
     if ((draftVersions.current[chatId] ?? 0) === request.draftVersion) {
+      clearAttachments.current(chatId);
       setDrafts(current => ({ ...current, [chatId]: "" }));
       setMentions(current => ({ ...current, [chatId]: [] }));
     }
@@ -210,7 +221,7 @@ export function Workspace() {
 
   function requestCloseTab(tabId: string) {
     const tab = tabs.find(item => item.id === tabId);
-    const dirty = tab?.kind === "chat" ? [...new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions)])].some(key => (key === tab.chatId || key.startsWith(`${tab.chatId}:`)) && (Boolean(drafts[key]?.trim()) || Boolean(pending[key]) || Boolean(mentions[key]?.length))) : false;
+    const dirty = tab?.kind === "chat" ? [...new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions), ...Object.keys(attachmentDrafts.drafts)])].some(key => (key === tab.chatId || key.startsWith(`${tab.chatId}:`)) && (Boolean(drafts[key]?.trim()) || Boolean(pending[key]) || Boolean(mentions[key]?.length) || Boolean(attachmentDrafts.drafts[key]?.length))) : false;
     if (tab?.kind === "project" && projectEditing[tab.projectId]?.busy) return;
     if (dirty || (tab?.kind === "project" && projectEditing[tab.projectId])) setClosingTab(tabId);
     else closeTab(tabId);
@@ -220,10 +231,11 @@ export function Workspace() {
     const closing = tabs.find(tab => tab.id === tabId);
     if (closing?.kind === "project") setProjectEditing(current => ({ ...current, [closing.projectId]: null }));
     if (closing?.kind === "chat") {
-      for (const key of new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions)])) {
+      for (const key of new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions), ...Object.keys(attachmentDrafts.drafts)])) {
         if (key !== closing.chatId && !key.startsWith(`${closing.chatId}:`)) continue;
         messageRequests.current[key] = undefined;
         draftVersions.current[key] = (draftVersions.current[key] ?? 0) + 1;
+        attachmentDrafts.clear(key);
         setDrafts(current => ({ ...current, [key]: "" }));
         setMentions(current => ({ ...current, [key]: [] }));
         setPending(current => ({ ...current, [key]: undefined }));
@@ -361,9 +373,12 @@ export function Workspace() {
     const chatId = threadId ? `${conversationId}:${threadId}` : conversationId;
     if (pending[chatId]?.sending) return;
     const previous = pending[chatId];
-    const text = previous?.text || drafts[chatId]?.trim();
-    if (!text) return;
-    const command: SendMessageInput = { requestId: previous?.requestId || crypto.randomUUID(), text, threadId, mentions: previous?.mentions ?? mentions };
+    const text = previous?.text ?? drafts[chatId]?.trim() ?? "";
+    const attachments = attachmentDrafts.drafts[chatId] ?? [];
+    if (attachments.some(item => !item.attachment)) return;
+    const attachmentIds = previous?.attachmentIds ?? attachments.map(item => item.attachment!.id);
+    if (!text && !attachmentIds.length) return;
+    const command: SendMessageInput = { attachmentIds, requestId: previous?.requestId || crypto.randomUUID(), text, threadId, mentions: previous?.mentions ?? mentions };
     const priorRequest = messageRequests.current[chatId];
     messageRequests.current[chatId] = priorRequest?.requestId === command.requestId
       ? priorRequest : { requestId: command.requestId, draftVersion: draftVersions.current[chatId] ?? 0 };
@@ -428,6 +443,10 @@ export function Workspace() {
   const connection = active.kind === "chat" ? connections[active.chatId] || "connecting" : null;
   const activeProjectId = active.kind === "project" ? active.projectId : active.kind === "chat" ? chats.find(chat => chat.id === active.chatId)?.projectId ?? null : null;
   const supporting = (inDrawer = false) => section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : active.kind === "chat" && snapshot ? <SharedContextPanel key={snapshot.conversation.id} snapshot={snapshot} models={config?.models ?? []} threadId={threads[active.chatId] ?? null}
+    attachments={attachmentDrafts.drafts[`${active.chatId}:${threads[active.chatId]}`] ?? emptyAttachments}
+    onAddFiles={files => attachmentDrafts.add(`${active.chatId}:${threads[active.chatId]}`, active.chatId, files)}
+    onRemoveAttachment={id => attachmentDrafts.remove(`${active.chatId}:${threads[active.chatId]}`, id)}
+    onRetryAttachment={id => attachmentDrafts.retry(`${active.chatId}:${threads[active.chatId]}`, active.chatId, id)}
     mentions={mentions[`${active.chatId}:${threads[active.chatId]}`] ?? []} onMentionsChange={ids => changeMentions(`${active.chatId}:${threads[active.chatId]}`, ids)}
     draft={drafts[threads[active.chatId] ? `${active.chatId}:${threads[active.chatId]}` : active.chatId] || ""}
     pending={pending[`${active.chatId}:${threads[active.chatId]}`]} error={sendErrors[`${active.chatId}:${threads[active.chatId]}`]}
@@ -570,6 +589,10 @@ export function Workspace() {
               connection={connections[tab.chatId] || "connecting"}
               chatId={tab.chatId}
               snapshot={snapshots[tab.chatId]}
+              attachments={attachmentDrafts.drafts[tab.chatId] ?? emptyAttachments}
+              onAddFiles={files => attachmentDrafts.add(tab.chatId, tab.chatId, files)}
+              onRemoveAttachment={id => attachmentDrafts.remove(tab.chatId, id)}
+              onRetryAttachment={id => attachmentDrafts.retry(tab.chatId, tab.chatId, id)}
               draft={drafts[tab.chatId] || ""}
               pending={pending[tab.chatId]}
               sendError={sendErrors[tab.chatId]}

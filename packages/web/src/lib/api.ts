@@ -9,8 +9,8 @@ export async function request<T>(path: string, body?: unknown, signal?: AbortSig
   const response = await fetch(path, {
     method: body === undefined ? "GET" : "POST",
     credentials: "same-origin",
-    headers: body === undefined ? { Accept: "application/json" } : { Accept: "application/json", "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: body === undefined ? { Accept: "application/json" } : { Accept: "application/json", ...(body instanceof FormData ? {} : { "Content-Type": "application/json" }) },
+    body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
     signal,
   });
   const contentType = response.headers.get("Content-Type") || "";

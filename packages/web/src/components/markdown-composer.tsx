@@ -36,6 +36,7 @@ type MarkdownComposerProps = {
   mentions: string[];
   onMentionsChange: (ids: string[]) => void;
   toolbar: ReactNode;
+  onPasteFiles?: (files: File[]) => void;
 });
 
 const noMentions: string[] = [];
@@ -88,6 +89,7 @@ function ComposerSync(props: MarkdownComposerProps & { transformers: Transformer
   const conversation = props.mode === "document" ? undefined : props;
   const mentions = conversation?.mentions ?? noMentions;
   const onSend = conversation?.onSend;
+  const onPasteFiles = conversation?.onPasteFiles;
   const onMentionsChange = conversation?.onMentionsChange;
   const [editor] = useLexicalComposerContext();
   const lastValue = useRef(value);
@@ -137,6 +139,12 @@ function ComposerSync(props: MarkdownComposerProps & { transformers: Transformer
 
   useEffect(() => editor.registerCommand(PASTE_COMMAND, event => {
     if (!(event instanceof ClipboardEvent) || !event.clipboardData) return false;
+    const files = Array.from(event.clipboardData.files);
+    if (files.length && onPasteFiles) {
+      event.preventDefault();
+      if (editor.isEditable()) onPasteFiles(files);
+      return true;
+    }
     const text = event.clipboardData.getData("text/plain");
     const selection = $getSelection();
     event.preventDefault();
@@ -145,7 +153,7 @@ function ComposerSync(props: MarkdownComposerProps & { transformers: Transformer
     if ($findMatchingParent(anchor, $isCodeNode) || ($isTextNode(anchor) && anchor.hasFormat("code"))) selection.insertRawText(text);
     else selection.insertNodes($generateNodesFromMarkdownString(text, transformers, true));
     return true;
-  }, COMMAND_PRIORITY_HIGH), [editor, transformers]);
+  }, COMMAND_PRIORITY_HIGH), [editor, transformers, onPasteFiles]);
 
   useEffect(() => {
     const unregister = [COPY_COMMAND, CUT_COMMAND].map(command => editor.registerCommand(command, event => {
