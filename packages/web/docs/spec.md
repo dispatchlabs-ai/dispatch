@@ -462,7 +462,7 @@ Design the first chat around Pi's public interfaces and the ownership boundaries
 
 ### Individual-agent evaluation
 
-**Data direction accepted October 7, 2026; implementation and functional acceptance pending.** Start with individual agents, supporting both stored standalone prompts/cases and evaluation of real usage. Team evaluation is deferred. Agent Eval and Jev are optional tools, not required dependencies or the product's organizing model. [WP-047](handoff.md#wp-047--agent-evaluation-profiles-and-editor) owns the first data/editor delivery; storing a profile does not establish evaluation execution.
+**Data direction accepted October 7, 2026; profile/editor source implementation available, functional acceptance pending.** Start with individual agents, supporting both stored standalone prompts/cases and evaluation of real usage. Team evaluation is deferred. Agent Eval and Jev are optional tools, not required dependencies or the product's organizing model. [WP-047](handoff.md#wp-047--agent-evaluation-profiles-and-editor) owns the first data/editor delivery; storing a profile does not establish evaluation execution.
 
 Use Dispatch-owned Pi Durable documents in the existing persistent store, separate from `dispatch.catalog` and native `pi.agent`. Profile revision is application data, distinct from the document schema/migration version. Large fixtures/artifacts remain private file/blob references. Document scope is not an authorization boundary.
 
@@ -475,7 +475,7 @@ Use Dispatch-owned Pi Durable documents in the existing persistent store, separa
 
 Criterion outcomes distinguish `pass`, `fail`, `insufficient`, `not_applicable` and `not_evaluated`. Execution/grading completion is not a pass; an evaluator error is not an agent failure. Missing profiles mean not configured, not passed.
 
-Profile saves require the expected current revision and preserve prior revisions. Profile access does not grant access to referenced conversations/artifacts. Saving prompts or grading material grants no execution authority. The editor first exposes responsibilities, expected behavior, criteria, prohibited actions and standalone cases; run/results remain system-generated. Automation, budgets, execution authorization, grader integration and Doctor's improvement loop are separate later contracts. This does not expand permissioned-agent-management grants.
+Profile saves require the expected current revision and preserve prior revisions. Profile access does not grant access to referenced conversations/artifacts. Saving prompts or grading material grants no execution authority. The editor first exposes responsibilities, expected behavior, criteria, prohibited actions and standalone cases; run/results remain system-generated. Automation, budgets, execution authorization, grader integration and Doctor's improvement loop are separate later contracts. This does not expand permissioned-agent-management grants. The [usage guide](usage-guide.md#agent-evaluation-profiles) describes the current profile-only API/editor and limits; run/result types are a later-execution contract, not persisted or executable records in this slice.
 
 ### Permissioned agent management
 
