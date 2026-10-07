@@ -4,7 +4,8 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { z } from "zod";
 import type { createAuth, AuthPrincipal } from "./auth.js";
 import { ProjectAccessError } from "./project-access.js";
-import { RuntimeError, type DispatchRuntime } from "./runtime.js";
+import { RuntimeError } from "./runtime.js";
+import type { RuntimeService } from "./runtime-service.js";
 import { CollaborationError } from "./collaboration/shared.js";
 import type { ApplicationConfig, ChatSnapshot } from "../src/shared/contracts.js";
 import { ConnectionError, type McpConnections } from "./mcp-connections.js";
@@ -16,7 +17,7 @@ import { randomToken } from "./auth/crypto.js";
 type Auth = ReturnType<typeof createAuth>;
 type AppOptions = {
   auth: Auth;
-  runtime: DispatchRuntime;
+  runtime: RuntimeService;
   mcpConnections: McpConnections;
   origin: string;
   configuration: () => Promise<ApplicationConfig>;
@@ -257,7 +258,7 @@ export function createApp(options: AppOptions) {
   return app;
 }
 
-type ChatWatch = Awaited<ReturnType<DispatchRuntime["watchChat"]>>;
+type ChatWatch = Awaited<ReturnType<RuntimeService["watchChat"]>>;
 
 /** Each subscriber retains at most the latest complete snapshot under backpressure. */
 function snapshotStream(watch: ChatWatch, isValid: () => boolean, signal: AbortSignal, onRevocation: (listener: () => void) => () => void) {

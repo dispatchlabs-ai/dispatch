@@ -37,6 +37,7 @@ export class AgentConnections {
   private harness!: Harness;
   private closed = false;
   onChanged: () => Promise<void> = async () => {};
+  runBackground: <T>(operation: () => Promise<T>) => Promise<T> = operation => operation();
 
   private constructor(configs: ConnectionConfig[], private readonly registry: Registry, private readonly managed?: McpConnections, private readonly companyId?: string) {
     this.connections = configs.map(config => this.create(config));
@@ -51,7 +52,7 @@ export class AgentConnections {
         catalog.connections[connection.key] = connection.catalog;
       }, context);
       await this.onChanged();
-    }, "source" in config ? this.managed : undefined);
+    }, "source" in config ? this.managed : undefined, operation => this.runBackground(operation));
   }
 
   private syncManaged() {
@@ -141,7 +142,7 @@ class McpConnection {
   private error?: string;
   catalog: Catalog["connections"][string] = { tools: [], instructions: "", checkedAt: 0 };
 
-  constructor(readonly config: ConnectionConfig, private readonly registry: Registry, private readonly changed: (connection: McpConnection) => Promise<void>, private readonly managed?: McpConnections) {
+  constructor(readonly config: ConnectionConfig, private readonly registry: Registry, private readonly changed: (connection: McpConnection) => Promise<void>, private readonly managed?: McpConnections, private readonly runBackground: <T>(operation: () => Promise<T>) => Promise<T> = operation => operation()) {
     this.key = `${config.agentId}/${config.id}`;
     this.extensionName = `dispatch-mcp-${config.agentId}-${config.id}`;
   }
@@ -200,11 +201,17 @@ class McpConnection {
     const client = new McpClient({ name: "dispatch-web", version: "0.1.0" });
     this.client = client;
     client.onClose(() => { if (!this.closed) this.error = `${this.config.name} disconnected. The next tool call will reconnect.`; });
-    client.onNotification("notifications/tools/list_changed", () => { void this.discover(client).catch(() => { this.error = "The tool list could not be refreshed."; }); });
+    client.onNotification("notifications/tools/list_changed", () => { void this.runBackground(() => this.discover(client)).catch(() => { this.error = "The tool list could not be refreshed."; }); });
     try {
       if (this.managed) {
-        await this.managed.beforeConnect(this.config.id);
-        await client.connect(new StreamableHttpTransport({ url: this.config.endpoint, authProvider: this.managed.authProvider(this.config.id), fetch: (input, init) => this.managed!.fetch(this.config.id, input, init) }));
+        await this.runBackground(() => this.managed!.beforeConnect(this.config.id));
+        const auth = this.managed.authProvider(this.config.id);
+        await client.connect(new StreamableHttpTransport({ url: this.config.endpoint, authProvider: {
+          // SSE reconnect and transport close can renew credentials independently
+          // of discovery or an HTTP request. Track the entire renewal as a writer.
+          token: () => this.runBackground(() => auth.token()),
+          onUnauthorized: input => this.runBackground(async () => { await auth.onUnauthorized?.(input); }),
+        }, fetch: (input, init) => this.managed!.fetch(this.config.id, input, init) }));
       } else if ("command" in this.config) {
         await client.connect(new StdioTransport({ command: this.config.command, args: this.config.args, inheritEnv: false, stderr: "pipe" }));
       }

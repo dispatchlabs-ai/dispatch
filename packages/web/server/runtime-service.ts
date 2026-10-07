@@ -1,0 +1,38 @@
+import type { DispatchRuntime } from "./runtime.js";
+
+/** Authenticated application boundary, shared by native and distributed runtimes.
+ * Implementations must enforce the supplied company/user scope; this interface
+ * does not authorize forwarding caller-provided scope over an untrusted network.
+ */
+export type RuntimeService = Pick<DispatchRuntime,
+  | "addParticipants"
+  | "agentConnections"
+  | "archiveAgent"
+  | "authorizeAttachmentUpload"
+  | "composing"
+  | "createChat"
+  | "createProject"
+  | "downloadAttachment"
+  | "getChat"
+  | "getSkill"
+  | "listAgents"
+  | "listChats"
+  | "listMcpConnections"
+  | "listProjects"
+  | "listSkills"
+  | "managementGrants"
+  | "reconnectAgentConnection"
+  | "refreshMcpConnections"
+  | "renameChat"
+  | "saveAgent"
+  | "saveManagementGrant"
+  | "saveProject"
+  | "saveSkill"
+  | "stop"
+  | "submit"
+  | "updateChat"
+  | "uploadAttachment"
+  | "watchChat"
+  | "getDefaultAgent"
+  | "close"
+>;
