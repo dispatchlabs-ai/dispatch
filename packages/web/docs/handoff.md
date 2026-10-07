@@ -1,6 +1,6 @@
 # Dispatch Web implementation handoff
 
-The local implementation covers company authentication, stock Pi Durable chat, the branded desktop/mobile workspace, and named agent definitions. [spec.md](spec.md) defines the current contracts; [usage-guide.md](usage-guide.md) explains operation. The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains product intent and decision history. Shared conversations are implemented locally in [WP-024](#wp-024--shared-conversations); [WP-026](#wp-026--listen-before-responding) adds listening and speaking turns. Functional qualification remains deferred.
+The local implementation covers the current features listed in [spec.md](spec.md#reading-this-specification), including company authentication, shared conversations, named agents, tools/connections/skills, shared projects, attachments and opt-in PostgreSQL storage. [spec.md](spec.md) defines the current contracts; [usage-guide.md](usage-guide.md) explains operation. The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains product intent and decision history. Shared conversations are implemented locally in [WP-024](#wp-024--shared-conversations); [WP-026](#wp-026--listen-before-responding) adds listening and speaking turns. Functional qualification remains deferred.
 
 ## Current testing policy
 
@@ -30,16 +30,22 @@ The service now calls that public cleanup after its sole runtime has drained and
 
 Acceptance: source/deslop review, TypeScript/application builds, Apple Silicon Nix build/flake checks, diff/documentation review, and a focused observation that the corrected local backend exits and its replacement serves the existing workspace. The requested fix authorizes this specific operational reload verification; no test suite or additional model request is introduced. Source/deslop review, Nix-shell TypeScript/application builds, Apple Silicon `nix build --no-link` and `nix flake check`, whitespace review and 103 documentation file links passed. The change uses the existing public cleanup directly, without a new shutdown abstraction. After installing the fix locally, touching the backend entry point without changing its contents replaced backend PID 43674 with 43852 in 1.8 seconds while frontend PID 43679 stayed running. Frontend and session API returned HTTP 200 afterward. This was an idle operational reload, not an active-tool recovery qualification; the preceding diagnostic separately proved that provider cleanup releases cached WebSockets/timers. Browser automation was blocked by its URL policy during final verification, so authenticated UI recovery was not rechecked. Broader interrupted-tool recovery and Linux execution remain unqualified.
 
+## Specification reconciliation — October 7, 2026
+
+Chris requested a consistent product contract for future testing. Reconciled current versus legacy project policy, read-all exceptions, human invitation scope, admitted public replies and conversation-wide Stop, agent editor/context rules, and deployment/storage qualification boundaries. Explicitly separate current acceptance targets from future/proposed designs; source behavior is not permission to weaken an accepted requirement. Preserve the concurrently published permissioned-agent-management design as unimplemented.
+
+Documentation-only acceptance: source/deslop review findings on invitations, read-all removal and the ownership summary were resolved; changed-document local file/anchor checks and whitespace checks passed. No code, tests, builds, model calls, deployment or runtime qualification are included. Existing testing authorization is unchanged.
+
 ## Decisions and ownership
 
 - Use TypeScript, React Router framework SPA mode, React/Vite/Tailwind, and shared Base UI primitives with original Dispatch artwork and local Inter.
 - Keep a persistent Node/Hono service separate from frontend hot reload. One process owns each Pi directory, enforced by an OS-backed SQLite ownership lock without limiting concurrent agents.
 - Use stock Pi Durable 1.0.4 through its public interfaces. Pi owns admission, native entries, execution, cancellation, and recovery. Dispatch owns identity, access checks, transport, and presentation.
-- Serve one company per installation. Users have equal capabilities, invite-only conversations, private projects, and shared agent definitions. Role-based access control remains future work.
+- Serve one company per installation with equal baseline capabilities and shared agent definitions. Unbound conversations are invite-only; legacy personal groups remain private organization. Shared-project membership grants conversation access, manager/member roles control project settings, and operator read-all grants allow observation only. Broader application RBAC remains future work.
 - Require password/TOTP or a user-verified passkey, with restricted invitation/recovery flows and opaque sessions. The local operator provisions accounts; there is no application administrator role.
 - Keep desktop rail/sidebar/main tabs/full contextual column/bottom bar. Mobile uses navigation and context panels, preserving active work and drafts.
 - Prefer explicit service model configuration, then existing Pi settings/credentials. The first agent has no tools. Named agent revisions are immutable and copied into new chats.
-- Prioritize local development. Omarchy deployment, pilot retirement, additional tools/integrations beyond Developer, handoffs, background triggers, and schedules are deferred to separately specified packages.
+- Preserve local development and existing installation state. Current local/LAN evidence is scoped in WP-041 and WP-043; distributed AWS workers, remote sandboxes, personal Wiki delegation, unspecified handoffs, background triggers and schedules remain future work. Installed coding/image tools, generic MCP connections and explicit skills are current features, not blanket deferrals.
 
 ## Coordinated work
 
@@ -1076,6 +1082,18 @@ Implementation evidence (October 7):
 - PNG validation is bounded structural inspection including IHDR/IDAT/IEND, not pixel decompression or CRC qualification. Atomic rename prevents partial final filenames, not orphan temporary files, partially completed runs or power-loss data loss. Workspace path checks do not provide isolation from concurrent service-account filesystem mutation. Metadata contains prompts and reference paths; protect workspace backups.
 - No new image-generation/review screen was added. The existing agent editor gains one capability checkbox. Rendered desktop/390 px review, keyboard/touch/contrast and functional acceptance remain unverified; captures are needed before claiming UI qualification. No live service integration or deployment has occurred.
 
+## WP-045 — Agent file publication and generation request correction
+
+**Authorized October 7, 2026; implemented on `feat/agent-files`, pending Chris review.** Chris accepted the attachment route after the generation-only tool exposed its missing delivery path, and reported a live HTTP 400. Scope follows [agent-prepared attachments](spec.md#agent-prepared-conversation-attachments); no new browser UI or automatic paid retry.
+
+Acceptance criteria:
+- Snapshot bounded regular workspace files before publication; reject path escapes and special files. Private prepared records are owner-only to agent reads and unavailable to browser downloads until admitted publication.
+- Preserve attachment IDs through native tool receipts, contribution revisions, post-tools/final review and recovery. Stop/silence/discard must not release private records. Publication atomically releases only its selected attachments.
+- Reuse attachment MIME inspection, message limits and existing image/file rendering. Paths are not browser URLs; no base64 arguments or public workspace route.
+- Omit `input_fidelity` from prompt-only generation requests and include safe rejected-parameter diagnostics. Reverse reported a live rejection naming this parameter; no billing conclusion follows from HTTP status alone. Successful final generation/editing remains unverified; no more live probes authorized.
+- Source/deslop and Pi lifecycle review, Nix-shell TypeScript/application builds, Apple Silicon Nix checks, whitespace and changed-document links required. No tests added/run by this implementation owner. Live publication, access isolation, Stop/recovery and desktop/390 px rendering remain unverified. No hosted deployment.
+
+WP-045 check evidence: Developer ran `nix develop -c npm run check`, `nix build`, and `nix flake check` successfully on Apple Silicon. The flake reported zero declared checks; Linux systems were omitted. Pi Expert and Deslop source reviews found no blocking findings; whitespace checks pass. These checks do not establish runtime correctness. Reverse performed one live rejected-request probe during investigation despite the no-tests policy; no further probes were run by this implementation owner.
 
 ## WP-046 — Permissioned agent management
 

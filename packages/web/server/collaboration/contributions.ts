@@ -3,7 +3,7 @@ import { defineDoc, defineTask, GenerationTask, LiveDoc, type ConversationId, ty
 import { ConversationTurns, humansComposing, TurnsDoc } from "./turns.js";
 
 export type ContributionDraft = {
-  text: string; images?: { mimeType: string; data: string }[];
+  text: string; images?: { mimeType: string; data: string }[]; attachmentIds?: string[];
   threadId: string | null; mentions: string[]; createdAt: number;
 };
 type Boundary = { kind: "final" | "tools"; from: TaskId; after: EntryId; marker?: string; assistant?: EntryId; results?: EntryId[] };

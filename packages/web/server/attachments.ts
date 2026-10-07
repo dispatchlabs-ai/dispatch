@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { constants } from "node:fs";
+import { mkdir, open, readFile, realpath } from "node:fs/promises";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { toUSVString } from "node:util";
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import { defineDoc, type ConversationId, type Tx } from "@earendil-works/pi-durable";
 import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MAX_COUNT, ATTACHMENT_TOTAL_MAX_BYTES, ATTACHMENT_IMAGE_MAX_BYTES, ATTACHMENT_IMAGE_TOTAL_MAX_BYTES, type Attachment } from "../src/shared/contracts.js";
 
-export type StoredAttachment = Attachment & { uploaderId: string; createdAt: number };
+export type StoredAttachment = Attachment & { uploaderId: string; createdAt: number; private?: boolean };
 export const AttachmentsDoc = defineDoc<{ records: Record<string, StoredAttachment> }>({
   kind: "dispatch.attachments", version: 1, scope: "conversation", history: "latest", fork: "initial", initial: () => ({ records: {} }),
 });
@@ -62,6 +63,37 @@ export class AttachmentStore {
     return { id, name, ...format, size: bytes.byteLength, uploaderId, createdAt: Date.now(), url: `/api/chats/${encodeURIComponent(conversationId)}/attachments/${id}` };
   }
 
+  /** Snapshot bytes once; publication never reads the mutable source again. Not a process sandbox. */
+  async saveWorkspace(conversationId: string, uploaderId: string, workspace: string, path: string, signal?: AbortSignal): Promise<StoredAttachment> {
+    signal?.throwIfAborted();
+    if (!workspace || !path || isAbsolute(path)) throw new AttachmentError(400, "Choose a workspace-relative file path.");
+    const root = await realpath(workspace);
+    const source = await realpath(resolve(root, path));
+    const within = relative(root, source);
+    if (!within || within === ".." || within.startsWith(`..${sep}`) || isAbsolute(within)) throw new AttachmentError(400, "File must be inside the workspace.");
+    // Refuse final-component symlink replacement and special files; parent-directory races remain a service-account boundary.
+    const handle = await open(source, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    let bytes: Buffer;
+    try {
+      const info = await handle.stat();
+      if (!info.isFile()) throw new AttachmentError(400, "Choose a regular file.");
+      if (info.size > ATTACHMENT_MAX_BYTES) throw new AttachmentError(413, "Files must be 10 MiB or smaller.");
+      const buffer = Buffer.alloc(ATTACHMENT_MAX_BYTES + 1);
+      let length = 0;
+      while (length < buffer.length) {
+        signal?.throwIfAborted();
+        const result = await handle.read(buffer, length, buffer.length - length, null);
+        if (!result.bytesRead) break;
+        length += result.bytesRead;
+      }
+      if (length > ATTACHMENT_MAX_BYTES) throw new AttachmentError(413, "Files must be 10 MiB or smaller.");
+      bytes = buffer.subarray(0, length);
+    } finally { await handle.close(); }
+    signal?.throwIfAborted();
+    const record = await this.save(conversationId, uploaderId, new File([new Uint8Array(bytes)], basename(path)));
+    return { ...record, private: true };
+  }
+
   async read(attachment: Attachment): Promise<Buffer> {
     if (!uuid.test(attachment.id)) throw new AttachmentError(404, "Attachment not found.");
     try { return await readFile(join(this.directory, attachment.id)); }
@@ -90,7 +122,7 @@ export class AttachmentStore {
   }
 }
 
-export function attachmentMetadata({ uploaderId: _uploaderId, createdAt: _createdAt, ...metadata }: StoredAttachment): Attachment { return metadata; }
+export function attachmentMetadata({ uploaderId: _uploaderId, createdAt: _createdAt, private: _private, ...metadata }: StoredAttachment): Attachment { return metadata; }
 
 /** Call only after authorizing the conversation on this transaction. */
 export async function messageAttachments(tx: Tx, roomId: ConversationId, uploaderId: string, ids: string[] = []): Promise<Attachment[]> {

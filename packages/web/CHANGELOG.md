@@ -5,6 +5,15 @@
 - Add native authorized definition reads, revisioned tuning saves and forward restoration, with trusted instance identity, dual editor-revision pins, atomic receipts, explicit rolling quotas and no live rollout.
 - Add separate human-session grant administration and audit APIs. No grants are seeded; Doctor's target and direct-save trial remain unconfigured. Proposal workflows, eval automation and a grant UI are not included.
 
+## Unreleased — specification reconciliation
+
+- Separate current acceptance contracts, legacy personal-group compatibility and future designs. Reconcile project authority, agent editing/context, admitted public replies and conversation-wide Stop; scope deployment and PostgreSQL evidence without claiming full qualification.
+
+## Unreleased — agent file sharing
+
+- Prepare workspace files privately with `conversation_attach` and publish saved attachment IDs through contribution review. Reuse existing attachment storage and rendering; Stop/discard does not publish prepared files.
+- Omit `input_fidelity` on prompt-only image generation and include sanitized rejected-parameter diagnostics. Live generation, publication and recovery remain unverified.
+
 ## Unreleased — agent archive response
 
 - Detach nested agent configuration from the catalog transaction before returning it, so successful archives do not display a failed-request error. The same public projection covers saved-agent retries and retained skill selections.

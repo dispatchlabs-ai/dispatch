@@ -438,3 +438,9 @@ Enable **Image generation** in an agent's Capabilities and save a new revision. 
 `generate_image` generates from a prompt or edits workspace reference PNGs with an optional mask. It defaults to `gpt-image-2.5-sunburst`; specify another supported model explicitly when needed. References leave the workspace for OpenAI processing. Outputs and run metadata remain workspace files; no gallery, automatic conversation attachment, or cleanup job is added. Metadata may contain private prompts and reference paths, so protect workspace storage and backups.
 
 Generation may incur provider charges. There is no automatic retry. After interruption, inspect the existing run record and outputs before deciding whether to request another generation. An incomplete record or locally cancelled request does not prove OpenAI stopped or avoided a charge. Rewind does not delete outputs or reverse charges. Skill guidance is not a permission grant or a guaranteed workflow.
+
+### Sharing generated files from agents
+
+After generating a file, an agent calls `conversation_attach` with its workspace-relative path. This snapshots the file privately and returns an attachment ID. The agent then includes that ID in `conversation_post`'s `attachmentIds`. Preparation alone does not share the file; it becomes readable by conversation members only when the post is admitted. The same workflow supports ordinary generated files as well as images, using the existing 10 MiB per-file, 25 MiB per-message and 10-file limits.
+
+Do not paste base64 into messages or treat workspace paths as browser links. A stopped or discarded draft leaves its prepared files private. Retained prepared/orphan blobs may consume storage; no automatic cleanup is promised. Prompt-only image generation omits the edit-specific `input_fidelity` parameter; provider rejections now identify a safe parameter name when available.
