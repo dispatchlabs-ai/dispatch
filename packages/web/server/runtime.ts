@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, stat } from "node:fs/promises";
+import { mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, getSupportedThinkingLevels, type Models } from "@earendil-works/pi-ai/models";
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, type ConversationId, type HarnessSettings, type RegistryReader, type Storage, type Tx } from "@earendil-works/pi-durable";
-import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
+import { openPiStorage, type PiStorageConfig } from "./storage/open.js";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
 import type { AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
@@ -41,6 +41,7 @@ export class RuntimeError extends Error {
 
 export type RuntimeOptions = {
   stateDir: string;
+  piStorage?: PiStorageConfig;
   workspaceDir: string;
   readAllProjectUserIds?: string[];
   companyId: string;
@@ -89,9 +90,7 @@ export class DispatchRuntime {
     try {
       options.mcpConnections?.initialize();
       const models = options.models ?? productionModels();
-      const filename = join(owner.directory, "pi.sqlite");
-      storage = await openNodeSqliteStorage(filename);
-      await chmod(filename, 0o600);
+      storage = await openPiStorage(owner.directory, options.piStorage ?? { kind: "sqlite" });
       const registry = createRegistry();
       let runtime: DispatchRuntime;
       const attachments = new AttachmentStore(join(owner.directory, "attachments"));

@@ -1,6 +1,6 @@
 # AWS deployment runbook
 
-**Status: provisional, October 7, 2026.** This runbook supports [WP-041](handoff.md#wp-041--generic-aws-container-deployment), not a claim of deployability. Target ECS Fargate, ALB and S3 Files. The candidate module and OCI wrapper exist; isolated amd64 startup/shutdown passed as recorded in WP-041, but ARM execution, persistent-state/network qualification, live consumer-plan review and AWS qualification remain pending. See the [module interfaces](../infra/aws/README.md) for inputs/outputs; resolve the remaining operator transport before use. The application owns this generic procedure; installation-specific plans, secret references and evidence belong in the caller's infrastructure repository.
+**Status: provisional, October 7, 2026.** This runbook supports [WP-041](handoff.md#wp-041--generic-aws-container-deployment), not a claim of deployability. This procedure covers the earlier single-service ECS Fargate, ALB and S3 Files candidate, not the newly accepted [per-conversation workers/Postgres target](spec.md#aws-container-deployment-target). Keep its persistent-mount requirements for that SQLite candidate; they are not requirements for disposable-workspace workers. The candidate module and OCI wrapper exist; isolated amd64 startup/shutdown passed as recorded in WP-041, but ARM execution, persistent-state/network qualification, live consumer-plan review and AWS qualification remain pending. See the [module interfaces](../infra/aws/README.md) for inputs/outputs; resolve the remaining operator transport before use. The application owns this generic procedure; installation-specific plans, secret references and evidence belong in the caller's infrastructure repository.
 
 ## Before applying
 
@@ -32,7 +32,7 @@ Record exact module/image/provider revisions, client topology, stop/exit timesta
 1. Review the new image/module plan and migration compatibility. Record the last known-good image digest and restorable backup. Do not assume an older image can read migrated state.
 2. Stop admission, scale service to zero and confirm all tasks using this store have exited. A stop request is not evidence of exit. Disable independent maintenance/qualification tasks and scheduled replacements before touching files.
 3. Take a complete stopped-service backup. Apply the reviewed replacement with no overlapping writer; restore the service to one task and observe health, sign-in, MCP credentials, attachments and committed conversations.
-4. If startup/recovery fails, scale to zero and confirm exit again. Revert to the known-compatible digest, or restore the matching complete backup to an isolated empty destination before starting its matching image. Restoring older state discards subsequent writes; obtain operator approval for that loss. Never point two running services at the restored store.
+4. If startup/recovery fails, scale to zero and confirm exit again. Preserve the newer store privately before rollback. Revert only to a digest proven compatible with that store, or restore the matching complete pre-upgrade backup to an isolated empty destination before starting its matching image. Restoring older state discards subsequent writes; obtain operator approval for that loss. Never point two running services at the restored store.
 
 ## Backup and restore
 
@@ -40,6 +40,8 @@ The module destroys its service, ALB, access point and roles, but not caller-own
 
 
 Preserve the complete `DISPATCH_DATA_DIR`: `auth.sqlite` plus `auth.key`, `connections.sqlite` plus `connections.key`, operator connection configuration, and the entire `runtime/` tree including Pi metadata and attachment blobs. Also preserve the workspace, configured Pi agent directory/provider authorization and any separately referenced operator credential files under their own restricted backup policy. Capture installation configuration and image/module pins without secret values. SQLite keys, databases and blobs form one restore set; rebuilding the image cannot recover missing keys or attachments.
+
+An installation backup supports restart/recovery, not live-machine migration: stored conversations and task state can travel, but running shell processes, network connections and external-service state do not. Stop the source before starting a migrated destination. Use disposable state and credentials for rehearsals; separate copies of a store can otherwise resume the same pending external actions. Qualify unfinished-work recovery separately from file restoration.
 
 Existing conversations persist absolute coding-tool working directories. Changing `DISPATCH_WORKSPACE_DIR` does not generally retarget them: `DispatchRuntime.migrateWorkspaces()` handles only the specific legacy generated-directory pattern and skips unfinished work. Before restoring host state into a container or changing mount paths, inventory persisted paths and preserve narrowly scoped mappings or obtain a reviewed migration before native recovery. Do not broadly mount the host home directory to make old paths work. Use fresh disposable state for initial container qualification.
 

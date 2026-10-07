@@ -2,6 +2,9 @@ import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+if (process.env.DISPATCH_PI_STORAGE === "postgres" && !process.env.DISPATCH_DATA_DIR) {
+  throw new Error("PostgreSQL mode requires an explicit separate DISPATCH_DATA_DIR");
+}
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const port = process.env.DISPATCH_WEB_PORT ?? "5173";
 const child = spawn(process.execPath, ["packages/web/build/service/server/index.js"], {

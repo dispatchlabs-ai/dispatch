@@ -40,9 +40,68 @@ Send the signal only while that PID still identifies this repository's `scripts/
 
 The launcher fails if the frontend port is occupied, rather than silently choosing another URL. Stop only a server owned by this task/check-out. Run `npm ci` after the dependency lock changes. The initial dependency fetch needs network access; model calls need configured server-side credentials.
 
-The root development, account, and built-app commands share `.local/state/dispatch` in the repository root. This directory is ignored by Git. Do not point two runtime processes at the same storage; a native SQLite ownership lock rejects the second owner. Separate worktrees default to separate state.
+By default, the root development, account, and built-app commands share `.local/state/dispatch` in the repository root. This directory is ignored by Git. Do not point two runtime processes at the same storage; a native SQLite ownership lock rejects the second owner. Separate worktrees default to separate state.
+
+### PostgreSQL development (WP-042)
+
+**Opt-in implementation; runtime qualification pending.** See the [adapter work package](handoff.md#wp-042--local-postgresql-pi-storage-adapter) for integration/check evidence. PostgreSQL is opt-in Pi storage, not an AWS deployment or a switch to distributed workers. The current application still owns one runtime/store. Authentication, managed connection credentials and attachment bytes remain in local application state.
+
+Use PostgreSQL 17 and a dedicated development database owned by the connecting role. The adapter creates/version-checks its `dispatch_pi` schema at open, so that role needs schema/table creation privileges. Choose **one** setup below; do not replace an existing database service or reuse installation data. These commands are procedures, not recorded execution evidence.
+
+#### Container
+
+With Docker available, from a trusted local terminal:
+
+```sh
+# Read a disposable database password without putting it in shell history.
+read -r -s -p 'Development database password: ' POSTGRES_PASSWORD
+printf '\n'
+export POSTGRES_PASSWORD
+docker volume create dispatch-pg-dev
+docker run -d --name dispatch-pg-dev \
+  -p 127.0.0.1:55432:5432 \
+  -e POSTGRES_USER=dispatch_dev -e POSTGRES_DB=dispatch_dev \
+  -e POSTGRES_PASSWORD \
+  -v dispatch-pg-dev:/var/lib/postgresql/data postgres:17
+unset POSTGRES_PASSWORD
+```
+
+The prompt uses Bash syntax; run this block in Bash on macOS. Use unused container/volume names and port; do not adopt a preexisting volume. Wait for PostgreSQL initialization before starting Dispatch. The volume persists through `docker stop dispatch-pg-dev`; later use `docker start dispatch-pg-dev`. Do not remove the volume unless intentionally discarding this development database. The password is visible to Docker administrators in container configuration; use disposable credentials, never a production secret. Port 55432 is loopback-only, not a network exposure boundary against other local users.
+
+#### Homebrew on macOS
+
+If no existing PostgreSQL service occupies port 5432:
+
+```sh
+brew install postgresql@17
+brew services start postgresql@17
+"$(brew --prefix postgresql@17)/bin/createuser" -h localhost -p 5432 -P dispatch_dev
+"$(brew --prefix postgresql@17)/bin/createdb" -h localhost -p 5432 -O dispatch_dev dispatch_dev
+```
+
+Run role/database creation as the installation's database administrator; Homebrew's initial administrator is normally your macOS user. Choose new names if those already exist. Set a disposable role password at the prompt. Keep the server loopback-only and review its existing authentication configuration; installing a password does not itself change `pg_hba.conf`. Do not weaken authentication, overwrite an existing cluster or restart someone else's service to follow this example.
+
+#### Application settings
+
+In the repository's Nix shell, use a fresh state path and a stable store identity unique to this development instance:
+
+```sh
+export DISPATCH_PI_STORAGE=postgres
+export DISPATCH_DATA_DIR="$PWD/.local/state/dispatch-postgres"
+export DISPATCH_POSTGRES_STORE_ID=dispatch-dev-postgres
+# Inject DISPATCH_POSTGRES_URL privately, then:
+npm run dev
+```
+
+Supply `DISPATCH_POSTGRES_URL` through private process injection or a non-echoing prompt, not a literal secret in shell history or a committed file. Its shape is `postgresql://dispatch_dev:<encoded-password>@127.0.0.1:55432/dispatch_dev` for the container; use port 5432 for Homebrew. Percent-encode password characters when constructing the URL. URL query parameters and fragments are rejected; TLS/remote-deployment configuration is not supported by this slice. Restart the launcher after changing settings. Keep these exports in effect when running `npm run auth -- invite ...`, so account enrollment uses the same fresh local state; invitation links are private.
+
+PostgreSQL mode requires an explicit data directory and store ID and rejects existing `runtime/pi.sqlite`; there is no migration. `runtime/postgres-store.json` binds the local directory to database host, port, path and store ID, without credentials. It blocks changing that identity or switching the directory back to SQLite, including after a failed initial connection. Do not remove the marker or rename/delete `pi.sqlite` to bypass these guards. Reopening PostgreSQL state requires the same database, logical-store ID, local state and company configuration. A new store ID selects different Pi state; it does not copy accounts, conversations or attachments. Backups must pair PostgreSQL state with the complete local state and its encryption keys/attachment bytes; database-only backup is insufficient. PostgreSQL backup/restore qualification is still outstanding.
+
+The local duplicate-owner guard is a per-store PostgreSQL session advisory lock on a dedicated, serialized, non-reconnecting connection used for storage. A competing open is rejected without waiting; the lock is released only after admitted operations drain. Connection loss permanently rejects further storage operations and an uncertain COMMIT requires reopening rather than automatic retry. This is **not distributed fencing**, and automatic takeover is unsupported: losing the database connection does not terminate an already-running shell command or remote tool request. Do not start a replacement while an old executor might still run tools. Confirm the old process and its work have stopped before restart. The local runtime-directory SQLite ownership lock remains in use in both modes; only Pi record persistence changes. Keep existing native/LAN owners unchanged.
 
 ## First account and sign-in
+
+Accounts require an operator-issued invitation; the login page has no self-service signup. Only the unused enrollment link expires—not the enrolled account. After setup, sign in normally with your saved credentials.
 
 With the same root checkout and Nix shell, create a single-use enrollment link:
 
@@ -86,7 +145,7 @@ On startup, idle existing agents still using Dispatch’s generated `runtime/wor
 
 Agents sharing a checkout must coordinate edits and Git operations. Use separate Git worktrees for parallel coding, and set the workspace explicitly when launching a separate instance with its own state directory. Dispatch does not create worktrees or clone repositories automatically.
 
-Coding tools run on the service machine with the service account's access, including paths outside the working directory. This first setup is for trusted local use on M1 Air; the directory is not a sandbox. Tool activity and follow-up text appear under one agent heading. Bash appears as an open terminal with the command above its live output, then its recorded result and completion status. Select the terminal header to collapse it. Long output scrolls inside the terminal; scroll up to read without following new output. Errors and full-output file paths appear below the output. A completed follow-up that only repeats the terminal output is omitted from the display; explanations remain visible. Raw call/result and assistant records remain in Pi’s SQLite storage; tool activity has no debug-data option. Other tools without a custom presenter keep a generic output disclosure. Stop uses Pi's cancellation; an interrupted shell/file operation is not guaranteed to be undone or to execute only once during recovery.
+Coding tools run on the service machine with the service account's access, including paths outside the working directory. This first setup is for trusted local use on M1 Air; the directory is not a sandbox. Tool activity and follow-up text appear under one agent heading. Bash appears as an open terminal with the command above its live output, then its recorded result and completion status. Select the terminal header to collapse it. Long output scrolls inside the terminal; scroll up to read without following new output. Errors and full-output file paths appear below the output. A completed follow-up that only repeats the terminal output is omitted from the display; explanations remain visible. Raw call/result and assistant records remain in the selected Pi storage; tool activity has no debug-data option. Other tools without a custom presenter keep a generic output disclosure. Stop uses Pi's cancellation; an interrupted shell/file operation is not guaranteed to be undone or to execute only once during recovery.
 
 Write and edit appear as open file cards. A write shows the recorded file content with green additions, line numbers, and a line count; an edit shows the actual recorded patch, with green additions and red removals in one column. Markdown stays source text. Select the file header to collapse the card. Long content wraps and scrolls inside it. Execution status remains visible; requested write content is labeled until completion is confirmed, and errors retain their native output.
 
@@ -241,7 +300,10 @@ Do not run that service beside the development owner of the same state. Passkeys
 | Variable | Meaning |
 | --- | --- |
 | `DISPATCH_WORKSPACE_DIR` | Existing directory for new coding agents; root launchers default to the repository root, standalone service to its launch directory. Relative values resolve from the service launch directory. |
-| `DISPATCH_DATA_DIR` | Writable authentication and native Pi state; root launchers default to the repository's `.local/state/dispatch` |
+| `DISPATCH_DATA_DIR` | Writable local authentication, connections, attachments and runtime ownership state; also Pi records in SQLite mode. Root launchers default to `.local/state/dispatch`; PostgreSQL requires an explicit separate path. |
+| `DISPATCH_PI_STORAGE` | Pi storage backend: `sqlite` (default) or opt-in `postgres`; see [PostgreSQL development](#postgresql-development-wp-042). |
+| `DISPATCH_POSTGRES_URL` | Private database connection URL; required only for `postgres`, with host/database and no query or fragment. |
+| `DISPATCH_POSTGRES_STORE_ID` | Stable logical-store identity; required only for `postgres`. 1–200 ASCII letters/digits/dots/underscores/colons/hyphens, starting with a letter or digit. |
 | `DISPATCH_AGENT_CONNECTIONS_FILE` | Operator per-agent MCP manifest; defaults to `agent-connections.json` inside the state directory |
 | `DISPATCH_WEB_PORT` | Root frontend/built-app port; default 5173; root account links use the same port |
 | `DISPATCH_PORT` | API service port during development or standalone Nix operation; default 3001; root built launcher uses `DISPATCH_WEB_PORT` |
@@ -254,7 +316,7 @@ Do not run that service beside the development owner of the same state. Passkeys
 
 Use HTTPS for any non-loopback origin. HTTP configurations must bind to loopback. Keep company identity and state together; changing the company ID does not migrate accounts or conversations. Custom origin/port settings must be shared by the service, frontend, and account CLI.
 
-The state directory contains `auth.sqlite`, `auth.key`, and `runtime/` with Pi storage and its ownership lock. Back up the authentication database and encryption key together, along with the complete runtime directory, including `runtime/attachments/` blobs and their native Pi metadata. Attachment references without their blobs cannot be restored by rebuilding; missing bytes return 410. Stop the service before a simple file-copy backup so SQLite journals are settled. A missing encryption key must be restored; generating another key cannot decrypt existing TOTP factors. Do not copy these files into build inputs or source control.
+In default SQLite mode, the state directory contains `auth.sqlite`, `auth.key`, and `runtime/` with Pi storage and its ownership lock. Back up the authentication database and encryption key together, along with the complete runtime directory, including `runtime/attachments/` blobs and their native Pi metadata. Attachment references without their blobs cannot be restored by rebuilding; missing bytes return 410. Stop the service before a simple file-copy backup so SQLite journals are settled. A missing encryption key must be restored; generating another key cannot decrypt existing TOTP factors. Do not copy these files into build inputs or source control.
 
 ## Application API
 
