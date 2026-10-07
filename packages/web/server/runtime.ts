@@ -22,6 +22,7 @@ import { SharedConversations, SharedDoc, type Member, type PeopleDirectory } fro
 import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
 import type { AuthPrincipal } from "./auth.js";
 import { ManagementError, detached, grantHistory, managementFields, readGrants, writeGrant, type Grant } from "./agent-grants.js";
+import { parseEvaluationProfile, readEvaluationProfile, readEvaluationProfileRevision, saveEvaluationProfile } from "./evaluations.js";
 import { managementReadSchema, managementSaveSchema } from "./agent-management.js";
 import type { McpConnections } from "./mcp-connections.js";
 
@@ -518,6 +519,28 @@ export class DispatchRuntime {
   async listAgents(scope: RuntimeScope): Promise<AgentDefinition[]> {
     const catalog = await this.harness.snapshot(CatalogDoc, context);
     return [...latestAgents(catalog!, scope.companyId).values()].map(publicAgent);
+  }
+
+  async evaluationProfile(scope: RuntimeScope, agentId: string) {
+    return this.harness.commit(async tx => {
+      this.findAgent(await tx.doc(CatalogDoc), scope, agentId);
+      return readEvaluationProfile(tx, scope, agentId);
+    }, context);
+  }
+
+  async evaluationProfileRevision(scope: RuntimeScope, agentId: string, revision: number) {
+    return this.harness.commit(async tx => {
+      this.findAgent(await tx.doc(CatalogDoc), scope, agentId);
+      return readEvaluationProfileRevision(tx, scope, agentId, revision);
+    }, context);
+  }
+
+  async saveEvaluationProfile(scope: RuntimeScope, agentId: string, raw: unknown) {
+    const input = parseEvaluationProfile(raw);
+    return this.harness.commit(async tx => {
+      const agent = this.findAgent(await tx.doc(CatalogDoc), scope, agentId);
+      return saveEvaluationProfile(tx, scope, agentId, agent.archived, input);
+    }, context);
   }
 
   async listSkills(scope: RuntimeScope): Promise<SkillDefinition[]> {
