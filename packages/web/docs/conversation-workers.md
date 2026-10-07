@@ -1,6 +1,6 @@
 # Single-server conversation workers
 
-Status: application integration in progress; the web/API + conversation-worker stack is not deployed or qualified. Implements the [accepted target](spec.md#aws-container-deployment-target) and [single-server rehearsal](spec.md#single-server-container-rehearsal). Chris authorized implementation, isolated Omarchy deployment and focused testing on October 7, 2026. Existing installations and their data remain untouched.
+Status: application integration in progress. A private, sealed backend/launcher/PostgreSQL/Garage stack is running on Omarchy with zero conversation workers; no HTTPS/DNS publication. Conversation execution and integrated acceptance remain unqualified. Implements the [accepted target](spec.md#aws-container-deployment-target) and [single-server rehearsal](spec.md#single-server-container-rehearsal). Chris authorized implementation, isolated Omarchy deployment and focused testing on October 7, 2026. Existing installations and their data remain untouched.
 
 ## Ownership and boundaries
 
@@ -57,7 +57,7 @@ Backend directory-only runtime must neither construct conversation agents nor re
 
 Remote Git stores source, PostgreSQL stores Pi state, and ordinary S3 stores artifact bytes. Worker Pi metadata references immutable blobs; workers use authenticated conversation-scoped artifact RPC and receive no S3 credentials. Backend namespaces objects by the authenticated route/store, never a supplied native conversation ID. Worker conversation open requires a remote attachment store; it must not silently fall back to worker-local bytes. Native installations retain their local default.
 
-The backend `artifacts` object is `{endpoint, region, bucket, prefix, credentialsFile}`. The credential file is restricted regular-file JSON `{accessKeyId, secretAccessKey, sessionToken?}`. The SDK uses path-style addressing and explicit credentials, without transparent retries or local fallback. The isolated rehearsal selects Garage, not AWS provisioning; actual Garage compatibility remains pending. Artifact retrieval after fresh-worker replacement is required.
+The backend `artifacts` object is `{endpoint, region, bucket, prefix, credentialsFile}`. The credential file is restricted regular-file JSON `{accessKeyId, secretAccessKey, sessionToken?}`. The SDK uses path-style addressing and explicit credentials, without transparent retries or local fallback. The isolated rehearsal uses Garage, not AWS provisioning; actual S3 save/read, store-isolation and client-reopen checks passed. This does not qualify browser artifact flows, worker replacement or backup/restore. Artifact retrieval after fresh-worker replacement is required.
 
 Consistent backup covers backend auth/connection/routing/launcher state, PostgreSQL and artifact bytes while writers remain quiesced. Restore must resolve restored attachment references in isolated resources. Disposable worker workspaces are not backup inputs. A local S3-compatible service or replacement check does not establish off-machine durability.
 
@@ -76,7 +76,10 @@ Component evidence reported October 7, 2026:
 - [Installer qualification](https://github.com/dispatchlabs-ai/terraform-local-dispatch-workers/blob/f08308ac45c55046e92ec9ee48abb7d0ebabb426/docs/qualification.md): synthetic Omarchy install/reapply/update gating, not application drain or execution.
 - Launcher: 18 injected-driver lifecycle checks; actual Docker probe: stopped creation, identity, retirement, two shell workers/replacement and persistent drain. Neither exercised Dispatch/Pi/model execution.
 - AMD64 source-snapshot image checks: three wrappers, Node 24, non-root execution, no anonymous volumes and fresh writable workspaces. Receipt remains restricted in `.local/worker-qualification/image-build-1-result.json`; this is packaging evidence, not deployed application evidence.
-- Runtime/remote-attachment slice `932e560` and S3 slice `f4e8371` are locally committed with focused checks reported passing. SDK/HTTP checks do not qualify actual Garage, worker artifact replacement or backup/restore.
+- Runtime/remote-attachment slice `932e560` and S3 slice `f4e8371` are locally committed with focused checks reported passing. SDK/HTTP checks do not qualify worker artifact replacement or backup/restore.
+- Actual Garage probe: SDK PUT/GET preserved text/image bytes and external-chat URLs, cross-store artifact lookup was rejected, native MIME/size validation was retained, and a reopened client retrieved existing bytes. Receipt: restricted `.local/worker-qualification/garage-result.json`. This is object-store compatibility evidence, not integrated conversation execution.
+
+The initial private stack reports `backendQuiesced: false`; uncovered MCP writers mean the barrier is not yet trustworthy for backup/update acceptance.
 
 Retain sanitized exact revisions/receipts with integrated results before claiming qualification. ARM64 runtime and AWS deployment are not qualified by AMD64 Omarchy checks.
 
