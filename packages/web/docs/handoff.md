@@ -30,6 +30,12 @@ The service now calls that public cleanup after its sole runtime has drained and
 
 Acceptance: source/deslop review, TypeScript/application builds, Apple Silicon Nix build/flake checks, diff/documentation review, and a focused observation that the corrected local backend exits and its replacement serves the existing workspace. The requested fix authorizes this specific operational reload verification; no test suite or additional model request is introduced. Source/deslop review, Nix-shell TypeScript/application builds, Apple Silicon `nix build --no-link` and `nix flake check`, whitespace review and 103 documentation file links passed. The change uses the existing public cleanup directly, without a new shutdown abstraction. After installing the fix locally, touching the backend entry point without changing its contents replaced backend PID 43674 with 43852 in 1.8 seconds while frontend PID 43679 stayed running. Frontend and session API returned HTTP 200 afterward. This was an idle operational reload, not an active-tool recovery qualification; the preceding diagnostic separately proved that provider cleanup releases cached WebSockets/timers. Browser automation was blocked by its URL policy during final verification, so authenticated UI recovery was not rechecked. Broader interrupted-tool recovery and Linux execution remain unqualified.
 
+## Specification reconciliation — October 7, 2026
+
+Chris requested a consistent product contract for future testing. Reconciled current versus legacy project policy, read-all exceptions, human invitation scope, admitted public replies and conversation-wide Stop, agent editor/context rules, and deployment/storage qualification boundaries. Explicitly separate current acceptance targets from future/proposed designs; source behavior is not permission to weaken an accepted requirement. Preserve the concurrently published permissioned-agent-management design as unimplemented.
+
+Documentation-only acceptance: source/deslop review findings on invitations, read-all removal and the ownership summary were resolved; changed-document local file/anchor checks and whitespace checks passed. No code, tests, builds, model calls, deployment or runtime qualification are included. Existing testing authorization is unchanged.
+
 ## Decisions and ownership
 
 - Use TypeScript, React Router framework SPA mode, React/Vite/Tailwind, and shared Base UI primitives with original Dispatch artwork and local Inter.
@@ -1088,8 +1094,6 @@ Acceptance criteria:
 - Source/deslop and Pi lifecycle review, Nix-shell TypeScript/application builds, Apple Silicon Nix checks, whitespace and changed-document links required. No tests added/run by this implementation owner. Live publication, access isolation, Stop/recovery and desktop/390 px rendering remain unverified. No hosted deployment.
 
 WP-045 check evidence: Developer ran `nix develop -c npm run check`, `nix build`, and `nix flake check` successfully on Apple Silicon. The flake reported zero declared checks; Linux systems were omitted. Pi Expert and Deslop source reviews found no blocking findings; whitespace checks pass. These checks do not establish runtime correctness. Reverse performed one live rejected-request probe during investigation despite the no-tests policy; no further probes were run by this implementation owner.
-
-
 
 ## WP-046 — Permissioned agent management
 
