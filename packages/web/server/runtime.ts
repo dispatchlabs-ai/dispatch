@@ -20,6 +20,9 @@ import { createImageGen } from "./extensions/image-gen.js";
 import { Coding } from "./extensions/coding.js";
 import { SharedConversations, SharedDoc, type Member, type PeopleDirectory } from "./collaboration/shared.js";
 import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
+import type { AuthPrincipal } from "./auth.js";
+import { ManagementError, detached, grantHistory, managementFields, readGrants, writeGrant, type Grant } from "./agent-grants.js";
+import { managementReadSchema, managementSaveSchema } from "./agent-management.js";
 import type { McpConnections } from "./mcp-connections.js";
 
 const context = BACKGROUND_CONTEXT;
@@ -29,6 +32,15 @@ type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: 
 type StoredProject = Project & { companyId: string; userId: string; requestId: string };
 type StoredSkill = SkillDefinition & { companyId: string; savedBy: string; requestId: string; fingerprint: string };
 type Catalog = { skills?: StoredSkill[]; chats: StoredChat[]; agents: StoredAgent[]; projects?: StoredProject[]; runtimeInstance?: string; connectionOwners?: Record<string, string> };
+type ManagementActor = Awaited<ReturnType<SharedConversations["managementActor"]>>;
+type ManagementReceipt = {
+  companyId: string; definitionId: string; revision: number; instanceId: string; participantId: string; roomId: string;
+  operationId: string; callId: string; fingerprint: string; targetId: string; beforeRevision: number; afterRevision: number;
+  at: number; reason: string; evidence: string[]; fields: string[]; restoreRevision?: number; grantVersion: number;
+};
+const ManagementReceiptsDoc = defineDoc<{ receipts: ManagementReceipt[] }>({
+  kind: "dispatch.agent-management-receipts", version: 1, scope: "session", initial: () => ({ receipts: [] }),
+});
 const CatalogDoc = defineDoc<Catalog>({
   kind: "dispatch.catalog", version: 1, scope: "session",
   initial: () => ({ chats: [], agents: [] }),
@@ -94,7 +106,10 @@ export class DispatchRuntime {
       const registry = createRegistry();
       let runtime: DispatchRuntime;
       const attachments = new AttachmentStore(join(owner.directory, "attachments"));
-      const shared = new SharedConversations((tx, roomId, companyId, definitionId) => runtime.createParticipant(tx, roomId, companyId, definitionId), attachments);
+      const shared = new SharedConversations((tx, roomId, companyId, definitionId) => runtime.createParticipant(tx, roomId, companyId, definitionId), attachments, {
+        read: (tx, instance, input) => runtime.readManagedAgent(tx, instance, input),
+        save: (tx, instance, callId, input) => runtime.saveManagedAgent(tx, instance, callId, input),
+      });
       registry.install(shared.extension);
       registry.install(CodingTools);
       registry.install(Coding);
@@ -640,6 +655,125 @@ export class DispatchRuntime {
     }, context);
   }
 
+  async managementGrants(principal: AuthPrincipal) {
+    return this.harness.commit(async tx => ({ grants: await readGrants(tx, principal.companyId), history: await grantHistory(tx, principal),
+      saves: detached((await tx.doc(ManagementReceiptsDoc)).receipts.filter(item => item.companyId === principal.companyId)) }), context);
+  }
+
+  async saveManagementGrant(principal: AuthPrincipal, input: unknown) {
+    return this.harness.commit(tx => writeGrant(tx, principal, input, async input => {
+      const catalog = await tx.doc(CatalogDoc);
+      const editor = latestAgent(catalog, principal.companyId, input.editorId);
+      const target = latestAgent(catalog, principal.companyId, input.targetId);
+      if (!editor || editor.archived || editor.revision !== input.policy!.editorRevision) throw new ManagementError(409, "Reload the editor revision before granting access.");
+      this.requireUnprivileged(editor);
+      const grants = await readGrants(tx, principal.companyId);
+      this.requireManagementTarget(target, input.editorId, grants);
+      if (input.policy!.action === "save" && !input.policy!.fields.length) throw new ManagementError(400, "Choose editable fields for a save grant.");
+    }), context);
+  }
+
+  private requireUnprivileged(agent: Partial<Pick<AgentDefinition, "extensions" | "tools" | "connections" | "skills">>) {
+    if (agent.extensions?.length || agent.tools?.length || agent.connections?.length || agent.skills?.length)
+      throw new ManagementError(403, "Management requires a target and editor without assigned tools, extensions, connections or skills.");
+  }
+
+  private requireManagementTarget(target: StoredAgent | undefined, editorId: string, grants: Grant[]): asserts target is StoredAgent {
+    if (!target || target.archived || target.id === "default" || target.id === editorId || grants.some(grant => grant.editorId === target.id && grant.policy))
+      throw new ManagementError(403, "This target is not eligible for management.");
+    this.requireUnprivileged(target);
+    // Include externally configured connections, not only the saved catalog snapshot.
+    if (this.connections.forAgent(target.id, managedIds(target)).length) throw new ManagementError(403, "Connected agents are not eligible for management.");
+  }
+
+  private requireManagementGrant(catalog: Catalog, actor: ManagementActor, targetId: string, grants: Grant[]) {
+    const grant = grants.find(item => item.editorId === actor.definitionId && item.targetId === targetId && item.policy);
+    const editor = latestAgent(catalog, actor.companyId, actor.definitionId);
+    if (!grant?.policy || !editor || editor.archived) throw new ManagementError(403, "No current management grant for this editor and target.");
+    if (grant.policy.editorRevision !== actor.revision || editor.revision !== actor.revision)
+      throw new ManagementError(403, `Grant is pinned to revision ${grant.policy.editorRevision}; current definition is ${editor.revision}, acting instance is ${actor.revision}. Re-grant and start a matching instance.`);
+    this.requireUnprivileged(editor);
+    this.requireUnprivileged(actor.configuration);
+    if (this.connections.forAgent(editor.id, managedIds(editor)).length) throw new ManagementError(403, "Connected editors cannot manage agents.");
+    const target = latestAgent(catalog, actor.companyId, targetId);
+    this.requireManagementTarget(target, actor.definitionId, grants);
+    return { grant, target };
+  }
+
+  private managementView(agent: StoredAgent) {
+    return { id: agent.id, name: agent.name, description: agent.description, revision: agent.revision,
+      instructions: agent.instructions, provider: agent.provider, modelId: agent.modelId, thinkingLevel: agent.thinkingLevel };
+  }
+
+  private async readManagedAgent(tx: Tx, instance: ConversationId, raw: unknown) {
+    const input = managementReadSchema.parse(raw);
+    const actor = await this.shared.managementActor(tx, instance);
+    const catalog = await tx.doc(CatalogDoc);
+    const grants = await readGrants(tx, actor.companyId);
+    if (!input.targetId) {
+      const targets = [];
+      for (const candidate of grants.filter(grant => grant.editorId === actor.definitionId && grant.policy)) {
+        try {
+          const { grant, target } = this.requireManagementGrant(catalog, actor, candidate.targetId, grants);
+          targets.push({ id: target.id, name: target.name, revision: target.revision, policy: grant.policy });
+        } catch (error) { if (!(error instanceof ManagementError)) throw error; }
+      }
+      return detached({ targets: targets.slice(input.offset ?? 0, (input.offset ?? 0) + 100), total: targets.length,
+        nextOffset: (input.offset ?? 0) + 100 < targets.length ? (input.offset ?? 0) + 100 : null });
+    }
+    const { grant, target } = this.requireManagementGrant(catalog, actor, input.targetId, grants);
+    const selected = input.revision ? catalog.agents.find(agent => agent.companyId === actor.companyId && agent.id === target.id && agent.revision === input.revision) : target;
+    if (!selected) throw new ManagementError(404, "Revision not found.");
+    this.requireUnprivileged(selected);
+    return detached({ agent: this.managementView(selected), policy: grant.policy });
+  }
+
+  private async saveManagedAgent(tx: Tx, instance: ConversationId, callId: string, raw: unknown) {
+    const input = managementSaveSchema.parse(raw);
+    const actor = await this.shared.managementActor(tx, instance);
+    const catalog = await tx.doc(CatalogDoc);
+    const receipts = await tx.doc(ManagementReceiptsDoc);
+    const fingerprint = JSON.stringify([input.targetId, input.expectedRevision, input.reason, input.evidence ?? [], input.restoreRevision ?? null,
+      input.patch ? managementFields.filter(field => input.patch![field] !== undefined).map(field => [field, input.patch![field]]) : null]);
+    // Durable call identity catches transport replay; operation identity also catches a new call retry.
+    const receipt = receipts.receipts.find(item => item.companyId === actor.companyId && item.instanceId === String(actor.instanceId) &&
+      (item.callId === callId || item.operationId === input.operationId));
+    if (receipt) {
+      if (receipt.fingerprint !== fingerprint || receipt.operationId !== input.operationId || receipt.definitionId !== actor.definitionId || receipt.revision !== actor.revision)
+        throw new ManagementError(409, "Operation ID was already used with different content.");
+      return managementReceipt(receipt);
+    }
+    const grants = await readGrants(tx, actor.companyId);
+    const { grant, target } = this.requireManagementGrant(catalog, actor, input.targetId, grants);
+    const policy = grant.policy!;
+    if (policy.action !== "save") throw new ManagementError(403, "This grant permits reads only.");
+    if (target.revision !== input.expectedRevision) throw new ManagementError(409, "The target changed. Reload before saving.");
+    let patch = input.patch;
+    if (input.restoreRevision) {
+      const historical = catalog.agents.find(agent => agent.companyId === actor.companyId && agent.id === target.id && agent.revision === input.restoreRevision);
+      if (!historical) throw new ManagementError(404, "Restore revision not found.");
+      patch = Object.fromEntries(policy.fields.map(field => [field, historical[field]]));
+    }
+    const fields = Object.keys(patch!);
+    if (fields.some(field => !policy.fields.includes(field as typeof managementFields[number]))) throw new ManagementError(403, "The patch includes a field outside this grant.");
+    const now = Date.now();
+    const recent = receipts.receipts.filter(item => item.companyId === actor.companyId && item.definitionId === actor.definitionId && item.at > now - 3_600_000).sort((a, b) => a.at - b.at);
+    if (recent.length >= policy.maxSavesPerHour)
+      throw new ManagementError(429, `The editor's limit of ${policy.maxSavesPerHour} committed saves per hour has been reached. Retry after ${new Date(recent[recent.length - policy.maxSavesPerHour].at + 3_600_000).toISOString()}.`);
+    const next: StoredAgent = { ...detached(target), ...patch, revision: target.revision + 1, updatedAt: now };
+    // Do not copy a human save receipt onto an agent-authored revision.
+    delete next.savedBy; delete next.saveRequestId; delete next.saveFingerprint;
+    this.validateAgent(next);
+    catalog.agents.push(next);
+    const outcome: ManagementReceipt = { companyId: actor.companyId, definitionId: actor.definitionId, revision: actor.revision,
+      instanceId: String(actor.instanceId), roomId: String(actor.roomId), participantId: actor.participantId,
+      operationId: input.operationId, callId, fingerprint, targetId: target.id, beforeRevision: target.revision, afterRevision: next.revision,
+      at: now, reason: input.reason, evidence: input.evidence ?? [], fields, grantVersion: grant.version,
+      ...(input.restoreRevision ? { restoreRevision: input.restoreRevision } : {}) };
+    receipts.receipts.push(outcome);
+    return managementReceipt(outcome);
+  }
+
   async archiveAgent(scope: RuntimeScope, id: string, expectedRevision: number): Promise<AgentDefinition> {
     if (id === "default") throw new RuntimeError(400, "The default agent cannot be archived.");
     return this.harness.commit(async (tx) => {
@@ -788,6 +922,11 @@ export class DispatchRuntime {
     if (!model) throw new RuntimeError(400, "This model is not available from the configured providers.");
     if (!getSupportedThinkingLevels(model).includes(agent.thinkingLevel)) throw new RuntimeError(400, "This model does not support the selected thinking level.");
   }
+}
+
+function managementReceipt(receipt: ManagementReceipt) {
+  const { operationId, targetId, beforeRevision, afterRevision, at, grantVersion } = receipt;
+  return { operationId, targetId, beforeRevision, afterRevision, at, grantVersion };
 }
 
 // Catalog revisions are append-only. Keep archived latest revisions in the lookup;

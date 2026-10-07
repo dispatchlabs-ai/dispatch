@@ -12,6 +12,7 @@ import type {
 } from "../../src/shared/contracts.js";
 import { requireProjectAccess, type ProjectAction } from "../project-access.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata, messageAttachments } from "../attachments.js";
+import { managementTools } from "../agent-management.js";
 import { ConversationTurns, TurnsDoc } from "./turns.js";
 import { Contributions, ContributionsDoc, contributionCopy, type Contribution } from "./contributions.js";
 
@@ -81,7 +82,7 @@ export class SharedConversations {
   readonly turns = new ConversationTurns();
   readonly contributions = new Contributions(this.turns);
 
-  constructor(private readonly createAgent: (tx: Tx, roomId: ConversationId, companyId: string, definitionId: string) => Promise<Member>, private readonly attachments: AttachmentStore) {
+  constructor(private readonly createAgent: (tx: Tx, roomId: ConversationId, companyId: string, definitionId: string) => Promise<Member>, private readonly attachments: AttachmentStore, management: Parameters<typeof managementTools>[0]) {
     this.delivery = defineTask<{
       roomId: ConversationId; participantId: string; messageId: string; epoch: number; previous?: TaskId;
     }, { phase: "deliver" }, null>({
@@ -289,7 +290,7 @@ export class SharedConversations {
       },
     });
     this.extension = defineExtension({
-      name: "dispatch-collaboration", tasks: [this.delivery, this.legacyReporter, this.stopTask, this.turns.wait, this.turns.expirePresence, this.contributions.guard], tools: [history, attachment, post, invite],
+      name: "dispatch-collaboration", tasks: [this.delivery, this.legacyReporter, this.stopTask, this.turns.wait, this.turns.expirePresence, this.contributions.guard], tools: [history, attachment, post, invite, ...managementTools(management)],
       hooks: [hook(GenerationTask, {
         beforeRequest: (request, api, ctx) => this.coordinated(api, ctx, async () => {
           const binding = await api.snapshot(BindingDoc, api.conversationId, ctx);
@@ -575,6 +576,16 @@ export class SharedConversations {
       const reporter = await tx.createTask(this.legacyReporter, { roomId, participantId: legacy.id, afterEntry: Number(entries.at(-1)?.id ?? 0) }, { conversationId: roomId, ownership: { kind: "conversation" }, background: true });
       room.deliveries.push(reporter); legacy.lastDelivery = reporter;
     }
+  }
+
+  async managementActor(tx: Tx, conversationId: ConversationId) {
+    const binding = await tx.doc(BindingDoc, conversationId);
+    if (!binding.roomId || !binding.participantId) throw new CollaborationError(403, "Agent binding is unavailable.");
+    const room = await tx.doc(SharedDoc, binding.roomId);
+    const member = room.members.find(item => item.id === binding.participantId && item.conversationId === conversationId && item.kind === "agent");
+    if (!member?.agentDefinitionId || !member.agentRevision || !member.agent) throw new CollaborationError(403, "Agent membership is unavailable.");
+    return { companyId: room.companyId, definitionId: member.agentDefinitionId, revision: member.agentRevision,
+      instanceId: conversationId, participantId: member.id, roomId: binding.roomId, configuration: JSON.parse(JSON.stringify(member.agent)) as NonNullable<Member["agent"]> };
   }
 
   async binding(conversationId: ConversationId, ctx: Context) {
