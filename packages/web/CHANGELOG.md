@@ -9,6 +9,10 @@
 - Prepare workspace files privately with `conversation_attach` and publish saved attachment IDs through contribution review. Reuse existing attachment storage and rendering; Stop/discard does not publish prepared files.
 - Omit `input_fidelity` on prompt-only image generation and include sanitized rejected-parameter diagnostics. Live generation, publication and recovery remain unverified.
 
+## Unreleased — agent archive response
+
+- Detach nested agent configuration from the catalog transaction before returning it, so successful archives do not display a failed-request error. The same public projection covers saved-agent retries and retained skill selections.
+
 ## Unreleased — backend reload cleanup
 
 - Release cached model WebSockets and provider idle timers after Pi work drains, allowing backend reloads to finish without waiting for cache expiry.
