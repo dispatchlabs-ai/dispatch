@@ -51,8 +51,35 @@ type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: 
 type StoredSkill = SkillDefinition & { companyId: string; savedBy: string; requestId: string; fingerprint: string };
 type Catalog = { skills?: StoredSkill[]; chats: StoredChat[]; agents: StoredAgent[]; runtimeInstance?: string; connectionOwners?: Record<string, string> };
 type ManagementActor = Awaited<ReturnType<SharedConversations["managementActor"]>>;
+/** Nonsecret backend projection. History is retained so pinned skill/agent revisions stay resolvable. */
+export type WorkerCatalogSnapshot = {
+  sourceId: string; companyId: string; revision: number;
+  agents: AgentDefinition[]; skills: SkillDefinition[]; projects: StoredProject[];
+  sharedProjects: SharedProjectRecord[]; grants: Grant[];
+  connectionOwners: Record<string, string>; readAllProjectUserIds: string[];
+};
+export type WorkerManagementActor = ManagementActor & { conversationKey: string; storeId: string };
+export type WorkerManagement = {
+  read(actor: WorkerManagementActor, input: unknown): Promise<unknown>;
+  save(actor: WorkerManagementActor, callId: string, input: unknown): Promise<unknown>;
+};
+export type ConversationWorkerBootstrap = {
+  conversationKey: string; storeId: string; scope: RuntimeScope; input: CreateChatInput;
+  catalog: WorkerCatalogSnapshot;
+};
+type WorkerBinding = {
+  conversationKey: string; storeId: string; companyId: string; creationFingerprint: string;
+  roomId?: string; sourceId: string; catalogRevision: number; catalogFingerprint: string;
+};
+const RuntimeModeDoc = defineDoc<{ mode?: "native" | "directory" | "conversation"; worker?: WorkerBinding }>({
+  kind: "dispatch.runtime-mode", version: 1, scope: "session", initial: () => ({}),
+});
+const WorkerExportsDoc = defineDoc<{ sourceId?: string; companies: Record<string, { revision: number; fingerprint: string }> }>({
+  kind: "dispatch.worker-catalog-exports", version: 1, scope: "session", initial: () => ({ companies: {} }),
+});
 type ManagementReceipt = {
   companyId: string; definitionId: string; revision: number; instanceId: string; participantId: string; roomId: string;
+  workerStoreId?: string; conversationKey?: string;
   operationId: string; callId: string; fingerprint: string; targetId: string; beforeRevision: number; afterRevision: number;
   at: number; reason: string; evidence: string[]; fields: string[]; restoreRevision?: number; grantVersion: number;
 };
@@ -101,6 +128,11 @@ export type RuntimeOptions = {
   models?: Models;
   settings?: HarnessSettings;
   peopleDirectory?: PeopleDirectory;
+  /** Backend catalog/directory store only: no agent construction and no scheduler resume. */
+  directoryOnly?: boolean;
+  workerManagement?: WorkerManagement;
+  /** Workers must inject durable remote blob storage; native installations keep their local default. */
+  attachmentStore?: AttachmentStore;
 };
 
 /** Authentication supplies the scope; Pi remains the only owner of transcripts and work. */
@@ -121,6 +153,10 @@ export class DispatchRuntime {
   private connections: AgentConnections;
   private managed?: McpConnections;
   private readAllProjectUserIds = new Set<string>();
+  private directoryOnly = false;
+  private worker?: ConversationWorkerBootstrap;
+  private workerManagement?: WorkerManagement;
+  private boundRoomId?: string;
 
   private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: RegistryReader, shared: SharedConversations, connections: AgentConnections, private readonly workspaceDir: string, private readonly attachments: AttachmentStore, peopleDirectory?: PeopleDirectory) {
     this.connections = connections;
@@ -136,18 +172,33 @@ export class DispatchRuntime {
     harness.subscribeCommits((publication) => { this.commitRevision = publication.seq; });
   }
 
-  static async open(options: RuntimeOptions) {
+  static open(options: RuntimeOptions) { return this.openInternal(options); }
+
+  static openConversation(options: RuntimeOptions, bootstrap: ConversationWorkerBootstrap) {
+    if (options.directoryOnly) throw new RuntimeError(400, "A worker cannot be a directory runtime.");
+    if (!options.attachmentStore) throw new RuntimeError(400, "Workers require an explicitly supplied durable attachment store.");
+    if (options.piStorage?.kind !== "postgres" || options.piStorage.storeId !== bootstrap.storeId)
+      throw new RuntimeError(400, "Conversation workers require their bound PostgreSQL store.");
+    if (options.companyId !== bootstrap.scope.companyId || bootstrap.catalog.companyId !== options.companyId)
+      throw new RuntimeError(400, "Worker company identity mismatch.");
+    requireText(bootstrap.conversationKey, "Conversation key", 200);
+    requireText(bootstrap.storeId, "Store ID", 200);
+    return this.openInternal(options, detached(bootstrap));
+  }
+
+  private static async openInternal(options: RuntimeOptions, worker?: ConversationWorkerBootstrap) {
     if (!(await stat(options.workspaceDir)).isDirectory()) throw new Error("DISPATCH_WORKSPACE_DIR must point to an existing directory.");
     const owner = await acquireRuntimeOwner(options.stateDir);
     let storage: Storage | undefined;
     let connections: AgentConnections | undefined;
+    let openedHarness: Harness | undefined;
     try {
       options.mcpConnections?.initialize();
       const models = options.models ?? productionModels();
       storage = await openPiStorage(owner.directory, options.piStorage ?? { kind: "sqlite" });
       const registry = createRegistry();
       let runtime: DispatchRuntime;
-      const attachments = new AttachmentStore(join(owner.directory, "attachments"));
+      const attachments = options.attachmentStore ?? new AttachmentStore(join(owner.directory, "attachments"));
       const shared = new SharedConversations((tx, roomId, companyId, definitionId) => runtime.createParticipant(tx, roomId, companyId, definitionId), attachments, {
         read: (tx, instance, input) => runtime.readManagedAgent(tx, instance, input),
         save: (tx, instance, callId, input) => runtime.saveManagedAgent(tx, instance, callId, input),
@@ -180,9 +231,24 @@ export class DispatchRuntime {
           return new NodeExecutionEnv({ cwd });
         },
       }, context);
+      openedHarness = harness;
       runtime = new DispatchRuntime(harness, storage, models, owner, registry, shared, connections, options.workspaceDir, attachments, options.peopleDirectory);
       runtime.managed = options.mcpConnections;
+      runtime.directoryOnly = options.directoryOnly ?? false;
+      runtime.worker = worker;
+      runtime.workerManagement = options.workerManagement;
       runtime.readAllProjectUserIds = new Set(options.readAllProjectUserIds ?? []);
+      await runtime.bindRuntimeMode();
+      if (worker) {
+        await runtime.applyWorkerCatalog(worker.catalog);
+        await connections.open(harness);
+        runtime.boundRoomId = await runtime.createChatRecord(worker.scope, worker.input);
+        // No whole-installation migrations or catalog revisions generated by worker discovery.
+        // The stable workspace path must be identical after replacement; its bytes are disposable.
+        await runtime.verifyWorkerWorkspace();
+        harness.resume();
+        return runtime;
+      }
       // Seed once and publish a real commit before recovery so snapshots use Pi's persisted sequence.
       await harness.commit(async (tx) => {
         const catalog = await tx.doc(CatalogDoc);
@@ -239,22 +305,199 @@ export class DispatchRuntime {
         }
         catalog.runtimeInstance = randomUUID();
       }, context);
-      await runtime.migrateChats();
-      await runtime.initializePublicSummaries();
-      await runtime.migrateWorkspaces(options.companyId);
+      if (!runtime.directoryOnly) {
+        await runtime.migrateChats();
+        await runtime.initializePublicSummaries();
+        await runtime.migrateWorkspaces(options.companyId);
+      }
       await connections.open(harness);
       await runtime.configureConnections(options.companyId);
       connections.onChanged = () => runtime.configureConnections(options.companyId);
-      await runtime.reconcileUpgrades();
-      runtime.unsubscribeUpgrades = harness.subscribeCommits(publication => runtime.queueUpgrades(publication));
-      harness.resume();
+      if (!runtime.directoryOnly) {
+        await runtime.reconcileUpgrades();
+        runtime.unsubscribeUpgrades = harness.subscribeCommits(publication => runtime.queueUpgrades(publication));
+        harness.resume();
+      }
       return runtime;
     } catch (error) {
-      await connections?.close();
-      await storage?.close(context);
-      owner.release();
+      try { if (openedHarness) await openedHarness.close(context); else await storage?.close(context); }
+      finally { try { await connections?.close(); } finally { owner.release(); } }
       throw error;
     }
+  }
+
+  private async bindRuntimeMode() {
+    await this.harness.commit(async tx => {
+      const state = await tx.doc(RuntimeModeDoc);
+      const mode = this.worker ? "conversation" : this.directoryOnly ? "directory" : "native";
+      if (state.mode && state.mode !== mode) throw new RuntimeError(409, "This store belongs to another runtime mode; implicit migration is not supported.");
+      if (!state.mode && mode !== "native") {
+        const catalog = await tx.doc(CatalogDoc);
+        if (catalog.chats.length || catalog.agents.length || (await tx.scanConversations({}, 1)).items.length || (await tx.scanTasks({}, 1)).items.length)
+          throw new RuntimeError(409, "Split runtime initialization requires a new, empty store.");
+      }
+      state.mode = mode;
+      if (this.directoryOnly && (await tx.scanTasks({}, 1)).items.length)
+        throw new RuntimeError(409, "A directory runtime cannot own execution tasks.");
+      if (!this.worker) return;
+      const worker = this.worker;
+      const creationFingerprint = fingerprint([worker.scope, worker.input]);
+      if (state.worker) {
+        if (state.worker.conversationKey !== worker.conversationKey || state.worker.storeId !== worker.storeId
+          || state.worker.companyId !== worker.scope.companyId || state.worker.creationFingerprint !== creationFingerprint)
+          throw new RuntimeError(409, "Worker store/bootstrap binding conflict.");
+      } else {
+        state.worker = { conversationKey: worker.conversationKey, storeId: worker.storeId, companyId: worker.scope.companyId,
+          creationFingerprint, sourceId: worker.catalog.sourceId, catalogRevision: 0, catalogFingerprint: "" };
+      }
+      this.boundRoomId = state.worker.roomId;
+    }, context);
+  }
+
+  /** Backend-owned export receipt. Revision advances durably whenever the exported projection changes,
+   * including grant/project/connection changes; it is not a volatile subscription sequence.
+   */
+  async exportWorkerCatalog(companyId: string): Promise<WorkerCatalogSnapshot> {
+    this.requireCatalogOwner();
+    requireText(companyId, "Company ID", 200);
+    return this.harness.commit(async tx => {
+      const catalog = await tx.doc(CatalogDoc);
+      const shared = await tx.doc(ProjectsDoc);
+      const exports = await tx.doc(WorkerExportsDoc);
+      exports.sourceId ??= randomUUID();
+      const agentIds = new Set(catalog.agents.filter(agent => agent.companyId === companyId).map(agent => agent.id));
+      const payload = detached({
+        sourceId: exports.sourceId, companyId,
+        agents: catalog.agents.filter(agent => agent.companyId === companyId).map(publicAgent),
+        skills: (catalog.skills ?? []).filter(skill => skill.companyId === companyId).map(publicSkill),
+        projects: (catalog.projects ?? []).filter(project => project.companyId === companyId),
+        sharedProjects: Object.values(shared.projects).filter(project => project.companyId === companyId),
+        grants: await readGrants(tx, companyId),
+        connectionOwners: Object.fromEntries(Object.entries(catalog.connectionOwners ?? {}).filter(([, agentId]) => agentIds.has(agentId))),
+        readAllProjectUserIds: [...this.readAllProjectUserIds].sort(),
+      });
+      const hash = fingerprint(payload);
+      const prior = exports.companies[companyId];
+      if (!prior || prior.fingerprint !== hash) exports.companies[companyId] = { revision: (prior?.revision ?? 0) + 1, fingerprint: hash };
+      return { ...payload, revision: exports.companies[companyId].revision };
+    }, context);
+  }
+
+  /** Call only with an authenticated backend projection. A receipt is committed with the projection.
+   * Membership/grant snapshots are not an independent authority for cross-store management saves.
+   */
+  async applyWorkerCatalog(input: WorkerCatalogSnapshot) {
+    if (!this.worker) throw new RuntimeError(409, "Only conversation workers accept catalog projections.");
+    const snapshot = detached(input);
+    requireText(snapshot.sourceId, "Catalog source ID", 200);
+    if (snapshot.companyId !== this.worker.scope.companyId || !Number.isSafeInteger(snapshot.revision) || snapshot.revision < 1)
+      throw new RuntimeError(409, "Worker catalog identity/revision mismatch.");
+    if (snapshot.projects.some(project => project.companyId !== snapshot.companyId)
+      || snapshot.sharedProjects.some(project => project.companyId !== snapshot.companyId)
+      || snapshot.grants.some(grant => grant.companyId !== snapshot.companyId))
+      throw new RuntimeError(409, "Worker catalog contains another company's state.");
+    const hash = fingerprint(snapshot);
+    const receipt = await this.harness.commit(async tx => {
+      const binding = (await tx.doc(RuntimeModeDoc)).worker!;
+      if (binding.sourceId !== snapshot.sourceId || snapshot.revision < binding.catalogRevision)
+        throw new RuntimeError(409, "Stale or unrelated worker catalog.");
+      if (snapshot.revision === binding.catalogRevision && binding.catalogFingerprint !== hash)
+        throw new RuntimeError(409, "Catalog revision was reused with different content.");
+      if (snapshot.revision > binding.catalogRevision) {
+        const catalog = await tx.doc(CatalogDoc);
+        catalog.agents = snapshot.agents.map(agent => ({ ...agent, companyId: snapshot.companyId }));
+        catalog.skills = snapshot.skills.map(skill => ({ ...skill, companyId: snapshot.companyId, savedBy: "backend",
+          requestId: `projection:${skill.id}:${skill.revision}`, fingerprint: "backend-projection" }));
+        catalog.projects = snapshot.projects;
+        catalog.connectionOwners = snapshot.connectionOwners;
+        const shared = await tx.doc(ProjectsDoc);
+        shared.projects = Object.fromEntries(snapshot.sharedProjects.map(project => [project.id, project]));
+        // Workers never write project-administration request receipts or management grants.
+        binding.catalogRevision = snapshot.revision;
+        binding.catalogFingerprint = hash;
+      }
+      return { sourceId: binding.sourceId, revision: binding.catalogRevision, fingerprint: binding.catalogFingerprint };
+    }, context);
+    this.readAllProjectUserIds = new Set(snapshot.readAllProjectUserIds);
+    return receipt;
+  }
+
+  async workerBinding() {
+    if (!this.worker) throw new RuntimeError(409, "Not a conversation worker.");
+    const binding = (await this.harness.snapshot(RuntimeModeDoc, context))?.worker;
+    if (!binding?.roomId) throw new RuntimeError(503, "Worker bootstrap is incomplete.");
+    return detached({ conversationKey: binding.conversationKey, storeId: binding.storeId, companyId: binding.companyId,
+      roomId: binding.roomId, sourceId: binding.sourceId, catalogRevision: binding.catalogRevision });
+  }
+
+  /** Directory metadata only. Preserve resolved creation choices when the backend persists routing. */
+  async directoryChatBootstrap(scope: RuntimeScope, id: string) {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    return this.harness.commit(async tx => {
+      const room = await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
+      const chat = (await tx.doc(CatalogDoc)).chats.find(item => item.id === id && item.companyId === scope.companyId);
+      if (!chat) throw new RuntimeError(404, "Conversation not found.");
+      return detached({ scope: { companyId: chat.companyId, userId: chat.userId }, input: {
+        requestId: chat.requestId, ...(chat.creationTitleExplicit ? { title: chat.title } : {}),
+        agentDefinitionIds: chat.creationAgentIds ?? [chat.agentDefinitionId], projectId: chat.creationProjectId ?? null,
+        ...(room.sharedProjectId ? { sharedProjectId: room.sharedProjectId } : {}),
+      } satisfies CreateChatInput });
+    }, context);
+  }
+
+  /** RPC caller must first authenticate and bind the actor's store/key to the current launcher attempt.
+   * Never call the worker back from this backend transaction: the worker awaits it on its own commit line.
+   */
+  async readWorkerManagedAgent(actor: WorkerManagementActor, raw: unknown) {
+    this.requireDirectoryActor(actor);
+    return this.harness.commit(tx => this.readManagedActor(tx, detached(actor), managementReadSchema.parse(raw)), context);
+  }
+
+  async saveWorkerManagedAgent(actor: WorkerManagementActor, callId: string, raw: unknown) {
+    this.requireDirectoryActor(actor);
+    requireText(callId, "Tool call ID", 200);
+    return this.harness.commit(tx => this.saveManagedActor(tx, detached(actor), callId, managementSaveSchema.parse(raw)), context);
+  }
+
+  private requireDirectoryActor(actor: WorkerManagementActor) {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Remote management requires a directory runtime.");
+    requireText(actor.conversationKey, "Conversation key", 200);
+    requireText(actor.storeId, "Worker store ID", 200);
+    requireText(actor.companyId, "Company ID", 200);
+  }
+
+  private remoteActor(actor: ManagementActor): WorkerManagementActor {
+    this.requireWorkerRoom({ companyId: actor.companyId, userId: "" }, String(actor.roomId));
+    return detached({ ...actor, conversationKey: this.worker!.conversationKey, storeId: this.worker!.storeId });
+  }
+
+  private requireCatalogOwner() {
+    if (this.worker) throw new RuntimeError(409, "Catalog administration belongs to the backend, not a conversation worker.");
+  }
+
+  private requireConversationExecutor() {
+    if (this.directoryOnly) throw new RuntimeError(409, "Conversation execution must be routed to its worker.");
+  }
+
+  private requireWorkerRoom(scope: RuntimeScope, id: string) {
+    if (this.worker && (scope.companyId !== this.worker.scope.companyId || id !== this.boundRoomId))
+      throw new RuntimeError(404, "Conversation not found in this worker.");
+  }
+
+  private async verifyWorkerWorkspace() {
+    await this.harness.commit(async tx => {
+      const catalog = await tx.doc(CatalogDoc);
+      if (catalog.chats.length !== 1 || catalog.chats[0].id !== this.boundRoomId)
+        throw new RuntimeError(409, "A conversation worker must own exactly one room.");
+      const room = await tx.doc(SharedDoc, nativeId(this.boundRoomId!));
+      if (room.companyId !== this.worker!.scope.companyId) throw new RuntimeError(409, "Worker room company mismatch.");
+      for (const member of room.members) {
+        if (!member.conversationId) continue;
+        const agent = await tx.doc(AgentDoc, member.conversationId);
+        if (agent.cwd && agent.cwd !== this.workspaceDir)
+          throw new RuntimeError(409, "Worker workspace path changed; implicit workspace migration is not supported.");
+      }
+    }, context);
   }
 
   async listChats(scope: RuntimeScope): Promise<ChatSummary[]> {
@@ -290,6 +533,7 @@ export class DispatchRuntime {
   }
 
   async createProject(scope: RuntimeScope, input: CreateProjectInput): Promise<Project> {
+    this.requireCatalogOwner();
     requireText(input.requestId, "Request ID", 200);
     const name = input.name.trim();
     requireText(name, "Project name", 100);
@@ -422,6 +666,7 @@ export class DispatchRuntime {
   }
 
   async saveProject(scope: RuntimeScope, id: string, input: SaveProjectInput): Promise<Project> {
+    this.requireCatalogOwner();
     const cwd = input.cwd === undefined ? undefined : input.cwd?.trim() || null;
     if (cwd && (cwd.length > 4096 || cwd.includes("\0") || !isAbsolute(cwd))) {
       throw new RuntimeError(400, "Working directory must be an absolute path on the service host.");
@@ -465,6 +710,16 @@ export class DispatchRuntime {
   }
 
   async createChat(scope: RuntimeScope, input: CreateChatInput): Promise<ChatSnapshot> {
+    return this.getChat(scope, await this.createChatRecord(scope, input));
+  }
+
+  private async createChatRecord(scope: RuntimeScope, input: CreateChatInput): Promise<string> {
+    if (this.worker) {
+      if (fingerprint([scope, input]) !== fingerprint([this.worker.scope, this.worker.input]))
+        throw new RuntimeError(409, "A conversation worker cannot create another room.");
+      const binding = (await this.harness.snapshot(RuntimeModeDoc, context))?.worker;
+      if (binding?.roomId) return binding.roomId;
+    }
     requireText(input.requestId, "Request ID", 200);
     const explicitTitle = Boolean(input.title?.trim());
     const title = input.title?.trim() || "New conversation";
@@ -496,13 +751,18 @@ export class DispatchRuntime {
       }
       for (const agentId of agentIds) this.validateAgent(this.findAgent(catalog, scope, agentId));
       const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
-      await this.shared.initialize(tx, record.id, scope.companyId, human, agentIds, { pinned: false, archived: false }, input.sharedProjectId ?? undefined);
+      await this.shared.initialize(tx, record.id, scope.companyId, human, this.directoryOnly ? [] : agentIds, { pinned: false, archived: false }, input.sharedProjectId ?? undefined);
       const first = agentIds.length ? this.findAgent(catalog, scope, agentIds[0]) : undefined;
       const id = String(record.id);
       catalog.chats.push({ ...(creationFingerprint ? { creationFingerprint } : {}), id, title, creationTitleExplicit: explicitTitle, ...(explicitTitle ? { displayTitle: title } : {}), creationAgentIds: agentIds, creationAgentsOmitted: requestedAgents === undefined, createdAt: Date.now(), agentDefinitionId: first?.id ?? "", agentRevision: first?.revision ?? 0, agentName: first?.name ?? "People", companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
+      if (this.worker) {
+        const binding = (await tx.doc(RuntimeModeDoc)).worker!;
+        if (binding.roomId) throw new RuntimeError(409, "Worker room already exists.");
+        binding.roomId = id;
+      }
       return id;
     }, context);
-    return this.getChat(scope, id);
+    return id;
   }
 
   async updateChat(scope: RuntimeScope, id: string, input: UpdateChatInput): Promise<ChatSnapshot> {
@@ -678,6 +938,7 @@ export class DispatchRuntime {
   }
 
   async authorizeAttachmentUpload(scope: RuntimeScope, id: string) {
+    this.requireWorkerRoom(scope, id);
     await this.harness.commit(async tx => { await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope)); }, context);
   }
 
@@ -693,6 +954,7 @@ export class DispatchRuntime {
   }
 
   async downloadAttachment(scope: RuntimeScope, id: string, attachmentId: string) {
+    this.requireWorkerRoom(scope, id);
     const attachment = await this.harness.commit(async tx => {
       await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
       const record = (await tx.doc(AttachmentsDoc, nativeId(id))).records[attachmentId];
@@ -703,6 +965,7 @@ export class DispatchRuntime {
   }
 
   async submit(scope: RuntimeScope, id: string, input: SendMessageInput) {
+    this.requireConversationExecutor();
     requireText(input.requestId, "Request ID", 200);
     requireText(input.text, "Message", 100_000, Boolean(input.attachmentIds?.length));
     await this.authorize(scope, id);
@@ -715,6 +978,7 @@ export class DispatchRuntime {
   }
 
   async composing(scope: RuntimeScope, id: string, input: { clientId: string; sequence: number; active: boolean }) {
+    this.requireConversationExecutor();
     await this.authorize(scope, id);
     const person = await this.person(scope.companyId, scope.userId);
     await this.harness.commit(async tx => {
@@ -725,6 +989,7 @@ export class DispatchRuntime {
   }
 
   async addParticipants(scope: RuntimeScope, id: string, input: AddParticipantsInput) {
+    this.requireConversationExecutor();
     requireText(input.requestId, "Request ID", 200);
     await this.authorize(scope, id);
     const people = await Promise.all((input.userIds ?? []).map(userId => this.person(scope.companyId, userId)));
@@ -764,6 +1029,7 @@ export class DispatchRuntime {
   }
 
   async stop(scope: RuntimeScope, id: string) {
+    this.requireConversationExecutor();
     await this.authorize(scope, id);
     await this.shared.stop(nativeId(id), async tx => { await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope)); });
     return this.getChat(scope, id);
@@ -1077,6 +1343,7 @@ export class DispatchRuntime {
   }
 
   async saveSkill(scope: RuntimeScope, input: SaveSkillInput): Promise<SkillDefinition> {
+    this.requireCatalogOwner();
     const fingerprint = JSON.stringify([input.id, input.expectedRevision, input.name, input.description, input.instructions]);
     return this.harness.commit(async tx => {
       const catalog = await tx.doc(CatalogDoc);
@@ -1131,6 +1398,7 @@ export class DispatchRuntime {
   async refreshMcpConnections(id?: string) { await this.connections.reloadManaged(id); }
 
   async saveAgent(scope: RuntimeScope, input: SaveAgentInput): Promise<AgentDefinition> {
+    this.requireCatalogOwner();
     this.validateAgent(input);
     const fingerprint = JSON.stringify([input.id, input.expectedRevision, input.name.trim(), input.description.trim(), input.instructions,
       input.provider, input.modelId, input.thinkingLevel, input.capabilities?.slice().sort(), input.connectionIds?.slice().sort(), !!input.applyConnectionsToExisting, ...(input.skills === undefined ? [] : [input.skills])]);
@@ -1203,6 +1471,7 @@ export class DispatchRuntime {
   }
 
   async saveManagementGrant(principal: AuthPrincipal, input: unknown) {
+    this.requireCatalogOwner();
     return this.harness.commit(tx => writeGrant(tx, principal, input, async input => {
       const catalog = await tx.doc(CatalogDoc);
       const editor = latestAgent(catalog, principal.companyId, input.editorId);
@@ -1237,6 +1506,14 @@ export class DispatchRuntime {
   private async readManagedAgent(tx: Tx, instance: ConversationId, raw: unknown) {
     const input = managementReadSchema.parse(raw);
     const actor = await this.shared.managementActor(tx, instance);
+    if (this.worker) {
+      if (!this.workerManagement) throw new ManagementError(503, "Backend management service is unavailable.");
+      return this.workerManagement.read(this.remoteActor(actor), detached(input));
+    }
+    return this.readManagedActor(tx, actor, input);
+  }
+
+  private async readManagedActor(tx: Tx, actor: ManagementActor, input: ReturnType<typeof managementReadSchema.parse>) {
     const catalog = await tx.doc(CatalogDoc);
     const grants = await readGrants(tx, actor.companyId);
     if (!input.targetId) {
@@ -1259,12 +1536,21 @@ export class DispatchRuntime {
   private async saveManagedAgent(tx: Tx, instance: ConversationId, callId: string, raw: unknown) {
     const input = managementSaveSchema.parse(raw);
     const actor = await this.shared.managementActor(tx, instance);
+    if (this.worker) {
+      if (!this.workerManagement) throw new ManagementError(503, "Backend management service is unavailable.");
+      return this.workerManagement.save(this.remoteActor(actor), callId, detached(input));
+    }
+    return this.saveManagedActor(tx, actor, callId, input);
+  }
+
+  private async saveManagedActor(tx: Tx, actor: ManagementActor | WorkerManagementActor, callId: string, input: ReturnType<typeof managementSaveSchema.parse>) {
     const catalog = await tx.doc(CatalogDoc);
     const receipts = await tx.doc(ManagementReceiptsDoc);
+    const workerStoreId = "storeId" in actor ? actor.storeId : undefined;
     const fingerprint = JSON.stringify([input.targetId, input.expectedRevision, input.reason, input.evidence ?? [], input.restoreRevision ?? null,
       input.patch ? managementFields.filter(field => input.patch![field] !== undefined).map(field => [field, input.patch![field]]) : null]);
     // Durable call identity catches transport replay; operation identity also catches a new call retry.
-    const receipt = receipts.receipts.find(item => item.companyId === actor.companyId && item.instanceId === String(actor.instanceId) &&
+    const receipt = receipts.receipts.find(item => item.companyId === actor.companyId && item.workerStoreId === workerStoreId && item.instanceId === String(actor.instanceId) &&
       (item.callId === callId || item.operationId === input.operationId));
     if (receipt) {
       if (receipt.fingerprint !== fingerprint || receipt.operationId !== input.operationId || receipt.definitionId !== actor.definitionId)
@@ -1295,6 +1581,7 @@ export class DispatchRuntime {
     catalog.agents.push(next);
     const outcome: ManagementReceipt = { companyId: actor.companyId, definitionId: actor.definitionId, revision: actor.revision,
       instanceId: String(actor.instanceId), roomId: String(actor.roomId), participantId: actor.participantId,
+      ...("storeId" in actor ? { workerStoreId: actor.storeId, conversationKey: actor.conversationKey } : {}),
       operationId: input.operationId, callId, fingerprint, targetId: target.id, beforeRevision: target.revision, afterRevision: next.revision,
       at: now, reason: input.reason, evidence: input.evidence ?? [], fields, grantVersion: grant.version,
       ...(input.restoreRevision ? { restoreRevision: input.restoreRevision } : {}) };
@@ -1303,6 +1590,7 @@ export class DispatchRuntime {
   }
 
   async archiveAgent(scope: RuntimeScope, id: string, expectedRevision: number): Promise<AgentDefinition> {
+    this.requireCatalogOwner();
     if (id === DEFAULT_AGENT_ID) throw new RuntimeError(400, "The default agent cannot be archived.");
     return this.harness.commit(async (tx) => {
       const catalog = await tx.doc(CatalogDoc);
@@ -1326,6 +1614,7 @@ export class DispatchRuntime {
   }
 
   private async authorize(scope: RuntimeScope, id: string) {
+    this.requireWorkerRoom(scope, id);
     await this.harness.commit(async tx => { await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope)); }, context);
   }
 
@@ -1479,6 +1768,9 @@ export class DispatchRuntime {
   }
 
   private async createParticipant(tx: Tx, roomId: ConversationId, companyId: string, definitionId: string): Promise<Member> {
+    this.requireConversationExecutor();
+    if (this.worker && (companyId !== this.worker.scope.companyId || (this.boundRoomId && String(roomId) !== this.boundRoomId)))
+      throw new RuntimeError(403, "Participant is outside this worker room.");
     const catalog = await tx.doc(CatalogDoc);
     const agent = this.findAgent(catalog, { companyId }, definitionId);
     this.validateAgent(agent);
@@ -1690,4 +1982,11 @@ function portableTrackedAgent(key: string, agent: StoredAgent, skills: TrackedBu
       const entry = skills.find(item => item.id === selection.id);
       return entry ? `${entry.key} (local revision ${selection.revision})` : `local skill (revision ${selection.revision})`;
     }), omittedConnections: agent.connections?.length ?? 0 };
+}
+
+/** Stable JSON identity across object-key order; arrays preserve semantically meaningful order. */
+function fingerprint(value: unknown): string {
+  const ordered = (input: unknown): unknown => Array.isArray(input) ? input.map(ordered)
+    : input !== null && typeof input === "object" ? Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, value]) => [key, ordered(value)])) : input;
+  return createHash("sha256").update(JSON.stringify(ordered(value))).digest("hex");
 }
