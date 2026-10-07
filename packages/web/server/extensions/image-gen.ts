@@ -143,14 +143,14 @@ export function createImageGen(models: Models) {
   const generateImage = defineTool({
     name: "generate_image",
     description:
-      `Generate or edit an image with the OpenAI Images API (default ${DEFAULT_MODEL}, ${SPEED_VARIANT} for fast iteration). With reference images (and optionally a mask PNG) this calls /v1/images/edits; otherwise /v1/images/generations. Writes PNG outputs and a per-run metadata record (request, reference hashes, dimensions, generation ids) under the workspace imagegen directory and returns the output paths. When the image-generation skill is assigned, load it first and follow its prompt craft.`,
+      `Generate or edit an image with the OpenAI Images API (default ${DEFAULT_MODEL}, ${SPEED_VARIANT} for fast iteration). With reference images (and optionally a mask PNG) this calls /v1/images/edits; otherwise /v1/images/generations. Writes PNG outputs and a per-run metadata record (request, reference hashes, dimensions, generation ids) under the workspace imagegen directory and returns the output paths plus native image content for visual inspection. Inspect the returned images before presenting them. When the image-generation skill is assigned, load it first and follow its prompt craft.`,
     parameters: Type.Object({
       prompt: Type.String({ minLength: 1, maxLength: 32_000, description: "Full image prompt, written per the assigned skill's prompt craft." }),
       name: Type.String({ minLength: 1, maxLength: 64, description: "Short slug naming this run's directory, outputs and metadata record." }),
       model: Type.Optional(Type.String({ maxLength: 64, description: `Images model id. Default ${DEFAULT_MODEL}.` })),
       size: Type.Optional(Type.Union(SIZES.map((size) => Type.Literal(size)), { description: "Output size. Default 1536x1024." })),
       quality: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("medium"), Type.Literal("high")], { description: "Default high." })),
-      input_fidelity: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("high")], { description: "Fidelity to reference images; edit runs only. Default high." })),
+      input_fidelity: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("high")], { description: "Legacy edit option for gpt-image-1 and gpt-image-1.5 (high/low), or gpt-image-1-mini (low). Omitted for other models, including GPT Image 2/2.5. No default is injected." })),
       n: Type.Optional(Type.Integer({ minimum: 1, maximum: 4, description: "Number of variants. Default 1." })),
       images: Type.Optional(Type.Array(Type.String(), { minItems: 1, maxItems: MAX_REFERENCE_IMAGES, description: "Reference image paths, workspace-relative. Present means an edit run." })),
       mask: Type.Optional(Type.String({ description: "Optional mask PNG path; fully transparent regions are regenerated. Requires reference images." })),
@@ -168,11 +168,15 @@ export function createImageGen(models: Models) {
       const requestedModel = args.model ?? DEFAULT_MODEL;
       const size = args.size ?? "1536x1024";
       const quality = args.quality ?? "high";
-      const inputFidelity = args.input_fidelity ?? "high";
       const count = args.n ?? 1;
-      // input_fidelity is edit-only: the 2.5 Images API rejects it on /v1/images/generations (unknown_parameter).
+      // Only the documented legacy image models accept this optional edit parameter.
+      // In particular, old saved skills must not force it into GPT Image 2/2.5 requests.
       const isEditRun = (args.images?.length ?? 0) > 0;
-      const request: Record<string, unknown> = { model: requestedModel, prompt: args.prompt, size, quality, n: count, ...(isEditRun ? { input_fidelity: inputFidelity } : {}) };
+      const supportsFidelity = /^gpt-image-1(?:\.5|-mini)?(?:-\d{4}-\d{2}-\d{2})?$/.test(requestedModel);
+      if (isEditRun && supportsFidelity && requestedModel.startsWith("gpt-image-1-mini") && args.input_fidelity === "high")
+        return textResult("gpt-image-1-mini accepts only input_fidelity: low. No request was made.", true);
+      const request: Record<string, unknown> = { model: requestedModel, prompt: args.prompt, size, quality, n: count,
+        ...(isEditRun && supportsFidelity && args.input_fidelity !== undefined ? { input_fidelity: args.input_fidelity } : {}) };
       const endpoint = isEditRun ? "https://api.openai.com/v1/images/edits" : "https://api.openai.com/v1/images/generations";
 
       let metadataPath: string | undefined;
@@ -335,9 +339,11 @@ export function createImageGen(models: Models) {
             type: "text" as const,
             text: [
               `Generated ${record.images.length} image(s) via ${endpoint} (requested model ${requestedModel}).`,
+              ...(args.input_fidelity !== undefined && !request.input_fidelity ? [`input_fidelity was omitted for this model/mode.`] : []),
+              "Inspect the returned image content against the brief and reference before presenting it. Check text, layout and preserved regions; report discrepancies or revise as needed.",
               ...record.images.map((image) => `${image.path} ${image.dimensions[0]}x${image.dimensions[1]}${image.generationId ? ` generation_id=${image.generationId}` : ""}`),
             ].join("\n"),
-          }],
+          }, ...decoded.map(image => ({ type: "image" as const, mimeType: "image/png", data: Buffer.from(image.bytes).toString("base64") }))],
           details: { runDir, endpoint, requestedModel, images: record.images },
         };
       } catch (error) {
@@ -383,6 +389,7 @@ export function createImageGen(models: Models) {
       if (!input.agent.tools.some((tool) => tool.name === generateImage.name)) return undefined;
       return [
         "You can generate and edit images with generate_image. When the image-generation skill is assigned, load it first and follow its prompt craft.",
+        "Successful results include image pixels for inspection. Review them against the brief, including readable labels and preserved regions, before publishing; a file path or successful API response is not visual verification.",
         "Every run writes outputs plus a metadata record; treat that record as the audit trail and never regenerate into an earlier run's directory.",
         "A cancelled or failed run may still have been generated and charged: verify before calling again.",
       ].join(" ");

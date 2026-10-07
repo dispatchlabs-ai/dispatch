@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — image editing and visual verification
+
+- Stop injecting `input_fidelity` into GPT Image 2/2.5 edits, including when older skill snapshots request it; retain explicit supported legacy-model values.
+- Return generated pixels to the model for visual review alongside existing paths and audit records. Clarify mask preparation, review-before-publication, rejected-parameter recovery and truthful fallback guidance in the reusable image skill.
+
 ## Unreleased — permissioned agent management
 
 - Add native authorized definition reads, revisioned tuning saves and forward restoration, with trusted instance identity, dual editor-revision pins, atomic receipts, explicit rolling quotas and no live rollout.
