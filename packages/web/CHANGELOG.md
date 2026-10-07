@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — specification reconciliation
+
+- Separate current acceptance contracts, legacy personal-group compatibility and future designs. Reconcile project authority, agent editing/context, admitted public replies and conversation-wide Stop; scope deployment and PostgreSQL evidence without claiming full qualification.
+
 ## Unreleased — agent file sharing
 
 - Prepare workspace files privately with `conversation_attach` and publish saved attachment IDs through contribution review. Reuse existing attachment storage and rendering; Stop/discard does not publish prepared files.

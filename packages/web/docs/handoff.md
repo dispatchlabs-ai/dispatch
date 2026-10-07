@@ -1,6 +1,6 @@
 # Dispatch Web implementation handoff
 
-The local implementation covers company authentication, stock Pi Durable chat, the branded desktop/mobile workspace, and named agent definitions. [spec.md](spec.md) defines the current contracts; [usage-guide.md](usage-guide.md) explains operation. The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains product intent and decision history. Shared conversations are implemented locally in [WP-024](#wp-024--shared-conversations); [WP-026](#wp-026--listen-before-responding) adds listening and speaking turns. Functional qualification remains deferred.
+The local implementation covers the current features listed in [spec.md](spec.md#reading-this-specification), including company authentication, shared conversations, named agents, tools/connections/skills, shared projects, attachments and opt-in PostgreSQL storage. [spec.md](spec.md) defines the current contracts; [usage-guide.md](usage-guide.md) explains operation. The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains product intent and decision history. Shared conversations are implemented locally in [WP-024](#wp-024--shared-conversations); [WP-026](#wp-026--listen-before-responding) adds listening and speaking turns. Functional qualification remains deferred.
 
 ## Current testing policy
 
@@ -35,11 +35,11 @@ Acceptance: source/deslop review, TypeScript/application builds, Apple Silicon N
 - Use TypeScript, React Router framework SPA mode, React/Vite/Tailwind, and shared Base UI primitives with original Dispatch artwork and local Inter.
 - Keep a persistent Node/Hono service separate from frontend hot reload. One process owns each Pi directory, enforced by an OS-backed SQLite ownership lock without limiting concurrent agents.
 - Use stock Pi Durable 1.0.4 through its public interfaces. Pi owns admission, native entries, execution, cancellation, and recovery. Dispatch owns identity, access checks, transport, and presentation.
-- Serve one company per installation. Users have equal capabilities, invite-only conversations, private projects, and shared agent definitions. Role-based access control remains future work.
+- Serve one company per installation with equal baseline capabilities and shared agent definitions. Unbound conversations are invite-only; legacy personal groups remain private organization. Shared-project membership grants conversation access, manager/member roles control project settings, and operator read-all grants allow observation only. Broader application RBAC remains future work.
 - Require password/TOTP or a user-verified passkey, with restricted invitation/recovery flows and opaque sessions. The local operator provisions accounts; there is no application administrator role.
 - Keep desktop rail/sidebar/main tabs/full contextual column/bottom bar. Mobile uses navigation and context panels, preserving active work and drafts.
 - Prefer explicit service model configuration, then existing Pi settings/credentials. The first agent has no tools. Named agent revisions are immutable and copied into new chats.
-- Prioritize local development. Omarchy deployment, pilot retirement, additional tools/integrations beyond Developer, handoffs, background triggers, and schedules are deferred to separately specified packages.
+- Preserve local development and existing installation state. Current local/LAN evidence is scoped in WP-041 and WP-043; distributed AWS workers, remote sandboxes, personal Wiki delegation, unspecified handoffs, background triggers and schedules remain future work. Installed coding/image tools, generic MCP connections and explicit skills are current features, not blanket deferrals.
 
 ## Coordinated work
 
