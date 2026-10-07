@@ -293,3 +293,14 @@ variable "allowed_client_cidrs" {
     error_message = "Supply at least one valid IPv4 client CIDR."
   }
 }
+
+variable "cpu_architecture" {
+  description = "Fargate Linux CPU architecture. The pinned image or image index must contain this platform."
+  type        = string
+  default     = "ARM64"
+
+  validation {
+    condition     = contains(["ARM64", "X86_64"], var.cpu_architecture)
+    error_message = "cpu_architecture must be ARM64 or X86_64."
+  }
+}

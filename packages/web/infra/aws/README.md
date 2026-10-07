@@ -33,7 +33,7 @@ module "dispatch_web" {
 }
 ```
 
-See `variables.tf` for all inputs, validation and defaults; `outputs.tf` defines integration outputs. Pin source to a reviewed release/commit, image to a Linux x86-64 digest and provider versions in the caller lockfile. The child module intentionally does not ship a provider lockfile.
+See `variables.tf` for all inputs, validation and defaults; `outputs.tf` defines integration outputs. Pin source to a reviewed release/commit, image to a matching Linux platform or multi-platform index digest and provider versions in the caller lockfile. The child module intentionally does not ship a provider lockfile.
 
 ## Runtime and IAM
 
@@ -56,3 +56,9 @@ Scale to zero and confirm STOPPED before enrollment/recovery CLI, file-copy back
 Destroy removes the service/ALB/access point and roles but not caller-owned storage or retained task-definition revisions. Data remains under the documented backing prefix; deleting it is a separate explicit operator action. Preserve image digests and a consistent backup for recovery. Rename/root-path changes require deliberate data migration.
 
 Compatibility checks: Terraform 1.16.5 and OpenTofu 1.12.6 init/validate passed locally; live deployment, SQLite qualification, artifact execution and consumer plan remain pending. Build/source checks do not establish live compatibility.
+
+## CPU architecture
+
+`cpu_architecture` defaults to `ARM64`; set `X86_64` explicitly for amd64-only images. Earlier module revisions fixed X86_64: upgrading the module without an explicit architecture now selects ARM64 and replaces the task definition. Review that change and qualify the matching image before applying. An image index must contain the selected platform; Terraform cannot verify registry contents.
+
+Build `packages.aarch64-linux.oci` and `packages.x86_64-linux.oci` from the same source revision on matching Linux builders (or explicitly configured emulation). Inspect and execute both independently before publishing a multi-platform OCI index. Pin the index digest and record both child manifest digests; tags alone are not release identities. A macOS ARM host build or an amd64 execution does not qualify Linux ARM64.

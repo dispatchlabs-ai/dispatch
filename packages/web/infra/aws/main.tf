@@ -320,7 +320,7 @@ resource "aws_ecs_task_definition" "this" {
   skip_destroy             = true
 
   runtime_platform {
-    cpu_architecture        = "X86_64"
+    cpu_architecture        = var.cpu_architecture
     operating_system_family = "LINUX"
   }
 

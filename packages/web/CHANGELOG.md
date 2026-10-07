@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — container architectures
+
+- Add Linux ARM64 image output and default ECS to ARM64, retaining explicit X86_64 selection. Multi-platform registry publication and per-platform execution remain pending.
+
 ## Unreleased — independent agent work
 
 - Separate concurrent model/tool work from public speaking admission; keep unadmitted prose private, including Stop/failure output.
