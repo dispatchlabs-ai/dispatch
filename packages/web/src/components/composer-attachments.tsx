@@ -1,3 +1,4 @@
+import { ATTACHMENT_IMAGE_MAX_BYTES } from "../shared/contracts";
 import { Menu } from "@base-ui/react/menu";
 import { FilePlus, FileText, ImagePlus, Plus, RotateCcw, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -50,7 +51,7 @@ export function DraftAttachments({ attachments, disabled, onRemoveAttachment, on
   if (!attachments.length) return null;
   return <div className="draft-attachments" aria-label="Prompt attachments">{attachments.map(item => <div className="draft-attachment" key={item.id}>
     <div className="attachment-thumbnail"><DraftPreview item={item} /></div>
-    <div className="attachment-copy"><span title={item.file.name}>{item.file.name}</span><small>{item.error ? item.error : !item.attachment ? <Spinner label="Uploading" /> : item.attachment.kind === "file" ? "Download only · not readable by agents" : `${Math.ceil(item.file.size / 1024)} KB`}</small></div>
+    <div className="attachment-copy"><span title={item.file.name}>{item.file.name}</span><small>{item.error ? item.error : !item.attachment ? <Spinner label="Uploading" /> : item.attachment.kind === "file" ? "Download only · not readable by agents" : item.attachment.kind === "image" && item.attachment.size > ATTACHMENT_IMAGE_MAX_BYTES ? "Preview/download only · upload a smaller image for agents" : `${Math.ceil(item.file.size / 1024)} KB`}</small></div>
     {item.error ? <IconButton label={`Retry uploading ${item.file.name}`} disabled={disabled} onClick={() => onRetryAttachment(item.id)}><RotateCcw size={16} /></IconButton> : null}
     <IconButton label={`Remove ${item.file.name} from draft`} disabled={disabled} onClick={() => onRemoveAttachment(item.id)}><X size={16} /></IconButton>
   </div>)}</div>;
