@@ -59,7 +59,9 @@ Remote Git stores source, PostgreSQL stores Pi state, and ordinary S3 stores art
 
 The backend `artifacts` object is `{endpoint, region, bucket, prefix, credentialsFile}`. The credential file is restricted regular-file JSON `{accessKeyId, secretAccessKey, sessionToken?}`. The SDK uses path-style addressing and explicit credentials, without transparent retries or local fallback. The isolated rehearsal uses Garage, not AWS provisioning; actual S3 save/read, store-isolation and client-reopen checks passed. This does not qualify browser artifact flows, worker replacement or backup/restore. Artifact retrieval after fresh-worker replacement is required.
 
-Consistent backup covers backend auth/connection/routing/launcher state, PostgreSQL and artifact bytes while writers remain quiesced. Restore must resolve restored attachment references in isolated resources. Disposable worker workspaces are not backup inputs. A local S3-compatible service or replacement check does not establish off-machine durability.
+Accepted storage-provisioning direction (implementation/qualification pending): backend alone receives `postgresStores.adminUrlFile` for a dedicated worker database owner with `CREATEROLE`, not superuser authority. Authenticated bootstrap supplies per-store worker credentials; shared PostgreSQL URLs must leave launcher/worker environments. PostgreSQL RLS must bind row access to the authenticated session user through an owner-controlled role/store mapping. Worker roles get row DML only, with no ownership, DDL, TRUNCATE, role administration or RLS bypass; worker storage skips migrations and verifies its binding. Provisioning runs under backend support-write admission. Native storage and existing trials remain unchanged.
+
+Consistent backup covers backend auth/connection/routing/launcher state, PostgreSQL (including provisioned cluster roles and the private credential-derivation key) and artifact bytes while writers remain quiesced. Restore must resolve restored attachment references in isolated resources. Disposable worker workspaces are not backup inputs. A local S3-compatible service or replacement check does not establish off-machine durability.
 
 ### Open integration gaps
 
@@ -89,6 +91,7 @@ Retain sanitized exact revisions/receipts with integrated results before claimin
 - Lost launch/stop responses, repeated requests, launcher/backend restart and Docker unavailability reconcile the same attempt without overlapping execution. Late launch after stop cannot resurrect it.
 - Drain survives restart, catches dynamic workers, blocks new admissions and gates upgrades/paired backups. Restore is isolated, preserves the applicable secrets/state and artifact bytes, and resolves restored attachment references.
 - Preserve company/user/project isolation, membership, revocation, definitions, skills, grants and apply-to-existing behavior across active and dormant conversations; stale updates must not restore revoked credentials.
+- Verify database-enforced store isolation with direct SQL, role/session-authorization escalation attempts and role-mapping tampering; application-scoped lookup checks alone are insufficient.
 - Exercise browser sign-in, message streaming/reconnect, attachments, real model/tool execution and independent conversation replacement using agent-browser where applicable.
 - TypeScript/application builds, separate ARM64/AMD64 image builds and inspection, source/deslop review and whitespace/link checks. Omarchy runtime evidence qualifies AMD64 only; retain explicit ARM64 runtime limits.
 - Fix observed defects in owning source/module/runbook, rebuild and redeploy immutable pins, then repeat affected checks. Record exact revisions, sanitized receipts and remaining limitations here or in the owning handoff.
