@@ -28,8 +28,9 @@ function launch(args: string[], cwd: string) {
   child.on("error", (error) => { console.error(error.message); stop(1); });
   child.on("exit", (code, signal) => { if (!stopping) stop(code ?? (signal ? 1 : 0)); });
 }
-// Do not watch/restart the backend on frontend edits; Pi has one persistent owner.
-launch(["--import", "tsx", "packages/web/server/index.ts"], root);
+// Watch the service's imports, not the frontend tree. Node waits for the old Pi
+// owner to finish its SIGTERM shutdown before starting the replacement process.
+launch(["--watch", "--watch-preserve-output", "--import", "tsx", "packages/web/server/index.ts"], root);
 launch([resolve(root, "node_modules/@react-router/dev/bin.cjs"), "dev", "--port", webPort], resolve(root, "packages/web"));
 process.once("SIGINT", () => stop());
 process.once("SIGTERM", () => stop());

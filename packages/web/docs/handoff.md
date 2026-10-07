@@ -14,6 +14,14 @@ Chris requested an independent Claude review after the integrated build. The [Oc
 
 The original review recorded deviations in readability/contrast, shared design tokens, truthful connection status, and account-form state preservation, plus additional navigation, tab visibility, defaults, and content-hierarchy gaps. The subsequent [WP-006](#wp-006--resolve-the-uiux-review-findings) implements the accepted fixes; the review document preserves the historical findings and their resolution status. Apply the accepted [UI implementation rules](spec.md#ui-implementation-rules) to subsequent UI work; session-expiry draft retention and in-place identity re-checks remain proposed decisions. Screenshots stay in the canonical checkout's ignored `.local/ui-ux-review/2026-10-03/` directory.
 
+## October 7, 2026 — Background development and backend reload
+
+Chris requested that the local development instance run in the background and reload the backend when needed. `scripts/dev.ts` uses Node's native dependency watcher for the service, retaining Vite's independent frontend hot reload. Node sends SIGTERM and awaits process exit before replacement; the existing shutdown closes Pi, MCP connections and authentication resources and releases runtime ownership. No application recovery engine, process limit or machine startup service is added. The [usage guide](usage-guide.md#background-development) records detached start, logs and graceful stop commands.
+
+Acceptance: frontend-only edits do not restart Pi; edits to loaded backend dependencies restart only the backend; previous ownership is released before replacement; the launcher can remain detached from the terminal and can stop both children. Source/deslop review and TypeScript/application/Nix checks are required. Startup/process observations will be recorded separately from automatic-reload and in-flight recovery qualification; no tests are added or run under the current policy.
+
+Evidence: source/deslop review confirmed that backend imports exclude frontend components, Node 24.21.0's watcher awaits the prior child's exit, and the service uses its existing graceful shutdown. `nix develop --command npm run check`, `nix build --no-link`, and `nix flake check` passed on Apple Silicon. The existing Vite chunk-size advisory remains; Linux was not built. Diff/whitespace review, 74 local file links and the new documentation anchor passed. Automatic reload, shutdown during active tool work and native recovery were not exercised; build/source checks do not qualify them.
+
 ## Decisions and ownership
 
 - Use TypeScript, React Router framework SPA mode, React/Vite/Tailwind, and shared Base UI primitives with original Dispatch artwork and local Inter.

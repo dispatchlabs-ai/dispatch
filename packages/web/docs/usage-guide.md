@@ -14,7 +14,29 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173`. The development launcher runs Vite on localhost and the API/Pi service on `127.0.0.1:3001`, proxying `/api` through Vite. Edit files in `packages/web/src/` for frontend hot reload. Server changes require stopping the launcher with Ctrl-C and restarting it. Frontend edits and browser disconnection do not restart the Pi owner or cancel its work.
+Open `http://localhost:5173`. The development launcher runs Vite on localhost and the API/Pi service on `127.0.0.1:3001`, proxying `/api` through Vite. Frontend-only edits hot reload without restarting Pi. Node watches the service entry point and its imported modules, including the shared contracts used by the service. Changes to those files send SIGTERM and wait for the old backend to exit before starting its replacement against the same state. The frontend stays running through that brief backend interruption. Pi owns recovery of interrupted native work; a restart is not an uninterrupted model or tool session. Browser disconnection does not restart the Pi owner.
+
+Changes to launcher settings, environment variables, or the MCP manifest still require a manual launcher restart. Stop development before installing changed dependencies.
+
+### Background development
+
+From the repository root inside `nix develop`, with no existing dev launcher running:
+
+```sh
+mkdir -p .local/dev
+chmod 700 .local/dev
+nohup node --import tsx scripts/dev.ts > .local/dev/dev.log 2>&1 < /dev/null &
+echo $! > .local/dev/dev.pid
+```
+
+This keeps development running independently of the terminal, with logs in `.local/dev/dev.log`. It does not register a login or reboot service. Inspect the recorded launcher before stopping it:
+
+```sh
+ps -p "$(cat .local/dev/dev.pid)" -o pid=,command=
+kill -TERM "$(cat .local/dev/dev.pid)"
+```
+
+Send the signal only while that PID still identifies this repository's `scripts/dev.ts` launcher. Its shutdown stops both children. Wait for shutdown before launching again against the same state or ports.
 
 The launcher fails if the frontend port is occupied, rather than silently choosing another URL. Stop only a server owned by this task/check-out. Run `npm ci` after the dependency lock changes. The initial dependency fetch needs network access; model calls need configured server-side credentials.
 

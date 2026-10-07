@@ -26,6 +26,8 @@ The local tooling package uses Node 24 from locked nixpkgs, npm workspaces with 
 
 Accepted October 3, 2026: prioritize a quick localhost edit/run loop now. The frontend binds only to `localhost:5173` and proxies `/api` to the persistent loopback service on port 3001. Source edits hot reload without restarting Pi. Authentication protects user data and operations. Root `npm start` and `npm run preview` serve the built app at the same localhost URL and use the same local state directory; stop the development process first.
 
+October 7 development update: frontend-only edits continue to avoid Pi restarts. The development launcher now watches the backend entry point and its imported modules, including runtime shared contracts. A matching edit gracefully stops the old backend before starting a replacement against the same state, while Vite remains running. Stock Pi remains responsible for native recovery; uninterrupted model/tool execution across a restart is not promised. A detached local launch may outlive the terminal; login/reboot supervision is outside this change. Launcher configuration and dependency installation still require an explicit stop/start.
+
 Internal deployment on Omarchy, reachable over the Palm network at an HTTPS domain, is a later work package. The current `dispatch.chrisreynolds.me` pilot, DNS, and services remain in place. Local HTTP on loopback is the development endpoint, not an internal hosted site. Application deployment configuration will belong to this repository; machine prerequisites remain owned by Palm.
 
 ## Testing policy

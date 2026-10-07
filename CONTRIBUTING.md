@@ -16,7 +16,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173`. Frontend source edits hot reload without restarting the persistent service; stop the launcher with Ctrl-C. Repeat `npm ci` after the lockfile changes. Run `npm run check` for route-type generation, frontend/service/tooling TypeScript, and application builds; run `nix build` and `nix flake check` for the pinned build and declared type/build checks. The Node 24 toolchain is shared by the Nix shell and build, and npm dependencies are locked in `package-lock.json`.
+Open `http://localhost:5173`. Frontend source edits hot reload without restarting the persistent service. Changes to the service or its imported modules restart only the backend after its previous process shuts down; existing state stays in place. Stop the launcher with Ctrl-C. See the [background launch instructions](packages/web/docs/usage-guide.md#background-development) to keep it running after closing the terminal. Stop development before repeating `npm ci` after a lockfile change. Run `npm run check` for route-type generation, frontend/service/tooling TypeScript, and application builds; run `nix build` and `nix flake check` for the pinned build and declared type/build checks. The Node 24 toolchain is shared by the Nix shell and build, and npm dependencies are locked in `package-lock.json`.
 
 Use `npm run auth -- invite --email person@example.com --name "Person"` to provision an account. See the [package usage guide](packages/web/docs/usage-guide.md) for sign-in, provider credentials, built mode, dependency updates, and platform coverage. Shared flake configuration and lockfiles belong at the repository root; the package-specific Nix recipe stays with its package. Future automation must invoke the same build definitions.
 
