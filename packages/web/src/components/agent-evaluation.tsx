@@ -38,7 +38,7 @@ export function AgentEvaluation({ agentId, readOnly, onGuardChange }: {
     catch (err) { setError(errorMessage(err)); } finally { setBusy(false); }
   }
   async function save() {
-    if (!draft) return;
+    if (!draft || readOnly || busy) return;
     setBusy(true); setError(null); setConflict(false);
     const body = { ...draft, expectedRevision: data?.profile?.revision ?? null, changeReason: reason };
     const fingerprint = JSON.stringify(body);
@@ -56,12 +56,13 @@ export function AgentEvaluation({ agentId, readOnly, onGuardChange }: {
     <div className="evaluation-heading"><h2>Evaluation profile</h2><span className="revision-badge">{draft ? "Editing" : displayed ? `Revision ${displayed.revision}` : data ? "Not configured" : "Loading"}</span></div>
     {error ? <Notice>{error}</Notice> : null}
     {!data ? error ? <Button variant="secondary" disabled={busy} onClick={() => void reload()}>Retry</Button> : <Spinner /> : draft ? <form onSubmit={event => { event.preventDefault(); void save(); }}>
-      <EvaluationFields draft={draft} onChange={setDraft} disabled={busy} />
-      <Field label="Change reason">{props => <textarea {...props} required maxLength={1000} rows={2} value={reason} disabled={busy} onChange={event => setReason(event.target.value)} />}</Field>
+      {readOnly ? <Notice tone="info">Archived agent. Draft retained; saving unavailable.</Notice> : null}
+      <EvaluationFields draft={draft} onChange={setDraft} disabled={busy || readOnly} />
+      <Field label="Change reason">{props => <textarea {...props} required maxLength={1000} rows={2} value={reason} disabled={busy || readOnly} onChange={event => setReason(event.target.value)} />}</Field>
       {conflict ? <Notice tone="info">Conflict. Draft preserved.</Notice> : null}
       <div className="button-row evaluation-actions">
         <Button variant="secondary" disabled={busy} onClick={() => { if (!dirty || window.confirm("Discard evaluation changes?")) { setDraft(null); setReason(""); setError(null); setConflict(false); } }}>Discard</Button>
-        {conflict ? <Button variant="secondary" disabled={busy} onClick={() => { if (window.confirm("Discard this draft and load the latest profile?")) void reload(); }}>Reload latest</Button> : <Button type="submit" disabled={busy || !dirty || !draft.criteria.length}>{busy ? <Spinner /> : null}Save evaluation profile</Button>}
+        {conflict ? <Button variant="secondary" disabled={busy} onClick={() => { if (window.confirm("Discard this draft and load the latest profile?")) void reload(); }}>Reload latest</Button> : <Button type="submit" disabled={busy || readOnly || !dirty || !draft.criteria.length}>{busy ? <Spinner /> : null}Save evaluation profile</Button>}
       </div>
     </form> : <>
       {displayed ? <>

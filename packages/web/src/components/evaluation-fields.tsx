@@ -6,21 +6,21 @@ export function EvaluationFields({ draft, onChange, disabled = false }: {
   onChange: (draft: EvaluationProfileDraft) => void;
   disabled?: boolean;
 }) {
-  function text(label: string, value: string, change: (value: string) => void, maxLength = 10000) {
-    return <Field label={label}>{props => <textarea {...props} value={value} required={["Responsibilities", "Expected behavior", "Description", "Prompt", "Expected outcome"].includes(label)} maxLength={maxLength} rows={3} onChange={event => change(event.target.value)} />}</Field>;
+  function text(label: string, value: string, change: (value: string) => void, maxLength = 10000, required = false) {
+    return <Field label={label}>{props => <textarea {...props} value={value} required={required} maxLength={maxLength} rows={3} onChange={event => change(event.target.value)} />}</Field>;
   }
   function updateCase(id: string, patch: Partial<EvaluationCase>) {
     onChange({ ...draft, cases: draft.cases.map(item => item.id === id ? { ...item, ...patch } : item) });
   }
   return <fieldset className="evaluation-fields" disabled={disabled}>
-    {text("Responsibilities", draft.responsibilities, responsibilities => onChange({ ...draft, responsibilities }))}
-    {text("Expected behavior", draft.expectedBehavior, expectedBehavior => onChange({ ...draft, expectedBehavior }))}
+    {text("Responsibilities", draft.responsibilities, responsibilities => onChange({ ...draft, responsibilities }), 10000, true)}
+    {text("Expected behavior", draft.expectedBehavior, expectedBehavior => onChange({ ...draft, expectedBehavior }), 10000, true)}
     {text("Prohibited actions", draft.prohibitedActions, prohibitedActions => onChange({ ...draft, prohibitedActions }))}
     <section className="evaluation-group">
       <h3>Criteria</h3>
       {draft.criteria.map((criterion, index) => <fieldset className="evaluation-item" key={criterion.id}>
         <legend>Criterion {index + 1}</legend>
-        {text("Description", criterion.description, description => onChange({ ...draft, criteria: draft.criteria.map(item => item.id === criterion.id ? { ...item, description } : item) }), 2000)}
+        {text("Description", criterion.description, description => onChange({ ...draft, criteria: draft.criteria.map(item => item.id === criterion.id ? { ...item, description } : item) }), 2000, true)}
         <Field label="Grading method">{props => <Select {...props} value={criterion.gradingMethod} onChange={event => onChange({ ...draft, criteria: draft.criteria.map(item => item.id === criterion.id ? { ...item, gradingMethod: event.target.value as typeof criterion.gradingMethod } : item) })}>
           <option value="direct">Direct check</option><option value="judge">Judge</option><option value="human">Human review</option>
         </Select>}</Field>
@@ -36,7 +36,7 @@ export function EvaluationFields({ draft, onChange, disabled = false }: {
         <legend>Case {index + 1}</legend>
         <Field label="Name">{props => <Input {...props} required maxLength={200} value={item.name} onChange={event => updateCase(item.id, { name: event.target.value })} />}</Field>
         <label className="evaluation-check"><input type="checkbox" checked={item.enabled} onChange={event => updateCase(item.id, { enabled: event.target.checked })} />Enabled</label>
-        {text("Prompt", item.prompt, prompt => updateCase(item.id, { prompt }), 20000)}
+        {text("Prompt", item.prompt, prompt => updateCase(item.id, { prompt }), 20000, true)}
         {text("Starting conditions", item.startingConditions, startingConditions => updateCase(item.id, { startingConditions }), 20000)}
         <fieldset className="evaluation-item"><legend>Input artifact references</legend>
           {item.inputArtifacts.map((artifact, artifactIndex) => <div className="evaluation-artifact" key={artifactIndex}>
@@ -48,7 +48,7 @@ export function EvaluationFields({ draft, onChange, disabled = false }: {
         <fieldset className="evaluation-criteria"><legend>Applicable criteria</legend>
           {!draft.criteria.length ? <p className="field-hint">Add criteria above.</p> : draft.criteria.map((criterion, criterionIndex) => <label className="evaluation-check" key={criterion.id}><input type="checkbox" checked={item.criterionIds.includes(criterion.id)} onChange={event => updateCase(item.id, { criterionIds: event.target.checked ? [...item.criterionIds, criterion.id] : item.criterionIds.filter(id => id !== criterion.id) })} />{criterion.description || `Criterion ${criterionIndex + 1}`}</label>)}
         </fieldset>
-        {text("Expected outcome", item.expectedOutcome, expectedOutcome => updateCase(item.id, { expectedOutcome }), 20000)}
+        {text("Expected outcome", item.expectedOutcome, expectedOutcome => updateCase(item.id, { expectedOutcome }), 20000, true)}
         <details className="evaluation-private"><summary>Evaluator-only material</summary>
           {text("Grading guidance", item.gradingGuidance, gradingGuidance => updateCase(item.id, { gradingGuidance }))}
           {text("Reference answer", item.evaluatorOnly.referenceAnswer, referenceAnswer => updateCase(item.id, { evaluatorOnly: { ...item.evaluatorOnly, referenceAnswer } }), 20000)}
