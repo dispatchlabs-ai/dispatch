@@ -899,7 +899,7 @@ Post-publication feedback, October 6: after `3859775` was applied locally, Chris
 
 Acceptance criteria and evidence:
 
-- Main and thread composers offer file/image picking, image paste, compact previews and removal. Preserve Markdown paste, mentions, IME/Enter, Send/Stop and editor identity. Disclose immediate conversation sharing and retention; removal never claims deletion.
+- Main and thread composers offer file/image picking, image paste, compact previews and removal. Preserve Markdown paste, mentions, IME/Enter, Send/Stop and editor identity. Keep immediate sharing/retention documented; removal never claims deletion. The October 7 correction below supersedes the original long UI-disclosure requirement.
 - Keep independent in-memory attachment drafts, visible upload failures, no partial send, attachment-only send, same-request retries and newer-draft settlement guards. Preview resources must be released without invalidating another mounted draft.
 - Enforce 10 MiB/file, 25 MiB/message and 10 attachments before client upload and at the server boundary. Authorize upload before body parsing; scope reads and send references to current conversation access and only allow the uploader to attach. Generated storage IDs, sanitized names, restricted upload body limit and safe download headers are required.
 - Preserve attachment identity through native admission, retries, delivery/history and recovery. Native image blocks use only verified raster formats, capped at 4 MiB/image and 8 MiB/delivery or history/tool read with explicit omission IDs and preserved originals; validated UTF-8 text reads use the scoped attachment tool; binary/PDF/Office remain download-only.
@@ -913,3 +913,7 @@ Implementation evidence:
 - Deployer independently passed integrated `nix develop -c npm run check`, `nix flake check`, `nix build`, and working/staged/branch diff checks at `6d7826b` on Apple Silicon; Linux was skipped. Logs remain ignored in the integration worktree’s `.local/attachment-integrated-*.log`. No tests or runtime qualification are claimed. Rendered desktop/390 px review is unavailable in this session; captures are needed. Clipboard, keyboard/focus/assistive technology, contrast, touch/virtual keyboards, upload failures, draft/send races, provider acceptance, membership/revocation and restart/recovery remain unverified by execution. No live service restart or deployment is included.
 
 Product intent belongs at wiki.dispatchworks.ai; no wiki publication is claimed from this tool session.
+
+### October 7, 2026 — Attachment UI copy correction
+
+Chris requested completely removing the long sharing/retention sentences from the attachment menu and below the composer. This supersedes WP-040's original visible-disclosure criterion, not the immediate-sharing/retention contract. Security confirmed that the prose is not an access control. Keep the boundary in the [usage guide](usage-guide.md#chat-and-workspace), preserve file/image picking, paste, previews, removal/retry and concise status/error labels. Source/build and rendered desktop/390 px evidence for this correction remain pending; no deployment or functional verification is implied.
