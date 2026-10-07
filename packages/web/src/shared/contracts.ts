@@ -69,6 +69,23 @@ export interface AgentParticipant extends ParticipantIdentity {
 
 export type ConversationParticipant = HumanParticipant | AgentParticipant;
 
+export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+export const ATTACHMENT_TOTAL_MAX_BYTES = 25 * 1024 * 1024;
+export const ATTACHMENT_MAX_COUNT = 10;
+/** Raw-byte budgets for native model content; original downloads retain the upload limit. */
+export const ATTACHMENT_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
+export const ATTACHMENT_IMAGE_TOTAL_MAX_BYTES = 8 * 1024 * 1024;
+
+export type Attachment = {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  kind: "image" | "text" | "file";
+  /** Authenticated, conversation-authorized download/preview route. */
+  url: string;
+};
+
 export interface ConversationMessage {
   id: string;
   /** Prior IDs of the same native reply; preserved for thread and history references. */
@@ -77,6 +94,7 @@ export interface ConversationMessage {
   authorId: string;
   text: string;
   createdAt: number;
+  attachments?: Attachment[];
   /** Native image content retained when projecting existing public messages. */
   images?: { mimeType: string; data: string }[];
   /** Root public-message ID; replies remain visible to all conversation members. */
@@ -228,6 +246,7 @@ export interface CreateProjectInput {
 
 export interface SendMessageInput {
   requestId: string;
+  attachmentIds?: string[];
   text: string;
   threadId?: string | null;
   mentions?: string[];

@@ -11,6 +11,7 @@ import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
 import type { AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
 import { isManagedConnection } from "../src/shared/contracts.js";
+import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata } from "./attachments.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
 import { Skills, SkillBindingsDoc } from "./extensions/skills.js";
@@ -65,7 +66,7 @@ export class DispatchRuntime {
   private managed?: McpConnections;
   private readAllProjectUserIds = new Set<string>();
 
-  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: RegistryReader, shared: SharedConversations, connections: AgentConnections, private readonly workspaceDir: string, peopleDirectory?: PeopleDirectory) {
+  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: RegistryReader, shared: SharedConversations, connections: AgentConnections, private readonly workspaceDir: string, private readonly attachments: AttachmentStore, peopleDirectory?: PeopleDirectory) {
     this.connections = connections;
     this.shared = shared;
     this.peopleDirectory = peopleDirectory;
@@ -91,7 +92,8 @@ export class DispatchRuntime {
       await chmod(filename, 0o600);
       const registry = createRegistry();
       let runtime: DispatchRuntime;
-      const shared = new SharedConversations((tx, roomId, companyId, definitionId) => runtime.createParticipant(tx, roomId, companyId, definitionId));
+      const attachments = new AttachmentStore(join(owner.directory, "attachments"));
+      const shared = new SharedConversations((tx, roomId, companyId, definitionId) => runtime.createParticipant(tx, roomId, companyId, definitionId), attachments);
       registry.install(shared.extension);
       registry.install(CodingTools);
       registry.install(Coding);
@@ -106,7 +108,7 @@ export class DispatchRuntime {
           return new NodeExecutionEnv({ cwd });
         },
       }, context);
-      runtime = new DispatchRuntime(harness, storage, models, owner, registry, shared, connections, options.workspaceDir, options.peopleDirectory);
+      runtime = new DispatchRuntime(harness, storage, models, owner, registry, shared, connections, options.workspaceDir, attachments, options.peopleDirectory);
       runtime.managed = options.mcpConnections;
       runtime.readAllProjectUserIds = new Set(options.readAllProjectUserIds ?? []);
       // Seed once and publish a real commit before recovery so snapshots use Pi's persisted sequence.
@@ -400,9 +402,34 @@ export class DispatchRuntime {
     };
   }
 
+  async authorizeAttachmentUpload(scope: RuntimeScope, id: string) {
+    await this.shared.authorized(scope, nativeId(id), "participate", this.readAll(scope));
+  }
+
+  async uploadAttachment(scope: RuntimeScope, id: string, file: File) {
+    await this.authorizeAttachmentUpload(scope, id);
+    const record = await this.attachments.save(id, scope.userId, file);
+    // Repeat authorization after I/O. Unreferenced bytes are safe to retain if admission fails.
+    await this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
+      (await tx.doc(AttachmentsDoc, nativeId(id))).records[record.id] = record;
+    }, context);
+    return attachmentMetadata(record);
+  }
+
+  async downloadAttachment(scope: RuntimeScope, id: string, attachmentId: string) {
+    const attachment = await this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
+      const record = (await tx.doc(AttachmentsDoc, nativeId(id))).records[attachmentId];
+      if (!record) throw new AttachmentError(404, "Attachment not found.");
+      return attachmentMetadata(record);
+    }, context);
+    return { attachment, bytes: await this.attachments.read(attachment) };
+  }
+
   async submit(scope: RuntimeScope, id: string, input: SendMessageInput) {
     requireText(input.requestId, "Request ID", 200);
-    requireText(input.text, "Message", 100_000);
+    requireText(input.text, "Message", 100_000, Boolean(input.attachmentIds?.length));
     await this.authorize(scope, id);
     const person = await this.person(scope.companyId, scope.userId);
     return this.harness.commit(async tx => {
@@ -698,7 +725,14 @@ export class DispatchRuntime {
     const catalog = (await this.harness.snapshot(CatalogDoc, context))!;
     for (const chat of catalog.chats) {
       const roomId = nativeId(chat.id);
-      await this.harness.commit(async tx => { await tx.doc(TurnsDoc, roomId); await this.shared.migrateReplyHistory(tx, roomId); }, context);
+      await this.harness.commit(async tx => {
+        await tx.doc(TurnsDoc, roomId);
+        await this.shared.migrateReplyHistory(tx, roomId);
+        // Collaboration tools are application capabilities, including bounded attachment reads.
+        for (const member of (await tx.doc(SharedDoc, roomId)).members) {
+          if (member.kind === "agent" && member.conversationId) await this.shared.enable(tx, member.conversationId);
+        }
+      }, context);
       if ((await this.harness.snapshot(SharedDoc, roomId, context))?.companyId) continue;
       // Preserve orphaned historical authors without authorizing any new human identity.
       const human = await this.peopleDirectory?.get(chat.companyId, chat.userId) ?? { id: chat.userId, name: "Former member" };

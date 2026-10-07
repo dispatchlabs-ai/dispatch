@@ -8,6 +8,8 @@ import { RuntimeError, type DispatchRuntime } from "./runtime.js";
 import { CollaborationError } from "./collaboration/shared.js";
 import type { ApplicationConfig, ChatSnapshot } from "../src/shared/contracts.js";
 import { ConnectionError, type McpConnections } from "./mcp-connections.js";
+import { AttachmentError, readAttachmentUpload } from "./attachments.js";
+import { ATTACHMENT_MAX_COUNT } from "../src/shared/contracts.js";
 import { randomToken } from "./auth/crypto.js";
 
 type Auth = ReturnType<typeof createAuth>;
@@ -91,12 +93,16 @@ export function createApp(options: AppOptions) {
       button.addEventListener("click",complete);void complete();
     </script></html>`);
   });
-  app.use("/api/*", bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: { code: "too_large", message: "Request is too large." } }, 413) }));
+  const jsonLimit = bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: { code: "too_large", message: "Request is too large." } }, 413) });
+  const isUpload = (method: string, path: string) => method === "POST" && /^\/api\/chats\/[^/]+\/attachments$/.test(path);
+  // Upload bytes are counted only after authentication and conversation authorization below.
+  app.use("/api/*", (c, next) => isUpload(c.req.method, c.req.path) ? next() : jsonLimit(c, next));
   app.use("/api/*", async (c, next) => {
     c.header("Cache-Control", "no-store");
     if (!["GET", "HEAD"].includes(c.req.method)) {
       if (c.req.header("origin") !== options.origin) return c.json({ error: { code: "origin", message: "Request origin is not allowed." } }, 403);
-      if (!c.req.header("content-type")?.toLowerCase().startsWith("application/json")) return c.json({ error: { code: "content_type", message: "Use an application/json request." } }, 415);
+      const type = isUpload(c.req.method, c.req.path) ? "multipart/form-data" : "application/json";
+      if (c.req.header("content-type")?.split(";")[0].trim().toLowerCase() !== type) return c.json({ error: { code: "content_type", message: `Use a ${type} request.` } }, 415);
     }
     const response = await auth.handle(c.req.raw);
     if (response) return response;
@@ -173,11 +179,30 @@ export function createApp(options: AppOptions) {
       .refine(value => value.pinned !== undefined || value.archived !== undefined || value.projectId !== undefined).parse(await c.req.json());
     return c.json(await runtime.updateChat(c.get("principal"), c.req.param("id"), input));
   });
+  app.post("/api/chats/:id/attachments", async c => {
+    const principal = c.get("principal");
+    await runtime.authorizeAttachmentUpload(principal, c.req.param("id"));
+    const file = await readAttachmentUpload(c.req.raw);
+    if (!auth.isSessionValid(principal.sessionId)) return c.json({ error: { code: "unauthenticated", message: "Sign in to continue." } }, 401);
+    return c.json({ attachment: await runtime.uploadAttachment(principal, c.req.param("id"), file) }, 201);
+  });
+  app.get("/api/chats/:id/attachments/:attachmentId", async c => {
+    const attachmentId = z.string().uuid().parse(c.req.param("attachmentId"));
+    const { attachment, bytes } = await runtime.downloadAttachment(c.get("principal"), c.req.param("id"), attachmentId);
+    c.header("Content-Type", attachment.mimeType);
+    c.header("Content-Length", String(attachment.size));
+    c.header("Content-Security-Policy", "default-src 'none'; sandbox");
+    const disposition = attachment.kind === "image" ? "inline" : "attachment";
+    const name = encodeURIComponent(attachment.name).replace(/[!'()*]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+    c.header("Content-Disposition", `${disposition}; filename="attachment"; filename*=UTF-8''${name}`);
+    return c.body(new Uint8Array(bytes));
+  });
   app.post("/api/chats/:id/messages", async (c) => {
     const input = z.object({
-      requestId, text: z.string().trim().min(1).max(100_000),
+      requestId, text: z.string().trim().max(100_000),
       threadId: identity.nullable().optional(), mentions: identities.optional(),
-    }).strict().parse(await c.req.json());
+      attachmentIds: z.array(z.string().uuid()).max(ATTACHMENT_MAX_COUNT).refine(ids => new Set(ids).size === ids.length).optional(),
+    }).strict().refine(input => input.text.length > 0 || Boolean(input.attachmentIds?.length), "Add a message or attachment.").parse(await c.req.json());
     await runtime.submit(c.get("principal"), c.req.param("id"), input);
     return c.json(await runtime.getChat(c.get("principal"), c.req.param("id")), 202);
   });
@@ -222,7 +247,7 @@ export function createApp(options: AppOptions) {
   }
   app.onError((error, c) => {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return c.json({ error: { code: "invalid_request", message: "The request is invalid. Check the fields and try again." } }, 400);
-    if (error instanceof ProjectAccessError || error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
+    if (error instanceof AttachmentError || error instanceof ProjectAccessError || error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
     console.error("Dispatch request failed:", error);
     return c.json({ error: { code: "internal", message: "The request could not be completed. Try again." } }, 500);
   });
