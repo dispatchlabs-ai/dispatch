@@ -49,6 +49,15 @@ buildNpmPackage {
       --add-flags "$app/packages/web/build/service/server/index.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-auth" \
       --add-flags "$app/packages/web/build/service/server/auth-cli.js"
+    test -f "$app/packages/web/build/service/server/workers/backend-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-backend" \
+      --add-flags "$app/packages/web/build/service/server/workers/backend-main.js"
+    test -f "$app/packages/web/build/service/server/workers/control-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-launcher" \
+      --add-flags "$app/packages/web/build/service/server/workers/control-main.js"
+    test -f "$app/packages/web/build/service/server/workers/worker-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-worker" \
+      --add-flags "$app/packages/web/build/service/server/workers/worker-main.js"
     mkdir -p "$out/share/dispatch-web"
     cp -R packages/web/capabilities "$out/share/dispatch-web/capabilities"
     cp packages/web/server/storage/postgres/NOTICE "$out/share/dispatch-web/postgres-storage-NOTICE"
