@@ -1065,3 +1065,16 @@ Implementation evidence (October 7):
 - Nix-shell `npm run check`, Apple Silicon `nix build` and `nix flake check`, and staged/working whitespace checks passed after the final source cleanup. Linux builds were not run. No tests or live provider calls were made for this implementation.
 - PNG validation is bounded structural inspection including IHDR/IDAT/IEND, not pixel decompression or CRC qualification. Atomic rename prevents partial final filenames, not orphan temporary files, partially completed runs or power-loss data loss. Workspace path checks do not provide isolation from concurrent service-account filesystem mutation. Metadata contains prompts and reference paths; protect workspace backups.
 - No new image-generation/review screen was added. The existing agent editor gains one capability checkbox. Rendered desktop/390 px review, keyboard/touch/contrast and functional acceptance remain unverified; captures are needed before claiming UI qualification. No live service integration or deployment has occurred.
+
+## WP-045 — Agent file publication and generation request correction
+
+**Authorized October 7, 2026; implemented on `feat/agent-files`, pending Chris review.** Chris accepted the attachment route after the generation-only tool exposed its missing delivery path, and reported a live HTTP 400. Scope follows [agent-prepared attachments](spec.md#agent-prepared-conversation-attachments); no new browser UI or automatic paid retry.
+
+Acceptance criteria:
+- Snapshot bounded regular workspace files before publication; reject path escapes and special files. Private prepared records are owner-only to agent reads and unavailable to browser downloads until admitted publication.
+- Preserve attachment IDs through native tool receipts, contribution revisions, post-tools/final review and recovery. Stop/silence/discard must not release private records. Publication atomically releases only its selected attachments.
+- Reuse attachment MIME inspection, message limits and existing image/file rendering. Paths are not browser URLs; no base64 arguments or public workspace route.
+- Omit `input_fidelity` from prompt-only generation requests and include safe rejected-parameter diagnostics. Reverse reported a live rejection naming this parameter; no billing conclusion follows from HTTP status alone. Successful final generation/editing remains unverified; no more live probes authorized.
+- Source/deslop and Pi lifecycle review, Nix-shell TypeScript/application builds, Apple Silicon Nix checks, whitespace and changed-document links required. No tests added/run by this implementation owner. Live publication, access isolation, Stop/recovery and desktop/390 px rendering remain unverified. No hosted deployment.
+
+WP-045 check evidence: Developer ran `nix develop -c npm run check`, `nix build`, and `nix flake check` successfully on Apple Silicon. The flake reported zero declared checks; Linux systems were omitted. Pi Expert and Deslop source reviews found no blocking findings; whitespace checks pass. These checks do not establish runtime correctness. Reverse performed one live rejected-request probe during investigation despite the no-tests policy; no further probes were run by this implementation owner.

@@ -150,7 +150,7 @@ export function createImageGen(models: Models) {
       model: Type.Optional(Type.String({ maxLength: 64, description: `Images model id. Default ${DEFAULT_MODEL}.` })),
       size: Type.Optional(Type.Union(SIZES.map((size) => Type.Literal(size)), { description: "Output size. Default 1536x1024." })),
       quality: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("medium"), Type.Literal("high")], { description: "Default high." })),
-      input_fidelity: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("high")], { description: "Fidelity to reference images. Default high." })),
+      input_fidelity: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("high")], { description: "Fidelity to reference images; edit runs only. Default high." })),
       n: Type.Optional(Type.Integer({ minimum: 1, maximum: 4, description: "Number of variants. Default 1." })),
       images: Type.Optional(Type.Array(Type.String(), { minItems: 1, maxItems: MAX_REFERENCE_IMAGES, description: "Reference image paths, workspace-relative. Present means an edit run." })),
       mask: Type.Optional(Type.String({ description: "Optional mask PNG path; fully transparent regions are regenerated. Requires reference images." })),
@@ -170,8 +170,10 @@ export function createImageGen(models: Models) {
       const quality = args.quality ?? "high";
       const inputFidelity = args.input_fidelity ?? "high";
       const count = args.n ?? 1;
-      const request: Record<string, unknown> = { model: requestedModel, prompt: args.prompt, size, quality, input_fidelity: inputFidelity, n: count };
-      const endpoint = (args.images?.length ?? 0) > 0 ? "https://api.openai.com/v1/images/edits" : "https://api.openai.com/v1/images/generations";
+      // input_fidelity is edit-only: the 2.5 Images API rejects it on /v1/images/generations (unknown_parameter).
+      const isEditRun = (args.images?.length ?? 0) > 0;
+      const request: Record<string, unknown> = { model: requestedModel, prompt: args.prompt, size, quality, n: count, ...(isEditRun ? { input_fidelity: inputFidelity } : {}) };
+      const endpoint = isEditRun ? "https://api.openai.com/v1/images/edits" : "https://api.openai.com/v1/images/generations";
 
       let metadataPath: string | undefined;
       let record: RunRecord | undefined;
@@ -293,12 +295,15 @@ export function createImageGen(models: Models) {
         catch { throw new ToolError("The provider response was not valid JSON."); }
 
         if (!response.ok) {
-          const providerError = (parsed as { error?: { type?: unknown; code?: unknown } }).error;
+          const providerError = (parsed as { error?: { type?: unknown; code?: unknown; param?: unknown } }).error;
           const code = safeCode(providerError?.type) ?? safeCode(providerError?.code);
+          // The rejected parameter name is a short identifier and names the exact contract violation.
+          const param = safeCode(providerError?.param);
+          const detail = `HTTP ${response.status}${code ? `, ${code}` : ""}${param ? `, param=${param}` : ""}`;
           record.status = "failed";
-          record.error = `provider_error (HTTP ${response.status}${code ? `, ${code}` : ""})`;
+          record.error = `provider_error (${detail})`;
           await persist();
-          return textResult(`Image generation failed (HTTP ${response.status}${code ? `: ${code}` : ""}). ${auditNote()}`, true);
+          return textResult(`Image generation failed (${detail}). ${auditNote()}`, true);
         }
 
         // Structured validation: every requested image must decode; partial results are failures.

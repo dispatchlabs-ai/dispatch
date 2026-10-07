@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — agent file sharing
+
+- Prepare workspace files privately with `conversation_attach` and publish saved attachment IDs through contribution review. Reuse existing attachment storage and rendering; Stop/discard does not publish prepared files.
+- Omit `input_fidelity` on prompt-only image generation and include sanitized rejected-parameter diagnostics. Live generation, publication and recovery remain unverified.
+
 ## Unreleased — local PostgreSQL storage
 
 - Add an opt-in PostgreSQL adapter for Pi Durable 1.0.4, with isolated logical stores, atomic batches, document history and a dedicated single-owner connection. SQLite remains the default; existing state is not migrated.

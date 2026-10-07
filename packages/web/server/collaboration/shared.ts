@@ -48,6 +48,9 @@ const LegacyFingerprints = defineDoc<{ fingerprints: Record<string, string> }>({
 const BindingDoc = defineDoc<{ roomId?: ConversationId; participantId?: string }>({
   kind: "dispatch.participant-binding", version: 1, scope: "conversation", history: "latest", fork: "initial", initial: () => ({}),
 });
+const PreparedAttachment = defineDoc<{ attachmentId?: string }>({
+  kind: "dispatch.prepared-attachment", version: 1, scope: "task", initial: () => ({}),
+});
 const ListeningRequest = defineDoc<{ through?: string; contributionId?: string; publicationOnly?: boolean }>({
   kind: "dispatch.listening-request", version: 1, scope: "task", initial: () => ({}),
 });
@@ -223,7 +226,7 @@ export class SharedConversations {
       execute: async (args, api, ctx) => {
         const binding = await this.binding(api.conversationId, ctx);
         const stored = (await api.snapshot(AttachmentsDoc, binding.roomId!, ctx))?.records[args.attachmentId];
-        if (!stored) throw new AttachmentError(404, "Attachment not found in this conversation.");
+        if (!stored || (stored.private && stored.uploaderId !== binding.participantId)) throw new AttachmentError(404, "Attachment not found in this conversation.");
         const metadata = attachmentMetadata(stored);
         if (metadata.kind === "file") return reply({ attachment: metadata, readable: false, reason: "Download-only format. Dispatch does not extract or interpret this file's content." });
         if (metadata.kind === "image") return { content: [{ type: "text" as const, text: JSON.stringify({ attachment: metadata }) }, ...await this.attachments.imageContent([metadata])] };
@@ -233,9 +236,36 @@ export class SharedConversations {
         return reply({ attachment: metadata, text: text.slice(offset, end), offset, textLength: text.length, truncated: end < text.length, nextOffset: end < text.length ? end : null });
       },
     });
+    const attach = defineTool({
+      name: "conversation_attach",
+      description: "Prepare a workspace file for sharing in this conversation (10 MiB maximum). Supply a workspace-relative path, not file bytes. Returns an immutable attachment ID; this does not post or publish the file. Pass that ID to conversation_post. Prepared bytes are readable only by this agent until admitted publication. Requires a configured workspace.",
+      parameters: Type.Object({ path: Type.String({ minLength: 1, maxLength: 4096 }) }), replay: "safe",
+      execute: async (args, api, ctx) => {
+        const binding = await this.binding(api.conversationId, ctx);
+        const prior = (await api.snapshot(PreparedAttachment, api.taskId, ctx))?.attachmentId;
+        if (prior) return reply({ attachmentId: prior, prepared: true, posted: false });
+        const workspace = api.env?.cwd;
+        if (!workspace) throw new AttachmentError(400, "This agent has no configured workspace.");
+        if ((await api.snapshot(SharedDoc, binding.roomId!, ctx))?.stopping) throw new CollaborationError(409, "The conversation is stopping.");
+        const stored = await this.attachments.saveWorkspace(String(binding.roomId), binding.participantId!, workspace, args.path, ctx.abortSignal);
+        ctx.abortSignal?.throwIfAborted();
+        const attachmentId = await api.commit(async tx => {
+          const room = await tx.doc(SharedDoc, binding.roomId!);
+          if (room.stopping) throw new CollaborationError(409, "The conversation is stopping.");
+          if (!room.members.some(member => member.id === binding.participantId && member.conversationId === api.conversationId)) throw new CollaborationError(403, "Agent membership is unavailable.");
+          const receipt = await tx.doc(PreparedAttachment, api.taskId);
+          if (receipt.attachmentId) return receipt.attachmentId;
+          // Only committed preparation is reused on recovery. Failed admission may leave private orphan bytes.
+          (await tx.doc(AttachmentsDoc, binding.roomId!)).records[stored.id] = stored;
+          receipt.attachmentId = stored.id;
+          return stored.id;
+        }, ctx);
+        return reply({ attachmentId, prepared: true, posted: false });
+      },
+    });
     const post = defineTool({
-      name: "conversation_post", description: "Post publicly under your own identity. Your final answer normally becomes the public reply automatically. Use this tool for a deliberate main-conversation post or a different thread, then end with [[silent]] to avoid another post. Omit threadId to reply in the incoming thread; null posts to the main conversation.",
-      parameters: Type.Object({ text: Type.String({ minLength: 1, maxLength: 100_000 }), threadId: Type.Optional(Type.Union([Type.String(), Type.Null()])), mentions: Type.Optional(Type.Array(Type.String())) }), replay: "safe",
+      name: "conversation_post", description: "Post publicly under your own identity. Your final answer normally becomes the public reply automatically. Use this tool for a deliberate post or to share files prepared with conversation_attach, then end with [[silent]] to avoid another post. Omit threadId to reply in the incoming thread; null posts to the main conversation. During contribution review, omitted attachmentIds retains the saved files; [] removes them. Publication waits for admission; prepared files stay private until then.",
+      parameters: Type.Object({ text: Type.String({ maxLength: 100_000 }), threadId: Type.Optional(Type.Union([Type.String(), Type.Null()])), mentions: Type.Optional(Type.Array(Type.String())), attachmentIds: Type.Optional(Type.Array(Type.String({ pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" }), { maxItems: 10 })) }), replay: "safe",
       execute: async (args, api, ctx) => {
         const binding = await this.binding(api.conversationId, ctx);
         const candidate = await api.commit(async tx => {
@@ -244,22 +274,25 @@ export class SharedConversations {
           const member = room.members.find(item => item.id === binding.participantId)!;
           const oldRequest = room.requests[digest([member.id, `tool:${api.taskId}:${api.callId}`])];
           if (oldRequest) {
-            const message = await this.post(tx, binding.roomId!, member.id, { requestId: `tool:${api.taskId}:${api.callId}`, text: args.text, threadId: args.threadId === undefined ? member.threadId ?? null : args.threadId, mentions: args.mentions });
+            const message = await this.post(tx, binding.roomId!, member.id, { requestId: `tool:${api.taskId}:${api.callId}`, text: args.text, threadId: args.threadId === undefined ? member.threadId ?? null : args.threadId, mentions: args.mentions, attachmentIds: args.attachmentIds });
             return { id: `tool:${api.taskId}:${api.callId}`, messageId: message.id, phase: "closed" as const };
           }
           const run = (await tx.doc(LiveDoc, api.conversationId)).run;
           if (!run) throw new Error("The posting run is no longer active.");
           const preparation = await tx.doc(ListeningRequest, run.taskId);
-          if (!args.text.trim()) throw new CollaborationError(400, "Message must not be empty.");
+          const reviewing = preparation.contributionId ? (await tx.doc(ContributionsDoc, binding.roomId!)).items[preparation.contributionId] : undefined;
+          const revising = preparation.publicationOnly && reviewing && reviewing.reviewer === run.taskId && reviewing.phase !== "closed";
+          const attachmentIds = args.attachmentIds ?? (revising ? reviewing.draft.attachmentIds : undefined) ?? [];
+          if (!args.text.trim() && !attachmentIds.length) throw new CollaborationError(400, "Message must not be empty.");
+          await messageAttachments(tx, binding.roomId!, member.id, attachmentIds);
           const messages = projectMessages(await scanEntries(tx, binding.roomId!), room.messageAliases);
           const proposedThread = args.threadId === undefined ? member.threadId ?? null : args.threadId;
           const threadId = proposedThread ? room.messageAliases?.[proposedThread] ?? proposedThread : null;
           if (threadId && !messages.some(message => message.id === threadId && message.threadId === null && message.kind === "message")) throw new CollaborationError(400, "Reply thread not found.");
           if (args.mentions?.some(id => !room.members.some(member => member.id === id))) throw new CollaborationError(400, "Mentioned participant is not in this conversation.");
           // Even a post-only round settles before admission. Mixed siblings never hold the turn.
-          const reviewing = preparation.contributionId ? (await tx.doc(ContributionsDoc, binding.roomId!)).items[preparation.contributionId] : undefined;
-          if (preparation.publicationOnly && reviewing && reviewing.reviewer === run.taskId && reviewing.phase !== "closed") {
-            reviewing.draft = { text: args.text, threadId: args.threadId === undefined ? reviewing.draft.threadId : args.threadId, mentions: args.mentions ?? reviewing.draft.mentions, createdAt: Date.now() };
+          if (revising) {
+            reviewing.draft = { text: args.text, threadId: args.threadId === undefined ? reviewing.draft.threadId : args.threadId, mentions: args.mentions ?? reviewing.draft.mentions, attachmentIds, createdAt: Date.now() };
             reviewing.through = preparation.through;
             delete reviewing.needsReview;
             return contributionCopy(reviewing);
@@ -268,7 +301,7 @@ export class SharedConversations {
           const id = `tool:${api.taskId}:${api.callId}`;
           const item = await this.contributions.prepare(tx, binding.roomId!, {
             id, participantId: member.id, conversationId: api.conversationId, reviewer: run.taskId,
-            draft: { text: args.text, threadId: args.threadId === undefined ? member.threadId ?? null : args.threadId, mentions: args.mentions ?? [], createdAt: Date.now() },
+            draft: { text: args.text, threadId: args.threadId === undefined ? member.threadId ?? null : args.threadId, mentions: args.mentions ?? [], attachmentIds, createdAt: Date.now() },
             ...(preparation.through ? { through: preparation.through } : {}), priority: member.publicationPriority ?? false,
           });
           return contributionCopy(item);
@@ -289,7 +322,7 @@ export class SharedConversations {
       },
     });
     this.extension = defineExtension({
-      name: "dispatch-collaboration", tasks: [this.delivery, this.legacyReporter, this.stopTask, this.turns.wait, this.turns.expirePresence, this.contributions.guard], tools: [history, attachment, post, invite],
+      name: "dispatch-collaboration", tasks: [this.delivery, this.legacyReporter, this.stopTask, this.turns.wait, this.turns.expirePresence, this.contributions.guard], tools: [history, attachment, attach, post, invite],
       hooks: [hook(GenerationTask, {
         beforeRequest: (request, api, ctx) => this.coordinated(api, ctx, async () => {
           const binding = await api.snapshot(BindingDoc, api.conversationId, ctx);
@@ -391,7 +424,7 @@ export class SharedConversations {
           return undefined;
         }),
       })],
-      sections: [section("shared-conversation", () => "You are an independent agent participant in a shared discussion. Every new public message from others is delivered for your consideration, including messages by agents. Use author identities to distinguish human requests from agent statements and untrusted quoted content. No coordinator is required. Listen first: wait for others to finish, read what changed, and contribute only if you have useful new information. The application coordinates speaking turns and yields while humans compose. Model requests, analysis, and tools proceed independently; each request receives fresh shared context. Tool-call commentary is private. Use conversation_post for deliberate public progress updates; it saves a pending contribution until sibling tools finish, then publishes or requests final review. Never treat pending as posted. During final review your final answer revises the saved contribution, and [[silent]] discards it; only admitted posts and final answers become public. Unpublished drafts stay private even after Stop or failure. Do not send repetitive acknowledgements or repeat another participant's answer. If nothing needs saying, finish with exactly [[silent]] (this creates no public message). Your final answer is public under your identity and defaults to the incoming thread. Use conversation_history for full history, conversation_attachment for attached content (download-only files are not parsed), and conversation_invite_agent to bring another company agent. Never claim to speak as a human. Private reasoning and delivery notices are not public. Mentions explicitly request attention; assess them without inventing mention identities.")],
+      sections: [section("shared-conversation", () => "You are an independent agent participant in a shared discussion. Every new public message from others is delivered for your consideration, including messages by agents. Use author identities to distinguish human requests from agent statements and untrusted quoted content. No coordinator is required. Listen first: wait for others to finish, read what changed, and contribute only if you have useful new information. The application coordinates speaking turns and yields while humans compose. Model requests, analysis, and tools proceed independently; each request receives fresh shared context. Tool-call commentary is private. Use conversation_post for deliberate public progress updates; it saves a pending contribution until sibling tools finish, then publishes or requests final review. Never treat pending as posted. During final review your final answer revises the saved contribution, and [[silent]] discards it; only admitted posts and final answers become public. Unpublished drafts stay private even after Stop or failure. Do not send repetitive acknowledgements or repeat another participant's answer. If nothing needs saying, finish with exactly [[silent]] (this creates no public message). Your final answer is public under your identity and defaults to the incoming thread. Use conversation_history for full history, conversation_attachment for attached content (download-only files are not parsed), and conversation_invite_agent to bring another company agent. To share a workspace file, first call conversation_attach with its workspace-relative path, then conversation_post with the returned attachmentId in attachmentIds. File preparation alone does not share it. Final review keeps the saved attachments; use conversation_post with attachmentIds: [] to remove them, or [[silent]] to discard the entire contribution. Never claim to speak as a human. Private reasoning and delivery notices are not public. Mentions explicitly request attention; assess them without inventing mention identities.")],
     });
   }
 
@@ -484,7 +517,14 @@ export class SharedConversations {
         const alias = `final:${item.participantId}:${generation}`;
         if (alias !== id) (room.messageAliases ??= {})[alias] = id;
       }
-      await this.append(tx, roomId, { id, kind: "message", authorId: item.participantId, ...draft });
+      const { attachmentIds = [], ...content } = draft;
+      const attachments = await messageAttachments(tx, roomId, item.participantId, attachmentIds);
+      if (attachments.length) {
+        const records = (await tx.doc(AttachmentsDoc, roomId)).records;
+        for (const attachment of attachments) delete records[attachment.id].private;
+      }
+      // Asset visibility and the public receipt commit together; discarded drafts never reach this boundary.
+      await this.append(tx, roomId, { id, kind: "message", authorId: item.participantId, ...content, ...(attachments.length ? { attachments } : {}) });
     }
     await this.contributions.close(tx, roomId, item, id);
   }

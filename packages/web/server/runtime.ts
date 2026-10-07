@@ -448,7 +448,7 @@ export class DispatchRuntime {
     const attachment = await this.harness.commit(async tx => {
       await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
       const record = (await tx.doc(AttachmentsDoc, nativeId(id))).records[attachmentId];
-      if (!record) throw new AttachmentError(404, "Attachment not found.");
+      if (!record || record.private) throw new AttachmentError(404, "Attachment not found.");
       return attachmentMetadata(record);
     }, context);
     return { attachment, bytes: await this.attachments.read(attachment) };
