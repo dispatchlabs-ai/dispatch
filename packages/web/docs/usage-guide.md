@@ -127,13 +127,49 @@ The service uses Pi's public `ModelRuntime` from the pinned coding-agent package
 
 When seeding the company's default agent for the first time, explicit `DISPATCH_PROVIDER`, `DISPATCH_MODEL`, and `DISPATCH_THINKING` override Pi's `defaultProvider`, `defaultModel`, and `defaultThinkingLevel`. Without either configuration, the fallback is `openai` / `gpt-6-sol` / `off`; the provider still needs credentials. `DISPATCH_PI_AGENT_DIR` selects a different existing Pi configuration directory. Provider environment credentials supported by Pi can also be supplied to the service. Use Personal Vault's process injection for secrets rather than putting them on the command line or in committed files.
 
-The default agent is chat-only and has no tools. It is saved on first startup and can be edited in Agents just like other definitions; subsequent restarts or changes to the service defaults do not overwrite it. The Agents section creates company-shared definitions with instructions, provider/model, and supported thinking levels. Each save produces a new immutable revision. New agent instances copy that configuration; existing instances remain unchanged. A stale edit returns a conflict. Archived definitions cannot start new chats or be edited; there is no restore operation in this slice.
+The default agent is chat-only and has no tools. It is saved on first startup and can be edited in Agents just like other definitions; subsequent restarts or changes to the service defaults do not overwrite it. The Agents section creates company-shared definitions with instructions, provider/model, and supported thinking levels. Each save produces a new immutable revision. New agent instances copy that configuration; existing instances remain unchanged. A stale edit returns a conflict. Archived definitions cannot start new chats or be edited; archive restoration is not supported. Configuration restoration for an eligible active target is described under [permissioned agent management](#permissioned-agent-management).
 
 In Agents, New agent is at the top of the sidebar, followed by Find an agent and the saved-agent list. Select an agent to read its description and instructions; the right column shows its saved configuration. Start chat opens the starting-agent chooser with that definition selected. Hover or focus an agent's row for Edit and, for non-default agents, Archive; touch layouts keep the actions visible. Archived agents is at the bottom of the sidebar and supports inspection, not restoration. The default agent keeps its Default tag and cannot be archived.
 
 New agent opens an editor with the saved default agent's model/thinking values. Fill in Identity, Instructions, and Model; Cancel and Create agent/Save new revision stay below the scrolling form. The right column previews the unsaved draft and distinguishes changes from the saved revision for existing agents. Choosing another agent or starting a new edit asks before discarding unsaved changes. Switching to Chats or Account, hiding a column, or changing screen size preserves the open editor. On phones, Start chat fills its row and the agent view includes a short model/thinking/tools summary; Details exposes the full configuration.
 
 Instructions format Markdown while you type or paste, using the same editor as chat. Headings, lists, quotes, emphasis, links and code remain editable. Enter adds a paragraph or list item; Shift+Enter adds a line. Use Create agent or Save new revision to save. Saved instructions stay rendered when viewing the agent. Instructions remain Markdown text; formatting may normalize when edited. Drafts over 50,000 characters including Markdown formatting stay editable and show an error until shortened. Unsupported editor syntax remains text, and drafts are not saved across page reloads.
+
+### Permissioned agent management
+
+WP-046 adds disabled-by-default management rights through a human-session API; there is no grant-management screen or seeded Doctor grant. The interface below documents the implementation slice, not a successful live trial. Doctor's target and direct-save mode still require confirmation before enabling access. Proposal/promotion and automatic evals are not included.
+
+**Grant administration.** Any fully authenticated company member can inspect/change company grants under the existing equal-capability human policy. Use same-origin JSON requests; never give an agent a browser session. `GET /api/agent-management/grants` returns `{ grants, history, saves }`: current versioned policies, human grant-change audit and agent-save receipts. Save reasons/evidence are untrusted agent-supplied text, not verified eval results; the history includes request fingerprints containing submitted tuning text and is company-visible. Receipts are retained for replay safety, not pruned when the hourly quota window expires. `POST` to that endpoint returns `{ grant }` and accepts:
+
+```json
+{
+  "editorId": "<immutable editor ID>",
+  "targetId": "<immutable target ID>",
+  "expectedVersion": 0,
+  "requestId": "<stable human request ID>",
+  "reason": "Enable a reviewed narrow grant",
+  "policy": {
+    "editorRevision": 1,
+    "action": "save",
+    "fields": ["instructions"],
+    "maxSavesPerHour": 1
+  }
+}
+```
+
+The revision and limit above are illustrative, not trial defaults. `expectedVersion` is 0 for a new editor/target pair; thereafter use the returned current version. Set `policy: null` to revoke, retaining the pair's current version, a reason and a new request ID. Identical retries reuse the original request ID and payload; changed content or stale versions conflict (409). Policy action is `read` or `save`; save requires a nonempty field list drawn from `instructions`, `provider`, `modelId`, `thinkingLevel`. Every policy requires an explicit limit of 1–100 committed saves per rolling hour.
+
+Both editor and target must have no assigned tools, extensions, skills or MCP connections, including externally configured connections. The target cannot be the default agent, the editor itself, archived, or another granted editor. These restrictions are rechecked when acting. Grants pin the editor revision: both its current definition and acting instance must match. After editing the editor, re-grant the new revision and start a matching instance; old instances do not retain authority.
+
+**Native tools.** Tool visibility alone grants nothing. `agent_management_read` with no arguments lists up to 100 currently eligible granted targets and returns `total`/`nextOffset`; pass `{ offset }` to continue. `{ targetId, revision? }` reads identity and tuning fields from the current or specified historical revision; the selected historical revision must also be unprivileged. Unauthorized targets are not returned by listing. There is no general agent API-call tool.
+
+`agent_management_save` accepts `{ targetId, operationId, expectedRevision, reason, evidence?, patch?, restoreRevision? }`. Supply exactly one nonempty `patch` or positive `restoreRevision`; patch keys must be granted fields. Instructions retain the 50,000-character cap and model/thinking changes retain normal validation. Evidence is at most 20 opaque references (2,000 characters each); it is not fetched and grants no access. Unknown fields, capability/connection/skill changes and live-rollout flags are rejected.
+
+A successful save returns a compact acknowledgement with operation ID, target before/after revisions, timestamp and grant version; full attribution, evidence and retry fingerprints remain in the human-inspectable save history, not the tool response. Retry an uncertain result with the **same operation ID and identical payload in the same agent instance**. Receipt replay precedes grant/quota checks, including after revocation, and never creates another revision or consumes quota; changed content conflicts. Operation IDs are instance-scoped, not a cross-conversation retry mechanism. New saves use the current expected target revision; stale revisions conflict. The applicable grant's hourly limit counts committed saves across that editor's targets; exhaustion returns 429 with a retry time.
+
+**Restoration.** Read the desired historical revision and latest target revision, then save with `restoreRevision` set to the historical revision and `expectedRevision` set to the latest. Restoration copies only the granted tuning fields into a new forward revision and counts as a save. It does not rewrite history, restore ungranted fields, change existing conversations or undo external effects. Revoke the grant separately if further edits should stop. Stop/cancellation does not undo an already committed save.
+
+Permission checks do not isolate an agent with host shell/state access; cwd is not a sandbox. Inspect both agents' effective access before enabling a trial. Source/build checks and the standing zero-tests policy do not establish successful Doctor edits, replay/revocation behavior or deployment.
 
 ### Developer
 
@@ -345,6 +381,7 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `GET /api/chats/:id/events` | SSE `snapshot` events; `session-ended` closes access on invalidation |
 | `GET /api/people` | Active company people available for invitation |
 | `POST /api/chats/:id/participants` | Invite company agents or people with an idempotent request ID |
+| `GET/POST /api/agent-management/grants` | Inspect company grant/change/save history / versioned human grant update or revocation |
 | `GET/POST /api/agents` | List company definitions / append a revision using optimistic concurrency |
 | `GET /api/agents/:id/connections` | Read observed per-agent MCP status and the discovered tool catalog |
 | `POST /api/agents/:id/connections/:connection/reconnect` | Retry initialization/discovery for a configured connection; body `{}` |

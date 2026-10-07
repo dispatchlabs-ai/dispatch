@@ -1082,7 +1082,7 @@ Implementation evidence (October 7):
 **Implementation authorized October 7, 2026; in progress.** Chris subsequently requested execution through completion after the documentation-only package. Developer owns implementation, Pi Durable Expert and Security own their source reviews, and Documenter owns documentation. No grant or successful Doctor edit is established by this authorization. Depends on the current immutable definition catalog, trusted native participant bindings and Pi Durable 1.0.4 public document/commit interfaces. Scope follows [permissioned agent management](spec.md#permissioned-agent-management). Doctor is the selected trial editor, not an already authorized principal.
 
 Before enabling grants:
-- Resolve the spec's open choices: target and immutable IDs/effective privileges, direct saves versus proposals, human grant administration and grant validity across Doctor revisions.
+- Confirm the trial target and immutable IDs/effective privileges, direct-save mode, pinned editor revision, editable fields and explicit hourly limit. The first implementation supports human-session API grant administration, revision-pinned reads/direct saves and no proposal/promotion workflow.
 - Confirm the narrow trial allowlist. Do not provision grants, change Doctor/target configuration, run evals or start model calls as part of this documentation package.
 
 Implementation scope:
@@ -1090,6 +1090,12 @@ Implementation scope:
 - Dedicated grant document and separately authorized human grant writer, with grant-change audit. Keep agent-edit paths unable to mutate grants.
 - Atomic authorization/target eligibility, expected-revision validation, immutable save, agent attribution and deduplication receipt. Retain all existing definition validation, including instruction-length limits, human saves and company isolation without treating agent identity as a human user ID.
 - No existing-instance rollout, permission expansion, self-editing or skill/connection/capability changes. Document restoration as a new revision, not history replacement.
+
+Implementation contract (pending final integration/review):
+- `agent_management_read` and `agent_management_save` commit through the supplied native transaction. Grant writes are separate human-session operations at `/api/agent-management/grants`; no grants are seeded and no UI is added.
+- Both current and acting editor revisions match a human-granted pin. Both agents remain unprivileged; target eligibility includes external connections and management grants.
+- Explicit 1–100 rolling-hour save limit; committed editor saves across all targets count, receipt replay does not. Same-instance operation and durable call identity prevent replay duplication. Restore copies only granted fields into a forward revision.
+- The [usage guide](usage-guide.md#permissioned-agent-management) owns API shapes, failure/retry handling, grant invalidation and restoration steps.
 
 Acceptance criteria:
 - Source/security review covers forged caller/target IDs, cross-company reads/writes, absent/revoked grants, forbidden fields, changed target privileges, editor revisions, human-versus-agent principal handling and every grant-writing path.
@@ -1099,6 +1105,8 @@ Acceptance criteria:
 - Apply source/deslop review, TypeScript/application and applicable Nix builds for implementation, full diff/whitespace and changed-link checks. Any UI must satisfy desktop/390 px review rules. The zero-tests policy remains active; runtime, security, replay/revocation and actual Doctor edits remain unqualified until separately authorized and observed. No deployment is included.
 
 Initial documentation-only evidence (`8635def`): architecture checked against the then-current `saveAgent`, human-session API and native collaboration-tool pattern, and installed Pi Durable 1.0.4 public configuration/document contracts. That publication added no executable code and granted no rights. Documentation diff/deslop and whitespace review passed; relative link paths in both changed documents and the new cross-link anchors were checked. No tests, model calls, builds or runtime qualification were performed for this documentation-only change.
+
+WP-046 implementation evidence (in progress): Developer reports the initial TypeScript/application build passed. Security found no blocking authorization issues and independently passed typecheck. Pi identified a blocking oversized save-receipt response; the implementation now returns compact acknowledgements with explicit output limits, increases the bounded read output allowance and paginates target listings. Source includes specific pin/quota errors and checks historical-read privilege. Final Pi/security confirmation, source/deslop review and applicable Nix builds remain pending. No grants were seeded; no runtime trial, UI qualification or deployment is established. Documentation describes the implementation contract for integration, not observed Doctor behavior.
 
 ## Agent archive response correction — October 7, 2026
 
