@@ -12,7 +12,12 @@
           pkgs = import nixpkgs { inherit system; };
           web = pkgs.callPackage ./packages/web/nix/package.nix { };
         in {
-          packages.default = web;
+          packages = { default = web; } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+            oci = pkgs.callPackage ./packages/web/nix/oci.nix {
+              inherit web;
+              sourceRevision = self.rev or self.dirtyRev or "uncommitted";
+            };
+          };
           checks.web = web;
           devShells.default = pkgs.mkShell {
             packages = [ pkgs.nodejs_24 ];
