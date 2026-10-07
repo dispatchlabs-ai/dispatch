@@ -460,6 +460,23 @@ Continue adding Pi Durable capabilities in focused feature slices: tools and int
 
 Design the first chat around Pi's public interfaces and the ownership boundaries below. Add later features' detailed behavior and UI when their use cases are agreed. The right column remains available for specified supporting views; chat-first scope does not invent content for it.
 
+### Individual-agent evaluation
+
+**Data direction accepted October 7, 2026; implementation and functional acceptance pending.** Start with individual agents, supporting both stored standalone prompts/cases and evaluation of real usage. Team evaluation is deferred. Agent Eval and Jev are optional tools, not required dependencies or the product's organizing model. [WP-047](handoff.md#wp-047--agent-evaluation-profiles-and-editor) owns the first data/editor delivery; storing a profile does not establish evaluation execution.
+
+Use Dispatch-owned Pi Durable documents in the existing persistent store, separate from `dispatch.catalog` and native `pi.agent`. Profile revision is application data, distinct from the document schema/migration version. Large fixtures/artifacts remain private file/blob references. Document scope is not an authorization boundary.
+
+| Record | Required information |
+| --- | --- |
+| Evaluation profile | ID, company, agent definition, independent immutable revision; responsibilities, expected behavior, prohibited actions; criteria with stable IDs, descriptions, direct/judge/human grading method and critical-failure flag; author, timestamp and change reason. |
+| Standalone case, within a profile revision | Stable ID, name, enabled state, prompt, starting conditions, versioned input/fixture references, expected outcome, applicable criterion IDs and case-specific grading guidance. Keep evaluator-only references/checks separate from agent-visible inputs. Exact identity is profile revision plus case ID. |
+| Evaluation run | Agent definition/revision and profile revision; standalone case and fresh execution reference, or real-use instance/conversation/submission and bounded evidence range/task requirements; actual configuration/environment identity including relevant skill/capability versions; execution status, timestamps, requester, operation ID, evidence references and coverage limitations. Real usage requires no standalone case. |
+| Immutable evaluation result | Run ID; criterion outcomes, reasons and evidence; grader identity/version/configuration; grading status/errors and review/disagreement flags; agent tokens/time/cost separately from evaluator usage. Regrading preserves earlier judgments; unknown measurements remain unknown. |
+
+Criterion outcomes distinguish `pass`, `fail`, `insufficient`, `not_applicable` and `not_evaluated`. Execution/grading completion is not a pass; an evaluator error is not an agent failure. Missing profiles mean not configured, not passed.
+
+Profile saves require the expected current revision and preserve prior revisions. Profile access does not grant access to referenced conversations/artifacts. Saving prompts or grading material grants no execution authority. The editor first exposes responsibilities, expected behavior, criteria, prohibited actions and standalone cases; run/results remain system-generated. Automation, budgets, execution authorization, grader integration and Doctor's improvement loop are separate later contracts. This does not expand permissioned-agent-management grants.
+
 ### Permissioned agent management
 
 **Direction accepted; implemented October 7, 2026. Runtime behavior not qualified.** Chris wants explicitly authorized agents to modify other agents as a foundation for eval-driven improvement, and has created **Doctor** as the first trial editor. The initial request authorized documentation only; Chris subsequently requested execution through completion. Grants remain disabled pending the trial choices below; this status does not establish trial execution or deployment. Product context remains the [repository decision record](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/); [WP-046](handoff.md#wp-046--permissioned-agent-management) tracks the implementation scope and unresolved choices.
