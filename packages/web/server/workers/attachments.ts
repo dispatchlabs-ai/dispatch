@@ -14,7 +14,7 @@ export const attachmentSaveRequestSchema = z.object({
 }).strict();
 export const attachmentReadRequestSchema = z.object({ id }).strict();
 const savedSchema = z.object({
-  id, name: text, mimeType: z.string().min(1).max(256), size: z.number().int().min(0).max(ATTACHMENT_MAX_BYTES),
+  id, name: z.string().min(1).refine(value => Array.from(value).length <= 200), mimeType: z.string().min(1).max(256), size: z.number().int().min(0).max(ATTACHMENT_MAX_BYTES),
   kind: z.enum(["image", "text", "file"]), url: z.string().max(2048),
   uploaderId: text, createdAt: z.number().int().nonnegative(), private: z.boolean().optional(),
 }).strict();

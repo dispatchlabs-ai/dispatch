@@ -12,6 +12,7 @@
     "build:capabilities": "tsc -p tsconfig.capabilities.json"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1147.0",
     "@base-ui/react": "1.8.0",
     "@earendil-works/chord": "1.0.4",
     "@earendil-works/pi-ai": "1.0.4",
