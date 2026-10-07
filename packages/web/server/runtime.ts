@@ -523,14 +523,14 @@ export class DispatchRuntime {
 
   async evaluationProfile(scope: RuntimeScope, agentId: string) {
     return this.harness.commit(async tx => {
-      this.findAgent(await tx.doc(CatalogDoc), scope, agentId);
+      if (!latestAgent(await tx.doc(CatalogDoc), scope.companyId, agentId)) throw new RuntimeError(404, "Agent not found.");
       return readEvaluationProfile(tx, scope, agentId);
     }, context);
   }
 
   async evaluationProfileRevision(scope: RuntimeScope, agentId: string, revision: number) {
     return this.harness.commit(async tx => {
-      this.findAgent(await tx.doc(CatalogDoc), scope, agentId);
+      if (!latestAgent(await tx.doc(CatalogDoc), scope.companyId, agentId)) throw new RuntimeError(404, "Agent not found.");
       return readEvaluationProfileRevision(tx, scope, agentId, revision);
     }, context);
   }
@@ -538,7 +538,8 @@ export class DispatchRuntime {
   async saveEvaluationProfile(scope: RuntimeScope, agentId: string, raw: unknown) {
     const input = parseEvaluationProfile(raw);
     return this.harness.commit(async tx => {
-      const agent = this.findAgent(await tx.doc(CatalogDoc), scope, agentId);
+      const agent = latestAgent(await tx.doc(CatalogDoc), scope.companyId, agentId);
+      if (!agent) throw new RuntimeError(404, "Agent not found.");
       return saveEvaluationProfile(tx, scope, agentId, agent.archived, input);
     }, context);
   }
