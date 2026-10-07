@@ -1022,3 +1022,20 @@ Configuration source reviewed October 7: backend/URL/store settings and explicit
 Source/deslop review retained the upstream 1.0.4 storage semantics and MIT notice, explicit store predicates and one operation queue. It removed redundant metadata initialization reads and separate multi-query shutdown counters; queued repeatable-read operations own their complete read lifetime. Persistent ID reservations use the same connection-health boundary, and PostgreSQL `bigint` decoding rejects unsafe IDs/revisions while commit-sequence exhaustion is handled explicitly. The Nix artifact retains upstream attribution. Source review also fixed the effective default database port to match the local endpoint marker rather than inheriting `PGPORT`.
 
 Outstanding: authorized runtime isolation, interrupted-work recovery and backup/restore qualification. No PostgreSQL server, application restart, tests, migration or deployment is established by this work-package record.
+
+
+## WP-043 — Isolated Palm PostgreSQL trial
+
+**Authorized October 7, 2026; deployment and qualification pending.** Chris accepted the proposed isolated Palm trial and asked Developer to work with Deployer. This includes focused disposable-data startup, persistence, restart recovery, duplicate-owner/isolation and paired backup/restore checks as an exception to the [testing policy](spec.md#testing-policy); it does not authorize a broad test suite, existing-installation cutover or real-data migration.
+
+Depends on [WP-042](#wp-042--local-postgresql-pi-storage-adapter), initially pinned to `d2ffd0be2d9c9c99d447007ecd6de2762673d18e`. Deployer owns Palm infrastructure and isolated installation; Developer owns application corrections; Pi Durable Expert supports storage/recovery review. Palm's repository owns host-specific installation, secrets handling and recovery steps; link its published evidence here when available.
+
+Scope and acceptance criteria:
+- Preserve existing Palm services/data. Use a separate hostname, local application state and PostgreSQL 17 database/store, with one application owner and private host/container-network database access. Keep TLS/HTTPS routing in Palm; do not imply the adapter supports remote database TLS configuration.
+- Build and inspect the pinned application/image for the actual target Linux architecture; record revision/artifact identity and actual serving configuration. Prior Apple Silicon checks do not qualify Linux execution.
+- With disposable accounts/data, observe startup/sign-in, a conversation and its persisted history, then reopen after a controlled restart. Record exactly what interrupted-work recovery was exercised; do not infer it from an HTTP response or saved transcript alone.
+- Reject a competing open of the same store, including from a separate local runtime directory; verify different store IDs remain isolated. For connection-loss checks, confirm old executor/tool termination before reopening. Advisory-lock release is not fencing or automatic-takeover permission.
+- Stop the trial owner before backing up PostgreSQL together with complete local auth/connection state, encryption keys and attachment bytes/metadata. Restore the pair into isolated resources and observe restored application behavior. Keep secret-bearing backup material restricted and outside Git/shared evidence; file/database integrity alone is not full application restore qualification.
+- Record failures/corrections, permitted checks and remaining gaps here, linking Palm's owning evidence. Source changes require source/deslop review and applicable TypeScript/application/Nix checks; documentation changes require full diff/whitespace and local-link review. Successful trial checks do not qualify AWS, distributed workers, real-data migration or safe automatic takeover.
+
+Current evidence: authorization and scope only. No installation, PostgreSQL execution, Linux artifact, runtime recovery or restore result is claimed by this record.
