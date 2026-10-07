@@ -1000,3 +1000,21 @@ Implementation evidence:
 - Further replay review corrected multi-candidate binding: a generation keeps its original publish/discard association and cannot revise the next queued draft after recovery. Research/retry releases claims while preserving pending candidates; only explicit silence discards the current candidate. Publication-only tool revision is restricted to a single post call, so mixed/multiple calls cannot overwrite one saved candidate.
 - Research explicitly invalidates approval of the currently reviewed draft, separately from releasing its reservation. Its tool results must reach a model before publication even if public history is unchanged; untouched queued drafts retain approval. Final-answer or single-post revision records fresh approval.
 - Final TypeScript/application and Apple Silicon Nix build/flake checks passed after the approval-state correction. Pi Durable Expert independently passed the Nix-shell application/whitespace checks and found no remaining blocking source findings. Source/deslop review retains native ownership, explicit approval state and immutable generation decisions; 87 local Markdown link targets exist (anchors not checked by that pass). The publication candidate reconciles the later remote documentation commits without changing the running implementation; TypeScript/application and Apple Silicon Nix checks were rerun on that integrated candidate. No tests, model calls, browser acceptance or measured retry/concurrency claims are included.
+
+## WP-042 — Local PostgreSQL Pi Storage adapter
+
+**Requested October 7, 2026; implementation in progress, functional qualification pending.** Depends on Pi Durable 1.0.4's public `Storage` contract and the [AWS target](spec.md#aws-container-deployment-target). This is the [local adapter slice](spec.md#local-postgresql-adapter-slice), not the worker deployment topology.
+
+Scope:
+- Implement PostgreSQL storage through public Pi interfaces, with explicit logical-store keys in shared tables. Keep Pi responsible for native execution and recovery.
+- Offer one adapter through both container and Homebrew PostgreSQL setup. Retain SQLite as the default and use separate disposable local state.
+- Preserve existing native and LAN installations. No real-data migration, authentication/connection migration, worker routing/lifecycle, distributed ownership or AWS apply.
+
+Acceptance criteria:
+- Source-review every lookup, scan, ID/commit allocation and write for logical-store isolation; preserve atomic batches, metadata/document revisions, fork/history behavior and request deduplication. Preserve opaque JSON and string identities losslessly, including lone UTF-16 surrogates and embedded NULs; reserve root ID 1, mint from 2, advance past committed explicit IDs and enforce JavaScript safe-integer bounds.
+- Distinguish definite rejection from an uncertain COMMIT; never retry an uncertain batch or report it as `StorageRejected`. Review consistent multi-query reads (repeatable-read or equivalent serialization, not default `READ COMMITTED` alone) and shutdown draining.
+- Review [Pi 1.0.4 storage conformance](https://github.com/earendil-works/pi/blob/v1.0.4/packages/durable/src/testing/storage-conformance.ts) against the implementation without running tests under the current policy.
+- Document verified setting names, database requirements, loopback container/Homebrew procedures, separate-state safeguards and the actual local ownership boundary in the [usage guide](usage-guide.md). Do not imply that logical-store isolation supplies worker fencing or authorization.
+- Apply source/deslop review, integrated TypeScript/application builds, Apple Silicon Nix build/flake checks, full diff/whitespace and changed-document link checks. Record actual evidence here before claiming completion; builds do not qualify runtime behavior.
+
+Outstanding: final local configuration and ownership contract, implementation/review/check evidence, and authorized runtime isolation, interrupted-work recovery and backup/restore qualification. No PostgreSQL server, application restart, tests, migration or deployment is established by this work-package record.

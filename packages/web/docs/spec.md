@@ -54,6 +54,14 @@ Retain the ARM64 AWS target and a multi-platform OCI index with separately built
 
 The earlier single-service SQLite + S3 Files module is a prepared, source-reviewed candidate, **not this worker/Postgres topology**. Its [runbook](aws-deployment.md) and [SQLite qualification procedure](aws-sqlite-qualification.md) remain applicable only to that candidate and existing storage-specific evidence. See [WP-041](handoff.md#wp-041--generic-aws-container-deployment) for implementation history and outstanding evidence. Before real-data use, qualify the selected storage, ownership, interrupted-work recovery, authorization and backup/restore through an explicitly scoped work package. Prior Palm results, local image checks and source publication do not qualify the new target.
 
+### Local PostgreSQL adapter slice
+
+**Requested October 7, 2026; implementation and qualification pending.** [WP-042](handoff.md#wp-042--local-postgresql-pi-storage-adapter) implements Pi Durable 1.0.4's public asynchronous `Storage` interface with PostgreSQL and an opt-in local setup using either a small container or Homebrew PostgreSQL. SQLite remains the default; use separate disposable development state rather than migrating existing installations.
+
+The adapter must scope every record, lookup, scan, ID allocation and commit sequence to its logical store; commit each complete write batch atomically; and preserve fork ancestry, historical document reads and submission-request deduplication. Multi-query reads must observe a consistent state, and shutdown must drain admitted storage operations. `StorageRejected` is valid only when no batch effect committed. An uncertain COMMIT outcome remains an ordinary error so Pi poisons the Session and requires reopening; do not silently retry it.
+
+This slice does not implement per-conversation workers, distributed executor ownership, authentication/connection migration or AWS deployment. Logical-store scoping is not company/user authorization or fencing of external tool effects. Local connection settings and ownership enforcement must be finalized against the implementation before documenting a runnable setup. Existing native/LAN state stays untouched; runtime recovery and backup/restore remain unqualified until explicitly authorized and observed.
+
 ## Testing policy
 
 **Accepted October 3, 2026.** Do not add or run tests at the current stage. Make enough implementation progress to establish useful, stable behavior before investing in regression coverage. During this exploratory stage, use source review, TypeScript checks, and builds; record functional outcomes that remain unverified.
