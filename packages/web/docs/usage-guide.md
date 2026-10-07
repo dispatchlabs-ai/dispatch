@@ -42,6 +42,63 @@ The launcher fails if the frontend port is occupied, rather than silently choosi
 
 The root development, account, and built-app commands share `.local/state/dispatch` in the repository root. This directory is ignored by Git. Do not point two runtime processes at the same storage; a native SQLite ownership lock rejects the second owner. Separate worktrees default to separate state.
 
+### PostgreSQL development (WP-042)
+
+**Draft setup contract; implementation and runtime qualification pending.** Use this only after the [adapter work package](handoff.md#wp-042--local-postgresql-pi-storage-adapter) is integrated. PostgreSQL is opt-in Pi storage, not an AWS deployment or a switch to distributed workers. The current application still owns one runtime/store. Authentication, managed connection credentials and attachment bytes remain in local application state.
+
+Use PostgreSQL 17 and a dedicated development database. Choose **one** setup below; do not replace an existing database service or reuse installation data. These commands are procedures, not recorded execution evidence.
+
+#### Container
+
+With Docker available, from a trusted local terminal:
+
+```sh
+# Read a disposable database password without putting it in shell history.
+read -r -s -p 'Development database password: ' POSTGRES_PASSWORD
+printf '\n'
+export POSTGRES_PASSWORD
+docker volume create dispatch-pg-dev
+docker run -d --name dispatch-pg-dev \
+  -p 127.0.0.1:55432:5432 \
+  -e POSTGRES_USER=dispatch_dev -e POSTGRES_DB=dispatch_dev \
+  -e POSTGRES_PASSWORD \
+  -v dispatch-pg-dev:/var/lib/postgresql/data postgres:17
+unset POSTGRES_PASSWORD
+```
+
+The prompt uses Bash syntax; run this block in Bash on macOS. Use unused container/volume names and port; do not adopt a preexisting volume. Wait for PostgreSQL initialization before starting Dispatch. The volume persists through `docker stop dispatch-pg-dev`; later use `docker start dispatch-pg-dev`. Do not remove the volume unless intentionally discarding this development database. The password is visible to Docker administrators in container configuration; use disposable credentials, never a production secret. Port 55432 is loopback-only, not a network exposure boundary against other local users.
+
+#### Homebrew on macOS
+
+If no existing PostgreSQL service occupies port 5432:
+
+```sh
+brew install postgresql@17
+brew services start postgresql@17
+"$(brew --prefix postgresql@17)/bin/createuser" -h localhost -p 5432 -P dispatch_dev
+"$(brew --prefix postgresql@17)/bin/createdb" -h localhost -p 5432 -O dispatch_dev dispatch_dev
+```
+
+Run role/database creation as the installation's database administrator; Homebrew's initial administrator is normally your macOS user. Choose new names if those already exist. Set a disposable role password at the prompt. Keep the server loopback-only and review its existing authentication configuration; installing a password does not itself change `pg_hba.conf`. Do not weaken authentication, overwrite an existing cluster or restart someone else's service to follow this example.
+
+#### Application settings
+
+In the repository's Nix shell, use a fresh state path and a stable store identity unique to this development instance:
+
+```sh
+export DISPATCH_PI_STORAGE=postgres
+export DISPATCH_DATA_DIR="$PWD/.local/state/dispatch-postgres"
+export DISPATCH_POSTGRES_STORE_ID=dispatch-dev-postgres
+# Inject DISPATCH_POSTGRES_URL privately, then:
+npm run dev
+```
+
+Supply `DISPATCH_POSTGRES_URL` through private process injection or a non-echoing prompt, not a literal secret in shell history or a committed file. Its shape is `postgresql://dispatch_dev:<encoded-password>@127.0.0.1:55432/dispatch_dev` for the container; use port 5432 for Homebrew. Percent-encode password characters when constructing the URL. Restart the launcher after changing settings. Keep these exports in effect when running `npm run auth -- invite ...`, so account enrollment uses the same fresh local state; invitation links are private.
+
+PostgreSQL mode requires an explicit data directory and store ID and is planned to reject existing `runtime/pi.sqlite`; there is no migration. Do not rename or delete that file to bypass the guard. Reopening PostgreSQL state requires the same database, logical-store ID, local state and company configuration. A new store ID selects different Pi state; it does not copy accounts, conversations or attachments. Backups must pair PostgreSQL state with the complete local state and its encryption keys/attachment bytes; database-only backup is insufficient. PostgreSQL backup/restore qualification is still outstanding.
+
+The planned local duplicate-owner guard is a per-store PostgreSQL session advisory lock on a dedicated, serialized, non-reconnecting connection used for storage. A competing open is rejected without waiting; the lock is released only after admitted operations drain. Connection loss permanently rejects further storage operations and an uncertain COMMIT requires reopening rather than automatic retry. This is **not distributed fencing**, and automatic takeover is unsupported: losing the database connection does not terminate an already-running shell command or remote tool request. Do not start a replacement while an old executor might still run tools. Confirm the old process and its work have stopped before restart. Keep existing native/LAN owners unchanged.
+
 ## First account and sign-in
 
 Accounts require an operator-issued invitation; the login page has no self-service signup. Only the unused enrollment link expires—not the enrolled account. After setup, sign in normally with your saved credentials.
