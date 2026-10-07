@@ -1,6 +1,8 @@
 // Initial layout adapted from Pi Durable 1.0.4 (MIT); see NOTICE.
 import type { Client } from "pg";
 
+export const STORE_TABLES = ["durable_metadata", "record_ids", "conversations", "entries", "tasks", "submissions", "documents", "document_revisions"] as const;
+
 const INITIAL_SCHEMA: readonly string[] = [
   `CREATE TABLE dispatch_pi.durable_metadata (
     store_id TEXT COLLATE "C" PRIMARY KEY,
@@ -94,25 +96,30 @@ const INITIAL_SCHEMA: readonly string[] = [
 export async function migrate(client: Client): Promise<void> {
   await client.query("BEGIN");
   try {
-    // Serialize schema installation across stores/processes in this database.
-    await client.query("SELECT pg_advisory_xact_lock(1684632432, 1)");
-    await client.query("CREATE SCHEMA IF NOT EXISTS dispatch_pi");
-    await client.query(`CREATE TABLE IF NOT EXISTS dispatch_pi.schema_version (
-      singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-      version INTEGER NOT NULL CHECK (version >= 0)
-    )`);
-    await client.query("INSERT INTO dispatch_pi.schema_version VALUES (1, 0) ON CONFLICT DO NOTHING");
-    const { rows } = await client.query<{ version: number }>("SELECT version FROM dispatch_pi.schema_version WHERE singleton = 1");
-    const version = rows[0]?.version;
-    if (version !== 0 && version !== 1) throw new Error("Unsupported PostgreSQL Pi schema version");
-    if (version === 0) {
-      for (const statement of INITIAL_SCHEMA) await client.query(statement);
-      await client.query("UPDATE dispatch_pi.schema_version SET version = 1 WHERE singleton = 1");
-    }
+    await migrateWithinTransaction(client);
     await client.query("COMMIT");
   } catch (error) {
     // The connection is discarded on any initialization error, including uncertain COMMIT.
     try { await client.query("ROLLBACK"); } catch { /* Preserve initialization failure. */ }
     throw error;
+  }
+}
+
+/** Caller owns BEGIN/COMMIT, allowing the worker schema and RLS to publish atomically. */
+export async function migrateWithinTransaction(client: Client): Promise<void> {
+  // Serialize schema installation across stores/processes in this database.
+  await client.query("SELECT pg_advisory_xact_lock(1684632432, 1)");
+  await client.query("CREATE SCHEMA IF NOT EXISTS dispatch_pi");
+  await client.query(`CREATE TABLE IF NOT EXISTS dispatch_pi.schema_version (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    version INTEGER NOT NULL CHECK (version >= 0)
+  )`);
+  await client.query("INSERT INTO dispatch_pi.schema_version VALUES (1, 0) ON CONFLICT DO NOTHING");
+  const { rows } = await client.query<{ version: number }>("SELECT version FROM dispatch_pi.schema_version WHERE singleton = 1");
+  const version = rows[0]?.version;
+  if (version !== 0 && version !== 1) throw new Error("Unsupported PostgreSQL Pi schema version");
+  if (version === 0) {
+    for (const statement of INITIAL_SCHEMA) await client.query(statement);
+    await client.query("UPDATE dispatch_pi.schema_version SET version = 1 WHERE singleton = 1");
   }
 }
