@@ -135,6 +135,33 @@ New agent opens an editor with the saved default agent's model/thinking values. 
 
 Instructions format Markdown while you type or paste, using the same editor as chat. Headings, lists, quotes, emphasis, links and code remain editable. Enter adds a paragraph or list item; Shift+Enter adds a line. Use Create agent or Save new revision to save. Saved instructions stay rendered when viewing the agent. Instructions remain Markdown text; formatting may normalize when edited. Drafts over 50,000 characters including Markdown formatting stay editable and show an error until shortened. Unsupported editor syntax remains text, and drafts are not saved across page reloads.
 
+### Agent evaluation profiles
+
+WP-047 adds a separate Evaluation profile section for saved agents. This describes the current source implementation; persistence, conflict recovery and desktop/390 px rendering still require demonstration before acceptance. See the [data contract](spec.md#individual-agent-evaluation) and [acceptance scope](handoff.md#wp-047--agent-evaluation-profiles-and-editor).
+
+1. Save the agent definition first, then select **Configure evaluations** (or **Edit evaluation profile**).
+2. Enter responsibilities, expected behavior and at least one criterion. Criteria choose direct checks, judge or human review; critical-failure flags and grading guidance describe how to assess work, not an assessment already performed.
+3. Optionally add standalone cases with a name, prompt, expected outcome and one or more applicable criteria. Starting conditions and artifact references describe agent-visible inputs. Reference answers/checks belong in the labeled evaluator-only section.
+4. Enter a change reason and select **Save evaluation profile**. Profile revisions are independent of agent revisions; saving does not alter operating instructions, existing instances or execute cases.
+
+Use **Profile revision** to inspect immutable history. Edit always starts from the latest profile, not the historical selection. A conflict preserves the draft; **Reload latest** explicitly discards it after confirmation, so copy needed changes before reloading. Archived agents remain readable and read-only. Archiving during an edit retains the in-memory draft but locks editing/saving. Drafts are not durable across page reloads. An absent profile is **Not configured**, not passed.
+
+Artifacts are references only, not uploads, verified files or access grants. Each requires a nonblank name (up to 200 characters), reference (2,048) and SHA-256 (exactly 64 lowercase hexadecimal characters). The service stores the supplied hash; it does not fetch or verify the artifact. Evaluator-only labeling is not a separate human permission: company users who can inspect the profile can read that material. Profile access never grants access to referenced private evidence.
+
+#### Profile API and limits
+
+Authenticated company-session endpoints:
+
+- `GET /api/agents/:id/evaluation` returns `{ profile, revisions }`, with a nullable latest profile and newest-first revision metadata.
+- `GET /api/agents/:id/evaluation/revisions/:revision` returns `{ profile }`.
+- `POST /api/agents/:id/evaluation` accepts `SaveEvaluationProfileInput` from [`src/shared/evaluations.ts`](../src/shared/evaluations.ts) and returns `{ profile }`.
+
+First save uses `expectedRevision: null`; subsequent saves use the loaded profile revision. Retry identical requests with the same `requestId`; changed reuse or stale revision returns 409. An identical replay returns the originally saved revision, not necessarily the latest. Archived agents reject new saves. Agent/company identity and author are resolved server-side; there is no native agent profile-editing tool in this slice.
+
+The API requires nonblank responsibilities, expected behavior, change reason, criterion descriptions and case names/prompts/outcomes. Criterion/case IDs are unique UUIDs; each case selects unique existing criterion IDs. Limits are 100 criteria, 100 cases and 20 artifact references per case. Responsibilities, expected behavior, prohibited actions and grading guidance allow 10,000 characters; criterion descriptions 2,000; case names 200; change reason 1,000; prompt, starting conditions, expected outcome, reference answer and checks 20,000 each. Parsed save JSON must be at most 200 KiB. Invalid fields return 400; an oversized parsed profile returns 413.
+
+This slice has no runner, real-conversation evidence picker, grading/results screen or execution authorization. The broader contract includes standalone and real-use evaluation, but stored cases are not completed evaluations.
+
 ### Permissioned agent management
 
 WP-046 adds disabled-by-default management rights through a human-session API; there is no grant-management screen or seeded Doctor grant. The interface below documents the implementation slice, not a successful live trial. Doctor's target and direct-save mode still require confirmation before enabling access. Proposal/promotion and automatic evals are not included.
