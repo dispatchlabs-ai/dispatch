@@ -46,21 +46,27 @@ export async function readAttachmentUpload(request: Request): Promise<File> {
   return file;
 }
 
+/** Shared byte validation and metadata projection, before either local or S3 publication. */
+export async function prepareAttachment(conversationId: string, uploaderId: string, file: File): Promise<{ record: StoredAttachment; bytes: Buffer }> {
+  if (file.size > ATTACHMENT_MAX_BYTES) throw new AttachmentError(413, "Files must be 10 MiB or smaller.");
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const format = classify(bytes, file.type);
+  const id = randomUUID();
+  const name = Array.from(toUSVString(file.name).replace(/[\\/\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, "_").trim()).slice(0, 200).join("") || "attachment";
+  return { bytes, record: { id, name, ...format, size: bytes.byteLength, uploaderId, createdAt: Date.now(), url: `/api/chats/${encodeURIComponent(conversationId)}/attachments/${id}` } };
+}
+
 /** Immutable bytes precede native metadata admission. A crash may leave an unreferenced blob, never a published partial file. */
 export class AttachmentStore {
   constructor(private readonly directory: string) {}
 
   async save(conversationId: string, uploaderId: string, file: File): Promise<StoredAttachment> {
-    if (file.size > ATTACHMENT_MAX_BYTES) throw new AttachmentError(413, "Files must be 10 MiB or smaller.");
-    const bytes = Buffer.from(await file.arrayBuffer());
-    const format = classify(bytes, file.type);
-    const id = randomUUID();
-    const name = Array.from(toUSVString(file.name).replace(/[\\/\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, "_").trim()).slice(0, 200).join("") || "attachment";
+    const { record, bytes } = await prepareAttachment(conversationId, uploaderId, file);
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
-    const handle = await open(join(this.directory, id), "wx", 0o600);
+    const handle = await open(join(this.directory, record.id), "wx", 0o600);
     try { await handle.writeFile(bytes); await handle.sync(); }
     finally { await handle.close(); }
-    return { id, name, ...format, size: bytes.byteLength, uploaderId, createdAt: Date.now(), url: `/api/chats/${encodeURIComponent(conversationId)}/attachments/${id}` };
+    return record;
   }
 
   /** Snapshot bytes once; publication never reads the mutable source again. Not a process sandbox. */
