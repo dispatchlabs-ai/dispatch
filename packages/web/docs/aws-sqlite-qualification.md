@@ -1,6 +1,6 @@
 # AWS SQLite and recovery qualification
 
-**Procedure, not executed evidence.** This is the focused disposable-state qualification authorized for the [AWS container target](spec.md#aws-container-deployment-target), not a general application test suite. Do not use an existing personal or team installation. A build, successful mount, healthy ALB target, or clean SQLite integrity result alone does not establish application recovery.
+**AWS procedure; live qualification pending.** The local probe rehearsal below is not AWS evidence. This is the focused disposable-state qualification authorized for the [AWS container target](spec.md#aws-container-deployment-target), not a general application test suite. Do not use an existing personal or team installation. A build, successful mount, healthy ALB target, or clean SQLite integrity result alone does not establish application recovery.
 
 Use the exact candidate image and module revisions. Record results in the deployment work package's acceptance criteria and the installation's private deployment record. Stop qualification and retain failure evidence if an invariant below fails; do not promote the installation to real data.
 
@@ -71,7 +71,7 @@ Interrupt both an active native model/tool turn and repeated synthetic user-mess
 
 Run this supplementary storage probe in a **separate disposable qualification directory**, never an application database or a live application's state directory. The service should be stopped. It tests WAL rollback after a killed writer using the candidate runtime; it does not substitute for the application interruption above.
 
-From a qualification-only Node helper, run the following against a fresh `PROBE_DB` path under the same persistent mount. The child uses a small cache and approximately 4 MiB of synthetic writes to spill uncommitted WAL frames. The parent waits for that signal, then kills it without graceful cleanup. This snippet is provided for operator execution; it has not been run as part of authoring this procedure.
+From a qualification-only Node helper, run the following against a fresh `PROBE_DB` path under the same persistent mount. The child uses a small cache and approximately 4 MiB of synthetic writes to spill uncommitted WAL frames. The parent waits for that signal, then kills it without graceful cleanup. The local rehearsal below verifies this snippet's mechanics; it must still run on the candidate Fargate/S3 Files configuration.
 
 ```js
 // Run with the candidate's Node 24, e.g. node --input-type=module < probe.mjs.
@@ -116,6 +116,16 @@ console.log('Writer killed after uncommitted insert; reopen from a separate task
 ```
 
 After that helper is confirmed `STOPPED`, open `PROBE_DB` from a **different Fargate task/mount client**, using Node `DatabaseSync`. Require `PRAGMA integrity_check` to return `ok` and `SELECT * FROM probe ORDER BY id` to return only `{id: 1, value: 'committed'}`. Insert and commit row 3, close, and verify rows 1 and 3 from one further replacement task. Keep expected and actual rows in the evidence. Do not delete WAL/SHM/journal files to make recovery succeed.
+
+### Local probe rehearsal — October 7, 2026
+
+The exact embedded probe extracted from application revision `7410e27` passed on Omarchy with the candidate's pinned Nix Node 24.21.0 binary (`/nix/store/frlyjd2wya3rk8xmdc98yq3x0rhpkh9n-nodejs-24.21.0/bin/node`), SQLite 3.51.2. The probe script SHA-256 was `5649a5a6f7878f177e0fa1015876a9bcdc6ee009400144cdbd7020ebddeafc99`.
+
+- The writer signaled spilled uncommitted WAL frames and was terminated with SIGKILL.
+- A separate sequential Node process reopened the database: integrity was `ok`, and only committed row 1 remained. It committed row 3.
+- One further fresh Node process reopened it: integrity remained `ok`, with exactly rows 1 and 3.
+
+Evidence and the synthetic database are retained in `/home/chris/.local/sqlite-probe-rehearsal.dC7HcW` on Omarchy; local scripts/log copies are ignored under `.local/sqlite-probe-rehearsal/` in the M1 Air checkout. No application data, credentials or live service was used or changed. This was unprivileged host execution on local storage, **not** Docker, a container identity/capability check, cross-task/cross-client storage, an application/native-work recovery check, or S3 Files qualification. It establishes that the probe mechanics work, not that the deployment acceptance criteria pass.
 
 ## 4. Offline database integrity
 
