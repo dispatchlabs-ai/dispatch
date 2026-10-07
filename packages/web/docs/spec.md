@@ -445,7 +445,7 @@ Design the first chat around Pi's public interfaces and the ownership boundaries
 
 ### Permissioned agent management
 
-**Direction accepted; implementation authorized October 7, 2026. In progress, not qualified.** Chris wants explicitly authorized agents to modify other agents as a foundation for eval-driven improvement, and has created **Doctor** as the first trial editor. The initial request authorized documentation only; Chris subsequently requested execution through completion. Grants remain disabled pending the trial choices below; this status does not establish trial execution or deployment. Product context remains the [repository decision record](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/); [WP-046](handoff.md#wp-046--permissioned-agent-management) tracks the implementation scope and unresolved choices.
+**Direction accepted; implemented October 7, 2026. Runtime behavior not qualified.** Chris wants explicitly authorized agents to modify other agents as a foundation for eval-driven improvement, and has created **Doctor** as the first trial editor. The initial request authorized documentation only; Chris subsequently requested execution through completion. Grants remain disabled pending the trial choices below; this status does not establish trial execution or deployment. Product context remains the [repository decision record](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/); [WP-046](handoff.md#wp-046--permissioned-agent-management) tracks the implementation scope and unresolved choices.
 
 #### Management boundary and identity
 

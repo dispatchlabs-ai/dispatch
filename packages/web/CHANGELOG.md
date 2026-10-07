@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — permissioned agent management
+
+- Add native authorized definition reads, revisioned tuning saves and forward restoration, with trusted instance identity, dual editor-revision pins, atomic receipts, explicit rolling quotas and no live rollout.
+- Add separate human-session grant administration and audit APIs. No grants are seeded; Doctor's target and direct-save trial remain unconfigured. Proposal workflows, eval automation and a grant UI are not included.
+
 ## Unreleased — agent archive response
 
 - Detach nested agent configuration from the catalog transaction before returning it, so successful archives do not display a failed-request error. The same public projection covers saved-agent retries and retained skill selections.
