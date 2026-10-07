@@ -29,6 +29,8 @@ try {
   const text = await remote.save("local-room-1", "human", new File(["retained text"], "probe.txt", { type: "text/plain" }));
   assert.equal(text.url, `/api/chats/external-route/attachments/${text.id}`);
   assert.equal((await remote.read(text)).toString(), "retained text");
+  const unicode = await remote.save("local-room-1", "human", new File(["unicode name"], "😀".repeat(200)));
+  assert.equal(Array.from(unicode.name).length, 200);
   const workspace = join(root, "workspace");
   await mkdir(workspace);
   await writeFile(join(workspace, "draft.txt"), "snapshot before change");
