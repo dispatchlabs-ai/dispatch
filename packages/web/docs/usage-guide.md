@@ -44,6 +44,8 @@ The root development, account, and built-app commands share `.local/state/dispat
 
 ## First account and sign-in
 
+Accounts require an operator-issued invitation; the login page has no self-service signup. Only the unused enrollment link expires—not the enrolled account. After setup, sign in normally with your saved credentials.
+
 With the same root checkout and Nix shell, create a single-use enrollment link:
 
 ```sh
