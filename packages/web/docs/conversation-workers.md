@@ -1,6 +1,6 @@
 # Single-server conversation workers
 
-Status: application integration in progress. A private, sealed backend/launcher/PostgreSQL/Garage stack is running on Omarchy with zero conversation workers; no HTTPS/DNS publication. Conversation execution and integrated acceptance remain unqualified. Implements the [accepted target](spec.md#aws-container-deployment-target) and [single-server rehearsal](spec.md#single-server-container-rehearsal). Chris authorized implementation, isolated Omarchy deployment and focused testing on October 7, 2026. Existing installations and their data remain untouched.
+Status: application integration in progress. A private, sealed backend/launcher/PostgreSQL/Garage stack was established on Omarchy; the backend is now deliberately stopped for corrective activation, with launcher drain verified and zero workers. No HTTPS/DNS publication. Conversation execution and integrated acceptance remain unqualified. Implements the [accepted target](spec.md#aws-container-deployment-target) and [single-server rehearsal](spec.md#single-server-container-rehearsal). Chris authorized implementation, isolated Omarchy deployment and focused testing on October 7, 2026. Existing installations and their data remain untouched.
 
 ## Ownership and boundaries
 
@@ -82,7 +82,7 @@ Component evidence reported October 7, 2026:
 - Scoped storage/workspace slice `058ae3e`: disposable PostgreSQL checks reported direct-SQL isolation, denied escalation/mapping tampering/DDL/TRUNCATE, rejected owner credentials and mismatched stores, stable provisioning after reopen and preserved native behavior. Workspace checks cover generation and durable pre-resume notice. Deployed isolation and model-visible recovery remain pending.
 - Actual Garage probe: SDK PUT/GET preserved text/image bytes and external-chat URLs, cross-store artifact lookup was rejected, native MIME/size validation was retained, and a reopened client retrieved existing bytes. Receipt: restricted `.local/worker-qualification/garage-result.json`. This is object-store compatibility evidence, not integrated conversation execution.
 
-The initial private stack reports `backendQuiesced: false`; uncovered MCP writers mean the barrier is not yet trustworthy for backup/update acceptance.
+The initial private stack reported `backendQuiesced: false`; the incomplete writer barrier is not trustworthy for backup/update acceptance. Deployer subsequently reported a cold paired backup of all four services' state and private credentials, with archive integrity passing. It followed fresh authenticated launcher drain/zero-worker evidence and confirmed backend termination, rather than relying on the incomplete backend barrier. Restore qualification and corrected-image activation remain pending; cold capture does not qualify graceful application drain.
 
 Retain sanitized exact revisions/receipts with integrated results before claiming qualification. ARM64 runtime and AWS deployment are not qualified by AMD64 Omarchy checks.
 
