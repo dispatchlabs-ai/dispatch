@@ -1,3 +1,4 @@
+import type { SearchSecret, SaveSearchSecret } from "../src/shared/secrets.js";
 import { createHmac, randomUUID } from "node:crypto";
 import { chmodSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -55,7 +56,15 @@ export class McpConnections {
           ALTER TABLE mcp_connections ADD COLUMN server_name TEXT NOT NULL DEFAULT '';
           ALTER TABLE mcp_connections ADD COLUMN disconnect_notice TEXT;`);
       }
-      db.exec(`CREATE TABLE IF NOT EXISTS mcp_connections (
+      db.exec(`CREATE TABLE IF NOT EXISTS integration_secrets (
+          company_id TEXT NOT NULL, owner_id TEXT NOT NULL, source TEXT NOT NULL, secret TEXT, revision INTEGER NOT NULL,
+          PRIMARY KEY(company_id, owner_id)
+        );
+        CREATE TABLE IF NOT EXISTS integration_secret_grants (
+          company_id TEXT NOT NULL, definition_id TEXT NOT NULL, owner_id TEXT NOT NULL, active INTEGER NOT NULL,
+          PRIMARY KEY(company_id, definition_id)
+        );
+        CREATE TABLE IF NOT EXISTS mcp_connections (
           id TEXT PRIMARY KEY, company_id TEXT NOT NULL, owner_id TEXT NOT NULL,
           name TEXT NOT NULL, endpoint TEXT NOT NULL, state TEXT NOT NULL,
           authentication TEXT NOT NULL, provider TEXT NOT NULL DEFAULT '', config TEXT NOT NULL,
@@ -73,7 +82,7 @@ export class McpConnections {
           session_id TEXT NOT NULL, request_id TEXT NOT NULL, connection_id TEXT NOT NULL REFERENCES mcp_connections(id),
           fingerprint TEXT NOT NULL, PRIMARY KEY(session_id,request_id)
         );`);
-      this.key = loadSecretKey(this.keyPath, Boolean(db.prepare("SELECT 1 FROM mcp_connections WHERE secret IS NOT NULL UNION SELECT 1 FROM mcp_oauth_pending LIMIT 1").get()));
+      this.key = loadSecretKey(this.keyPath, Boolean(db.prepare("SELECT 1 FROM mcp_connections WHERE secret IS NOT NULL UNION SELECT 1 FROM mcp_oauth_pending UNION SELECT 1 FROM integration_secrets WHERE secret IS NOT NULL LIMIT 1").get()));
       if (legacy) {
         for (const row of db.prepare("SELECT * FROM mcp_connections").all() as ConnectionRow[]) {
           const old = JSON.parse(row.config) as { issuer: string; clientId: string; authorize: string; token: string; revoke: string };
@@ -90,6 +99,57 @@ export class McpConnections {
         .run("Credential renewal was interrupted. Authorize this connection again.");
       db.exec("COMMIT");
     } catch (error) { db.exec("ROLLBACK"); throw error; }
+  }
+
+  searchSecret(scope: RuntimeScope): SearchSecret {
+    const row = this.db!.prepare("SELECT source,secret,revision FROM integration_secrets WHERE company_id=? AND owner_id=?").get(scope.companyId, scope.userId) as { source: SearchSecret["source"]; secret: string | null; revision: number } | undefined;
+    const source = row?.source ?? "disconnected";
+    const configured = source === "environment" ? Boolean(process.env.EXA_API_KEY?.trim()) : Boolean(row?.secret);
+    const grants = this.db!.prepare("SELECT definition_id FROM integration_secret_grants WHERE company_id=? AND owner_id=? AND active=1").all(scope.companyId, scope.userId) as { definition_id: string }[];
+    return { revision: row?.revision ?? 0, source, status: source === "disconnected" ? "disconnected" : configured ? "configured" : "missing", agentIds: grants.map(row => row.definition_id) };
+  }
+
+  saveSearchSecret(scope: RuntimeScope, input: SaveSearchSecret) {
+    const db = this.db!;
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const existing = db.prepare("SELECT source,secret,revision FROM integration_secrets WHERE company_id=? AND owner_id=?").get(scope.companyId, scope.userId) as { source: string; secret: string | null; revision: number } | undefined;
+      if ((existing?.revision ?? 0) !== input.revision) throw new ConnectionError(409, "Secrets changed in another tab. Reload before saving.");
+      const secret = input.source === "stored" ? input.value ? encryptSecret(input.value, this.key) : existing?.source === "stored" ? existing.secret : null : null;
+      if (input.source === "stored" && !secret) throw new ConnectionError(400, "Enter an API key.");
+      for (const id of input.agentIds) {
+        const grant = db.prepare("SELECT owner_id,active FROM integration_secret_grants WHERE company_id=? AND definition_id=?").get(scope.companyId, id) as { owner_id: string; active: number } | undefined;
+        if (grant?.active && grant.owner_id !== scope.userId) throw new ConnectionError(409, "An agent already uses another owner's search credential.");
+      }
+      db.prepare("INSERT INTO integration_secrets VALUES (?,?,?,?,?) ON CONFLICT(company_id,owner_id) DO UPDATE SET source=excluded.source,secret=excluded.secret,revision=excluded.revision").run(scope.companyId, scope.userId, input.source, secret, input.revision + 1);
+      db.prepare("UPDATE integration_secret_grants SET active=0 WHERE company_id=? AND owner_id=?").run(scope.companyId, scope.userId);
+      for (const id of input.agentIds) db.prepare("INSERT INTO integration_secret_grants VALUES (?,?,?,1) ON CONFLICT(company_id,definition_id) DO UPDATE SET owner_id=excluded.owner_id,active=1").run(scope.companyId, id, scope.userId);
+      db.exec("COMMIT");
+    } catch (error) { db.exec("ROLLBACK"); throw error; }
+    return this.searchSecret(scope);
+  }
+
+  disconnectSearchSecret(scope: RuntimeScope, revision: number) {
+    const db = this.db!;
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const current = this.searchSecret(scope);
+      if (current.revision !== revision) throw new ConnectionError(409, "Secrets changed in another tab. Reload before disconnecting.");
+      db.prepare("UPDATE integration_secrets SET source='disconnected',secret=NULL,revision=revision+1 WHERE company_id=? AND owner_id=?").run(scope.companyId, scope.userId);
+      db.prepare("UPDATE integration_secret_grants SET active=0 WHERE company_id=? AND owner_id=?").run(scope.companyId, scope.userId);
+      db.exec("COMMIT");
+    } catch (error) { db.exec("ROLLBACK"); throw error; }
+    return this.searchSecret(scope);
+  }
+
+  resolveSearchSecret(companyId: string, definitionId: string): string | undefined {
+    const grant = this.db!.prepare("SELECT owner_id,active FROM integration_secret_grants WHERE company_id=? AND definition_id=?").get(companyId, definitionId) as { owner_id: string; active: number } | undefined;
+    // Never fall back to operator credentials after managed access has been revoked.
+    if (!grant) return undefined;
+    if (!grant.active) return undefined;
+    const row = this.db!.prepare("SELECT source,secret,revision FROM integration_secrets WHERE company_id=? AND owner_id=?").get(companyId, grant.owner_id) as { source: string; secret: string | null; revision: number } | undefined;
+    if (row?.source === "environment") return process.env.EXA_API_KEY?.trim();
+    return row?.source === "stored" && row.secret ? decryptSecret(row.secret, this.key) : undefined;
   }
 
   private row(id: string): ConnectionRow {

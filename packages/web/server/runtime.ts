@@ -142,7 +142,18 @@ export class DispatchRuntime {
       registry.install(CodingTools);
       registry.install(Coding);
       registry.install(Skills);
-      registry.install(createWebResearch(createWebBackend({ searchApiKey: process.env.EXA_API_KEY })));
+      registry.install(createWebResearch(createWebBackend(), async (instanceId, query, signal) => {
+        const authorized = await runtime.harness.commit(async tx => {
+          const actor = await shared.managementActor(tx, instanceId);
+          const catalog = await tx.doc(CatalogDoc);
+          const definition = latestAgent(catalog, actor.companyId, actor.definitionId);
+          if (!definition || definition.archived || !publicAgent(definition).capabilities?.includes("web-research")) return undefined;
+          return { companyId: actor.companyId, definitionId: actor.definitionId };
+        }, context);
+        signal?.throwIfAborted();
+        const key = authorized ? options.mcpConnections?.resolveSearchSecret(authorized.companyId, authorized.definitionId) : undefined;
+        return createWebBackend({ searchApiKey: key }).search(query, signal);
+      }));
       registry.install(createImageGen(models));
       connections = await AgentConnections.load(options.connectionsFile ?? join(owner.directory, "agent-connections.json"), registry, options.mcpConnections, options.companyId);
       const harness = await Harness.open(storage, {

@@ -599,3 +599,11 @@ Use the returned `web_…` reference for subsequent reads and literal finds. `op
 References are private to the agent's working conversation, not portable across participants. Snapshots remain stored with native conversation state; there is no automatic expiry. Evidence is retained without application-imposed text/link/body caps; pagination bounds presentation only. No application-imposed request deadline is added; Stop supplies cancellation. Memory/storage and upstream provider limits still apply. Interrupted batches are not automatically repeated, even if they include cached reads; a new retrieval may repeat charges. Completed saved snapshots remain accessible.
 
 Direct extraction is not a browser: JavaScript-only pages, authenticated content, PDFs and image interpretation are unsupported. Public HTTP(S) only; private/local destinations and nonstandard ports are blocked. Websites and search content remain untrusted evidence. Extraction can omit layout or content; respect truncation/error markers and do not claim an inaccessible page was read.
+
+### Exa search credentials
+
+Open **Settings → Secrets**. Choose encrypted storage and enter an Exa API key, or select the server's fixed `EXA_API_KEY` environment source. Select the agent definitions allowed to use it, then save. Enable **Web research** on those agents separately. Environment-only installations now need this explicit assignment; an unset grant never inherits the server key.
+
+Only the saving user manages their credential. Grants cover the definition's existing and future instances and conversation audiences. Replacing a stored key takes effect on subsequent search calls without restarting agents. Changing the process environment still requires relaunching the server. “Configured” is not provider verification. A conflict means another tab changed these settings; reload before saving again.
+
+Disconnect removes local access for every assigned agent, without falling back to another credential. Revoke the API key at Exa separately if needed. Already-running requests and saved search results remain. Direct URL reading does not need an Exa key. Back up `connections.sqlite` and `connections.key` together using the existing connection-store backup procedure. Codex configuration and arbitrary vault commands are not imported automatically.

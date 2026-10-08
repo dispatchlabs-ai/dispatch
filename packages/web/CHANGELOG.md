@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — integration secrets
+
+- Add Settings → Secrets for encrypted Exa keys or explicit server-environment grants, owner-scoped management, revision-conflict protection, and use-time credential authorization. Environment-only search now requires explicit agent grants.
+
 ## Unreleased — starter and GitHub bundles
 
 - Add an explicit-model Developer starter through the existing archive preview/import path.
