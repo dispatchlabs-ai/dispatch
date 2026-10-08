@@ -65,7 +65,7 @@ const directory = await DispatchRuntime.open({
   peopleDirectory: { list: async companyId => auth.listCompanyPeople(companyId), get: async (companyId, userId) => auth.getCompanyPerson(companyId, userId) },
 });
 const routes = await WorkerRoutes.open(join(config.stateDir, "routing"), workerConfig.installationId);
-const admission = new WriteAdmission(routes.admissionBlocked(), async blocked => { routes.setAdmissionBlocked(blocked); });
+const admission = new WriteAdmission(routes.admissionBlocked(), async blocked => { await routes.setAdmissionBlocked(blocked); });
 const mcpPolicy = new McpPolicyGate();
 const runtime = distributedRuntime({ runPolicyChange: operation => mcpPolicy.change(operation), ...workerConfig, workerKey, launcherToken, directory, routes, runBackground: operation => admission.run(operation) });
 // On restart support remains open until an explicit, freshly verified drain.
@@ -113,7 +113,7 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
     return mcp.call(route, input, c.req.raw.signal, assertCurrent);
   }));
   if (operation === "summary") {
-    routes.updateSummary(route.conversationId, route.attemptId, route.storeId, input);
+    await routes.updateSummary(route.conversationId, route.attemptId, route.storeId, input);
     return c.json({ accepted: true });
   }
   if (operation === "attachment/save") {
@@ -158,8 +158,8 @@ app.post("/internal/replace", async c => {
     const status = await workerRequest<LauncherStatus>(workerConfig.launcherUrl, launcherToken, "/v1/status");
     const retired = status.attempts.find(attempt => attempt.attemptId === attemptId);
     if (!status.driverReachable || retired?.phase !== "stopped" || retired.observed !== "absent") throw new Error("Retirement is not confirmed.");
-    routes.retiring(conversationId, attemptId);
-    return routes.replaceRetired(conversationId, attemptId, workerConfig.configurationRevision);
+    await routes.retiring(conversationId, attemptId);
+    return await routes.replaceRetired(conversationId, attemptId, workerConfig.configurationRevision);
   })));
   return c.json({ conversationId, attemptId: replacement.attemptId, phase: replacement.phase });
 });
