@@ -463,6 +463,23 @@ Authenticated JSON routes use base64 archive bytes, not multipart uploads:
 
 Reuse the same `requestId` and contents for the same import; changed contents under the same operation conflict. Use a new ID only for a deliberate additional copy. Native receipts are actor/company-scoped. Transport base64 increases request size and is not encryption. See [the first-slice contract](spec.md#first-archive-slice) for atomicity and compatibility requirements.
 
+## Project historical archives
+
+**Codec/native/API candidate; UI integration and functional qualification pending.** Separate from agent ZIP bundles and installation recovery. The data-only UTF-8 JSON format is `dispatch-project-content`, version `1`, containing project name, public chats/threads, historical authors and referenced attachment bytes as canonical base64 with size/SHA-256 checks. Limits: 32 MiB serialized archive, 10 MiB/file, 100 chats, 10,000 messages and 1,000 files total. No ZIP extraction or executable installation.
+
+Export requires project-manager access, selects chat IDs and rechecks authorization/membership before return; missing referenced bytes fail rather than creating an incomplete archive. Inspect content and historical author labels before sharing. Import creates a new project with only the importing human as manager, no default agents, source memberships or private model state. History remains read-only, not resumed conversations or new submissions.
+
+Authenticated candidate routes:
+
+| Route | Request/result |
+| --- | --- |
+| `POST /api/projects/:id/export` | `{ chatIds: string[] }` → `{ archive }` (JSON object) |
+| `POST /api/project-archives/preview` | `{ archive: string }` (serialized JSON) → `{ preview }` (counts/historical authors) |
+| `POST /api/project-archives/import` | `{ archive: string, requestId: string }` → `{ project }` |
+| `GET /api/projects/:id/history` | `{ archive }`, or null when no imported history; requires project read access |
+
+Preview is a summary, not a durable reviewed-content token; import sends the archive again. Keep the same archive and request ID for uncertain retries: changed content with a reused ID conflicts. Replay still requires destination read access. Immutable restricted blobs are saved before atomic project/pointer/receipt admission; failed admission can leave non-visible orphan files. Back up the complete state/runtime directory, including project archive blobs. See [project contract](spec.md#project-content-and-operational-recovery) and [acceptance evidence](handoff.md#project-content-portability--october-8-2026).
+
 ## Offline installation recovery
 
 **CLI candidate `1291f49`; source-reviewed instructions, not verified recovery.** This is secret-bearing installation material, not a shareable project archive. SQLite only; PostgreSQL, symlinks/special files and overlapping roots are rejected. See [recovery contract](spec.md#project-content-and-operational-recovery) and [acceptance evidence](handoff.md#installation-backup-and-restore--october-8-2026).
