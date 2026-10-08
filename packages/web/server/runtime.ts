@@ -1,3 +1,4 @@
+import type { TranscriptQuery } from "../src/shared/contracts.js";
 import { ProjectArchiveStore, ProjectArchivesDoc, archiveDigest, decodeProjectArchive } from "./project-archives.js";
 import { PROJECT_ARCHIVE_MAX_BYTES, type ProjectArchive, type ArchivedChat } from "../src/shared/project-archives.js";
 import { createHash, randomUUID } from "node:crypto";
@@ -531,7 +532,8 @@ export class DispatchRuntime {
       const catalog = await tx.doc(CatalogDoc);
       const chat = catalog.chats.find(item => item.id === id && item.companyId === scope.companyId)!;
       const room = await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
-      const presentation = await this.shared.presentation(tx, nativeId(id));
+      const presentation = await this.shared.presentation(tx, nativeId(id), {});
+      delete presentation.page;
       for (const participant of presentation.participants) {
         if (participant.kind !== "agent" || participant.membership !== "active") continue;
         const latest = latestAgent(catalog, scope.companyId, participant.agentDefinitionId);
@@ -555,6 +557,25 @@ export class DispatchRuntime {
       };
       // Compatibility carries no private native transcript, inbox, reasoning or agent context.
       return { conversation, definitionOfDone: room.definitionOfDone ?? { markdown: "", revision: 0 }, ...presentation, view: { conversation: (await tx.conversation(nativeId(id)))!, entries: [], docs: {} }, submissions: [] } as ChatSnapshot;
+    }, context);
+  }
+
+  async transcriptPage(scope: RuntimeScope, id: string, query: TranscriptQuery) {
+    await this.authorize(scope, id);
+    return this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
+      return (await this.shared.presentation(tx, nativeId(id), query)).page!;
+    }, context);
+  }
+
+  async publicDetail(scope: RuntimeScope, id: string, kind: "message" | "activity", itemId: string) {
+    await this.authorize(scope, id);
+    return this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
+      const presentation = await this.shared.presentation(tx, nativeId(id));
+      const value = kind === "message" ? presentation.messages.find(item => item.id === itemId || item.aliases?.includes(itemId)) : presentation.activities.find(item => item.id === itemId);
+      if (!value) throw new RuntimeError(404, "History item unavailable.");
+      return value;
     }, context);
   }
 
