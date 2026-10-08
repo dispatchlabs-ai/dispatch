@@ -1,5 +1,5 @@
 // Focused rollout/summary probe: scoped PostgreSQL, directory SQLite and Pi 1.0.4.
-// Real Pi tool execution; injected MCP discovery, credentials and remote invocation.
+// Real Pi tool execution and loopback worker RPC; injected upstream MCP/credential service.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -11,8 +11,11 @@ import { Client, escapeLiteral } from "pg";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { fauxProvider, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
 import { DispatchRuntime, type ConversationWorkerBootstrap, type WorkerMcp, type WorkerManagementActor } from "../runtime.js";
-import { Type } from "@earendil-works/pi-ai";
-import { defineExtension, defineTool } from "@earendil-works/pi-durable";
+import { serve, type ServerType } from "@hono/node-server";
+import { Hono } from "hono";
+import { workerMcp as remoteWorkerMcp, backendWorkerMcp, type WorkerMcpRoute } from "./mcp.js";
+import { workerRequest } from "./transport.js";
+import { WriteAdmission } from "./admission.js";
 import type { McpConnections, ManagedConnectionRecord } from "../mcp-connections.js";
 import { AttachmentStore } from "../attachments.js";
 import { WorkerStoreProvisioner } from "./postgres-stores.js";
@@ -39,6 +42,10 @@ let provisioner: WorkerStoreProvisioner | undefined;
 let admin: Client | undefined;
 let pgStarted = false;
 const passed: string[] = [];
+let heldCall: Promise<void> | undefined;
+let releaseCall: (() => void) | undefined;
+let callEntered = false;
+let cancelledNotifications = 0;
 const records: ManagedConnectionRecord[] = ["a", "b"].map(id => ({ id, companyId: scope.companyId, ownerId: scope.userId,
   name: id, endpoint: `https://${id}.invalid/mcp`, identity: id, serverName: id, authentication: "bearer", authorization: "authorized", scopes: [], createdAt: 1 }));
 const json = (id: unknown, result: unknown) => Response.json({ jsonrpc: "2.0", id, result });
@@ -53,6 +60,12 @@ const managed = {
     const request = JSON.parse(String(init?.body)) as { id?: unknown; method: string };
     if (request.method === "initialize") return json(request.id, { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "rollout", version: "1" } });
     if (request.method === "notifications/initialized") return new Response(null, { status: 202 });
+    if (request.method === "notifications/cancelled") { cancelledNotifications++; return new Response(null, { status: 202 }); }
+    if (request.method === "tools/call") {
+      remoteCalls++;
+      if (heldCall) { callEntered = true; await heldCall; }
+      return json(request.id, { content: [{ type: "text", text: `AUTHORIZED_${_id}` }] });
+    }
     assert.equal(request.method, "tools/list");
     return json(request.id, { tools: [{ name: "probe", description: "No external effects", inputSchema: { type: "object", properties: {} } }] });
   },
@@ -60,20 +73,15 @@ const managed = {
 let actorSeen: WorkerManagementActor | undefined;
 let remoteCalls = 0;
 let preparations = 0;
-const workerMcp: WorkerMcp = { prepare: async (registry, membership, actorForInstance) => {
-  preparations++;
-  for (const pin of membership.agents) for (const connection of pin.mcp.connections) {
-    registry.install(defineExtension({ name: connection.extension, tools: pin.mcp.tools.map(name => defineTool({
-      name, description: "Authority check", parameters: Type.Object({}), replay: "unsafe",
-      execute: async (_args, api) => {
-        actorSeen = await actorForInstance(api.conversationId);
-        await directory!.authorizeWorkerMcp(actorSeen, connection.id, name);
-        remoteCalls++;
-        return { content: [{ type: "text", text: `AUTHORIZED_${connection.id}` }] };
-      },
-    })) }));
-  }
-} };
+const support = new WriteAdmission(false, async () => {});
+let server: ServerType | undefined;
+let origin: string;
+const routes = new Map<string, WorkerMcpRoute>();
+const token = randomBytes(32).toString("base64url");
+const workerMcpFor = (conversationId: string): WorkerMcp => {
+  const remote = remoteWorkerMcp((operation, input, signal) => workerRequest(origin, token, `/${conversationId}/${operation}`, input, signal));
+  return { prepare: async (...args) => { preparations++; await remote.prepare(...args); } };
+};
 try {
   const password = randomBytes(24).toString("hex");
   const pwfile = join(root, "password"); await writeFile(pwfile, password, { mode: 0o600 });
@@ -84,14 +92,32 @@ try {
   await admin.query(`CREATE ROLE provisioner LOGIN CREATEROLE NOSUPERUSER NOBYPASSRLS PASSWORD ${escapeLiteral(password)}`);
   await admin.query("CREATE DATABASE rollout_probe OWNER provisioner"); url.username = "provisioner"; url.pathname = "/rollout_probe";
   provisioner = await WorkerStoreProvisioner.open({ connectionString: url.toString(), installationId: "rollout-probe", credentialKey: randomBytes(32).toString("base64url") });
-  const directoryOptions = { ...common, mcpConnections: managed as unknown as McpConnections, stateDir: join(root, "directory"), directoryOnly: true };
+  const directoryOptions = { ...common, runMcpBackground: <T>(operation: () => Promise<T>) => support.run(operation), mcpConnections: managed as unknown as McpConnections, stateDir: join(root, "directory"), directoryOnly: true };
   directory = await DispatchRuntime.open(directoryOptions);
+  const app = new Hono();
+  app.post("/:conversation/:operation", async c => {
+    if (c.req.header("Authorization") !== `Bearer ${token}`) return c.json({ error: "Forbidden" }, 403);
+    return support.run(async () => {
+      const route = routes.get(c.req.param("conversation"));
+      if (!route) return c.json({ error: "Forbidden" }, 403);
+      const input = await c.req.json();
+      const bridge = backendWorkerMcp(directory!);
+      if (c.req.param("operation") === "definitions") return c.json(await bridge.definitions(route, input));
+      if (input.actor?.storeId === route.storeId) actorSeen = input.actor;
+      return c.json(await bridge.call(route, input, c.req.raw.signal));
+    });
+  });
+  app.onError((_error, c) => c.json({ error: "Denied" }, 403));
+  server = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: 0 });
+  await new Promise<void>(resolve => server!.listening ? resolve() : server!.once("listening", resolve));
+  const address = server.address(); assert(address && typeof address === "object"); origin = `http://127.0.0.1:${address.port}`;
   const draft = { name: "Pinned", description: "Disposable rollout probe", instructions: "Original instructions", provider: "faux", modelId: "faux-1", thinkingLevel: "off" as const };
   const agent = await directory.saveAgent(scope, { ...draft, capabilities: ["files-and-commands"], connectionIds: ["a"] });
   const chat = await directory.createChat(scope, { requestId: "room", agentDefinitionIds: [agent.id] });
   const boot: ConversationWorkerBootstrap = { conversationKey: chat.conversation.id, storeId: `rollout:${randomUUID()}`,
     ...await directory.directoryChatBootstrap(scope, chat.conversation.id), ...await directory.directoryWorkerBootstrap(scope.companyId, chat.conversation.id) };
-  const options = { ...common, stateDir: join(workspaceDir, "state"), workerMcp, attachmentStore: new AttachmentStore(join(root, "artifacts")), piStorage: await provisioner.ensure(boot.storeId) };
+  routes.set(chat.conversation.id, { companyId: scope.companyId, conversationId: chat.conversation.id, storeId: boot.storeId });
+  const options = { ...common, stateDir: join(workspaceDir, "state"), workerMcp: workerMcpFor(chat.conversation.id), attachmentStore: new AttachmentStore(join(root, "artifacts")), piStorage: await provisioner.ensure(boot.storeId) };
   worker = await DispatchRuntime.openConversation(options, boot);
   const roomId = (await worker.workerBinding()).roomId;
   const firstSummary = await worker.workerSummary();
@@ -99,6 +125,10 @@ try {
   const initial = (await worker.getChat(scope, roomId)).participants.find(member => member.kind === "agent")!;
   assert(initial.kind === "agent");
   const firstMcp = boot.membership!.agents[0].mcp;
+  const definitionPayload = await workerRequest(origin, token, `/${chat.conversation.id}/definitions`, { revision: boot.membership!.revision });
+  assert(!JSON.stringify(definitionPayload).includes("disposable-token"));
+  await assert.rejects(workerRequest(origin, "invalid", `/${chat.conversation.id}/definitions`, { revision: boot.membership!.revision }));
+  await assert.rejects(workerRequest(origin, token, `/${chat.conversation.id}/definitions`, { revision: boot.membership!.revision + 1 }));
   const aTool = firstMcp.tools[0]; assert(aTool);
   faux.setResponses([fauxAssistantMessage(fauxToolCall(aTool, {}, { id: "a-call" }), { stopReason: "toolUse" }), fauxAssistantMessage("ROLLOUT_A_DONE")]);
   await worker.submit(scope, roomId, { requestId: "first", text: "Public title" });
@@ -129,6 +159,10 @@ try {
     await assert.rejects(directory.authorizeWorkerMcp({ ...actorSeen!, ...patch }, "b", bTool));
   const forged = { ...actorSeen!, configuration: { ...actorSeen!.configuration, connections: firstMcp.connections, tools: [aTool] } };
   await assert.rejects(directory.authorizeWorkerMcp(forged, "a", aTool));
+  const beforeDenied = remoteCalls;
+  await assert.rejects(workerRequest(origin, token, `/${chat.conversation.id}/call`, { actor: forged, connectionId: "a", toolName: aTool, args: {} }));
+  await assert.rejects(workerRequest(origin, token, `/${chat.conversation.id}/call`, { actor: { ...actorSeen!, storeId: "another-store" }, connectionId: "b", toolName: bTool, args: {} }));
+  assert.equal(remoteCalls, beforeDenied);
   await worker.applyWorkerCatalog(await directory.exportWorkerCatalog(scope.companyId));
   await worker.applyWorkerMembership(rolled);
   const updated = (await worker.getChat(scope, roomId)).participants.find(member => member.kind === "agent")!;
@@ -154,6 +188,28 @@ try {
   records[1].authorization = "revoked";
   await assert.rejects(directory.authorizeWorkerMcp(actorSeen!, "b", bTool));
   records[1].authorization = "authorized";
+  const bridge = backendWorkerMcp(directory);
+  const call = { actor: actorSeen!, connectionId: "b", toolName: bTool, args: {} };
+  heldCall = new Promise<void>(resolve => { releaseCall = resolve; }); callEntered = false;
+  const admitted = bridge.call(routes.get(chat.conversation.id)!, call);
+  await waitFor("admitted upstream call", async () => callEntered);
+  let drained = false;
+  const draining = support.quiesce().then(() => { drained = true; });
+  await delay(25); assert(!drained && !support.quiesced);
+  await assert.rejects(bridge.call(routes.get(chat.conversation.id)!, call));
+  releaseCall!(); await admitted; await draining; assert(support.quiesced);
+  heldCall = undefined; await support.resume();
+  heldCall = new Promise<void>(resolve => { releaseCall = resolve; }); callEntered = false;
+  const cancellation = new AbortController();
+  const callsBeforeAbort = remoteCalls;
+  const interrupted = bridge.call(routes.get(chat.conversation.id)!, call, cancellation.signal);
+  const rejected = assert.rejects(interrupted);
+  await waitFor("cancellable upstream call", async () => callEntered);
+  cancellation.abort(); await rejected;
+  await waitFor("native MCP cancellation notification", async () => cancelledNotifications > 0);
+  releaseCall!(); heldCall = undefined;
+  assert.equal(remoteCalls, callsBeforeAbort + 1);
+  passed.push("Support quiescence waits for admitted MCP calls, denies late calls; cancellation reaches native MCP without retrying an uncertain external invocation");
   passed.push("Native Pi tool callbacks resolve backend pins; new-only saves preserve old selection, explicit rollout changes MCP only, retries deduplicate and revocation/forged authority deny");
   const summary = await worker.workerSummary();
   assert(summary.revision > firstSummary.revision); assert.equal(summary.suggestedTitle, "Public title");
@@ -175,7 +231,8 @@ try {
   assert.deepEqual(await worker.workerSummary(), restoredSummary);
   passed.push("Directory reopen/fresh-workspace replacement reconciles lost rollout delivery while preserving history, pinned revision and durable summary ordering");
   await worker.close(); worker = undefined;
-  worker = await DispatchRuntime.openConversation({ ...options, stateDir: join(root, "pending-state"), piStorage: await provisioner.ensure(pendingBoot.storeId) },
+  routes.set(pendingBoot.conversationKey, { companyId: scope.companyId, conversationId: pendingBoot.conversationKey, storeId: pendingBoot.storeId });
+  worker = await DispatchRuntime.openConversation({ ...options, workerMcp: workerMcpFor(pendingBoot.conversationKey), stateDir: join(root, "pending-state"), piStorage: await provisioner.ensure(pendingBoot.storeId) },
     { ...pendingBoot, ...await directory.directoryWorkerBootstrap(scope.companyId, pendingChat.conversation.id) });
   const pending = (await worker.getChat(scope, (await worker.workerBinding()).roomId)).participants.find(member => member.kind === "agent")!;
   assert(pending.kind === "agent"); assert.equal(pending.agentRevision, v2.revision);
@@ -192,9 +249,12 @@ try {
   assert.equal(nativeMember.agent.instructions, draft.instructions);
   assert.deepEqual(nativeMember.agent.tools.filter(name => name.startsWith("mcp_")), [bTool]);
   passed.push("Native MCP binding rollout still preserves instructions/revision and changes only selected MCP tools");
-  console.log(JSON.stringify({ scope: "Runtime APIs, real Pi tool execution/scoped PostgreSQL; injected MCP discovery/credentials and remote invocation double, not HTTP/Docker/live OAuth", passed }, null, 2));
+  console.log(JSON.stringify({ scope: "Runtime APIs, real Pi tool execution/scoped PostgreSQL; loopback worker RPC through real bridge/native MCP client; injected upstream MCP/credentials, not deployed entrypoints/Docker/live OAuth", passed }, null, 2));
 } finally {
-  await worker?.close(); await directory?.close(); await provisioner?.close(); await admin?.end();
+  releaseCall?.();
+  await worker?.close();
+  if (server) { await new Promise<void>((resolve, reject) => server!.close(error => error ? reject(error) : resolve())); }
+  await directory?.close(); await provisioner?.close(); await admin?.end();
   if (pgStarted) runPg("pg_ctl", ["-D", join(root, "postgres"), "-m", "fast", "-w", "stop"]);
   await rm(root, { recursive: true, force: true });
 }
