@@ -13,7 +13,7 @@ import { createAuth } from "../auth.js";
 import { createApp } from "../app.js";
 import { readConfig } from "../config.js";
 import { openModels } from "../model-auth.js";
-import { DispatchRuntime, type WorkerManagementActor } from "../runtime.js";
+import { DispatchRuntime, RuntimeError, type WorkerManagementActor } from "../runtime.js";
 import { McpConnections } from "../mcp-connections.js";
 import { WorkerRoutes } from "./routes.js";
 import { distributedRuntime } from "./distributed.js";
@@ -70,8 +70,14 @@ app.use("/internal/*", async (c, next) => {
 });
 app.use("/internal/workers/*", bodyLimit({ maxSize: ATTACHMENT_RPC_MAX_BYTES, onError: c => c.json({ error: "Request too large" }, 413) }));
 app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
-  const route = routes.get(c.req.param("conversation"));
-  if (!route || route.attemptId !== c.req.param("attempt") || route.phase === "retiring" || !tokenMatches(workerToken(workerKey, workerConfig.installationId, route), c.req.header("Authorization"))) return c.json({ error: "Forbidden" }, 403);
+  const currentRoute = () => {
+    const route = routes.get(c.req.param("conversation"));
+    if (!route || route.attemptId !== c.req.param("attempt") || route.phase === "retiring" || !tokenMatches(workerToken(workerKey, workerConfig.installationId, route), c.req.header("Authorization")))
+      throw new RuntimeError(403, "Forbidden");
+    return route;
+  };
+  const route = currentRoute();
+  const assertCurrent = () => { currentRoute(); };
   const operation = c.req.param("operation");
   if (operation === "bootstrap" && c.req.method === "GET") {
     const projection = await directory.directoryWorkerBootstrap(route.companyId, route.conversationId);
@@ -80,8 +86,12 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
   }
   if (c.req.method !== "POST") return c.json({ error: "Not found" }, 404);
   const input = await c.req.json();
+  assertCurrent();
   if (operation === "mcp/definitions") return c.json(await mcp.definitions(route, input));
-  if (operation === "mcp/call") return c.json(await mcpPolicy.call(() => mcp.call(route, input, c.req.raw.signal)));
+  if (operation === "mcp/call") return c.json(await mcpPolicy.call(() => {
+    assertCurrent();
+    return mcp.call(route, input, c.req.raw.signal, assertCurrent);
+  }));
   if (operation === "summary") {
     routes.updateSummary(route.conversationId, route.attemptId, route.storeId, input);
     return c.json({ accepted: true });
@@ -162,7 +172,9 @@ const clientDir = process.env.DISPATCH_CLIENT_DIR ?? resolve(dirname(fileURLToPa
 app.route("/", createApp({ auth, runtime, mcpConnections: connections, origin: config.origin, clientDir,
   configuration: async () => ({ company: { id: config.companyId, name: config.companyName }, defaultAgentId: "default", ...await provider.configuration(await runtime.getDefaultAgent(config.companyId)) }),
 }));
-app.onError((_error, c) => c.json({ error: "Internal worker request failed" }, 503));
+app.onError((error, c) => error instanceof RuntimeError && error.status === 403
+  ? c.json({ error: "Forbidden" }, 403)
+  : c.json({ error: "Internal worker request failed" }, 503));
 const server = serve({ fetch: app.fetch, hostname: config.host, port: config.port });
 let closing = false;
 async function close() { if (closing) return; closing = true; server.close(); await runtime.close(); await connections.close(); artifacts.close(); await stores.close(); auth.close(); if ("closeAllConnections" in server) server.closeAllConnections(); }
