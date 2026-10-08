@@ -89,6 +89,8 @@ Source review also requires enforcing storage isolation below application query 
 
 ## Acceptance and evidence
 
+Open browser visual finding (October 8): despite functional reconnect passing, Deployer’s capture shows a persistent “Couldn’t connect” banner alongside “Conversation connected” and the recovered reply. Clean recovery presentation is not accepted yet. Investigate the warning’s source without clearing genuine failed-send/upload errors merely on SSE reconnect; correction and deployed visual retest remain pending.
+
 Inspected October 8 restricted receipts at candidate `7caa835`:
 
 - `browser-result.json`: AMD64 HTTPS `agent-browser` checks passed password/TOTP login, admitted model replies, six distinct live tool/status snapshots, independently checked bash bytes, reload, upload/download byte equality, model reading attached text, 390px layout without horizontal overflow, and automatic reconnect during a running tool with one reply/effect. Unadmitted answer prose is intentionally not streamed; no external OAuth or ARM64 browser claim.
