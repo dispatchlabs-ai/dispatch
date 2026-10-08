@@ -113,7 +113,7 @@ export class WorkerLauncher {
   }
 
   /** Explicit opt-in; no SQLite import or automatic crashed-controller takeover. */
-  static async openPostgres(options: { connectionString: string; installationId: string; driver: ContainerDriver; recoverOwnerId?: string }) {
+  static async openPostgres(options: { connectionString: string; ca?: string; installationId: string; driver: ContainerDriver; recoverOwnerId?: string }) {
     identity.parse(options.installationId);
     const initial: Journal = { version: 1, installationId: options.installationId, drained: true, attempts: [], stoppedAttemptIds: [] };
     const storage = await PostgresLauncherJournal.open({ ...options, initial: JSON.stringify(initial) });
