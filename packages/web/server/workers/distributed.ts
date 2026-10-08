@@ -10,14 +10,14 @@ import { workerRequest } from "./transport.js";
 import type { LaunchAttempt, LauncherStatus } from "./launcher.js";
 
 export type DistributedOptions = {
-  installationId: string; workerKey: string; launcherUrl: string; launcherToken: string;
+  launcherTimeoutMs?: number; installationId: string; workerKey: string; launcherUrl: string; launcherToken: string;
   runBackground<T>(operation: () => Promise<T>): Promise<T>;
   configurationRevision: string; directory: DispatchRuntime; routes: WorkerRoutes;
 };
 export function distributedRuntime(options: DistributedOptions): RuntimeService {
   const { directory, routes } = options;
   const launching = new Map<string, Promise<WorkerRoute>>();
-  const launcher = <T>(path: string, body?: unknown) => workerRequest<T>(options.launcherUrl, options.launcherToken, `/v1/${path}`, body);
+  const launcher = <T>(path: string, body?: unknown) => workerRequest<T>(options.launcherUrl, options.launcherToken, `/v1/${path}`, body, undefined, options.launcherTimeoutMs ?? 300_000);
   const token = (route: WorkerRoute) => workerToken(options.workerKey, options.installationId, route);
   async function activate(route: WorkerRoute): Promise<WorkerRoute> {
     const existing = launching.get(route.conversationId); if (existing) return existing;
