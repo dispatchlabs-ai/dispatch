@@ -250,6 +250,8 @@ export interface SendMessageInput {
   text: string;
   threadId?: string | null;
   mentions?: string[];
+  /** Definition IDs selected as invite-on-send mentions; resolved to participant IDs on admission. */
+  agentMentions?: string[];
 }
 
 export interface AddParticipantsInput {

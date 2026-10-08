@@ -710,16 +710,18 @@ export class SharedConversations {
     const entries = await scanEntries(tx, roomId);
     const messages = projectMessages(entries, room.messageAliases);
     const normalized = { text: input.text, threadId: input.threadId ?? null, mentions: [...new Set(input.mentions ?? [])].sort() };
-    // Omit empty attachments to preserve fingerprints of every pre-attachment request.
+    // Fingerprint the original intent, not the participant IDs resolved during admission.
+    // Omit empty additions to preserve receipts for older requests.
     const ids = input.attachmentIds ?? [];
-    const key = digest([authorId, input.requestId]); const hash = digest({ ...normalized, ...(ids.length ? { attachmentIds: ids } : {}) });
+    const agentMentions = [...new Set(input.agentMentions ?? [])].sort();
+    const key = digest([authorId, input.requestId]); const hash = digest({ ...normalized, ...(ids.length ? { attachmentIds: ids } : {}), ...(agentMentions.length ? { agentMentions } : {}) });
     const prior = room.requests[key];
     if (!prior && authorId === room.legacyCreatorId) {
       const fingerprints = await tx.doc(LegacyFingerprints, roomId);
       const oldKey = createHash("sha256").update(input.requestId).digest("hex");
       const oldHash = createHash("sha256").update(input.text).digest("hex");
       const reserved = fingerprints.fingerprints[oldKey];
-      if ((oldSubmission && !reserved) || (reserved && (reserved !== oldHash || normalized.threadId || normalized.mentions.length || ids.length))) throw new CollaborationError(409, "This older request cannot be reused with this input. Use a new request ID.");
+      if ((oldSubmission && !reserved) || (reserved && (reserved !== oldHash || normalized.threadId || normalized.mentions.length || ids.length || agentMentions.length))) throw new CollaborationError(409, "This older request cannot be reused with this input. Use a new request ID.");
       // A withdrawn native input may have no transcript entry; acknowledge its existing receipt without admitting it again.
       if (oldSubmission) return messages.find(message => message.id === (room.legacyQueued?.[String(oldSubmission.id)] ?? `legacy:${oldSubmission.entry}`)) ?? { id: `legacy-request:${oldSubmission.id}`, kind: "message", authorId, text: input.text, createdAt: 0, threadId: null, mentions: [] };
     }
@@ -734,6 +736,20 @@ export class SharedConversations {
     if (normalized.mentions.some(id => !room.members.some(member => member.id === id))) throw new CollaborationError(400, "Mentioned participant is not in this conversation.");
     if (ids.length && author.kind !== "human") throw new CollaborationError(400, "Only uploaders may attach files.");
     const attachments = await messageAttachments(tx, roomId, author.userId!, ids);
+    if (agentMentions.length) {
+      if (author.kind !== "human") throw new CollaborationError(400, "Use conversation_invite_agent to invite agents.");
+      await this.invite(tx, roomId, authorId, { requestId: `message:${input.requestId}`, agentDefinitionIds: agentMentions }, []);
+      const resolved = new Map(agentMentions.map(definitionId => [
+        `agent-definition:${definitionId}`, room.members.find(member => member.agentDefinitionId === definitionId)!.id,
+      ]));
+      normalized.mentions = [...new Set([...normalized.mentions, ...resolved.values()])].sort();
+      normalized.text = normalized.text.replace(/\[(@(?:\\.|[^\]\\])*)\]\((mention:[^\s)]+)\)/g, (token, label: string, url: string) => {
+        let target: string;
+        try { target = decodeURIComponent(url.slice(8)); } catch { return token; }
+        const participantId = resolved.get(target);
+        return participantId ? `[${label}](mention:${encodeURIComponent(participantId)})` : token;
+      });
+    }
     const message: MessageData = { id: randomUUID(), kind: "message", authorId, createdAt: Date.now(), ...normalized, ...(attachments.length ? { attachments } : {}) };
     room.requests[key] = { hash, messageId: message.id };
     await this.append(tx, roomId, message);

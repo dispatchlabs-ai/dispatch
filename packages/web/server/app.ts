@@ -202,7 +202,7 @@ export function createApp(options: AppOptions) {
   app.post("/api/chats/:id/messages", async (c) => {
     const input = z.object({
       requestId, text: z.string().trim().max(100_000),
-      threadId: identity.nullable().optional(), mentions: identities.optional(),
+      threadId: identity.nullable().optional(), mentions: identities.optional(), agentMentions: identities.optional(),
       attachmentIds: z.array(z.string().uuid()).max(ATTACHMENT_MAX_COUNT).refine(ids => new Set(ids).size === ids.length).optional(),
     }).strict().refine(input => input.text.length > 0 || Boolean(input.attachmentIds?.length), "Add a message or attachment.").parse(await c.req.json());
     await runtime.submit(c.get("principal"), c.req.param("id"), input);
