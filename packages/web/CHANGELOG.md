@@ -2,7 +2,7 @@
 
 ## Unreleased — continuing simplification
 
-- Align runtime/setup guidance with shared-project authority, Developer defaults and safe idle definition/skill adoption; use canonical testing-policy links.
+- Align runtime/setup and agent workflow guidance with current contracts and testing-policy exceptions; distinguish historical editor proposals and deployment/qualification evidence from current claims.
 - Ignore root generated image outputs/run metadata without deleting user files or tracked design assets.
 
 - Share agent-connection polling, remove an unused account dirty-state callback, and centralize fixed capability mappings.
