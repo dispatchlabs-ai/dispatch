@@ -1648,3 +1648,18 @@ Integrated closeout: Deslop integrated both backend changes, composer/refresh ex
 
 
 Source publication: Deslop published the integrated five-finding package at `2e00aca`. Documenter independently verified remote `main` and the canonical checkout at full SHA `2e00acab775e8dc8a5551eaa29eb3b8d45aba7b8`. This closes source publication only; the runtime/rendered qualification gaps above and the separate broader chat-performance acceptance remain open. No deployment is established.
+
+
+## Continuing simplification — October 8, 2026
+
+Chris authorized further focused passes after the five-finding delivery. Deslop owns integration, image-generation retry cleanup and cross-review; Developer owns justified frontend simplifications; Pi Durable Expert owns runtime/storage review; Documenter owns stale current guidance, artifact ownership and acceptance records. Supply scoped commits for integration, not independent publication. Stop when review finds no further evidence-backed simplification within the inspected scope; this is not a proof that the repository contains no slop.
+
+Acceptance:
+
+- Preserve supported behavior, public/persisted contracts, authorization, meaningful failures and native Pi execution/recovery ownership. Investigate compatibility consumers before removal; unresolved behavior changes require a decision, not speculative deletion.
+- Correct current runtime/setup guidance on shared projects, Developer defaults, safe idle base/skill adoption and check-policy exceptions by linking canonical contracts; preserve historical decisions and scoped evidence.
+- Preserve intentional image outputs, user files, state, credentials, backups and active worktree/qualification evidence. Remove only confirmed task-owned disposable material; uncertain ownership is not permission to delete.
+- Source/deslop and independent affected-boundary review, TypeScript/application and applicable Nix checks for code changes, diff/whitespace and changed documentation links. No expanded tests, billable probes, deployment or live-state cleanup is authorized. Record runtime, rendered desktop/390 px, recovery and Linux outcomes as unverified unless specifically observed.
+- Verify integrated source publication separately from deployment. Broader chat-performance work retains its separate acceptance criteria.
+
+Documentation candidate: runtime guidance now follows shared-project authorization/default migration and safe idle adoption rather than obsolete personal-group/new-instance-only rules. Root/package check summaries link the canonical scoped policy. Root `imagegen/` is now ignored to prevent accidental commits of generated images/private run metadata; no files were deleted or moved. Tracked design assets, active worktrees and qualification evidence remain untouched. 141 local file/anchor links, whitespace and source/contract review passed; `git check-ignore` confirms the generated-output rule. No code, runtime, build or deployment outcome is established by this slice; integration remains pending.

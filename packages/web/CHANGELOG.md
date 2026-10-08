@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — continuing simplification (integration pending)
+
+- Align runtime/setup guidance with shared-project authority, Developer defaults and safe idle definition/skill adoption; use canonical testing-policy links.
+- Ignore root generated image outputs/run metadata without deleting user files or tracked design assets.
+
+Source integration and code checks remain pending; see [acceptance evidence](docs/handoff.md#continuing-simplification--october-8-2026).
+
 ## Unreleased — five-finding simplification
 
 - Replace full-transcript chat listing with lightweight summaries and target pending base upgrades instead of scanning all chats after unrelated commits.

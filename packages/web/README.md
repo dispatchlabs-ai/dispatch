@@ -16,7 +16,7 @@ npm run dev
 
 Open `http://localhost:5173`. Use the root `npm run auth -- invite --email person@example.com --name "Person"` command to create an enrollment link. Run `npm run check` for TypeScript/build checks, `nix build` for the pinned application artifact, and `nix flake check` for declared build checks. Root `npm start` serves the built app at the same URL/state location after stopping development.
 
-The current rule is zero tests. Add end-to-end and API coverage later, after stable behavior is ready to lock in; functional/browser qualification remains deferred. Source, TypeScript, and build review are the current checks.
+Follow the [testing policy](docs/spec.md#testing-policy) for the zero-tests rule and scoped exceptions. Outside those exceptions, use source, TypeScript and build review; runtime/browser qualification remains unverified. Future coverage prioritizes stable end-to-end and API behavior.
 
 ## Documentation
 
