@@ -1404,21 +1404,21 @@ The normal localhost window exposed a narrow desktop header with both side panel
 
 ## Starter packages and onboarding — October 8, 2026
 
-**Assigned to Dev 2; proposed inventory/workflow awaiting Pi Durable Expert review.** Depends on the published archive codec/preview/import path. Scope follows [the starter contract](spec.md#starter-packages-and-onboarding). Documenter owns package records; Developer and Dev 2 coordinate shared bundle-dialog ownership and use separate worktrees.
+**Assigned to Dev 2; Developer-only inventory selected by Pi Durable Expert, implementation pending.** Depends on the published archive codec/preview/import path. Scope follows [the starter contract](spec.md#starter-packages-and-onboarding). Documenter owns package records; Developer owns shared `bundles.tsx`/`app.ts` integration; Dev 2 supplies standalone starter component/server modules and mount/route hooks in a separate worktree.
 
 Acceptance criteria:
-- Review repository-owned starter inventory before implementation; no private live-agent exports, credentials/grants, machine paths or implicit connection authority.
+- First inventory is Developer-only, with repository-owned instructions/coding capability and a visible model choice before import. No private live-agent exports, credentials/grants, machine paths or implicit connection authority.
 - Use the public format and existing preview/compatibility/authorization/native import receipt path, not a second seeding mechanism. Preserve the existing default, saved edits and participant snapshots; explicit copies and stable retry identity remain visible.
 - Define optional onboarding/discovery and failure/cancel/retry behavior before implementation; record actual UI labels and source usage once settled.
 - Source/Pi/deslop review, TypeScript/application and applicable Nix builds, full diff/whitespace and changed documentation links. Review desktop/390 px rendering and record keyboard/touch/accessibility gaps separately. Standing zero-tests policy applies; focused runtime/browser verification requested but not authorized by adding Dev 2. No deployment or starter qualification claimed.
 
 ## GitHub bundle imports and updates — October 8, 2026
 
-**Assigned to Developer; contract selected by Pi Durable Expert, implementation pending.** Depends on the published bundle import path. Developer owns GitHub fetch/API/UI; native persistence ownership must be coordinated with Expert before overlapping runtime edits. [The specification](spec.md#github-sources-and-updates) owns update semantics.
+**Assigned to Developer; contract selected by Pi Durable Expert, implementation pending.** Depends on the published bundle import path. Developer owns GitHub fetch/API/UI and shared dialog/routes; Pi Durable Expert owns tracked-import/update persistence in `runtime.ts` and shared preview/apply types in a separate worktree. [The specification](spec.md#github-sources-and-updates) owns update semantics.
 
 Acceptance criteria:
-- Track repository/path/immutable commit/digest, package keys, local mappings and baseline definition snapshots. Fetch outside native commits and apply the exact reviewed content. Settle bounded source-fetch and preview-retention rules before implementation.
+- Track repository/path/immutable commit/digest, package keys, local mappings and baseline definition snapshots. Fetch outside native commits and apply the exact reviewed content. Initially use public github.com repositories at an explicit commit SHA/package directory; bounded manifest/Markdown reads only, no clone/scripts/credentials/arbitrary-host URLs. Settle preview retention before implementation.
 - Preview local/upstream differences and capabilities; whole-update conflicts protect locally changed fields, with an independent-copy alternative and no forced overwrite. Retain removed-upstream records without deletion/archive; new keys create new records, never name matches.
-- Require explicit capability-change approval, exclude imported connections/credentials/grants and show retained local connections/authority. Preserve existing instances.
+- Require explicit capability-change approval, exclude imported connections/credentials/grants and show retained local connections/authority and disclose existing safe-idle base adoption for updates. Independent imports affect no existing instances; updates must not introduce a hidden pinning exception. Preserve identity/history/supplements/workspace and separate connection rollout rules.
 - One native commit appends revisions, updates provenance/mappings and saves a stable retry receipt. Expected revisions reject intervening local edits; settle request replay/fingerprint rules consistently with first-slice receipts.
 - Source/Pi/deslop review, TypeScript/application and applicable Nix builds, full diff/whitespace and changed links. Desktop/390 px UI and runtime fetch/update/conflict/replay/restart remain unverified until authorized evidence. Adding a developer changes no testing/deployment authorization. Project content export and operational backup remain separate work packages.
