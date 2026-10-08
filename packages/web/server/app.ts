@@ -236,7 +236,7 @@ export function createApp(options: AppOptions) {
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-store", "X-Accel-Buffering": "no" },
     });
   });
-  const archiveSchema = z.object({ archive: z.string().max(Math.ceil(BUNDLE_MAX_BYTES / 3) * 4).regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/), requestId: requestId.optional() }).strict();
+  const archiveSchema = z.object({ archive: z.string().max(Math.ceil(BUNDLE_MAX_BYTES / 3) * 4).refine(value => value.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(value), "Invalid base64 archive."), requestId: requestId.optional() }).strict();
   app.post("/api/bundles/export", async c => {
     const bundle = await runtime.exportBundle(c.get("principal"), bundleExportSchema.parse(await c.req.json()));
     return c.json({ archive: encodeBundle(bundle).toString("base64"), filename: `${bundle.id}-${bundle.version}.zip` });
