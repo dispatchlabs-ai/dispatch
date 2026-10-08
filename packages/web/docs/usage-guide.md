@@ -534,7 +534,10 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `POST /api/chats/:id/title` | Rename the shared Dispatch display title |
 | `POST /api/chats/:id/definition-of-done` | Save or clear shared Markdown criteria with an expected revision |
 | `POST /api/chats/:id/preferences` | Set pin/archive flags or assign, move, or remove project membership |
-| `GET /api/chats/:id` | Public messages, participants and sanitized native activity |
+| `GET /api/chats/:id` | Recent public previews, participants, sanitized activity disclosures and history cursor |
+| `GET /api/chats/:id/history` | Page older main/thread public history |
+| `GET /api/chats/:id/detail/message/:item` | Complete public message or JSON download |
+| `GET /api/chats/:id/detail/activity/:item` | Paired activity-detail blocks or complete JSON download |
 | `POST /api/chats/:id/messages` | Admit a message idempotently; return a snapshot with status 202 |
 | `POST /api/chats/:id/attachments` | Upload one multipart `file`; return `{ attachment }` |
 | `GET /api/chats/:id/attachments/:attachmentId` | Session/access-checked image or download |
@@ -574,7 +577,7 @@ A public message can include `aliases`, prior IDs for a reconciled duplicate of 
 
 ### Paged chat presentation (performance candidate)
 
-**Candidate contract, October 8; not yet installed on the target or fully qualified.** The [performance package](handoff.md#chat-presentation-performance--october-8-2026) tracks exact source/build revisions, publication, real-service verification and remaining acceptance. The following replaces the full-history GET/SSE behavior only after this candidate is installed; the API table above describes the prior transport.
+**Source-published at `e87c0ab`, October 8; local target installation/demonstration pending.** The [performance package](handoff.md#chat-presentation-performance--october-8-2026) tracks exact source/build revisions, scoped real-service measurements and remaining acceptance. The API table reflects this paged transport; older installations retain their prior full-history GET/SSE behavior until updated.
 
 - Chat opening and mutation responses carry recent main-timeline previews plus `history: { before, generation }`, not the entire transcript. Choose **Load older** for earlier content. Threads have independent paging, a separately supplied root, and authoritative reply counts.
 - `GET /api/chats/:id/history` accepts optional `threadId` (root ID or alias, at most 300 characters) and opaque `before` (at most 1,000 characters). Response: `TranscriptPage` with `messages`, `activities`, `threadId`, `generation`, nullable `before`, and optional `revision`/`root`/`replyCount`. The runtime includes its current presentation revision for thread refresh tracking; this does not replace the opaque cursor or alias-generation check. Use the returned cursor unchanged. Invalid or invalidated cursors return 409 / `HISTORY_CHANGED`; discard the stale page cursor and reload the current timeline. Alias-map generation changes invalidate loaded pages so suppressed duplicates do not survive.
