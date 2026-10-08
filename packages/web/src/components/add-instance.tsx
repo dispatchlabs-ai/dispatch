@@ -25,7 +25,8 @@ export function AddInstanceDialog({ chatId, initialDefinitionId, agents, canPart
   const removing = removingDefinitionIds.includes(definitionId);
   const valid = Boolean(agent && !tooLong && name.length <= 100 && canParticipate && !removing);
   function close() {
-    if (!busy && (!(name || instructions) || window.confirm("Discard this instance draft?"))) onClose();
+    const dirty = definitionId !== (initialDefinitionId ?? "") || Boolean(name || instructions);
+    if (!busy && (!dirty || window.confirm("Discard this instance draft?"))) onClose();
   }
   async function create() {
     if (busy || !valid) return;
@@ -38,7 +39,7 @@ export function AddInstanceDialog({ chatId, initialDefinitionId, agents, canPart
       onSnapshot(result);
       const participant = result.participants.find(person => person.id === result.createdParticipantId);
       if (participant?.kind === "agent" && participant.membership === "active") onCreated?.({ ...participant, name: mentionLabel(participant, result.participants) });
-      else if (onCreated) { setError("This request already added an instance that is no longer active. Close and start a new request to add another."); return; }
+      else if (onCreated) { setError("That instance is no longer active. Close to add another."); return; }
       onClose();
     } catch (error) {
       setError(errorMessage(error));
@@ -51,7 +52,7 @@ export function AddInstanceDialog({ chatId, initialDefinitionId, agents, canPart
       <Field label="Instance name (optional)" hint="Leave blank to use the agent’s name.">{props => <Input {...props} value={name} maxLength={100} disabled={busy} onChange={event => setName(event.target.value)} placeholder="e.g. Developer · Backend" />}</Field>
       {agent ? <details><summary>Base instructions · revision {agent.revision}</summary><Markdown>{agent.instructions || "No base instructions."}</Markdown></details> : null}
       <Field label="Additional instructions (optional)" hint="This instance only. Set at creation." hintPosition="before" error={tooLong ? "Shorten to 50,000 characters, including Markdown." : undefined}>{props => <div className="composer instance-instructions-editor"><MarkdownComposer {...props} mode="document" label="Additional instructions" value={instructions} onChange={setInstructions} disabled={busy} readOnly={false} placeholder="e.g. Own API changes; coordinate with the frontend developer." /></div>}</Field>
-      {removing ? <Notice>Removal is still pending. Finish cleanup before adding an instance.</Notice> : null}
+      {removing ? <Notice>Removal pending. Finish cleanup first.</Notice> : null}
       {!canParticipate ? <Notice>Participation access is required.</Notice> : null}
       {error ? <Notice>{error} Your draft is kept.</Notice> : null}
       <div className="button-row"><Button variant="secondary" disabled={busy} onClick={close}>Cancel</Button><Button type="submit" disabled={busy || !valid}>{busy ? <Spinner label="Adding instance" /> : null}Add instance</Button></div>
