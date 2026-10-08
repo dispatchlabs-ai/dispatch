@@ -5,6 +5,7 @@ import type { ChatSnapshot, RuntimeScope } from "../../src/shared/contracts.js";
 import { WorkerRoutes, type WorkerRoute } from "./routes.js";
 import { workerToken } from "./identity.js";
 import { decodeAttachmentBytes } from "./attachments.js";
+import { mergeWorkerSummary } from "./summaries.js";
 import type { Attachment } from "../../src/shared/contracts.js";
 import { workerRequest } from "./transport.js";
 import type { LaunchAttempt, LauncherStatus } from "./launcher.js";
@@ -81,6 +82,11 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
   }
   const snapshot = (value: ChatSnapshot, id: string): ChatSnapshot => ({ ...value, conversation: { ...value.conversation, id } });
   const overrides: Partial<RuntimeService> = {
+    async listChats(scope) {
+      const entries = await directory.directoryChatSummaries(scope);
+      return entries.map(({ conversation, automaticTitle }) => mergeWorkerSummary(conversation, automaticTitle, routes.readSummary(conversation.id)))
+        .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
+    },
     async saveProject(scope, id, input) {
       const result = await directory.saveProject(scope, id, input);
       await acknowledgePolicy(scope.companyId);
