@@ -14,11 +14,7 @@ import { useSession } from "../lib/session";
 import { TotpForm } from "./auth";
 import { Button, Field, Input, Modal, Notice, Spinner } from "./ui";
 
-export function SecurityPage({
-  onDirtyChange,
-}: {
-  onDirtyChange?: (dirty: boolean) => void;
-}) {
+export function SecurityPage() {
   const { state, auth, setState } = useSession();
   const [security, setSecurity] = useState<SecurityState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,16 +29,6 @@ export function SecurityPage({
   const [password, setPassword] = useState("");
   const [totp, setTotp] = useState<TotpEnrollment | null>(null);
 
-  const dirty =
-    busy ||
-    addingPasskey ||
-    !!passkeyName ||
-    settingTotp ||
-    !!password ||
-    !!totp;
-  useEffect(() => {
-    onDirtyChange?.(dirty);
-  }, [dirty, onDirtyChange]);
   const lastSignInMethod =
     security?.passkeys.length === 1 &&
     !(security.passwordEnabled && security.totpEnabled);
