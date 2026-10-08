@@ -97,7 +97,7 @@ resource "aws_service_discovery_service" "stable" {
       type = "A"
     }
   }
-  health_check_custom_config {}
+  health_check_custom_config { failure_threshold = 1 }
   tags = local.tags
 }
 resource "aws_ecs_service" "stable" {
