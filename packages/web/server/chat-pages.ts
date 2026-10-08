@@ -40,8 +40,8 @@ export function transcriptPage(messages: ConversationMessage[], activities: Part
     replies.set(m.threadId, summary);
   }
   const items = [
-    ...messages.map((m, timelineOrder) => ({ ...messagePreview(m), timelineOrder })).filter(m => m.threadId === canonical).map(m => ({ key: `m:${m.id}`, at: m.createdAt, message: { ...m, replySummary: replies.has(m.id) ? { ...replies.get(m.id)!, authorIds: replies.get(m.id)!.authorIds.slice(0, 4) } : undefined }, activity: undefined as ParticipantActivity | undefined })),
-    ...activities.map((a, timelineOrder) => ({ ...activityPreview(a), timelineOrder })).filter(a => a.threadId === canonical).map(a => ({ key: `a:${a.id}`, at: a.createdAt, message: undefined as ConversationMessage | undefined, activity: a })),
+    ...messages.map((message, timelineOrder) => ({ key: `m:${message.id}`, at: message.createdAt, timelineOrder, message, activity: undefined as ParticipantActivity | undefined })).filter(item => item.message.threadId === canonical),
+    ...activities.map((activity, timelineOrder) => ({ key: `a:${activity.id}`, at: activity.createdAt, timelineOrder, message: undefined as ConversationMessage | undefined, activity })).filter(item => item.activity.threadId === canonical),
   ].sort((a, b) => a.at - b.at);
   let end = items.length;
   if (query.before) {
@@ -52,9 +52,17 @@ export function transcriptPage(messages: ConversationMessage[], activities: Part
     end = items.findIndex(item => item.key === cursor.key);
     if (end < 0) throw new HistoryCursorError("History changed. Reload history.");
   }
-  const chosen: typeof items = []; let size = root ? bytes(messagePreview(root)) + 1024 : 1024; let index = end - 1;
+  const chosen: { key: string; message?: ConversationMessage; activity?: ParticipantActivity }[] = [];
+  let size = root ? bytes(messagePreview(root)) + 1024 : 1024; let index = end - 1;
   for (; index >= 0 && chosen.length < PAGE_ITEMS; index--) {
-    const item = items[index]!; const length = bytes(item);
+    const { key, at, timelineOrder, message, activity } = items[index]!;
+    const summary = message ? replies.get(message.id) : undefined;
+    // Only page candidates need truncation, serialization and activity-version hashing.
+    const item = { key, at,
+      message: message ? { ...messagePreview(message), timelineOrder, replySummary: summary ? { ...summary, authorIds: summary.authorIds.slice(0, 4) } : undefined } : undefined,
+      activity: activity ? { ...activityPreview(activity), timelineOrder } : undefined,
+    };
+    const length = bytes(item);
     if (size + length > PAGE_BYTES) break;
     chosen.unshift(item); size += length;
   }

@@ -979,9 +979,13 @@ export class SharedConversations {
   }
 
   private async nativeSettlement(conversationId: ConversationId, ctx: Context): Promise<Pick<Member, "status" | "error">> {
-    const submissions: SubmissionRecord[] = []; let cursor: Cursor | undefined;
-    do { const page = await this.storage.scanSubmissions({ conversationId }, 200, cursor, ctx); submissions.push(...page.items); cursor = page.next; } while (cursor);
-    const latest = submissions.filter(item => item.type === "input" && (item.status === "done" || item.status === "unanswered")).sort((a, b) => Number(a.id) - Number(b.id)).at(-1);
+    let latest: SubmissionRecord | undefined; let cursor: Cursor | undefined;
+    // Pi Storage scans submissions in ascending ID order; only the latest settled input is needed.
+    do {
+      const page = await this.storage.scanSubmissions({ conversationId }, 200, cursor, ctx);
+      for (const item of page.items) if (item.type === "input" && (item.status === "done" || item.status === "unanswered")) latest = item;
+      cursor = page.next;
+    } while (cursor);
     if (latest?.status !== "unanswered") return { status: "idle" };
     if (latest.reason === "aborted") return { status: "stopped" };
     return { status: "failed", error: typeof latest.detail === "string" ? latest.detail : `Response ended: ${latest.reason}.` };
@@ -1174,7 +1178,8 @@ function messageMetadata({ images, ...message }: MessageData) {
 function recentMessages(messages: MessageData[]) {
   const recent: (ReturnType<typeof messageMetadata> & { textLength: number; textTruncated: boolean })[] = [];
   let remaining = 24_000;
-  for (const message of [...messages].reverse()) {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index];
     const text = message.text.slice(0, Math.min(remaining, 12_000));
     recent.unshift({ ...messageMetadata(message), text, textLength: message.text.length, textTruncated: text.length < message.text.length });
     remaining -= JSON.stringify(recent[0]).length;
