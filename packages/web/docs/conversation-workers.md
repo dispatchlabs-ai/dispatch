@@ -1,6 +1,6 @@
 # Single-server conversation workers
 
-Status: application integration in progress. October 8 private Omarchy checks progressed from authenticated startup/model smoke (`995c696`) to clean active-worker replacement and isolated service-graph restore (`e8bdab0`); scoped evidence is recorded below. The original backend remains cold after restore; policy-ordering candidate `d606f09` was built but activation paused for callback fencing. Corrections `0445420`/`3f40a82`/`7caa835` are committed with component evidence; private redeployment/acceptance remains pending. No HTTPS/DNS publication; integrated acceptance remains pending. Implements the [accepted target](spec.md#aws-container-deployment-target) and [single-server rehearsal](spec.md#single-server-container-rehearsal). Chris authorized implementation, isolated Omarchy deployment and focused testing on October 7, 2026. Existing installations and their data remain untouched.
+Status: application integration in progress. October 8 private Omarchy checks progressed from authenticated startup/model smoke (`995c696`) to clean active-worker replacement and isolated service-graph restore (`e8bdab0`); scoped evidence is recorded below. After a cold interval for callback-fencing corrections, Deployer reported private redeployment at `7caa835` and a successful hosted-model managed MCP call, explicit existing-worker rollout and summary/list delivery. Delayed-body, held-call replacement and revocation checks continue; this is not overall acceptance. No HTTPS/DNS publication; integrated acceptance remains pending. Implements the [accepted target](spec.md#aws-container-deployment-target) and [single-server rehearsal](spec.md#single-server-container-rehearsal). Chris authorized implementation, isolated Omarchy deployment and focused testing on October 7, 2026. Existing installations and their data remain untouched.
 
 ## Ownership and boundaries
 
@@ -89,7 +89,7 @@ Source review also requires enforcing storage isolation below application query 
 
 ## Acceptance and evidence
 
-Integrated acceptance checks below remain pending. Focused disposable-data checks are authorized; component/build checks do not establish application runtime correctness.
+Integrated acceptance remains pending. Deployer reported private `7caa835` image `sha256:d98fcf95924dedb3a40e5550ee01509463ba10ad2106a548321e1bda9b24bde3` executing a hosted-model managed MCP tool through actual worker/backend/native HTTP transport, with independently recorded upstream completion. Explicit rollout reached an existing worker; summaries reached the conversation list and dormant listing started no workers. This uses a disposable bearer fixture, not external OAuth; deployed delayed-body/held-call/revocation checks continue and a final receipt has not yet been inspected. Focused disposable-data checks are authorized; component/build checks do not establish application runtime correctness.
 
 Focused component evidence (October 7–8, 2026):
 
