@@ -6,7 +6,7 @@ locals {
   volume_init = {
     name                   = "volume-init", image = var.image, essential = false, user = "0:0",
     entryPoint             = ["/bin/sh", "-c"],
-    command                = ["chown 65532:65532 /data /tmp /workspace && chmod 0700 /data /workspace && chmod 1777 /tmp"],
+    command                = ["touch /data/.dispatch-volume-init /tmp/.dispatch-volume-init /workspace/.dispatch-volume-init && chown 65532:65532 /data /tmp /workspace && chmod 0700 /data /workspace && chmod 1777 /tmp"],
     readonlyRootFilesystem = true, mountPoints = local.mounts
   }
   runtime = {

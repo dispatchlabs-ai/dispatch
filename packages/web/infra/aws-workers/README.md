@@ -43,8 +43,9 @@ values belong in a separate consumer repository. The Surton consumer is
   need explicit review, not default all-port egress.
 
 All tasks use the same digest. A short same-image `volume-init` container runs as
-root without the app's secret/environment bundle, fixes ownership of only the
-three task-local volume roots `/data`, `/tmp`, `/workspace`, and exits successfully
+root without the app's secret/environment bundle, creates an empty marker in each
+volume to prevent Docker repopulating empty-volume metadata, then fixes ownership
+of only the three task-local volume roots `/data`, `/tmp`, `/workspace`, and exits successfully
 before application startup. It has no application command or persistent mount.
 ECS task-role identity is task-wide (including this trusted initializer), not an
 OS-user boundary. Main containers run UID/GID 65532, read-only root, dropped
@@ -111,3 +112,15 @@ Linux/Fargate execution is not established. Live IAM authorization, RDS provisio
 ALB/path behavior, AWS recovery, credential lifetime, performance and full application
 security qualification remain unverified. The Surton consumer records access,
 actual cost assumptions, missing operator decisions and publication separately.
+
+Native image follow-up: application `99ae730` built on native ARM64 Lima and AMD64
+Omarchy. Non-root/Node 24/wrapper/fresh-workspace packaging passed. A second scoped
+check found empty Docker volume repopulation resetting `/data` to 0755 after init.
+The initializer now creates empty `.dispatch-volume-init` markers before setting
+ownership/modes; both native reruns passed read-only-root UID 65532 bootstrap,
+0700 directory/0600 exact 32-byte decoded fixture file, auth CLI help and collision
+refusal. All volume roots retained their intended modes. Every layer path was
+reviewed (63,822 ARM64 / 63,824 AMD64 entries) with no matched host-state/credential
+paths. These bounded inspections are not an exhaustive secret audit. No network,
+real credentials, application database or AWS execution was used. Candidate image
+`99ae730` is superseded for actual activation by subsequent cold-start fixes.
