@@ -416,7 +416,7 @@ In default SQLite mode, the state directory contains `auth.sqlite`, `auth.key`, 
 
 ## Agent and skill bundles
 
-**First-slice candidate; source-reviewed usage, not runtime/browser qualification.** In Agents, choose **Import / export** to open Agent bundles.
+**First slice source-published; source-reviewed usage, not runtime/browser qualification.** In Agents, choose **Import / export** to open Agent bundles.
 
 - **Export:** select agents and optional additional skills, enter a package ID/version, then **Download ZIP**. Assigned skills use the exact selected revisions. Connections and credentials are excluded; inspect instructions for private information before sharing. This is not a project or installation backup.
 - **Import:** choose a bundle ZIP, inspect definitions/instructions, model requirements, capabilities, skills and excluded connections. Resolve blockers, then explicitly allow the listed capabilities and choose **Import copies**. Imports create independent definitions and do not replace the default agent or alter existing chats. Configure connections separately.

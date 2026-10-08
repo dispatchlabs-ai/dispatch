@@ -1320,7 +1320,7 @@ Acceptance criteria/evidence:
 
 ## Portable definitions and project data — October 8, 2026
 
-**Architecture accepted and implementation authorized; no implementation or verification claimed.** Chris delegated the architecture call to Pi Durable Expert, then accepted its direction and asked the team to implement it. [The specification](spec.md#portable-definitions-and-project-data) owns the execution, privacy and recovery boundaries. Documenter owns these package records; Developer owns first-slice implementation; Pi Durable Expert owns manifest/import contracts and native commit review.
+**Architecture accepted and implementation authorized; first archive slice source-published, runtime/UI qualification outstanding.** Chris delegated the architecture call to Pi Durable Expert, then accepted its direction and asked the team to implement it. [The specification](spec.md#portable-definitions-and-project-data) owns the execution, privacy and recovery boundaries. Documenter owns these package records; Developer owns first-slice implementation; Pi Durable Expert owns manifest/import contracts and native commit review.
 
 Ordered work:
 
@@ -1351,6 +1351,9 @@ Runtime candidate `3e98d19`: Documenter source-reviewed single-snapshot exact-re
 Integrated first-slice code candidate `44d6c3b` includes `3e98d19` runtime and `0acb8d0` documentation. Pi Durable Expert reviewed ZIP/API bounds and identified the large grouped base64 regex; the correction uses a character class with length/padding validation. Developer source/deslop review covered archive parsing without extraction, strict manifests, native replay-before-compatibility, unchanged instance snapshots, bounded inputs and retained browser operation identity. The UI reuses Dispatch Inter/navy/surface tokens and shared dialog/controls, with collapsible definition content rather than a separate collection layout. No new dependency or executable installation path is introduced.
 
 Integrated `nix develop --command npm run check`, Apple Silicon `nix build --no-link` and `nix flake check` passed (zero runnable flake checks; Linux omitted). The existing large-chunk advisory remains. No tests or browser probes were run. Desktop/390 px rendering, measured contrast, keyboard/touch/accessibility, export/import round trips, malformed archives, lost-response/restart replay and authorization remain unverified; this is an outstanding UI-rule qualification requirement, not completed acceptance. Starter distribution is not implemented; GitHub updates, project content export and operational backup remain separate packages. Source publication is recorded separately from deployment.
+
+
+Publication closeout: remote `main` and canonical checkout were independently verified at `af3895d`. The reconciled code candidate `6433bc7` received Pi Durable Expert's source review of Web research capability mapping without a remaining blocker. The later handoff-only integration note was appended under agent-authoring by mistake; this portability closeout places its conclusion with the owning work. Source publication does not establish running-service availability, runtime correctness or desktop/390 px qualification. Starter distribution, pinned GitHub import/update, project content export and the separate operational-backup work remain incomplete.
 
 
 ## Bundled agent-browser and dogfood skills
@@ -1397,5 +1400,3 @@ Acceptance evidence:
 - Functional acceptance remains unverified under the zero-tests policy: toolbar editing, save/reopen, conflicts, discard confirmations, keyboard traversal, touch and recovery were not requalified. Full WCAG contrast/accessibility conformance and Linux builds remain unverified. The earlier WP-047 one-time exception is not reused. No evaluation was executed and no service deployment is included.
 
 The normal localhost window exposed a narrow desktop header with both side panels open. The header now gives the identity block a wrapping flex basis so actions move to another row before the title becomes cramped. This correction is visually reviewed at the normal desktop width and 390 CSS px; candidate `b46ac23` passed Nix-shell TypeScript/application builds, Apple Silicon Nix build and flake check (zero runnable checks, Linux omitted).
-
-Final integration candidate `6433bc7` preserves concurrent agent-authoring/browser-skill/Web research work. Web research maps explicitly to its installed native extension/tool during bundle compatibility and import. Integrated TypeScript/application, Apple Silicon Nix artifact and flake checks passed again; source/deslop, whitespace and local file links reviewed. No runtime, rendered UI or deployment evidence was added.

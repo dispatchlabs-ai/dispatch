@@ -834,7 +834,7 @@ This slice supports text skills only. Repository package import/export is now au
 
 ## Portable definitions and project data
 
-**Accepted and implementation authorized October 8, 2026; first archive-slice candidates exist, not functionally qualified.** Chris accepted Pi Durable Expert's architecture call: a thin Dispatch packaging layer over stock Pi Durable, not a new plugin runtime. Separate reusable definitions, executable extensions and private recovery state.
+**Accepted and implementation authorized October 8, 2026; first archive slice implemented and source-published, not functionally qualified.** Chris accepted Pi Durable Expert's architecture call: a thin Dispatch packaging layer over stock Pi Durable, not a new plugin runtime. Separate reusable definitions, executable extensions and private recovery state.
 
 ### Agent and skill bundles
 
@@ -846,7 +846,7 @@ Use native document commits for atomic definition/reference/import-receipt chang
 
 ### First archive slice
 
-**Contract selected October 8 by Pi Durable Expert; source candidates, integrated qualification pending.** Manifest `formatVersion: 1` identifies the package and version, with package-local agent/skill keys and UTF-8 Markdown instruction references. Agent skill references resolve entirely inside the bundle. Agent entries hold name/description, instruction reference, provider/model/thinking preferences and explicit capability requirements, not raw native extension/tool names or local identifiers.
+**Contract selected October 8 by Pi Durable Expert; implemented/source-build checked; runtime/UI qualification pending.** Manifest `formatVersion: 1` identifies the package and version, with package-local agent/skill keys and UTF-8 Markdown instruction references. Agent skill references resolve entirely inside the bundle. Agent entries hold name/description, instruction reference, provider/model/thinking preferences and explicit capability requirements, not raw native extension/tool names or local identifiers.
 
 Import creates independent local copies, never overwrites definitions or the default agent, and leaves conversation configuration and skill snapshots unchanged. An identical actor/company-scoped request returns the original mapping; another-copy import uses a new operation. Check the receipt/fingerprint before mutable compatibility checks on retry; new requests revalidate requirements. Commit the complete catalog changes and receipt/mapping together, not a loop over independently committing save methods.
 
