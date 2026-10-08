@@ -10,7 +10,7 @@ import { ApiError, errorMessage } from "../lib/api";
 import type { PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
 import { useComposingPresence } from "../lib/composing";
-import { mentionUrl } from "../lib/mentions";
+import { agentMentionPrefix, mentionUrl } from "../lib/mentions";
 import { toolActivities, toolOutput, type ToolActivity } from "../lib/tool-activity";
 import { AgentChoices, ParticipantAvatar } from "./conversation-people";
 import { Markdown } from "./markdown";
@@ -176,11 +176,16 @@ export const SharedTranscript = memo(function SharedTranscript({ snapshot, threa
 
 function formatTime(timestamp: number) { return new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
 
-export function ConversationComposer({ id, chatId, active = true, draft, pending, error, participants, mentions, onMentionsChange, onDraftChange, onSend, thread = false, conversationTitle, disabled = false, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment, children }: AttachmentComposerProps & {
-  id: string; chatId: string; active?: boolean; draft: string; pending?: PendingMessage; error?: string; participants: ConversationParticipant[]; mentions: string[];
+export function ConversationComposer({ id, chatId, active = true, draft, pending, error, participants, agents, mentions, onMentionsChange, onDraftChange, onSend, thread = false, conversationTitle, disabled = false, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment, children }: AttachmentComposerProps & {
+  id: string; chatId: string; active?: boolean; draft: string; pending?: PendingMessage; error?: string; participants: ConversationParticipant[]; agents: AgentDefinition[]; mentions: string[];
   onMentionsChange: (ids: string[]) => void; onDraftChange: (text: string) => void; onSend: (mentions: string[]) => void;
   thread?: boolean; conversationTitle?: string; disabled?: boolean; children?: ReactNode;
 }) {
+  const mentionPeople = useMemo(() => [
+    ...participants,
+    ...agents.filter(agent => !agent.archived && !participants.some(person => person.kind === "agent" && person.agentDefinitionId === agent.id))
+      .map(agent => ({ id: `${agentMentionPrefix}${agent.id}`, name: agent.name, kind: "agent" as const, inviteOnSend: true })),
+  ], [participants, agents]);
   const tooLong = draft.length > 100000;
   const [attachmentError, setAttachmentError] = useState<string>();
   useEffect(() => setAttachmentError(undefined), [id]);
@@ -196,7 +201,7 @@ export function ConversationComposer({ id, chatId, active = true, draft, pending
     <form className="composer" onInput={composing.pulse} onCompositionStart={composing.pulse} onCompositionUpdate={composing.pulse} onPaste={composing.pulse} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) composing.clear(); }} onSubmit={event => { event.preventDefault(); send(); }}>
       <DraftAttachments attachments={attachments} disabled={disabled || Boolean(pending?.sending)} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} />
       <MarkdownComposer onPasteFiles={addFiles} id={id} value={draft} disabled={disabled} readOnly={Boolean(pending?.sending)} onChange={onDraftChange} onSend={send}
-        participants={participants} mentions={mentions} onMentionsChange={onMentionsChange} placeholder={thread ? "Reply to thread…" : conversationTitle ? `Message ${conversationTitle}…` : "Message conversation…"}
+        participants={mentionPeople} mentions={mentions} onMentionsChange={onMentionsChange} placeholder={thread ? "Reply to thread…" : conversationTitle ? `Message ${conversationTitle}…` : "Message conversation…"}
         toolbar={<><AttachmentPicker disabled={disabled || Boolean(pending?.sending)} onAddFiles={addFiles} /><div className="button-row">{children}<Button type="submit" className="send-button" disabled={!canSend} aria-label={pending?.error ? "Retry sending message" : thread ? "Send reply" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}</Button></div></>}
       />
     </form>
@@ -204,8 +209,8 @@ export function ConversationComposer({ id, chatId, active = true, draft, pending
   </div>;
 }
 
-export function SharedContextPanel({ snapshot, models, threadId, draft, pending, error, mentions, onMentionsChange, onDraftChange, onSend, onInvite, onSnapshot, onClose, showHeader = true, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment }: AttachmentComposerProps & {
-  snapshot: ChatSnapshot; models: ApplicationConfig["models"]; threadId: string | null;
+export function SharedContextPanel({ snapshot, agents, models, threadId, draft, pending, error, mentions, onMentionsChange, onDraftChange, onSend, onInvite, onSnapshot, onClose, showHeader = true, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment }: AttachmentComposerProps & {
+  snapshot: ChatSnapshot; agents: AgentDefinition[]; models: ApplicationConfig["models"]; threadId: string | null;
   draft: string; pending?: PendingMessage; error?: string; mentions: string[]; onMentionsChange: (ids: string[]) => void;
   onDraftChange: (text: string) => void; onSend: (mentions: string[]) => void; onInvite: () => void; onSnapshot: (snapshot: ChatSnapshot) => void; onClose: () => void; showHeader?: boolean;
 }) {
@@ -230,7 +235,7 @@ export function SharedContextPanel({ snapshot, models, threadId, draft, pending,
         <SharedTranscript snapshot={snapshot} threadId={root?.id ?? threadId} />
         <ConversationPresence participants={snapshot.participants} />
       </div>
-      <ConversationComposer attachments={attachments} onAddFiles={onAddFiles} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} id={`thread-${snapshot.conversation.id}-${threadId}`} chatId={snapshot.conversation.id} draft={draft} pending={pending} error={error} participants={snapshot.participants} mentions={mentions} onMentionsChange={onMentionsChange} onDraftChange={onDraftChange} onSend={onSend} disabled={snapshot.conversation.canParticipate === false} thread>
+      <ConversationComposer attachments={attachments} onAddFiles={onAddFiles} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} id={`thread-${snapshot.conversation.id}-${threadId}`} chatId={snapshot.conversation.id} draft={draft} pending={pending} error={error} participants={snapshot.participants} agents={agents} mentions={mentions} onMentionsChange={onMentionsChange} onDraftChange={onDraftChange} onSend={onSend} disabled={snapshot.conversation.canParticipate === false} thread>
         {snapshot.conversation.status === "running" && snapshot.conversation.canParticipate !== false ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
           setStopping(true); setStopError(null);
           void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(snapshot.conversation.id)}/stop`, {}).then(onSnapshot).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));

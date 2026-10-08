@@ -1,4 +1,4 @@
-export type MentionParticipant = { id: string; name: string; kind: "human" | "agent" };
+export type MentionParticipant = { id: string; name: string; kind: "human" | "agent"; inviteOnSend?: boolean };
 
 export function mentionUrl(id: string) { return `mention:${encodeURIComponent(id)}`; }
 
@@ -12,3 +12,5 @@ export function mentionLabel(person: MentionParticipant, people: MentionParticip
   return people.some(other => other.id !== person.id && other.name === person.name)
     ? `${person.name} · ${person.id.slice(-6)}` : person.name;
 }
+
+export const agentMentionPrefix = "agent-definition:";

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { useSearchParams } from "react-router";
 import type { AgentDefinition, ApplicationConfig, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, SendMessageInput, UpdateChatInput } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
+import { agentMentionPrefix } from "../lib/mentions";
 import { mergeChat, type ConnectionState, type PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
 import { AgentArchiveDialog, AgentDetails, AgentsPage, agentEditIsDirty, beginAgentEdit, type AgentEditing } from "./agents";
@@ -381,7 +382,7 @@ export function Workspace() {
     if (attachments.some(item => !item.attachment)) return;
     const attachmentIds = previous?.attachmentIds ?? attachments.map(item => item.attachment!.id);
     if (!text && !attachmentIds.length) return;
-    const command: SendMessageInput = { attachmentIds, requestId: previous?.requestId || crypto.randomUUID(), text, threadId, mentions: previous?.mentions ?? mentions };
+    const command: SendMessageInput = { attachmentIds, requestId: previous?.requestId || crypto.randomUUID(), text, threadId, mentions: previous?.mentions ?? mentions.filter(id => !id.startsWith(agentMentionPrefix)), agentMentions: previous?.agentMentions ?? mentions.filter(id => id.startsWith(agentMentionPrefix)).map(id => id.slice(agentMentionPrefix.length)) };
     const priorRequest = messageRequests.current[chatId];
     messageRequests.current[chatId] = priorRequest?.requestId === command.requestId
       ? priorRequest : { requestId: command.requestId, draftVersion: draftVersions.current[chatId] ?? 0 };
@@ -446,7 +447,7 @@ export function Workspace() {
   const snapshot = active.kind === "chat" ? snapshots[active.chatId] : undefined;
   const connection = active.kind === "chat" ? connections[active.chatId] || "connecting" : null;
   const activeProjectId = active.kind === "project" ? active.projectId : active.kind === "chat" ? chats.find(chat => chat.id === active.chatId)?.projectId ?? null : null;
-  const supporting = (inDrawer = false) => section === "agents" && !editingAgent && evaluationAgent === selectedAgent?.id ? <div className="agent-details">{!inDrawer ? <header className="context-header"><h2>Evaluation profile</h2></header> : null}<div className="context-body">{evaluationContext}</div></div> : section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : active.kind === "chat" && snapshot ? <SharedContextPanel key={snapshot.conversation.id} snapshot={snapshot} models={config?.models ?? []} threadId={threads[active.chatId] ?? null}
+  const supporting = (inDrawer = false) => section === "agents" && !editingAgent && evaluationAgent === selectedAgent?.id ? <div className="agent-details">{!inDrawer ? <header className="context-header"><h2>Evaluation profile</h2></header> : null}<div className="context-body">{evaluationContext}</div></div> : section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : active.kind === "chat" && snapshot ? <SharedContextPanel agents={agents} key={snapshot.conversation.id} snapshot={snapshot} models={config?.models ?? []} threadId={threads[active.chatId] ?? null}
     attachments={attachmentDrafts.drafts[`${active.chatId}:${threads[active.chatId]}`] ?? emptyAttachments}
     onAddFiles={files => attachmentDrafts.add(`${active.chatId}:${threads[active.chatId]}`, active.chatId, files)}
     onRemoveAttachment={id => attachmentDrafts.remove(`${active.chatId}:${threads[active.chatId]}`, id)}
@@ -588,7 +589,7 @@ export function Workspace() {
         <main className="workspace-main" id="main-workspace" tabIndex={-1}>
           <div className="workspace-section" hidden={section !== "chats"}>
           {tabs.map(tab => <Tabs.Panel key={tab.id} value={tab.id} className="main-tab-panel" role={tabs.length === 1 ? "region" : "tabpanel"} aria-label={tabs.length === 1 ? "Workspace content" : undefined} keepMounted>
-            {tab.kind === "chat" ? <ChatPanel
+            {tab.kind === "chat" ? <ChatPanel agents={agents}
               active={section === "chats" && tab.id === activeId}
               connection={connections[tab.chatId] || "connecting"}
               chatId={tab.chatId}

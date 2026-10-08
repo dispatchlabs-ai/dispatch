@@ -38,7 +38,7 @@ export function MentionMenu({ options, selectedIndex, selectOptionAndCleanUp, se
         onMouseEnter={() => setHighlightedIndex(index)} onClick={() => selectOptionAndCleanUp(option)}>
         <ParticipantAvatar kind={option.person.kind} name={option.person.name} />
         <span className="mention-option-name">{option.label}</span>
-        <span className="mention-option-kind">{option.person.kind === "agent" ? "Agent" : "Person"}</span>
+        <span className="mention-option-kind">{option.person.inviteOnSend ? "Invite on send" : option.person.kind === "agent" ? "Agent" : "Person"}</span>
         {selectedIndex === index ? <CornerDownLeft size={14} className="mention-option-selected" aria-hidden="true" /> : null}
       </li>)}
       {!options.length ? <li className="mention-no-results" role="status">No one matches {query ? `“${query}”` : "your search"}.</li> : null}

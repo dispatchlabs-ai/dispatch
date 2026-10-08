@@ -1,6 +1,6 @@
 import { TRANSFORMERS, type TextMatchTransformer } from "@lexical/markdown";
 import { $applyNodeReplacement, $createTextNode, $getRoot, TextNode, type EditorConfig, type LexicalNode, type NodeKey, type SerializedTextNode, type Spread } from "lexical";
-import { mentionId, mentionLabel, mentionUrl, type MentionParticipant } from "../lib/mentions";
+import { agentMentionPrefix, mentionId, mentionLabel, mentionUrl, type MentionParticipant } from "../lib/mentions";
 
 type SerializedMention = Spread<{ participantId: string }, SerializedTextNode>;
 
@@ -49,9 +49,12 @@ export function mentionTransformers(people: MentionParticipant[]) {
     export: node => $isMentionNode(node)
       ? `[${node.getTextContent().replace(/[\\[\]]/g, "\\$&")}](${mentionUrl(node.getParticipantId())})` : null,
     replace: (node, match) => {
-      const person = people.find(person => person.id === mentionId(match[2]));
-      // Pasted references to people outside this conversation remain ordinary text.
-      node.replace(person ? $createMentionNode(person.id, `@${mentionLabel(person, people)}`) : $createTextNode(match[1].replace(/\\(.)/g, "$1")));
+      const id = mentionId(match[2]);
+      const person = people.find(person => person.id === id);
+      const label = match[1].replace(/\\(.)/g, "$1");
+      // Keep invite intent through catalog changes; admission validates availability.
+      node.replace(person ? $createMentionNode(person.id, `@${mentionLabel(person, people)}`)
+        : id?.startsWith(agentMentionPrefix) ? $createMentionNode(id, label) : $createTextNode(label));
     },
   };
   return [mention, ...TRANSFORMERS];

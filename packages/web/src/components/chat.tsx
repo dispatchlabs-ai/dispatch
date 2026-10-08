@@ -1,7 +1,7 @@
 import type { AttachmentComposerProps } from "./composer-attachments";
 import { ArrowDown, RotateCcw, Square, Users } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { ChatSnapshot } from "../shared/contracts";
+import type { AgentDefinition, ChatSnapshot } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
 import { chatStatusLabel, type ConnectionState, type PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
@@ -11,6 +11,7 @@ import { Button, Notice, Spinner } from "./ui";
 
 interface ChatPanelProps extends AttachmentComposerProps {
   chatId: string;
+  agents: AgentDefinition[];
   active: boolean;
   connection: ConnectionState;
   snapshot?: ChatSnapshot;
@@ -29,7 +30,7 @@ interface ChatPanelProps extends AttachmentComposerProps {
   onConnection: (chatId: string, state: ConnectionState) => void;
 }
 
-export function ChatPanel({ active: visible, connection, chatId, snapshot, draft, pending, sendError, mentions, onMentionsChange, onDraftChange, onSend, activeThreadId, onParticipants, onThread, onSnapshot, onConnection, onAccessLost, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment }: ChatPanelProps) {
+export function ChatPanel({ agents, active: visible, connection, chatId, snapshot, draft, pending, sendError, mentions, onMentionsChange, onDraftChange, onSend, activeThreadId, onParticipants, onThread, onSnapshot, onConnection, onAccessLost, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment }: ChatPanelProps) {
   const { api, refreshSession } = useSession();
   const openThread = useCallback((id: string) => onThread(chatId, id), [chatId, onThread]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -156,7 +157,7 @@ export function ChatPanel({ active: visible, connection, chatId, snapshot, draft
         <ArrowDown /> Latest messages</Button>
     </div> : null}
     {stopError ? <Notice>{stopError}</Notice> : null}
-    <ConversationComposer attachments={attachments} onAddFiles={onAddFiles} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} id={`composer-${chatId}`} conversationTitle={snapshot?.conversation.title} chatId={chatId} active={visible} draft={draft} pending={pending} error={sendError} participants={snapshot?.participants ?? []} mentions={mentions} onMentionsChange={onMentionsChange} disabled={!snapshot || snapshot.conversation.canParticipate === false} onDraftChange={onDraftChange} onSend={sendDraft}>
+    <ConversationComposer attachments={attachments} onAddFiles={onAddFiles} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} id={`composer-${chatId}`} conversationTitle={snapshot?.conversation.title} chatId={chatId} active={visible} draft={draft} pending={pending} error={sendError} agents={agents} participants={snapshot?.participants ?? []} mentions={mentions} onMentionsChange={onMentionsChange} disabled={!snapshot || snapshot.conversation.canParticipate === false} onDraftChange={onDraftChange} onSend={sendDraft}>
       {running && snapshot?.conversation.canParticipate !== false ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
         setStopping(true); setStopError(null);
         void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/stop`, {}).then(onSnapshot).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));
