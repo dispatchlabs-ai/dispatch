@@ -1263,7 +1263,7 @@ The correction retains authorization for known pre-exchange connection failures 
 
 Acceptance criteria/evidence:
 
-- Inspect classification, serialized renewal, disconnect ordering and call-site error propagation; preserve unknown-rotation behavior and provider authority.
-- Run TypeScript/application builds, Apple Silicon Nix build and flake checks, diff/deslop review and changed-document link checks. Results pending.
-- Recover only the two existing affected connections after rechecking provider grant/token state and taking a private database backup; retain IDs, bindings and credentials. Recovery evidence pending.
+- Source/deslop review covered classification, serialized renewal, disconnect ordering and call-site error propagation. The SDK maps malformed error responses to `ServerError`, so classification inspects the actual OAuth error code rather than trusting that fallback type. Unknown rotation outcomes stay blocked.
+- TypeScript/application builds, Apple Silicon Nix build and flake checks passed; Linux was not built. Final integrated revision checks and publication are recorded below. Whitespace review passed; this change adds no local documentation links.
+- Restored only Pi Durable · Personal Wiki and Palm Wiki — Deployer after independently rechecking active provider grants and unused/unexpired refresh tokens. A private SQLite backup and key were retained locally. The transaction required the exact original credential, error and inactive-refresh state; IDs, bindings and credential material were preserved. Live renewal evidence is recorded below.
 - No tests under the standing policy. This backend change adds no UI layout. Fault injection, interruption/replay and cross-provider behavior remain unqualified.
