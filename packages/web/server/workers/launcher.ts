@@ -151,7 +151,7 @@ export class WorkerLauncher {
         throw new LauncherError(409, "Stopped launch attempts cannot be restarted; reconcile stop before replacement.");
       if (this.journal.drained) throw new LauncherError(409, "Worker admission is drained.");
       if (!attempt) {
-        if (this.driver.run && this.journal.attempts.some(item => item.phase === "starting" && !item.containerId))
+        if (this.driver.run && this.journal.attempts.some(item => (item.phase === "starting" || item.phase === "stopping") && !item.containerId))
           throw new LauncherError(503, "An ECS launch outcome is unresolved; operator reconciliation is required.");
         if (this.journal.attempts.some(item => item.phase !== "stopped" && (item.conversationId === request.conversationId || item.storeId === request.storeId)))
           throw new LauncherError(409, "A previous executor attempt must be retired before replacement.");
@@ -295,6 +295,10 @@ export class WorkerLauncher {
         attempt = { ...attempt, phase: "stopped" }; // no launch intent ever committed
         await this.update(attempt);
         return structuredClone(attempt);
+      }
+      if (attempt.phase !== "stopping") {
+        attempt = { ...attempt, phase: "stopping" };
+        await this.update(attempt); // retain Stop even when inspection fails or the task is not yet visible
       }
       if (!attempt.containerId) {
         const existing = this.match(attempt, await this.inventory());
