@@ -185,6 +185,7 @@ export function createApp(options: AppOptions) {
       members: z.array(z.object({ userId: identity, role: z.enum(["manager", "member"]) }).strict()).min(1).max(1000)
         .refine(members => new Set(members.map(member => member.userId)).size === members.length && members.some(member => member.role === "manager"), "Choose unique members and retain at least one manager."),
       defaultAgentDefinitionIds: identities.max(50),
+      cwd: z.string().trim().max(4096).nullable().optional(),
     }).strict().parse(await c.req.json());
     return c.json({ project: await runtime.saveProject(c.get("principal"), c.req.param("id"), input) });
   });

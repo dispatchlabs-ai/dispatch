@@ -29,6 +29,8 @@ export type Member = {
   agent?: { [K in keyof AgentParticipant["agent"]]: AgentParticipant["agent"][K] };
   status: "idle" | "working" | "listening" | "silent" | "stopped" | "failed"; error?: string;
   instanceInstructions?: string;
+  /** Workspace chosen at creation, including for agents that gain local tools later. */
+  workspaceDefault?: string;
   pendingConnectionIds?: string[];
   connectionsRefreshPending?: boolean;
   upgradeError?: string;

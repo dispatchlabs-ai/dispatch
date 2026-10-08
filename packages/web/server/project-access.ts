@@ -5,6 +5,7 @@ export type SharedProjectRecord = {
   id: string;
   companyId: string;
   name: string;
+  cwd?: string;
   revision: number;
   createdAt: number;
   updatedAt: number;

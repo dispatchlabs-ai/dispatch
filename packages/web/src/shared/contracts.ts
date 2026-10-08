@@ -229,9 +229,11 @@ export type ProjectMember = { userId: string; role: "manager" | "member" };
 export interface SaveProjectInput {
   requestId: string; expectedRevision: number; name: string;
   members: ProjectMember[]; defaultAgentDefinitionIds: string[];
+  cwd?: string | null;
 }
 
 export type Project = {
+  cwd?: string;
   kind: "shared";
   revision?: number;
   members?: ProjectMember[];

@@ -1,8 +1,8 @@
 import { ProjectArchiveStore, ProjectArchivesDoc, archiveDigest, decodeProjectArchive } from "./project-archives.js";
 import { PROJECT_ARCHIVE_MAX_BYTES, type ProjectArchive, type ArchivedChat } from "../src/shared/project-archives.js";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { stat } from "node:fs/promises";
+import { isAbsolute, join, normalize } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, getSupportedThinkingLevels, type Models } from "@earendil-works/pi-ai/models";
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
@@ -162,7 +162,7 @@ export class DispatchRuntime {
         models, registry, settings: { ...options.settings, extensions: options.settings?.extensions ?? [shared.extension, CodingTools, Coding] },
         env: async ({ cwd }) => {
           if (!cwd) return undefined;
-          await mkdir(cwd, { recursive: true, mode: 0o700 });
+          if (!(await stat(cwd)).isDirectory()) throw new Error("Agent workspace must be an existing directory.");
           // A local working directory organizes files; it is not a filesystem or process sandbox.
           return new NodeExecutionEnv({ cwd });
         },
@@ -267,7 +267,7 @@ export class DispatchRuntime {
 
   private projectSummary(project: SharedProjectRecord, scope: RuntimeScope): Project {
     const access = projectAccess(project, scope, this.readAll(scope));
-    return { id: project.id, name: project.name, createdAt: project.createdAt, kind: "shared", revision: project.revision,
+    return { id: project.id, name: project.name, ...(project.cwd ? { cwd: project.cwd } : {}), createdAt: project.createdAt, kind: "shared", revision: project.revision,
       members: project.members.map(({ userId, role }) => ({ userId, role })), defaultAgentDefinitionIds: [...project.defaultAgentDefinitionIds], canManage: access.manage, canParticipate: access.participate };
   }
 
@@ -403,21 +403,43 @@ export class DispatchRuntime {
   }
 
   async saveProject(scope: RuntimeScope, id: string, input: SaveProjectInput): Promise<Project> {
+    const cwd = input.cwd === undefined ? undefined : input.cwd?.trim() || null;
+    if (cwd && (cwd.length > 4096 || cwd.includes("\0") || !isAbsolute(cwd))) {
+      throw new RuntimeError(400, "Working directory must be an absolute path on the service host.");
+    }
+    const key = JSON.stringify([scope.companyId, scope.userId, id, input.requestId]);
+    // Preserve pre-cwd fingerprints for clients that omit the new field.
+    const fields = [input.expectedRevision, input.name, input.members, input.defaultAgentDefinitionIds];
+    const fingerprint = JSON.stringify(cwd === undefined ? fields : [...fields, cwd]);
+    const replay = async (tx: Tx) => {
+      const current = await requireProjectAccess(tx, scope, id, "manage", this.readAll(scope));
+      const prior = (await tx.doc(ProjectsDoc)).requests[key];
+      if (!prior) return;
+      if (prior.fingerprint !== fingerprint) throw requestConflict();
+      return this.projectSummary(current, scope);
+    };
+    // A committed retry must not depend on a directory or company member still existing.
+    const prior = await this.harness.commit(replay, context);
+    if (prior) return prior;
+    if (cwd) {
+      const info = await stat(normalize(cwd)).catch(() => undefined);
+      if (!info?.isDirectory()) throw new RuntimeError(400, "Working directory must be an existing directory on the service host.");
+    }
     await Promise.all(input.members.map(member => this.person(scope.companyId, member.userId)));
     return this.harness.commit(async tx => {
+      const prior = await replay(tx);
+      if (prior) return prior;
       const current = await requireProjectAccess(tx, scope, id, "manage", this.readAll(scope));
-      const doc = await tx.doc(ProjectsDoc);
-      const key = JSON.stringify([scope.companyId, scope.userId, id, input.requestId]);
-      const fingerprint = JSON.stringify([input.expectedRevision, input.name, input.members, input.defaultAgentDefinitionIds]);
-      if (doc.requests[key]) {
-        if (doc.requests[key].fingerprint !== fingerprint) throw requestConflict();
-        return this.projectSummary(current, scope);
-      }
       if (current.revision !== input.expectedRevision) throw new RuntimeError(409, "Project changed. Reload before saving.");
       const catalog = await tx.doc(CatalogDoc);
       for (const agentId of input.defaultAgentDefinitionIds) this.findAgent(catalog, scope, agentId);
       const project: SharedProjectRecord = { ...current, name: input.name, members: input.members, defaultAgentDefinitionIds: input.defaultAgentDefinitionIds,
         revision: current.revision + 1, updatedAt: Date.now() };
+      if (cwd !== undefined) {
+        if (cwd === null) delete project.cwd;
+        else project.cwd = normalize(cwd);
+      }
+      const doc = await tx.doc(ProjectsDoc);
       doc.projects[id] = project; doc.requests[key] = { fingerprint, projectId: project.id };
       return this.projectSummary(project, scope);
     }, context);
@@ -1338,7 +1360,7 @@ export class DispatchRuntime {
         tools: [...(agent.tools ?? []).filter(name => !isMcpTool(name)), ...member.agent.tools.filter(isMcpTool)],
       };
       const { extensions, tools, snapshots } = this.resolveConfiguration(catalog, companyId, configuration);
-      const cwd = member.agent.cwd ?? (configuration.extensions.some(name => name === CodingTools.name || name === "dispatch-image-gen") ? this.workspaceDir : undefined);
+      const cwd = member.agent.cwd ?? (configuration.extensions.some(name => name === CodingTools.name || name === "dispatch-image-gen") ? member.workspaceDefault ?? this.workspaceDir : undefined);
       await configure(tx, id, {
         model: { provider: agent.provider, modelId: agent.modelId }, thinkingLevel: agent.thinkingLevel,
         instructions: [agent.instructions, ...(member.instanceInstructions ? ["## Instance instructions", member.instanceInstructions] : [])].filter(Boolean).join("\n\n"),
@@ -1393,17 +1415,21 @@ export class DispatchRuntime {
     return { extensions, tools, snapshots };
   }
 
-  private async createParticipant(tx: Tx, _roomId: ConversationId, companyId: string, definitionId: string): Promise<Member> {
+  private async createParticipant(tx: Tx, roomId: ConversationId, companyId: string, definitionId: string): Promise<Member> {
     const catalog = await tx.doc(CatalogDoc);
     const agent = this.findAgent(catalog, { companyId }, definitionId);
     this.validateAgent(agent);
     const { extensions, tools, snapshots } = this.resolveConfiguration(catalog, companyId, agent);
+    const room = await tx.doc(SharedDoc, roomId);
+    const project = room.sharedProjectId ? (await tx.doc(ProjectsDoc)).projects[room.sharedProjectId] : undefined;
+    if (room.sharedProjectId && (!project || project.companyId !== companyId)) throw new RuntimeError(404, "Project not found.");
+    const workspaceDefault = project?.cwd ?? this.workspaceDir;
     const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
     if (snapshots.length) (await tx.doc(SkillBindingsDoc, record.id)).skills = snapshots;
-    const cwd = agent.extensions?.some(name => name === CodingTools.name || name === "dispatch-image-gen") ? this.workspaceDir : undefined;
+    const cwd = agent.extensions?.some(name => name === CodingTools.name || name === "dispatch-image-gen") ? workspaceDefault : undefined;
     await configure(tx, record.id, { model: { provider: agent.provider, modelId: agent.modelId }, instructions: agent.instructions, thinkingLevel: agent.thinkingLevel, extensions, tools, ...(cwd ? { cwd } : {}) });
     await this.connections.bind(tx, record.id, definitionId, false, managedIds(agent));
-    return { id: randomUUID(), kind: "agent", name: agent.name, joinedAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, conversationId: record.id, status: "idle", agent: { ...publicAgent(agent), extensions: extensions.map(extension => extension.name), tools: tools.map(tool => tool.name), ...(cwd ? { cwd } : {}) } };
+    return { id: randomUUID(), kind: "agent", workspaceDefault, name: agent.name, joinedAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, conversationId: record.id, status: "idle", agent: { ...publicAgent(agent), extensions: extensions.map(extension => extension.name), tools: tools.map(tool => tool.name), ...(cwd ? { cwd } : {}) } };
   }
 
   private async configureConnections(companyId: string) {
@@ -1442,7 +1468,7 @@ export class DispatchRuntime {
         // Recovered deliveries and tools must keep the directory they were admitted against.
         if (await hasUnfinishedTasks(tx, roomId)) return;
         for (const member of room.members) {
-          if (!member.conversationId || !member.agent?.extensions.includes(CodingTools.name)) continue;
+          if (!member.conversationId || !member.agent?.extensions.includes(CodingTools.name) || member.workspaceDefault !== undefined) continue;
           const native = await tx.doc(AgentDoc, member.conversationId);
           if (native.cwd !== join(this.owner.directory, "workspaces", String(member.conversationId))) continue;
           if ((await tx.doc(InboxDoc, member.conversationId)).items.length) continue;
