@@ -212,7 +212,11 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
         async stop() { stopped = true; finish({ reason: "stopped" }); return closed; },
       };
     },
-    async close() { await directory.close(); routes.close(); },
+    async close() {
+      const results = await Promise.allSettled([Promise.resolve().then(() => directory.close()), Promise.resolve().then(() => routes.close())]);
+      const failures = results.filter(result => result.status === "rejected").map(result => result.reason);
+      if (failures.length) throw new AggregateError(failures, "Distributed runtime teardown failed.");
+    },
   };
   // Bound delegation preserves the native catalog API without duplicating its policy.
   return new Proxy(directory, { get(target, property) {

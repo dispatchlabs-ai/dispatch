@@ -209,6 +209,7 @@ const server = tls
   : serve(listener);
 let closing = false;
 let shutdown: Promise<void> | undefined;
+let teardownStarted = false;
 function close(): Promise<void> {
   closing = true;
   return shutdown ??= operatorTransition(async () => {
@@ -216,19 +217,33 @@ function close(): Promise<void> {
     // An unresolved retirement leaves the server available for status/recovery,
     // never reporting a successful shutdown or reopening application admission.
     await drainBackend();
-    server.close();
-    await runtime.close();
-    await connections.close();
-    artifacts.close();
-    await stores.close();
-    await auth.close();
-    if ("closeAllConnections" in server) server.closeAllConnections();
-  }).catch(error => { shutdown = undefined; throw error; });
+    teardownStarted = true;
+    const failures: unknown[] = [];
+    // Attempt every independent cleanup even if an earlier close fails. Retain
+    // the terminal result: closing owners is not a replayable drain operation.
+    for (const cleanup of [
+      () => { server.close(); },
+      () => runtime.close(),
+      () => connections.close(),
+      () => artifacts.close(),
+      () => stores.close(),
+      () => auth.close(),
+      () => { if ("closeAllConnections" in server) server.closeAllConnections(); },
+    ]) {
+      try { await cleanup(); } catch (error) { failures.push(error); }
+    }
+    if (failures.length) throw new AggregateError(failures, "Backend resource teardown failed.");
+  }).catch(error => {
+    if (!teardownStarted) shutdown = undefined;
+    throw error;
+  });
 }
 function requestShutdown() {
   void close().catch(() => {
     process.exitCode = 1;
-    console.error("Backend shutdown incomplete; admission remains closed. Resolve retirement and retry shutdown.");
+    console.error(teardownStarted
+      ? "Backend resource teardown failed; admission remains closed. Operator intervention required."
+      : "Backend shutdown incomplete; admission remains closed. Resolve retirement and retry shutdown.");
   });
 }
 process.on("SIGTERM", requestShutdown); process.on("SIGINT", requestShutdown);
