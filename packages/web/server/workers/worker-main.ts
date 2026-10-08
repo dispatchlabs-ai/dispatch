@@ -7,6 +7,7 @@ import { z } from "zod";
 import { DispatchRuntime, RuntimeError, type ConversationWorkerBootstrap, type WorkerCatalogSnapshot } from "../runtime.js";
 import { openModels } from "../model-auth.js";
 import { WriteAdmission } from "./admission.js";
+import { workerMcp } from "./mcp.js";
 import { workerModels } from "./models.js";
 import { ATTACHMENT_RPC_MAX_BYTES, decodeAttachmentBytes, RemoteAttachmentStore } from "./attachments.js";
 import type { WorkerStoreConfig } from "./postgres-stores.js";
@@ -30,6 +31,7 @@ const models = workerModels(providers.models.getProviders(), (provider, signal) 
 const runtime = await DispatchRuntime.openConversation({
   stateDir: "/workspace/state", workspaceDir: "/workspace", companyId: bootstrap.scope.companyId,
   piStorage: bootstrap.storage, models,
+  workerMcp: workerMcp((operation, input, signal) => backend(`/mcp/${operation}`, input, signal)),
   peopleDirectory: { list: companyId => backend("/people", { companyId }), get: (companyId, userId) => backend("/person", { companyId, userId }) },
   attachmentStore: new RemoteAttachmentStore((operation, input) => backend(`/attachment/${operation}`, input)),
   workerInvitations: { invite: (actor, requestId, definitionIds) => backend("/invitation", { actor, requestId, definitionIds }) },
@@ -67,9 +69,10 @@ app.use("*", async (c, next) => {
   await operation;
 });
 app.post("/sync", async c => {
-  const { catalog } = z.object({ catalog: z.custom<WorkerCatalogSnapshot>() }).strict().parse(await c.req.json());
+  const { catalog, membership } = z.object({ catalog: z.custom<WorkerCatalogSnapshot>(), membership: z.custom<import("../runtime.js").WorkerMembershipSnapshot>() }).strict().parse(await c.req.json());
   await runtime.applyWorkerCatalog(catalog);
-  return c.json({ revision: catalog.revision });
+  await runtime.applyWorkerMembership(membership);
+  return c.json({ revision: catalog.revision, membershipRevision: membership.revision });
 });
 app.post("/rpc", async c => {
   const { method, scope, input, catalog, membership } = rpcSchema.parse(await c.req.json());
