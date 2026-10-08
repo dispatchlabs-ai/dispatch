@@ -119,6 +119,12 @@ const directory = await DispatchRuntime.open({
 startupCleanup.push(async () => { try { await support.quiesce(); } finally { await directory.close(); } });
 const mcpPolicy = new McpPolicyGate();
 const runtime = distributedRuntime({ runPolicyChange: operation => mcpPolicy.change(operation), ...workerConfig, workerKey, launcherToken, directory, routes, runBackground: operation => admission.run(operation) });
+async function launcherStatus(): Promise<LauncherStatus> {
+  const status = await workerRequest<LauncherStatus>(workerConfig.launcherUrl, launcherToken, "/v1/status");
+  if (status.installationId !== workerConfig.installationId)
+    throw new Error("Launcher installation identity does not match backend identity.");
+  return status;
+}
 let credentialsQuiesced = true;
 async function resumeCredentials(refresh = true) {
   credentialsQuiesced = false;
@@ -139,7 +145,7 @@ if (!routes.admissionBlocked()) {
   // Do not proactively refresh models or discover MCP connections in this mode.
   let retired = false;
   try {
-    const status = await workerRequest<LauncherStatus>(workerConfig.launcherUrl, launcherToken, "/v1/status");
+    const status = await launcherStatus();
     retired = status.drainComplete;
   } catch { /* Unreachable launcher is not retirement evidence. */ }
   if (!retired) {
@@ -233,7 +239,7 @@ app.post("/internal/replace", async c => {
     const route = routes.get(conversationId);
     if (!route || route.attemptId !== attemptId) throw new Error("Stale replacement request.");
     await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/stop", { attemptId }, undefined, workerConfig.launcherTimeoutMs);
-    const status = await workerRequest<LauncherStatus>(workerConfig.launcherUrl, launcherToken, "/v1/status");
+    const status = await launcherStatus();
     const retired = status.attempts.find(attempt => attempt.attemptId === attemptId);
     if (!status.driverReachable || retired?.phase !== "stopped" || retired.observed !== "absent") throw new Error("Retirement is not confirmed.");
     await routes.retiring(conversationId, attemptId);
@@ -245,7 +251,7 @@ app.post("/internal/replace", async c => {
 async function drainBackend() {
   await admission.quiesce();
   await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/drain", {}, undefined, workerConfig.launcherTimeoutMs);
-  const status = await workerRequest<LauncherStatus>(workerConfig.launcherUrl, launcherToken, "/v1/status");
+  const status = await launcherStatus();
   if (!status.drainComplete) throw new Error("Worker retirement remains unresolved.");
   await support.quiesce();
   credentialsQuiesced = false;
@@ -273,7 +279,7 @@ app.post("/internal/undrain", async c => {
 });
 app.get("/internal/status", async c => {
   if (!tokenMatches(operatorToken, c.req.header("Authorization"))) return c.json({ error: "Forbidden" }, 403);
-  const status = await workerRequest<LauncherStatus>(workerConfig.launcherUrl, launcherToken, "/v1/status");
+  const status = await launcherStatus();
   return c.json({ schemaVersion: 1, installation: workerConfig.installationId, drained: status.drained, drainComplete: status.drainComplete, backendQuiesced: admission.quiesced && support.quiesced && credentialsQuiesced, activeWorkers: status.activeWorkers.length, unresolvedAttempts: status.unresolvedAttempts.length });
 });
 const clientDir = process.env.DISPATCH_CLIENT_DIR ?? resolve(dirname(fileURLToPath(import.meta.url)), "../../../client");
