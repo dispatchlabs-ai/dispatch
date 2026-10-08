@@ -389,8 +389,8 @@ function snapshotStream(watch: ChatWatch, isValid: () => Promise<boolean>, signa
     pending = undefined;
     try {
       if (!await valid()) return;
-      await watch.deliver(() => {
-        if (!stopped) {
+      await watch.deliver(async () => {
+        if (await valid()) {
           const event = delivered ? "delta" : "snapshot";
           const payload = delivered ? chatDelta(delivered, snapshot) : snapshot;
           controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`));
