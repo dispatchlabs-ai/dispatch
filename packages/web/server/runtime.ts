@@ -36,6 +36,14 @@ import type { McpConnections } from "./mcp-connections.js";
 const context = BACKGROUND_CONTEXT;
 export const DEFAULT_AGENT_ID = "developer";
 const IMAGE_GENERATION_SKILL_ID = "d6f5a67d-5c7b-4813-910f-b29d97d29cd1";
+// Fixed application selections, not a plugin registry. Markers preserve historical capability recognition.
+const capabilityDefinitions: { id: NonNullable<AgentDefinition["capabilities"]>[number]; marker: string; extensions: string[]; tools: string[] }[] = [
+  { id: "files-and-commands", marker: CodingTools.name, extensions: [Coding.name, CodingTools.name], tools: ["read", "write", "edit", "bash"] },
+  { id: "image-generation", marker: "dispatch-image-gen", extensions: ["dispatch-image-gen"], tools: ["generate_image"] },
+  { id: "web-research", marker: "dispatch-web", extensions: ["dispatch-web"], tools: ["web_run"] },
+];
+const capabilityExtensions = new Set(capabilityDefinitions.flatMap(item => item.extensions));
+const capabilityTools = new Set(capabilityDefinitions.flatMap(item => item.tools));
 type StoredChat = Omit<ChatSummary, "sharedProjectId" | "canParticipate" | "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { creationFingerprint?: string; creationTitleExplicit?: boolean; displayTitle?: string; pinned?: boolean; archived?: boolean; agentName?: string; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[]; creationAgentsOmitted?: boolean };
 type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: string; extensions?: string[]; tools?: string[]; savedBy?: string; saveRequestId?: string; saveFingerprint?: string };
 type StoredSkill = SkillDefinition & { companyId: string; savedBy: string; requestId: string; fingerprint: string };
@@ -1028,11 +1036,11 @@ export class DispatchRuntime {
         blockers.push(`${agent.name}: ${error.message}`);
       }
       for (const capability of agent.capabilities) {
-        if (capability !== "files-and-commands" && capability !== "image-generation" && capability !== "web-research") {
+        const selection = capabilityDefinitions.find(item => item.id === capability);
+        if (!selection) {
           blockers.push(`${agent.name}: unsupported capability ${capability}.`);
           continue;
         }
-        const selection = capabilitySelection([capability]);
         const installed = selection.extensions.map(name => registry.extension(name));
         if (installed.some(extension => !extension) || selection.tools.some(name => !installed.some(extension => extension?.tools?.some(tool => tool.name === name))))
           blockers.push(`${agent.name}: capability ${capability} is unavailable.`);
@@ -1137,8 +1145,8 @@ export class DispatchRuntime {
       let extensions = (prior?.extensions ?? []).filter(name => !isMcpExtension(name));
       let tools = (prior?.tools ?? []).filter(name => !isMcpTool(name));
       if (input.capabilities !== undefined) {
-        extensions = extensions.filter(name => name !== Coding.name && name !== CodingTools.name && name !== "dispatch-image-gen" && name !== "dispatch-web");
-        tools = tools.filter(name => !["read", "write", "edit", "bash", "generate_image", "web_run"].includes(name));
+        extensions = extensions.filter(name => !capabilityExtensions.has(name));
+        tools = tools.filter(name => !capabilityTools.has(name));
         const capabilities = capabilitySelection(input.capabilities);
         extensions.push(...capabilities.extensions);
         tools.push(...capabilities.tools);
@@ -1602,7 +1610,8 @@ function nativeId(id: string): ConversationId {
 function owns(scope: RuntimeScope, chat: RuntimeScope) { return scope.companyId === chat.companyId && scope.userId === chat.userId; }
 function publicAgent({ companyId: _companyId, savedBy: _savedBy, saveRequestId: _request, saveFingerprint: _fingerprint, ...agent }: StoredAgent): AgentDefinition {
   // Nested catalog values may be transaction proxies; detach before the transaction settles.
-  return JSON.parse(JSON.stringify({ ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [], capabilities: [...(agent.extensions?.includes(CodingTools.name) ? ["files-and-commands" as const] : []), ...(agent.extensions?.includes("dispatch-image-gen") ? ["image-generation" as const] : []), ...(agent.extensions?.includes("dispatch-web") ? ["web-research" as const] : [])] })) as AgentDefinition;
+  return detached({ ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [],
+    capabilities: capabilityDefinitions.filter(item => agent.extensions?.includes(item.marker)).map(item => item.id) });
 }
 function managedIds(agent: Pick<AgentDefinition, "connections">) { return (agent.connections ?? []).filter(isManagedConnection).map(connection => connection.id); }
 function requireText(value: unknown, field: string, max: number, allowEmpty = false): asserts value is string {
@@ -1615,17 +1624,8 @@ function publicSkill({ companyId: _company, savedBy: _user, requestId: _request,
 
 /** Explicit capability selections only; importing never installs registry code. */
 function capabilitySelection(capabilities: readonly string[]) {
-  const extensions: string[] = [], tools: string[] = [];
-  if (capabilities.includes("files-and-commands")) {
-    extensions.push(Coding.name, CodingTools.name);
-    tools.push("read", "write", "edit", "bash");
-  }
-  if (capabilities.includes("image-generation")) {
-    extensions.push("dispatch-image-gen");
-    tools.push("generate_image");
-  }
-  if (capabilities.includes("web-research")) { extensions.push("dispatch-web"); tools.push("web_run"); }
-  return { extensions, tools };
+  const selected = capabilityDefinitions.filter(item => capabilities.includes(item.id));
+  return { extensions: selected.flatMap(item => item.extensions), tools: selected.flatMap(item => item.tools) };
 }
 
 function sameNames(left: string[], right: string[]) {
