@@ -88,14 +88,16 @@ export function backendWorkerMcp(directory: DispatchRuntime) {
       }
       return definitionsSchema.parse({ conversationKey: route.conversationId, revision: membership.revision, connections: [...connections.values()] });
     },
-    async call(route: WorkerMcpRoute, raw: unknown, signal?: AbortSignal): Promise<CallToolResult> {
+    async call(route: WorkerMcpRoute, raw: unknown, signal: AbortSignal | undefined, assertCurrent: () => void): Promise<CallToolResult> {
+      assertCurrent();
       const { actor, connectionId, toolName, args } = callRequest.parse(raw);
       if (actor.companyId !== route.companyId || actor.conversationKey !== route.conversationId || actor.storeId !== route.storeId)
         throw new RuntimeError(403, "MCP actor is outside the authenticated worker route.");
       const authorized = await directory.authorizeWorkerMcp(actor, connectionId, toolName);
-      return bridge.call(authorized.connection, toolName, args, { signal,
+      assertCurrent();
+      return bridge.call(authorized.connection, toolName, args, { signal, assertCurrent,
         // A reconnect can cross a rollout/revocation; recheck backend pins immediately before callTool.
-        beforeCall: async () => { await directory.authorizeWorkerMcp(actor, connectionId, toolName); },
+        beforeCall: async () => { await directory.authorizeWorkerMcp(actor, connectionId, toolName); assertCurrent(); },
       });
     },
   };

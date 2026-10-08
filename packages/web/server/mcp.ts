@@ -36,7 +36,7 @@ export type WorkerConnectionDefinition = {
   id: string; extension: string; instructions: string;
   tools: { name: string; description: string; inputSchema: Tool["inputSchema"] }[];
 };
-export type WorkerMcpCallOptions = Pick<McpRequestOptions, "signal" | "onProgress"> & { beforeCall: () => Promise<void> };
+export type WorkerMcpCallOptions = Pick<McpRequestOptions, "signal" | "onProgress"> & { beforeCall: () => Promise<void>; assertCurrent: () => void };
 
 /** Explicit per-definition bindings; credentials never enter native documents. */
 export class AgentConnections {
@@ -268,8 +268,9 @@ class McpConnection {
     })) as WorkerConnectionDefinition;
   }
 
-  async callRegisteredTool(name: string, args: Record<string, unknown>, options: Pick<McpRequestOptions, "signal" | "onProgress"> & { beforeCall?: () => Promise<void> }): Promise<CallToolResult> {
+  async callRegisteredTool(name: string, args: Record<string, unknown>, options: Pick<McpRequestOptions, "signal" | "onProgress"> & { beforeCall?: () => Promise<void>; assertCurrent?: () => void }): Promise<CallToolResult> {
     options.signal?.throwIfAborted();
+    options.assertCurrent?.();
     await this.connect();
     // Reconnect/discovery/credential renewal can yield across a policy change.
     await options.beforeCall?.();
@@ -277,6 +278,9 @@ class McpConnection {
     if (this.closed || (this.managed && this.managedRecord?.authorization !== "authorized")) throw new Error("MCP connection is disabled.");
     const tool = this.catalog.tools.find(tool => this.toolName(tool.name) === name);
     if (!tool) throw new Error("This MCP tool is no longer available.");
+    // No await between the attempt fence and handing the call to the transport.
+    // Retirement still joins admitted calls; this check cannot undo remote effects.
+    options.assertCurrent?.();
     return this.client!.callTool(tool.name, args, { signal: options.signal, onProgress: options.onProgress });
   }
 
