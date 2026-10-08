@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import { acquireRuntimeOwner } from "../runtime-owner.js";
+import { PostgresLauncherJournal } from "./postgres-launcher-journal.js";
 
 const identity = z.string().min(1).max(200).refine(value => !value.includes("\0"));
 export const launchRequestSchema = z.object({
@@ -48,6 +49,12 @@ const journalSchema = z.object({
 }).strict();
 type Journal = z.infer<typeof journalSchema>;
 
+interface LauncherJournal {
+  assertHealthy(): void;
+  save(body: string): Promise<void>;
+  close(): Promise<void>;
+}
+
 export type LauncherStatus = {
   installationId: string;
   drained: boolean;
@@ -74,8 +81,7 @@ export class WorkerLauncher {
   private poisoned = false;
 
   private constructor(
-    private readonly db: DatabaseSync,
-    private readonly releaseOwner: () => void,
+    private readonly storage: LauncherJournal,
     private readonly driver: ContainerDriver,
     private journal: Journal,
   ) {}
@@ -97,11 +103,29 @@ export class WorkerLauncher {
       if (new Set(journal.attempts.map(attempt => attempt.attemptId)).size !== journal.attempts.length)
         throw new Error("Duplicate attempt IDs in launcher journal.");
       if (!row) db.prepare("INSERT INTO journal (id, body) VALUES (1, ?)").run(JSON.stringify(journal));
-      return new WorkerLauncher(db, owner.release, options.driver, journal);
+      const database = db;
+      return new WorkerLauncher({
+        assertHealthy() {},
+        async save(body) { database.prepare("UPDATE journal SET body = ? WHERE id = 1").run(body); },
+        async close() { try { database.close(); } finally { owner.release(); } },
+      }, options.driver, journal);
     } catch (error) {
       try { db?.close(); } finally { owner.release(); }
       throw error;
     }
+  }
+
+  /** Explicit opt-in; no SQLite import or automatic crashed-controller takeover. */
+  static async openPostgres(options: { connectionString: string; installationId: string; driver: ContainerDriver; recoverOwnerId?: string }) {
+    identity.parse(options.installationId);
+    const initial: Journal = { version: 1, installationId: options.installationId, drained: true, attempts: [], stoppedAttemptIds: [] };
+    const storage = await PostgresLauncherJournal.open({ ...options, initial: JSON.stringify(initial) });
+    try {
+      const journal = journalSchema.parse(JSON.parse(storage.body));
+      if (journal.installationId !== options.installationId) throw new Error("Launcher journal installation mismatch.");
+      if (new Set(journal.attempts.map(attempt => attempt.attemptId)).size !== journal.attempts.length) throw new Error("Duplicate launcher attempt IDs.");
+      return new WorkerLauncher(storage, options.driver, journal);
+    } catch (error) { await storage.close(); throw error; }
   }
 
   /** A new installation starts drained. Explicitly enable admission after operator verification. */
@@ -110,7 +134,7 @@ export class WorkerLauncher {
       const status = await this.readStatus();
       if (!this.journal.drained) return status;
       if (!status.drainComplete) throw new LauncherError(409, "Resolve all attempts and containers before enabling admission.");
-      this.save({ ...this.journal, drained: false });
+      await this.save({ ...this.journal, drained: false });
       return this.readStatus();
     });
   }
@@ -132,7 +156,7 @@ export class WorkerLauncher {
           throw new LauncherError(503, "Reconcile unresolved launcher state before admitting a new worker.");
         const digest = createHash("sha256").update(JSON.stringify([this.journal.installationId, request.attemptId])).digest("hex");
         attempt = { ...request, name: `dispatch-worker-${digest.slice(0, 40)}`, phase: "creating" };
-        this.save({ ...this.journal, attempts: [...this.journal.attempts, attempt] });
+        await this.save({ ...this.journal, attempts: [...this.journal.attempts, attempt] });
       }
       return this.advance(attempt);
     });
@@ -156,8 +180,8 @@ export class WorkerLauncher {
       else {
         // Stop can arrive before its delayed ensure request. Even an unknown attempt needs a tombstone.
         if (!this.journal.stoppedAttemptIds.includes(attemptId))
-          this.save({ ...this.journal, stoppedAttemptIds: [...this.journal.stoppedAttemptIds, attemptId] });
-        for (const container of (await this.inventory()).filter(item => item.attemptId === attemptId)) await this.driver.retire(container.id);
+          await this.save({ ...this.journal, stoppedAttemptIds: [...this.journal.stoppedAttemptIds, attemptId] });
+        for (const container of (await this.inventory()).filter(item => item.attemptId === attemptId)) { this.storage.assertHealthy(); await this.driver.retire(container.id); }
         if ((await this.inventory()).some(item => item.attemptId === attemptId)) throw new LauncherError(503, "Container retirement is unresolved.");
       }
       return { attemptId, phase: "stopped" };
@@ -168,14 +192,14 @@ export class WorkerLauncher {
   drain(): Promise<LauncherStatus> {
     return this.serial(async () => {
       // Persist the admission seal and every stop intent before transport effects.
-      this.save({ ...this.journal, drained: true, attempts: this.journal.attempts.map(attempt => attempt.phase === "stopped" ? attempt : { ...attempt, phase: "stopping" }) });
+      await this.save({ ...this.journal, drained: true, attempts: this.journal.attempts.map(attempt => attempt.phase === "stopped" ? attempt : { ...attempt, phase: "stopping" }) });
       for (const attempt of this.journal.attempts) {
         try { await this.retire(attempt); }
         catch { if (this.poisoned) throw new LauncherError(503, "Launcher journal failed; reopen before continuing."); }
       }
       // Include orphan containers after a lost journal/restore; never adopt them as runnable attempts.
       try {
-        for (const container of await this.inventory()) await this.driver.retire(container.id);
+        for (const container of await this.inventory()) { this.storage.assertHealthy(); await this.driver.retire(container.id); }
       } catch { /* readStatus reports unreachable/unresolved state; never report a successful drain here. */ }
       return this.readStatus();
     });
@@ -187,9 +211,7 @@ export class WorkerLauncher {
   close(): Promise<void> {
     if (!this.closePromise) {
       this.closing = true;
-      this.closePromise = this.tail.then(() => {
-        try { this.db.close(); } finally { this.releaseOwner(); }
-      });
+      this.closePromise = this.tail.then(() => this.storage.close());
     }
     return this.closePromise;
   }
@@ -199,6 +221,7 @@ export class WorkerLauncher {
     let container = this.match(attempt, containers);
     if (attempt.containerId && !container) throw new LauncherError(409, "Previously created container is absent; retire the attempt before replacement.");
     if (!container) {
+      this.storage.assertHealthy();
       await this.driver.create({ ...pickRequest(attempt), installationId: this.journal.installationId, name: attempt.name });
       containers = await this.inventory();
       container = this.match(attempt, containers);
@@ -206,7 +229,7 @@ export class WorkerLauncher {
     }
     if (!attempt.containerId) {
       attempt = { ...attempt, containerId: container.id };
-      this.update(attempt);
+      await this.update(attempt);
     }
     if (container.state === "unknown") throw new LauncherError(503, "Container state is unknown.");
     if (container.state === "exited") throw new LauncherError(409, "Exited workers require retirement and a new attempt, not restart.");
@@ -216,25 +239,26 @@ export class WorkerLauncher {
       // and exit before a retry arrives, causing Docker to restart an already-executed worker.
       if (attempt.phase !== "creating") throw new LauncherError(409, "A journaled start is unresolved; retire this attempt before replacement.");
       attempt = { ...attempt, phase: "starting" };
-      this.update(attempt); // Record immutable target before issuing any potentially delayed start.
+      await this.update(attempt); // Record immutable target before issuing any potentially delayed start.
+      this.storage.assertHealthy();
       await this.driver.start(container.id);
       container = this.match(attempt, await this.inventory());
       if (!container || container.state !== "running") throw new LauncherError(503, "Container start is unresolved; reconcile the same attempt.");
     }
     attempt = { ...attempt, phase: "running" };
-    this.update(attempt);
+    await this.update(attempt);
     return structuredClone(attempt);
   }
 
   private async retire(attempt: LaunchAttempt): Promise<LaunchAttempt> {
     if (attempt.phase !== "stopped" && attempt.phase !== "stopping") {
       attempt = { ...attempt, phase: "stopping" };
-      this.update(attempt);
+      await this.update(attempt);
     }
     // Retirement addresses every matching immutable ID, including a late stopped-only create.
     const containers = await this.inventory();
     const targets = containers.filter(container => container.attemptId === attempt.attemptId || container.name === attempt.name || container.id === attempt.containerId);
-    for (const container of targets) await this.driver.retire(container.id);
+    for (const container of targets) { this.storage.assertHealthy(); await this.driver.retire(container.id); }
     // The inventory check is necessary even if a transport reports a successful stop/removal.
     const remaining = await this.inventory();
     if (remaining.some(container => targets.some(target => target.id === container.id) || container.attemptId === attempt.attemptId || container.name === attempt.name))
@@ -242,7 +266,7 @@ export class WorkerLauncher {
     // A delayed create may still appear, but cannot execute: create never starts containers, and
     // no start is issued until its immutable ID has been journaled. Late starts of retired IDs fail.
     attempt = { ...attempt, phase: "stopped" };
-    this.update(attempt);
+    await this.update(attempt);
     return structuredClone(attempt);
   }
 
@@ -288,12 +312,12 @@ export class WorkerLauncher {
     return attempt;
   }
 
-  private update(attempt: LaunchAttempt) {
-    this.save({ ...this.journal, attempts: this.journal.attempts.map(item => item.attemptId === attempt.attemptId ? attempt : item) });
+  private async update(attempt: LaunchAttempt) {
+    await this.save({ ...this.journal, attempts: this.journal.attempts.map(item => item.attemptId === attempt.attemptId ? attempt : item) });
   }
 
-  private save(journal: Journal) {
-    try { this.db.prepare("UPDATE journal SET body = ? WHERE id = 1").run(JSON.stringify(journal)); }
+  private async save(journal: Journal) {
+    try { await this.storage.save(JSON.stringify(journal)); }
     catch {
       // Even an uncertain local commit must not permit more container effects in this instance.
       this.poisoned = true;
@@ -306,6 +330,7 @@ export class WorkerLauncher {
     if (this.closing) return Promise.reject(new LauncherError(503, "Launcher is closing."));
     const result = this.tail.then(() => {
       if (this.poisoned) throw new LauncherError(503, "Launcher journal failed; reopen before continuing.");
+      this.storage.assertHealthy();
       return operation();
     });
     this.tail = result.catch(() => undefined);
