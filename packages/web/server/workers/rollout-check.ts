@@ -104,7 +104,7 @@ try {
       const bridge = backendWorkerMcp(directory!);
       if (c.req.param("operation") === "definitions") return c.json(await bridge.definitions(route, input));
       if (input.actor?.storeId === route.storeId) actorSeen = input.actor;
-      return c.json(await bridge.call(route, input, c.req.raw.signal));
+      return c.json(await bridge.call(route, input, c.req.raw.signal, () => assert.strictEqual(routes.get(route.conversationId), route)));
     });
   });
   app.onError((_error, c) => c.json({ error: "Denied" }, 403));
@@ -190,19 +190,53 @@ try {
   records[1].authorization = "authorized";
   const bridge = backendWorkerMcp(directory);
   const call = { actor: actorSeen!, connectionId: "b", toolName: bTool, args: {} };
+  const route = routes.get(chat.conversation.id)!;
+  const assertCurrent = () => assert.strictEqual(routes.get(chat.conversation.id), route);
+  // Pause each backend authorization boundary with the real authorization still
+  // executed. Replacing the admitted route during either await must reach no tool.
+  const authorize = directory.authorizeWorkerMcp.bind(directory);
+  for (const pauseAt of [1, 2]) {
+    let entered = false, calls = 0;
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    directory.authorizeWorkerMcp = async (...args) => {
+      const result = await authorize(...args);
+      if (++calls === pauseAt) { entered = true; await held; }
+      return result;
+    };
+    const count = remoteCalls;
+    const rejected = assert.rejects(bridge.call(route, call, undefined, assertCurrent));
+    try {
+      await waitFor(`authorization boundary ${pauseAt}`, async () => entered);
+      routes.set(chat.conversation.id, { ...route });
+      release(); await rejected;
+      assert.equal(remoteCalls, count);
+    } finally { release(); directory.authorizeWorkerMcp = authorize; routes.set(chat.conversation.id, route); }
+  }
+  // The native client must also check after the async beforeCall callback returns,
+  // rather than allowing a queued microtask to retire the attempt before callTool.
+  const authorized = await authorize(call.actor, "b", bTool);
+  let retired = false;
+  const beforeNative = remoteCalls;
+  await assert.rejects(directory.workerMcpBridge().call(authorized.connection, bTool, {}, {
+    assertCurrent: () => assert(!retired, "Retired attempt"),
+    beforeCall: async () => { queueMicrotask(() => { retired = true; }); },
+  }), /Retired attempt/);
+  assert.equal(remoteCalls, beforeNative);
+  passed.push("Attempt guard denies retirement across both actor-authorization awaits and the final native-client handoff, with zero upstream tool calls");
   heldCall = new Promise<void>(resolve => { releaseCall = resolve; }); callEntered = false;
-  const admitted = bridge.call(routes.get(chat.conversation.id)!, call);
+  const admitted = bridge.call(route, call, undefined, assertCurrent);
   await waitFor("admitted upstream call", async () => callEntered);
   let drained = false;
   const draining = support.quiesce().then(() => { drained = true; });
   await delay(25); assert(!drained && !support.quiesced);
-  await assert.rejects(bridge.call(routes.get(chat.conversation.id)!, call));
+  await assert.rejects(bridge.call(route, call, undefined, assertCurrent));
   releaseCall!(); await admitted; await draining; assert(support.quiesced);
   heldCall = undefined; await support.resume();
   heldCall = new Promise<void>(resolve => { releaseCall = resolve; }); callEntered = false;
   const cancellation = new AbortController();
   const callsBeforeAbort = remoteCalls;
-  const interrupted = bridge.call(routes.get(chat.conversation.id)!, call, cancellation.signal);
+  const interrupted = bridge.call(route, call, cancellation.signal, assertCurrent);
   const rejected = assert.rejects(interrupted);
   await waitFor("cancellable upstream call", async () => callEntered);
   cancellation.abort(); await rejected;
