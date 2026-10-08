@@ -1219,3 +1219,6 @@ Acceptance criteria:
 - Review rendered desktop/390 px controls, status, cleanup-error retry and historical identity; record unverified keyboard/touch/accessibility/runtime flows explicitly. The zero-tests policy remains active; request focused authorization before prohibited browser/runtime probes.
 
 Documentation records the accepted design and API agreement, not observed implementation. Wiki access returned HTTP 401 and no authenticated wiki tool is available to Documenter; intended product-history home is the established [repository wiki](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/). No wiki publication, runtime verification, tests or deployment is claimed.
+
+
+Frontend candidate `127e85d`: Documenter reviewed the diff for participant-specific confirmation/removal requests, cleanup-error retry, historical membership badges, retained configuration/usage, active-only presence and mention targets, and fresh-definition invitation availability. Developer reports typecheck/frontend build passing with temporary agreed contract fields (not committed), plus source/deslop and whitespace review. Integrated server/Nix checks remain outstanding. Desktop/390 px rendering, contrast, keyboard/touch, broader accessibility and runtime cancellation/recovery remain unverified; no tests were run.
