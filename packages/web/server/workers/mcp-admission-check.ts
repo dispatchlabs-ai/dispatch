@@ -42,7 +42,7 @@ const json = (id: unknown, result: unknown) => Response.json({ jsonrpc: "2.0", i
 const managed = {
   list: () => [record], record: () => record,
   beforeConnect: async () => { assert(!gate.quiesced); },
-  recordServer: () => { assert(!gate.quiesced); recordedCatalogs++; },
+  recordServer: async () => { assert(!gate.quiesced); recordedCatalogs++; },
   authProvider: () => ({
     token: async () => {
       tokenCalls++;
