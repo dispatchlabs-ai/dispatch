@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — chat presentation performance candidate
+
+- Replace sidebar transcript projection with transactionally maintained public summaries and checkpointed existing-chat initialization.
+- Load recent chat/thread previews first, fetch older history on demand, stream delivered-state deltas, and virtualize transcript rows. Expand paired tool activity in pages; complete message/activity downloads retain access to oversized content.
+- Candidate implementation and scoped measurements are recorded in the [performance package](docs/handoff.md#chat-presentation-performance--october-8-2026). Final authenticated-service responsiveness, integrated checks, local installation and demonstration remain acceptance gates; no general performance or deployment qualification is claimed.
+
 ## Unreleased — chat criteria response
 
 - Detach saved Definition of Done criteria inside the native read transaction so chats with criteria can serialize after settlement.
