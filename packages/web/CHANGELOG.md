@@ -12,7 +12,7 @@ Integrated source review and TypeScript/application/Apple Silicon Nix checks pas
 
 - Replace sidebar transcript projection with transactionally maintained public summaries and checkpointed existing-chat initialization.
 - Load recent chat/thread previews first, fetch older history on demand, stream delivered-state deltas, and virtualize transcript rows. Expand paired tool activity in pages; complete message/activity downloads retain access to oversized content.
-- Source-published at `e87c0ab`: scoped authenticated desktop/390 px presence-update measurements meet the <100 ms typing budget; native cancellation/paging/SSE and integrated Apple Silicon checks passed. Local installation verification and demonstration remain open. See the [performance package](docs/handoff.md#chat-presentation-performance--october-8-2026) for measurement limits; arbitrary model-output loads are not qualified.
+- Source-published at `e87c0ab`: scoped authenticated desktop/390 px presence-update measurements meet the <100 ms typing budget; native cancellation/paging/SSE and integrated Apple Silicon checks passed. Guarded local installation and source-equivalent authenticated desktop/390 px demonstrations are recorded. See the [performance package](docs/handoff.md#chat-presentation-performance--october-8-2026) for measurement limits; arbitrary model-output loads are not qualified.
 
 ## Unreleased — chat criteria response
 
