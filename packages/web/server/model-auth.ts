@@ -13,7 +13,10 @@ const defaultsSchema = z.object({
 });
 
 /** Use Pi's public credential handling, including its locked OAuth refresh. */
-export async function openModels(environment: NodeJS.ProcessEnv = process.env) {
+export async function openModels(
+  environment: NodeJS.ProcessEnv = process.env,
+  credentials?: NonNullable<Parameters<typeof ModelRuntime.create>[0]>["credentials"],
+) {
   const agentDir = resolve(environment.DISPATCH_PI_AGENT_DIR ?? join(homedir(), ".pi", "agent"));
   let defaults: z.infer<typeof defaultsSchema> = {};
   try { defaults = defaultsSchema.parse(JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8"))); }
@@ -21,8 +24,8 @@ export async function openModels(environment: NodeJS.ProcessEnv = process.env) {
   const provider = environment.DISPATCH_PROVIDER ?? defaults.defaultProvider ?? "openai";
   const modelId = environment.DISPATCH_MODEL ?? defaults.defaultModel ?? "gpt-6-sol";
   const models = await ModelRuntime.create({
-    authPath: join(agentDir, "auth.json"), modelsPath: join(agentDir, "models.json"),
-    allowModelNetwork: false,
+    ...(credentials ? { credentials, refreshOnCreate: false } : { authPath: join(agentDir, "auth.json") }),
+    modelsPath: join(agentDir, "models.json"), allowModelNetwork: false,
   });
   const thinkingLevel = (environment.DISPATCH_THINKING ?? defaults.defaultThinkingLevel ?? "off") as ThinkingLevel;
   return {
