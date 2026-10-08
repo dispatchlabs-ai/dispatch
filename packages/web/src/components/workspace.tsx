@@ -382,7 +382,11 @@ export function Workspace() {
     if (attachments.some(item => !item.attachment)) return;
     const attachmentIds = previous?.attachmentIds ?? attachments.map(item => item.attachment!.id);
     if (!text && !attachmentIds.length) return;
-    const command: SendMessageInput = { attachmentIds, requestId: previous?.requestId || crypto.randomUUID(), text, threadId, mentions: previous?.mentions ?? mentions.filter(id => !id.startsWith(agentMentionPrefix)), agentMentions: previous?.agentMentions ?? mentions.filter(id => id.startsWith(agentMentionPrefix)).map(id => id.slice(agentMentionPrefix.length)) };
+    const command: SendMessageInput = {
+      attachmentIds, requestId: previous?.requestId || crypto.randomUUID(), text, threadId,
+      mentions: previous?.mentions ?? mentions.filter(id => !id.startsWith(agentMentionPrefix)),
+      agentMentions: previous?.agentMentions ?? mentions.filter(id => id.startsWith(agentMentionPrefix)).map(id => id.slice(agentMentionPrefix.length)),
+    };
     const priorRequest = messageRequests.current[chatId];
     messageRequests.current[chatId] = priorRequest?.requestId === command.requestId
       ? priorRequest : { requestId: command.requestId, draftVersion: draftVersions.current[chatId] ?? 0 };
