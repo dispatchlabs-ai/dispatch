@@ -463,6 +463,25 @@ Authenticated JSON routes use base64 archive bytes, not multipart uploads:
 
 Reuse the same `requestId` and contents for the same import; changed contents under the same operation conflict. Use a new ID only for a deliberate additional copy. Native receipts are actor/company-scoped. Transport base64 increases request size and is not encryption. See [the first-slice contract](spec.md#first-archive-slice) for atomicity and compatibility requirements.
 
+## Offline installation recovery
+
+**CLI candidate `1291f49`; source-reviewed instructions, not verified recovery.** This is secret-bearing installation material, not a shareable project archive. SQLite only; PostgreSQL, symlinks/special files and overlapping roots are rejected. See [recovery contract](spec.md#project-content-and-operational-recovery) and [acceptance evidence](handoff.md#installation-backup-and-restore--october-8-2026).
+
+Before any authorized operational use, stop supervisors, services, auth CLI, provider refreshers and every other writer. The runtime lock is only an additional guard. Fence the original executor before recovery. These acknowledgments are operator assertions, not automatic shutdown/proof; documentation does not authorize stopping a live service.
+
+Prepare a restricted JSON plan with `storage: "sqlite"`, `codeRevision` identifying the deployed immutable revision, and `roots: [{ role, path }]`. Require exactly one each of `state`, `workspace`, `pi-agent`; optional roles are `connection-config` and `operator-config`. Include every external workspace/configuration/credential dependency explicitly. Roots must exist and be disjoint; nest neither backup nor restore destination inside a source. Destination must not exist and its parent must exist. Do not commit a real installation plan: paths can disclose private configuration.
+
+After building the candidate, commands from repository root are:
+
+```sh
+node packages/web/build/service/server/recovery-cli.js backup --plan PLAN.json --destination NEW_BACKUP_DIRECTORY --writers-stopped
+node packages/web/build/service/server/recovery-cli.js restore --backup BACKUP_DIRECTORY --destination NEW_RESTORE_DIRECTORY --writers-stopped --original-fenced --paths-reviewed --code-revision REVISION
+```
+
+Backup includes the listed roots and SQLite sidecars, omitting ephemeral runtime-owner lock files. It writes numbered roots plus `manifest.json`, SHA-256 inventories and restricted permissions. Protect the directory and transfer medium as credentials. Checksums detect changed bytes, not malicious provenance: use only trusted recovery material.
+
+Restore requires the exact manifest code revision and creates numbered root directories plus `RECOVERY.json`. It neither overwrites nor starts anything. Before manual startup reconcile stored absolute working-directory/credential paths, origin/company, external environment secrets and compatible runtime/extensions/configuration. A copy is not automatically relocatable or ready to run. Never run original and restored owners together. Failure can leave an incomplete restricted destination: inspect it, never start it. Missing dependencies in the operator plan are not discovered automatically. Backup/restore execution and restart correctness remain unverified.
+
 ## Application API
 
 `POST /api/chats/:id/preferences` accepts any combination of boolean `pinned`/`archived` and nullable `projectId`, and returns the current chat snapshot. Any human member may update their own conversation preferences; the destination project must belong to that same user/company. `GET /api/chats` includes archived records and project membership so the browser can present active, archived, and grouped lists.
