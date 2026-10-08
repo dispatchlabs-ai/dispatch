@@ -1577,3 +1577,7 @@ Overall acceptance (open until evidence is recorded):
 - Verify source publication, identify the local target and running revision, verify local deployment and demonstrate the running version to Chris. Neither source publication nor a fixture-only profile proves deployed responsiveness. Record private evidence paths without publishing transcripts, credentials or authenticated captures.
 
 Baseline: the read-only recorded-data scaling evidence is maintained under [WP-039](#wp-039--composer-render-isolation). No optimized implementation, new runtime/browser result, deployment or final demonstration is claimed at package creation. Focused verification follows the [testing-policy scope](spec.md#testing-policy); avoid unrelated tests, billable model load and destructive live-state changes.
+
+### Criteria snapshot lifetime correction
+
+Chris's October 8 save-error screenshot and the service log exposed `Cannot use a settled overlay`: the snapshot returned the native document's criteria proxy after its transaction settled. Copying the two primitive fields inside the transaction detaches the response. Pi Durable Expert reviewed this correction; source/deslop, TypeScript/application builds, Apple Silicon Nix build/flake checks and whitespace checks passed. No runtime probes ran; successful save/read after loading the fix remains unverified. The failed response may follow a committed save, so retain drafts and refresh saved criteria first. The supplied cropped still confirms the editor/error view only, not desktop/390 px qualification.
