@@ -59,6 +59,25 @@ Chris subsequently sized the next package to close all application/rehearsal pre
 4. Implement operator-driven, stopped-worker key rotation as a privileged maintenance operation, separate from ordinary provisioning. Define interrupted-maintenance recovery, persisted key-hash changes, secret-version coordination, password replacement and explicit login restoration for returning stores. Source at `2954503` rejects a changed key in `open()`; `ensure()` updates passwords but neither migrates the key hash nor restores `LOGIN` ([provisioner](../server/workers/postgres-stores.ts)). These paths are not a rotation implementation.
 5. Update the owning Terraform module and Palm runbook for secret delivery, least-privilege database authority, private control ingress, worker network-access policy and encrypted backup/restore. Backend replicas, online rotation and AWS high availability remain deferred.
 
+### Pre-AWS readiness checklist
+
+This checklist assigns outstanding gaps to a completion boundary; it does not mark them complete. Each item closed here requires implementation decisions, acceptance evidence and reviewer confirmation before module readiness. AWS-only items require explicit follow-up acceptance in the module package, not a waiver.
+
+| Outstanding gap / output | Completion boundary and reason |
+| --- | --- |
+| Host-independent auth, connection, catalog and lifecycle state; single-owner OAuth persistence; stopped-worker rotation and least-privilege revocation | Close here: defines storage, secret-delivery and maintenance inputs for infrastructure. Resolve the open decisions below, including interruption recovery. |
+| First-ever startup after creator revocation, agent-tool invitations, concurrent HTTP/Docker bootstrap and policy ordering, immediate backend-authoritative project authorization | Close here: these are application authorization properties, not ECS-specific behavior. |
+| External provider/MCP OAuth refresh and revocation; full live writer quiescence | Close here: real credential lifecycle and backup correctness must be established beyond bearer fixtures. |
+| Host/controller failure, ambiguous lifecycle operations and partition recovery | Close application/rehearsal behavior here: confirm retirement or block replacement, reconcile durable receipts and preserve drain. Verify ECS/RDS-specific faults with the module because their APIs and failure semantics differ. |
+| Isolated paired restore executing new model/tool work; encrypted restricted backups with secrets, cluster roles and artifact references | Close here: restored reads alone do not establish operational recovery. |
+| ARM64 hosted-model, browser, OAuth and hard-crash recovery; multi-platform artifacts and digest-pinned publication | Close here: AWS's ARM64 target needs usable, separately qualified artifacts; AMD64 evidence is not transferable. Resolve package-write authority without publishing credentials. |
+| Off-machine durability and security/load baseline | Close here for the application/rehearsal: define recoverability, expected load/resource limits and security acceptance, then retain evidence. Verify AWS capacity, storage durability configuration and managed-service limits with the module. |
+| Concrete ECS launcher, task/bootstrap identity, credential delivery and PostgreSQL TLS contract | Specify and source-review here: module authors need definite inputs. Verify actual IAM, task execution, secret delivery and RDS TLS with the module because local Docker cannot qualify AWS services. |
+| Private control ingress and worker egress | Close documented/enforced local policy and external edge checks here; specify AWS enforcement inputs. Security groups cannot filter HTTP paths or hostname destinations, and NAT is not destination filtering. Select private listeners/routing rules for control paths and an enforcing proxy/firewall or explicitly accepted broader HTTPS egress. Verify actual ALB/ENI/IAM/egress rules with the module. |
+| AWS apply/cost plan, task failover, RDS failover, multi-AZ recovery, AWS paired restore and sustained AWS load | Verify with the module: these require actual AWS infrastructure and separate apply/cost authorization. Full HA remains deferred for the first single-owner deployment; its absence must be explicit, not claimed qualified. |
+
+Backend replicas and online rotation remain deferred, not prerequisites for the first single-owner AWS module. New findings must be assigned explicitly to this checklist or the owning AWS acceptance criteria, with reasons. Existing scoped results retain their original revision and platform limits.
+
 ### Open decisions
 
 - Select local secret management and supported recoverable provider/OAuth persistence. Copied credential files do not establish safe shared refresh. Retain one credential owner and Pi's supported credential handling; the recreation criterion cannot be claimed until this dependency is resolved.
