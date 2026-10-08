@@ -1254,3 +1254,16 @@ Frontend `cd2eb53` is integrated according to Pi Durable Expert. Documenter insp
 
 
 Final integrated candidate `a3a7fdf`: Pi Durable Expert reviewed/integrated `8267050`, replacing the temporary Lexical query-node key with a parent-relative range and unchanged-parent/mounted-editor checks. This closes the reported source insertion finding, not runtime insertion acceptance. Final refinement makes agent-selection changes count toward discard confirmation and shortens routine status copy. Documenter read the correction diff and saved check-log tails: TypeScript/application builds completed; Pi Durable Expert reports Apple Silicon `nix build --no-link` passing; `nix flake check` reports all checks passed with zero runnable checks and Linux omitted. Source/deslop and whitespace review are reported passing. Developer reviewed the final `a3a7fdf` delta without a blocker. Source publication and local availability are not yet claimed. Runtime creation, retry/conflict, restart, authorization, sibling removal, main/thread insertion and rendered desktop/390 px, contrast, keyboard/touch/accessibility remain unverified. No tests, browser probes or deployment were performed.
+
+## MCP renewal recovery — October 8, 2026
+
+Chris reported disconnected Wiki tools and requested that this not recur. Read-only inspection found both affected Dispatch rows in `reauthorize`; the provider still had active grants and unused, unexpired refresh tokens. The earlier catch-all discarded the original failure, so its precise transport cause cannot be recovered from Dispatch.
+
+The correction retains authorization for known pre-exchange connection failures and explicit temporary OAuth errors, allowing the next attempt to renew. Unknown exchange outcomes and rejected credentials still require reauthorization. Fixed safe error categories reach tool callers; provider response bodies and credentials are never retained in diagnostics. Successful renewal clears the temporary error. No new background loop, concurrency cap or automatic tool replay is introduced.
+
+Acceptance criteria/evidence:
+
+- Inspect classification, serialized renewal, disconnect ordering and call-site error propagation; preserve unknown-rotation behavior and provider authority.
+- Run TypeScript/application builds, Apple Silicon Nix build and flake checks, diff/deslop review and changed-document link checks. Results pending.
+- Recover only the two existing affected connections after rechecking provider grant/token state and taking a private database backup; retain IDs, bindings and credentials. Recovery evidence pending.
+- No tests under the standing policy. This backend change adds no UI layout. Fault injection, interruption/replay and cross-provider behavior remain unqualified.

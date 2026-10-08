@@ -181,7 +181,8 @@ class McpConnection {
 
   connect(): Promise<void> {
     if (this.closed) return Promise.reject(new Error("MCP connection is closed."));
-    if (this.managed && this.managedRecord?.authorization !== "authorized") return Promise.reject(new Error("Connect this server in Settings → Connections."));
+    const managed = this.managedRecord;
+    if (managed && managed.authorization !== "authorized") return Promise.reject(new Error(managed.error ?? "Connect this server in Settings → Connections."));
     if (this.connecting) return this.connecting;
     if (this.client?.connectionState === "connected" && !this.error) return Promise.resolve();
     this.connecting = this.open().finally(() => { this.connecting = undefined; });
@@ -211,7 +212,7 @@ class McpConnection {
       await this.discover(client);
     } catch {
       await client.close().catch(() => {});
-      this.error = `${this.config.name} could not connect. Check its registration and service configuration.`;
+      this.error = this.managedRecord?.error ?? `${this.config.name} could not connect. Check its registration and service configuration.`;
       throw new Error(this.error);
     }
   }

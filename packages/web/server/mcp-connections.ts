@@ -7,7 +7,7 @@ import type { OAuthClientInformationMixed } from "@modelcontextprotocol/sdk/shar
 import { extractWWWAuthenticateParams } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { ConnectMcpInput, ConnectMcpResult, ConnectionAuthentication, ConnectionAuthorizationState, RuntimeScope } from "../src/shared/contracts.js";
 import { decryptSecret, digest, encryptSecret, loadSecretKey, randomToken } from "./auth/crypto.js";
-import { ConnectionError, connectionURL, exchangeCode, prepareOAuth, refreshTokens, revokeTokens, type OAuthConfiguration, type StoredTokens } from "./mcp-oauth.js";
+import { ConnectionError, RenewalError, connectionURL, exchangeCode, prepareOAuth, refreshTokens, revokeTokens, type OAuthConfiguration, type StoredTokens } from "./mcp-oauth.js";
 import { legacyWikiIdentity, verifyLegacyWikiIdentity } from "./legacy-wiki-connection.js";
 
 export { ConnectionError } from "./mcp-oauth.js";
@@ -258,7 +258,7 @@ export class McpConnections {
 
   async beforeConnect(id: string) {
     const row = this.row(id);
-    if (row.state !== "authorized") throw new ConnectionError(401, "Connect this server in Settings → Connections.");
+    if (row.state !== "authorized") throw new ConnectionError(401, row.error ?? "Connect this server in Settings → Connections.");
     if (row.provider === "agent-wiki") await this.verifyLegacy(id, (await this.token(id))!);
   }
 
@@ -270,7 +270,7 @@ export class McpConnections {
 
   async token(id: string): Promise<string | undefined> {
     const row = this.row(id);
-    if (row.state !== "authorized") throw new ConnectionError(401, "Connect this server in Settings → Connections.");
+    if (row.state !== "authorized") throw new ConnectionError(401, row.error ?? "Connect this server in Settings → Connections.");
     if (row.authentication !== "oauth") return undefined;
     const credential = this.credential(row), tokens = credential.tokens;
     if (!tokens) throw new ConnectionError(401, "Authorize this connection again.");
@@ -291,10 +291,13 @@ export class McpConnections {
       // so revocation can revoke the current grant after awaiting this exchange.
       this.saveCredential(row.id, credential);
       if (this.row(row.id).state !== "authorized") throw new ConnectionError(401, "This connection was disconnected during renewal.");
+      this.mark(row.id, "authorized", null);
       return credential.tokens.access_token;
-    } catch {
-      if (this.row(row.id).state === "authorized") this.mark(row.id, "reauthorize", "Credential renewal could not be confirmed. Authorize this connection again.");
-      throw new ConnectionError(401, "This connection needs authorization again.");
+    } catch (error) {
+      if (this.row(row.id).state !== "authorized") throw new ConnectionError(401, "This connection was disconnected during renewal.");
+      const failure = error instanceof RenewalError ? error : new RenewalError(false, "Credential renewal could not be saved. Authorize this connection again.");
+      this.mark(row.id, failure.retryable ? "authorized" : "reauthorize", failure.message);
+      throw failure;
     }
   }
 

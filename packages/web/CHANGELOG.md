@@ -4,6 +4,10 @@
 
 - Add explicit same-definition instances with optional names and creation-only instruction supplements, immutable instance targeting and stable creation retries. Source/build checked; runtime and rendered UI remain unqualified. Evidence in [WP-050](docs/handoff.md#wp-050--multiple-agent-instances-and-supplemental-instructions).
 
+## Unreleased — MCP credential renewal recovery
+
+- Preserve authorization after known pre-exchange connection failures and explicit temporary OAuth errors; allow the next attempt to renew. Keep uncertain rotations and rejected grants blocked, and report safe renewal reasons to tools.
+
 ## Unreleased — conversation agent removal
 
 - Add per-instance removal: fence participation, cancel native work durably, preserve history and require explicit human re-addition as a fresh instance after cleanup. Source/build checked; runtime and rendered UI remain unqualified. Evidence and outstanding acceptance are tracked in [WP-049](docs/handoff.md#wp-049--remove-conversation-agents).
