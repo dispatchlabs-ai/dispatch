@@ -81,15 +81,24 @@ function expandIPv6(address: string): bigint[] | null {
 function isBlockedIPv6(address: string): boolean {
   const groups = expandIPv6(address);
   if (!groups || groups.length !== 8) return true;
-  // 0000::/8 is reserved in full: this covers ::, loopback ::1 (…:0:1 in any position), and every
-  // other 0-prefixed address; the mapped branch below still reports its own precise reason first.
+  const embeddedIPv4 = (high: number, low: number) =>
+    `${Number(groups[high] >> 8n)}.${Number(groups[high] & 0xffn)}.${Number(groups[low] >> 8n)}.${Number(groups[low] & 0xffn)}`;
+  // IPv4-mapped ::ffff:0:0/96: a private embedded IPv4 is reported precisely; the 0000::/8 block below rejects the rest.
+  if (groups.slice(0, 5).every(g => g === 0n) && groups[5] === 0xffffn) return isBlockedIPv4(embeddedIPv4(6, 7));
+  // Translation/transition prefixes embed an IPv4 destination; a private embedded IPv4 is a tunnel to a non-public address.
+  if (groups[0] === 0x64n && groups[1] === 0xff9bn) {
+    if (groups[2] === 1n) return true;                                                       // RFC 8215 local-use NAT64
+    if (groups.slice(2, 6).every(g => g === 0n)) return isBlockedIPv4(embeddedIPv4(6, 7));   // RFC 6052 well-known NAT64
+  }
+  if (groups[0] === 0x2002n) return isBlockedIPv4(embeddedIPv4(1, 2));                       // RFC 3056 6to4
+  if (groups[0] === 0x2001n && groups[1] < 0x0200n) return true;                              // 2001::/23 IETF special (Teredo, ORCHID)
+  if (groups[0] === 0x100n && groups.slice(1, 4).every(g => g === 0n)) return true;              // 100::/64 discard-only
+  // 0000::/8 is reserved in full: ::, loopback ::1, and every other 0-prefixed address.
   if (groups[0] === 0n) return true;
-  if (groups.slice(0, 5).every(g => g === 0n) && groups[5] === 0xffffn)                        // IPv4-mapped
-    return isBlockedIPv4(`${Number(groups[6] >> 8n)}.${Number(groups[6] & 0xffn)}.${Number(groups[7] >> 8n)}.${Number(groups[7] & 0xffn)}`);
   if ((groups[0] & 0xfe00n) === 0xfc00n) return true;                                          // fc00::/7 unique local
   if ((groups[0] & 0xff00n) === 0xfe00n) return true;                                          // fe00::/8 link/site-local
   if ((groups[0] & 0xff00n) === 0xff00n) return true;                                          // ff00::/8 multicast
-  return groups[0] === 0x2001n && groups[1] === 0xdb8n;                                        // documentation prefix
+  return groups[0] === 0x2001n && groups[1] === 0xdb8n;                                      // 2001:db8::/32 documentation
 }
 
 /** A validated public destination plus the pinned address every connection for it must use. */
@@ -280,10 +289,30 @@ function decodeEntities(text: string): string {
 const CLOSING_BLOCKS = /<\/?(?:p|div|section|article|header|footer|nav|aside|main|blockquote|pre|li|ul|ol|dl|dd|dt|h[1-6]|table|thead|tbody|tfoot|tr|figure|figcaption|form|fieldset|address|details|summary|caption|center|marquee)\b[^>]*>/gi;
 const NON_RENDERING = /<(script|style|noscript|template|svg|iframe|head|object|canvas|dialog|video|audio)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
 
-/** Attribute value with a whole-name boundary, so data-href or xhref cannot impersonate href. */
-function hrefAttribute(attributes: string): string {
-  const match = /(?:^|[\s"'])href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes);
-  return (match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim();
+/** Attribute value with quote-aware tokenization: attribute-like text inside a quoted value is never a real attribute. */
+function attributeValue(attributes: string, wanted: string): string {
+  for (let index = 0; index < attributes.length;) {
+    while (index < attributes.length && /\s/.test(attributes[index]!)) index++;          // separators between attributes
+    if (index >= attributes.length) break;
+    let name = "";
+    while (index < attributes.length && !/[\s=]/.test(attributes[index]!)) name += attributes[index++]!;  // name up to '=', whitespace, or end
+    while (index < attributes.length && /\s/.test(attributes[index]!)) index++;
+    let value = "";
+    if (attributes[index] === "=") {                                                    // optional value: quoted or unquoted
+      index++;
+      while (index < attributes.length && /\s/.test(attributes[index]!)) index++;
+      const quote = attributes[index];
+      if (quote === '"' || quote === "'") {
+        index++;
+        while (index < attributes.length && attributes[index] !== quote) value += attributes[index++]!;  // consumed as one unit
+        if (index < attributes.length) index++;                                        // closing quote
+      } else {
+        while (index < attributes.length && !/\s/.test(attributes[index]!)) value += attributes[index++]!;
+      }
+    }
+    if (name.toLowerCase() === wanted) return value.trim();
+  }
+  return "";
 }
 
 /** Bounded, dependency-free HTML-to-text extraction: title, readable text, and an absolute hyperlink inventory. */
@@ -292,7 +321,7 @@ function extractHtmlDocument(html: string, baseUrl: string): { title: string; te
     .replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim().slice(0, 300);
   // <base href> (typically inside <head>) rebases every relative link, so capture it before head removal.
   let base = baseUrl;
-  const baseHref = hrefAttribute(/<base\b([^>]*)>/i.exec(html)?.[1] ?? "");
+  const baseHref = attributeValue(/<base\b([^>]*)>/i.exec(html)?.[1] ?? "", "href");
   if (baseHref) { try { base = new URL(decodeEntities(baseHref), baseUrl).href; } catch { /* keep the document URL */ } }
   // Comments first (they may hide markup), then non-rendering regions; the title was captured above.
   const body = html.replace(/<!--[\s\S]*?-->/g, "").replace(NON_RENDERING, "").replace(/<(?:script|style|link|meta)\b[^>]*\/?>/gi, "");
@@ -301,7 +330,7 @@ function extractHtmlDocument(html: string, baseUrl: string): { title: string; te
   const seen = new Set<string>();
   const anchors = /<a\b([^>]*)>([\s\S]{0,1000}?)<\/a\s*>/gi;
   for (let match = anchors.exec(body); match; match = anchors.exec(body)) {
-    const href = hrefAttribute(match[1]);
+    const href = attributeValue(match[1], "href");
     if (!href) continue;
     let resolved: URL;
     try { resolved = new URL(decodeEntities(href), base); } catch { continue; }
