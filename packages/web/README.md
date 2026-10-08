@@ -16,7 +16,7 @@ npm run dev
 
 Open `http://localhost:5173`. Use the root `npm run auth -- invite --email person@example.com --name "Person"` command to create an enrollment link. Run `npm run check` for TypeScript/build checks, `nix build` for the pinned application artifact, and `nix flake check` for declared build checks. Root `npm start` serves the built app at the same URL/state location after stopping development.
 
-The current rule is zero tests. Add end-to-end and API coverage later, after stable behavior is ready to lock in; functional/browser qualification remains deferred. Source, TypeScript, and build review are the current checks.
+The standing rule is zero tests outside the [documented scoped exceptions](docs/spec.md#testing-policy). Add end-to-end and API coverage later, after stable behavior is ready to lock in; otherwise use source, TypeScript and build review, and leave functional/browser outcomes unqualified.
 
 ## Documentation
 
@@ -24,6 +24,7 @@ The current rule is zero tests. Add end-to-end and API coverage later, after sta
 - [Implementation handoff](docs/handoff.md): work packages, source/build evidence, and unverified outcomes.
 - [Usage guide](docs/usage-guide.md): startup, account/model configuration, API, state, and troubleshooting.
 - [Runtime integration](docs/runtime.md): native Pi ownership, request identity, cancellation, and recovery.
+- [Conversation workers and Surton AWS POC](docs/conversation-workers.md): single-owner deployment contracts, iteration scope, scoped evidence and unqualified outcomes.
 - [UI/UX review](docs/ui-ux-review.md): October 3, 2026 review of `d83f70d` that introduced the spec's UI implementation rules.
 - [Brand asset provenance](src/assets/README.md) and [changelog](CHANGELOG.md).
 - [Repository contribution workflow](../../CONTRIBUTING.md) and [wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/).
