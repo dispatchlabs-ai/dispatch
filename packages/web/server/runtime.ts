@@ -352,7 +352,7 @@ export class DispatchRuntime {
       const preference = room.preferences[scope.userId] ?? { projectId: null, pinned: false, archived: false };
       const access = room.sharedProjectId ? projectAccess((await tx.doc(ProjectsDoc)).projects[room.sharedProjectId], scope, this.readAll(scope)) : { participate: true };
       const first = presentation.messages.find(message => message.kind === "message");
-      const agents = presentation.participants.filter(member => member.kind === "agent");
+      const agents = presentation.participants.filter(member => member.kind === "agent").filter(member => member.membership === "active");
       const status = agents.some(agent => ["working", "listening", "responding"].includes(agent.status)) ? "running" : agents.some(agent => agent.status === "failed") ? "failed" : agents.some(agent => agent.status === "stopped") ? "stopped" : "idle";
       const error = agents.find(agent => agent.status === "failed")?.error;
       const conversation: ChatSummary = {
@@ -502,6 +502,17 @@ export class DispatchRuntime {
       await this.shared.ensureHuman(tx, nativeId(id), person);
       await this.shared.invite(tx, nativeId(id), `human:${scope.userId}`, input, people);
     }, context);
+    return this.getChat(scope, id);
+  }
+
+  async removeParticipant(scope: RuntimeScope, id: string, participantId: string) {
+    requireText(participantId, "Participant ID", 200);
+    await this.authorize(scope, id);
+    const person = await this.person(scope.companyId, scope.userId);
+    await this.shared.remove(nativeId(id), participantId, `human:${scope.userId}`, async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
+      await this.shared.ensureHuman(tx, nativeId(id), person);
+    });
     return this.getChat(scope, id);
   }
 

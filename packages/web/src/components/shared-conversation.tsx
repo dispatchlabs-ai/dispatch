@@ -187,7 +187,7 @@ export function ConversationComposer({ id, chatId, active = true, draft, pending
 }) {
   const mentionPeople = useMemo(() => [
     ...participants.filter(person => person.kind === "human" || person.membership === "active"),
-    ...agents.filter(agent => !agent.archived && !participants.some(person => person.kind === "agent" && person.membership === "active" && person.agentDefinitionId === agent.id))
+    ...agents.filter(agent => !agent.archived && !participants.some(person => person.kind === "agent" && person.membership !== "removed" && person.agentDefinitionId === agent.id))
       .map(agent => ({ id: `${agentMentionPrefix}${agent.id}`, name: agent.name, kind: "agent" as const, inviteOnSend: true })),
   ], [participants, agents]);
   const tooLong = draft.length > 100000;
@@ -324,7 +324,7 @@ export function InviteParticipantsDialog({ snapshot, agents, onSnapshot, onClose
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const request = useRef<AddParticipantsInput | null>(null);
-  const joinedDefinitionIds = snapshot.participants.filter((member): member is AgentParticipant => member.kind === "agent" && member.membership === "active").map(member => member.agentDefinitionId);
+  const joinedDefinitionIds = snapshot.participants.filter((member): member is AgentParticipant => member.kind === "agent" && member.membership !== "removed").map(member => member.agentDefinitionId);
   const selectedAgentIds = agentIds.filter(id => !joinedDefinitionIds.includes(id));
   useEffect(() => {
     const controller = new AbortController();

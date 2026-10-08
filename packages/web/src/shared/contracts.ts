@@ -60,6 +60,8 @@ export interface AgentParticipant extends ParticipantIdentity {
   kind: "agent";
   agentDefinitionId: string;
   agentRevision: number;
+  membership: "active" | "removing" | "removed";
+  removalError?: string;
   status: ParticipantStatus;
   error?: string;
   usage: UsageState;

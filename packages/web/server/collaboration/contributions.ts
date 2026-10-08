@@ -75,9 +75,10 @@ export class Contributions {
     if (messageId) item.messageId = messageId;
   }
 
-  async closeAll(tx: Tx, roomId: ConversationId) {
-    const items = Object.values((await tx.doc(ContributionsDoc, roomId)).items);
-    const owners = items.filter(item => item.phase !== "closed").map(item => item.owner);
+  async closeAll(tx: Tx, roomId: ConversationId, participantId?: string) {
+    const items = Object.values((await tx.doc(ContributionsDoc, roomId)).items).filter(item => !participantId || item.participantId === participantId);
+    // Removal retries also join owners closed by the first admission but not yet settled.
+    const owners = items.filter(item => participantId || item.phase !== "closed").map(item => item.owner);
     for (const item of items) if (item.phase !== "closed") await this.close(tx, roomId, item);
     return owners;
   }
@@ -86,7 +87,9 @@ export class Contributions {
   async admit(roomId: ConversationId, id: string, ctx: Context) {
     const item = (await this.harness.snapshot(ContributionsDoc, roomId, ctx))?.items[id];
     if (!item || item.phase === "closed") return;
-    await this.turns.acquire(roomId, item.participantId, item.owner, item.owner, roomId, ctx, item.priority);
+    await this.turns.acquire(roomId, item.participantId, item.owner, item.owner, roomId, ctx, item.priority, async tx => {
+      if ((await tx.doc(ContributionsDoc, roomId)).items[id]?.phase === "closed") throw new Error("The contribution has been closed.");
+    });
   }
 
   async owns(tx: Tx, roomId: ConversationId, item: Contribution) {

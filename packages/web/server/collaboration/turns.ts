@@ -104,8 +104,9 @@ export class ConversationTurns {
     turns.contributionOwned = true;
   }
 
-  async acquire(roomId: ConversationId, participantId: string, owner: TaskId, requester: TaskId, conversationId: ConversationId, ctx: Context, priority = false) {
+  async acquire(roomId: ConversationId, participantId: string, owner: TaskId, requester: TaskId, conversationId: ConversationId, ctx: Context, priority = false, authorize?: (tx: Tx) => Promise<void>) {
     const gate = await this.harness.commit(async tx => {
+      await authorize?.(tx);
       const task = await tx.task(requester);
       if (!task || task.abortRequested || task.state.status === "terminal") throw new Error("The response is no longer active.");
       const turns = await tx.doc(TurnsDoc, roomId);

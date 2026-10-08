@@ -176,6 +176,11 @@ export function createApp(options: AppOptions) {
       .refine(value => (value.agentDefinitionIds?.length ?? 0) + (value.userIds?.length ?? 0) > 0).parse(await c.req.json());
     return c.json(await runtime.addParticipants(c.get("principal"), c.req.param("id"), input));
   });
+  app.post("/api/chats/:id/participants/:participantId/remove", async (c) => {
+    z.object({}).strict().parse(await c.req.json());
+    const participantId = identity.parse(c.req.param("participantId"));
+    return c.json(await runtime.removeParticipant(c.get("principal"), c.req.param("id"), participantId));
+  });
   app.post("/api/chats/:id/preferences", async (c) => {
     const input = z.object({ pinned: z.boolean().optional(), archived: z.boolean().optional(), projectId }).strict()
       .refine(value => value.pinned !== undefined || value.archived !== undefined || value.projectId !== undefined).parse(await c.req.json());
