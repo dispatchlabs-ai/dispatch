@@ -23,7 +23,7 @@ import { WriteAdmission } from "./admission.js";
 
 const filename = process.env.DISPATCH_BACKEND_WORKERS_CONFIG_FILE;
 if (!filename) throw new Error("DISPATCH_BACKEND_WORKERS_CONFIG_FILE is required.");
-const workerConfig = z.object({ postgresStores: z.object({ adminUrlFile: z.string().startsWith("/") }).strict(), artifacts: s3ArtifactsConfigSchema, installationId: z.string().min(1), workerKeyFile: z.string(), launcherTokenFile: z.string(), operatorTokenFile: z.string(), launcherUrl: z.url(), configurationRevision: z.string().min(1) }).strict().parse(JSON.parse(await readFile(filename, "utf8")));
+const workerConfig = z.object({ postgresStores: z.object({ adminUrlFile: z.string().startsWith("/") }).strict(), artifacts: s3ArtifactsConfigSchema, installationId: z.string().min(1), workerKeyFile: z.string(), launcherTokenFile: z.string(), operatorTokenFile: z.string(), launcherUrl: z.url(), launcherTimeoutMs: z.number().int().min(1000).max(3_600_000).default(300_000), configurationRevision: z.string().min(1) }).strict().parse(JSON.parse(await readFile(filename, "utf8")));
 const artifacts = await S3Artifacts.open(workerConfig.artifacts);
 const workerKey = (await readFile(workerConfig.workerKeyFile, "utf8")).trim();
 const stores = await WorkerStoreProvisioner.open({ connectionString: (await readFile(workerConfig.postgresStores.adminUrlFile, "utf8")).trim(), installationId: workerConfig.installationId, credentialKey: workerKey });
@@ -114,7 +114,7 @@ app.post("/internal/replace", async c => {
   const replacement = await operatorTransition(() => admission.run(async () => {
     const route = routes.get(conversationId);
     if (!route || route.attemptId !== attemptId) throw new Error("Stale replacement request.");
-    await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/stop", { attemptId });
+    await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/stop", { attemptId }, undefined, workerConfig.launcherTimeoutMs);
     const status = await workerRequest<LauncherStatus>(workerConfig.launcherUrl, launcherToken, "/v1/status");
     const retired = status.attempts.find(attempt => attempt.attemptId === attemptId);
     if (!status.driverReachable || retired?.phase !== "stopped" || retired.observed !== "absent") throw new Error("Retirement is not confirmed.");
@@ -127,7 +127,7 @@ app.post("/internal/drain", async c => {
   if (!tokenMatches(operatorToken, c.req.header("Authorization"))) return c.json({ error: "Forbidden" }, 403);
   await operatorTransition(async () => {
     await admission.quiesce();
-    await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/drain", {});
+    await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/drain", {}, undefined, workerConfig.launcherTimeoutMs);
     const status = await workerRequest<LauncherStatus>(workerConfig.launcherUrl, launcherToken, "/v1/status");
     if (!status.drainComplete) throw new Error("Worker retirement remains unresolved.");
     await support.quiesce();
@@ -138,7 +138,7 @@ app.post("/internal/undrain", async c => {
   if (!tokenMatches(operatorToken, c.req.header("Authorization"))) return c.json({ error: "Forbidden" }, 403);
   await operatorTransition(async () => {
     await support.resume();
-    await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/undrain", {});
+    await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/undrain", {}, undefined, workerConfig.launcherTimeoutMs);
     await admission.resume();
   });
   return c.json({ admitting: admission.admitting });
