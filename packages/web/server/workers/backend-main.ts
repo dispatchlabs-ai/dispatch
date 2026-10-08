@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { createServer as createHttpsServer } from "node:https";
+import { createSecureContext } from "node:tls";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { S3Artifacts, s3ArtifactsConfigSchema } from "./s3-artifacts.js";
@@ -32,6 +33,7 @@ const tls = workerConfig.tls ? {
   key: await readFile(workerConfig.tls.keyFile), cert: await readFile(workerConfig.tls.certFile),
   minVersion: "TLSv1.2" as const,
 } : undefined;
+if (tls) createSecureContext(tls);
 const artifacts = await S3Artifacts.open(workerConfig.artifacts);
 const workerKey = (await readFile(workerConfig.workerKeyFile, "utf8")).trim();
 const stores = await WorkerStoreProvisioner.open({ connectionString: (await readFile(workerConfig.postgresStores.adminUrlFile, "utf8")).trim(), installationId: workerConfig.installationId, credentialKey: workerKey });
