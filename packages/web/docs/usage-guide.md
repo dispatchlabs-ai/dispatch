@@ -293,8 +293,13 @@ Select a suggestion with the arrow keys and Enter/Tab, or click/tap the person.
 The name appears highlighted within your text. Escape dismisses the picker;
 deleting the highlighted name removes the mention. Enter selects a suggestion
 while the picker is open, then
-returns to its normal send behavior. Only current participants appear. Mentioning
-someone requests attention without inviting them or changing access.
+returns to its normal send behavior. The picker includes current participants and
+available company agents. **Invite on send** identifies an agent not yet in the
+conversation: selecting it only adds a draft token; sending invites it and posts
+your message together. Deleting the token before Send cancels that invitation.
+The new agent can read the full public history, considers the inviting message,
+and remains a participant afterward. Mentioning an existing participant does not
+change access or require an answer. Invite people through Participants instead.
 
 Agents waiting to publish show **Listening**. An agent with the speaking turn shows **Responding**; **Working** includes concurrent model requests, analysis and tools without holding that turn. Ordinary tool-call commentary stays private; deliberate progress posts and admitted final answers are public. Prepared contributions keep their place through final conversational review and publication. Agents read intervening messages and can revise or discard their draft; unchanged history needs no extra review call. Human typing pauses publication without discarding the answer. Further research releases the speaking turn. Explicit posting tools initially report pending while sibling tools finish, not posted. Mentions give an agent first opportunity when the conversation is free. Human typing and sending are always available, and abandoned typing indicators expire automatically. This policy spans the conversation and its reply threads.
 
@@ -415,7 +420,14 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `POST /api/agents/:id/archive` | Archive using the expected revision |
 | `/api/auth/*` | Enrollment, sign-in, recovery, session and factor management, logout |
 
-`POST /api/chats` accepts `agentDefinitionIds` (one or more), or the legacy singular `agentDefinitionId`. Message commands accept `threadId` and participant-ID `mentions`. Invitation commands accept `{ requestId, agentDefinitionIds?, userIds? }`. The service binds public authorship to the authenticated human or native agent instance.
+`POST /api/chats` accepts `agentDefinitionIds` (one or more), or the legacy singular `agentDefinitionId`. Message commands accept `threadId`, participant-ID `mentions`, and optional
+`agentMentions` containing company agent-definition IDs. For an invitation mention,
+the draft Markdown uses `[@Name](mention:agent-definition%3A<encoded definition ID>)`.
+Submit the corresponding definition in `agentMentions`; do not put it in `mentions`.
+The server authorizes and invites/reuses those agents, rewrites invitation links to
+resolved participant IDs, and commits the message and native deliveries together.
+Retry the unchanged full command with its original `requestId`; do not call the
+participant-invitation endpoint separately before sending. Invitation commands accept `{ requestId, agentDefinitionIds?, userIds? }`. The service binds public authorship to the authenticated human or native agent instance.
 
 Attachment uploads return `{ attachment: Attachment }`, where metadata contains `id`, `name`, `mimeType`, `size` (bytes), `kind` (`image`, `text` or `file`) and a session/access-checked `url`. Send commands accept `attachmentIds` (at most 10 unique IDs, 25 MiB total), scoped to the same conversation and uploaded by the sender. Their Markdown `text` may be empty when attachments are present. Uploaded IDs may be reused in later messages by their uploader; duplicate IDs within one message are rejected. Retries retain both the send request ID and attachment IDs; changing attachment identity under the same request ID returns a conflict. Message snapshots include `attachments`. Shared limits and metadata are exported from `src/shared/contracts.ts`.
 

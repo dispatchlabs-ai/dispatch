@@ -218,7 +218,24 @@ requested Slack's inline mention interaction. In main messages and replies, typi
 `@` opens a participant picker at the caret; typing a name filters it. The menu
 shows people and agents already in the conversation with their avatars and names,
 and distinguishes duplicate names.
-It does not invite anyone or add broadcast mentions such as `@everyone`.
+**October 8, 2026 extension authorized:** the picker also offers available company
+agent definitions not already participating, marked **Invite on send**. Selecting
+one changes only the draft; sending invites that agent and mentions its resolved
+participant identity in the same native Pi Durable commit as the public message
+and delivery tasks. It remains an independent participant with access to the full
+public history, including the inviting message. Existing instances are reused,
+not recreated or reconfigured. Human invitations still use Participants; no
+broadcast mentions such as `@everyone` are added. [WP-048](handoff.md#wp-048--invite-agents-through-inline-mentions)
+owns implementation and local acceptance evidence.
+
+Agent-definition invitation targets and participant IDs are distinct identities.
+The server validates current company availability and participation authority,
+resolves invitation targets before checking message mentions, and persists only
+resolved participant references in the public message. One stable request ID
+covers invitation, message and delivery for retries. A failed submission must not
+leave a newly invited agent behind without the message; removing its draft token
+before sending must not invite it. Selecting or inviting an agent does not require
+it to answer.
 
 **Refined October 6, 2026:** remove the redundant toolbar `@` shortcut and restore
 the compact arrow-only Send button in main messages and replies. The accessible
@@ -237,11 +254,17 @@ The selected identity is an atomic Lexical text node. Deleting its token removes
 that mention; undo/redo restores it with its identity. Drafts remain Markdown,
 using `[@Name](mention:<encoded participant ID>)` internally so identity survives
 draft switching and copying between compatible conversation contexts. Importing a
-reference to someone outside the current conversation yields ordinary text.
-Submitted `mentions` contains only IDs of remaining mention nodes. Public messages
+reference to someone outside the current conversation yields ordinary text unless
+it is an available company-agent invitation target.
+Draft invitation tokens use `[@Name](mention:agent-definition%3A<encoded definition ID>)`.
+Submission separates current participant IDs in `mentions` from definition IDs in
+`agentMentions`; both come only from remaining mention nodes. The server rewrites
+accepted invitation-token URLs to participant IDs before public persistence. Public messages
 render authorized references inline; older messages with detached mention metadata
 retain their historical badges. Mention selection requests attention under the
-existing participation policy and does not change authorship or access.
+existing participation policy and does not change authorship. Existing-participant
+mentions do not change access; accepted invitation targets grant the agent access
+on successful Send.
 
 ## UI implementation rules
 
@@ -384,7 +407,7 @@ Chris requested Slack as the conversation screen's visual model, approved the [I
 
 - A reply stores the root public-message ID and remains part of the conversation's public history. It has the same membership and full-history access as the main discussion; there are no private thread members. Every other agent member considers new replies with their thread context. An agent's response defaults to the triggering thread and may deliberately post to the main discussion.
 - The main column shows top-level messages and reply counts. Opening a thread shows its root and ordered replies in the contextual column with an independent reply composer. The header's participant control switches that same column to members and saved instance details. A narrow screen presents these as a full-height supporting surface.
-- Mentions reference participant IDs through the [inline picker](#inline-mentions). Selecting a participant inserts its readable name in the text and identifies that member in the submitted message; a mention requests attention without changing access or requiring an answer. Plain text cannot impersonate a participant.
+- Mentions reference participant IDs through the [inline picker](#inline-mentions). Selecting a participant inserts its readable name in the text and identifies that member in the submitted message; a mention requests attention without requiring an answer. Existing-participant mentions do not change access; available company-agent targets join on successful Send under the inline-mention contract. Plain text cannot impersonate a participant.
 - Keep main and thread drafts, request identities and scroll state associated with their conversation/root. Navigation, responsive remounts and late acknowledgements must not discard or overwrite newer input. Closing a conversation with either draft asks before discarding it.
 - New conversation lets the user select one or more active company agent definitions. The saved default can be initially selected; starting from an agent preselects that definition. In unbound conversations, human invitations choose existing active company accounts and grant access to that conversation only. Shared-project conversations direct human access changes to project membership management; membership grants access to every conversation in that project.
 

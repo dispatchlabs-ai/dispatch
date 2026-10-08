@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — inline agent invitations
+
+- Extend inline `@` selection to available company agents, inviting them only on Send. Resolve invitation mentions and save the message/deliveries in one native commit; preserve existing instances and unchanged-request retries. Implementation and local acceptance evidence are tracked in [WP-048](docs/handoff.md#wp-048--invite-agents-through-inline-mentions).
+
 ## Unreleased — agent evaluation profiles
 
 - Refine editing into a focused evaluation workspace with scannable expectations/cases, progressive disclosure, persistent save controls and profile history in context/phone Details. Gemini’s scoped designer-agent assessment is 91/100 (A−); human comprehension, broader accessibility and native-select arrow behavior remain unverified. See [WP-047](docs/handoff.md#wp-047--agent-evaluation-profiles-and-editor) for receipt-review limits.
