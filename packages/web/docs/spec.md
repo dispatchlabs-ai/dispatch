@@ -860,7 +860,7 @@ The first codec/API/UI candidate uses a restricted ZIP profile and base64 JSON t
 
 Fetch an immutable commit and record provenance; imported local definitions work without GitHub afterward. Updates show a diff and create explicit local revisions, protecting local edits and preserving instance identity/history under the safe-idle base-upgrade policy. No automatic upstream execution dependency. A later marketplace can index these bundles without changing execution ownership.
 
-**GitHub update candidate implemented October 8; integration/qualification pending.** Track repository/package path, immutable commit, content digest, package-local keys, local record mappings and last imported definition snapshots. Fetch outside native commits; apply exactly the previewed content, never a fresh moving-branch read.
+**Source-published October 8 at `ce244ca`; runtime/UI qualification pending.** Track repository/package path, immutable commit, content digest, package-local keys, local record mappings and last imported definition snapshots. Fetch outside native commits; apply exactly the previewed content, never a fresh moving-branch read.
 
 Preview upstream/local changes, capability additions/removals and retained local connections: changed instructions will operate with that existing authority. Explicitly approve capability changes. Never import credentials, connections or grants. Conservatively block the whole update when the same definition has divergent local and upstream edits, even in different fields; offer an independent copy, not automatic merge or force-overwrite. New upstream entries receive new local records, never display-name matches. Removed upstream entries remain local and are marked removed upstream, not deleted or archived.
 
@@ -868,7 +868,7 @@ Append definition/skill revisions, update mappings/provenance and save the retry
 
 ### Starter packages and onboarding
 
-**Assigned October 8; not implemented.** Repository-owned starter definitions use the public bundle preview/import path, not private live-agent exports or a second seeding mechanism. Preserve the default agent and saved edits. Pi Durable Expert selected Developer-only for the first inventory: repository-owned guidance and coding capability, no live settings. Show the model choice before import; never silently rewrite a downloaded package model. Starter UI/packaging and GitHub fetch/UI are independent workstreams with coordinated bundle-dialog ownership. [The starter work package](handoff.md#starter-packages-and-onboarding--october-8-2026) owns the settled inventory, workflow and qualification.
+**Source-published October 8 at `ce244ca`; runtime/UI qualification pending.** Repository-owned starter definitions use the public bundle preview/import path, not private live-agent exports or a second seeding mechanism. Preserve the default agent and saved edits. Pi Durable Expert selected Developer-only for the first inventory: repository-owned guidance and coding capability, no live settings. Show the model choice before import; never silently rewrite a downloaded package model. Starter UI/packaging and GitHub fetch/UI are independent workstreams with coordinated bundle-dialog ownership. [The starter work package](handoff.md#starter-packages-and-onboarding--october-8-2026) owns the settled inventory, workflow and qualification.
 
 ### Project content and operational recovery
 

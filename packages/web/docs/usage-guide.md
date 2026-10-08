@@ -424,11 +424,11 @@ In default SQLite mode, the state directory contains `auth.sqlite`, `auth.key`, 
 
 ### Developer starter
 
-**Integrated route/dialog candidate; runtime/browser qualification pending.** The Developer starter uses repository-owned guidance, files/commands only and no skills or connections. Choose a **Model** and its supported **Thinking** level explicitly, then **Preview starter**. The generated package is `dispatch-starter-developer` version `1.0.0`; it enters the ordinary archive preview/authorization/import flow rather than modifying the existing default. Review capabilities before creating your independent copy. This is not a copy of a live Developer's settings, and runtime/browser behavior remains unverified.
+**Source-published; runtime/browser qualification pending.** The Developer starter uses repository-owned guidance, files/commands only and no skills or connections. Choose a **Model** and its supported **Thinking** level explicitly, then **Preview starter**. The generated package is `dispatch-starter-developer` version `1.0.0`; it enters the ordinary archive preview/authorization/import flow rather than modifying the existing default. Review capabilities before creating your independent copy. This is not a copy of a live Developer's settings, and runtime/browser behavior remains unverified.
 
 ### GitHub bundles
 
-**Implemented candidate; integrated checks/runtime/browser qualification pending.** In Agent bundles, choose **GitHub**. Destination **New independent copy** imports new local records; selecting an existing tracked installation previews its update. Enter public GitHub owner/repository, package directory (empty for root) and a full 40-character commit SHA, not a branch/tag, then **Preview commit**.
+**Source-published; runtime/browser qualification pending.** In Agent bundles, choose **GitHub**. Destination **New independent copy** imports new local records; selecting an existing tracked installation previews its update. Enter public GitHub owner/repository, package directory (empty for root) and a full 40-character commit SHA, not a branch/tag, then **Preview commit**.
 
 Inspect Last imported, Local now and Incoming definitions, blockers, warnings, capability changes and retained local authority. Approve definitions/capability changes explicitly, then **Import copy** or **Apply update**. Updates preserve local connections and active instances adopt changed base definitions when idle. Divergent local/upstream edits to the same definition block the whole update, even when different fields changed; **Preview independent copy** offers a separate import instead. Removed-upstream definitions remain local, not archived/deleted.
 
