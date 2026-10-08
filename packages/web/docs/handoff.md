@@ -1622,6 +1622,9 @@ Thread/scroll receipt reconciliation: Documenter inspected `.local/chat-performa
 
 
 
+Pre-install native observation: Pi Durable Expert's read-only `.local/aws-chat-diagnosis/summary-before-install.json`, inspected by Documenter, recorded all 51 catalog chats with complete summary documents, none missing/incomplete, 52 documents read and zero entry scans. Documenter also confirmed that `collaboration/summary.ts` is unchanged between qualified slice `5b248ca` and parallel integration `2e00aca`. The observation establishes persisted metadata only—not authenticated list behavior, the running service revision, installation or deployment acceptance. Retain the parallel package's targeted upgrade wakeups during integration.
+
+
 ## Five-finding simplification — October 8, 2026
 
 Chris authorized fixing the five findings ranked in the source review. Deslop owns integration and final review; Pi Durable Expert owns lightweight chat summaries and targeted base-upgrade reconciliation; Developer owns per-composer state and coordinated list refreshes; Documenter owns contract reconciliation and acceptance evidence. Reuse the lightweight-summary candidate from [chat presentation performance](#chat-presentation-performance--october-8-2026); this package does not complete that broader performance goal or authorize transcript transport/rendering changes, deployment or unrelated cleanup.
