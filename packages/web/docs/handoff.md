@@ -1291,8 +1291,7 @@ Acceptance criteria:
 - Preserve native cancellation/recovery; never automatically replay interrupted paid work. Reject unsafe destinations and sanitize backend failures without leaking credentials.
 - Source/deslop review, TypeScript/application and applicable Nix builds, whitespace/link review. No functional tests under the standing policy. Record desktop/390 px rendered and runtime security/restart evidence separately; successful builds are not functional qualification.
 
-Implementation is in progress; checks, backend setup, rendered review and publication are not yet claimed.
-||||||| 1728945
+Implementation source-reviewed by Pi Durable Expert through `11b6b10`: DNS pinning, public-address checks, credential redirect rejection and maintained HTML parsing address all reported blockers. Native keyed snapshots avoid loading accumulated evidence on every lookup. TypeScript/application and Apple Silicon Nix builds passed; final publication checks are recorded below. No tests ran. Live fetching, search credentials, TLS rejection, cancellation, restart and rendered desktop/390 px UI remain unverified, including the required UI-rule layout review. No existing agent is automatically granted this capability.
 
 
 ## Project overview redesign — October 8, 2026

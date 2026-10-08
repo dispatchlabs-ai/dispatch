@@ -18,7 +18,7 @@ import { WebBackendError, type WebBackend } from "./types.js";
 export interface WebBackendConfig {
   /** Exa API key enabling search(); without it only direct URL reads are available. */
   searchApiKey?: string;
-  /** Per-request wall-clock cap (default 20s) plus a 60s cap across one open() redirect chain. */
+  /** DNS and connection/body deadlines (default 20s each), plus a 60s overall redirect-chain cap. */
   requestTimeoutMs?: number;
 }
 
@@ -308,7 +308,7 @@ export function createWebBackend(config: WebBackendConfig = {}): WebBackend {
 
   return {
     async open(url: string, signal?: AbortSignal) {
-      // One overall cap across the redirect chain, plus a per-hop cap covering DNS, connection and body.
+      // One overall cap across the redirect chain, plus separate DNS and connection/body deadlines.
       const overall = deadline(signal, OPEN_TOTAL_TIMEOUT_MS);
       const hopDeadline = () => deadline(overall, openTimeoutMs);
       let destination = await assertPublicDestination(url, hopDeadline());
