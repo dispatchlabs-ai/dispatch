@@ -1,102 +1,93 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { chmodSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
+import { AUTH_SCHEMA } from "./schema.js";
 
-export class AuthStore {
-  readonly database: DatabaseSync;
+export type AuthValue = SQLInputValue;
+
+/** A connection queue keeps unrelated requests outside an awaited transaction. */
+export abstract class AsyncAuthStore {
+  private readonly context = new AsyncLocalStorage<{ active: boolean }>();
+  private tail: Promise<unknown> = Promise.resolve();
+  private closing?: Promise<void>;
+  protected failure?: Error;
+
+  protected abstract execute(sql: string, parameters: AuthValue[]): Promise<{ rows: unknown[]; changes: number }>;
+  protected abstract begin(): Promise<void>;
+  protected abstract commit(): Promise<void>;
+  protected abstract rollback(): Promise<void>;
+  protected abstract disconnect(): Promise<void>;
+
+  protected assertHealthy(): void { if (this.failure) throw this.failure; }
+
+  transaction<T>(operation: () => Promise<T>): Promise<T> {
+    const context = this.context.getStore();
+    if (context) {
+      if (!context.active) return Promise.reject(new Error("Authentication transaction has ended"));
+      this.assertHealthy();
+      return operation();
+    }
+    if (this.closing) return Promise.reject(new Error("Authentication store is closing"));
+    const result = this.tail.then(async () => {
+      this.assertHealthy();
+      await this.begin();
+      const scope = { active: true };
+      let value: T;
+      try {
+        value = await this.context.run(scope, operation);
+      } catch (error) {
+        scope.active = false;
+        try { await this.rollback(); }
+        catch (rollbackError) {
+          this.failure = new AggregateError([error, rollbackError], "Authentication rollback failed; reopen the store");
+          throw this.failure;
+        }
+        throw error;
+      }
+      scope.active = false;
+      try { await this.commit(); this.assertHealthy(); }
+      catch (error) {
+        this.failure = new Error("Authentication commit outcome is uncertain; reopen the store without retrying the operation", { cause: error });
+        throw this.failure;
+      }
+      return value;
+    });
+    this.tail = result.catch(() => {});
+    return result;
+  }
+
+  async one<T>(sql: string, ...parameters: AuthValue[]): Promise<T | undefined> {
+    return (await this.all<T>(sql, ...parameters))[0];
+  }
+  all<T>(sql: string, ...parameters: AuthValue[]): Promise<T[]> {
+    return this.transaction(async () => (await this.execute(sql, parameters)).rows as T[]);
+  }
+  run(sql: string, ...parameters: AuthValue[]): Promise<number> {
+    return this.transaction(async () => (await this.execute(sql, parameters)).changes);
+  }
+  close(): Promise<void> {
+    return this.closing ??= this.tail.then(() => this.disconnect());
+  }
+}
+
+export class AuthStore extends AsyncAuthStore {
+  private readonly database: DatabaseSync;
 
   constructor(path: string) {
+    super();
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     this.database = new DatabaseSync(path);
     if (path !== ":memory:") chmodSync(path, 0o600);
-    this.database.exec(`
-      PRAGMA busy_timeout = 5000;
-      PRAGMA foreign_keys = ON;
-      PRAGMA journal_mode = WAL;
-      CREATE TABLE IF NOT EXISTS auth_users (
-        id TEXT PRIMARY KEY,
-        company_id TEXT NOT NULL,
-        email TEXT NOT NULL UNIQUE,
-        name TEXT NOT NULL,
-        status TEXT NOT NULL CHECK (status IN ('invited', 'active', 'recovery')),
-        password_hash TEXT,
-        totp_secret TEXT,
-        totp_last_step INTEGER NOT NULL DEFAULT -1,
-        credential_version INTEGER NOT NULL DEFAULT 0
-      );
-      CREATE TABLE IF NOT EXISTS auth_passkeys (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        public_key TEXT NOT NULL,
-        counter INTEGER NOT NULL,
-        transports TEXT NOT NULL,
-        device_type TEXT NOT NULL,
-        backed_up INTEGER NOT NULL,
-        created_at INTEGER NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS auth_sessions (
-        id TEXT NOT NULL UNIQUE,
-        token_hash TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
-        credential_version INTEGER NOT NULL,
-        created_at INTEGER NOT NULL,
-        expires_at INTEGER NOT NULL,
-        last_seen_at INTEGER NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS auth_sessions_user ON auth_sessions(user_id);
-      CREATE TABLE IF NOT EXISTS auth_invitations (
-        token_hash TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
-        reason TEXT NOT NULL CHECK (reason IN ('invitation', 'recovery')),
-        expires_at INTEGER NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS auth_pending (
-        token_hash TEXT PRIMARY KEY,
-        user_id TEXT REFERENCES auth_users(id) ON DELETE CASCADE,
-        purpose TEXT NOT NULL,
-        credential_version INTEGER,
-        data TEXT NOT NULL,
-        expires_at INTEGER NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS auth_recovery_codes (
-        code_hash TEXT NOT NULL,
-        user_id TEXT NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
-        PRIMARY KEY (user_id, code_hash)
-      );
-      CREATE TABLE IF NOT EXISTS auth_rate_limits (
-        key TEXT PRIMARY KEY,
-        starts_at INTEGER NOT NULL,
-        attempts INTEGER NOT NULL
-      );
-    `);
+    this.database.exec(`PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; ${AUTH_SCHEMA}`);
   }
-
-  one<T>(sql: string, ...parameters: SQLInputValue[]): T | undefined {
-    return this.database.prepare(sql).get(...parameters) as T | undefined;
+  protected async execute(sql: string, parameters: AuthValue[]) {
+    const statement = this.database.prepare(sql);
+    if (/^\s*SELECT\b/i.test(sql)) return { rows: statement.all(...parameters), changes: 0 };
+    return { rows: [], changes: Number(statement.run(...parameters).changes) };
   }
-
-  all<T>(sql: string, ...parameters: SQLInputValue[]): T[] {
-    return this.database.prepare(sql).all(...parameters) as T[];
-  }
-
-  run(sql: string, ...parameters: SQLInputValue[]): number {
-    return Number(this.database.prepare(sql).run(...parameters).changes);
-  }
-
-  transaction<T>(operation: () => T): T {
-    this.database.exec("BEGIN IMMEDIATE");
-    try {
-      const result = operation();
-      this.database.exec("COMMIT");
-      return result;
-    } catch (error) {
-      this.database.exec("ROLLBACK");
-      throw error;
-    }
-  }
-
-  close() {
-    this.database.close();
-  }
+  protected async begin() { this.database.exec("BEGIN IMMEDIATE"); }
+  protected async commit() { this.database.exec("COMMIT"); }
+  protected async rollback() { this.database.exec("ROLLBACK"); }
+  protected async disconnect() { this.database.close(); }
 }
