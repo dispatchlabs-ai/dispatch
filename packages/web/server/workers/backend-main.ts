@@ -43,7 +43,7 @@ const config = readConfig();
 await mkdir(config.stateDir, { recursive: true, mode: 0o700 });
 await mkdir(config.workspaceDir, { recursive: true, mode: 0o700 });
 const provider = await openModels();
-const auth = createAuth({ databasePath: join(config.stateDir, "auth.sqlite"), secretPath: join(config.stateDir, "auth.key"), origin: config.origin, rpId: config.rpId, companyId: config.companyId, companyName: config.companyName });
+const auth = await createAuth({ databasePath: join(config.stateDir, "auth.sqlite"), secretPath: join(config.stateDir, "auth.key"), origin: config.origin, rpId: config.rpId, companyId: config.companyId, companyName: config.companyName });
 const connections = new McpConnections(join(config.stateDir, "connections.sqlite"), join(config.stateDir, "connections.key"), config.origin);
 const support = new WriteAdmission(false, async () => {});
 const directory = await DispatchRuntime.open({
@@ -122,7 +122,7 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
   if (operation === "people" || operation === "person") {
     const person = z.object({ companyId: z.string(), userId: z.string().optional() }).strict().parse(input);
     if (person.companyId !== route.companyId) return c.json({ error: "Forbidden" }, 403);
-    return c.json(operation === "people" ? auth.listCompanyPeople(route.companyId) : auth.getCompanyPerson(route.companyId, person.userId ?? ""));
+    return c.json(operation === "people" ? await auth.listCompanyPeople(route.companyId) : await auth.getCompanyPerson(route.companyId, person.userId ?? ""));
   }
   if (operation === "invitation") {
     const body = z.object({ actor: z.custom<WorkerManagementActor>(), requestId: z.string().min(1).max(200), definitionIds: z.array(z.string().min(1).max(200)).max(100) }).strict().parse(input);
@@ -188,5 +188,5 @@ const server = tls
   ? serve({ ...listener, createServer: createHttpsServer, serverOptions: tls })
   : serve(listener);
 let closing = false;
-async function close() { if (closing) return; closing = true; server.close(); await runtime.close(); await connections.close(); artifacts.close(); await stores.close(); auth.close(); if ("closeAllConnections" in server) server.closeAllConnections(); }
+async function close() { if (closing) return; closing = true; server.close(); await runtime.close(); await connections.close(); artifacts.close(); await stores.close(); await auth.close(); if ("closeAllConnections" in server) server.closeAllConnections(); }
 process.once("SIGTERM", () => { void close(); }); process.once("SIGINT", () => { void close(); });

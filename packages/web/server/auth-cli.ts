@@ -44,7 +44,7 @@ try {
     const hours = Number(values.hours);
     if (!Number.isFinite(hours) || hours <= 0 || hours > 24) throw new Error("--hours must be greater than zero and at most 24.");
     const config = readConfig();
-    const auth = createAuth({
+    const auth = await createAuth({
       databasePath: join(config.stateDir, "auth.sqlite"),
       secretPath: join(config.stateDir, "auth.key"),
       origin: config.origin,
@@ -54,11 +54,11 @@ try {
     });
     try {
       const input = { email: values.email, name: values.name, expiresInMs: Math.floor(hours * 60 * 60_000) };
-      const invitation = command === "reset" ? auth.issueRecoveryInvitation(input) : auth.issueInvitation(input);
+      const invitation = command === "reset" ? await auth.issueRecoveryInvitation(input) : await auth.issueInvitation(input);
       console.log(`Single-use ${command === "reset" ? "recovery" : "enrollment"} link; expires ${new Date(invitation.expiresAt).toISOString()}:`);
       console.log(invitation.url);
     } finally {
-      auth.close();
+      await auth.close();
     }
   }
 } catch (error) {
