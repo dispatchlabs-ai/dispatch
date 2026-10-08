@@ -2,7 +2,8 @@
  * Web research backend: bounded public-web retrieval for the web-research
  * capability. Direct HTTP page reads with public-destination validation and
  * connection-time address pinning (original Host header and TLS SNI kept),
- * plus dependency-free HTML-to-text extraction and optional Exa search.
+ * maintained-parser HTML-to-text extraction (node-html-parser), and optional
+ * Exa search.
  * No browser, no JavaScript rendering, no credential forwarding, and no
  * private-network destinations, including through redirects.
  */
@@ -11,6 +12,7 @@ import { request as httpRequest, type IncomingMessage } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { isIPv4, isIPv6 } from "node:net";
 import { brotliDecompressSync, gunzipSync, inflateSync } from "node:zlib";
+import { parse } from "node-html-parser";
 import { WebBackendError, type WebBackend } from "./types.js";
 
 export interface WebBackendConfig {
@@ -262,94 +264,35 @@ async function readBoundedText(response: Response, limit: number): Promise<{ tex
   return { text: decodeCharset(bytes, response.headers.get("content-type") ?? ""), truncated };
 }
 
-const NAMED_ENTITIES: Record<string, string> = {
-  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", hellip: "…", mdash: "—", ndash: "–",
-  lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”", laquo: "«", raquo: "»", copy: "©", reg: "®", trade: "™",
-  deg: "°", plusmn: "±", times: "×", divide: "÷", middot: "·", bull: "•", dagger: "†", sect: "§", para: "¶",
-  frac12: "½", frac14: "¼", frac34: "¾", sup2: "²", sup3: "³", micro: "µ", shy: "", ensp: " ", emsp: " ",
-  thinsp: " ", zwnj: "‌", zwj: "‍", aacute: "á", agrave: "à", acirc: "â", atilde: "ã", auml: "ä",
-  eacute: "é", egrave: "è", ecirc: "ê", iacute: "í", igrave: "ì", oacute: "ó", ograve: "ò", ocirc: "ô",
-  otilde: "õ", ouml: "ö", uacute: "ú", ugrave: "ù", uuml: "ü", ccedil: "ç", ntilde: "ñ", szlig: "ß",
-};
-
-/** Decode common named and all numeric character references; unknown references pass through unchanged. */
-function decodeEntities(text: string): string {
-  return text.replace(/&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{0,31});/g, (match, entity: string) => {
-    if (entity.startsWith("#")) {
-      const code = entity[1] === "x" || entity[1] === "X"
-        ? Number.parseInt(entity.slice(2), 16)
-        : Number.parseInt(entity.slice(1), 10);
-      if (!Number.isInteger(code) || code === 0 || (code >= 0xd800 && code <= 0xdfff) || code > 0x10ffff) return match;
-      return String.fromCodePoint(code);
-    }
-    return NAMED_ENTITIES[entity] ?? match;
-  });
-}
-
-const CLOSING_BLOCKS = /<\/?(?:p|div|section|article|header|footer|nav|aside|main|blockquote|pre|li|ul|ol|dl|dd|dt|h[1-6]|table|thead|tbody|tfoot|tr|figure|figcaption|form|fieldset|address|details|summary|caption|center|marquee)\b[^>]*>/gi;
-const NON_RENDERING = /<(script|style|noscript|template|svg|iframe|head|object|canvas|dialog|video|audio)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
-
-/** Attribute value with quote-aware tokenization: attribute-like text inside a quoted value is never a real attribute. */
-function attributeValue(attributes: string, wanted: string): string {
-  for (let index = 0; index < attributes.length;) {
-    while (index < attributes.length && /\s/.test(attributes[index]!)) index++;          // separators between attributes
-    if (index >= attributes.length) break;
-    let name = "";
-    while (index < attributes.length && !/[\s=]/.test(attributes[index]!)) name += attributes[index++]!;  // name up to '=', whitespace, or end
-    while (index < attributes.length && /\s/.test(attributes[index]!)) index++;
-    let value = "";
-    if (attributes[index] === "=") {                                                    // optional value: quoted or unquoted
-      index++;
-      while (index < attributes.length && /\s/.test(attributes[index]!)) index++;
-      const quote = attributes[index];
-      if (quote === '"' || quote === "'") {
-        index++;
-        while (index < attributes.length && attributes[index] !== quote) value += attributes[index++]!;  // consumed as one unit
-        if (index < attributes.length) index++;                                        // closing quote
-      } else {
-        while (index < attributes.length && !/\s/.test(attributes[index]!)) value += attributes[index++]!;
-      }
-    }
-    if (name.toLowerCase() === wanted) return value.trim();
-  }
-  return "";
-}
-
-/** Bounded, dependency-free HTML-to-text extraction: title, readable text, and an absolute hyperlink inventory. */
+/** Bounded HTML-to-text extraction with a maintained parser: title, readable text, and an absolute hyperlink inventory. */
 function extractHtmlDocument(html: string, baseUrl: string): { title: string; text: string; links: Array<{ url: string; text: string }>; textTruncated: boolean; linksTruncated: boolean } {
-  const title = decodeEntities((/<title\b[^>]*>([\s\S]{0,1000}?)<\/title\s*>/i.exec(html)?.[1] ?? "")
-    .replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim().slice(0, 300);
-  // <base href> (typically inside <head>) rebases every relative link, so capture it before head removal.
+  // <base href> rebases every relative link; script/style/noscript text is excluded from the read.
+  const root = parse(html, { blockTextElements: { script: false, style: false, noscript: false } });
+  const title = (root.querySelector("title")?.text ?? "").replace(/\s+/g, " ").trim().slice(0, 300);
   let base = baseUrl;
-  const baseHref = attributeValue(/<base\b([^>]*)>/i.exec(html)?.[1] ?? "", "href");
-  if (baseHref) { try { base = new URL(decodeEntities(baseHref), baseUrl).href; } catch { /* keep the document URL */ } }
-  // Comments first (they may hide markup), then non-rendering regions; the title was captured above.
-  const body = html.replace(/<!--[\s\S]*?-->/g, "").replace(NON_RENDERING, "").replace(/<(?:script|style|link|meta)\b[^>]*\/?>/gi, "");
+  const baseHref = root.querySelector("base")?.getAttribute("href")?.trim();
+  if (baseHref) { try { base = new URL(baseHref, baseUrl).href; } catch { /* keep the document URL */ } }
+  // Non-rendering regions (head metadata, embedded media) leave no text once title and base are captured.
+  for (const element of root.querySelectorAll("head, script, style, noscript, svg, template, iframe, object, canvas, dialog, video, audio")) element.remove();
 
   const links: Array<{ url: string; text: string }> = [];
   const seen = new Set<string>();
-  const anchors = /<a\b([^>]*)>([\s\S]{0,1000}?)<\/a\s*>/gi;
-  for (let match = anchors.exec(body); match; match = anchors.exec(body)) {
-    const href = attributeValue(match[1], "href");
+  for (const anchor of root.querySelectorAll("a")) {
+    if (links.length >= MAX_LINKS) break;
+    const href = (anchor.getAttribute("href") ?? "").trim();
     if (!href) continue;
     let resolved: URL;
-    try { resolved = new URL(decodeEntities(href), base); } catch { continue; }
+    try { resolved = new URL(href, base); } catch { continue; }
     // Only followable public-web links; javascript:, mailto:, and credential-bearing URLs are dropped.
     if (resolved.protocol !== "http:" && resolved.protocol !== "https:") continue;
     if (resolved.username || resolved.password) continue;
     if (seen.has(resolved.href)) continue;
     seen.add(resolved.href);
-    const text = decodeEntities(match[2].replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim().slice(0, MAX_LINK_TEXT_CHARS);
+    const text = anchor.text.replace(/\s+/g, " ").trim().slice(0, MAX_LINK_TEXT_CHARS);
     links.push({ url: resolved.href, text: text || resolved.hostname });
-    if (links.length >= MAX_LINKS) break;
   }
 
-  const converted = decodeEntities(body
-    .replace(/<li\b[^>]*>/gi, "\n- ")
-    .replace(/<br\b[^>]*\/?>/gi, "\n")
-    .replace(/<(?:td|th)\b[^>]*>/gi, " | ")
-    .replace(CLOSING_BLOCKS, "\n")
-    .replace(/<[^>]*>/g, ""))
+  const converted = root.structuredText
     .replace(/\r\n?/g, "\n")
     .replace(/[ \t]+/g, " ")
     .replace(/ ?\n ?/g, "\n")
