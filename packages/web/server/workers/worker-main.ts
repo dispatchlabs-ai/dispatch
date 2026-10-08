@@ -101,8 +101,11 @@ const server = serve({ fetch: app.fetch, hostname: "0.0.0.0", port: 8831 });
 let closing = false;
 async function close() {
   if (closing) return; closing = true; server.close();
+  console.info("Worker shutdown: runtime close started");
   await runtime.close();
+  console.info("Worker shutdown: runtime close completed");
   if ("closeAllConnections" in server) server.closeAllConnections();
+  console.info("Worker shutdown: remaining resources", process.getActiveResourcesInfo());
 }
 process.once("SIGTERM", () => { void close(); });
 process.once("SIGINT", () => { void close(); });
