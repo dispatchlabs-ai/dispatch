@@ -311,13 +311,13 @@ Agents waiting to publish show **Listening**. An agent with the speaking turn sh
 
 ### Adding another agent instance
 
-**Planned in [WP-050](handoff.md#wp-050--multiple-agent-instances-and-supplemental-instructions); not yet verified or available in the published candidate.** Use Participants → Add instance, or the picker's explicit add-another action. Select the definition, optionally name the instance (for example, Developer · Backend), and supply additional instructions. Inspect its base and instance instructions separately in Participants. Supplements are creation-only; they do not edit the shared definition, alter siblings or grant permissions.
+**Implemented in candidate `a3a7fdf`; runtime/UI qualification outstanding ([WP-050](handoff.md#wp-050--multiple-agent-instances-and-supplemental-instructions)).** Use Participants → Add instance, or the picker's explicit add-another action. Select the definition, optionally name the instance (for example, Developer · Backend), and supply additional instructions. Inspect its base and instance instructions separately in Participants. Supplements are creation-only; they do not edit the shared definition, alter siblings or grant permissions.
 
 Confirming **Add instance** commits membership immediately, unlike **Invite on send**. Deleting its inserted mention or abandoning the later message does not remove that member; use Remove from conversation. Closing a nonempty instance form asks before discarding its separate instance draft; conversation drafts remain intact. Errors retain the form for retry.
 
 Adding an instance alone does not start a model response; send a public message to activate it. Each instance has separate working context but reads the shared public history and considers new messages. Mention the specific instance to request attention; ordinary mentions do not create duplicates. Coding instances share configured files, so coordinate task ownership or separate worktrees. Removing one instance leaves siblings active.
 
-Planned API: `POST /api/chats/:id/instances`, JSON `{ requestId, agentDefinitionId, name?, instructions? }`, returns `{ ...snapshot, createdParticipantId }`. Name limit: 100 characters; supplement: 50,000. Use the returned ID, not a participant-list diff. Retry identical requests with the same ID; replay after removal returns that historical ID without recreating it. Changed input needs a new request ID. New creation conflicts while a same-definition instance is Removing. Only participating humans can create duplicates. Ordinary invitations reuse an existing instance; ambiguous definition mentions return 409, so select a participant directly.
+API: `POST /api/chats/:id/instances`, JSON `{ requestId, agentDefinitionId, name?, instructions? }`, returns `{ ...snapshot, createdParticipantId }`. Name limit: 100 characters; supplement: 50,000. Use the returned ID, not a participant-list diff. Retry identical requests with the same ID; replay after removal returns that historical ID without recreating it. Changed input needs a new request ID. New creation conflicts while a same-definition instance is Removing. Only participating humans can create duplicates. Ordinary invitations reuse an existing instance; ambiguous definition mentions return 409, so select a participant directly.
 
 ### Removing a conversation agent
 
@@ -431,6 +431,7 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `GET /api/chats/:id/events` | SSE `snapshot` events; `session-ended` closes access on invalidation |
 | `GET /api/people` | Active company people available for invitation |
 | `POST /api/chats/:id/participants/:participantId/remove` | Remove one agent instance; JSON `{}`, refreshed snapshot on completion |
+| `POST /api/chats/:id/instances` | Human-only explicit instance creation; snapshot plus `createdParticipantId` |
 | `POST /api/chats/:id/participants` | Invite company agents or people with an idempotent request ID |
 | `GET/POST /api/agent-management/grants` | Inspect company grant/change/save history / versioned human grant update or revocation |
 | `GET/POST /api/agents` | List company definitions / append a revision using optimistic concurrency |
