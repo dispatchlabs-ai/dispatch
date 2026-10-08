@@ -151,7 +151,7 @@ export interface AgentDraft {
   modelId: string;
   thinkingLevel: ThinkingLevel;
   /** Selections from the capabilities installed by this application. */
-  capabilities?: ("files-and-commands" | "image-generation" | "web-research")[];
+  capabilities?: ("files-and-commands" | "image-generation" | "web-research" | "edit-definition-of-done")[];
   skills?: SkillSelection[];
 }
 
