@@ -1,3 +1,4 @@
+import { McpPolicyGate } from "./mcp-policy.js";
 import { backendWorkerMcp } from "./mcp.js";
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -45,7 +46,8 @@ const directory = await DispatchRuntime.open({
 });
 const routes = await WorkerRoutes.open(join(config.stateDir, "routing"), workerConfig.installationId);
 const admission = new WriteAdmission(routes.admissionBlocked(), async blocked => { routes.setAdmissionBlocked(blocked); });
-const runtime = distributedRuntime({ ...workerConfig, workerKey, launcherToken, directory, routes, runBackground: operation => admission.run(operation) });
+const mcpPolicy = new McpPolicyGate();
+const runtime = distributedRuntime({ runPolicyChange: operation => mcpPolicy.change(operation), ...workerConfig, workerKey, launcherToken, directory, routes, runBackground: operation => admission.run(operation) });
 // On restart support remains open until an explicit, freshly verified drain.
 let transition: Promise<unknown> = Promise.resolve();
 function operatorTransition<T>(operation: () => Promise<T>): Promise<T> {
@@ -79,7 +81,7 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
   if (c.req.method !== "POST") return c.json({ error: "Not found" }, 404);
   const input = await c.req.json();
   if (operation === "mcp/definitions") return c.json(await mcp.definitions(route, input));
-  if (operation === "mcp/call") return c.json(await mcp.call(route, input, c.req.raw.signal));
+  if (operation === "mcp/call") return c.json(await mcpPolicy.call(() => mcp.call(route, input, c.req.raw.signal)));
   if (operation === "summary") {
     routes.updateSummary(route.conversationId, route.attemptId, route.storeId, input);
     return c.json({ accepted: true });
