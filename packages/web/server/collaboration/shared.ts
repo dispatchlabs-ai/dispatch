@@ -14,6 +14,7 @@ import { requireProjectAccess, type ProjectAction } from "../project-access.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata, messageAttachments } from "../attachments.js";
 import { managementTools } from "../agent-management.js";
 import { ConversationTurns, TurnsDoc } from "./turns.js";
+import { resolveAgentMentionLinks } from "./mentions.js";
 import { Contributions, ContributionsDoc, contributionCopy, type Contribution } from "./contributions.js";
 
 const context = BACKGROUND_CONTEXT;
@@ -743,12 +744,7 @@ export class SharedConversations {
         `agent-definition:${definitionId}`, room.members.find(member => member.agentDefinitionId === definitionId)!.id,
       ]));
       normalized.mentions = [...new Set([...normalized.mentions, ...resolved.values()])].sort();
-      normalized.text = normalized.text.replace(/\[(@(?:\\.|[^\]\\])*)\]\((mention:[^\s)]+)\)/g, (token, label: string, url: string) => {
-        let target: string;
-        try { target = decodeURIComponent(url.slice(8)); } catch { return token; }
-        const participantId = resolved.get(target);
-        return participantId ? `[${label}](mention:${encodeURIComponent(participantId)})` : token;
-      });
+      normalized.text = resolveAgentMentionLinks(normalized.text, resolved);
     }
     const message: MessageData = { id: randomUUID(), kind: "message", authorId, createdAt: Date.now(), ...normalized, ...(attachments.length ? { attachments } : {}) };
     room.requests[key] = { hash, messageId: message.id };
