@@ -287,10 +287,16 @@ const listener = { fetch: app.fetch, hostname: config.host, port: config.port };
 const server = tls
   ? serve({ ...listener, createServer: createHttpsServer, serverOptions: tls })
   : serve(listener);
-startupCleanup.push(() => {
-  server.close();
-  if ("closeAllConnections" in server) server.closeAllConnections();
-});
+function closeListener(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    server.close(error => {
+      if (error && (error as NodeJS.ErrnoException).code !== "ERR_SERVER_NOT_RUNNING") reject(error);
+      else resolve();
+    });
+    if ("closeAllConnections" in server) server.closeAllConnections();
+  });
+}
+startupCleanup.push(closeListener);
 await once(server, "listening");
 let closing = false;
 let shutdown: Promise<void> | undefined;
@@ -307,7 +313,7 @@ function close(): Promise<void> {
     // Attempt every independent cleanup even if an earlier close fails. Retain
     // the terminal result: closing owners is not a replayable drain operation.
     for (const cleanup of [
-      () => { server.close(); },
+      closeListener,
       () => runtime.close(),
       () => { cleanupSessionResources(); },
       () => connections.close(),
@@ -315,7 +321,6 @@ function close(): Promise<void> {
       () => stores.close(),
       () => auth.close(),
       () => credentials?.close(),
-      () => { if ("closeAllConnections" in server) server.closeAllConnections(); },
     ]) {
       try { await cleanup(); } catch (error) { failures.push(error); }
     }
