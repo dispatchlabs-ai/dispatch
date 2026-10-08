@@ -64,11 +64,11 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
     for (const route of routes.list().filter(route => !companyId || route.companyId === companyId)) {
       const attempt = status.attempts.find(item => item.attemptId === route.attemptId);
       if (!attempt || (attempt.phase === "stopped" && attempt.observed === "absent")) continue;
-      const catalog = await directory.exportWorkerCatalog(route.companyId);
+      const { catalog, membership } = await directory.directoryWorkerBootstrap(route.companyId, route.conversationId);
       try {
         if (attempt.phase !== "running" || !/^dispatch-worker-[a-f0-9]+$/.test(attempt.name)) throw new Error("Worker is not ready for policy acknowledgement.");
-        const receipt = await workerRequest<{ revision: number }>(`http://${attempt.name}:8831`, token(route), "/sync", { catalog });
-        if (receipt.revision !== catalog.revision) throw new Error("Policy acknowledgement mismatch.");
+        const receipt = await workerRequest<{ revision: number; membershipRevision: number }>(`http://${attempt.name}:8831`, token(route), "/sync", { catalog, membership });
+        if (receipt.revision !== catalog.revision || receipt.membershipRevision !== membership.revision) throw new Error("Policy acknowledgement mismatch.");
       } catch {
         // No acknowledgement is safe only after independent irreversible retirement.
         await launcher("stop", { attemptId: route.attemptId });
@@ -86,6 +86,11 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
       const entries = await directory.directoryChatSummaries(scope);
       return entries.map(({ conversation, automaticTitle }) => mergeWorkerSummary(conversation, automaticTitle, routes.readSummary(conversation.id)))
         .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
+    },
+    async saveAgent(scope, input) {
+      const result = await directory.saveAgent(scope, input);
+      if (input.applyConnectionsToExisting) await acknowledgePolicy(scope.companyId);
+      return result;
     },
     async saveProject(scope, id, input) {
       const result = await directory.saveProject(scope, id, input);
