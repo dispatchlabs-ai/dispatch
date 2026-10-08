@@ -1,3 +1,5 @@
+import { createDeveloperStarter } from "./starters.js";
+import { fetchGithubBundle, githubSourceSchema } from "./github-bundles.js";
 import { BUNDLE_MAX_BYTES, BundleError, bundleExportSchema, decodeBundle, encodeBundle } from "./bundles.js";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -235,6 +237,17 @@ export function createApp(options: AppOptions) {
     return new Response(snapshotStream(watch, () => auth.isSessionValid(principal.sessionId), c.req.raw.signal, (listener) => auth.onRevocation(listener)), {
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-store", "X-Accel-Buffering": "no" },
     });
+  });
+  app.post("/api/bundles/starters/developer", async c => c.json(createDeveloperStarter(await c.req.json())));
+  app.get("/api/bundles/github", async c => c.json({ installations: await runtime.listGitHubBundles(c.get("principal")) }));
+  app.post("/api/bundles/github/preview", async c => {
+    const input = z.object({ source: githubSourceSchema, installationId: z.string().uuid().optional() }).strict().parse(await c.req.json());
+    const fetched = await fetchGithubBundle(input.source);
+    return c.json(await runtime.previewGitHubBundle(c.get("principal"), fetched.bundle, fetched.source, input.installationId));
+  });
+  app.post("/api/bundles/github/apply", async c => {
+    const input = z.object({ previewId: z.string().uuid(), requestId }).strict().parse(await c.req.json());
+    return c.json(await runtime.applyGitHubBundle(c.get("principal"), input));
   });
   const archiveSchema = z.object({ archive: z.string().max(Math.ceil(BUNDLE_MAX_BYTES / 3) * 4).refine(value => value.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(value), "Invalid base64 archive."), requestId: requestId.optional() }).strict();
   app.post("/api/bundles/export", async c => {

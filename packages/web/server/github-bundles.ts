@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import { BUNDLE_MAX_BYTES, BundleError, bundleSchema, validateBundle } from "./bundles.js";
 
@@ -53,8 +52,7 @@ export async function fetchGithubBundle(input: GithubSourceInput) {
       entry.instructions = files.get(path)!;
     }
     const bundle = validateBundle(manifest);
-    const digest = createHash("sha256").update(JSON.stringify(bundle)).digest("hex");
-    return { bundle, source, digest };
+    return { bundle, source };
   } catch (error) {
     if (error instanceof BundleError || error instanceof z.ZodError) throw error;
     throw new BundleError("GitHub fetch failed or timed out. Retry the pinned commit.");
