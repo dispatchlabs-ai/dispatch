@@ -4,7 +4,7 @@ import { $isCodeNode } from "@lexical/code";
 import { $isLinkNode } from "@lexical/link";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { LexicalTypeaheadMenuPlugin, MenuOption, type MenuRenderFn, type TriggerFn } from "@lexical/react/LexicalTypeaheadMenuPlugin";
-import { $createTextNode, $getNodeByKey, $findMatchingParent, $getSelection, $isRangeSelection, $isTextNode, BLUR_COMMAND, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_HIGH, KEY_ENTER_COMMAND, KEY_ESCAPE_COMMAND } from "lexical";
+import { $createTextNode, $getNodeByKey, $isElementNode, $findMatchingParent, $getSelection, $isRangeSelection, $isTextNode, BLUR_COMMAND, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_HIGH, KEY_ENTER_COMMAND, KEY_ESCAPE_COMMAND } from "lexical";
 import { CornerDownLeft } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Ref } from "react";
 import { createPortal } from "react-dom";
@@ -104,17 +104,33 @@ export function MentionsPlugin({ people, instanceChoices = [], onAddInstance }: 
     commandPriority={COMMAND_PRIORITY_HIGH} onOpen={opened} onClose={closed} anchorClassName="mention-menu-anchor" parent={parent}
     onSelectOption={(option, node, close) => {
       if (option.createInstance) {
-        const key = node?.getKey();
-        const original = node?.getTextContent();
+        const parent = node?.getParent();
+        const parentKey = parent?.getKey();
+        const original = parent?.getChildren().map(child => child.getTextContent()).join("");
+        const start = node?.getPreviousSiblings().reduce((offset, sibling) => offset + sibling.getTextContentSize(), 0) ?? 0;
+        const length = node?.getTextContentSize() ?? 0;
+        const root = editor.getRootElement();
         close();
         onAddInstance?.(option.person.id, participant => {
           editor.update(() => {
-            const target = key ? $getNodeByKey(key) : null;
-            // Do not overwrite a draft edited while the creation request was outstanding.
-            if (!$isTextNode(target) || target.getTextContent() !== original) return;
-            const mention = $createMentionNode(participant.id, `@${participant.name}`);
-            target.replace(mention);
-            mention.insertAfter($createTextNode(" ")).selectEnd();
+            const container = parentKey ? $getNodeByKey(parentKey) : null;
+            if (!root || editor.getRootElement() !== root || !$isElementNode(container) || !container.isAttached()) return;
+            const children = container.getChildren();
+            if (children.map(child => child.getTextContent()).join("") !== original) return;
+            // Text normalization can merge the query node; its parent-relative range survives.
+            let offset = 0;
+            for (const child of children) {
+              const end = offset + child.getTextContentSize();
+              if ($isTextNode(child) && child.isSimpleText() && start >= offset && start + length <= end && length) {
+                const from = start - offset;
+                const target = child.splitText(from, from + length)[from === 0 ? 0 : 1];
+                const mention = $createMentionNode(participant.id, `@${participant.name}`);
+                target.replace(mention);
+                mention.insertAfter($createTextNode(" ")).selectEnd();
+                return;
+              }
+              offset = end;
+            }
           });
         });
         return;
