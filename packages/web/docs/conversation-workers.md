@@ -45,6 +45,31 @@ The accepted [AWS target](spec.md#aws-container-deployment-target) preserves the
 
 Before AWS rollout, obtain authorization for the actual infrastructure/cost plan, then qualify simultaneous ensures/stops, controller loss during launch/stop, backend/task restart, network partitions, RDS failover, stale callbacks/revocation, multi-AZ recovery, full paired restore and sustained load. Demonstrate no overlapping executors and preserve unsafe-tool recovery boundaries under those faults. ARM64 packaging alone is insufficient. Omarchy acceptance remains a prerequisite, not evidence that these AWS checks passed.
 
+## Host-independent control plane — next work package
+
+Discussion consensus, October 8, 2026: make backend and launcher state recoverable independently of their host-local files **before** adding replicas. This is planned work, not implemented behavior or authorization to deploy AWS infrastructure. Preserve native installations and the existing PostgreSQL trial.
+
+### Scope and sequence
+
+1. Move authoritative authentication/session, encrypted connection, catalog/directory and lifecycle state into PostgreSQL with separate schemas and restricted roles. Retain one active backend, launcher, catalog owner and provider-credential owner initially; backend replicas must not independently open the same Pi catalog store. Pi continues owning execution inside each conversation worker.
+2. Keep encryption, signing and derivation root keys outside PostgreSQL in separately controlled secret management. Encrypt credential records and backups; include cluster roles, required secrets and artifact bytes in recoverable, access-restricted backup coverage. A database read compromise must not directly yield plaintext credentials; this does not protect against a compromised backend with decryption authority.
+3. Preserve durable operation IDs, terminal tombstones, ownership/version checks and current-attempt callback revalidation. Uncertain ownership, lease expiry or database disconnection must not authorize replacement without confirmed old-container termination.
+4. Implement operator-driven, stopped-worker key rotation as a privileged maintenance operation, separate from ordinary provisioning. Define interrupted-maintenance recovery, persisted key-hash changes, secret-version coordination, password replacement and explicit login restoration for returning stores. Source at `2954503` rejects a changed key in `open()`; `ensure()` updates passwords but neither migrates the key hash nor restores `LOGIN` ([provisioner](../server/workers/postgres-stores.ts)). These paths are not a rotation implementation.
+5. Update the owning Terraform module and Palm runbook for secret delivery, least-privilege database authority, private control ingress, worker network-access policy and encrypted backup/restore. Backend replicas, online rotation and AWS high availability remain deferred.
+
+### Open decisions
+
+- Select local secret management and supported recoverable provider/OAuth persistence. Copied credential files do not establish safe shared refresh. Retain one credential owner and Pi's supported credential handling; the recreation criterion cannot be claimed until this dependency is resolved.
+- Select and qualify database session revocation under the actual PostgreSQL version and deployment role. Database ownership plus `CREATEROLE` alone does not establish termination authority. Scoped role membership and explicitly accepted cluster-wide signaling authority are options, not an agreed SQL recipe. A dedicated database does not make cluster-wide grants database-scoped. Do not require broad query-statistics access merely to enumerate session identities.
+
+### Acceptance criteria and evidence
+
+- Recreate backend and launcher from configuration and managed secrets without their old local writable files; recover accounts, connections, catalog/directory, routes and maintenance state without lost state or duplicate workers. This is host independence, not zero downtime or protection against loss of a single-host database.
+- Rotation/revocation blocks new old-credential logins, terminates **all** sessions for each retired role and verifies none remain, and confirms container retirement before a replacement opens the store. Deliberately include an extra connection opened with the worker credential; one runtime connection is not a security limit. Password changes and `NOLOGIN` do not terminate existing sessions, and token changes do not stop shell execution.
+- Reject retired callbacks and credentials after recreation; exercise interrupted rotation and interrupted lifecycle recovery without granting overlapping executor authority. Restore an isolated paired backup including required secrets, roles and artifacts.
+- Verify private control endpoints from outside the host and document permitted worker egress. Keep first-start/concurrent-bootstrap and external-OAuth/live-writer-quiescence gaps open until qualified; earlier scoped evidence does not close them.
+- Source/deslop review, TypeScript/build and documentation-link/whitespace checks apply. Functional checks require authorization under the repository check policy; none were run for this planning update. No implementation or deployment evidence exists for this work package yet.
+
 ## Integration deliverables
 
 Developer owns application routing/RPC, authorization and integration. Deployer drives deployment and acceptance, owns Nix packaging, the generic Terraform module and Palm integration, and tracks findings through fixes in the owning repositories. Expert owns delegated Pi/lifecycle/artifact work and reviews recovery. Documenter maintains this contract, spec scope and evidence links. Component milestones are handoffs, not stopping points: Deployer keeps implementation, review and acceptance moving through completion; scoped work needs no renewed authorization at each handoff. Any participant should directly mention a stalled owner with the next concrete task rather than wait for Chris or a coordinator. If the coordination role itself stalls, another participant may take over and directly notify the displaced owner; announce changed ownership before overlapping file edits.
