@@ -84,7 +84,7 @@ export class SharedConversations {
   private readonly entryCache = new Map<ConversationId, EntryRecord[]>();
   private readonly messageCache = new Map<ConversationId, { entries: EntryRecord[]; aliases: string; messages: MessageData[] }>();
   private readonly activityCache = new Map<ConversationId, { entries: EntryRecord[]; messages: ConversationMessage[]; memberId: string; joinedAt: number; groups: ParticipantActivity[] }>();
-  beforeDelivery?: (tx: Tx, companyId: string, member: Member) => Promise<void>;
+  beforeDelivery?: (tx: Tx, roomId: ConversationId, companyId: string, member: Member) => Promise<void>;
   readonly extension;
   readonly delivery;
   readonly legacyReporter;
@@ -126,7 +126,7 @@ export class SharedConversations {
           const room = await tx.doc(SharedDoc, task.input.roomId);
           if (room.epoch !== task.input.epoch || room.stopping || !activeMember(room.members.find(item => item.id === member.id))) { cancelled = true; return terminal(); }
           const target = room.members.find(item => item.id === member.id)!;
-          if (!prior) await this.beforeDelivery?.(tx, room.companyId, target);
+          if (!prior) await this.beforeDelivery?.(tx, task.input.roomId, room.companyId, target);
           target.status = "listening"; delete target.error; target.threadId = incoming.threadId; target.activeDelivery = task.id; target.publicationPriority = incoming.mentions.includes(target.id);
         }, ctx);
         if (cancelled) return;

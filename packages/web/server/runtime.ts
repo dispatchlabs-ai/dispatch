@@ -91,7 +91,7 @@ export class DispatchRuntime {
     this.shared = shared;
     this.peopleDirectory = peopleDirectory;
     shared.bind(harness, storage);
-    shared.beforeDelivery = (tx, companyId, member) => this.upgradeParticipant(tx, companyId, member);
+    shared.beforeDelivery = (tx, roomId, companyId, member) => this.upgradeParticipant(tx, roomId, companyId, member);
     shared.availableAgents = async companyId => (await this.listAgents({ companyId, userId: "" })).filter(agent => !agent.archived).map(({id,name,description}) => ({id,name,description}));
     this.harness = harness;
     this.models = models;
@@ -799,7 +799,7 @@ export class DispatchRuntime {
     const receipt = receipts.receipts.find(item => item.companyId === actor.companyId && item.instanceId === String(actor.instanceId) &&
       (item.callId === callId || item.operationId === input.operationId));
     if (receipt) {
-      if (receipt.fingerprint !== fingerprint || receipt.operationId !== input.operationId || receipt.definitionId !== actor.definitionId || receipt.revision !== actor.revision)
+      if (receipt.fingerprint !== fingerprint || receipt.operationId !== input.operationId || receipt.definitionId !== actor.definitionId)
         throw new ManagementError(409, "Operation ID was already used with different content.");
       return managementReceipt(receipt);
     }
@@ -893,7 +893,7 @@ export class DispatchRuntime {
         try {
           await this.harness.commit(async tx => {
             const current = (await tx.doc(SharedDoc, roomId)).members.find(item => item.id === member.id);
-            if (current) await this.upgradeParticipant(tx, chat.companyId, current);
+            if (current) await this.upgradeParticipant(tx, roomId, chat.companyId, current);
           }, context);
         } catch {
           // The failed configuration transaction rolls back before recording its safe public status.
@@ -907,7 +907,7 @@ export class DispatchRuntime {
     }
   }
 
-  private async upgradeParticipant(tx: Tx, companyId: string, member: Member) {
+  private async upgradeParticipant(tx: Tx, roomId: ConversationId, companyId: string, member: Member) {
     if (!member.conversationId || !member.agent || !member.agentDefinitionId || (member.membership && member.membership !== "active")) return;
     const catalog = await tx.doc(CatalogDoc);
     const latest = latestAgent(catalog, companyId, member.agentDefinitionId);
@@ -915,7 +915,7 @@ export class DispatchRuntime {
     const updateBase = agent && agent.revision !== member.agentRevision;
     if (!updateBase && !member.pendingConnectionIds && !member.connectionsRefreshPending) return;
     const id = member.conversationId;
-    if ((await tx.doc(LiveDoc, id)).run || (await tx.doc(InboxDoc, id)).items.length || await hasUnfinishedTasks(tx, id)) return;
+    if ((await tx.doc(LiveDoc, id)).run || (await tx.doc(InboxDoc, id)).items.length || await this.hasUnfinishedAgentWork(tx, id, roomId)) return;
     if (member.pendingConnectionIds || member.connectionsRefreshPending) {
       const connected = await this.connections.bind(tx, id, member.agentDefinitionId, true, member.pendingConnectionIds, member.pendingConnectionIds !== undefined);
       member.agent.extensions = [...member.agent.extensions.filter(name => !isMcpExtension(name)), ...connected.extensions];
@@ -945,6 +945,25 @@ export class DispatchRuntime {
       member.agentRevision = agent.revision;
     }
     if (member.upgradeError) delete member.upgradeError;
+  }
+
+  private async hasUnfinishedAgentWork(tx: Tx, id: ConversationId, roomId: ConversationId) {
+    if (id !== roomId) return hasUnfinishedTasks(tx, id);
+    // Legacy agents share the room stream. Room deliveries/presence are not native agent work.
+    const roomTasks = new Set([
+      this.shared.delivery.definition.name, this.shared.legacyReporter.definition.name,
+      this.shared.turns.expirePresence.definition.name, this.shared.turns.wait.definition.name,
+      this.shared.contributions.guard.definition.name,
+    ]);
+    for (const status of ["pending", "running", "waiting", "completing"] as const) {
+      let page = await tx.scanTasks({ conversationId: id, status }, 100);
+      while (true) {
+        if (page.items.some(task => !roomTasks.has(task.kind))) return true;
+        if (!page.next) break;
+        page = await tx.scanTasks({ conversationId: id, status }, 100, page.next);
+      }
+    }
+    return false;
   }
 
   private resolveConfiguration(catalog: Catalog, companyId: string, agent: StoredAgent) {
