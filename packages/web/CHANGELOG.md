@@ -7,6 +7,7 @@
 
 - Share agent-connection polling, remove an unused account dirty-state callback, and centralize fixed capability mappings.
 - Replace unconditional image-directory retries with one exclusive creation and remove unused in-memory reference paths; retain audit metadata.
+- Project only transcript page candidates, compare window overlap with set membership, and avoid redundant history/connection reads; preserve page, ordering and authorization contracts. Share blob-download cleanup without changing output metadata.
 
 Integrated source/build checks passed; runtime/rendered qualification remains unverified. See [acceptance evidence](docs/handoff.md#continuing-simplification--october-8-2026).
 
