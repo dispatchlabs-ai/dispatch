@@ -566,7 +566,7 @@ export class DispatchRuntime {
       }
       const conversation = await this.chatSummary(tx, scope, chat);
       // Compatibility carries no private native transcript, inbox, reasoning or agent context.
-      return { conversation, definitionOfDone: room.definitionOfDone ?? { markdown: "", revision: 0 }, ...presentation, view: { conversation: (await tx.conversation(nativeId(id)))!, entries: [], docs: {} }, submissions: [] } as ChatSnapshot;
+      return { conversation, definitionOfDone: { markdown: room.definitionOfDone?.markdown ?? "", revision: room.definitionOfDone?.revision ?? 0 }, ...presentation, view: { conversation: (await tx.conversation(nativeId(id)))!, entries: [], docs: {} }, submissions: [] } as ChatSnapshot;
     }, context);
   }
 

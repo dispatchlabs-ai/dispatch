@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — chat criteria response
+
+- Detach saved Definition of Done criteria inside the native read transaction so chats with criteria can serialize after settlement.
+
 ## Unreleased — chat Definition of Done
 
 - Add shared Markdown completion criteria in chat Details, with authorized editing, revision conflicts, retained drafts and refresh-before-retry. Agents receive current criteria as guidance, not completion or work authorization.
