@@ -1488,3 +1488,15 @@ Remote `main` publication at `64298d7` was independently verified by Documenter.
 Source-published `64298d7` (integrated candidate `7a26350`) includes project history archives, offline SQLite recovery with synced completion publication, and native capability packaging. Reconciled current main's owner-scoped secrets work without removing its UI or documentation. Expert approved the reviewed native admission/recovery paths; the reported missing archive parent-directory sync was retracted after inspecting `124a4a6`, where it was already present. Source/deslop review preserves inert history, current authorization rechecks, immutable blob-before-pointer admission and retry receipts; capability packaging uses existing implementations, not a plugin runtime.
 
 Combined TypeScript/application/capability builds, Apple Silicon Nix build and flake check passed after reconciliation (zero runnable flake checks; Linux omitted). Whitespace reviewed. No portability API/runtime/browser probes, recovery execution, live-state changes or service stops were performed. Desktop/390 px rendering, keyboard/touch/contrast/accessibility, import/retry/restart, recovery correctness and independent-host capability execution remain unverified pending explicit authorization. The separate secrets visual evidence above does not qualify these portability screens. Publication is separate from deployment. PostgreSQL recovery and resumable project-task migration remain outside this first version.
+
+
+## Shared work continuity prompts — October 8, 2026
+
+Chris authorized prompt-only changes after inspecting AWS Prep's idle Developer responses. Scope: shared system-prompt section plus incoming-message and refreshed-history notices; no native hooks, task state, scheduling or agent-definition changes.
+
+Acceptance criteria:
+- Check recent history and relevant spec/current work-package/acceptance sections before ending, including silence; retrieve omitted assignment context as needed without mandatory whole-spec rereads.
+- Continue authorized, unblocked work within role and ownership, without requiring a public reply. Preserve Stop, explicit pauses, approval boundaries, final-review discard semantics and future-scope limits. Report new concrete blockers and distinguish completion evidence from unverified outcomes.
+- Source/deslop review, TypeScript/application and Nix builds, whitespace and changed local links. No tests or model/browser probes under the standing policy; effectiveness against premature idle remains unverified.
+
+Evidence: source/deslop review confirms only prompt strings change in runtime code; native admission, publication receipts, discard/recovery handoffs, Stop and tool execution are unchanged. Nix-shell TypeScript/application/capability builds, Apple Silicon Nix build, flake evaluation (zero runnable checks; Linux omitted), whitespace and changed documentation diff checks passed. No tests, model calls, browser probes or live-state edits were performed. Behavioral effectiveness and loaded-service adoption remain unverified.

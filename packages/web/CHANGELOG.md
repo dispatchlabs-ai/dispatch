@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — shared work continuity
+
+- Align shared-chat instructions and both history notifications: check recent history and relevant spec/work-package criteria before ending, and continue authorized, unblocked work without redundant public replies. No scheduling, native lifecycle or agent-definition changes.
+
 ## Unreleased — integration secrets
 
 - Add Settings → Secrets for encrypted Exa keys or explicit server-environment grants, owner-scoped management, revision-conflict protection, and use-time credential authorization. Environment-only search now requires explicit agent grants.

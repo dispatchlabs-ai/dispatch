@@ -415,6 +415,12 @@ Chris requested Slack as the conversation screen's visual model, approved the [I
 - A newly invited human or agent can read the entire public history, including messages from before joining. Model context limits do not delete history or silently turn this into a since-joining view. Private agent working state is distinct from the shared discussion.
 - Legacy personal groups remain private organization: inviting someone to an unbound conversation does not share its creator's group or unrelated conversations. Shared-project membership instead grants full history and participation across that project, as specified in [project policy](#shared-project-access-and-default-agents).
 
+### Work continuity before ending a turn
+
+**Accepted October 8, 2026:** before ending a turn (including `[[silent]]`), agents review recent history and relevant specification, current work-package and acceptance criteria for authorized, unblocked work within their role. Read only relevant sections as needed, retrieving older assignment context when necessary. Continue that work through tools without requiring a public reply; a progress report or completed subtask does not complete the broader assignment. Respect ownership, Stop, explicit pauses and approval boundaries. Future spec work is not automatically authorized. Report concrete blockers when not already clear and distinguish acceptance evidence from unverified outcomes when declaring completion.
+
+Apply this guidance consistently in the shared system-prompt section, incoming-message notification and refreshed-history notice. This is prompt guidance, not a new work queue, scheduler, forced continuation hook or completion guarantee. Existing publication review, native settlement and recovery remain unchanged.
+
 ### Listen before responding
 
 **Accepted October 5, 2026:** agents listen while another participant is composing, then read the intervening public messages and decide whether a contribution is useful. The [maintained decision](https://wiki.dispatchworks.ai/wiki/agent-collaboration-spaces/#section-listen-before-responding) and [WP-026](handoff.md#wp-026--listen-before-responding) own this refinement to immediate independent activation.
