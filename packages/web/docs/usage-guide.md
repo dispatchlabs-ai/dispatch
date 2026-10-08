@@ -421,7 +421,10 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `/api/auth/*` | Enrollment, sign-in, recovery, session and factor management, logout |
 
 `POST /api/chats` accepts `agentDefinitionIds` (one or more), or the legacy singular `agentDefinitionId`. Message commands accept `threadId`, participant-ID `mentions`, and optional
-`agentMentions` containing company agent-definition IDs. For an invitation mention,
+`agentMentions` containing at most 50 company agent-definition IDs. Participants
+invitation commands likewise accept at most 50 `agentDefinitionIds` per request.
+Existing instances are reused even after definition archival; only creating new
+instances requires an active definition. For an invitation mention,
 the draft Markdown uses `[@Name](mention:agent-definition%3A<encoded definition ID>)`.
 Submit the corresponding definition in `agentMentions`; do not put it in `mentions`.
 The server authorizes and invites/reuses those agents, rewrites invitation links to

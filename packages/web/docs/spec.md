@@ -224,18 +224,21 @@ one changes only the draft; sending invites that agent and mentions its resolved
 participant identity in the same native Pi Durable commit as the public message
 and delivery tasks. It remains an independent participant with access to the full
 public history, including the inviting message. Existing instances are reused,
-not recreated or reconfigured. Human invitations still use Participants; no
+not recreated or reconfigured, even if their definition has since been archived.
+Archival prevents new instances, not participation by existing ones. Human invitations still use Participants; no
 broadcast mentions such as `@everyone` are added. [WP-048](handoff.md#wp-048--invite-agents-through-inline-mentions)
 owns implementation and local acceptance evidence.
 
 Agent-definition invitation targets and participant IDs are distinct identities.
 The server validates current company availability and participation authority,
-resolves invitation targets before checking message mentions, and persists only
+resolves invitation targets alongside message validation, and persists only
 resolved participant references in the public message. One stable request ID
 covers invitation, message and delivery for retries. A failed submission must not
 leave a newly invited agent behind without the message; removing its draft token
 before sending must not invite it. Selecting or inviting an agent does not require
-it to answer.
+it to answer. Human message submissions and Participants invitations accept at most
+50 agent-definition targets per request; this is a request limit, not a total
+conversation-participant cap.
 
 **Refined October 6, 2026:** remove the redundant toolbar `@` shortcut and restore
 the compact arrow-only Send button in main messages and replies. The accessible
