@@ -1750,6 +1750,8 @@ Integrated `ad76406`: contribution guard completion shares the native reconcilia
 
 Expanded-pass source publication: Documenter independently verified remote `main` and the synchronized canonical checkout at `98d00cf5161cc6ccecf609e480754995a5960ce9`. This delivers the expanded code/guidance fixes above, not overall cleanup acceptance, runtime/rendered qualification or deployment. The old-editor request/event retirement decision remains unresolved; persisted Wiki credentials, bindings and identity checks remain required.
 
+Legacy-reporter follow-up `4960d61` removes only the unread `afterEntry` input from newly created tasks. Independent source review confirmed the observer reads room/participant identity only; existing task inputs remain untouched and the legacy reporter remains registered at version 1. Integrated TypeScript/application/capability checks, Apple Silicon Nix build, flake evaluation and whitespace passed. Recovery is source-reviewed, not runtime-qualified. Overall acceptance and the old-editor retirement decision remain open.
+
 
 ## Opt-in agent criteria editing — October 8, 2026
 
