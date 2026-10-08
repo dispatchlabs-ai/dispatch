@@ -21,10 +21,14 @@ import { Button, IconButton, Modal, Notice, Spinner } from "./ui";
 
 export const participantStatus = { idle: "Following", working: "Working", listening: "Listening", responding: "Responding", typing: "Typing", silent: "Following", stopped: "Stopped", failed: "Needs attention" };
 
+function agentStatus(participant: AgentParticipant) {
+  return participant.membership === "removed" ? "Removed" : participant.membership === "removing" ? (participant.removalError ? "Removal needs attention" : "Removing…") : participantStatus[participant.status];
+}
+
 export function ConversationPresence({ participants }: { participants: ConversationParticipant[] }) {
   const { state } = useSession();
   const userId = state?.state === "authenticated" ? state.user.id : undefined;
-  return <div className="conversation-presence" role="status" aria-live="polite">{participants.filter(member => member.kind === "human" ? member.status === "typing" && member.userId !== userId : ["working", "listening", "responding"].includes(member.status)).map(member => <div className="agent-working" key={member.id}>
+  return <div className="conversation-presence" role="status" aria-live="polite">{participants.filter(member => member.kind === "human" ? member.status === "typing" && member.userId !== userId : member.membership === "active" && ["working", "listening", "responding"].includes(member.status)).map(member => <div className="agent-working" key={member.id}>
     {member.status === "listening" ? <Ear size={15} aria-hidden="true" /> : member.status === "typing" ? <Pencil size={15} aria-hidden="true" /> : <Spinner label={`${member.name} is ${participantStatus[member.status].toLowerCase()}`} />}
     <span>{member.name} · {participantStatus[member.status]}</span>
   </div>)}</div>;
@@ -41,7 +45,7 @@ function ParticipantContent({ author, participants, createdAt, showAuthor = true
   return <>
     {showAuthor ? <ParticipantAvatar kind={author?.kind || "human"} name={author?.name || "?"} /> : null}
     <div className="participant-body">
-      {showAuthor ? <header className="message-heading"><strong>{author ? participantName(author, participants) : "Former participant"}</strong>{author?.kind === "agent" ? <span className="agent-kind-badge">Agent</span> : null}<time dateTime={new Date(createdAt).toISOString()}>{formatTime(createdAt)}</time>{status ? <span className="activity-status">{status}</span> : null}</header> : null}
+      {showAuthor ? <header className="message-heading"><strong>{author ? participantName(author, participants) : "Former participant"}</strong>{author?.kind === "agent" ? <span className="agent-kind-badge">{author.membership === "removed" ? "Removed agent" : author.membership === "removing" ? "Removing agent" : "Agent"}</span> : null}<time dateTime={new Date(createdAt).toISOString()}>{formatTime(createdAt)}</time>{status ? <span className="activity-status">{status}</span> : null}</header> : null}
       {children}
     </div>
   </>;
@@ -126,7 +130,7 @@ export function PublicActivity({ activity, participants }: { activity: Participa
   if (generation?.retry) content.push(<p className="run-outcome" role="status" key="retry">Retrying the response…</p>);
   if (!content.length) return null;
   return <section className="conversation-entry participant-activity" aria-label={`${author?.name || "Agent"} activity`}>
-    <ParticipantContent author={author} participants={participants} createdAt={activity.createdAt} status={generation && author?.kind === "agent" ? `${participantStatus[author.status]}…` : "Activity"}>
+    <ParticipantContent author={author} participants={participants} createdAt={activity.createdAt} status={generation && author?.kind === "agent" ? `${agentStatus(author)}…` : "Activity"}>
       {content}
     </ParticipantContent>
   </section>;
@@ -182,8 +186,8 @@ export function ConversationComposer({ id, chatId, active = true, draft, pending
   thread?: boolean; conversationTitle?: string; disabled?: boolean; children?: ReactNode;
 }) {
   const mentionPeople = useMemo(() => [
-    ...participants,
-    ...agents.filter(agent => !agent.archived && !participants.some(person => person.kind === "agent" && person.agentDefinitionId === agent.id))
+    ...participants.filter(person => person.kind === "human" || person.membership === "active"),
+    ...agents.filter(agent => !agent.archived && !participants.some(person => person.kind === "agent" && person.membership === "active" && person.agentDefinitionId === agent.id))
       .map(agent => ({ id: `${agentMentionPrefix}${agent.id}`, name: agent.name, kind: "agent" as const, inviteOnSend: true })),
   ], [participants, agents]);
   const tooLong = draft.length > 100000;
@@ -245,13 +249,13 @@ export function SharedContextPanel({ snapshot, agents, models, threadId, draft, 
     </> : <div className="participants-body">
       <Button className="invite-participants" variant="secondary" disabled={snapshot.conversation.canParticipate === false} onClick={onInvite}><UserPlus size={18} /> Add participants</Button>
       <div className="participant-list">{snapshot.participants.map(member => <button type="button" className={`participant-row ${participant?.id === member.id ? "selected" : ""}`} key={member.id} onClick={() => setSelectedId(member.id)} aria-pressed={participant?.id === member.id}>
-        <ParticipantAvatar kind={member.kind} name={member.name} /><span className="participant-choice-copy"><strong>{participantName(member, snapshot.participants)}</strong><span>{member.kind === "agent" ? `Agent · ${participantStatus[member.status]}` : `${state?.state === "authenticated" && state.user.id === member.userId ? "You" : "Person"}${member.status === "typing" ? " · Typing" : ""}`}</span></span>
+        <ParticipantAvatar kind={member.kind} name={member.name} /><span className="participant-choice-copy"><strong>{participantName(member, snapshot.participants)}</strong><span>{member.kind === "agent" ? `Agent · ${agentStatus(member)}` : `${state?.state === "authenticated" && state.user.id === member.userId ? "You" : "Person"}${member.status === "typing" ? " · Typing" : ""}`}</span></span>
       </button>)}</div>
-      <p className="history-access"><LockKeyhole size={14} /> {snapshot.conversation.sharedProjectId ? "Current project members can read the full history. Listed authors may include former members." : "Everyone here can read the full public history."}</p>
+      <p className="history-access"><LockKeyhole size={14} /> {snapshot.conversation.sharedProjectId ? "Current project members can read the full history. Listed authors may include former members." : "Active participants can read the full public history."}</p>
       {participant ? <section className="participant-details">
         <h3>{participantName(participant, snapshot.participants)}</h3>
         {participant.kind === "agent" ? <>
-          <p>This conversation’s independent agent instance.</p>
+          <AgentRemoval key={`${snapshot.conversation.id}:${participant.id}`} participant={participant} chatId={snapshot.conversation.id} canParticipate={snapshot.conversation.canParticipate !== false} onSnapshot={onSnapshot} />
           <dl className="context-facts"><div><dt>Based on</dt><dd>{participant.agent.name} · revision {participant.agentRevision}</dd></div><div><dt>Model</dt><dd>{models.find(model => model.id === participant.agent.modelId && model.provider === participant.agent.provider)?.name || participant.agent.modelId}</dd></div><div><dt>Provider</dt><dd>{participant.agent.provider}</dd></div><div><dt>Thinking</dt><dd>{participant.agent.thinkingLevel}</dd></div><div><dt>Tools</dt><dd>{describeAgentTools(participant.agent.tools)}</dd></div>{participant.agent.cwd ? <div><dt>Local workspace</dt><dd>{participant.agent.cwd}</dd></div> : null}</dl>
           {participant.error ? <Notice>{participant.error}</Notice> : null}
           <details><summary>Saved instructions</summary><Markdown>{participant.agent.instructions || "No additional instructions."}</Markdown></details>
@@ -264,6 +268,35 @@ export function SharedContextPanel({ snapshot, agents, models, threadId, draft, 
   </div>;
 }
 
+function AgentRemoval({ participant, chatId, canParticipate, onSnapshot }: {
+  participant: AgentParticipant; chatId: string; canParticipate: boolean; onSnapshot: (snapshot: ChatSnapshot) => void;
+}) {
+  const { api } = useSession();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const retry = participant.membership === "removing" && Boolean(participant.removalError);
+  async function remove() {
+    if (busy) return;
+    setBusy(true); setError(null);
+    try {
+      onSnapshot(await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/participants/${encodeURIComponent(participant.id)}/remove`, {}));
+      setConfirming(false);
+    } catch (error) { setError(errorMessage(error)); }
+    finally { setBusy(false); }
+  }
+  return <>
+    <p role="status">{agentStatus(participant)}</p>
+    {participant.removalError ? <Notice>{participant.removalError}</Notice> : null}
+    {canParticipate && (participant.membership === "active" || retry) ? <Button variant="danger" disabled={busy} onClick={() => setConfirming(true)}>{retry ? "Retry removal" : "Remove from conversation"}</Button> : null}
+    <Modal title={retry ? `Retry removing ${participant.name}?` : `Remove ${participant.name}?`} description="Stops this instance. Its history stays." open={confirming} onOpenChange={open => { if (!busy) setConfirming(open); }}>
+      <p>Completed file changes and external actions cannot be undone.</p>
+      {error ? <Notice>{error}</Notice> : null}
+      <div className="button-row"><Button variant="secondary" disabled={busy} onClick={() => setConfirming(false)}>Cancel</Button><Button variant="danger" disabled={busy || !canParticipate || participant.membership === "removed"} onClick={() => void remove()}>{busy ? <Spinner label="Removing agent" /> : null}{retry ? "Retry removal" : "Remove"}</Button></div>
+    </Modal>
+  </>;
+}
+
 function ParticipantRunDetails({ participant, activities }: { participant: AgentParticipant; activities: ParticipantActivity[] }) {
   const models = Object.entries(participant.usage.models);
   const tokens = models.reduce((sum, [, usage]) => sum + usage.totalTokens, 0);
@@ -271,7 +304,7 @@ function ParticipantRunDetails({ participant, activities }: { participant: Agent
   const submissions = [...new Map(activities.filter(activity => activity.participantId === participant.id).flatMap(activity => activity.submissions).map(submission => [submission.id, submission])).values()];
   return <details className="participant-run">
     <summary>Run &amp; usage</summary>
-    <p>{participant.name} · {participantStatus[participant.status]}</p>
+    <p>{participant.name} · {agentStatus(participant)}</p>
     <dl className="context-facts"><div><dt>Total tokens</dt><dd>{tokens.toLocaleString()}</dd></div><div><dt>Estimated cost</dt><dd>{new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 4 }).format(cost)}</dd></div></dl>
     {!models.length ? <p>No usage has been recorded yet.</p> : null}
     {models.map(([model, usage]) => <section className="context-section" key={model}><h4 className="model-label">{model}</h4><dl className="context-facts"><div><dt>Input tokens</dt><dd>{usage.input.toLocaleString()}</dd></div><div><dt>Output tokens</dt><dd>{usage.output.toLocaleString()}</dd></div><div><dt>Cached input</dt><dd>{usage.cacheRead.toLocaleString()}</dd></div></dl></section>)}
@@ -291,7 +324,7 @@ export function InviteParticipantsDialog({ snapshot, agents, onSnapshot, onClose
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const request = useRef<AddParticipantsInput | null>(null);
-  const joinedDefinitionIds = snapshot.participants.filter(member => member.kind === "agent").map(member => member.agentDefinitionId);
+  const joinedDefinitionIds = snapshot.participants.filter((member): member is AgentParticipant => member.kind === "agent" && member.membership === "active").map(member => member.agentDefinitionId);
   const selectedAgentIds = agentIds.filter(id => !joinedDefinitionIds.includes(id));
   useEffect(() => {
     const controller = new AbortController();
