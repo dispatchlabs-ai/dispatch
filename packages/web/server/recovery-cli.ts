@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createReadStream, constants } from "node:fs";
-import { chmod, copyFile, lstat, mkdir, readFile, readdir, realpath, writeFile } from "node:fs/promises";
+import { chmod, copyFile, lstat, mkdir, open, readFile, readdir, realpath, rename, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 import { z } from "zod";
@@ -64,6 +64,20 @@ function entryPath(root: string, path: string) {
   if (path && (isAbsolute(path) || path.includes("\\") || path.split("/").some(part => !part || part === "." || part === ".."))) fail("Unsafe recovery path.");
   return path ? join(root, ...path.split("/")) : root;
 }
+async function syncPath(path: string) {
+  const handle = await open(path, "r");
+  try { await handle.sync(); } finally { await handle.close(); }
+}
+async function publishCompletion(destination: string, name: string, value: unknown) {
+  // Publish the completion marker only after all payload entries are durable.
+  await syncPath(destination);
+  await syncPath(dirname(destination));
+  const pending = join(destination, `${name}.pending`);
+  await writeFile(pending, JSON.stringify(value, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+  await syncPath(pending);
+  await rename(pending, join(destination, name));
+  await syncPath(destination);
+}
 async function copyTree(source: string, destination: string, entries: Entry[]) {
   for (const entry of entries) {
     const from = entryPath(source, entry.path), to = entryPath(destination, entry.path);
@@ -72,8 +86,11 @@ async function copyTree(source: string, destination: string, entries: Entry[]) {
       await copyFile(from, to, constants.COPYFILE_EXCL);
       await chmod(to, 0o600 | (entry.mode & 0o100));
       if (await digest(to) !== entry.sha256 || (await lstat(to)).size !== entry.size) fail("Recovery copy checksum mismatch.");
+      await syncPath(to);
     }
   }
+  for (const entry of [...entries].reverse()) if (entry.directory) await syncPath(entryPath(destination, entry.path));
+  await syncPath(dirname(destination));
 }
 async function assertSqlite(state: string) {
   if (await exists(join(state, "runtime/postgres-store.json"))) fail("PostgreSQL recovery is unsupported.");
@@ -131,7 +148,7 @@ try {
           await copyTree(sources[i], join(destination, String(i)), retained);
           roots.push({ role: plan.roots[i].role, source: sources[i], entries: retained });
         }
-        await writeFile(join(destination, "manifest.json"), JSON.stringify({ formatVersion: 1, plan, roots }, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+        await publishCompletion(destination, "manifest.json", { formatVersion: 1, plan, roots });
       } finally { owner.release(); }
       console.log("Backup written. Protect it as secret-bearing recovery material.");
     } else if (positionals[0] === "restore") {
@@ -153,7 +170,7 @@ try {
       }
       await mkdir(destination, { mode: 0o700 });
       for (let i = 0; i < manifest.roots.length; i++) await copyTree(join(backup, String(i)), join(destination, String(i)), manifest.roots[i].entries);
-      await writeFile(join(destination, "RECOVERY.json"), JSON.stringify(manifest, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+      await publishCompletion(destination, "RECOVERY.json", manifest);
       console.log("Restore copied; NOT started. Reconcile paths/configuration before manual recovery.");
     } else fail(help);
   }
