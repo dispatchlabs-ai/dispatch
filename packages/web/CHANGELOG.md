@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — agent management eligibility
+
+- Allow explicitly granted agent management for agents with tools, skills, extensions or connections, including default-agent and granted-editor targets. Preserve human grants, revision pins and permitted tuning fields.
+
 ## Unreleased — project working directories
 
 - Add an optional service-host working directory in Project settings. New agent instances retain the selected workspace; changing project settings never redirects existing instances. Blank uses the installation default.

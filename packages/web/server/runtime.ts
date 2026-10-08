@@ -1154,24 +1154,14 @@ export class DispatchRuntime {
       const editor = latestAgent(catalog, principal.companyId, input.editorId);
       const target = latestAgent(catalog, principal.companyId, input.targetId);
       if (!editor || editor.archived || editor.revision !== input.policy!.editorRevision) throw new ManagementError(409, "Reload the editor revision before granting access.");
-      this.requireUnprivileged(editor);
-      const grants = await readGrants(tx, principal.companyId);
-      this.requireManagementTarget(target, input.editorId, grants);
+      this.requireManagementTarget(target, input.editorId);
       if (input.policy!.action === "save" && !input.policy!.fields.length) throw new ManagementError(400, "Choose editable fields for a save grant.");
     }), context);
   }
 
-  private requireUnprivileged(agent: Partial<Pick<AgentDefinition, "extensions" | "tools" | "connections" | "skills">>) {
-    if (agent.extensions?.length || agent.tools?.length || agent.connections?.length || agent.skills?.length)
-      throw new ManagementError(403, "Management requires a target and editor without assigned tools, extensions, connections or skills.");
-  }
-
-  private requireManagementTarget(target: StoredAgent | undefined, editorId: string, grants: Grant[]): asserts target is StoredAgent {
-    if (!target || target.archived || target.id === DEFAULT_AGENT_ID || target.id === editorId || grants.some(grant => grant.editorId === target.id && grant.policy))
+  private requireManagementTarget(target: StoredAgent | undefined, editorId: string): asserts target is StoredAgent {
+    if (!target || target.archived || target.id === editorId)
       throw new ManagementError(403, "This target is not eligible for management.");
-    this.requireUnprivileged(target);
-    // Include externally configured connections, not only the saved catalog snapshot.
-    if (this.connections.forAgent(target.id, managedIds(target)).length) throw new ManagementError(403, "Connected agents are not eligible for management.");
   }
 
   private requireManagementGrant(catalog: Catalog, actor: ManagementActor, targetId: string, grants: Grant[]) {
@@ -1180,11 +1170,8 @@ export class DispatchRuntime {
     if (!grant?.policy || !editor || editor.archived) throw new ManagementError(403, "No current management grant for this editor and target.");
     if (grant.policy.editorRevision !== actor.revision || editor.revision !== actor.revision)
       throw new ManagementError(403, `Grant is pinned to revision ${grant.policy.editorRevision}; current definition is ${editor.revision}, acting instance is ${actor.revision}. Wait for base adoption and explicitly re-grant the current revision.`);
-    this.requireUnprivileged(editor);
-    this.requireUnprivileged(actor.configuration);
-    if (this.connections.forAgent(editor.id, managedIds(editor)).length) throw new ManagementError(403, "Connected editors cannot manage agents.");
     const target = latestAgent(catalog, actor.companyId, targetId);
-    this.requireManagementTarget(target, actor.definitionId, grants);
+    this.requireManagementTarget(target, actor.definitionId);
     return { grant, target };
   }
 
@@ -1212,7 +1199,6 @@ export class DispatchRuntime {
     const { grant, target } = this.requireManagementGrant(catalog, actor, input.targetId, grants);
     const selected = input.revision ? catalog.agents.find(agent => agent.companyId === actor.companyId && agent.id === target.id && agent.revision === input.revision) : target;
     if (!selected) throw new ManagementError(404, "Revision not found.");
-    this.requireUnprivileged(selected);
     return detached({ agent: this.managementView(selected), policy: grant.policy });
   }
 
