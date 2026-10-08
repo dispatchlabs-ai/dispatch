@@ -1722,7 +1722,7 @@ Expanded-pass source publication: Documenter independently verified remote `main
 
 ## Opt-in agent criteria editing — October 8, 2026
 
-Chris agreed to explicit opt-in editing after Developer and Pi Durable Expert distinguished an agent tool from a capability toggle. Developer owns implementation, Expert native/authorization review, Documenter contract/usage and acceptance reconciliation. See [the extension contract](spec.md#opt-in-agent-definition-of-done-editing). Existing human-only criteria qualification remains separate and incomplete.
+Chris agreed to explicit opt-in editing after Developer and Pi Durable Expert distinguished an agent tool from a capability toggle. Developer owns configuration/UI integration and independent review, Expert owns the native tool, Documenter contract/usage and acceptance reconciliation. See [the extension contract](spec.md#opt-in-agent-definition-of-done-editing). Existing human-only criteria qualification remains separate and incomplete.
 
 Acceptance criteria:
 - Per-agent **Edit Definition of Done** is disabled by default; only enabled active agent participants may mutate criteria through an agent-facing tool. Resolve current chat and actor from trusted native bindings, with no caller-supplied cross-chat authority.
@@ -1731,3 +1731,6 @@ Acceptance criteria:
 - Source/deslop and independent native authorization/lifetime review; TypeScript/application and applicable Nix builds, whitespace and documentation links. Record runtime/tool/revocation/conflict evidence separately under the current testing policy; UI desktop/390 px review applies if capability controls change.
 
 Status: accepted direction, implementation and exact tool/configuration interface pending. No capability has been enabled or criteria mutated by this documentation update.
+
+
+Candidate source inspection: Developer's configuration/UI `97af985` adds the capability ID `edit-definition-of-done`, editor checkbox, summary label, API allowlist and extension registration. Documenter inspected Expert's native module and binding authorization: strict read-or-complete-save input, actor-scoped operation fingerprint/receipt, revision protection, same-commit receipt and criteria, detached primitive result, applied-extension/active-member checks and Stop transition rejection. Source-derived usage records the tool and idle-boundary adoption, not instantaneous revocation. Integrated build/publication, tool/replay/restart behavior and desktop/390 px evidence remain pending. No tool calls, capability grants or criteria changes were made by Documenter.
