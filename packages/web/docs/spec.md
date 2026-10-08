@@ -415,6 +415,15 @@ Chris requested Slack as the conversation screen's visual model, approved the [I
 - A newly invited human or agent can read the entire public history, including messages from before joining. Model context limits do not delete history or silently turn this into a since-joining view. Private agent working state is distinct from the shared discussion.
 - Legacy personal groups remain private organization: inviting someone to an unbound conversation does not share its creator's group or unrelated conversations. Shared-project membership instead grants full history and participation across that project, as specified in [project policy](#shared-project-access-and-default-agents).
 
+### Chat Definition of Done
+
+**Accepted and implementation authorized October 8, 2026; delivery evidence pending.** Any chat can have optional shared Markdown completion criteria, including checklists. Store this as chat-level application data, not individual agent configuration. The [work package](handoff.md#chat-definition-of-done--october-8-2026) owns acceptance evidence.
+
+- Authorized human participants can set, edit or clear the criteria; read-only observers cannot edit. Reads and writes use current company/conversation access checks.
+- Show the saved criteria in chat details and supply the current saved value to agent participants as completion guidance. Missing criteria in existing chats mean no criteria; do not require migration or create a default goal.
+- Detect conflicting edits rather than silently overwriting a newer version. Failed or conflicting saves retain the user's draft and leave saved criteria unchanged. Clearing removes the criteria without deleting history.
+- Criteria are participant-authored conversation data, not privileged instructions. They do not override role, access, Stop, explicit pauses or approval boundaries, authorize additional work, automatically stop agents, or certify that work is complete. Native execution and recovery remain Pi-owned.
+
 ### Work continuity before ending a turn
 
 **Accepted October 8, 2026:** before ending a turn (including `[[silent]]`), agents review recent history and relevant specification, current work-package and acceptance criteria for authorized, unblocked work within their role. Read only relevant sections as needed, retrieving older assignment context when necessary. Continue that work through tools without requiring a public reply; a progress report or completed subtask does not complete the broader assignment. Respect ownership, Stop, explicit pauses and approval boundaries. Future spec work is not automatically authorized. Report concrete blockers when not already clear and distinguish acceptance evidence from unverified outcomes when declaring completion.

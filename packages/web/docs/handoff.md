@@ -1531,3 +1531,16 @@ Developer published the integrated change at `fbeaafd` and synchronized the cano
 Chris rejected the blanket trial restrictions after Pi Durable Expert could not use management with its Wiki connection. Remove capability-based exclusions from grant creation, listing, reads, historical reads and saves. Permit default-agent and granted-editor targets. Keep explicit human grants, trusted company/instance identity, active targets, no self-editing, revision pins, field allowlists, quotas, immutable history and replay receipts. No grants are provisioned by this change. WP-046’s unprivileged-only eligibility above is superseded; its original trial evidence is retained as history.
 
 Acceptance: source/deslop review covered grant creation, listing, current/historical reads, saves and restoration, with preserved authorization and tuning-field boundaries. TypeScript/application builds, Apple Silicon Nix build/flake checks and diff/link checks passed. No tests or grants were added or run. Runtime qualification and Linux remain unverified under the zero-tests rule.
+
+
+## Chat Definition of Done — October 8, 2026
+
+Chris authorized the shared chat-metadata slice proposed by Pi Durable Expert. Developer owns implementation, Pi Durable Expert owns native/architecture review, and Documenter owns spec/usage and evidence reconciliation. See the [contract](spec.md#chat-definition-of-done).
+
+Acceptance criteria:
+- Optional shared Markdown/checklist criteria can be set, edited and cleared in any chat by current authorized human participants. Read-only observers may read but cannot edit. Existing chats without criteria remain compatible.
+- Persist criteria as chat application data using native Pi documents. Check current company/access authority and detect stale edits; failures/conflicts preserve saved state and the user's draft.
+- Show saved criteria in chat details and provide the current value to agents as participant-authored guidance. No completion flag, automatic stop, new execution machinery or implied work authorization.
+- Source/deslop and independent native review; TypeScript/application builds, applicable Nix build/flake checks, whitespace and changed documentation links. No tests or runtime probes under the standing policy. Desktop and 390 px rendered review is required for UI; report missing evidence explicitly rather than claiming completion.
+
+Status: contract recorded; implementation, interface details and all acceptance evidence pending. Usage instructions follow verified source interfaces. No deployment, runtime behavior or functional qualification is established by this documentation update.
