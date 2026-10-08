@@ -30,6 +30,7 @@ export class PostgresCredentialStore implements CredentialStore {
   readonly ownerId = randomUUID();
   private tail: Promise<void> = Promise.resolve();
   private accepting = true;
+  private admissionGeneration = 0;
   private failure?: Error;
   private closing?: Promise<void>;
   private draining?: Promise<void>;
@@ -175,6 +176,7 @@ export class PostgresCredentialStore implements CredentialStore {
 
   /** Seal admission and await underlying writes, including cancelled HTTP callers. */
   quiesce(): Promise<void> {
+    this.admissionGeneration++;
     this.accepting = false;
     this.draining ??= this.tail.then(() => { this.healthy(); });
     return this.draining;
@@ -183,11 +185,14 @@ export class PostgresCredentialStore implements CredentialStore {
   /** Only the application's authenticated undrain may reopen admission. */
   async resume(): Promise<void> {
     if (this.closing) throw new Error("Provider credential store is closing.");
+    const generation = ++this.admissionGeneration;
     await this.draining;
     this.healthy();
     if (this.closing) throw new Error("Provider credential store is closing.");
-    this.draining = undefined;
-    this.accepting = true;
+    if (generation === this.admissionGeneration) {
+      this.draining = undefined;
+      this.accepting = true;
+    }
   }
 
   close(): Promise<void> {
