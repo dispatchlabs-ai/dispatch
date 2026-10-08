@@ -62,6 +62,8 @@ export interface AgentParticipant extends ParticipantIdentity {
   agentRevision: number;
   membership: "active" | "removing" | "removed";
   removalError?: string;
+  /** Creation-time supplement; agent.instructions retains the base definition snapshot. */
+  instanceInstructions?: string;
   status: ParticipantStatus;
   error?: string;
   usage: UsageState;
@@ -255,6 +257,15 @@ export interface SendMessageInput {
   /** Definition IDs selected as invite-on-send mentions; resolved to participant IDs on admission. */
   agentMentions?: string[];
 }
+
+export interface CreateAgentInstanceInput {
+  requestId: string;
+  agentDefinitionId: string;
+  name?: string;
+  instructions?: string;
+}
+
+export type CreateAgentInstanceResult = ChatSnapshot & { createdParticipantId: string };
 
 export interface AddParticipantsInput {
   requestId: string;

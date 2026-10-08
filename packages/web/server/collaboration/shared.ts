@@ -3,12 +3,12 @@ import { awaitWithContext, BACKGROUND_CONTEXT } from "@earendil-works/chord/cont
 import { copyJson, type Context } from "@earendil-works/chord";
 import { Type, type AssistantMessage } from "@earendil-works/pi-ai";
 import {
-  AgentDoc, defineDoc, defineEntry, defineExtension, defineTask, defineTool, GenerationTask, hook, InboxDoc, LiveDoc, UsageDoc, section,
+  AgentDoc, configure, defineDoc, defineEntry, defineExtension, defineTask, defineTool, GenerationTask, hook, InboxDoc, LiveDoc, UsageDoc, section,
   type ConversationId, type Cursor, type EntryRecord, type Harness, type LiveState, type Storage,
   type EntryId, type HookApi, type SubmissionRecord, type TaskId, type Tx,
 } from "@earendil-works/pi-durable";
 import type {
-  Attachment, AgentParticipant, ConversationMessage, ConversationParticipant, ParticipantActivity, SendMessageInput, RuntimeScope,
+  Attachment, AgentParticipant, CreateAgentInstanceInput, ConversationMessage, ConversationParticipant, ParticipantActivity, SendMessageInput, RuntimeScope,
 } from "../../src/shared/contracts.js";
 import { requireProjectAccess, type ProjectAction } from "../project-access.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata, messageAttachments } from "../attachments.js";
@@ -28,6 +28,7 @@ export type Member = {
   userId?: string; agentDefinitionId?: string; agentRevision?: number; conversationId?: ConversationId;
   agent?: { [K in keyof AgentParticipant["agent"]]: AgentParticipant["agent"][K] };
   status: "idle" | "working" | "listening" | "silent" | "stopped" | "failed"; error?: string;
+  instanceInstructions?: string;
   membership?: AgentParticipant["membership"]; removalTask?: TaskId;
   threadId?: string | null; lastDelivery?: TaskId;
   activeDelivery?: TaskId; consideredThrough?: string; publicationPriority?: boolean; superseded?: TaskId[];
@@ -36,7 +37,7 @@ type Presentation = { participants: ConversationParticipant[]; messages: Convers
 type SharedState = {
   companyId: string; sharedProjectId?: string; legacyCreatorId?: string; legacyQueued?: Record<string, string>; members: Member[]; epoch: number; stopping?: TaskId;
   preferences: Record<string, { projectId: string | null; pinned: boolean; archived: boolean }>;
-  requests: Record<string, { hash: string; messageId?: string }>;
+  requests: Record<string, { hash: string; messageId?: string; participantId?: string }>;
   deliveries: TaskId[];
   messageAliases?: Record<string, string>;
   replyHistoryVersion?: 1;
@@ -606,9 +607,14 @@ export class SharedConversations {
     for (const definitionId of agentIds) await this.addAgent(tx, roomId, definitionId);
   }
 
-  async addAgent(tx: Tx, roomId: ConversationId, definitionId: string) {
+  async addAgent(tx: Tx, roomId: ConversationId, definitionId: string, options: Pick<CreateAgentInstanceInput, "name" | "instructions"> = {}) {
     const room = await tx.doc(SharedDoc, roomId);
     const member = await this.createAgent(tx, roomId, room.companyId, definitionId);
+    if (options.name) member.name = options.name;
+    if (options.instructions) {
+      member.instanceInstructions = options.instructions;
+      await configure(tx, member.conversationId!, { instructions: [member.agent!.instructions, "## Instance instructions", options.instructions].filter(Boolean).join("\n\n") });
+    }
     await this.enable(tx, member.conversationId!);
     const binding = await tx.doc(BindingDoc, member.conversationId!);
     binding.roomId = roomId; binding.participantId = member.id;
@@ -775,9 +781,11 @@ export class SharedConversations {
     if (agentMentions.length) {
       if (author.kind !== "human") throw new CollaborationError(400, "Use conversation_invite_agent to invite agents.");
       await this.invite(tx, roomId, authorId, { requestId: `message:${input.requestId}`, agentDefinitionIds: agentMentions }, []);
-      const resolved = new Map(agentMentions.map(definitionId => [
-        `agent-definition:${definitionId}`, room.members.find(member => member.agentDefinitionId === definitionId && activeMember(member))!.id,
-      ]));
+      const resolved = new Map(agentMentions.map(definitionId => {
+        const members = room.members.filter(member => member.agentDefinitionId === definitionId && activeMember(member));
+        if (members.length !== 1) throw new CollaborationError(409, "Several instances match this agent. Choose a specific participant to mention.");
+        return [`agent-definition:${definitionId}`, members[0].id];
+      }));
       normalized.mentions = [...new Set([...normalized.mentions, ...resolved.values()])].sort();
       normalized.text = resolveAgentMentionLinks(normalized.text, resolved);
     }
@@ -828,7 +836,7 @@ export class SharedConversations {
       room.preferences[id] = { projectId: null, pinned: false, archived: false };
     }
     for (const definitionId of [...new Set(input.agentDefinitionIds ?? [])]) {
-      // At most one active instance per definition. Historical identities never reactivate.
+      // Ensure-existing invitations do not create siblings. Explicit human instance creation does.
       const instances = room.members.filter(member => member.agentDefinitionId === definitionId);
       if (instances.some(activeMember)) continue;
       if (author.kind === "agent" && instances.length) throw new CollaborationError(403, "Only a human can re-add a removed agent.");
@@ -837,6 +845,30 @@ export class SharedConversations {
     }
     room.requests[key] = { hash };
     if (added.length) await tx.appendEntry(PublicEntry, roomId, { data: { id: randomUUID(), kind: "membership", authorId, text: `Invited ${added.map(member => member.name).join(", ")}`, createdAt: Date.now(), threadId: null, mentions: added.map(member => member.id) } });
+  }
+
+  async createInstance(tx: Tx, roomId: ConversationId, authorId: string, input: CreateAgentInstanceInput) {
+    const room = await tx.doc(SharedDoc, roomId);
+    const author = requireActiveMember(room, authorId);
+    if (author.kind !== "human") throw new CollaborationError(403, "Only humans can add additional instances.");
+    await this.authorize(tx, { companyId: room.companyId, userId: author.userId! }, roomId, "participate");
+    const key = digest([authorId, "instance", input.requestId]);
+    const hash = digest([input.agentDefinitionId, input.name ?? "", input.instructions ?? ""]);
+    const prior = room.requests[key];
+    if (prior) {
+      if (prior.hash !== hash) throw new CollaborationError(409, "This instance request was used with different settings.");
+      return prior.participantId!;
+    }
+    if (room.stopping) throw new CollaborationError(409, "Conversation is stopping. Retry after Stop finishes.");
+    if (room.members.some(member => member.agentDefinitionId === input.agentDefinitionId && member.membership === "removing")) {
+      throw new CollaborationError(409, "Agent removal is still pending. Retry after cleanup finishes.");
+    }
+    const member = await this.addAgent(tx, roomId, input.agentDefinitionId, input);
+    room.requests[key] = { hash, participantId: member.id };
+    await tx.appendEntry(PublicEntry, roomId, { data: {
+      id: randomUUID(), kind: "membership", authorId, text: `Invited ${member.name}`, createdAt: Date.now(), threadId: null, mentions: [member.id],
+    } });
+    return member.id;
   }
 
   async remove(roomId: ConversationId, participantId: string, authorId: string, authorize: (tx: Tx) => Promise<unknown>) {

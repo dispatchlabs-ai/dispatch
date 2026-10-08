@@ -9,7 +9,7 @@ import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, type
 import { openPiStorage, type PiStorageConfig } from "./storage/open.js";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
-import type { AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
+import type { CreateAgentInstanceInput, CreateAgentInstanceResult, AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
 import { isManagedConnection } from "../src/shared/contracts.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata } from "./attachments.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
@@ -503,6 +503,21 @@ export class DispatchRuntime {
       await this.shared.invite(tx, nativeId(id), `human:${scope.userId}`, input, people);
     }, context);
     return this.getChat(scope, id);
+  }
+
+  async createAgentInstance(scope: RuntimeScope, id: string, input: CreateAgentInstanceInput): Promise<CreateAgentInstanceResult> {
+    requireText(input.requestId, "Request ID", 200);
+    requireText(input.agentDefinitionId, "Agent ID", 200);
+    if (input.name !== undefined) requireText(input.name, "Instance name", 100, true);
+    if (input.instructions !== undefined) requireText(input.instructions, "Instance instructions", 50_000, true);
+    await this.authorize(scope, id);
+    const person = await this.person(scope.companyId, scope.userId);
+    const createdParticipantId = await this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
+      await this.shared.ensureHuman(tx, nativeId(id), person);
+      return this.shared.createInstance(tx, nativeId(id), `human:${scope.userId}`, { ...input, name: input.name?.trim() || undefined });
+    }, context);
+    return { ...await this.getChat(scope, id), createdParticipantId };
   }
 
   async removeParticipant(scope: RuntimeScope, id: string, participantId: string) {

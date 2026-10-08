@@ -176,6 +176,12 @@ export function createApp(options: AppOptions) {
       .refine(value => (value.agentDefinitionIds?.length ?? 0) + (value.userIds?.length ?? 0) > 0).parse(await c.req.json());
     return c.json(await runtime.addParticipants(c.get("principal"), c.req.param("id"), input));
   });
+  app.post("/api/chats/:id/instances", async (c) => {
+    const input = z.object({ requestId, agentDefinitionId: identity,
+      name: z.string().max(100).optional(), instructions: z.string().max(50_000).optional(),
+    }).strict().parse(await c.req.json());
+    return c.json(await runtime.createAgentInstance(c.get("principal"), c.req.param("id"), input));
+  });
   app.post("/api/chats/:id/participants/:participantId/remove", async (c) => {
     z.object({}).strict().parse(await c.req.json());
     const participantId = identity.parse(c.req.param("participantId"));
