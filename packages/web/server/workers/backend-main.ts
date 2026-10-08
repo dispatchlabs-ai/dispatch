@@ -69,8 +69,11 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
   const route = routes.get(c.req.param("conversation"));
   if (!route || route.attemptId !== c.req.param("attempt") || route.phase === "retiring" || !tokenMatches(workerToken(workerKey, workerConfig.installationId, route), c.req.header("Authorization"))) return c.json({ error: "Forbidden" }, 403);
   const operation = c.req.param("operation");
-  const catalog = await directory.exportWorkerCatalog(route.companyId);
-  if (operation === "bootstrap" && c.req.method === "GET") return c.json({ conversationKey: route.conversationId, storeId: route.storeId, scope: route.scope, input: route.input, membership: await directory.directoryWorkerMembership(route.scope, route.conversationId), initialAgentRevisions: await directory.workerInitialAgentRevisions(route.scope, route.conversationId), catalog, storage: await stores.ensure(route.storeId) });
+  if (operation === "bootstrap" && c.req.method === "GET") {
+    const projection = await directory.directoryWorkerBootstrap(route.companyId, route.conversationId);
+    return c.json({ ...projection, conversationKey: route.conversationId, storeId: route.storeId,
+      scope: route.scope, input: route.input, storage: await stores.ensure(route.storeId) });
+  }
   if (c.req.method !== "POST") return c.json({ error: "Not found" }, 404);
   const input = await c.req.json();
   if (operation === "attachment/save") {
@@ -84,6 +87,7 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
   }
   if (operation === "model-auth") {
     const { provider: providerId } = z.object({ provider: z.string() }).strict().parse(input);
+    const catalog = await directory.exportWorkerCatalog(route.companyId);
     if (!catalog.agents.some(agent => agent.provider === providerId && !agent.archived)) return c.json({ error: "Forbidden" }, 403);
     return c.json(await provider.models.getAuth(providerId) ?? null);
   }
