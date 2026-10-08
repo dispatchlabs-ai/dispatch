@@ -132,6 +132,13 @@ no fixture passwords in command output or database logs. The local receipt is
 tests or AWS evidence. Initial fixture setup failures (Unix socket path length and
 CA certificate construction) were corrected before these observations.
 
+Documenter inspected the [integrated native-image receipts](https://github.com/dispatchlabs-ai/dispatch-infra/blob/7d5ace9/environments/surton/dispatch-workers/evidence/6aa1b82-native-images.json)
+at `6aa1b82` for Linux ARM64 and AMD64. Network-disabled synthetic-secret containers
+passed volume initialization, nonroot/read-only bootstrap `database-init --help`,
+0700/0600 UID-owned materialization, exact key decoding and collision denial.
+These are packaging checks, not database initialization; their local image IDs
+are not registry/index digests. No database, hosted model or ECS was exercised.
+
 RDS master privileges, operator-task execution, IAM/network rules, secret delivery,
 real database logs and live application/browser behavior remain unverified. This
 helper is preparation toward the live Surton URL, not completion of that handoff.
