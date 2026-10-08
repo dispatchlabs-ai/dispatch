@@ -1,6 +1,6 @@
 # Single-server conversation workers
 
-Status: scoped single-server qualification passed at `7caa835`: AMD64 HTTPS/browser, membership/creator-revoked replacement, MCP rollout/fencing/summaries, Docker hard-crash recovery and isolated restore reads; separate native ARM64 runtime and container-stack checks also passed. This is not overall acceptance. Remaining gaps are listed below. Host operations and edge verification belong in [Palm's runbook](https://github.com/chrisbyboston/palm/blob/main/docs/dispatch-workers-trial.md). Implements the [accepted target](spec.md#aws-container-deployment-target) and [single-server rehearsal](spec.md#single-server-container-rehearsal). Chris authorized implementation, isolated deployment and focused checks on October 7, 2026; existing installations/data remain untouched.
+Status: latest deployed revision `4f625ec`; scoped single-server checks at `7caa835` and the latest candidate passed: AMD64 HTTPS/browser, membership/creator-revoked replacement, MCP rollout/fencing/summaries, Docker hard-crash recovery and isolated restore reads; separate native ARM64 runtime and container-stack checks also passed. This is not overall acceptance. Remaining gaps are listed below. Host operations and edge verification belong in [Palm's runbook](https://github.com/chrisbyboston/palm/blob/main/docs/dispatch-workers-trial.md). Implements the [accepted target](spec.md#aws-container-deployment-target) and [single-server rehearsal](spec.md#single-server-container-rehearsal). Chris authorized implementation, isolated deployment and focused checks on October 7, 2026; existing installations/data remain untouched.
 
 ## Ownership and boundaries
 
@@ -89,7 +89,9 @@ Source review also requires enforcing storage isolation below application query 
 
 ## Acceptance and evidence
 
-Open browser visual finding (October 8): despite functional reconnect passing, Deployer’s capture shows a persistent “Couldn’t connect” banner alongside “Conversation connected” and the recovered reply. Clean recovery presentation is not accepted yet. Investigate the warning’s source without clearing genuine failed-send/upload errors merely on SSE reconnect; correction and deployed visual retest remain pending.
+Reconnect visual finding closed on October 8 at deployed `4f625ec` (AMD64 image `sha256:6340dd3758341ff784a52fc297da043f0b162aa6278aac1ced86d04d53f2c6c8`). Inspected restricted Dispatch receipt `browser-refresh11-result.json` confirms desktop/390px metadata-failure labeling, successful retry clearing only metadata errors, no contradictory recovered banner, and preservation of separately induced action/send/upload failures. SSE reconnection alone does not clear action errors.
+
+Inspected restricted `two-workers11-result.json` at deployed `4f625ec` confirms distinct worker/store identities, hosted-model/native bash with independently checked bytes, old-container absence before replacement in 3.28 seconds while the second worker’s tool ran, unchanged second-worker identity/start time, fresh disk, retained attachment bytes and a new replacement model reply. This is not a new revocation or interrupted-tool qualification. Earlier receipts retain their original revision scope.
 
 Inspected October 8 restricted receipts at candidate `7caa835`:
 
