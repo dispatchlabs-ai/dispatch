@@ -354,7 +354,7 @@ The current editor groups Identity, Instructions, Model, installed Capabilities,
 
 **Creation naming, accepted October 6, 2026:** the starting-agent chooser includes an optional conversation name, including project and agent-start entry points.
 
-- Trim the name; a nonempty name is limited to 200 characters and becomes the shared display title. Blank or whitespace-only input keeps the existing unnamed-conversation behavior: “New conversation” until the first message supplies a preview.
+- Trim the name; a nonempty name is limited to 200 characters and becomes the shared display title. Blank or whitespace-only input keeps the existing unnamed-conversation behavior: “New chat” until the first message supplies a preview. The stored “New conversation” sentinel remains unchanged for retry matching.
 - Explicit names, including the literal “New conversation”, are not replaced by the first message. Save the explicit display title atomically with creation while retaining the immutable creation title for retry comparisons. New records also retain whether the creation name was explicit, so an omitted name and literal “New conversation” are distinct retry inputs; legacy records keep their previous comparison behavior.
 - Keep the name draft and selected agents on failure. An uncertain creation retry replays its original request, including title and project selection, rather than creating a second conversation with changed input. Successful creation or cancellation clears the chooser draft.
 
