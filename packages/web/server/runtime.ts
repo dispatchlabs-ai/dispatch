@@ -1073,9 +1073,9 @@ export class DispatchRuntime {
     });
     return {
       get value() { return value; },
-      deliver: (emit: () => void) => this.harness.commit(async tx => {
+      deliver: (emit: () => void | Promise<void>) => this.harness.commit(async tx => {
         await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
-        emit();
+        await emit();
       }, context),
       start: (next: (snapshot: ChatSnapshot) => Promise<void>) => {
         listener = next;

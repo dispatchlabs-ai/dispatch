@@ -188,7 +188,7 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
       let finish!: (value: { reason: "stopped" | "listener_error" | "session_closed" }) => void;
       const closed = new Promise<{ reason: "stopped" | "listener_error" | "session_closed" }>(resolve => { finish = resolve; });
       return { value, closed,
-        async deliver(deliver: () => void) { await options.runBackground(() => policyRead(async () => { await directory.getChat(scope, id); if (!stopped) deliver(); })); },
+        async deliver(deliver: () => void | Promise<void>) { await options.runBackground(() => policyRead(async () => { await directory.getChat(scope, id); if (!stopped) await deliver(); })); },
         start(listener: (value: ChatSnapshot) => Promise<void>) {
           if (started) throw new Error("Watch already started"); started = true;
           void (async () => {

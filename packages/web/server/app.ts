@@ -295,8 +295,8 @@ function snapshotStream(watch: ChatWatch, isValid: () => Promise<boolean>, signa
     pending = undefined;
     try {
       if (!await valid()) return;
-      await watch.deliver(() => {
-        if (!stopped) controller.enqueue(encoder.encode(`event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`));
+      await watch.deliver(async () => {
+        if (await valid()) controller.enqueue(encoder.encode(`event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`));
       });
     } catch { close(); }
     finally { flushing = false; }
