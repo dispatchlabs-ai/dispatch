@@ -22,13 +22,19 @@ A human creator becomes a member. Authenticated human members may invite active 
 
 [WP-050](handoff.md#wp-050--multiple-agent-instances-and-supplemental-instructions) permits explicit human creation of multiple active instances per definition in a conversation; ordinary invitations still ensure an existing instance rather than creating siblings. Removed instances remain historical. Creation copies its immutable revision, model, instructions, capabilities and thinking level. New coding-capable instances receive the absolute configured workspace directory, shared across participants. `DISPATCH_WORKSPACE_DIR` defaults to the repository root in root launchers and the process launch directory for a standalone service; it can select an existing checkout or Git worktree. Startup validates that the directory exists. Project labels do not select filesystem paths. Pi’s `NodeExecutionEnv` and the Coding prompt’s environment-derived cwd use the saved native configuration.
 
-Creation stores an optional name and separate `instanceInstructions`, while the base snapshot remains unchanged. Native `configure()` composes the base and supplement at creation without submitting a model request. Actor-scoped receipts return the original participant ID on identical retries, including after removal; changed input conflicts. New creation conflicts during Stop or same-definition cleanup. Ambiguous definition mentions return 409; mention/removal targets remain immutable participant IDs. All active siblings consider later public messages; instructions do not grant isolation or permissions.
+Creation stores an optional name and separate `instanceInstructions`; later base upgrades replace only the base snapshot and recompose the native prompt. Native `configure()` composes the base and supplement at creation without submitting a model request. Actor-scoped receipts return the original participant ID on identical retries, including after removal; changed input conflicts. New creation conflicts during Stop or same-definition cleanup. Ambiguous definition mentions return 409; mention/removal targets remain immutable participant IDs. All active siblings consider later public messages; instructions do not grant isolation or permissions.
 
 Before `Harness.resume()`, a native commit per room migrates idle coding participants whose stored `AgentDoc.cwd` exactly equals the old `<stateDir>/runtime/workspaces/<native agent conversation ID>` default. The commit updates `cwd` and the participant’s displayed path without rewriting instructions, history, other configuration, or files. Any unfinished task in the room defers the room; unfinished tasks or inbox items in the agent conversation defer that agent until a later idle startup. Custom paths are preserved. Changing the installation workspace later does not retarget already configured shared/custom paths. Old numbered folders and their contents remain available at their original paths.
 
 The default and Developer definitions are seeded once and remain editable through revisioned company definitions. Basic edits preserve capability selections. An archived definition cannot be newly instantiated or edited; existing instances continue with their saved configuration. The default cannot be archived.
 
 Coding tools have the service account’s filesystem, process and network access. Their directories are not sandboxes. This remains trusted local development on M1 Air; shared deployment and remote isolation are separate work.
+
+## In-place base upgrades
+
+Candidate `1ff6144` reconciles saved definition revisions with active member snapshots through `upgradeParticipant()`. Startup reconciles before native resume; commit notifications wake a serialized drain but are not durable truth. A pre-delivery callback reconciles only fresh submissions; recovery joins prior admitted submissions unchanged. Inside the native transaction, `LiveDoc.run`, inbox items and unfinished native tasks defer adoption. Native configuration, selected skill snapshots, collaboration hooks and member base revision commit together. IDs, instance names/supplements, histories and existing workspace paths are preserved. Removing/Removed members are excluded.
+
+MCP assignment is separate: explicit human save selections and connection refreshes queue member-owned pending state and use the same idle guard. `boundConnections()` derives displayed assignments from actual binding keys, not definition selections. Base adoption retains current MCP tools/bindings; it does not attach newly selected credentials. Safe error persistence skips unchanged writes; failure does not advance the applied base revision. No new durable execution engine, general pinning feature or grant migration is introduced. Runtime/recovery qualification remains outstanding in [the work package](handoff.md#in-place-agent-upgrades--october-8-2026).
 
 ## Public messages and native delivery
 
@@ -118,11 +124,10 @@ files accessible to the service account.
 
 Definition capability changes create a new revision. `applyToExisting: true` is an
 operator authorization to add that connection to existing instances. Already-bound
-instances receive catalog changes; removal from the manifest removes the binding
-and MCP selections on restart. This preserves other tools, instructions, model,
-reasoning, working directories and native history. An instance retains its original
-definition revision label; its tool list reflects the explicitly updated connection
-access. Basic definition edits preserve connections.
+instances receive catalog changes at an eligible idle boundary; removal from the manifest queues binding
+and MCP selection refresh on startup. This preserves other tools, instructions, model,
+reasoning, working directories and native history. The applied base revision follows safe idle upgrades; actual connection
+assignments remain separate from that label. Basic definition edits preserve connections.
 
 Every remote call uses Pi's native tool task, propagates its cancellation signal,
 and returns MCP text/images, error state and JSON details. All calls are declared
@@ -151,6 +156,6 @@ OAuth's no-store callback relay removes parameters from the address bar and send
 
 Every managed fetch checks authorization state and exact destination, rejects redirects and adds its configured credentials. OAuth renewal is serialized per credential; an interrupted/uncertain exchange requires explicit reauthorization. Insufficient-scope responses never trigger silent expansion. Authorize/disconnect operations are ordered. Disconnect invalidates pending callbacks and disables local requests before revocation, waits for in-flight renewal, and retains encrypted credentials when advertised provider revocation fails. Missing revocation support and static credentials produce an explicit local-removal notice. No tool-call timeout or concurrency cap is added.
 
-`SaveAgentInput.connectionIds` selects managed bindings; omitted values preserve older callers' choices. Public `source: "managed"` replaces `"oauth"`, with both accepted for stored definitions. `capabilities` selects installed coding tools. `applyConnectionsToExisting` updates matching instances' MCP selections in the same native commit as the definition revision. Other instances retain actual bindings. Removal alone does not revoke credentials used by older instances. Actor-bound save request IDs deduplicate revision saves and remain outside public descriptors.
+`SaveAgentInput.connectionIds` selects managed bindings; omitted values preserve older callers' choices. Public `source: "managed"` replaces `"oauth"`, with both accepted for stored definitions. `capabilities` selects installed coding tools. `applyConnectionsToExisting` queues matching active instances' MCP selections with the definition save; each applies through the native idle guard. Other instances retain actual bindings. Removal alone does not revoke credentials used by older instances. Actor-bound save request IDs deduplicate revision saves and remain outside public descriptors.
 
 Cached tool schemas install before native recovery, including disconnected connections whose access checks reject use. Discovery reads advertised tools and server metadata without invoking a tool, revises public metadata, and does not interpret catalog completeness as an access grant. Resources and prompts are not added to the agent UI by this package. Each connection's provider authority is shared by its assigned definition's instances. Personal delegation, programmatic principal creation and protected execution isolation remain WP-029 future work.
