@@ -7,7 +7,7 @@ import { createAuth } from "./auth.js";
 import { createApp } from "./app.js";
 import { readConfig } from "./config.js";
 import { openModels } from "./model-auth.js";
-import { DispatchRuntime } from "./runtime.js";
+import { DEFAULT_AGENT_ID, DispatchRuntime } from "./runtime.js";
 import { McpConnections } from "./mcp-connections.js";
 
 const config = readConfig();
@@ -35,7 +35,7 @@ const app = createApp({
   auth, runtime, mcpConnections, origin: config.origin,
   clientDir: process.env.DISPATCH_SERVE_CLIENT === "false" ? undefined : clientDir,
   configuration: async () => ({
-    company: { id: config.companyId, name: config.companyName }, defaultAgentId: "default", ...await provider.configuration(await runtime.getDefaultAgent(config.companyId)),
+    company: { id: config.companyId, name: config.companyName }, defaultAgentId: DEFAULT_AGENT_ID, ...await provider.configuration(await runtime.getDefaultAgent(config.companyId)),
   }),
 });
 const server = serve({ fetch: app.fetch, hostname: config.host, port: config.port }, () => {

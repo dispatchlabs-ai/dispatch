@@ -55,6 +55,7 @@ export function Workspace() {
   const [showArchivedAgents, setShowArchivedAgents] = useState(false);
   const [config, setConfig] = useState<ApplicationConfig | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [projectSearch, setProjectSearch] = useState<Record<string, string>>({});
   const [projectEditing, setProjectEditing] = useState<Record<string, ProjectEditing | null>>({});
   const createInFlight = useRef(false);
   const [focusChatId, setFocusChatId] = useState<string | null>(null);
@@ -230,13 +231,16 @@ export function Workspace() {
     const tab = tabs.find(item => item.id === tabId);
     const dirty = tab?.kind === "chat" ? [...new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions), ...Object.keys(attachmentDrafts.drafts)])].some(key => (key === tab.chatId || key.startsWith(`${tab.chatId}:`)) && (Boolean(drafts[key]?.trim()) || Boolean(pending[key]) || Boolean(mentions[key]?.length) || Boolean(attachmentDrafts.drafts[key]?.length))) : false;
     if (tab?.kind === "project" && projectEditing[tab.projectId]?.busy) return;
-    if (dirty || (tab?.kind === "project" && projectEditing[tab.projectId])) setClosingTab(tabId);
+    if (dirty || (tab?.kind === "project" && (projectEditing[tab.projectId] || projectSearch[tab.projectId]))) setClosingTab(tabId);
     else closeTab(tabId);
   }
 
   function closeTab(tabId: string) {
     const closing = tabs.find(tab => tab.id === tabId);
-    if (closing?.kind === "project") setProjectEditing(current => ({ ...current, [closing.projectId]: null }));
+    if (closing?.kind === "project") {
+      setProjectEditing(current => ({ ...current, [closing.projectId]: null }));
+      setProjectSearch(current => { const next = { ...current }; delete next[closing.projectId]; return next; });
+    }
     if (closing?.kind === "chat") {
       for (const key of new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions), ...Object.keys(attachmentDrafts.drafts)])) {
         if (key !== closing.chatId && !key.startsWith(`${closing.chatId}:`)) continue;
@@ -452,7 +456,12 @@ export function Workspace() {
   const snapshot = active.kind === "chat" ? snapshots[active.chatId] : undefined;
   const connection = active.kind === "chat" ? connections[active.chatId] || "connecting" : null;
   const activeProjectId = active.kind === "project" ? active.projectId : active.kind === "chat" ? chats.find(chat => chat.id === active.chatId)?.projectId ?? null : null;
-  const supporting = (inDrawer = false) => section === "agents" && !editingAgent && evaluationAgent === selectedAgent?.id ? <div className="agent-details">{!inDrawer ? <header className="context-header"><h2>Evaluation profile</h2></header> : null}<div className="context-body">{evaluationContext}</div></div> : section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : active.kind === "chat" && snapshot ? <SharedContextPanel agents={agents} key={snapshot.conversation.id} snapshot={snapshot} models={config?.models ?? []} threadId={threads[active.chatId] ?? null}
+  const selectedProject = active.kind === "project" ? projects.find(project => project.id === active.projectId) : undefined;
+  const supporting = (inDrawer = false) => selectedProject ? <ProjectSettings key={selectedProject.id}
+    project={selectedProject} agents={agents} showHeader={!inDrawer}
+    editing={projectEditing[selectedProject.id] ?? null}
+    onEditingChange={editing => setProjectEditing(current => ({ ...current, [selectedProject.id]: editing }))}
+    onSaved={project => { setProjects(current => mergeProjects(current, [project])); void load(); }} /> : section === "agents" && !editingAgent && evaluationAgent === selectedAgent?.id ? <div className="agent-details">{!inDrawer ? <header className="context-header"><h2>Evaluation profile</h2></header> : null}<div className="context-body">{evaluationContext}</div></div> : section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : active.kind === "chat" && snapshot ? <SharedContextPanel agents={agents} key={snapshot.conversation.id} snapshot={snapshot} models={config?.models ?? []} threadId={threads[active.chatId] ?? null}
     attachments={attachmentDrafts.drafts[`${active.chatId}:${threads[active.chatId]}`] ?? emptyAttachments}
     onAddFiles={files => attachmentDrafts.add(`${active.chatId}:${threads[active.chatId]}`, active.chatId, files)}
     onRemoveAttachment={id => attachmentDrafts.remove(`${active.chatId}:${threads[active.chatId]}`, id)}
@@ -621,13 +630,10 @@ export function Workspace() {
               onConnection={onConnection}
               onAccessLost={onAccessLost}
             /> : tab.kind === "project" ? <ProjectPage
+              search={projectSearch[tab.projectId] ?? ""} onSearchChange={search => setProjectSearch(current => ({ ...current, [tab.projectId]: search }))}
               project={projects.find(project => project.id === tab.projectId)} chats={chats} creating={creating || createFailed} updating={updatingChats}
               onCreate={() => chooseAgents(config.defaultAgentId, tab.projectId)} onSelect={selectChat}
               onRename={renameChat} onUpdate={updateChatAction}
-              settings={projects.find(project => project.id === tab.projectId) ? <ProjectSettings
-                project={projects.find(project => project.id === tab.projectId)!} agents={agents}
-                editing={projectEditing[tab.projectId] ?? null} onEditingChange={editing => setProjectEditing(current => ({ ...current, [tab.projectId]: editing }))}
-                onSaved={project => { setProjects(current => mergeProjects(current, [project])); void load(); }} /> : undefined}
             /> : <Welcome
               name={state.user.name} config={config}
               onCreate={() => chooseAgents()} creating={creating || createFailed}

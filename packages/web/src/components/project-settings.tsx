@@ -1,3 +1,4 @@
+import { Bot, ChevronRight, Settings, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { AgentDefinition, CompanyPerson, Project, SaveProjectInput } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
@@ -11,7 +12,8 @@ export type ProjectEditing = {
   conflict?: boolean;
 };
 
-export function ProjectSettings({ project, agents, editing, onEditingChange, onSaved }: {
+export function ProjectSettings({ project, agents, editing, onEditingChange, onSaved, showHeader = true }: {
+  showHeader?: boolean;
   project: Project;
   agents: AgentDefinition[];
   editing: ProjectEditing | null;
@@ -64,18 +66,19 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
     }
   }
 
-  return <section className="agent-connections">
-    <h2>Project settings</h2>
-    <p className="field-hint">Members can read the full project history and participate in its chats. Managers also control membership and default agents. Operator-designated readers can read all shared projects without membership.</p>
+  return <section className="project-details">
+    {showHeader ? <header className="context-header"><h2>{editing ? "Project settings" : "Project details"}</h2></header> : null}
+    <div className="project-details-body">
+    {!editing ? <div className="project-sharing"><Users size={24} aria-hidden="true" /><div><strong>Shared project</strong><p>Full history · Shared chats</p></div></div> : null}
     {error ? <Notice>People could not be loaded. {error} <Button variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></Notice> : null}
     {!people && !error ? <Spinner label="Loading people" /> : null}
     {editing ? <div className="stack">
-      {!project.canManage ? <Notice>You no longer have permission to save these settings. Your draft is retained until you discard it.</Notice> : null}
-      {editing.error ? <Notice>{editing.error}{editing.conflict ? " Your draft is preserved. Copy anything you need, then discard and reopen the latest settings." : " Retry unchanged to safely repeat this request."}</Notice> : null}
+      {!project.canManage ? <Notice>Management permission removed. Draft retained.</Notice> : null}
+      {editing.error ? <Notice>{editing.error}{editing.conflict ? " Draft retained. Discard to load current settings." : " Retry to save."}</Notice> : null}
       <Field label="Project name">{props => <Input {...props} value={editing.input.name} maxLength={100} disabled={disabled} onChange={event => update({ name: event.target.value })} />}</Field>
       <fieldset className="agent-form-section" disabled={disabled}>
         <legend>Members</legend>
-        <p className="field-hint">Saving additions grants access to all existing chats. Saving removals immediately revokes project membership, but cannot retract copies already seen or an operator-granted read-all permission. Keep at least one manager.</p>
+        <p className="field-hint">Members access all project history. Keep at least one manager.</p>
         {members.map(member => <div className="connection-card" key={member.userId}>
           <Field label={`Role for ${personName(member.userId)}`}>{props => <Select {...props} value={member.role} disabled={member.role === "manager" && managerCount === 1} onChange={event => update({ members: members.map(item => item.userId === member.userId ? { ...item, role: event.target.value as "manager" | "member" } : item) })}>
             <option value="member">Member</option><option value="manager">Manager</option>
@@ -90,7 +93,7 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
       </fieldset>
       <fieldset className="agent-form-section" disabled={disabled}>
         <legend>Default agents</legend>
-        <p className="field-hint">Preselected for new chats only. Existing participants and their saved configurations stay unchanged.</p>
+        <p className="field-hint">Defaults for new chats</p>
         {agents.filter(agent => !agent.archived).map(agent => <label className="choice-row" key={agent.id}>
           <input type="checkbox" checked={defaults.includes(agent.id)} onChange={event => update({ defaultAgentDefinitionIds: event.target.checked ? [...defaults, agent.id] : defaults.filter(id => id !== agent.id) })} />
           <span>{agent.name}<small>{agent.description}</small></span>
@@ -99,11 +102,12 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
       </fieldset>
       <div className="button-row"><Button variant="secondary" disabled={editing.busy} onClick={discard}>Discard settings</Button><Button disabled={disabled || editing.conflict || !editing.input.name.trim() || !managerCount || Boolean(unavailableDefaults.length)} onClick={() => void save()}>{editing.busy ? <Spinner label="Saving project" /> : null}Save project settings</Button></div>
     </div> : <>
-      <h3>Members</h3>
-      <ul>{members.map(member => <li key={member.userId}>{personName(member.userId)} · {member.role === "manager" ? "Manager" : "Member"}</li>)}</ul>
-      <h3>Default agents</h3>
-      {defaults.length ? <ul>{defaults.map(id => <li key={id}>{agentName(id)}{unavailableDefaults.includes(id) ? " · Unavailable" : ""}</li>)}</ul> : <p>No default agents selected.</p>}
-      {project.canManage ? <Button variant="secondary" onClick={begin}>Edit project settings</Button> : <p className="field-hint">Only project managers can change these settings.</p>}
+      <section className="project-detail-group"><h3>Members</h3>
+      <ul>{members.map(member => <li key={member.userId}><span className="participant-avatar" aria-hidden="true">{personName(member.userId).split(/\s+/).slice(0, 2).map(part => part[0]).join("")}</span><span>{personName(member.userId)}<small>{member.role === "manager" ? "Manager" : "Member"}</small></span></li>)}</ul></section>
+      <section className="project-detail-group"><h3>Default agents</h3>
+      {defaults.length ? <ul>{defaults.map(id => <li key={id}><span className="project-chat-icon"><Bot size={22} aria-hidden="true" /></span><span>{agentName(id)}{unavailableDefaults.includes(id) ? <small>Unavailable</small> : null}</span></li>)}</ul> : <p className="text-muted">No default agents</p>}</section>
+      {project.canManage ? <Button variant="ghost" className="project-settings-link" onClick={begin}><Settings size={20} aria-hidden="true" /><span>Project settings</span><ChevronRight size={18} aria-hidden="true" /></Button> : <p className="field-hint">Managed by project managers</p>}
     </>}
+    </div>
   </section>;
 }

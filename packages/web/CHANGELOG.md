@@ -4,6 +4,15 @@
 
 - Add the Web research capability with native search, page reading, literal find and numbered-link traversal, durable instance-local evidence and source citations. Interrupted network batches are not automatically replayed. Qualification tracked in [WP-054](docs/handoff.md#wp-054--native-web-research).
 
+||||||| 1728945
+## Unreleased — Developer default
+
+- Make Developer the company default and archive retired Dash/Dispatch without deleting revisions or changing existing conversation instances. Preserve Developer settings and migrate project defaults; new projects and implicit chat selections use Developer. Acceptance evidence and remaining qualification are tracked in the [handoff](docs/handoff.md#developer-default-and-dash-retirement--october-8-2026).
+
+## Unreleased — project overview
+
+- Add project chat search, All chats/Active filters, status and last activity. Move members, default agents and existing settings into the contextual details panel, with adaptive desktop/phone rows. See [implementation evidence](docs/handoff.md#project-overview-redesign--october-8-2026).
+
 ## Unreleased — project-row chat creation
 
 - Start a chat directly from a project row using its default agents, without a setup dialog; focus the new composer and retain existing drafts. Use Chat terminology in product controls.
