@@ -1174,3 +1174,5 @@ Candidate `a37b931` integrates case-specific missing-criterion validation; Pi Du
 
 
 **Local availability follow-up, October 8, 2026.** After receiving the walkthrough, Chris responded “Ok, great” and requested the feature on `main` and localhost:5173. Documenter verified remote `main` at `bcb3a49`; Developer and Pi Durable Expert report the updated application serving on port 5173, including the case-validation fix. This records Chris's requested next step and reported local availability, not additional save/reopen verification against the normal local state or authorization to execute evaluations.
+
+**Normal local-state follow-up, October 8, 2026.** At Chris’s request, Developer used agent-browser to present the Developer agent before/after opening its editor on localhost:5173, then filled and saved evaluation profile revision 1 and reported persistence after reload. This is Developer-reported verification, not a Documenter browser check. The saved case still needs its repository fixture provisioned; neither that save nor this follow-up represents evaluation execution.
