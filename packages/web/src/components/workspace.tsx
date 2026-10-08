@@ -453,7 +453,7 @@ export function Workspace() {
     newProject={{ name: projectName, busy: creatingProject, error: projectError, compact: viewportWidth <= 1100,
       onNameChange: name => { setProjectName(name); setProjectError(null); }, onCreate: createProject,
       onCancel: () => { setProjectName(""); setProjectError(null); projectRequest.current = null; } }}
-    onImportProject={() => setImportingProject(true)}
+    onImportProject={() => { setNavigationOpen(false); setImportingProject(true); }}
     onCreateProjectChat={project => { if (project.canParticipate === false) return; void createChat(undefined, project.id); }}
     onSelect={selectChat} onSelectProject={selectProject} onCreate={() => chooseAgents(config?.defaultAgentId, activeProjectId)}
     onRename={renameChat} onUpdate={updateChatAction} />;

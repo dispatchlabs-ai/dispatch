@@ -332,7 +332,7 @@ export class DispatchRuntime {
         chats.push({ id: chatId, title: stored.displayTitle ?? stored.title, messages: presentation.messages,
           authors: room.members.map(member => ({ id: member.id, name: member.name, kind: member.kind })) });
       }
-      return { name: project.name, chats, prior: (await tx.doc(ProjectArchivesDoc)).records[id] };
+      return JSON.parse(JSON.stringify({ name: project.name, chats, prior: (await tx.doc(ProjectArchivesDoc)).records[id] })) as { name: string; chats: typeof chats; prior?: { id: string; digest: string } };
     }, context);
     const archive: ProjectArchive = { format: "dispatch-project-content", version: 1, name: snapshot.name, exportedAt: Date.now(), chats: [] };
     // Existing imported history is retained when re-exporting, separate from native selected chats.
@@ -413,7 +413,8 @@ export class DispatchRuntime {
   async getProjectArchive(scope: RuntimeScope, id: string): Promise<ProjectArchive | null> {
     const blob = await this.harness.commit(async tx => {
       await requireProjectAccess(tx, scope, id, "read", this.readAll(scope));
-      return (await tx.doc(ProjectArchivesDoc)).records[id];
+      const record = (await tx.doc(ProjectArchivesDoc)).records[id];
+      return record ? { ...record } : undefined;
     }, context);
     const archive = blob ? await this.projectArchiveStore.read(blob) : null;
     await this.harness.commit(async tx => { await requireProjectAccess(tx, scope, id, "read", this.readAll(scope)); }, context);
