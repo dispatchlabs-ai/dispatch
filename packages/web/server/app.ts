@@ -172,7 +172,7 @@ export function createApp(options: AppOptions) {
     return c.json(await runtime.renameChat(c.get("principal"), c.req.param("id"), input.title));
   });
   app.post("/api/chats/:id/participants", async (c) => {
-    const input = z.object({ requestId, agentDefinitionIds: identities.optional(), userIds: identities.optional() }).strict()
+    const input = z.object({ requestId, agentDefinitionIds: identities.max(50).optional(), userIds: identities.optional() }).strict()
       .refine(value => (value.agentDefinitionIds?.length ?? 0) + (value.userIds?.length ?? 0) > 0).parse(await c.req.json());
     return c.json(await runtime.addParticipants(c.get("principal"), c.req.param("id"), input));
   });
@@ -202,7 +202,7 @@ export function createApp(options: AppOptions) {
   app.post("/api/chats/:id/messages", async (c) => {
     const input = z.object({
       requestId, text: z.string().trim().max(100_000),
-      threadId: identity.nullable().optional(), mentions: identities.optional(), agentMentions: identities.optional(),
+      threadId: identity.nullable().optional(), mentions: identities.optional(), agentMentions: identities.max(50).optional(),
       attachmentIds: z.array(z.string().uuid()).max(ATTACHMENT_MAX_COUNT).refine(ids => new Set(ids).size === ids.length).optional(),
     }).strict().refine(input => input.text.length > 0 || Boolean(input.attachmentIds?.length), "Add a message or attachment.").parse(await c.req.json());
     await runtime.submit(c.get("principal"), c.req.param("id"), input);
