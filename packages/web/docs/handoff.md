@@ -1245,3 +1245,6 @@ Acceptance criteria:
 - Review source/lifecycle and deslop, TypeScript/application and applicable Nix builds, full diff/whitespace and changed links. Runtime creation/replay/conflict/restart/authorization/removal and UI behavior remain unverified until authorized evidence; zero tests remains in force.
 
 Documentation records approved intent, not verified behavior. Wiki returned HTTP 401; no wiki update published. The established repository wiki remains the intended product-history home; no alternate-company fallback is used.
+
+
+Backend candidate `3a2fbf4`: Documenter source-reviewed HTTP limits, transaction participation checks, actor-scoped creation receipts, same-definition cleanup/Stop fences, fresh native conversation configuration and public projection. Base instructions remain in `member.agent`; a separate supplement is composed through native `configure()` before binding, without submitting a model request. Replay checks precede definition/cleanup creation checks and retain historical identity; ambiguous definition mentions conflict. No contract blocker found in this bounded review. Pi Durable Expert reports Nix-shell TypeScript/application builds passing. Frontend integration, Nix artifact checks and runtime/UI qualification remain outstanding; no tests or probes were run.
