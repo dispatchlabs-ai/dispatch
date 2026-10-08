@@ -22,6 +22,8 @@ export type WorkerRoute = z.infer<typeof routeSchema>;
  * is not authorization: callers must check current membership before using it.
  */
 export class WorkerRoutes {
+  // Process-local observation freshness, never an executor lease or fencing proof.
+  private readonly summaryReceivedAt = new Map<string, number>();
   private constructor(private readonly db: DatabaseSync, private readonly release: () => void) {}
   static async open(directory: string, installation: string) {
     const owner = await acquireRuntimeOwner(directory);
@@ -87,15 +89,21 @@ export class WorkerRoutes {
     if (previous && value.revision < previous.value.revision) throw new Error("Stale worker summary revision.");
     if (previous && value.revision === previous.value.revision) {
       if (JSON.stringify(value) !== JSON.stringify(previous.value)) throw new Error("Conflicting worker summary revision.");
-      if (previous.attemptId === attemptId) return;
+      if (previous.attemptId === attemptId) {
+        this.summaryReceivedAt.set(conversationId, performance.now());
+        return;
+      }
     }
     this.save({ ...route, summary: { attemptId, value } });
+    this.summaryReceivedAt.set(conversationId, performance.now());
   }
   /** Historical observations survive replacement, but are not current liveness. */
   readSummary(conversationId: string): WorkerSummaryObservation | undefined {
     const route = this.get(conversationId);
     if (!route?.summary) return undefined;
-    return { value: route.summary.value, stale: route.phase === "retiring" || route.summary.attemptId !== route.attemptId };
+    const receivedAt = this.summaryReceivedAt.get(conversationId);
+    return { value: route.summary.value, stale: route.phase === "retiring" || route.summary.attemptId !== route.attemptId
+      || receivedAt === undefined || performance.now() - receivedAt >= 10_000 };
   }
   close() { try { this.db.close(); } finally { this.release(); } }
   private requireAttempt(conversationId: string, attemptId: string) {
