@@ -60,6 +60,8 @@ export type ConversationWorkerBootstrap = {
   catalog: WorkerCatalogSnapshot;
   initialAgentRevisions?: Record<string, number>;
   membership?: WorkerMembershipSnapshot;
+  /** Retained attribution supplied by the authenticated backend, not a current ACL grant. */
+  creator?: Person;
 };
 type WorkerBinding = {
   conversationKey: string; storeId: string; companyId: string; creationFingerprint: string;
@@ -319,26 +321,48 @@ export class DispatchRuntime {
   async exportWorkerCatalog(companyId: string): Promise<WorkerCatalogSnapshot> {
     this.requireCatalogOwner();
     requireText(companyId, "Company ID", 200);
+    return this.harness.commit(tx => this.workerCatalog(tx, companyId), context);
+  }
+
+  private async workerCatalog(tx: Tx, companyId: string): Promise<WorkerCatalogSnapshot> {
+    const catalog = await tx.doc(CatalogDoc);
+    const shared = await tx.doc(ProjectsDoc);
+    const exports = await tx.doc(WorkerExportsDoc);
+    exports.sourceId ??= randomUUID();
+    const agentIds = new Set(catalog.agents.filter(agent => agent.companyId === companyId).map(agent => agent.id));
+    const payload = detached({
+      sourceId: exports.sourceId, companyId,
+      agents: catalog.agents.filter(agent => agent.companyId === companyId).map(publicAgent),
+      skills: (catalog.skills ?? []).filter(skill => skill.companyId === companyId).map(publicSkill),
+      projects: (catalog.projects ?? []).filter(project => project.companyId === companyId),
+      sharedProjects: Object.values(shared.projects).filter(project => project.companyId === companyId),
+      grants: await readGrants(tx, companyId),
+      connectionOwners: Object.fromEntries(Object.entries(catalog.connectionOwners ?? {}).filter(([, agentId]) => agentIds.has(agentId))),
+      readAllProjectUserIds: [...this.readAllProjectUserIds].sort(),
+    });
+    const hash = fingerprint(payload);
+    const prior = exports.companies[companyId];
+    if (!prior || prior.fingerprint !== hash) exports.companies[companyId] = { revision: (prior?.revision ?? 0) + 1, fingerprint: hash };
+    return { ...payload, revision: exports.companies[companyId].revision };
+  }
+
+  /** Internal route-bound read: the backend authenticates the current launch attempt first.
+   * One transaction pins catalog history, membership and creation attribution together.
+   * Never authorize recovery as the original creator, who may since have lost project access.
+   */
+  async directoryWorkerBootstrap(companyId: string, conversationKey: string) {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
     return this.harness.commit(async tx => {
-      const catalog = await tx.doc(CatalogDoc);
-      const shared = await tx.doc(ProjectsDoc);
-      const exports = await tx.doc(WorkerExportsDoc);
-      exports.sourceId ??= randomUUID();
-      const agentIds = new Set(catalog.agents.filter(agent => agent.companyId === companyId).map(agent => agent.id));
-      const payload = detached({
-        sourceId: exports.sourceId, companyId,
-        agents: catalog.agents.filter(agent => agent.companyId === companyId).map(publicAgent),
-        skills: (catalog.skills ?? []).filter(skill => skill.companyId === companyId).map(publicSkill),
-        projects: (catalog.projects ?? []).filter(project => project.companyId === companyId),
-        sharedProjects: Object.values(shared.projects).filter(project => project.companyId === companyId),
-        grants: await readGrants(tx, companyId),
-        connectionOwners: Object.fromEntries(Object.entries(catalog.connectionOwners ?? {}).filter(([, agentId]) => agentIds.has(agentId))),
-        readAllProjectUserIds: [...this.readAllProjectUserIds].sort(),
-      });
-      const hash = fingerprint(payload);
-      const prior = exports.companies[companyId];
-      if (!prior || prior.fingerprint !== hash) exports.companies[companyId] = { revision: (prior?.revision ?? 0) + 1, fingerprint: hash };
-      return { ...payload, revision: exports.companies[companyId].revision };
+      const chat = (await tx.doc(CatalogDoc)).chats.find(chat => chat.companyId === companyId && chat.id === conversationKey);
+      if (!chat) throw new RuntimeError(404, "Conversation not found.");
+      const room = await tx.doc(SharedDoc, nativeId(conversationKey));
+      if (room.companyId !== companyId) throw new RuntimeError(404, "Conversation not found.");
+      const human = room.members.find(member => member.kind === "human" && member.userId === chat.userId);
+      if (!human) throw new RuntimeError(409, "Conversation creation attribution is unavailable.");
+      const membership = await this.workerMembership(tx, conversationKey);
+      return { catalog: await this.workerCatalog(tx, companyId), membership,
+        initialAgentRevisions: Object.fromEntries(membership.agents.map(agent => [agent.definitionId, agent.revision])),
+        creator: { id: human.userId!, name: human.name } };
     }, context);
   }
 
@@ -433,21 +457,21 @@ export class DispatchRuntime {
   async inviteWorkerParticipants(scope: RuntimeScope, id: string, input: AddParticipantsInput): Promise<WorkerInvitationResult> {
     if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
     const people = await Promise.all([...new Set([scope.userId, ...input.userIds ?? []])].map(userId => this.person(scope.companyId, userId)));
-    const membership = await this.harness.commit(async tx => {
+    return this.harness.commit(async tx => {
       await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
-      return this.admitWorkerInvitation(tx, id, scope.companyId, { userId: scope.userId }, input, people);
+      const membership = await this.admitWorkerInvitation(tx, id, scope.companyId, { userId: scope.userId }, input, people);
+      return { membership, catalog: await this.workerCatalog(tx, scope.companyId) };
     }, context);
-    return { membership, catalog: await this.exportWorkerCatalog(scope.companyId) };
   }
 
   async inviteWorkerAgents(claim: WorkerManagementActor, requestId: string, definitionIds: string[]): Promise<WorkerInvitationResult> {
     this.requireDirectoryActor(claim);
-    const membership = await this.harness.commit(async tx => {
+    return this.harness.commit(async tx => {
       const actor = await this.authoritativeWorkerActor(tx, claim);
-      return this.admitWorkerInvitation(tx, claim.conversationKey, actor.companyId, { definitionId: actor.definitionId },
+      const membership = await this.admitWorkerInvitation(tx, claim.conversationKey, actor.companyId, { definitionId: actor.definitionId },
         { requestId, agentDefinitionIds: definitionIds }, []);
+      return { membership, catalog: await this.workerCatalog(tx, claim.companyId) };
     }, context);
-    return { membership, catalog: await this.exportWorkerCatalog(claim.companyId) };
   }
 
   private async workerMembership(tx: Tx, id: string): Promise<WorkerMembershipSnapshot> {
@@ -720,7 +744,11 @@ export class DispatchRuntime {
     const creationFingerprint = input.sharedProjectId ? JSON.stringify([title, input.sharedProjectId, requestedAgents ?? null]) : undefined;
     for (const agentId of agentIds) requireText(agentId, "Agent ID", 200);
     requireText(title, "Title", 200);
-    const human = await this.person(scope.companyId, scope.userId);
+    const admittedCreator = this.worker?.creator;
+    if (admittedCreator && (admittedCreator.id !== scope.userId || !this.worker?.membership
+      || this.worker.membership.conversationKey !== this.worker.conversationKey || requestedAgents === undefined))
+      throw new RuntimeError(409, "Worker creation attribution/admission mismatch.");
+    const human = admittedCreator ?? await this.person(scope.companyId, scope.userId);
     const id = await this.harness.commit(async tx => {
       const catalog = await tx.doc(CatalogDoc);
       const existing = catalog.chats.find(chat => owns(scope, chat) && chat.requestId === input.requestId);
@@ -734,8 +762,13 @@ export class DispatchRuntime {
         return existing.id;
       }
       if (input.sharedProjectId) {
-        const project = await requireProjectAccess(tx, scope, input.sharedProjectId, "participate", this.readAll(scope));
-        agentIds = [...new Set(requestedAgents ?? project.defaultAgentDefinitionIds)];
+        if (admittedCreator) {
+          const project = (await tx.doc(ProjectsDoc)).projects[input.sharedProjectId];
+          if (!project || project.companyId !== scope.companyId) throw new RuntimeError(409, "Admitted worker project is unavailable.");
+        } else {
+          const project = await requireProjectAccess(tx, scope, input.sharedProjectId, "participate", this.readAll(scope));
+          agentIds = [...new Set(requestedAgents ?? project.defaultAgentDefinitionIds)];
+        }
       }
       if (projectId !== null) this.findProject(catalog, scope, projectId);
       const initialAgent = (agentId: string) => {
@@ -747,7 +780,8 @@ export class DispatchRuntime {
       };
       for (const agentId of agentIds) this.validateAgent(initialAgent(agentId));
       const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
-      await this.shared.initialize(tx, record.id, scope.companyId, human, this.directoryOnly ? [] : agentIds, { projectId, pinned: false, archived: false }, input.sharedProjectId ?? undefined);
+      const initialize = admittedCreator ? this.shared.initializeAdmitted.bind(this.shared) : this.shared.initialize.bind(this.shared);
+      await initialize(tx, record.id, scope.companyId, human, this.directoryOnly ? [] : agentIds, { projectId, pinned: false, archived: false }, input.sharedProjectId ?? undefined);
       const first = agentIds.length ? initialAgent(agentIds[0]) : undefined;
       const id = String(record.id);
       if (this.directoryOnly) {

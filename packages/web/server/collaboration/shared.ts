@@ -566,6 +566,13 @@ export class SharedConversations {
 
   async initialize(tx: Tx, roomId: ConversationId, companyId: string, human: Person, agentIds: string[], preferences: { projectId: string | null; pinned: boolean; archived: boolean }, sharedProjectId?: string) {
     if (sharedProjectId !== undefined) await requireProjectAccess(tx, { companyId, userId: human.id }, sharedProjectId, "participate");
+    return this.initializeAdmitted(tx, roomId, companyId, human, agentIds, preferences, sharedProjectId);
+  }
+
+  /** Materialize backend-admitted creation. Historical attribution does not modify project ACLs;
+   * subsequent reads, invitations and submissions still authorize against the current project.
+   */
+  async initializeAdmitted(tx: Tx, roomId: ConversationId, companyId: string, human: Person, agentIds: string[], preferences: { projectId: string | null; pinned: boolean; archived: boolean }, sharedProjectId?: string) {
     const room = await tx.doc(SharedDoc, roomId);
     await tx.doc(TurnsDoc, roomId);
     room.companyId = companyId;
