@@ -68,7 +68,7 @@ variable "origin" {
 }
 
 variable "image_uri" {
-  description = "Immutable x86_64 Linux Dispatch Web image reference pinned by a full sha256 digest."
+  description = "Immutable Linux Dispatch Web image or image-index reference pinned by a full sha256 digest and matching cpu_architecture."
   type        = string
 
   validation {
@@ -131,7 +131,7 @@ variable "s3_files_prefix" {
 }
 
 variable "container_port" {
-  description = "Unencrypted HTTP port used between the caller-owned ingress and Dispatch task."
+  description = "Unencrypted HTTP port used between the module-owned ALB and Dispatch task."
   type        = number
   default     = 3001
 

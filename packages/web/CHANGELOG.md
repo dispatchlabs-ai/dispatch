@@ -1,12 +1,17 @@
 # Changelog
 
+## Unreleased — agent criteria editing
+
+- Add opt-in Edit Definition of Done capability with current-chat read/write tool, revision protection and durable retry receipts. Disabled by default; existing instances adopt capability changes at safe idle boundaries.
+
 ## Unreleased — continuing simplification
 
-- Align runtime/setup guidance with shared-project authority, Developer defaults and safe idle definition/skill adoption; use canonical testing-policy links.
+- Align runtime/setup and agent workflow guidance with current contracts and testing-policy exceptions; distinguish historical editor proposals and deployment/qualification evidence from current claims.
 - Ignore root generated image outputs/run metadata without deleting user files or tracked design assets.
 
 - Share agent-connection polling, remove an unused account dirty-state callback, and centralize fixed capability mappings.
 - Replace unconditional image-directory retries with one exclusive creation and remove unused in-memory reference paths; retain audit metadata.
+- Project only transcript page candidates, compare window overlap with set membership, and avoid redundant history/connection reads; preserve page, ordering and authorization contracts. Share blob-download cleanup without changing output metadata.
 
 Integrated source/build checks passed; runtime/rendered qualification remains unverified. See [acceptance evidence](docs/handoff.md#continuing-simplification--october-8-2026).
 

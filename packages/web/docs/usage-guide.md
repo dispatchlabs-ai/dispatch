@@ -325,6 +325,17 @@ Agents waiting to publish show **Listening**. An agent with the speaking turn sh
 
 Optional shared Markdown criteria guide all chat participants; checklists are supported. Only authorized human participants can edit them. Clearing criteria leaves chat history intact. Criteria do not declare the chat complete, stop agents or authorize additional work. Agents receive the saved value on their next shared-context refresh; saving alone does not activate them. See [the contract](spec.md#chat-definition-of-done).
 
+#### Agent editing capability
+
+**Source-published in `b400e4a`; runtime/rendered qualification pending.** In **Agents**, edit the definition, open **Capabilities**, select **Edit Definition of Done** and save a new revision. It is off by default. Existing instances adopt definition changes at their next safe idle boundary; an active instance's currently applied permission remains in effect until that adoption. Saving a definition is not evidence that a running instance has already upgraded.
+
+Enabled active participants use `conversation_definition_of_done` in their current chat only:
+- Read with `{}`; the result is `{ markdown, revision }`.
+- Save with `{ markdown, expectedRevision, operationId }`, using the saved revision and a nonempty operation ID of at most 200 characters. Markdown is limited to 20,000 characters before trimming; empty text clears it.
+- Retry identical edits with the **same** operation ID. A replay returns its original result, which may be older than current criteria; read again for current state. Changing the text or expected revision under that ID conflicts. After a stale-revision error, read and review before starting a new logical edit with a new ID.
+
+Tool calls recheck active membership and the instance's applied capability, including receipt replay; Stop transitions block calls. This capability edits shared criteria, not authority, task completion or human approval. Agents without it still receive criteria through shared context. See [the opt-in contract](spec.md#opt-in-agent-definition-of-done-editing).
+
 ### Adding another agent instance
 
 **Implemented in candidate `a3a7fdf`; runtime/UI qualification outstanding ([WP-050](handoff.md#wp-050--multiple-agent-instances-and-supplemental-instructions)).** Use Participants → Add instance, or the picker's explicit add-another action. Select the definition, optionally name the instance (for example, Developer · Backend), and supply additional instructions. Inspect its base and instance instructions separately in Participants. Supplements are creation-only; they do not edit the shared definition, alter siblings or grant permissions.

@@ -7,7 +7,9 @@ description: Prepare and verify an explicitly requested Dispatch Web release usi
 
 Use when a release is requested. Read `AGENTS.md`, `CONTRIBUTING.md`, the relevant package README and changelog, and the maintained deployment/release decisions linked from the repository wiki home. A source push, package release, and application deployment are different outcomes.
 
-**Current state:** the repository is at design stage. It has no build, release, deployment, versioning, or CI workflow. This procedure does not establish those choices or authorize adding infrastructure.
+**Current tooling:** application/Nix builds and deployment procedures exist; see [CONTRIBUTING.md](../../CONTRIBUTING.md) and the [package usage guide](../../packages/web/docs/usage-guide.md). CI and release automation remain unconfigured. Establish the requested target and versioning policy rather than assuming a registry release or deployment.
+
+Follow the [testing policy](../../packages/web/docs/spec.md#testing-policy): artifact, smoke and browser checks below require an applicable explicit exception. A release request alone does not authorize tests.
 
 1. Establish the requested artifact or deployment target, release revision, audience, and existing authorization. Inspect current manifests, scripts, workflows, and maintained procedures. If essential release choices are still absent, prepare the concrete proposal and identify the unresolved decision before publication.
 2. Audit the relevant changelog with [cl.md](../prompts/cl.md). Use the established versioning policy if one exists; do not import Pi's lockstep versioning or invent a package publishing command.

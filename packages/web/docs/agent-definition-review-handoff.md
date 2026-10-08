@@ -1,6 +1,6 @@
 # Handoff to Claude: agent definition design review
 
-October 6, 2026. Chris requested an independent opinion on the design, with the proposed screen and its Pi Durable explainer available together. This is a review request; the advanced agent editor has not been approved for implementation.
+**Historical review request, October 6, 2026.** Chris requested an independent opinion on the original design, before implementation approval. The revised editor was subsequently approved and implemented in [WP-030](handoff.md#wp-030--agent-editor-and-existing-wiki-authorization), with generic connection setup corrected in [WP-031](handoff.md#wp-031--generic-mcp-connections). The implementation descriptions and review instructions below preserve that earlier baseline; they are not current editor/base-adoption contracts.
 
 ## Read and inspect these first
 

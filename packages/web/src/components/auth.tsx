@@ -1,3 +1,4 @@
+import { downloadBlob } from "../lib/download";
 import {
   startAuthentication,
   startRegistration,
@@ -589,12 +590,7 @@ function RecoveryCodes({
   const [saved, setSaved] = useState(false);
   function download() {
     const text = `Dispatch recovery codes for ${state.user.email}\n\nKeep these codes somewhere private. Each code can be used once with your password.\n\n${state.recoveryCodes?.join("\n")}\n`;
-    const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "dispatch-recovery-codes.txt";
-    anchor.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(new Blob([text], { type: "text/plain" }), "dispatch-recovery-codes.txt");
   }
   return (
     <AuthLayout

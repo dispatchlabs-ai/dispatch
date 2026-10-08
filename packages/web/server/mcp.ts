@@ -155,8 +155,7 @@ class McpConnection {
 
   private get managedRecord(): ManagedConnectionRecord | undefined { return this.managed?.record(this.config.id); }
 
-  descriptor(): AgentConnection {
-    const record = this.managedRecord;
+  descriptor(record = this.managedRecord): AgentConnection {
     return { id: this.config.id, name: this.config.name, endpoint: this.config.endpoint, identity: record?.identity || this.config.identity,
       extension: this.extensionName, source: this.managed ? "managed" : "operator",
       ...(record?.serverName || this.catalog.serverName ? { serverName: record?.serverName || this.catalog.serverName } : {}) };
@@ -164,7 +163,7 @@ class McpConnection {
 
   status(): AgentConnectionStatus {
     const managed = this.managedRecord;
-    return { ...this.descriptor(), status: this.error || (managed && managed.authorization !== "authorized") ? "unavailable" : this.client?.connectionState === "connected" ? "connected" : "disconnected",
+    return { ...this.descriptor(managed), status: this.error || (managed && managed.authorization !== "authorized") ? "unavailable" : this.client?.connectionState === "connected" ? "connected" : "disconnected",
       checkedAt: this.catalog.checkedAt || null,
       tools: this.catalog.tools.map(tool => ({ name: tool.name, description: tool.description ?? "", ...(tool.title || tool.annotations?.title ? { title: tool.title || tool.annotations?.title } : {}) })),
       ...(managed ? { scopes: managed.scopes, authentication: managed.authentication, authorization: managed.authorization,

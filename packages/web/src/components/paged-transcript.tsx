@@ -76,7 +76,8 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
     if (!threadId) {
       setRows(old => {
         const incoming = items(snapshot);
-        if (old.length && incoming.length && !incoming.some(item => old.some(previous => previous.id === item.id))) {
+        const incomingIds = new Set(incoming.map(item => item.id));
+        if (old.length && incoming.length && !old.some(item => incomingIds.has(item.id))) {
           historyLoaded.current = false;
           setCursor(snapshot.history?.before ?? null);
           return incoming;

@@ -15,6 +15,7 @@ import type {
 import { requireProjectAccess, type ProjectAction } from "../project-access.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata, messageAttachments } from "../attachments.js";
 import { managementTools } from "../agent-management.js";
+import { createDefinitionOfDone, CRITERIA_EXTENSION } from "./definition-of-done.js";
 import { ConversationTurns, TurnsDoc } from "./turns.js";
 import { PublicSummaryDoc, includePublicMessage } from "./summary.js";
 import { resolveAgentMentionLinks } from "./mentions.js";
@@ -92,6 +93,7 @@ export class SharedConversations {
   private readonly activityCache = new Map<ConversationId, { entries: EntryRecord[]; messages: ConversationMessage[]; memberId: string; joinedAt: number; groups: ParticipantActivity[] }>();
   beforeDelivery?: (tx: Tx, roomId: ConversationId, companyId: string, member: Member) => Promise<void>;
   readonly extension;
+  readonly definitionOfDoneExtension;
   readonly delivery;
   readonly legacyReporter;
   readonly stopTask;
@@ -100,6 +102,15 @@ export class SharedConversations {
   readonly contributions = new Contributions(this.turns);
 
   constructor(private readonly createAgent: (tx: Tx, roomId: ConversationId, companyId: string, definitionId: string) => Promise<Member>, private readonly attachments: AttachmentStore, management: Parameters<typeof managementTools>[0]) {
+    this.definitionOfDoneExtension = createDefinitionOfDone(async (tx, instanceId) => {
+      const binding = await tx.doc(BindingDoc, instanceId);
+      if (!binding.roomId || !binding.participantId) throw new CollaborationError(403, "Agent binding is unavailable.");
+      const room = await tx.doc(SharedDoc, binding.roomId);
+      const member = requireActiveMember(room, binding.participantId);
+      if (member.kind !== "agent" || member.conversationId !== instanceId || !member.agent?.extensions.includes(CRITERIA_EXTENSION)) throw new CollaborationError(403, "Edit Definition of Done is not enabled for this agent instance.");
+      if (room.stopping) throw new CollaborationError(409, "The conversation is stopping.");
+      return { roomId: binding.roomId, participantId: member.id, room };
+    });
     this.delivery = defineTask<{
       roomId: ConversationId; participantId: string; messageId: string; epoch: number; previous?: TaskId;
     }, { phase: "deliver" }, null>({
@@ -541,7 +552,7 @@ export class SharedConversations {
           return this.harness.commit(async tx => {
             const markers: string[] = [];
             for (const item of await this.contributions.forReviewer(tx, roomId, api.conversationId, api.taskId)) {
-              const marker = await this.contributions.handoff(tx, roomId, item, kind, assistant, results);
+              const marker = await this.contributions.handoff(tx, item, kind, assistant, results);
               if (marker) markers.push(marker);
             }
             return markers;
@@ -979,9 +990,13 @@ export class SharedConversations {
   }
 
   private async nativeSettlement(conversationId: ConversationId, ctx: Context): Promise<Pick<Member, "status" | "error">> {
-    const submissions: SubmissionRecord[] = []; let cursor: Cursor | undefined;
-    do { const page = await this.storage.scanSubmissions({ conversationId }, 200, cursor, ctx); submissions.push(...page.items); cursor = page.next; } while (cursor);
-    const latest = submissions.filter(item => item.type === "input" && (item.status === "done" || item.status === "unanswered")).sort((a, b) => Number(a.id) - Number(b.id)).at(-1);
+    let latest: SubmissionRecord | undefined; let cursor: Cursor | undefined;
+    // Pi Storage scans submissions in ascending ID order; only the latest settled input is needed.
+    do {
+      const page = await this.storage.scanSubmissions({ conversationId }, 200, cursor, ctx);
+      for (const item of page.items) if (item.type === "input" && (item.status === "done" || item.status === "unanswered")) latest = item;
+      cursor = page.next;
+    } while (cursor);
     if (latest?.status !== "unanswered") return { status: "idle" };
     if (latest.reason === "aborted") return { status: "stopped" };
     return { status: "failed", error: typeof latest.detail === "string" ? latest.detail : `Response ended: ${latest.reason}.` };
@@ -1115,10 +1130,10 @@ function publicAssistant(message: AssistantMessage): AssistantMessage {
 }
 
 function publicLive(live: LiveState): LiveState {
-  const result = copyJson(live, { omitUndefinedProperties: true }) as LiveState;
-  if (result.generation?.message) result.generation.message = copyJson(publicAssistant(result.generation.message), { omitUndefinedProperties: true }) as NonNullable<NonNullable<LiveState["generation"]>["message"]>;
-  result.tools = result.tools?.filter(tool => !tool.name.startsWith("conversation_"));
-  return result;
+  return copyJson({ ...live,
+    ...(live.generation?.message ? { generation: { ...live.generation, message: publicAssistant(live.generation.message) } } : {}),
+    tools: live.tools?.filter(tool => !tool.name.startsWith("conversation_")),
+  }, { omitUndefinedProperties: true }) as LiveState;
 }
 
 function isContextBoundary(entry: EntryRecord) { return entry.kind === "pi.reset" || entry.kind === "pi.compaction"; }
@@ -1174,7 +1189,8 @@ function messageMetadata({ images, ...message }: MessageData) {
 function recentMessages(messages: MessageData[]) {
   const recent: (ReturnType<typeof messageMetadata> & { textLength: number; textTruncated: boolean })[] = [];
   let remaining = 24_000;
-  for (const message of [...messages].reverse()) {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index];
     const text = message.text.slice(0, Math.min(remaining, 12_000));
     recent.unshift({ ...messageMetadata(message), text, textLength: message.text.length, textTruncated: text.length < message.text.length });
     remaining -= JSON.stringify(recent[0]).length;
