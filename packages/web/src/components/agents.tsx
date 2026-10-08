@@ -170,7 +170,7 @@ export function AgentsPage({
               {agent.instructions || "No additional instructions."}
             </Markdown>
           </section>
-          <AgentEvaluation key={agent.id} agentId={agent.id} readOnly={agent.archived} onGuardChange={onEvaluationGuardChange} />
+          <AgentEvaluation key={`evaluation:${agent.id}`} agentId={agent.id} readOnly={agent.archived} onGuardChange={onEvaluationGuardChange} />
           <AgentSkillsPanel selections={agent.skills ?? []} />
           <AgentConnectionsPanel key={agent.id} agentId={agent.id} />
           {agent.archived ? (
