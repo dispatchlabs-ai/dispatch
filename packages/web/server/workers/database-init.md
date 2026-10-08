@@ -154,8 +154,15 @@ bound-parameter settings enforced by the dedicated RDS parameter group. A new
 image and explicit operator-controlled attempt are required; this is not an
 automatic retry/resume or permission to reset partial state. Correction source/deslop
 review, TypeScript/application checks and Apple Silicon Nix build passed; flake
-evaluation passed with zero runnable checks and omitted Linux systems. No new
-runtime check or Linux image build is claimed here. Successful creation,
-complete RDS logging/privilege qualification and live application/browser behavior
+evaluation passed with zero runnable checks and omitted Linux systems.
+A subsequent focused macOS ARM64/PostgreSQL 17.11 TLS/SCRAM qualification denied
+the synthetic operator `SET log_parameter_max_length`: inherited `0` permitted
+full fresh creation and verification, whereas an unsafe inherited value was
+refused before any store role existed. Repeat-create refusal and password-free
+client/server logs also passed. The initial fixture needed an explicit safe
+server default; after correction, all eleven observations passed and the stopped
+fixture was removed. Receipt: `.local/rds-settings-result.json` in the initializer
+worktree. These observations do not establish the corrected image's RDS execution.
+Successful live creation, complete RDS logging/privilege qualification and live application/browser behavior
 remain unverified. This helper is preparation toward the live Surton URL, not
 completion of that handoff.
