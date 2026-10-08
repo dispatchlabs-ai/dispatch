@@ -1680,7 +1680,7 @@ Source publication: Deslop published the integrated five-finding package at `2e0
 
 ## Continuing simplification — October 8, 2026
 
-Chris authorized further focused passes after the five-finding delivery. Deslop owns integration, image-generation retry cleanup and cross-review; Developer owns justified frontend simplifications; Pi Durable Expert owns runtime/storage review; Documenter owns stale current guidance, artifact ownership and acceptance records. Supply scoped commits for integration, not independent publication. Stop when review finds no further evidence-backed simplification within the inspected scope; this is not a proof that the repository contains no slop.
+Chris authorized further focused passes after the five-finding delivery. Deslop owns integration, image-generation retry cleanup and cross-review; Developer owns justified frontend simplifications; Pi Durable Expert owns runtime/storage review; Documenter owns stale current guidance, artifact ownership and acceptance records. Supply scoped commits for integration, not independent publication. Chris clarified that the overall definition of done is no remaining slop, and rejected closing the task after only scoped audits. **Overall cleanup remains open:** expand review to the remaining repository paths and resolve concrete findings. The closeouts below describe delivered passes, not overall completion. Preserve required complexity and report uncertain contracts rather than deleting them speculatively.
 
 Acceptance:
 
@@ -1704,3 +1704,6 @@ Final reconciliation preserved concurrently published chat-performance source an
 
 
 Continuing-pass source publication: Deslop published the integrated cleanup at `e9dddd7`. Documenter independently verified remote `main` and the synchronized canonical checkout at `e9dddd7187c6594c27430e2d594f82453c5bdada`. This closes source delivery for the scoped audits, not runtime/rendered qualification, deployment or the broader chat-performance acceptance. No further cleanup is justified by the reviewed scope; uncertain compatibility and intentional artifacts remain preserved.
+
+
+Expanded documentation review: corrected the release skill's obsolete design-stage/no-build claim, made browser/release completion instructions explicitly defer to the canonical testing-policy exceptions, and replaced the root README's unmaintained deployment-version claim with the owning handoff link. These guidance corrections authorize no tests or deployment. Earlier publication and scoped review evidence remains valid; overall cleanup acceptance is reopened following Chris's clarification.
