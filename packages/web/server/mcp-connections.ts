@@ -7,7 +7,7 @@ import type { OAuthClientInformationMixed } from "@modelcontextprotocol/sdk/shar
 import { extractWWWAuthenticateParams } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { ConnectMcpInput, ConnectMcpResult, ConnectionAuthentication, ConnectionAuthorizationState, RuntimeScope } from "../src/shared/contracts.js";
 import { decryptSecret, digest, encryptSecret, loadSecretKey, randomToken } from "./auth/crypto.js";
-import { ConnectionError, connectionURL, exchangeCode, prepareOAuth, refreshTokens, revokeTokens, type OAuthConfiguration, type StoredTokens } from "./mcp-oauth.js";
+import { ConnectionError, RenewalError, connectionURL, exchangeCode, prepareOAuth, refreshTokens, revokeTokens, type OAuthConfiguration, type StoredTokens } from "./mcp-oauth.js";
 import { legacyWikiIdentity, verifyLegacyWikiIdentity } from "./legacy-wiki-connection.js";
 import { McpDatabase, MCP_SCHEMA, type ConnectionRow, type McpPostgresOptions } from "./storage/mcp-database.js";
 import { decryptMcpSecret, encryptMcpSecret } from "./storage/mcp-secrets.js";
@@ -311,7 +311,7 @@ export class McpConnections {
   private async saveCredential(id: string, credential: Credential) {
     const row = this.row(id);
     await this.db!.write([id], async query => {
-      await query("UPDATE mcp_connections SET secret=$1,refreshing=0 WHERE id=$2", [this.seal(JSON.stringify(credential), this.binding(row)), id]);
+      await query("UPDATE mcp_connections SET secret=$1,refreshing=0,error=CASE WHEN state='authorized' THEN NULL ELSE error END WHERE id=$2", [this.seal(JSON.stringify(credential), this.binding(row)), id]);
       if (credential.tokens) await query("UPDATE mcp_connections SET scopes=$1 WHERE id=$2", [JSON.stringify(credential.tokens.scope?.split(/\s+/).filter(Boolean) ?? []), id]);
     });
   }
@@ -330,7 +330,7 @@ export class McpConnections {
   beforeConnect(id: string) {
     return this.admit(async () => {
       const row = this.row(id);
-      if (!this.authorized(row)) throw new ConnectionError(401, "Connect this server in Settings → Connections.");
+      if (!this.authorized(row)) throw new ConnectionError(401, row.error ?? "Connect this server in Settings → Connections.");
       if (row.provider === "agent-wiki") await this.verifyLegacy(id, (await this.tokenOnce(id))!);
     });
   }
@@ -347,7 +347,7 @@ export class McpConnections {
 
   private async tokenOnce(id: string): Promise<string | undefined> {
     const row = this.row(id);
-    if (!this.authorized(row)) throw new ConnectionError(401, "Connect this server in Settings → Connections.");
+    if (!this.authorized(row)) throw new ConnectionError(401, row.error ?? "Connect this server in Settings → Connections.");
     if (row.authentication !== "oauth") return undefined;
     const credential = this.credential(row), tokens = credential.tokens;
     if (!tokens) throw new ConnectionError(401, "Authorize this connection again.");
@@ -369,9 +369,13 @@ export class McpConnections {
       await this.saveCredential(row.id, credential);
       if (!this.authorized(this.row(row.id))) throw new ConnectionError(401, "This connection was disconnected during renewal.");
       return credential.tokens.access_token;
-    } catch {
-      if (this.authorized(this.row(row.id))) await this.mark(row.id, "reauthorize", "Credential renewal could not be confirmed. Authorize this connection again.");
-      throw new ConnectionError(401, "This connection needs authorization again.");
+    } catch (error) {
+      if (!this.authorized(this.row(row.id))) throw new ConnectionError(401, "This connection was disconnected during renewal.");
+      const failure = error instanceof RenewalError ? error : new RenewalError(false, "Credential renewal could not be saved. Authorize this connection again.");
+      // A queued disconnect must not be overwritten while this failure write waits.
+      await this.db!.write([row.id], query => query("UPDATE mcp_connections SET state=$1,error=$2,refreshing=0 WHERE id=$3 AND state='authorized'",
+        [failure.retryable ? "authorized" : "reauthorize", failure.message, row.id]));
+      throw failure;
     }
   }
 

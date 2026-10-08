@@ -10,6 +10,20 @@ export class ConnectionError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
 }
 
+export class RenewalError extends ConnectionError {
+  constructor(readonly retryable: boolean, message: string) { super(retryable ? 503 : 401, message); }
+}
+
+function connectionFailure(error: unknown): string | undefined {
+  if (error instanceof AggregateError) {
+    const codes = error.errors.map(connectionFailure);
+    return codes.length > 0 && codes.every(Boolean) ? codes.join(", ") : undefined;
+  }
+  if (!(error instanceof Error)) return undefined;
+  if ("code" in error && ["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "ENETUNREACH", "EHOSTUNREACH", "UND_ERR_CONNECT_TIMEOUT"].includes(String(error.code))) return String(error.code);
+  return connectionFailure(error.cause);
+}
+
 export function connectionURL(value: string | URL) {
   const url = new URL(value);
   const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
@@ -125,11 +139,41 @@ export async function exchangeCode(config: OAuthConfiguration, client: OAuthClie
 }
 
 export async function refreshTokens(config: OAuthConfiguration, client: OAuthClientInformationMixed, previous: StoredTokens) {
-  if (!previous.refresh_token) throw new ConnectionError(401, "This server did not issue a refresh token. Authorize the connection again.");
+  if (!previous.refresh_token) throw new RenewalError(false, "This server did not issue a refresh token. Authorize the connection again.");
   // Use the single-exchange primitive: an uncertain rotating refresh must never
   // trigger another exchange or an unattended authorization flow.
-  return storedTokens(await refreshAuthorization(config.issuer, { metadata: config.metadata, clientInformation: client,
-    refreshToken: previous.refresh_token, resource: config.resource, fetchFn: oauthFetch }), config, previous);
+  const refreshFetch: typeof fetch = async (input, init) => {
+    const response = await oauthFetch(input, init);
+    if (!response.ok) {
+      // The SDK also maps malformed/non-OAuth responses to ServerError. Inspect
+      // the actual response so those cannot be mistaken for a safe retry.
+      const body: unknown = await response.clone().json().catch(() => undefined);
+      const code = body && typeof body === "object" && "error" in body ? body.error : undefined;
+      if (code === "server_error" || code === "temporarily_unavailable") {
+        await response.body?.cancel();
+        throw new RenewalError(true, "Credential renewal is temporarily unavailable. Try again.");
+      }
+      if (code === "invalid_grant" || code === "invalid_client" || code === "unauthorized_client") {
+        await response.body?.cancel();
+        throw new RenewalError(false, "The server rejected the renewal credentials. Authorize this connection again.");
+      }
+    }
+    return response;
+  };
+  try {
+    return storedTokens(await refreshAuthorization(config.issuer, { metadata: config.metadata, clientInformation: client,
+      refreshToken: previous.refresh_token, resource: config.resource, fetchFn: refreshFetch }), config, previous);
+  } catch (error) {
+    // Only failures known not to have exchanged the token can be retried.
+    // A timeout/reset after sending, or a malformed success, may hide rotation.
+    if (error instanceof RenewalError) throw error;
+    const connectionError = connectionFailure(error);
+    if (connectionError) {
+      throw new RenewalError(true, `Credential renewal could not connect (${connectionError}). Try again.`);
+    }
+    // Never retain provider descriptions: they can contain credential material.
+    throw new RenewalError(false, "Credential renewal has an uncertain outcome. Authorize this connection again.");
+  }
 }
 
 export async function revokeTokens(config: OAuthConfiguration, client: OAuthClientInformationMixed, tokens: StoredTokens) {
