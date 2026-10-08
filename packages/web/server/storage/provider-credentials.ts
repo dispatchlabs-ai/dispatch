@@ -149,6 +149,12 @@ export class PostgresCredentialStore implements CredentialStore {
       // crash would lose this marker and silently reuse a rotated refresh token.
       await this.query(`INSERT INTO dispatch_provider_auth.credentials (installation, provider, pending)
         VALUES ($1, $2, TRUE) ON CONFLICT (installation, provider) DO UPDATE SET pending=TRUE`, [this.installation, providerId]);
+      // Cancellation may arrive during the intent write. Before fn has run,
+      // clearing this marker is safe; failed cleanup still poisons the store.
+      if (options?.signal?.aborted) {
+        await this.query("UPDATE dispatch_provider_auth.credentials SET pending=FALSE WHERE installation=$1 AND provider=$2", [this.installation, providerId]);
+        options.signal.throwIfAborted();
+      }
       // Do not retry fn or clear intent on rejection: external effects may exist.
       const next = await fn(current);
       this.healthy();
