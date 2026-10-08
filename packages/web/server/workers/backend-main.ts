@@ -3,6 +3,7 @@ import { backendWorkerMcp } from "./mcp.js";
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import { serve } from "@hono/node-server";
 import { createServer as createHttpsServer } from "node:https";
 import { createSecureContext } from "node:tls";
@@ -41,6 +42,24 @@ const workerConfig = z.object({
   authStoreConfigFile: z.string().startsWith("/").optional(),
   mcpStoreConfigFile: z.string().startsWith("/").optional(),
   routingStoreConfigFile: z.string().startsWith("/").optional(), directoryStoreConfigFile: z.string().startsWith("/").optional(), tls: z.object({ keyFile: z.string().startsWith("/"), certFile: z.string().startsWith("/") }).strict().optional(), postgresStores: z.object({ adminUrlFile: z.string().startsWith("/"), caFile: z.string().startsWith("/").optional() }).strict(), artifacts: s3ArtifactsConfigSchema, installationId: z.string().min(1), workerKeyFile: z.string(), launcherTokenFile: z.string(), operatorTokenFile: z.string(), launcherUrl: z.url(), launcherTimeoutMs: z.number().int().min(1000).max(3_600_000).default(300_000), configurationRevision: z.string().min(1) }).strict().parse(JSON.parse(await readFile(filename, "utf8")));
+// Recovery belongs to this invocation, never a retained deployment setting.
+const { values: recovery } = parseArgs({ options: {
+  "recover-routing-owner": { type: "string" },
+  "recover-provider-owner": { type: "string" },
+  "recover-mcp-owner": { type: "string" },
+  "confirm-retired-backend": { type: "boolean", default: false },
+} });
+const recovering = Boolean(recovery["recover-routing-owner"] || recovery["recover-provider-owner"] || recovery["recover-mcp-owner"]);
+if (recovering !== recovery["confirm-retired-backend"])
+  throw new Error("Owner recovery requires exact owner IDs and --confirm-retired-backend after independently confirming old backend termination.");
+for (const [owner, configuration] of [
+  [recovery["recover-routing-owner"], workerConfig.routingStoreConfigFile],
+  [recovery["recover-provider-owner"], workerConfig.providerStoreConfigFile],
+  [recovery["recover-mcp-owner"], workerConfig.mcpStoreConfigFile],
+]) {
+  if (owner !== undefined && (!configuration || !z.string().uuid().safeParse(owner).success))
+    throw new Error("Recovery requires a UUID owner ID and the corresponding PostgreSQL store configuration.");
+}
 // Load configured identity before opening stores; missing/invalid TLS never falls back to HTTP.
 const tls = workerConfig.tls ? {
   key: await readFile(workerConfig.tls.keyFile), cert: await readFile(workerConfig.tls.certFile),
@@ -83,9 +102,10 @@ for (const store of [providerConfig, authConfig, mcpConfig]) {
 }
 const startupCleanup: Array<() => void | Promise<void>> = [];
 try {
-const routes = routingConfig ? await openConfiguredWorkerRoutes(routingConfig)
+const routes = routingConfig ? await openConfiguredWorkerRoutes(routingConfig, recovery["recover-routing-owner"])
   : await WorkerRoutes.open(join(config.stateDir, "routing"), workerConfig.installationId);
 startupCleanup.push(() => routes.close());
+if (recovering) await routes.setAdmissionBlocked(true);
 const admission = new WriteAdmission(routes.admissionBlocked(), async blocked => { await routes.setAdmissionBlocked(blocked); });
 const artifacts = await S3Artifacts.open(workerConfig.artifacts);
 startupCleanup.push(() => artifacts.close());
@@ -97,7 +117,7 @@ const operatorToken = (await readFile(workerConfig.operatorTokenFile, "utf8")).t
 await mkdir(config.stateDir, { recursive: true, mode: 0o700 });
 await mkdir(config.workspaceDir, { recursive: true, mode: 0o700 });
 startupCleanup.push(() => { cleanupSessionResources(); });
-const credentials = providerConfig ? await openConfiguredProviderCredentials(providerConfig) : undefined;
+const credentials = providerConfig ? await openConfiguredProviderCredentials(providerConfig, recovery["recover-provider-owner"]) : undefined;
 if (credentials) {
   startupCleanup.push(() => credentials.close());
   await credentials.quiesce();
@@ -106,7 +126,7 @@ const provider = await openModels(process.env, credentials, false);
 const auth = authConfig ? await openConfiguredAuth(authConfig, config) : await createAuth({ databasePath: join(config.stateDir, "auth.sqlite"), secretPath: join(config.stateDir, "auth.key"), origin: config.origin, rpId: config.rpId, companyId: config.companyId, companyName: config.companyName });
 startupCleanup.push(() => auth.close());
 await auth.quiesce();
-const connections = mcpConfig ? await openConfiguredMcpConnections(mcpConfig, config.origin) : new McpConnections(join(config.stateDir, "connections.sqlite"), join(config.stateDir, "connections.key"), config.origin);
+const connections = mcpConfig ? await openConfiguredMcpConnections(mcpConfig, config.origin, recovery["recover-mcp-owner"]) : new McpConnections(join(config.stateDir, "connections.sqlite"), join(config.stateDir, "connections.key"), config.origin);
 startupCleanup.push(() => connections.close());
 await connections.quiesce();
 const support = new WriteAdmission(true, async () => {});
