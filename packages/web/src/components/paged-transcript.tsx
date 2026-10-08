@@ -155,7 +155,7 @@ function ActivityDetail({ activity, participants, chatId }: { activity: Particip
   }, [open, activity.detail?.version, before, url, api]);
   if (!activity.detail) return <PublicActivity activity={activity} participants={participants} />;
   const name = participants.find(person => person.id === activity.participantId)?.name ?? "Agent";
-  return <section className="conversation-entry">
+  return <section className="conversation-entry participant-activity"><div className="participant-body">
     <Button variant="secondary" aria-expanded={open} onClick={() => setOpen(value => !value)}>{name} · {activity.detail.active ? "Working" : "Activity"} · {activity.detail.count} records</Button>
     {open ? <>
       {error ? <Notice>{error}</Notice> : null}
@@ -166,5 +166,5 @@ function ActivityDetail({ activity, participants, chatId }: { activity: Particip
         <a href={`${url}?download=1`}>Download complete activity</a>
       </>}
     </> : null}
-  </section>;
+  </div></section>;
 }
