@@ -8,7 +8,7 @@ import {
   type EntryId, type HookApi, type SubmissionRecord, type TaskId, type Tx,
 } from "@earendil-works/pi-durable";
 import type {
-  Attachment, AgentParticipant, ConversationMessage, ConversationParticipant, ParticipantActivity, SendMessageInput, RuntimeScope,
+  Attachment, AgentConnection, AgentParticipant, ConversationMessage, ConversationParticipant, ParticipantActivity, SendMessageInput, RuntimeScope,
 } from "../../src/shared/contracts.js";
 import { requireProjectAccess, type ProjectAction } from "../project-access.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata, messageAttachments } from "../attachments.js";
@@ -25,7 +25,7 @@ export type PeopleDirectory = {
 export type Member = {
   id: string; kind: "human" | "agent"; name: string; joinedAt: number;
   userId?: string; agentDefinitionId?: string; agentRevision?: number; conversationId?: ConversationId;
-  agent?: { [K in keyof AgentParticipant["agent"]]: AgentParticipant["agent"][K] };
+  agent?: { [K in keyof AgentParticipant["agent"]]: AgentParticipant["agent"][K] } & { connections?: AgentConnection[] };
   status: "idle" | "working" | "listening" | "silent" | "stopped" | "failed"; error?: string;
   threadId?: string | null; lastDelivery?: TaskId;
   activeDelivery?: TaskId; consideredThrough?: string; publicationPriority?: boolean; superseded?: TaskId[];
