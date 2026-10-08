@@ -212,20 +212,42 @@ export class McpConnections {
     }
     const id = existing?.id ?? randomUUID();
     const state = randomToken();
+    const binding = { id, company_id: scope.companyId, owner_id: scope.userId, endpoint, authentication: input.authentication };
+    // OAuth discovery may dynamically register a client. Commit a request receipt
+    // before setup, not just before exchanging its eventual authorization code.
+    // No pending callback means setup is unconfirmed: same-request replay refuses
+    // to register again; the actor must explicitly start a new attempt.
+    if (input.authentication === "oauth") {
+      await this.db!.write([id], async query => {
+        await query(`INSERT INTO mcp_connections (id,company_id,owner_id,name,endpoint,state,authentication,provider,config,secret,scopes,created_at,error)
+          VALUES ($1,$2,$3,$4,$5,'pending',$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(id) DO UPDATE SET
+          name=excluded.name,state=excluded.state,config=excluded.config,secret=excluded.secret,scopes=excluded.scopes,
+          error=excluded.error,refreshing=0,disconnect_notice=NULL`,
+          [id, scope.companyId, scope.userId, input.name.trim(), endpoint, input.authentication, existing?.provider ?? "",
+            existing?.config ?? "{}", this.seal(JSON.stringify({ client: priorCredential?.client }), this.binding(binding)),
+            existing?.scopes ?? JSON.stringify(input.scopes ?? []), Date.now(), "Authorization setup is unconfirmed. Start a new attempt if interrupted."]);
+        await query("UPDATE mcp_oauth_pending SET consumed=1 WHERE connection_id=$1", [id]);
+        await query("INSERT INTO mcp_connection_requests VALUES ($1,$2,$3,$4)", [scope.sessionId, input.requestId, id, fingerprint]);
+      });
+    }
     let config: OAuthConfiguration | undefined;
     let credential: Credential = {};
     let authorization: { authorizationUrl: URL; codeVerifier: string } | undefined;
     if (input.authentication === "oauth") {
-      const prepared = await prepareOAuth(endpoint, this.redirectURI, state, { ...input,
-        scopes: existing ? JSON.parse(existing.scopes) as string[] : input.scopes,
-        clientId: input.clientId ?? priorCredential?.client?.client_id,
-        clientSecret: input.clientSecret ?? (!input.clientId || input.clientId === priorCredential?.client?.client_id ? priorCredential?.client?.client_secret : undefined),
-        expectedIssuer: existing ? (JSON.parse(existing.config) as OAuthConfiguration).issuer : undefined });
-      config = prepared.config; credential = { client: prepared.client }; authorization = prepared;
+      try {
+        const prepared = await prepareOAuth(endpoint, this.redirectURI, state, { ...input,
+          scopes: existing ? JSON.parse(existing.scopes) as string[] : input.scopes,
+          clientId: input.clientId ?? priorCredential?.client?.client_id,
+          clientSecret: input.clientSecret ?? (!input.clientId || input.clientId === priorCredential?.client?.client_id ? priorCredential?.client?.client_secret : undefined),
+          expectedIssuer: existing ? (JSON.parse(existing.config) as OAuthConfiguration).issuer : undefined });
+        config = prepared.config; credential = { client: prepared.client }; authorization = prepared;
+      } catch (error) {
+        await this.mark(id, "reauthorize", "Authorization setup could not be confirmed. Start a new attempt; revoke any unused registration at the provider if needed.");
+        throw error;
+      }
     } else if (input.authentication === "bearer") {
       credential.headers = { Authorization: `Bearer ${input.token}` };
     } else if (input.authentication === "headers") credential.headers = input.headers;
-    const binding = { id, company_id: scope.companyId, owner_id: scope.userId, endpoint, authentication: input.authentication };
     const pending: PendingRow = { state_hash: digest(state), connection_id: id, session_id: scope.sessionId,
       verifier: "", expires_at: Date.now() + 15 * 60_000, request_id: input.requestId, fingerprint,
       authorization_url: "", consumed: 0 };
@@ -242,7 +264,7 @@ export class McpConnections {
           [pending.state_hash, id, scope.sessionId, this.seal(authorization.codeVerifier, [...context, "verifier"]), pending.expires_at,
             input.requestId, fingerprint, this.seal(authorization.authorizationUrl.href, [...context, "url"])]);
       }
-      await query("INSERT INTO mcp_connection_requests VALUES ($1,$2,$3,$4)", [scope.sessionId, input.requestId, id, fingerprint]);
+      if (input.authentication !== "oauth") await query("INSERT INTO mcp_connection_requests VALUES ($1,$2,$3,$4)", [scope.sessionId, input.requestId, id, fingerprint]);
     });
     return { id, ...(authorization ? { authorizationUrl: authorization.authorizationUrl.href } : {}) };
   }
