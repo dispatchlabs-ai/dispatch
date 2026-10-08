@@ -57,7 +57,7 @@ const BundleImportsDoc = defineDoc<{ imports: BundleImportReceipt[] }>({
 type TrackedBundleEntry = { key: string; id: string; revision: number; baseline: string; upstream: string; present: boolean };
 type TrackedBundle = GitHubInstallation & { companyId: string; agents: TrackedBundleEntry[]; skills: TrackedBundleEntry[] };
 type SavedGitHubPreview = {
-  id: string; companyId: string; userId: string; preview: string; expectedInstallationRevision: number;
+  id: string; companyId: string; userId: string; expiresAt: number; preview: string; expectedInstallationRevision: number;
   expectedAgents: { id: string; revision: number }[]; expectedSkills: { id: string; revision: number }[];
   agents: StoredAgent[]; skills: StoredSkill[]; next: TrackedBundle;
 };
@@ -625,8 +625,13 @@ export class DispatchRuntime {
         companyId: scope.companyId, packageId: bundle.id, packageVersion: bundle.version, source, digest: preview.digest,
         updatedAt: Date.now(), agents: detached(prior?.agents ?? []), skills: detached(prior?.skills ?? []) };
       const saved: SavedGitHubPreview = { id: preview.previewId, companyId: scope.companyId, userId: scope.userId,
-        preview: "", expectedInstallationRevision: prior?.revision ?? 0, expectedAgents: [], expectedSkills: [], agents: [], skills: [], next };
+        expiresAt: Date.now() + 30 * 60_000, preview: "", expectedInstallationRevision: prior?.revision ?? 0, expectedAgents: [], expectedSkills: [], agents: [], skills: [], next };
       const now = Date.now();
+      for (const entry of next.agents) {
+        const local = latestAgent(catalog, scope.companyId, entry.id);
+        const names = local ? [...new Set([...(local.connections ?? []), ...this.connections.forAgent(local.id, managedIds(local))].map(connection => connection.name))] : [];
+        if (names.length) preview.warnings.push(`${local!.name}: retained local connections: ${names.join(", ")}. Updated instructions can use their existing authority.`);
+      }
       // Removed entries retain both their local records and identity for a later reappearance.
       for (const kind of ["skills", "agents"] as const) {
         for (const entry of next[kind]) {
@@ -681,9 +686,6 @@ export class DispatchRuntime {
         preview.changes.push({ kind: "agent", key: incoming.key, name: incoming.name, action: conflict ? "conflict" : !entry ? "add" : changed && JSON.stringify(agentContent(local!)) !== desiredContent ? "update" : "unchanged",
           before: entry ? JSON.parse(entry.upstream) : null, local: local ? portableTrackedAgent(incoming.key, local, next.skills) : null, incoming });
         if (conflict) { preview.blockers.push(`${incoming.name}: local agent edits or archive state conflict with this update. Import a separate copy.`); continue; }
-        const retainedConnections = local ? [...new Set([...(local.connections ?? []), ...this.connections.forAgent(local.id, managedIds(local))].map(connection => connection.name))] : [];
-        if (retainedConnections.length)
-          preview.warnings.push(`${incoming.name}: retained local connections: ${retainedConnections.join(", ")}. Updated instructions can use their existing authority.`);
         const write = !local || (changed && JSON.stringify(agentContent(local)) !== desiredContent);
         const record: StoredAgent = write ? { ...desired, id: entry?.id ?? randomUUID(), revision: (local?.revision ?? 0) + 1, archived: false,
           extensions: [...selection.extensions, ...(local?.extensions ?? []).filter(isMcpExtension)],
@@ -695,7 +697,18 @@ export class DispatchRuntime {
         if (entry) Object.assign(entry, updated); else next.agents.push(updated);
       }
       saved.preview = JSON.stringify(preview);
-      state.previews.push(saved);
+      // Bound abandoned review plans independently of permanent committed import receipts.
+      const size = (value: SavedGitHubPreview) => Buffer.byteLength(JSON.stringify(value));
+      const actorLimit = 32 * 1024 * 1024;
+      if (size(saved) > actorLimit) throw new RuntimeError(413, "This update preview is too large. Use smaller packages.");
+      state.previews = state.previews.filter(item => item.expiresAt > now);
+      const own = state.previews.filter(item => item.companyId === scope.companyId && item.userId === scope.userId);
+      own.push(saved);
+      while (own.length > 3 || own.reduce((bytes, item) => bytes + size(item), 0) > actorLimit) own.shift();
+      state.previews = state.previews.filter(item => item.companyId !== scope.companyId || item.userId !== scope.userId);
+      state.previews.push(...own);
+      if (state.previews.reduce((bytes, item) => bytes + size(item), 0) > 64 * 1024 * 1024)
+        throw new RuntimeError(503, "Bundle preview storage is full. Retry after older previews expire.");
       return detached(preview);
     }, context);
   }
@@ -708,10 +721,11 @@ export class DispatchRuntime {
         if (replay.previewId !== input.previewId) throw requestConflict();
         return detached(replay.result);
       }
-      const saved = state.previews.find(item => item.id === input.previewId && item.companyId === scope.companyId && item.userId === scope.userId);
-      if (!saved) throw new RuntimeError(404, "Bundle preview not found. Preview the pinned commit again.");
       // A preview is a single admission, even if a client mistakenly supplies a fresh request ID.
-      if (state.receipts.some(item => item.previewId === saved.id)) throw new RuntimeError(409, "This preview was already applied. Preview again to create another copy.");
+      if (state.receipts.some(item => item.companyId === scope.companyId && item.userId === scope.userId && item.previewId === input.previewId))
+        throw new RuntimeError(409, "This preview was already applied. Preview again to create another copy.");
+      const saved = state.previews.find(item => item.id === input.previewId && item.companyId === scope.companyId && item.userId === scope.userId);
+      if (!saved || saved.expiresAt <= Date.now()) throw new RuntimeError(404, "Bundle preview expired or was replaced. Preview the pinned commit again.");
       const preview = JSON.parse(saved.preview) as GitHubBundlePreview;
       if (preview.blockers.length) throw new RuntimeError(409, "Resolve the preview conflicts or import a separate copy.");
       const prior = state.installations.find(item => item.id === saved.next.id && item.companyId === scope.companyId);
@@ -735,6 +749,7 @@ export class DispatchRuntime {
         agents: next.agents.filter(item => item.present).map(({ key, id }) => ({ key, id })),
         skills: next.skills.filter(item => item.present).map(({ key, id }) => ({ key, id })) };
       state.receipts.push({ companyId: scope.companyId, userId: scope.userId, requestId: input.requestId, previewId: input.previewId, result });
+      state.previews = state.previews.filter(item => item.id !== saved.id && item.expiresAt > Date.now());
       return detached(result);
     }, context);
   }
