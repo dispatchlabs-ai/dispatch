@@ -1317,7 +1317,7 @@ Acceptance evidence:
 - Developer reports TypeScript/application builds passing (existing Vite chunk-size advisory only). Deployer reports Apple Silicon `nix build --no-link` and `nix flake check` passing from Git-indexed source; output contains compiled skill modules and byte-identical LICENSE/Dispatch NOTICE. Linux/container builds remain unverified.
 - Catalog/UI availability, assignment/loading, restart preservation and browser execution through these imported skills remain functionally unverified. The earlier disposable CLI pilot does not qualify this integration. Credential-safe enrollment/TOTP entry and useful full-use-case recording remain unresolved. No automated regression suite was introduced.
 
-Source publication remains pending. The running canonical checkout will not be fast-forwarded during this slice because its backend watcher would activate the change; local activation requires a separate rollout decision. No live service or global tooling changes were performed.
+Published source: `f055974`, independently verified on remote main. Chris subsequently approved local activation and clarified that development hot reload needs no manual restart. Developer checked that the canonical checkout already includes this commit and corrected the earlier activation-pending report. Catalog entries and assigned-skill loading remain unverified; checkout presence is not runtime evidence. No manual restart or global tooling change was needed.
 
 ## In-place agent upgrades — October 8, 2026
 
