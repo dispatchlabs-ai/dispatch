@@ -55,7 +55,7 @@ Scale to zero and confirm STOPPED before enrollment/recovery CLI, file-copy back
 
 Destroy removes the service/ALB/access point and roles but not caller-owned storage or retained task-definition revisions. Data remains under the documented backing prefix; deleting it is a separate explicit operator action. Preserve image digests and a consistent backup for recovery. Rename/root-path changes require deliberate data migration.
 
-Compatibility checks: Terraform 1.16.5 and OpenTofu 1.12.6 init/validate passed locally; live deployment, SQLite qualification, artifact execution and consumer plan remain pending. Build/source checks do not establish live compatibility.
+[WP-041](../../docs/handoff.md#wp-041--generic-aws-container-deployment) owns dated validation, synthetic consumer-plan and isolated amd64 artifact-execution evidence. Live AWS plan/deployment, ARM execution and AWS SQLite/storage qualification remain pending. These checks do not establish live compatibility.
 
 ## CPU architecture
 
