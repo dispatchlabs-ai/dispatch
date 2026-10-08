@@ -379,6 +379,8 @@ The current editor groups Identity, Instructions, Model, installed Capabilities,
 
 ### Legacy personal groups
 
+**Superseded October 8, 2026:** Chris clarified that projects are shared-only and requested removal of obsolete personal-group code paths, not merely hiding their UI. The following is historical compatibility documentation, not authorization to retain personal-group creation or assignment behavior. Implementation and any stored-record/retry handling must be recorded in the handoff; removing feature support does not authorize automatic audience expansion or deletion of native chat history.
+
 **Legacy contract, accepted October 5, 2026:** retain the approved [desktop design](assets/projects-desktop.png) locally. A project requires only a name. Many conversations may belong to one project; each conversation belongs to at most one project or remains unassigned. Additional project fields remain unspecified.
 
 - Projects live inside Conversations, with a visible New project action and a name-only anchored form. Collapsible groups contain their conversations; unassigned chats appear under Without a project. Search matches project names and conversation titles. Archive navigation remains available at the bottom.

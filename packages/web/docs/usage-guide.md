@@ -486,7 +486,7 @@ New project now creates an empty shared project with you as its manager. Project
 
 For custom setup, **New chat** opens the chooser. Default agents are preselected when starting a chat in the project; adjust the selection before creating it, including selecting none for a people-only conversation. Existing conversations keep their own participants and configuration. Add human access through project settings, not the conversation invitation picker. Default agents are not an allowed-agent restriction.
 
-Old projects remain **personal groupings** with unchanged invite-only conversation access. Their grouping moves remain private organizational changes. Shared projects cannot receive existing conversations or move their conversations to another audience in this slice. No automatic migration expands access.
+**Shared-only decision, October 8:** personal groupings are no longer a supported product workflow; removal of their obsolete code paths is in progress. References to personal-group moves above describe the previous implementation, not the target behavior. Shared projects cannot receive existing chats or move their chats to another audience in this slice. Removing personal-group support does not automatically expand chat access.
 
 Operators can set `DISPATCH_READ_ALL_PROJECT_USER_IDS` to comma-separated stable user IDs from the company's authenticated people directory. The default is empty. These users can read all shared projects in their company but cannot participate or manage settings without explicit membership. The grant excludes standalone conversations and legacy personal groupings. Changing it requires a backend restart. No grant for Ben or another person is inferred from a display name or provisioned by this release.
 
