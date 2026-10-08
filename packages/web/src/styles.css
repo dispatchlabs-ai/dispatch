@@ -1181,4 +1181,5 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 
 .bundle-actions { flex-wrap: wrap; }
 .bundle-provenance { overflow-wrap: anywhere; font-size: var(--text-sm); color: var(--color-muted); }
-.bundle-content > div:not([hidden]):has(> .field) { display: grid; gap: var(--space-4); }
+
+.bundle-content[hidden] { display: none; }

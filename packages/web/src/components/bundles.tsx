@@ -98,7 +98,7 @@ export function BundlesDialog({ open, onClose, agents, models, onImported }: {
       <div hidden={mode !== "github"}><GitHubBundles onImported={onImported} onBusyChange={setGithubBusy} /></div>
       <div hidden={mode === "github"}>
       {error ? <Notice>{error}</Notice> : null}
-      {mode !== "export" ? <>
+      <div className="bundle-content" hidden={mode === "export"}>
         <StarterPicker models={models} disabled={busy} onPreview={selection => void chooseStarter(selection)} />
         <Field label="Bundle ZIP" hint="Up to 8 MiB. Local copies only.">{props => <Input {...props} type="file" accept=".zip,application/zip" disabled={busy} onChange={event => { void chooseFile(event.target.files?.[0]); event.target.value = ""; }} />}</Field>
         {preview ? <>
@@ -121,14 +121,15 @@ export function BundlesDialog({ open, onClose, agents, models, onImported }: {
             <Button disabled={busy || !authorized || preview.blockers.length > 0} onClick={() => void importBundle()}>{busy ? <Spinner /> : null}{attempted ? "Retry same import" : "Import copies"}</Button>
           </>}
         </> : null}
-      </> : <>
+      </div>
+      <div className="bundle-content" hidden={mode !== "export"}>
         <Field label="Package ID">{props => <Input {...props} value={id} disabled={busy} maxLength={100} onChange={event => setId(event.target.value)} />}</Field>
         <Field label="Version">{props => <Input {...props} value={version} disabled={busy} maxLength={100} onChange={event => setVersion(event.target.value)} />}</Field>
         <fieldset disabled={busy}><legend>Agents</legend>{agents.filter(agent => !agent.archived).map(agent => <label className="choice-row" key={agent.id}><input type="checkbox" checked={selectedAgents.includes(agent.id)} onChange={() => setSelectedAgents(toggle(selectedAgents, agent.id))} /><span>{agent.name}</span></label>)}</fieldset>
         <fieldset disabled={busy}><legend>Additional skills</legend>{skills.map(skill => <label className="choice-row" key={skill.id}><input type="checkbox" checked={selectedSkills.includes(skill.id)} onChange={() => setSelectedSkills(toggle(selectedSkills, skill.id))} /><span>{skill.name} <small>Revision {skill.revision}</small></span></label>)}</fieldset>
         <Notice tone="info">Assigned skill revisions are included. Connections and credentials are excluded. Review instruction text for private information before sharing.</Notice>
         <Button disabled={busy || (!selectedAgents.length && !selectedSkills.length) || !id || !version} onClick={() => void exportBundle()}>{busy ? <Spinner /> : null}Download ZIP</Button>
-      </>}
+      </div>
       </div>
     </div>
   </Modal>;
