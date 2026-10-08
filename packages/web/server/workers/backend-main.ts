@@ -155,20 +155,28 @@ app.post("/internal/replace", async c => {
   })));
   return c.json({ conversationId, attemptId: replacement.attemptId, phase: replacement.phase });
 });
+// Keep worker support available until the launcher confirms retirement.
+async function drainBackend() {
+  await admission.quiesce();
+  await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/drain", {}, undefined, workerConfig.launcherTimeoutMs);
+  const status = await workerRequest<LauncherStatus>(workerConfig.launcherUrl, launcherToken, "/v1/status");
+  if (!status.drainComplete) throw new Error("Worker retirement remains unresolved.");
+  await support.quiesce();
+  await connections.quiesce();
+  await auth.quiesce();
+}
 app.post("/internal/drain", async c => {
   if (!tokenMatches(operatorToken, c.req.header("Authorization"))) return c.json({ error: "Forbidden" }, 403);
-  await operatorTransition(async () => {
-    await admission.quiesce();
-    await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/drain", {}, undefined, workerConfig.launcherTimeoutMs);
-    const status = await workerRequest<LauncherStatus>(workerConfig.launcherUrl, launcherToken, "/v1/status");
-    if (!status.drainComplete) throw new Error("Worker retirement remains unresolved.");
-    await support.quiesce();
-  });
+  await operatorTransition(drainBackend);
   return c.json({ quiesced: admission.quiesced && support.quiesced });
 });
 app.post("/internal/undrain", async c => {
   if (!tokenMatches(operatorToken, c.req.header("Authorization"))) return c.json({ error: "Forbidden" }, 403);
   await operatorTransition(async () => {
+    if (closing) throw new Error("Backend shutdown is in progress.");
+    await connections.resume();
+    await auth.resume();
+    if (!connections.admitting || !auth.admitting) throw new Error("Credential admission remains closed.");
     await support.resume();
     await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/undrain", {}, undefined, workerConfig.launcherTimeoutMs);
     await admission.resume();
@@ -192,5 +200,27 @@ const server = tls
   ? serve({ ...listener, createServer: createHttpsServer, serverOptions: tls })
   : serve(listener);
 let closing = false;
-async function close() { if (closing) return; closing = true; server.close(); await runtime.close(); await connections.close(); artifacts.close(); await stores.close(); await auth.close(); if ("closeAllConnections" in server) server.closeAllConnections(); }
-process.once("SIGTERM", () => { void close(); }); process.once("SIGINT", () => { void close(); });
+let shutdown: Promise<void> | undefined;
+function close(): Promise<void> {
+  closing = true;
+  return shutdown ??= operatorTransition(async () => {
+    // Persist admission closure and join worker effects before releasing owners.
+    // An unresolved retirement leaves the server available for status/recovery,
+    // never reporting a successful shutdown or reopening application admission.
+    await drainBackend();
+    server.close();
+    await runtime.close();
+    await connections.close();
+    artifacts.close();
+    await stores.close();
+    await auth.close();
+    if ("closeAllConnections" in server) server.closeAllConnections();
+  }).catch(error => { shutdown = undefined; throw error; });
+}
+function requestShutdown() {
+  void close().catch(() => {
+    process.exitCode = 1;
+    console.error("Backend shutdown incomplete; admission remains closed. Resolve retirement and retry shutdown.");
+  });
+}
+process.on("SIGTERM", requestShutdown); process.on("SIGINT", requestShutdown);
