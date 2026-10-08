@@ -27,12 +27,12 @@ export function chatDelta(before: ChatSnapshot, after: ChatSnapshot): ChatDelta 
   return { baseRevision: before.conversation.revision, snapshot, messages: m.changed, activities: a.changed, removedMessages: m.removed, removedActivities: a.removed };
 }
 
-function apply<T extends { id: string; createdAt: number }>(before: T[], changed: T[], removed: string[]) {
+function apply<T extends { id: string; createdAt: number; timelineOrder?: number }>(before: T[], changed: T[], removed: string[]) {
   if (!changed.length && !removed.length) return before;
   const values = new Map(before.map(item => [item.id, item]));
   for (const id of removed) values.delete(id);
   for (const item of changed) values.set(item.id, item);
-  return [...values.values()].sort((a, b) => a.createdAt - b.createdAt);
+  return [...values.values()].sort((a, b) => a.createdAt - b.createdAt || (a.timelineOrder ?? 0) - (b.timelineOrder ?? 0));
 }
 
 export function applyChatDelta(before: ChatSnapshot, delta: ChatDelta): ChatSnapshot {
