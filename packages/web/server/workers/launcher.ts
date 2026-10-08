@@ -279,8 +279,8 @@ export class WorkerLauncher {
     const container = await this.driver.inspectTask(attempt.containerId!);
     if (!sameRequest(container, attempt) || container.name !== attempt.name || container.id !== attempt.containerId || container.installationId !== this.journal.installationId)
       throw new LauncherError(503, "Task inspection identity mismatch.");
-    if (container.state !== "running" || !container.address)
-      throw new LauncherError(503, "Task is not running; reconcile this same attempt.");
+    if (container.state === "exited") throw new LauncherError(409, "Task exited; explicit retirement is required.");
+    if (container.state !== "running" || !container.address) return structuredClone(attempt);
     attempt = { ...attempt, phase: "running", address: container.address };
     await this.update(attempt);
     return structuredClone(attempt);

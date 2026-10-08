@@ -1,3 +1,4 @@
+import { awaitWorkerLaunch } from "./startup.js";
 import { isIPv4 } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { DispatchRuntime, RuntimeError } from "../runtime.js";
@@ -37,7 +38,7 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
     policyTail = result.catch(() => {});
     return result;
   }
-  const launcher = <T>(path: string, body?: unknown) => workerRequest<T>(options.launcherUrl, options.launcherToken, `/v1/${path}`, body, undefined, options.launcherTimeoutMs ?? 300_000);
+  const launcher = <T>(path: string, body?: unknown, timeoutMs = options.launcherTimeoutMs ?? 300_000) => workerRequest<T>(options.launcherUrl, options.launcherToken, `/v1/${path}`, body, undefined, timeoutMs);
   const token = (route: WorkerRoute) => workerToken(options.workerKey, options.installationId, route);
   async function activate(route: WorkerRoute): Promise<WorkerRoute> {
     const existing = launching.get(route.conversationId); if (existing) return existing;
@@ -49,7 +50,12 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
         await routes.retiring(route.conversationId, route.attemptId);
         route = await routes.replaceRetired(route.conversationId, route.attemptId, options.configurationRevision);
       }
-      const attempt = await launcher<LaunchAttempt>("ensure", { attemptId: route.attemptId, conversationId: route.conversationId, storeId: route.storeId, configurationRevision: route.configurationRevision });
+      const request = { attemptId: route.attemptId, conversationId: route.conversationId, storeId: route.storeId, configurationRevision: route.configurationRevision };
+      const attempt = await awaitWorkerLaunch(
+        timeout => launcher<LaunchAttempt>("ensure", request, timeout),
+        timeout => launcher<LaunchAttempt>("reconcile", { attemptId: request.attemptId }, timeout),
+        request, options.launcherTimeoutMs ?? 300_000,
+      );
       if (attempt.phase !== "running") throw new RuntimeError(503, "Conversation worker requires reconciliation.");
       const address = workerAddress(attempt);
       const origin = `http://${address}:8831`;
