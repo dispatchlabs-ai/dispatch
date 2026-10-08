@@ -1142,7 +1142,7 @@ Acceptance: effective Sunburst/Flare edit requests omit the rejected field even 
 
 ## WP-047 — Agent evaluation profiles and editor
 
-**Authorized October 7, 2026; focused functional evidence and independent review complete October 8; final Git publication pending.** Chris accepted the [individual-agent evaluation data contract](spec.md#individual-agent-evaluation), assigned Pi Durable Expert ownership and requires working demonstration before completion. Developer owns editor UI, Documenter package documentation and Deslop independent integrated review. First delivery is profile/case persistence and editing, not an evaluation runner, automatic grading, Doctor permissions or a separate Doctor screen.
+**Authorized October 7, 2026; data/editor slice demonstrated, independently reviewed and published October 8.** Chris accepted the [individual-agent evaluation data contract](spec.md#individual-agent-evaluation), assigned Pi Durable Expert ownership and requires working demonstration before completion. Developer owns editor UI, Documenter package documentation and Deslop independent integrated review. First delivery is profile/case persistence and editing, not an evaluation runner, automatic grading, Doctor permissions or a separate Doctor screen.
 
 Acceptance criteria:
 - Save and reopen per-agent responsibilities, expected behavior, criteria, prohibited actions and standalone prompts/cases. Preserve case/criterion identity, independent immutable profile revisions and author/change attribution. Agent operating instructions and existing instances remain unchanged.
