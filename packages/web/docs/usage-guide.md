@@ -133,7 +133,7 @@ Developer (`developer`) is the default agent and includes local coding tools. It
 
 In Agents, New agent is at the top of the sidebar, followed by Find an agent and the saved-agent list. Select an agent to read its description and instructions; the right column shows its saved configuration. Start chat opens the starting-agent chooser with that definition selected. Hover or focus an agent's row for Edit and, for non-default agents, Archive; touch layouts keep the actions visible. Archived agents is at the bottom of the sidebar and supports inspection, not restoration. The default agent keeps its Default tag and cannot be archived.
 
-New agent opens an editor with the saved default agent's model/thinking values. Fill in Identity, Instructions, and Model; Cancel and Create agent/Save new revision stay below the scrolling form. The right column previews the unsaved draft and distinguishes changes from the saved revision for existing agents. Choosing another agent or starting a new edit asks before discarding unsaved changes. Switching to Chats or Account, hiding a column, or changing screen size preserves the open editor. On phones, Start chat fills its row and the agent view includes a short model/thinking/tools summary; Details exposes the full configuration.
+New agent opens an editor with the saved default agent's model/thinking values. Fill in the sections described under [authoring navigation](#agent-overview-and-authoring-navigation); Discard and Create agent/Save new revision stay below the scrolling form. The right column previews the unsaved draft and distinguishes changes from the saved revision for existing agents. Choosing another agent or starting a new edit asks before discarding unsaved changes. Switching to Chats or Account, hiding a column, or changing screen size preserves the open editor. On phones, Start chat fills its row and the agent view includes a short model/thinking/tools summary; Details exposes the full configuration.
 
 Instructions format Markdown while you type or paste, using the same editor as chat. Headings, lists, quotes, emphasis, links and code remain editable. Enter adds a paragraph or list item; Shift+Enter adds a line. Use Create agent or Save new revision to save. Saved instructions stay rendered when viewing the agent. Instructions remain Markdown text; formatting may normalize when edited. Drafts over 50,000 characters including Markdown formatting stay editable and show an error until shortened. Unsupported editor syntax remains text, and drafts are not saved across page reloads.
 
@@ -592,7 +592,7 @@ The runtime pins Pi Durable, Pi AI, Chord, Pi Coding Agent, and Pi MCP to 1.0.4.
 
 Use exact versions in the owning manifest and commit the root dependency lock. To update `npmDepsHash` in `packages/web/nix/package.nix`, temporarily set `lib.fakeHash`, run `nix build`, replace the placeholder with the reported actual hash, then rebuild. Never commit a placeholder. Toolchain changes through `nix flake update` also require a build.
 
-Omarchy/Palm hosting and its internal HTTPS domain are a later work package. The current pilot at `dispatch.chrisreynolds.me` remains in place. Loopback development cannot be opened directly from a phone; real-device access requires a later reachable environment. CI and release automation are unconfigured. Do not add tests until stable behavior is ready to preserve and Chris resumes that work; future coverage focuses on end-to-end and API tests.
+Installation-specific hosting, artifact pins and deployment evidence belong in the owning infrastructure repository; the [handoff](handoff.md#wp-043--isolated-palm-postgresql-trial) links the isolated Palm trial and its qualification limits. This does not establish deployment of the latest source. Loopback development cannot be opened directly from a phone; real-device access requires an authorized reachable environment. CI and release automation are unconfigured. Follow the [testing policy](spec.md#testing-policy) for permitted verification.
 
 ### Agent skills
 
@@ -600,7 +600,7 @@ In the agent editor, Skills lets you create reusable text playbooks and explicit
 
 Only assigned skills are advertised to the model, which can call `load_skill` with the advertised ID. No Files and commands capability is required. Unassigned IDs are rejected by the loader. This is not filesystem isolation for coding agents.
 
-`GET /api/skills` returns the company's latest skill revisions. `POST /api/skills` creates or revises a text skill with name, description, instructions and requestId; updates also require id and expectedRevision. Agent saves accept `skills: [{ id, revision }]` (up to fifty). Text skills do not include uploaded files, package imports or automatically available scripts.
+`GET /api/skills` returns the company's latest skill revisions. `POST /api/skills` creates or revises a text skill with name, description, instructions and requestId; updates also require id and expectedRevision. Agent saves accept `skills: [{ id, revision }]` (up to fifty). The text-skill editor does not upload supporting files or enable scripts. Agent/skill definition imports use the separate [bundle workflow](#agent-and-skill-bundles).
 
 #### Bundled browser and dogfood skills
 
@@ -612,7 +612,7 @@ Loading either playbook requires no Files and commands capability, but **executi
 
 Use only explicitly authorized targets/accounts. The current pilot uses disposable loopback state; broader targets need separate approval. Keep unique owned sessions, close them after the run, and retain account-bearing evidence privately under gitignored `.local/` with directories 0700/files 0600. Start recordings after authentication and scrub secrets/sensitive URLs before sharing. Verify actual outcomes: an exit code of zero or a “Saved” message is not a QA pass. Credential-safe enrollment/TOTP entry remains unverified; do not copy upstream secrets-in-CLI-arguments examples.
 
-Pinned upstream provenance, licensing and the distinction between upstream text and Dispatch guidance belong in [the source provenance guide](../server/skills/agent-browser/README.md). Required dogfood report/taxonomy material is embedded; optional upstream filesystem references are not automatically available. General skill-package import and script execution remain unsupported.
+Pinned upstream provenance, licensing and the distinction between upstream text and Dispatch guidance belong in [the source provenance guide](../server/skills/agent-browser/README.md). Required dogfood report/taxonomy material is embedded; optional upstream filesystem references are not automatically available. Definition/Markdown imports use the [bundle workflow](#agent-and-skill-bundles); arbitrary supporting-file packages and script execution are not supplied by these playbooks.
 
 ### Shared projects
 
