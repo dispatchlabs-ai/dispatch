@@ -7,6 +7,8 @@ import { serve } from "@hono/node-server";
 import { createServer as createHttpsServer } from "node:https";
 import { createSecureContext } from "node:tls";
 import { Hono } from "hono";
+import { once } from "node:events";
+import { cleanupSessionResources } from "@earendil-works/pi-ai";
 import { bodyLimit } from "hono/body-limit";
 import { S3Artifacts, s3ArtifactsConfigSchema } from "./s3-artifacts.js";
 import { ATTACHMENT_RPC_MAX_BYTES, attachmentSaveRequestSchema, attachmentReadRequestSchema, decodeAttachmentBytes } from "./attachments.js";
@@ -52,19 +54,27 @@ const routingConfig = workerConfig.routingStoreConfigFile === undefined ? undefi
   : await readRoutingStoreConfig(workerConfig.routingStoreConfigFile);
 if (routingConfig && routingConfig.installationId !== workerConfig.installationId)
   throw new Error("Routing installation identity does not match backend identity.");
+const startupCleanup: Array<() => void | Promise<void>> = [];
+try {
 const routes = routingConfig ? await openConfiguredWorkerRoutes(routingConfig)
   : await WorkerRoutes.open(join(config.stateDir, "routing"), workerConfig.installationId);
+startupCleanup.push(() => routes.close());
 const admission = new WriteAdmission(routes.admissionBlocked(), async blocked => { await routes.setAdmissionBlocked(blocked); });
 const artifacts = await S3Artifacts.open(workerConfig.artifacts);
+startupCleanup.push(() => artifacts.close());
 const workerKey = (await readFile(workerConfig.workerKeyFile, "utf8")).trim();
 const stores = await WorkerStoreProvisioner.open({ connectionString: storeUrl, ca: storeCa, installationId: workerConfig.installationId, credentialKey: workerKey });
+startupCleanup.push(() => stores.close());
 const launcherToken = (await readFile(workerConfig.launcherTokenFile, "utf8")).trim();
 const operatorToken = (await readFile(workerConfig.operatorTokenFile, "utf8")).trim();
 await mkdir(config.stateDir, { recursive: true, mode: 0o700 });
 await mkdir(config.workspaceDir, { recursive: true, mode: 0o700 });
+startupCleanup.push(() => { cleanupSessionResources(); });
 const provider = await openModels();
 const auth = await createAuth({ databasePath: join(config.stateDir, "auth.sqlite"), secretPath: join(config.stateDir, "auth.key"), origin: config.origin, rpId: config.rpId, companyId: config.companyId, companyName: config.companyName });
+startupCleanup.push(() => auth.close());
 const connections = new McpConnections(join(config.stateDir, "connections.sqlite"), join(config.stateDir, "connections.key"), config.origin);
+startupCleanup.push(() => connections.close());
 const support = new WriteAdmission(false, async () => {});
 const directory = await DispatchRuntime.open({
   runMcpBackground: operation => support.run(operation), stateDir: join(config.stateDir, "runtime"), companyId: config.companyId, models: provider.models, directoryOnly: true,
@@ -72,6 +82,7 @@ const directory = await DispatchRuntime.open({
   provider: provider.provider, modelId: provider.modelId, thinkingLevel: provider.thinkingLevel, readAllProjectUserIds: config.readAllProjectUserIds,
   peopleDirectory: { list: async companyId => auth.listCompanyPeople(companyId), get: async (companyId, userId) => auth.getCompanyPerson(companyId, userId) },
 });
+startupCleanup.push(async () => { try { await support.quiesce(); } finally { await directory.close(); } });
 const mcpPolicy = new McpPolicyGate();
 const runtime = distributedRuntime({ runPolicyChange: operation => mcpPolicy.change(operation), ...workerConfig, workerKey, launcherToken, directory, routes, runBackground: operation => admission.run(operation) });
 // On restart support remains open until an explicit, freshly verified drain.
@@ -213,6 +224,11 @@ const listener = { fetch: app.fetch, hostname: config.host, port: config.port };
 const server = tls
   ? serve({ ...listener, createServer: createHttpsServer, serverOptions: tls })
   : serve(listener);
+startupCleanup.push(() => {
+  server.close();
+  if ("closeAllConnections" in server) server.closeAllConnections();
+});
+await once(server, "listening");
 let closing = false;
 let shutdown: Promise<void> | undefined;
 let teardownStarted = false;
@@ -230,6 +246,7 @@ function close(): Promise<void> {
     for (const cleanup of [
       () => { server.close(); },
       () => runtime.close(),
+      () => { cleanupSessionResources(); },
       () => connections.close(),
       () => artifacts.close(),
       () => stores.close(),
@@ -253,3 +270,10 @@ function requestShutdown() {
   });
 }
 process.on("SIGTERM", requestShutdown); process.on("SIGINT", requestShutdown);
+} catch (error) {
+  const failures: unknown[] = [error];
+  for (const cleanup of startupCleanup.reverse()) {
+    try { await cleanup(); } catch (failure) { failures.push(failure); }
+  }
+  throw new AggregateError(failures, "Backend startup failed; resource cleanup attempted.");
+}
