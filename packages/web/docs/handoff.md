@@ -44,7 +44,7 @@ Documentation-only acceptance: source/deslop review findings on invitations, rea
 - Serve one company per installation with equal baseline capabilities and shared agent definitions. Unbound conversations are invite-only; legacy personal groups remain private organization. Shared-project membership grants conversation access, manager/member roles control project settings, and operator read-all grants allow observation only. Broader application RBAC remains future work.
 - Require password/TOTP or a user-verified passkey, with restricted invitation/recovery flows and opaque sessions. The local operator provisions accounts; there is no application administrator role.
 - Keep desktop rail/sidebar/main tabs/full contextual column/bottom bar. Mobile uses navigation and context panels, preserving active work and drafts.
-- Prefer explicit service model configuration, then existing Pi settings/credentials. The first agent has no tools. Named agent revisions are immutable and copied into new chats.
+- Prefer explicit service model configuration, then existing Pi settings/credentials. Developer is now the default, with local coding tools; the original chat-only default is retired. Named agent revisions are immutable and copied into new chats.
 - Preserve local development and existing installation state. Current local/LAN evidence is scoped in WP-041 and WP-043; distributed AWS workers, remote sandboxes, personal Wiki delegation, unspecified handoffs, background triggers and schedules remain future work. Installed coding/image tools, generic MCP connections and explicit skills are current features, not blanket deferrals.
 
 ## Coordinated work
@@ -1292,3 +1292,15 @@ Acceptance evidence:
 - Rendered isolated frontend against the existing authenticated local service reviewed at desktop, a narrow desktop center column and 390 px. Corrected cramped title columns using container queries and search-icon padding. Phone overview, details and settings form were inspected without saving settings, changing membership or sending messages. Captures remain private in `.local/project-design/`.
 - Final code `dd84fb5` passed TypeScript/application builds, Apple Silicon `nix build --no-link` and `nix flake check` (zero runnable checks; Linux systems omitted). Source/deslop, whitespace and changed local documentation links reviewed. Both implementation commits were pushed normally to main under both integration locks, with remote ancestry verified and the canonical checkout fast-forwarded. The running localhost frontend displays the redesign; no backend restart or Omarchy deployment. The pre-existing untracked `imagegen/` directory was preserved.
 - No tests under the standing policy. Keyboard/touch, measured contrast, assistive technology, save/conflict/recovery and runtime functional qualification remain unverified. The preview browser did not complete the existing native discard confirmation; reloading cleared its unchanged preview-only draft. No saved settings were changed.
+
+
+## Developer default and Dash retirement — October 8, 2026
+
+Chris requested removal of Dash and promotion of Developer to Default. The [contract](spec.md#use-case-chat-with-the-default-agent) replaces the prior `default` identity with `developer`; [usage](usage-guide.md#developer) explains startup migration and the local coding boundary. Implementation archives the retired definition, preserves its revisions and all existing instances, preserves Developer settings (reactivating an archived definition), and migrates company project defaults without changing membership. Configuration, new-project/new-chat fallback, archive protection and management-target exclusion now use Developer.
+
+Acceptance criteria/evidence:
+
+- Startup appends only necessary revisions, preserves historical configuration and instances, replaces/deduplicates retired project selections, and leaves other companies and empty defaults unchanged.
+- New implicit selections use Developer; committed creation retries retain original selections across the change. Explicit unavailable definitions still reject new creation.
+- Source review of the candidate informed these documentation updates. Pi Durable Expert confirmed the startup migration and rechecked the retry fixes: explicit selections are deduplicated, new requests retain omission intent, and legacy fallback is limited to historical/current default singletons. No remaining blockers were found in that source review. Integrated `nix develop --command npm run check`, `nix build --no-link`, and `nix flake check` passed on Apple Silicon (zero runnable flake checks; Linux omitted). Source/deslop and full-diff review passed; the existing large-chunk advisory remains. Documentation whitespace and 166 local file/anchor checks passed.
+- No tests, rendered review or deployment are claimed. Live migration, restart/retry recovery and Default-tag/archived-list browser behavior remain unverified under the standing check policy.

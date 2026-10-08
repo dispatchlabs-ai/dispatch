@@ -27,8 +27,9 @@ import { managementReadSchema, managementSaveSchema } from "./agent-management.j
 import type { McpConnections } from "./mcp-connections.js";
 
 const context = BACKGROUND_CONTEXT;
+export const DEFAULT_AGENT_ID = "developer";
 const IMAGE_GENERATION_SKILL_ID = "d6f5a67d-5c7b-4813-910f-b29d97d29cd1";
-type StoredChat = Omit<ChatSummary, "sharedProjectId" | "canParticipate" | "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { creationFingerprint?: string; creationTitleExplicit?: boolean; displayTitle?: string; pinned?: boolean; archived?: boolean; agentName?: string; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
+type StoredChat = Omit<ChatSummary, "sharedProjectId" | "canParticipate" | "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { creationFingerprint?: string; creationTitleExplicit?: boolean; displayTitle?: string; pinned?: boolean; archived?: boolean; agentName?: string; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[]; creationAgentsOmitted?: boolean };
 type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: string; extensions?: string[]; tools?: string[]; savedBy?: string; saveRequestId?: string; saveFingerprint?: string };
 type StoredSkill = SkillDefinition & { companyId: string; savedBy: string; requestId: string; fingerprint: string };
 type Catalog = { skills?: StoredSkill[]; chats: StoredChat[]; agents: StoredAgent[]; runtimeInstance?: string; connectionOwners?: Record<string, string> };
@@ -131,29 +132,35 @@ export class DispatchRuntime {
       // Seed once and publish a real commit before recovery so snapshots use Pi's persisted sequence.
       await harness.commit(async (tx) => {
         const catalog = await tx.doc(CatalogDoc);
-        if (!catalog.agents.some(agent => agent.companyId === options.companyId && agent.id === "default")) {
-          const now = Date.now();
+        const now = Date.now();
+        const retired = latestAgent(catalog, options.companyId, "default");
+        const developer = latestAgent(catalog, options.companyId, DEFAULT_AGENT_ID);
+        if (!developer) {
           const agent: StoredAgent = {
-            id: "default", companyId: options.companyId, name: "Dispatch", description: "General-purpose conversation assistant.",
-            instructions: "You are Dispatch, a thoughtful assistant helping people solve problems. Be accurate, direct, and useful. Explain uncertainty and never claim to have performed actions you cannot perform.",
-            provider: options.provider ?? "openai", modelId: options.modelId ?? "gpt-6-sol",
-            thinkingLevel: options.thinkingLevel ?? "off", revision: 1, archived: false,
-            createdAt: now, updatedAt: now,
+            id: DEFAULT_AGENT_ID, companyId: options.companyId, name: "Developer",
+            description: "Builds, debugs, and improves software in a coding workspace.",
+            instructions: "Inspect the project and its instructions before changing code. Make focused changes, preserve existing work, and explain what changed and how it was checked. Be clear about anything you could not verify.",
+            provider: retired?.provider ?? options.provider ?? "openai",
+            modelId: retired?.modelId ?? options.modelId ?? "gpt-6-sol",
+            thinkingLevel: retired?.thinkingLevel ?? options.thinkingLevel ?? "off",
+            extensions: [Coding.name, CodingTools.name], tools: ["read", "write", "edit", "bash"],
+            revision: 1, archived: false, createdAt: now, updatedAt: now,
           };
           runtime.validateAgent(agent);
           catalog.agents.push(agent);
+        } else if (developer.archived) {
+          catalog.agents.push({ ...developer, archived: false, revision: developer.revision + 1, updatedAt: now });
         }
-        if (!catalog.agents.some(agent => agent.companyId === options.companyId && agent.id === "developer")) {
-          const defaults = runtime.findAgent(catalog, { companyId: options.companyId }, "default");
-          const now = Date.now();
-          catalog.agents.push({
-            id: "developer", companyId: options.companyId, name: "Developer",
-            description: "Builds, debugs, and improves software in a coding workspace.",
-            instructions: "Inspect the project and its instructions before changing code. Make focused changes, preserve existing work, and explain what changed and how it was checked. Be clear about anything you could not verify.",
-            provider: defaults.provider, modelId: defaults.modelId, thinkingLevel: defaults.thinkingLevel,
-            extensions: [Coding.name, CodingTools.name], tools: ["read", "write", "edit", "bash"],
-            revision: 1, archived: false, createdAt: now, updatedAt: now,
-          });
+        // Retain historical revisions and instances; only new selections change.
+        if (retired && !retired.archived) {
+          catalog.agents.push({ ...retired, archived: true, revision: retired.revision + 1, updatedAt: now });
+        }
+        const projects = await tx.doc(ProjectsDoc);
+        for (const project of Object.values(projects.projects)) {
+          if (project.companyId !== options.companyId || !project.defaultAgentDefinitionIds.includes("default")) continue;
+          project.defaultAgentDefinitionIds = [...new Set(project.defaultAgentDefinitionIds.map(id => id === "default" ? DEFAULT_AGENT_ID : id))];
+          project.revision += 1;
+          project.updatedAt = now;
         }
         catalog.skills ??= [];
         if (!catalog.skills.some(skill => skill.companyId === options.companyId && skill.id === IMAGE_GENERATION_SKILL_ID)) {
@@ -223,7 +230,7 @@ export class DispatchRuntime {
       }
       const now = Date.now();
       const project: SharedProjectRecord = { id: randomUUID(), name, companyId: scope.companyId, createdBy: scope.userId,
-        createdAt: now, updatedAt: now, revision: 1, members: [{ userId: scope.userId, role: "manager" }], defaultAgentDefinitionIds: ["default"] };
+        createdAt: now, updatedAt: now, revision: 1, members: [{ userId: scope.userId, role: "manager" }], defaultAgentDefinitionIds: [DEFAULT_AGENT_ID] };
       doc.projects[project.id] = project; doc.requests[key] = { fingerprint, projectId: project.id };
       return this.projectSummary(project, scope);
     }, context);
@@ -255,7 +262,7 @@ export class DispatchRuntime {
     const explicitTitle = Boolean(input.title?.trim());
     const title = input.title?.trim() || "New conversation";
     const requestedAgents = input.agentDefinitionIds ?? (input.agentDefinitionId ? [input.agentDefinitionId] : undefined);
-    let agentIds = [...new Set(requestedAgents ?? ["default"])];
+    let agentIds = [...new Set(requestedAgents ?? [DEFAULT_AGENT_ID])];
     const creationFingerprint = input.sharedProjectId ? JSON.stringify([title, input.sharedProjectId, requestedAgents ?? null]) : undefined;
     for (const agentId of agentIds) requireText(agentId, "Agent ID", 200);
     requireText(title, "Title", 200);
@@ -264,10 +271,14 @@ export class DispatchRuntime {
       const catalog = await tx.doc(CatalogDoc);
       const existing = catalog.chats.find(chat => owns(scope, chat) && chat.requestId === input.requestId);
       if (existing) {
+        const savedAgents = existing.creationAgentIds ?? [existing.agentDefinitionId];
+        const sameAgents = requestedAgents === undefined
+          ? existing.creationAgentsOmitted ?? (savedAgents.length === 1 && ["default", DEFAULT_AGENT_ID].includes(savedAgents[0]))
+          : existing.creationAgentsOmitted !== true && JSON.stringify([...savedAgents].sort()) === JSON.stringify([...new Set(requestedAgents)].sort());
         const matches = existing.creationFingerprint !== undefined
           ? existing.creationFingerprint === creationFingerprint
           : creationFingerprint === undefined && existing.title === title
-            && JSON.stringify([...(existing.creationAgentIds ?? [existing.agentDefinitionId])].sort()) === JSON.stringify([...agentIds].sort())
+            && sameAgents
             && (existing.creationProjectId ?? null) === null;
         if (!matches || (existing.creationTitleExplicit !== undefined && existing.creationTitleExplicit !== explicitTitle)) throw requestConflict();
         return existing.id;
@@ -281,7 +292,7 @@ export class DispatchRuntime {
       await this.shared.initialize(tx, record.id, scope.companyId, human, agentIds, { pinned: false, archived: false }, input.sharedProjectId ?? undefined);
       const first = agentIds.length ? this.findAgent(catalog, scope, agentIds[0]) : undefined;
       const id = String(record.id);
-      catalog.chats.push({ ...(creationFingerprint ? { creationFingerprint } : {}), id, title, creationTitleExplicit: explicitTitle, ...(explicitTitle ? { displayTitle: title } : {}), creationAgentIds: agentIds, createdAt: Date.now(), agentDefinitionId: first?.id ?? "", agentRevision: first?.revision ?? 0, agentName: first?.name ?? "People", companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
+      catalog.chats.push({ ...(creationFingerprint ? { creationFingerprint } : {}), id, title, creationTitleExplicit: explicitTitle, ...(explicitTitle ? { displayTitle: title } : {}), creationAgentIds: agentIds, creationAgentsOmitted: requestedAgents === undefined, createdAt: Date.now(), agentDefinitionId: first?.id ?? "", agentRevision: first?.revision ?? 0, agentName: first?.name ?? "People", companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
       return id;
     }, context);
     return this.getChat(scope, id);
@@ -511,7 +522,7 @@ export class DispatchRuntime {
 
   async getDefaultAgent(companyId: string): Promise<AgentDefinition> {
     const catalog = await this.harness.snapshot(CatalogDoc, context);
-    return publicAgent(this.findAgent(catalog!, { companyId }, "default"));
+    return publicAgent(this.findAgent(catalog!, { companyId }, DEFAULT_AGENT_ID));
   }
 
   async listAgents(scope: RuntimeScope): Promise<AgentDefinition[]> {
@@ -701,7 +712,7 @@ export class DispatchRuntime {
   }
 
   private requireManagementTarget(target: StoredAgent | undefined, editorId: string, grants: Grant[]): asserts target is StoredAgent {
-    if (!target || target.archived || target.id === "default" || target.id === editorId || grants.some(grant => grant.editorId === target.id && grant.policy))
+    if (!target || target.archived || target.id === DEFAULT_AGENT_ID || target.id === editorId || grants.some(grant => grant.editorId === target.id && grant.policy))
       throw new ManagementError(403, "This target is not eligible for management.");
     this.requireUnprivileged(target);
     // Include externally configured connections, not only the saved catalog snapshot.
@@ -797,7 +808,7 @@ export class DispatchRuntime {
   }
 
   async archiveAgent(scope: RuntimeScope, id: string, expectedRevision: number): Promise<AgentDefinition> {
-    if (id === "default") throw new RuntimeError(400, "The default agent cannot be archived.");
+    if (id === DEFAULT_AGENT_ID) throw new RuntimeError(400, "The default agent cannot be archived.");
     return this.harness.commit(async (tx) => {
       const catalog = await tx.doc(CatalogDoc);
       const prior = latestAgent(catalog, scope.companyId, id);
