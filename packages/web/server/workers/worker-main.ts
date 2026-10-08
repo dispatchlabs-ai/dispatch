@@ -12,17 +12,22 @@ import { workerModels } from "./models.js";
 import { ATTACHMENT_RPC_MAX_BYTES, decodeAttachmentBytes, RemoteAttachmentStore } from "./attachments.js";
 import type { WorkerStoreConfig } from "./postgres-stores.js";
 import { tokenMatches } from "./identity.js";
-import { workerRequest } from "./transport.js";
+import { validateBackendCa, workerRequest } from "./transport.js";
 import type { AuthResult } from "@earendil-works/pi-ai";
 import type { RuntimeScope, SendMessageInput, AddParticipantsInput, UpdateChatInput } from "../../src/shared/contracts.js";
 
 const env = z.object({
+  DISPATCH_BACKEND_CA_PEM: z.string().optional(),
   DISPATCH_BACKEND_INTERNAL_URL: z.url(), DISPATCH_WORKER_TOKEN: z.string().min(43),
   DISPATCH_WORKER_ATTEMPT_ID: z.string().min(1), DISPATCH_CONVERSATION_ID: z.string().min(1),
   DISPATCH_POSTGRES_STORE_ID: z.string().min(1),
 }).parse(process.env);
+if (env.DISPATCH_BACKEND_CA_PEM !== undefined) {
+  validateBackendCa(env.DISPATCH_BACKEND_CA_PEM);
+  if (new URL(env.DISPATCH_BACKEND_INTERNAL_URL).protocol !== "https:") throw new Error("Backend CA requires HTTPS.");
+}
 const path = `/internal/workers/${encodeURIComponent(env.DISPATCH_CONVERSATION_ID)}/${encodeURIComponent(env.DISPATCH_WORKER_ATTEMPT_ID)}`;
-const backend = <T>(suffix: string, body?: unknown, signal?: AbortSignal) => workerRequest<T>(env.DISPATCH_BACKEND_INTERNAL_URL, env.DISPATCH_WORKER_TOKEN, path + suffix, body, signal);
+const backend = <T>(suffix: string, body?: unknown, signal?: AbortSignal) => workerRequest<T>(env.DISPATCH_BACKEND_INTERNAL_URL, env.DISPATCH_WORKER_TOKEN, path + suffix, body, signal, 60_000, env.DISPATCH_BACKEND_CA_PEM);
 const bootstrap = await backend<ConversationWorkerBootstrap & { storage: WorkerStoreConfig }>("/bootstrap");
 if (bootstrap.conversationKey !== env.DISPATCH_CONVERSATION_ID || bootstrap.storeId !== env.DISPATCH_POSTGRES_STORE_ID || bootstrap.storage.storeId !== bootstrap.storeId || bootstrap.storage.access !== "worker") throw new Error("Worker bootstrap identity mismatch.");
 await mkdir("/workspace/state", { recursive: true, mode: 0o700 });

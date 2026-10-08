@@ -1,10 +1,11 @@
 import { createHash, createHmac } from "node:crypto";
 import { Client, escapeIdentifier, escapeLiteral } from "pg";
+import { verifiedPostgresConfig } from "../storage/postgres/tls.js";
 import { migrateWithinTransaction, STORE_TABLES } from "../storage/postgres/migrations.js";
 
 const tables = STORE_TABLES;
-export type WorkerStoreConfig = { kind: "postgres"; storeId: string; connectionString: string; access: "worker" };
-export type WorkerStoreProvisionerOptions = { connectionString: string; installationId: string; credentialKey: string };
+export type WorkerStoreConfig = { kind: "postgres"; storeId: string; connectionString: string; ca?: string; access: "worker" };
+export type WorkerStoreProvisionerOptions = { connectionString: string; ca?: string; installationId: string; credentialKey: string };
 const storePattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/;
 
 /** Backend-only provisioning in a dedicated database. RLS uses SESSION_USER, never a caller-set GUC.
@@ -25,7 +26,7 @@ export class WorkerStoreProvisioner {
     const url = new URL(options.connectionString);
     if (!["postgres:", "postgresql:"].includes(url.protocol) || !url.username || !url.password || !url.pathname.slice(1)) throw new Error("Explicit worker database credentials and database are required.");
     if ([...url.searchParams.keys()].some(key => !["sslmode", "sslrootcert", "uselibpqcompat"].includes(key))) throw new Error("Unsupported worker database URL parameters; credentials must be in URL authority only.");
-    const client = new Client({ connectionString: options.connectionString, connectionTimeoutMillis: 10_000, application_name: "dispatch-worker-provisioner" });
+    const client = new Client({ ...(options.ca === undefined ? { connectionString: options.connectionString } : verifiedPostgresConfig(options.connectionString, options.ca)), connectionTimeoutMillis: 10_000, application_name: "dispatch-worker-provisioner" });
     const provisioner = new WorkerStoreProvisioner(client, options);
     try {
       await client.connect();
@@ -109,7 +110,7 @@ export class WorkerStoreProvisioner {
         this.assertHealthy();
         const url = new URL(this.options.connectionString);
         url.username = role; url.password = password;
-        return { kind: "postgres", storeId, connectionString: url.toString(), access: "worker" };
+        return { kind: "postgres", storeId, connectionString: url.toString(), access: "worker", ...(this.options.ca === undefined ? {} : { ca: this.options.ca }) };
       } catch {
         try { await this.client.query("ROLLBACK"); } catch { /* Do not reuse uncertain state. */ }
         this.failure ??= new Error("Worker store provisioning failed; reopen to reconcile the same store.");

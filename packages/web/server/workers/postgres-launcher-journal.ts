@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Client } from "pg";
+import { verifiedPostgresConfig } from "../storage/postgres/tls.js";
 
 /** One non-reconnecting controller connection. A durable owner latch survives
  * connection loss: releasing the advisory lock is NOT proof the controller died.
@@ -18,8 +19,8 @@ export class PostgresLauncherJournal {
     client.on("end", () => { this.failure ??= new Error("Launcher database connection ended."); });
   }
 
-  static async open(options: { connectionString: string; installationId: string; initial: string; recoverOwnerId?: string }) {
-    const client = new Client({ connectionString: options.connectionString, connectionTimeoutMillis: 10_000, application_name: "dispatch-launcher-journal" });
+  static async open(options: { connectionString: string; ca?: string; installationId: string; initial: string; recoverOwnerId?: string }) {
+    const client = new Client({ ...(options.ca === undefined ? { connectionString: options.connectionString } : verifiedPostgresConfig(options.connectionString, options.ca)), connectionTimeoutMillis: 10_000, application_name: "dispatch-launcher-journal" });
     const store = new PostgresLauncherJournal(client, options.installationId);
     try {
       await client.connect();
