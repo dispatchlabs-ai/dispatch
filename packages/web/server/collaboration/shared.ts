@@ -346,7 +346,7 @@ export class SharedConversations {
       },
     });
     const invite = defineTool({
-      name: "conversation_invite_agent", description: "Invite an available company agent definition as an independent participant in this conversation. You cannot invite humans. Omit agentDefinitionId to list available definitions.",
+      name: "conversation_invite_agent", description: "Ensure an available company agent definition is present in this conversation, reusing an active instance if one exists. You cannot add additional instances, re-add removed agents, or invite humans. Omit agentDefinitionId to list available definitions.",
       parameters: Type.Object({ agentDefinitionId: Type.Optional(Type.String()) }), replay: "safe",
       execute: async (args, api, ctx) => {
         const binding = await this.binding(api.conversationId, ctx);

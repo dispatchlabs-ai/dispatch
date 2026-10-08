@@ -254,7 +254,7 @@ export interface SendMessageInput {
   text: string;
   threadId?: string | null;
   mentions?: string[];
-  /** Definition IDs selected as invite-on-send mentions; resolved to participant IDs on admission. */
+  /** Definition IDs selected as invite-on-send mentions; resolved to a single active participant on admission, or rejected as ambiguous. */
   agentMentions?: string[];
 }
 
