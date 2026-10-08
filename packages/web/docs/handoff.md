@@ -1539,10 +1539,12 @@ Chris authorized the shared chat-metadata slice proposed by Pi Durable Expert. D
 
 Acceptance criteria:
 - Optional shared Markdown/checklist criteria can be set, edited and cleared in any chat by current authorized human participants. Read-only observers may read but cannot edit. Existing chats without criteria remain compatible.
-- Persist criteria as chat application data using native Pi documents. Check current company/access authority and detect stale edits; failures/conflicts preserve saved state and the user's draft.
+- Persist criteria as chat application data using native Pi documents. Check current company/access authority and detect stale edits; rejections/conflicts preserve saved state and the user's draft. Transport uncertainty requires refreshing saved state before retrying.
 - Show saved criteria in chat details and provide the current value to agents as participant-authored guidance. No completion flag, automatic stop, new execution machinery or implied work authorization.
 - Source/deslop and independent native review; TypeScript/application builds, applicable Nix build/flake checks, whitespace and changed documentation links. No tests or runtime probes under the standing policy. Desktop and 390 px rendered review is required for UI; report missing evidence explicitly rather than claiming completion.
 
 Status: contract recorded; implementation, interface details and all acceptance evidence pending. Usage instructions follow verified source interfaces. No deployment, runtime behavior or functional qualification is established by this documentation update.
 
 Candidate backend source inspection: Documenter checked the route schema, snapshot default, native participation/revision commit and per-request context field. The source exposes a 20,000-character pre-trim limit and 409 stale-edit response; usage records these and the absence of request-ID replay. UI instructions, independent native review, integrated builds and runtime/rendered qualification remain pending. No tests, runtime probes or live-state edits were performed.
+
+Pi Durable Expert independently reported no blocking backend source findings: native authorization/revision/persistence are atomic, legacy defaults are safe and request-context refresh adds no tasks. Already-running requests are not rewritten; lost responses may conceal committed saves. Runtime/restart remains unverified.
