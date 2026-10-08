@@ -417,7 +417,7 @@ Chris requested Slack as the conversation screen's visual model, approved the [I
 
 ### Chat Definition of Done
 
-**Accepted and implementation authorized October 8, 2026; delivery evidence pending.** Any chat can have optional shared Markdown completion criteria, including checklists. Store this as chat-level application data, not individual agent configuration. The [work package](handoff.md#chat-definition-of-done--october-8-2026) owns acceptance evidence.
+**Accepted October 8, 2026; source-published in `89f9ff7`, functional/rendered qualification pending.** Any chat can have optional shared Markdown completion criteria, including checklists. Store this as chat-level application data, not individual agent configuration. The [work package](handoff.md#chat-definition-of-done--october-8-2026) owns acceptance evidence.
 
 - Authorized human participants can set, edit or clear the criteria; read-only observers cannot edit. Reads and writes use current company/conversation access checks.
 - Show the saved criteria in chat details and supply the current saved value to agent participants on subsequent request-context refreshes as completion guidance, without changing an already-running request. Missing criteria in existing chats mean no criteria; do not require migration or create a default goal.
