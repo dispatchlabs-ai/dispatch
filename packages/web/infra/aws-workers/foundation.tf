@@ -136,15 +136,16 @@ resource "aws_db_parameter_group" "this" {
   tags = local.tags
 }
 resource "aws_db_instance" "this" {
-  identifier                  = var.name
-  engine                      = "postgres"
-  engine_version              = var.database_engine_version
-  instance_class              = var.database_instance_class
-  allocated_storage           = var.database_storage_gib
-  max_allocated_storage       = 100
-  storage_type                = "gp3"
-  storage_encrypted           = true
-  db_name                     = "dispatch"
+  identifier            = var.name
+  engine                = "postgres"
+  engine_version        = var.database_engine_version
+  instance_class        = var.database_instance_class
+  allocated_storage     = var.database_storage_gib
+  max_allocated_storage = 100
+  storage_type          = "gp3"
+  storage_encrypted     = true
+  # Use PostgreSQL's default maintenance database. The operator initializer owns
+  # the seven application databases; RDS rejects "dispatch" as an initial DBName.
   username                    = "dispatch_operator"
   manage_master_user_password = true
   db_subnet_group_name        = aws_db_subnet_group.this.name
