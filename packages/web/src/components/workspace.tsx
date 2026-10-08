@@ -3,15 +3,15 @@ import type { CriteriaDraft } from "./definition-of-done";
 import { ProjectArchiveImport } from "./project-archives";
 import { SecretsPage } from "./secrets";
 import { BundlesDialog } from "./bundles";
-import { useAttachmentDrafts, emptyAttachments } from "../lib/attachments";
+import { emptyAttachments } from "../lib/attachments";
 import { Tabs } from "@base-ui/react/tabs";
 import { Bot, ChevronLeft, ChevronRight, CircleHelp, Folder, LogOut, Menu, MessageSquare, PanelLeft, PanelRight, Plus, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router";
-import type { AgentDefinition, ApplicationConfig, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, SendMessageInput, UpdateChatInput } from "../shared/contracts";
+import type { AgentDefinition, ApplicationConfig, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, UpdateChatInput } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
-import { agentMentionPrefix } from "../lib/mentions";
-import { mergeChat, type ConnectionState, type PendingMessage } from "../lib/chat";
+import { composerKey, useComposers } from "../lib/composers";
+import { mergeChat, type ConnectionState } from "../lib/chat";
 import { useSession } from "../lib/session";
 import { AgentArchiveDialog, AgentDetails, AgentsPage, agentEditIsDirty, beginAgentEdit, type AgentEditing } from "./agents";
 import { AgentSidebar } from "./agent-sidebar";
@@ -83,12 +83,6 @@ export function Workspace() {
   const [activeId, setActiveId] = useState(() => initialTab(searchParams).id);
   const [snapshots, setSnapshots] = useState<Record<string, ChatSnapshot>>({});
   const [connections, setConnections] = useState<Record<string, ConnectionState>>({});
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [mentions, setMentions] = useState<Record<string, string[]>>({});
-  const [pending, setPending] = useState<Record<string, PendingMessage | undefined>>({});
-  const draftVersions = useRef<Record<string, number>>({});
-  const messageRequests = useRef<Record<string, { requestId: string; draftVersion: number } | undefined>>({});
-  const [sendErrors, setSendErrors] = useState<Record<string, string | undefined>>({});
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
@@ -136,22 +130,70 @@ export function Workspace() {
   const createRequest = useRef<CreateChatInput | null>(null);
   const [createFailed, setCreateFailed] = useState(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const knownChats = useRef(new Set<string>());
+  const lostAccess = useRef(new Set<string>());
+  const refreshRequest = useRef<{ controller: AbortController; observed: Map<string, ChatSummary> } | null>(null);
   const load = useCallback(async () => {
+    refreshRequest.current?.controller.abort();
+    const request = { controller: new AbortController(), observed: new Map<string, ChatSummary>() };
+    refreshRequest.current = request;
+    const knownAtStart = new Set(knownChats.current);
+    const { signal } = request.controller;
     try {
       const [nextConfig, chatResult, agentResult, projectResult] = await Promise.all([
-        api<ApplicationConfig>("/api/config"), api<{ chats: ChatSummary[] }>("/api/chats"), api<{ agents: AgentDefinition[] }>("/api/agents"),
-        api<{ projects: Project[] }>("/api/projects"),
+        api<ApplicationConfig>("/api/config", undefined, signal), api<{ chats: ChatSummary[] }>("/api/chats", undefined, signal),
+        api<{ agents: AgentDefinition[] }>("/api/agents", undefined, signal), api<{ projects: Project[] }>("/api/projects", undefined, signal),
       ]);
+      if (signal.aborted) return;
+      // New chats observed while the list was in flight may be absent from that response.
+      const listed = new Map(chatResult.chats.map(chat => [chat.id, chat]));
+      // Omissions of already-known chats revoke access, even without an SSE error.
+      for (const id of knownAtStart) if (!listed.has(id)) lostAccess.current.add(id);
+      // Only a fresh authorized list can lift an access-loss fence.
+      for (const id of listed.keys()) {
+        lostAccess.current.delete(id);
+        knownChats.current.add(id);
+      }
+      for (const chat of request.observed.values()) {
+        if (lostAccess.current.has(chat.id)) continue;
+        if (!listed.has(chat.id) || listed.get(chat.id)!.revision < chat.revision) listed.set(chat.id, chat);
+      }
       setConfig(nextConfig);
-      setChats(chatResult.chats);
-      setSnapshots(current => Object.fromEntries(Object.entries(current).filter(([id]) => chatResult.chats.some(chat => chat.id === id))));
+      setChats(current => {
+        const existing = new Map(current.map(chat => [chat.id, chat]));
+        return [...listed.values()].map(chat => {
+          const previous = existing.get(chat.id);
+          return previous && previous.revision > chat.revision ? previous : chat;
+        }).sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
+      });
+      setSnapshots(current => Object.fromEntries(Object.entries(current).filter(([id]) => listed.has(id))));
       setAgents(agentResult.agents);
       setProjects(projectResult.projects);
-      setError(null);
-    } catch (error) { setError(errorMessage(error)); } finally { setLoading(false); }
+      setLoadError(null);
+    } catch (error) {
+      if (!signal.aborted) setLoadError(errorMessage(error));
+    } finally {
+      if (refreshRequest.current === request) {
+        refreshRequest.current = null;
+        if (!signal.aborted) setLoading(false);
+      }
+    }
   }, [api]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    const refresh = () => {
+      if (document.visibilityState === "visible" && !refreshRequest.current) void load();
+    };
+    document.addEventListener("visibilitychange", refresh);
+    const timer = window.setInterval(refresh, 15_000);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.clearInterval(timer);
+      refreshRequest.current?.controller.abort();
+    };
+  }, [load]);
   useEffect(() => {
     const navigation = window.matchMedia("(max-width: 1100px)");
     const context = window.matchMedia("(max-width: 800px)");
@@ -166,56 +208,27 @@ export function Workspace() {
       context.removeEventListener("change", closeWidePanels);
     };
   }, []);
-  useEffect(() => {
-    const refresh = () => { if (document.visibilityState === "visible") void load(); };
-    document.addEventListener("visibilitychange", refresh);
-    return () => document.removeEventListener("visibilitychange", refresh);
-  }, [load]);
-
-  useEffect(() => {
-
-    const timer = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      void load();
-    }, 15_000);
-    return () => window.clearInterval(timer);
-  }, [load]);
-
   const onAccessLost = useCallback((id: string) => {
+    lostAccess.current.add(id);
     setSnapshots(current => { const next = { ...current }; delete next[id]; return next; });
     setChats(current => current.filter(chat => chat.id !== id));
     void load();
   }, [load]);
 
   const onSnapshot = useCallback((snapshot: ChatSnapshot) => {
+    if (lostAccess.current.has(snapshot.conversation.id)) return;
+    knownChats.current.add(snapshot.conversation.id);
+    const observed = refreshRequest.current?.observed;
+    const previous = observed?.get(snapshot.conversation.id);
+    if (!previous || previous.revision <= snapshot.conversation.revision) observed?.set(snapshot.conversation.id, snapshot.conversation);
     setSnapshots(current => current[snapshot.conversation.id]?.conversation.revision > snapshot.conversation.revision
       ? current : { ...current, [snapshot.conversation.id]: reconcileChat(current[snapshot.conversation.id], snapshot) });
     setChats(current => mergeChat(current, snapshot.conversation));
   }, []);
   const onConnection = useCallback((chatId: string, connection: ConnectionState) => setConnections(current => ({ ...current, [chatId]: connection })), []);
 
-  const attachmentDrafts = useAttachmentDrafts(key => {
-    draftVersions.current[key] = (draftVersions.current[key] ?? 0) + 1;
-    messageRequests.current[key] = undefined;
-    setPending(current => ({ ...current, [key]: undefined }));
-    setSendErrors(current => ({ ...current, [key]: undefined }));
-  });
-  const clearAttachments = useRef(attachmentDrafts.clear);
-  clearAttachments.current = attachmentDrafts.clear;
-
-  const settleMessage = useCallback((chatId: string, requestId: string) => {
-    const request = messageRequests.current[chatId];
-    if (request?.requestId !== requestId) return;
-    messageRequests.current[chatId] = undefined;
-    setPending(current => current[chatId]?.requestId === requestId ? { ...current, [chatId]: undefined } : current);
-    // A later draft can have identical text; only the submitted edit may be cleared.
-    if ((draftVersions.current[chatId] ?? 0) === request.draftVersion) {
-      clearAttachments.current(chatId);
-      setDrafts(current => ({ ...current, [chatId]: "" }));
-      setMentions(current => ({ ...current, [chatId]: [] }));
-    }
-    setSendErrors(current => ({ ...current, [chatId]: undefined }));
-  }, []);
+  const composers = useComposers(onSnapshot);
+  const attachmentDrafts = composers.attachments;
 
   function selectSection(next: WorkspaceSection) {
     setSection(next);
@@ -237,7 +250,7 @@ export function Workspace() {
 
   function requestCloseTab(tabId: string) {
     const tab = tabs.find(item => item.id === tabId);
-    const dirty = tab?.kind === "chat" ? [...new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions), ...Object.keys(attachmentDrafts.drafts)])].some(key => (key === tab.chatId || key.startsWith(`${tab.chatId}:`)) && (Boolean(drafts[key]?.trim()) || Boolean(pending[key]) || Boolean(mentions[key]?.length) || Boolean(attachmentDrafts.drafts[key]?.length))) : false;
+    const dirty = tab?.kind === "chat" && composers.isDirty(tab.chatId);
     if (tab?.kind === "project" && projectEditing[tab.projectId]?.busy) return;
     if (tab?.kind === "chat" && criteriaDrafts[tab.chatId]?.busy) return;
     if (dirty || (tab?.kind === "chat" && criteriaDrafts[tab.chatId]) || (tab?.kind === "project" && (projectEditing[tab.projectId] || projectSearch[tab.projectId]))) setClosingTab(tabId);
@@ -252,16 +265,7 @@ export function Workspace() {
     }
     if (closing?.kind === "chat") {
       setCriteriaDrafts(current => ({ ...current, [closing.chatId]: undefined }));
-      for (const key of new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions), ...Object.keys(attachmentDrafts.drafts)])) {
-        if (key !== closing.chatId && !key.startsWith(`${closing.chatId}:`)) continue;
-        messageRequests.current[key] = undefined;
-        draftVersions.current[key] = (draftVersions.current[key] ?? 0) + 1;
-        attachmentDrafts.clear(key);
-        setDrafts(current => ({ ...current, [key]: "" }));
-        setMentions(current => ({ ...current, [key]: [] }));
-        setPending(current => ({ ...current, [key]: undefined }));
-        setSendErrors(current => ({ ...current, [key]: undefined }));
-      }
+      composers.close(closing.chatId);
     }
     setClosingTab(null);
     const remaining = tabs.filter(tab => tab.id !== tabId);
@@ -366,63 +370,12 @@ export function Workspace() {
     onSnapshot(await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(id)}/title`, { title }));
   }
 
-  function changeMentions(key: string, ids: string[]) {
-    draftVersions.current[key] = (draftVersions.current[key] ?? 0) + 1;
-    messageRequests.current[key] = undefined;
-    setPending(current => ({ ...current, [key]: undefined }));
-    setMentions(current => ({ ...current, [key]: ids }));
-  }
-
-  function changeDraft(key: string, text: string) {
-    draftVersions.current[key] = (draftVersions.current[key] ?? 0) + 1;
-    if (pending[key] && !pending[key]?.sending && pending[key]?.text !== text.trim()) messageRequests.current[key] = undefined;
-    setDrafts(current => ({ ...current, [key]: text }));
-    setSendErrors(current => ({ ...current, [key]: undefined }));
-    setPending(current => current[key] && !current[key]?.sending && current[key]?.text !== text.trim() ? { ...current, [key]: undefined } : current);
-  }
-
   const openSupporting = useCallback((chatId: string, threadId: string | null) => {
     setThreads(current => ({ ...current, [chatId]: threadId }));
     setChatDetailsVisible(current => ({ ...current, [chatId]: true }));
     if (viewportWidth <= 800) setContextOpen(true);
     else requestAnimationFrame(() => document.querySelector<HTMLElement>("#details-column .shared-context")?.focus());
   }, [viewportWidth]);
-
-  async function sendMessage(conversationId: string, threadId: string | null = null, mentions: string[] = []) {
-    const chatId = threadId ? `${conversationId}:${threadId}` : conversationId;
-    if (pending[chatId]?.sending) return;
-    const previous = pending[chatId];
-    const text = previous?.text ?? drafts[chatId]?.trim() ?? "";
-    const attachments = attachmentDrafts.drafts[chatId] ?? [];
-    if (attachments.some(item => !item.attachment)) return;
-    const attachmentIds = previous?.attachmentIds ?? attachments.map(item => item.attachment!.id);
-    if (!text && !attachmentIds.length) return;
-    const command: SendMessageInput = {
-      attachmentIds, requestId: previous?.requestId || crypto.randomUUID(), text, threadId,
-      mentions: previous?.mentions ?? mentions.filter(id => !id.startsWith(agentMentionPrefix)),
-      agentMentions: previous?.agentMentions ?? mentions.filter(id => id.startsWith(agentMentionPrefix)).map(id => id.slice(agentMentionPrefix.length)),
-    };
-    const priorRequest = messageRequests.current[chatId];
-    messageRequests.current[chatId] = priorRequest?.requestId === command.requestId
-      ? priorRequest : { requestId: command.requestId, draftVersion: draftVersions.current[chatId] ?? 0 };
-    setPending(current => ({ ...current, [chatId]: { ...command, sending: true } }));
-    setSendErrors(current => ({ ...current, [chatId]: undefined }));
-    try {
-      const snapshot = await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(conversationId)}/messages`, command);
-      onSnapshot(snapshot);
-      settleMessage(chatId, command.requestId);
-    } catch (error) {
-      if (messageRequests.current[chatId]?.requestId !== command.requestId) return;
-      const message = errorMessage(error);
-      if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429) {
-        messageRequests.current[chatId] = undefined;
-        setPending(current => current[chatId]?.requestId === command.requestId ? { ...current, [chatId]: undefined } : current);
-        setSendErrors(current => ({ ...current, [chatId]: message }));
-      } else {
-        setPending(current => current[chatId]?.requestId === command.requestId ? { ...current, [chatId]: { ...command, sending: false, error: message } } : current);
-      }
-    }
-  }
 
   async function signOut() {
     setSigningOut(true); setError(null);
@@ -467,21 +420,22 @@ export function Workspace() {
   const connection = active.kind === "chat" ? connections[active.chatId] || "connecting" : null;
   const activeProjectId = active.kind === "project" ? active.projectId : active.kind === "chat" ? chats.find(chat => chat.id === active.chatId)?.projectId ?? null : null;
   const selectedProject = active.kind === "project" ? projects.find(project => project.id === active.projectId) : undefined;
+  const supportingKey = active.kind === "chat" ? composerKey(active.chatId, threads[active.chatId]) : "";
   const supporting = (inDrawer = false) => selectedProject ? <ProjectSettings key={selectedProject.id}
     project={selectedProject} agents={agents} showHeader={!inDrawer}
     editing={projectEditing[selectedProject.id] ?? null}
     onEditingChange={editing => setProjectEditing(current => ({ ...current, [selectedProject.id]: editing }))}
     onSaved={project => { setProjects(current => mergeProjects(current, [project])); void load(); }} /> : section === "agents" && !editingAgent && evaluationAgent === selectedAgent?.id ? <div className="agent-details">{!inDrawer ? <header className="context-header"><h2>Evaluation profile</h2></header> : null}<div className="context-body">{evaluationContext}</div></div> : section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : active.kind === "chat" && snapshot ? <SharedContextPanel agents={agents} key={snapshot.conversation.id} snapshot={snapshot} models={config?.models ?? []} threadId={threads[active.chatId] ?? null}
     criteriaDraft={criteriaDrafts[active.chatId]} onCriteriaDraft={draft => setCriteriaDrafts(current => ({ ...current, [active.chatId]: draft }))}
-    attachments={attachmentDrafts.drafts[`${active.chatId}:${threads[active.chatId]}`] ?? emptyAttachments}
-    onAddFiles={files => attachmentDrafts.add(`${active.chatId}:${threads[active.chatId]}`, active.chatId, files)}
-    onRemoveAttachment={id => attachmentDrafts.remove(`${active.chatId}:${threads[active.chatId]}`, id)}
-    onRetryAttachment={id => attachmentDrafts.retry(`${active.chatId}:${threads[active.chatId]}`, active.chatId, id)}
-    mentions={mentions[`${active.chatId}:${threads[active.chatId]}`] ?? []} onMentionsChange={ids => changeMentions(`${active.chatId}:${threads[active.chatId]}`, ids)}
-    draft={drafts[threads[active.chatId] ? `${active.chatId}:${threads[active.chatId]}` : active.chatId] || ""}
-    pending={pending[`${active.chatId}:${threads[active.chatId]}`]} error={sendErrors[`${active.chatId}:${threads[active.chatId]}`]}
-    onDraftChange={text => changeDraft(`${active.chatId}:${threads[active.chatId]}`, text)}
-    onSnapshot={onSnapshot} onSend={mentions => void sendMessage(active.chatId, threads[active.chatId] ?? null, mentions)} onInvite={() => setInvitingChatId(active.chatId)} onAddInstance={(definitionId, onCreated) => setAddingInstance({ chatId: active.chatId, definitionId, onCreated })}
+    attachments={attachmentDrafts.drafts[supportingKey] ?? emptyAttachments}
+    onAddFiles={files => attachmentDrafts.add(supportingKey, active.chatId, files)}
+    onRemoveAttachment={id => attachmentDrafts.remove(supportingKey, id)}
+    onRetryAttachment={id => attachmentDrafts.retry(supportingKey, active.chatId, id)}
+    mentions={composers.get(supportingKey).mentions} onMentionsChange={ids => composers.changeMentions(supportingKey, ids)}
+    draft={composers.get(supportingKey).text}
+    pending={composers.get(supportingKey).pending} error={composers.get(supportingKey).error}
+    onDraftChange={text => composers.changeText(supportingKey, text)}
+    onSnapshot={onSnapshot} onSend={mentions => void composers.send(active.chatId, threads[active.chatId] ?? null, mentions)} onInvite={() => setInvitingChatId(active.chatId)} onAddInstance={(definitionId, onCreated) => setAddingInstance({ chatId: active.chatId, definitionId, onCreated })}
     onClose={() => {
       setThreads(current => ({ ...current, [active.chatId]: null }));
       setDetailsVisible(false);
@@ -537,7 +491,7 @@ export function Workspace() {
   </main>;
   if (!config) return <main className="page-loading">
     <Brand />
-    <Notice>{error || "The workspace could not be loaded."}</Notice>
+    <Notice>{error || loadError || "The workspace could not be loaded."}</Notice>
     <Button onClick={() => { setLoading(true); void load(); }}>Try again</Button>
     <Button variant="ghost" onClick={() => void signOut()}>Sign out</Button>
   </main>;
@@ -611,8 +565,8 @@ export function Workspace() {
               </IconButton> : null}
             </div>
         </header> : null}
-        {error || createFailed ? <div className="workspace-notice">
-          <Notice>{error ?? "Chat creation could not be confirmed. Retry to recover it."}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat([], null, createRequest.current ?? undefined)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}
+        {error || loadError || createFailed ? <div className="workspace-notice">
+          <Notice>{error ?? loadError ?? "Chat creation could not be confirmed. Retry to recover it."}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat([], null, createRequest.current ?? undefined)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => { setError(null); setLoadError(null); }}>Dismiss</Button>}
         </div> : null}
         <main className="workspace-main" id="main-workspace" tabIndex={-1}>
           <div className="workspace-section" hidden={section !== "chats"}>
@@ -628,13 +582,13 @@ export function Workspace() {
               onAddFiles={files => attachmentDrafts.add(tab.chatId, tab.chatId, files)}
               onRemoveAttachment={id => attachmentDrafts.remove(tab.chatId, id)}
               onRetryAttachment={id => attachmentDrafts.retry(tab.chatId, tab.chatId, id)}
-              draft={drafts[tab.chatId] || ""}
-              pending={pending[tab.chatId]}
-              sendError={sendErrors[tab.chatId]}
-              mentions={mentions[tab.chatId] ?? []}
-              onMentionsChange={ids => changeMentions(tab.chatId, ids)}
-              onDraftChange={text => changeDraft(tab.chatId, text)}
-              onSend={mentions => void sendMessage(tab.chatId, null, mentions)}
+              draft={composers.get(tab.chatId).text}
+              pending={composers.get(tab.chatId).pending}
+              sendError={composers.get(tab.chatId).error}
+              mentions={composers.get(tab.chatId).mentions}
+              onMentionsChange={ids => composers.changeMentions(tab.chatId, ids)}
+              onDraftChange={text => composers.changeText(tab.chatId, text)}
+              onSend={mentions => void composers.send(tab.chatId, null, mentions)}
               activeThreadId={(viewportWidth <= 800 ? contextOpen : chatDetailsVisible[tab.chatId]) ? threads[tab.chatId] : null}
               onParticipants={() => openSupporting(tab.chatId, null)}
               onAddInstance={(definitionId, onCreated) => setAddingInstance({ chatId: tab.chatId, definitionId, onCreated })}

@@ -8,7 +8,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, getSupportedThinkingLevels, type Models } from "@earendil-works/pi-ai/models";
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
-import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, LiveDoc, type ConversationId, type HarnessSettings, type RegistryReader, type Storage, type Tx } from "@earendil-works/pi-durable";
+import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, LiveDoc, type CommitPublication, type ConversationId, type HarnessSettings, type RegistryReader, type Storage, type Tx } from "@earendil-works/pi-durable";
 import { openPiStorage, type PiStorageConfig } from "./storage/open.js";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
@@ -103,7 +103,9 @@ export class DispatchRuntime {
   private commitRevision = 0;
   private closed = false;
   private upgradeDrain?: Promise<void>;
-  private upgradesDirty = false;
+  private upgradeCatalogDirty = false;
+  private upgradeRooms = new Set<ConversationId>();
+  private pendingUpgradeRooms = new Map<ConversationId, ConversationId>();
   private unsubscribeUpgrades?: () => void;
   private shared: SharedConversations;
   private peopleDirectory?: PeopleDirectory;
@@ -234,9 +236,7 @@ export class DispatchRuntime {
       await runtime.configureConnections(options.companyId);
       connections.onChanged = () => runtime.configureConnections(options.companyId);
       await runtime.reconcileUpgrades();
-      runtime.unsubscribeUpgrades = harness.subscribeCommits(publication => {
-        if (publication.changes.length) runtime.scheduleUpgrades();
-      });
+      runtime.unsubscribeUpgrades = harness.subscribeCommits(publication => runtime.queueUpgrades(publication));
       harness.resume();
       return runtime;
     } catch (error) {
@@ -1324,29 +1324,52 @@ export class DispatchRuntime {
     return person;
   }
 
-  // Notifications are only wakeups. Durable definition/member state is the source of truth.
-  private scheduleUpgrades() {
+  // These are wakeup indexes only. Startup and each transaction re-read durable revision/member state.
+  private queueUpgrades(publication: CommitPublication) {
     if (this.closed) return;
-    this.upgradesDirty = true;
-    if (this.upgradeDrain) return;
-    this.upgradeDrain = (async () => {
-      while (this.upgradesDirty && !this.closed) {
-        this.upgradesDirty = false;
-        await this.reconcileUpgrades();
+    for (const change of publication.changes) {
+      if (change.type === "document" || change.type === "document.copy") {
+        if (change.record.kind === CatalogDoc.definition.kind) this.upgradeCatalogDirty = true;
+        else if (change.record.kind === SharedDoc.definition.kind && change.conversationId) this.upgradeRooms.add(change.conversationId);
+        else if (change.record.kind === LiveDoc.definition.kind || change.record.kind === InboxDoc.definition.kind) {
+          const room = change.conversationId && this.pendingUpgradeRooms.get(change.conversationId);
+          if (room) this.upgradeRooms.add(room);
+        }
+      } else if (change.type === "task") {
+        const room = change.value.conversationId && this.pendingUpgradeRooms.get(change.value.conversationId);
+        if (room) this.upgradeRooms.add(room);
       }
-    })().catch(() => { console.error("Agent upgrade reconciliation failed; pending revisions remain saved."); })
-      .finally(() => { this.upgradeDrain = undefined; });
+    }
+    this.scheduleUpgrades();
   }
 
-  private async reconcileUpgrades() {
+  private scheduleUpgrades() {
+    if (this.closed || this.upgradeDrain || (!this.upgradeCatalogDirty && !this.upgradeRooms.size)) return;
+    // Commit listeners must not call Session operations. Start reads after publication returns.
+    this.upgradeDrain = Promise.resolve().then(async () => {
+      while ((this.upgradeCatalogDirty || this.upgradeRooms.size) && !this.closed) {
+        const rooms = this.upgradeCatalogDirty ? undefined : this.upgradeRooms;
+        this.upgradeCatalogDirty = false;
+        this.upgradeRooms = new Set();
+        await this.reconcileUpgrades(rooms);
+      }
+    }).catch(() => { console.error("Agent upgrade reconciliation failed; pending revisions remain saved."); })
+      .finally(() => { this.upgradeDrain = undefined; this.scheduleUpgrades(); });
+  }
+
+  private async reconcileUpgrades(rooms?: ReadonlySet<ConversationId>) {
     const catalog = (await this.harness.snapshot(CatalogDoc, context))!;
     for (const chat of catalog.chats) {
       const roomId = nativeId(chat.id);
+      if (rooms && !rooms.has(roomId)) continue;
       const room = await this.harness.snapshot(SharedDoc, roomId, context);
       for (const member of room?.members ?? []) {
+        if (member.conversationId) this.pendingUpgradeRooms.delete(member.conversationId);
         if (member.kind !== "agent" || !member.agentDefinitionId || (member.membership && member.membership !== "active")) continue;
         const latest = latestAgent(catalog, chat.companyId, member.agentDefinitionId);
         if ((!latest || latest.archived || latest.revision === member.agentRevision) && !member.pendingConnectionIds && !member.connectionsRefreshPending) continue;
+        // Index before awaiting the idle check, so a settling task cannot lose its wakeup.
+        if (member.conversationId) this.pendingUpgradeRooms.set(member.conversationId, roomId);
         try {
           await this.harness.commit(async tx => {
             const current = (await tx.doc(SharedDoc, roomId)).members.find(item => item.id === member.id);
