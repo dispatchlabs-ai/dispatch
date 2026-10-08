@@ -49,6 +49,8 @@ Before AWS rollout, obtain authorization for the actual infrastructure/cost plan
 
 Discussion consensus, October 8, 2026: make backend and launcher state recoverable independently of their host-local files **before** adding replicas. This is planned work, not implemented behavior or authorization to deploy AWS infrastructure. Preserve native installations and the existing PostgreSQL trial.
 
+Chris subsequently sized the next package to close all application/rehearsal prerequisites for the AWS Terraform module, not host independence alone; see the [pre-AWS readiness requirement](spec.md#pre-aws-application-readiness). The scope below is a starting point pending a complete gap inventory, concrete completion design and ordered acceptance criteria.
+
 ### Scope and sequence
 
 1. Move authoritative authentication/session, encrypted connection, catalog/directory and lifecycle state into PostgreSQL with separate schemas and restricted roles. Retain one active backend, launcher, catalog owner and provider-credential owner initially; backend replicas must not independently open the same Pi catalog store. Pi continues owning execution inside each conversation worker.
