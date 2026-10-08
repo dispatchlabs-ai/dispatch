@@ -17,6 +17,9 @@ import { createAuth } from "../auth.js";
 import { createApp } from "../app.js";
 import { readConfig } from "../config.js";
 import { readDirectoryStoreConfig } from "../storage/directory-config.js";
+import { readAuthStoreConfig, openConfiguredAuth } from "../auth/config.js";
+import { readMcpConnectionConfig, openConfiguredMcpConnections } from "../storage/mcp-config.js";
+import { readProviderCredentialConfig, openConfiguredProviderCredentials } from "../storage/provider-credential-config.js";
 import { openModels } from "../model-auth.js";
 import { DispatchRuntime, RuntimeError, type WorkerManagementActor } from "../runtime.js";
 import { McpConnections } from "../mcp-connections.js";
@@ -27,12 +30,17 @@ import { tokenMatches, workerToken } from "./identity.js";
 import { workerRequest } from "./transport.js";
 import type { LauncherStatus } from "./launcher.js";
 import { WorkerStoreProvisioner } from "./postgres-stores.js";
+import { readRestrictedConfigurationFile } from "../storage/restricted-config-file.js";
 import { verifiedPostgresConfig } from "../storage/postgres/tls.js";
 import { WriteAdmission } from "./admission.js";
 
 const filename = process.env.DISPATCH_BACKEND_WORKERS_CONFIG_FILE;
 if (!filename) throw new Error("DISPATCH_BACKEND_WORKERS_CONFIG_FILE is required.");
-const workerConfig = z.object({ routingStoreConfigFile: z.string().startsWith("/").optional(), directoryStoreConfigFile: z.string().startsWith("/").optional(), tls: z.object({ keyFile: z.string().startsWith("/"), certFile: z.string().startsWith("/") }).strict().optional(), postgresStores: z.object({ adminUrlFile: z.string().startsWith("/"), caFile: z.string().startsWith("/").optional() }).strict(), artifacts: s3ArtifactsConfigSchema, installationId: z.string().min(1), workerKeyFile: z.string(), launcherTokenFile: z.string(), operatorTokenFile: z.string(), launcherUrl: z.url(), launcherTimeoutMs: z.number().int().min(1000).max(3_600_000).default(300_000), configurationRevision: z.string().min(1) }).strict().parse(JSON.parse(await readFile(filename, "utf8")));
+const workerConfig = z.object({
+  providerStoreConfigFile: z.string().startsWith("/").optional(),
+  authStoreConfigFile: z.string().startsWith("/").optional(),
+  mcpStoreConfigFile: z.string().startsWith("/").optional(),
+  routingStoreConfigFile: z.string().startsWith("/").optional(), directoryStoreConfigFile: z.string().startsWith("/").optional(), tls: z.object({ keyFile: z.string().startsWith("/"), certFile: z.string().startsWith("/") }).strict().optional(), postgresStores: z.object({ adminUrlFile: z.string().startsWith("/"), caFile: z.string().startsWith("/").optional() }).strict(), artifacts: s3ArtifactsConfigSchema, installationId: z.string().min(1), workerKeyFile: z.string(), launcherTokenFile: z.string(), operatorTokenFile: z.string(), launcherUrl: z.url(), launcherTimeoutMs: z.number().int().min(1000).max(3_600_000).default(300_000), configurationRevision: z.string().min(1) }).strict().parse(JSON.parse(await readFile(filename, "utf8")));
 // Load configured identity before opening stores; missing/invalid TLS never falls back to HTTP.
 const tls = workerConfig.tls ? {
   key: await readFile(workerConfig.tls.keyFile), cert: await readFile(workerConfig.tls.certFile),
@@ -54,6 +62,25 @@ const routingConfig = workerConfig.routingStoreConfigFile === undefined ? undefi
   : await readRoutingStoreConfig(workerConfig.routingStoreConfigFile);
 if (routingConfig && routingConfig.installationId !== workerConfig.installationId)
   throw new Error("Routing installation identity does not match backend identity.");
+const providerConfig = workerConfig.providerStoreConfigFile === undefined ? undefined : await readProviderCredentialConfig(workerConfig.providerStoreConfigFile);
+const authConfig = workerConfig.authStoreConfigFile === undefined ? undefined : await readAuthStoreConfig(workerConfig.authStoreConfigFile);
+const mcpConfig = workerConfig.mcpStoreConfigFile === undefined ? undefined : await readMcpConnectionConfig(workerConfig.mcpStoreConfigFile);
+// Validate every configured credential file before any database or artifact opens.
+for (const store of [providerConfig, authConfig, mcpConfig]) {
+  if (!store) continue;
+  let url: Buffer | undefined;
+  let key: Buffer | undefined;
+  try {
+    if (store.installationId !== workerConfig.installationId) throw new Error();
+    url = await readRestrictedConfigurationFile(store.databaseUrlFile, true);
+    const ca = await readRestrictedConfigurationFile(store.databaseCaFile, false);
+    verifiedPostgresConfig(url.toString("utf8").trim(), ca.toString("utf8"));
+    key = await readRestrictedConfigurationFile(store.encryptionKeyFile, true);
+    if (key.length !== 32) throw new Error();
+  } catch {
+    throw new Error("Invalid backend credential configuration; check installation identity, restricted files, key and TLS.");
+  } finally { url?.fill(0); key?.fill(0); }
+}
 const startupCleanup: Array<() => void | Promise<void>> = [];
 try {
 const routes = routingConfig ? await openConfiguredWorkerRoutes(routingConfig)
@@ -70,14 +97,21 @@ const operatorToken = (await readFile(workerConfig.operatorTokenFile, "utf8")).t
 await mkdir(config.stateDir, { recursive: true, mode: 0o700 });
 await mkdir(config.workspaceDir, { recursive: true, mode: 0o700 });
 startupCleanup.push(() => { cleanupSessionResources(); });
-const provider = await openModels();
-const auth = await createAuth({ databasePath: join(config.stateDir, "auth.sqlite"), secretPath: join(config.stateDir, "auth.key"), origin: config.origin, rpId: config.rpId, companyId: config.companyId, companyName: config.companyName });
+const credentials = providerConfig ? await openConfiguredProviderCredentials(providerConfig) : undefined;
+if (credentials) {
+  startupCleanup.push(() => credentials.close());
+  await credentials.quiesce();
+}
+const provider = await openModels(process.env, credentials, false);
+const auth = authConfig ? await openConfiguredAuth(authConfig, config) : await createAuth({ databasePath: join(config.stateDir, "auth.sqlite"), secretPath: join(config.stateDir, "auth.key"), origin: config.origin, rpId: config.rpId, companyId: config.companyId, companyName: config.companyName });
 startupCleanup.push(() => auth.close());
-const connections = new McpConnections(join(config.stateDir, "connections.sqlite"), join(config.stateDir, "connections.key"), config.origin);
+await auth.quiesce();
+const connections = mcpConfig ? await openConfiguredMcpConnections(mcpConfig, config.origin) : new McpConnections(join(config.stateDir, "connections.sqlite"), join(config.stateDir, "connections.key"), config.origin);
 startupCleanup.push(() => connections.close());
-const support = new WriteAdmission(false, async () => {});
+await connections.quiesce();
+const support = new WriteAdmission(true, async () => {});
 const directory = await DispatchRuntime.open({
-  runMcpBackground: operation => support.run(operation), stateDir: join(config.stateDir, "runtime"), companyId: config.companyId, models: provider.models, directoryOnly: true,
+  connectMcpOnOpen: false, runMcpBackground: operation => support.run(operation), stateDir: join(config.stateDir, "runtime"), companyId: config.companyId, models: provider.models, directoryOnly: true,
   piStorage: directoryStorage, workspaceDir: config.workspaceDir, connectionsFile: config.connectionsFile, mcpConnections: connections,
   provider: provider.provider, modelId: provider.modelId, thinkingLevel: provider.thinkingLevel, readAllProjectUserIds: config.readAllProjectUserIds,
   peopleDirectory: { list: async companyId => auth.listCompanyPeople(companyId), get: async (companyId, userId) => auth.getCompanyPerson(companyId, userId) },
@@ -85,7 +119,21 @@ const directory = await DispatchRuntime.open({
 startupCleanup.push(async () => { try { await support.quiesce(); } finally { await directory.close(); } });
 const mcpPolicy = new McpPolicyGate();
 const runtime = distributedRuntime({ runPolicyChange: operation => mcpPolicy.change(operation), ...workerConfig, workerKey, launcherToken, directory, routes, runBackground: operation => admission.run(operation) });
-// On restart support remains open until an explicit, freshly verified drain.
+let credentialsQuiesced = true;
+async function resumeCredentials() {
+  credentialsQuiesced = false;
+  await credentials?.resume();
+  await auth.resume();
+  await connections.resume();
+  if ((credentials && !credentials.admitting) || !auth.admitting || !connections.admitting)
+    throw new Error("Credential admission remains closed.");
+  await provider.models.refresh({ allowNetwork: false });
+}
+if (!routes.admissionBlocked()) {
+  await resumeCredentials();
+  await support.resume();
+  await support.run(() => directory.startMcpConnections());
+}
 let transition: Promise<unknown> = Promise.resolve();
 function operatorTransition<T>(operation: () => Promise<T>): Promise<T> {
   const result = transition.then(operation);
@@ -187,22 +235,24 @@ async function drainBackend() {
   const status = await workerRequest<LauncherStatus>(workerConfig.launcherUrl, launcherToken, "/v1/status");
   if (!status.drainComplete) throw new Error("Worker retirement remains unresolved.");
   await support.quiesce();
-  await connections.quiesce();
-  await auth.quiesce();
+  credentialsQuiesced = false;
+  const results = await Promise.allSettled([connections.quiesce(), auth.quiesce(), credentials?.quiesce()]);
+  const failures = results.flatMap(result => result.status === "rejected" ? [result.reason] : []);
+  if (failures.length) throw new AggregateError(failures, "Credential drain failed.");
+  credentialsQuiesced = true;
 }
 app.post("/internal/drain", async c => {
   if (!tokenMatches(operatorToken, c.req.header("Authorization"))) return c.json({ error: "Forbidden" }, 403);
   await operatorTransition(drainBackend);
-  return c.json({ quiesced: admission.quiesced && support.quiesced });
+  return c.json({ quiesced: admission.quiesced && support.quiesced && credentialsQuiesced });
 });
 app.post("/internal/undrain", async c => {
   if (!tokenMatches(operatorToken, c.req.header("Authorization"))) return c.json({ error: "Forbidden" }, 403);
   await operatorTransition(async () => {
     if (closing) throw new Error("Backend shutdown is in progress.");
-    await connections.resume();
-    await auth.resume();
-    if (!connections.admitting || !auth.admitting) throw new Error("Credential admission remains closed.");
+    await resumeCredentials();
     await support.resume();
+    await support.run(() => directory.startMcpConnections());
     await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/undrain", {}, undefined, workerConfig.launcherTimeoutMs);
     await admission.resume();
   });
@@ -211,7 +261,7 @@ app.post("/internal/undrain", async c => {
 app.get("/internal/status", async c => {
   if (!tokenMatches(operatorToken, c.req.header("Authorization"))) return c.json({ error: "Forbidden" }, 403);
   const status = await workerRequest<LauncherStatus>(workerConfig.launcherUrl, launcherToken, "/v1/status");
-  return c.json({ schemaVersion: 1, installation: workerConfig.installationId, drained: status.drained, drainComplete: status.drainComplete, backendQuiesced: admission.quiesced && support.quiesced, activeWorkers: status.activeWorkers.length, unresolvedAttempts: status.unresolvedAttempts.length });
+  return c.json({ schemaVersion: 1, installation: workerConfig.installationId, drained: status.drained, drainComplete: status.drainComplete, backendQuiesced: admission.quiesced && support.quiesced && credentialsQuiesced, activeWorkers: status.activeWorkers.length, unresolvedAttempts: status.unresolvedAttempts.length });
 });
 const clientDir = process.env.DISPATCH_CLIENT_DIR ?? resolve(dirname(fileURLToPath(import.meta.url)), "../../../client");
 app.route("/", createApp({ auth, runtime, mcpConnections: connections, origin: config.origin, clientDir,
@@ -251,6 +301,7 @@ function close(): Promise<void> {
       () => artifacts.close(),
       () => stores.close(),
       () => auth.close(),
+      () => credentials?.close(),
       () => { if ("closeAllConnections" in server) server.closeAllConnections(); },
     ]) {
       try { await cleanup(); } catch (error) { failures.push(error); }

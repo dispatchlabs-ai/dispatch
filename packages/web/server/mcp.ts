@@ -91,11 +91,16 @@ export class AgentConnections {
     return new AgentConnections(configs, registry, managed, companyId);
   }
 
-  async open(harness: Harness) {
+  async open(harness: Harness, connect = true) {
     this.harness = harness;
     const saved = await harness.snapshot(CatalogDoc, context);
     for (const connection of this.connections) connection.restore(saved?.connections[connection.key]);
     // Discovery installs executable definitions before Pi resumes any saved work.
+    if (connect) await this.start();
+  }
+
+  async start() {
+    this.syncManaged();
     await Promise.all(this.connections.map(connection => connection.connect().catch(() => {})));
   }
 

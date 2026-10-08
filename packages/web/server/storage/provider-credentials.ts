@@ -88,6 +88,8 @@ export class PostgresCredentialStore implements CredentialStore {
     }
   }
 
+  get admitting() { return this.accepting && !this.closing && !this.failure; }
+
   private healthy() { if (this.failure) throw this.failure; }
 
   private async query<T extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
