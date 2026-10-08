@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — native web research
+
+- Add the Web research capability with native search, page reading, literal find and numbered-link traversal, durable instance-local evidence and source citations. Interrupted network batches are not automatically replayed. Qualification tracked in [WP-054](docs/handoff.md#wp-054--native-web-research).
+
 ## Unreleased — project-row chat creation
 
 - Start a chat directly from a project row using its default agents, without a setup dialog; focus the new composer and retain existing drafts. Use Chat terminology in product controls.

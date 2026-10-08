@@ -1280,3 +1280,15 @@ Authorized October 8, 2026. Implemented the project-row compose action, bypassin
 Removed personal-project listing/creation/move paths, the move dialog and related UI. Explicit shared creation is required; obsolete grouping inputs are rejected rather than interpreted as access-changing transfers. Ungrouped chats retain explicit membership. The stored unnamed title sentinel remains unchanged, with a display-only New chat fallback.
 
 Acceptance evidence: Developer integrated Documenter's contract updates and Deslop's removal. Pi Durable Expert reviewed creation/default resolution, uncertain retries, persistence and authorization; the refresh-hidden retry notice was corrected. Source/deslop and whitespace review completed. Integrated `nix develop --command npm run check`, `nix build --no-link`, and `nix flake check` passed on Apple Silicon. No tests run. Desktop/390 px rendered review, keyboard/touch focus, duplicate-click and lost-response recovery remain unverified; this is an outstanding UI-rule qualification requirement, not a runtime correctness claim. Existing large-chunk build advisory remains.
+
+## WP-054 — Native web research
+
+Authorized October 8, 2026 for all four operations together. Pi Durable Expert owns the native extension and durable references; Reverse owns retrieval/security; Developer owns capability/runtime/UI integration, documentation and publication.
+
+Acceptance criteria:
+- Expose Web research in agent configuration, validate the capability on the service and register its implementation before native recovery. Existing instances retain their immutable configuration.
+- Search, open, literal find and hyperlink traversal return bounded evidence with source URLs, stable instance-local references, retrieval times and explicit truncation. Cached reads retain the same snapshot; refresh creates a new reference.
+- Preserve native cancellation/recovery; never automatically replay interrupted paid work. Reject unsafe destinations and sanitize backend failures without leaking credentials.
+- Source/deslop review, TypeScript/application and applicable Nix builds, whitespace/link review. No functional tests under the standing policy. Record desktop/390 px rendered and runtime security/restart evidence separately; successful builds are not functional qualification.
+
+Implementation is in progress; checks, backend setup, rendered review and publication are not yet claimed.
