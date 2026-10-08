@@ -10,7 +10,8 @@ export class PostgresLauncherJournal {
   private closing?: Promise<void>;
   private revision = "0";
   private readonly ownerId = randomUUID();
-  body = "";
+  private loadedBody = "";
+  get initialBody(): string { return this.loadedBody; }
 
   private constructor(private readonly client: Client, private readonly installationId: string) {
     client.on("error", () => { this.failure ??= new Error("Launcher database connection lost; confirm controller retirement before recovery."); });
@@ -40,7 +41,7 @@ export class PostgresLauncherJournal {
       await client.query("UPDATE dispatch_launcher.journal SET owner_id=$1 WHERE singleton=1", [store.ownerId]);
       await client.query("COMMIT");
       store.assertHealthy();
-      store.body = row.body;
+      store.loadedBody = row.body;
       store.revision = row.revision;
       return store;
     } catch (error) {
@@ -66,7 +67,6 @@ export class PostgresLauncherJournal {
       if (!row) throw new Error("Launcher journal ownership/version changed.");
       this.assertHealthy();
       this.revision = row.revision;
-      this.body = body;
     } catch {
       this.failure ??= new Error("Launcher journal write uncertain; confirm controller retirement before recovery.");
       throw this.failure;

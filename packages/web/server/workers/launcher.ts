@@ -96,12 +96,9 @@ export class WorkerLauncher {
       await chmod(filename, 0o600);
       db.exec("PRAGMA journal_mode = DELETE; PRAGMA synchronous = FULL; CREATE TABLE IF NOT EXISTS journal (id INTEGER PRIMARY KEY CHECK (id = 1), body TEXT NOT NULL)");
       const row = db.prepare("SELECT body FROM journal WHERE id = 1").get();
-      const journal = row ? journalSchema.parse(JSON.parse(String(row.body))) : {
+      const journal = row ? parseJournal(String(row.body), options.installationId) : {
         version: 1 as const, installationId: options.installationId, drained: true, attempts: [], stoppedAttemptIds: [],
       };
-      if (journal.installationId !== options.installationId) throw new LauncherError(409, "Launcher state belongs to a different installation.");
-      if (new Set(journal.attempts.map(attempt => attempt.attemptId)).size !== journal.attempts.length)
-        throw new Error("Duplicate attempt IDs in launcher journal.");
       if (!row) db.prepare("INSERT INTO journal (id, body) VALUES (1, ?)").run(JSON.stringify(journal));
       const database = db;
       return new WorkerLauncher({
@@ -121,9 +118,7 @@ export class WorkerLauncher {
     const initial: Journal = { version: 1, installationId: options.installationId, drained: true, attempts: [], stoppedAttemptIds: [] };
     const storage = await PostgresLauncherJournal.open({ ...options, initial: JSON.stringify(initial) });
     try {
-      const journal = journalSchema.parse(JSON.parse(storage.body));
-      if (journal.installationId !== options.installationId) throw new Error("Launcher journal installation mismatch.");
-      if (new Set(journal.attempts.map(attempt => attempt.attemptId)).size !== journal.attempts.length) throw new Error("Duplicate launcher attempt IDs.");
+      const journal = parseJournal(storage.initialBody, options.installationId);
       return new WorkerLauncher(storage, options.driver, journal);
     } catch (error) { await storage.close(); throw error; }
   }
@@ -342,3 +337,11 @@ function pickRequest(request: LaunchRequest): LaunchRequest {
   return { attemptId: request.attemptId, conversationId: request.conversationId, storeId: request.storeId, configurationRevision: request.configurationRevision };
 }
 function sameRequest(a: LaunchRequest, b: LaunchRequest) { return JSON.stringify(pickRequest(a)) === JSON.stringify(pickRequest(b)); }
+
+function parseJournal(body: string, installationId: string): Journal {
+  const journal = journalSchema.parse(JSON.parse(body));
+  if (journal.installationId !== installationId) throw new LauncherError(409, "Launcher state belongs to a different installation.");
+  if (new Set(journal.attempts.map(attempt => attempt.attemptId)).size !== journal.attempts.length)
+    throw new Error("Duplicate attempt IDs in launcher journal.");
+  return journal;
+}
