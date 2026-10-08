@@ -1,8 +1,8 @@
 import { RuntimeError } from "../runtime.js";
 
 /** Internal JSON transport: no automatic retry of potentially committed mutations. */
-export async function workerRequest<T>(origin: string, token: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const timeout = AbortSignal.timeout(60_000);
+export async function workerRequest<T>(origin: string, token: string, path: string, body?: unknown, signal?: AbortSignal, timeoutMs = 60_000): Promise<T> {
+  const timeout = AbortSignal.timeout(timeoutMs);
   const response = await fetch(new URL(path, origin), {
     method: body === undefined ? "GET" : "POST", redirect: "error",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
