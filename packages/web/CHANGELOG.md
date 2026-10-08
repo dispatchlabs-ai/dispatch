@@ -244,3 +244,11 @@
 - Accepted TypeScript throughout the application, local development on M1 Air, and Nix development/build requirements with initial tooling acceptance criteria. The local tooling package now provides these entry points.
 
 - Initial package layout with draft specification, implementation handoff, and usage-guide locations. The initial skeleton reserved source and test locations.
+
+
+## Portability continuation — October 8, 2026
+
+- Add bounded project-history JSON export/import with attachment checksums, manager export authorization, independent projects, inert history and atomic retry-safe admission.
+- Add restricted offline SQLite recovery tooling requiring stopped writers and fenced original ownership; restore never starts a service.
+- Package existing native capabilities for reviewed host installation on Pi Durable 1.0.4; bundle import never installs code.
+- Type/build checks passed; functional, recovery and portability UI qualification remain outstanding.
