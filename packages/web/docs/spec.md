@@ -466,7 +466,7 @@ Design the first chat around Pi's public interfaces and the ownership boundaries
 
 ### Individual-agent evaluation
 
-**Data direction accepted October 7, 2026; profile/editor source implementation available, functional acceptance pending.** Start with individual agents, supporting both stored standalone prompts/cases and evaluation of real usage. Team evaluation is deferred. Agent Eval and Jev are optional tools, not required dependencies or the product's organizing model. [WP-047](handoff.md#wp-047--agent-evaluation-profiles-and-editor) owns the first data/editor delivery; storing a profile does not establish evaluation execution.
+**Data direction accepted October 7, 2026; profile/editor source implementation available, functional acceptance pending.** Start with individual agents, supporting both stored standalone prompts/cases and evaluation of real usage. Team evaluation is deferred. Product intent is recorded in the [evaluation decision record](https://wiki.chrisreynolds.me/wiki/dispatch-web-next-agent-evaluations/). Agent Eval and Jev are optional tools, not required dependencies or the product's organizing model. [WP-047](handoff.md#wp-047--agent-evaluation-profiles-and-editor) owns the first data/editor delivery; storing a profile does not establish evaluation execution.
 
 Use Dispatch-owned Pi Durable documents in the existing persistent store, separate from `dispatch.catalog` and native `pi.agent`. Profile revision is application data, distinct from the document schema/migration version. Large fixtures/artifacts remain private file/blob references. Document scope is not an authorization boundary.
 
