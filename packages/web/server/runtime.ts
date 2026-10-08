@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -10,6 +10,7 @@ import { openPiStorage, type PiStorageConfig } from "./storage/open.js";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
 import type { CreateAgentInstanceInput, CreateAgentInstanceResult, AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
+import type { BundleExportInput, BundleImportResult, BundlePreview, PortableBundle } from "../src/shared/bundles.js";
 import { isManagedConnection } from "../src/shared/contracts.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata } from "./attachments.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
@@ -41,6 +42,13 @@ type ManagementReceipt = {
 };
 const ManagementReceiptsDoc = defineDoc<{ receipts: ManagementReceipt[] }>({
   kind: "dispatch.agent-management-receipts", version: 1, scope: "session", initial: () => ({ receipts: [] }),
+});
+type BundleImportReceipt = {
+  companyId: string; userId: string; requestId: string; fingerprint: string;
+  packageId: string; packageVersion: string; importedAt: number; result: { agents: { key: string; id: string }[]; skills: { key: string; id: string }[] };
+};
+const BundleImportsDoc = defineDoc<{ imports: BundleImportReceipt[] }>({
+  kind: "dispatch.bundle-imports", version: 1, scope: "session", initial: () => ({ imports: [] }),
 });
 const CatalogDoc = defineDoc<Catalog>({
   kind: "dispatch.catalog", version: 1, scope: "session",
@@ -567,6 +575,116 @@ export class DispatchRuntime {
     return publicSkill(skill);
   }
 
+  /** Export from one catalog snapshot, including each exact assigned skill revision. */
+  async exportBundle(scope: RuntimeScope, input: BundleExportInput): Promise<PortableBundle> {
+    const catalog = (await this.harness.snapshot(CatalogDoc, context))!;
+    const bundle: PortableBundle = { formatVersion: 1, id: input.id, version: input.version, agents: [], skills: [] };
+    const skillKeys = new Map<string, string>();
+    const includeSkill = (selection: { id: string; revision: number }) => {
+      const identity = JSON.stringify([selection.id, selection.revision]);
+      const existing = skillKeys.get(identity);
+      if (existing) return existing;
+      const skill = catalog.skills?.find(value => value.companyId === scope.companyId && value.id === selection.id && value.revision === selection.revision);
+      if (!skill) throw new RuntimeError(409, "An exported skill revision is unavailable.");
+      const key = `skill-${bundle.skills.length + 1}`;
+      bundle.skills.push({ key, name: skill.name, description: skill.description, instructions: skill.instructions });
+      skillKeys.set(identity, key);
+      return key;
+    };
+    for (const id of new Set(input.agentIds)) {
+      const agent = latestAgent(catalog, scope.companyId, id);
+      if (!agent) throw new RuntimeError(404, "Agent not found.");
+      const capabilities = publicAgent(agent).capabilities ?? [];
+      const selection = capabilitySelection(capabilities);
+      const extensions = (agent.extensions ?? []).filter(name => !isMcpExtension(name));
+      const tools = (agent.tools ?? []).filter(name => !isMcpTool(name));
+      // Never silently omit custom code or broaden a partial tool selection on reimport.
+      if (!sameNames(extensions, selection.extensions) || !sameNames(tools, selection.tools))
+        throw new RuntimeError(409, `${agent.name} has a capability selection this bundle format cannot represent.`);
+      bundle.agents.push({ key: `agent-${bundle.agents.length + 1}`, name: agent.name, description: agent.description,
+        instructions: agent.instructions, provider: agent.provider, modelId: agent.modelId, thinkingLevel: agent.thinkingLevel,
+        capabilities, skills: (agent.skills ?? []).map(includeSkill),
+        omittedConnections: new Set([...(agent.connections ?? []).map(connection => connection.id),
+          ...this.connections.forAgent(id, managedIds(agent)).map(connection => connection.id)]).size });
+    }
+    for (const selection of input.skills) includeSkill(selection);
+    return bundle;
+  }
+
+  async previewBundle(_scope: RuntimeScope, bundle: PortableBundle): Promise<BundlePreview> {
+    return this.bundlePreview(bundle);
+  }
+
+  /** Codec validates structure first; mutable compatibility is checked again at admission. */
+  async importBundle(scope: RuntimeScope, bundle: PortableBundle, requestId: string): Promise<BundleImportResult> {
+    const fingerprint = bundleFingerprint(bundle);
+    return this.harness.commit(async tx => {
+      const receipts = await tx.doc(BundleImportsDoc);
+      const replay = receipts.imports.find(receipt => receipt.companyId === scope.companyId && receipt.userId === scope.userId && receipt.requestId === requestId);
+      if (replay) {
+        if (replay.fingerprint !== fingerprint) throw requestConflict();
+        return detached(replay.result);
+      }
+      const preview = this.bundlePreview(bundle);
+      if (preview.blockers.length) throw new RuntimeError(409, preview.blockers.join("\n"));
+      const catalog = await tx.doc(CatalogDoc);
+      catalog.skills ??= [];
+      const now = Date.now();
+      const result: BundleImportResult = { agents: [], skills: [] };
+      const skillIds = new Map<string, string>();
+      for (const skill of bundle.skills) {
+        const id = randomUUID();
+        skillIds.set(skill.key, id);
+        catalog.skills.push({ id, revision: 1, name: skill.name, description: skill.description, instructions: skill.instructions,
+          createdAt: now, updatedAt: now, companyId: scope.companyId, savedBy: scope.userId,
+          requestId: `bundle:${requestId}:${skill.key}`, fingerprint });
+        result.skills.push({ key: skill.key, id });
+      }
+      for (const agent of bundle.agents) {
+        const id = randomUUID();
+        const selection = capabilitySelection(agent.capabilities);
+        catalog.agents.push({ id, revision: 1, archived: false, name: agent.name, description: agent.description,
+          instructions: agent.instructions, provider: agent.provider, modelId: agent.modelId, thinkingLevel: agent.thinkingLevel,
+          skills: agent.skills.map(key => ({ id: skillIds.get(key)!, revision: 1 })),
+          extensions: selection.extensions, tools: selection.tools, connections: [],
+          companyId: scope.companyId, savedBy: scope.userId, createdAt: now, updatedAt: now });
+        result.agents.push({ key: agent.key, id });
+      }
+      receipts.imports.push({ companyId: scope.companyId, userId: scope.userId, requestId, fingerprint,
+        packageId: bundle.id, packageVersion: bundle.version, importedAt: now, result });
+      return detached(result);
+    }, context);
+  }
+
+  private bundlePreview(bundle: PortableBundle): BundlePreview {
+    const blockers: string[] = [];
+    const warnings = ["Review instructions for private information before sharing. Credential fields are excluded, but text is not automatically redacted."];
+    const registry = this.registry.snapshot();
+    for (const agent of bundle.agents) {
+      try {
+        this.validateAgent({ name: agent.name, description: agent.description, instructions: agent.instructions,
+          provider: agent.provider, modelId: agent.modelId, thinkingLevel: agent.thinkingLevel });
+      } catch (error) {
+        if (!(error instanceof RuntimeError)) throw error;
+        blockers.push(`${agent.name}: ${error.message}`);
+      }
+      for (const capability of agent.capabilities) {
+        if (capability !== "files-and-commands" && capability !== "image-generation") {
+          blockers.push(`${agent.name}: unsupported capability ${capability}.`);
+          continue;
+        }
+        const selection = capabilitySelection([capability]);
+        const installed = selection.extensions.map(name => registry.extension(name));
+        if (installed.some(extension => !extension) || selection.tools.some(name => !installed.some(extension => extension?.tools?.some(tool => tool.name === name))))
+          blockers.push(`${agent.name}: capability ${capability} is unavailable.`);
+      }
+      if (agent.skills.length && !registry.extension(Skills.name)?.tools?.some(tool => tool.name === "load_skill"))
+        blockers.push(`${agent.name}: assigned skills are unavailable on this installation.`);
+      if (agent.omittedConnections) warnings.push(`${agent.name}: ${agent.omittedConnections} connection(s) excluded; configure new connections after import.`);
+    }
+    return { bundle, blockers, warnings };
+  }
+
   async saveSkill(scope: RuntimeScope, input: SaveSkillInput): Promise<SkillDefinition> {
     const fingerprint = JSON.stringify([input.id, input.expectedRevision, input.name, input.description, input.instructions]);
     return this.harness.commit(async tx => {
@@ -662,8 +780,9 @@ export class DispatchRuntime {
       if (input.capabilities !== undefined) {
         extensions = extensions.filter(name => name !== Coding.name && name !== CodingTools.name && name !== "dispatch-image-gen");
         tools = tools.filter(name => !["read", "write", "edit", "bash", "generate_image"].includes(name));
-        if (input.capabilities.includes("files-and-commands")) { extensions.push(Coding.name, CodingTools.name); tools.push("read", "write", "edit", "bash"); }
-        if (input.capabilities.includes("image-generation")) { extensions.push("dispatch-image-gen"); tools.push("generate_image"); }
+        const capabilities = capabilitySelection(input.capabilities);
+        extensions.push(...capabilities.extensions);
+        tools.push(...capabilities.tools);
       }
       const agent: StoredAgent = {
         id, name: input.name.trim(), description: input.description.trim(),
@@ -1008,3 +1127,29 @@ function requireText(value: unknown, field: string, max: number, allowEmpty = fa
 function requestConflict() { return new RuntimeError(409, "This request ID was already used with different content. Use a new request ID."); }
 
 function publicSkill({ companyId: _company, savedBy: _user, requestId: _request, fingerprint: _fingerprint, ...skill }: StoredSkill): SkillDefinition { return skill; }
+
+/** Explicit capability selections only; importing never installs registry code. */
+function capabilitySelection(capabilities: readonly string[]) {
+  const extensions: string[] = [], tools: string[] = [];
+  if (capabilities.includes("files-and-commands")) {
+    extensions.push(Coding.name, CodingTools.name);
+    tools.push("read", "write", "edit", "bash");
+  }
+  if (capabilities.includes("image-generation")) {
+    extensions.push("dispatch-image-gen");
+    tools.push("generate_image");
+  }
+  return { extensions, tools };
+}
+
+function sameNames(left: string[], right: string[]) {
+  return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
+}
+
+function bundleFingerprint(bundle: PortableBundle) {
+  // Fixed field order makes retries independent of JSON object property ordering.
+  return createHash("sha256").update(JSON.stringify([bundle.formatVersion, bundle.id, bundle.version,
+    bundle.agents.map(agent => [agent.key, agent.name, agent.description, agent.instructions, agent.provider,
+      agent.modelId, agent.thinkingLevel, agent.capabilities, agent.skills, agent.omittedConnections]),
+    bundle.skills.map(skill => [skill.key, skill.name, skill.description, skill.instructions])])).digest("hex");
+}

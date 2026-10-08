@@ -1,4 +1,4 @@
-import type { AgentDraft } from "./contracts";
+import type { AgentDraft } from "./contracts.js";
 
 /** Resolved text data. Archive instruction paths are replaced with contents by the codec. */
 export interface PortableBundle {
