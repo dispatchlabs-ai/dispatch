@@ -1718,3 +1718,16 @@ Integrated `ad76406`: contribution guard completion shares the native reconcilia
 
 
 Expanded-pass source publication: Documenter independently verified remote `main` and the synchronized canonical checkout at `98d00cf5161cc6ccecf609e480754995a5960ce9`. This delivers the expanded code/guidance fixes above, not overall cleanup acceptance, runtime/rendered qualification or deployment. The old-editor request/event retirement decision remains unresolved; persisted Wiki credentials, bindings and identity checks remain required.
+
+
+## Opt-in agent criteria editing — October 8, 2026
+
+Chris agreed to explicit opt-in editing after Developer and Pi Durable Expert distinguished an agent tool from a capability toggle. Developer owns implementation, Expert native/authorization review, Documenter contract/usage and acceptance reconciliation. See [the extension contract](spec.md#opt-in-agent-definition-of-done-editing). Existing human-only criteria qualification remains separate and incomplete.
+
+Acceptance criteria:
+- Per-agent **Edit Definition of Done** is disabled by default; only enabled active agent participants may mutate criteria through an agent-facing tool. Resolve current chat and actor from trusted native bindings, with no caller-supplied cross-chat authority.
+- Enforce current participation and capability permission at execution/mutation time. Reuse shared criteria storage, expected-revision conflict detection, 20,000-character limit and blank-clear behavior. Return detached values; preserve uncertain-response reconciliation.
+- No automatic stop/completion, implicit work authorization, human impersonation or new execution machinery. Human editing remains available; observers remain read-only.
+- Source/deslop and independent native authorization/lifetime review; TypeScript/application and applicable Nix builds, whitespace and documentation links. Record runtime/tool/revocation/conflict evidence separately under the current testing policy; UI desktop/390 px review applies if capability controls change.
+
+Status: accepted direction, implementation and exact tool/configuration interface pending. No capability has been enabled or criteria mutated by this documentation update.
