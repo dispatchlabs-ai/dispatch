@@ -14,6 +14,7 @@ import { requireProjectAccess, type ProjectAction } from "../project-access.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata, messageAttachments } from "../attachments.js";
 import { managementTools } from "../agent-management.js";
 import { ConversationTurns, TurnsDoc } from "./turns.js";
+import { PublicSummaryDoc, includePublicMessage } from "./summary.js";
 import { resolveAgentMentionLinks } from "./mentions.js";
 import { Contributions, ContributionsDoc, contributionCopy, type Contribution } from "./contributions.js";
 
@@ -229,7 +230,7 @@ export class SharedConversations {
           member.status = "stopped";
           delete member.error;
           delete member.activeDelivery;
-          await tx.appendEntry(PublicEntry, task.input.roomId, { data: {
+          await this.appendPublic(tx, task.input.roomId, { data: {
             id: `removed:${member.id}`, kind: "membership", authorId: task.input.authorId,
             text: `Removed ${member.name}`, createdAt: Date.now(), threadId: null, mentions: [member.id],
           } });
@@ -610,6 +611,7 @@ export class SharedConversations {
     const room = await tx.doc(SharedDoc, roomId);
     await tx.doc(TurnsDoc, roomId);
     room.companyId = companyId;
+    (await tx.doc(PublicSummaryDoc, roomId)).complete = true;
     if (sharedProjectId !== undefined) room.sharedProjectId = sharedProjectId;
     room.members.push({ id: `human:${human.id}`, kind: "human", userId: human.id, name: human.name, joinedAt: Date.now(), status: "idle" });
     room.preferences[human.id] = preferences;
@@ -654,7 +656,7 @@ export class SharedConversations {
       const content = nativeContent(entry);
       const { text } = content;
       if (!text && !content.images?.length) continue;
-      await tx.appendEntry(PublicEntry, roomId, { data: { id: `legacy:${entry.id}`, kind: "message", authorId: message.role === "user" ? `human:${human.id}` : legacy.id, ...content, createdAt: message.timestamp, threadId: null, mentions: [] } });
+      await this.appendPublic(tx, roomId, { data: { id: `legacy:${entry.id}`, kind: "message", authorId: message.role === "user" ? `human:${human.id}` : legacy.id, ...content, createdAt: message.timestamp, threadId: null, mentions: [] } });
     }
     for (const item of inbox.items) {
       if (item.mode === "write") continue;
@@ -662,7 +664,7 @@ export class SharedConversations {
       const images = typeof item.content === "string" ? [] : item.content.flatMap(part => part.type === "image" ? [{ mimeType: part.mimeType, data: part.data }] : []);
       const id = `legacy-queued:${item.id}`;
       room.legacyQueued[String(item.id)] = id;
-      await tx.appendEntry(PublicEntry, roomId, { data: { id, kind: "message", authorId: `human:${human.id}`, text, ...(images.length ? { images } : {}), createdAt: Date.now(), threadId: null, mentions: [] } });
+      await this.appendPublic(tx, roomId, { data: { id, kind: "message", authorId: `human:${human.id}`, text, ...(images.length ? { images } : {}), createdAt: Date.now(), threadId: null, mentions: [] } });
     }
     if (live.run) {
       const reporter = await tx.createTask(this.legacyReporter, { roomId, participantId: legacy.id, afterEntry: Number(entries.at(-1)?.id ?? 0) }, { conversationId: roomId, ownership: { kind: "conversation" }, background: true });
@@ -804,11 +806,50 @@ export class SharedConversations {
     return message;
   }
 
+  /** Public metadata and its entry are one native commit, including membership and legacy writes. */
+  private async appendPublic(tx: Tx, roomId: ConversationId, value: { data: MessageData }) {
+    const entry = await tx.appendEntry(PublicEntry, roomId, value);
+    includePublicMessage(await tx.doc(PublicSummaryDoc, roomId), entry.id, value.data);
+    return entry;
+  }
+
+  /** One bounded startup page; persisted progress resumes after interruption before serving reads. */
+  async initializeSummary(tx: Tx, roomId: ConversationId) {
+    const summary = await tx.doc(PublicSummaryDoc, roomId);
+    if (summary.complete) return true;
+    const room = await tx.doc(SharedDoc, roomId);
+    const page = await tx.scanEntries({ conversationId: roomId }, 200, summary.cursor);
+    for (const entry of page.items) {
+      if (PublicEntry.is(entry) && !room.messageAliases?.[entry.data.id]) includePublicMessage(summary, entry.id, entry.data);
+    }
+    if (page.next) summary.cursor = page.next;
+    else { summary.complete = true; delete summary.cursor; }
+    return summary.complete;
+  }
+
+  async summary(tx: Tx, roomId: ConversationId) {
+    const summary = await tx.doc(PublicSummaryDoc, roomId);
+    if (!summary.complete) throw new Error("Public summary initialization is incomplete.");
+    const room = await tx.doc(SharedDoc, roomId);
+    const turns = await tx.doc(TurnsDoc, roomId);
+    const tickets = await activeTurnTickets(tx, turns);
+    const agents = [];
+    for (const member of room.members) {
+      if (member.kind !== "agent" || !activeMember(member)) continue;
+      const live = member.conversationId ? await tx.doc(LiveDoc, member.conversationId) : {};
+      agents.push(await participantStatus(tx, member, live, turns, tickets));
+    }
+    const status = agents.some(agent => ["working", "listening", "responding"].includes(agent.status)) ? "running"
+      : agents.some(agent => agent.status === "failed") ? "failed" : agents.some(agent => agent.status === "stopped") ? "stopped" : "idle";
+    const error = agents.find(agent => agent.status === "failed")?.error;
+    return { firstText: summary.first?.text, updatedAt: summary.updatedAt, status, ...(error ? { error } : {}) } as const;
+  }
+
   private async append(tx: Tx, roomId: ConversationId, message: MessageData) {
     const room = await tx.doc(SharedDoc, roomId);
     const turns = await tx.doc(TurnsDoc, roomId);
     ++turns.sequence;
-    await tx.appendEntry(PublicEntry, roomId, { data: message });
+    await this.appendPublic(tx, roomId, { data: message });
     for (const member of room.members) {
       if (member.kind !== "agent" || !activeMember(member) || member.id === message.authorId) continue;
       const id = await tx.createTask(this.delivery, { roomId, participantId: member.id, messageId: message.id, epoch: room.epoch, ...(member.lastDelivery ? { previous: member.lastDelivery } : {}) }, { conversationId: roomId, ownership: { kind: "conversation" }, background: true });
@@ -853,7 +894,7 @@ export class SharedConversations {
       added.push(await this.addAgent(tx, roomId, definitionId));
     }
     room.requests[key] = { hash };
-    if (added.length) await tx.appendEntry(PublicEntry, roomId, { data: { id: randomUUID(), kind: "membership", authorId, text: `Invited ${added.map(member => member.name).join(", ")}`, createdAt: Date.now(), threadId: null, mentions: added.map(member => member.id) } });
+    if (added.length) await this.appendPublic(tx, roomId, { data: { id: randomUUID(), kind: "membership", authorId, text: `Invited ${added.map(member => member.name).join(", ")}`, createdAt: Date.now(), threadId: null, mentions: added.map(member => member.id) } });
   }
 
   async createInstance(tx: Tx, roomId: ConversationId, authorId: string, input: CreateAgentInstanceInput) {
@@ -874,7 +915,7 @@ export class SharedConversations {
     }
     const member = await this.addAgent(tx, roomId, input.agentDefinitionId, input);
     room.requests[key] = { hash, participantId: member.id };
-    await tx.appendEntry(PublicEntry, roomId, { data: {
+    await this.appendPublic(tx, roomId, { data: {
       id: randomUUID(), kind: "membership", authorId, text: `Invited ${member.name}`, createdAt: Date.now(), threadId: null, mentions: [member.id],
     } });
     return member.id;
@@ -950,40 +991,55 @@ export class SharedConversations {
     const activities: ParticipantActivity[] = [];
     const participants: ConversationParticipant[] = [];
     const messages = this.projectedMessages(roomId, await this.committedEntries(roomId), room.messageAliases);
-    const activeTickets = new Set<string>();
-    for (const ticket of [...turns.queue, ...(turns.speaker ? [turns.speaker] : [])]) {
-      const owner = await tx.task(ticket.owner);
-      if (owner && !owner.abortRequested && owner.state.status !== "terminal") activeTickets.add(ticket.key);
-    }
+    const activeTickets = await activeTurnTickets(tx, turns);
     for (const member of room.members) {
       const { pendingConnectionIds, connectionsRefreshPending, conversationId, removalTask, lastDelivery: _last, threadId, activeDelivery: _delivery, consideredThrough: _through, superseded: _superseded, publicationPriority: _priority, ...participant } = member;
       if (conversationId) {
         const live = await tx.doc(LiveDoc, conversationId);
-        if (live.run) participant.status = "working";
-        else if (member.lastDelivery) {
-          const delivery = await tx.task(member.lastDelivery);
-          if (delivery?.state.status === "terminal" && ["faulted", "failed", "orphaned"].includes(delivery.state.outcome.status)) {
-            participant.status = "failed";
-            const outcome = delivery.state.outcome;
-            participant.error = "error" in outcome && outcome.error ? outcome.error.message : "Agent delivery could not complete.";
-          } else if (delivery?.state.status === "terminal" && participant.status === "listening") participant.status = "idle";
-        }
+        const observed = await participantStatus(tx, member, live, turns, activeTickets);
         const entries = await this.committedEntries(conversationId);
         const usage = await tx.doc(UsageDoc, conversationId);
-        const listening = turns.queue.some(ticket => ticket.participantId === member.id && activeTickets.has(ticket.key));
-        const speaking = turns.speaker?.participantId === member.id && activeTickets.has(turns.speaker.key);
         activities.push(...this.projectedActivities(member, entries, live, messages));
         const removal = removalTask ? await tx.task(removalTask) : undefined;
         const removalError = member.membership === "removing" && (!removal || removal.state.status === "terminal")
           ? "Removal incomplete. Retry removal." : undefined;
         participants.push({ ...participant, ...(pendingConnectionIds || connectionsRefreshPending ? { connectionsPending: true } : {}), membership: member.membership ?? "active", ...(removalError ? { removalError } : {}),
-          status: !activeMember(member) ? "stopped" : participant.status === "failed" ? "failed" : speaking ? "responding" : listening ? "listening" : participant.status, usage } as ConversationParticipant);
+          ...observed, usage } as ConversationParticipant);
       }
       else participants.push({ ...participant, status: Object.values(turns.presence).some(presence => presence.participantId === member.id && presence.until > Date.now()) ? "typing" : "idle" } as ConversationParticipant);
     }
     // Native document drafts are revoked at the end of the enclosing commit.
     return copyJson({ participants, messages, activities }, { omitUndefinedProperties: true }) as unknown as Presentation;
   }
+}
+
+type TurnState = { queue: { key: string; owner: TaskId; participantId: string }[]; speaker?: { key: string; owner: TaskId; participantId: string } };
+
+async function activeTurnTickets(tx: Tx, turns: TurnState) {
+  const active = new Set<string>();
+  for (const ticket of [...turns.queue, ...(turns.speaker ? [turns.speaker] : [])]) {
+    const owner = await tx.task(ticket.owner);
+    if (owner && !owner.abortRequested && owner.state.status !== "terminal") active.add(ticket.key);
+  }
+  return active;
+}
+
+async function participantStatus(tx: Tx, member: Member, live: LiveState, turns: TurnState, tickets: ReadonlySet<string>) {
+  let status = member.status;
+  let error = member.error;
+  if (live.run) status = "working";
+  else if (member.lastDelivery) {
+    const delivery = await tx.task(member.lastDelivery);
+    if (delivery?.state.status === "terminal" && ["faulted", "failed", "orphaned"].includes(delivery.state.outcome.status)) {
+      status = "failed";
+      const outcome = delivery.state.outcome;
+      error = "error" in outcome && outcome.error ? outcome.error.message : "Agent delivery could not complete.";
+    } else if (delivery?.state.status === "terminal" && status === "listening") status = "idle";
+  }
+  const listening = turns.queue.some(ticket => ticket.participantId === member.id && tickets.has(ticket.key));
+  const speaking = turns.speaker?.participantId === member.id && tickets.has(turns.speaker.key);
+  return { status: !activeMember(member) ? "stopped" : status === "failed" ? "failed" : speaking ? "responding" : listening ? "listening" : status,
+    ...(error ? { error } : {}) } as const;
 }
 
 function activeMember(member: Pick<Member, "membership"> | undefined) {

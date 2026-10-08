@@ -227,6 +227,7 @@ export class DispatchRuntime {
         catalog.runtimeInstance = randomUUID();
       }, context);
       await runtime.migrateChats();
+      await runtime.initializePublicSummaries();
       await runtime.migrateWorkspaces(options.companyId);
       await connections.open(harness);
       await runtime.configureConnections(options.companyId);
@@ -249,7 +250,13 @@ export class DispatchRuntime {
     const catalog = await this.harness.snapshot(CatalogDoc, context);
     const summaries: ChatSummary[] = [];
     for (const chat of catalog!.chats.filter(chat => chat.companyId === scope.companyId)) {
-      try { summaries.push((await this.getChat(scope, chat.id)).conversation); }
+      try {
+        summaries.push(await this.harness.commit(async tx => {
+          const current = (await tx.doc(CatalogDoc)).chats.find(item => item.id === chat.id && item.companyId === scope.companyId);
+          if (!current) throw new RuntimeError(404, "Conversation not found.");
+          return this.chatSummary(tx, scope, current);
+        }, context));
+      }
       catch (error) { if (!(error instanceof Error && "status" in error && error.status === 404)) throw error; }
     }
     return summaries.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
@@ -524,6 +531,22 @@ export class DispatchRuntime {
     return this.getChat(scope, id);
   }
 
+  /** Shared by list and detail so metadata semantics never depend on loaded history. */
+  private async chatSummary(tx: Tx, scope: RuntimeScope, chat: StoredChat): Promise<ChatSummary> {
+    const room = await this.shared.authorize(tx, scope, nativeId(chat.id), "read", this.readAll(scope));
+    const preference = room.preferences[scope.userId] ?? { pinned: false, archived: false };
+    const access = room.sharedProjectId ? projectAccess((await tx.doc(ProjectsDoc)).projects[room.sharedProjectId], scope, this.readAll(scope)) : { participate: true };
+    const summary = await this.shared.summary(tx, nativeId(chat.id));
+    return {
+      id: chat.id, title: chat.displayTitle ?? (chat.title === "New conversation" && !chat.creationTitleExplicit ? summary.firstText || "New chat" : chat.title),
+      sharedProjectId: room.sharedProjectId ?? null, canParticipate: access.participate,
+      projectId: room.sharedProjectId ?? null, pinned: preference.pinned, archived: preference.archived,
+      createdAt: chat.createdAt, updatedAt: Math.max(summary.updatedAt, chat.createdAt), revision: this.commitRevision,
+      agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, agentName: chat.agentName ?? "Saved agent", status: summary.status,
+      ...(summary.error ? { error: summary.error } : {}),
+    };
+  }
+
   async getChat(scope: RuntimeScope, id: string): Promise<ChatSnapshot> {
     await this.authorize(scope, id);
     // Hold the native commit line while reading all participating streams. No read commits write state.
@@ -539,20 +562,7 @@ export class DispatchRuntime {
         const member = room.members.find(item => item.id === participant.id)!;
         if (member.conversationId) participant.agent = { ...participant.agent, connections: await this.connections.boundConnections(tx, member.conversationId) };
       }
-      const preference = room.preferences[scope.userId] ?? { pinned: false, archived: false };
-      const access = room.sharedProjectId ? projectAccess((await tx.doc(ProjectsDoc)).projects[room.sharedProjectId], scope, this.readAll(scope)) : { participate: true };
-      const first = presentation.messages.find(message => message.kind === "message");
-      const agents = presentation.participants.filter(member => member.kind === "agent").filter(member => member.membership === "active");
-      const status = agents.some(agent => ["working", "listening", "responding"].includes(agent.status)) ? "running" : agents.some(agent => agent.status === "failed") ? "failed" : agents.some(agent => agent.status === "stopped") ? "stopped" : "idle";
-      const error = agents.find(agent => agent.status === "failed")?.error;
-      const conversation: ChatSummary = {
-        id, title: chat.displayTitle ?? (chat.title === "New conversation" && !chat.creationTitleExplicit ? first?.text.slice(0, 80) || "New chat" : chat.title),
-        sharedProjectId: room.sharedProjectId ?? null, canParticipate: access.participate,
-        projectId: room.sharedProjectId ?? null, pinned: preference.pinned, archived: preference.archived,
-        createdAt: chat.createdAt, updatedAt: presentation.messages.reduce((latest, message) => Math.max(latest, message.createdAt), chat.createdAt), revision: this.commitRevision,
-        agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, agentName: chat.agentName ?? "Saved agent", status,
-        ...(error ? { error } : {}),
-      };
+      const conversation = await this.chatSummary(tx, scope, chat);
       // Compatibility carries no private native transcript, inbox, reasoning or agent context.
       return { conversation, definitionOfDone: { markdown: room.definitionOfDone?.markdown ?? "", revision: room.definitionOfDone?.revision ?? 0 }, ...presentation, view: { conversation: (await tx.conversation(nativeId(id)))!, entries: [], docs: {} }, submissions: [] } as ChatSnapshot;
     }, context);
@@ -1475,6 +1485,15 @@ export class DispatchRuntime {
           member.agent.cwd = this.workspaceDir;
         }
       }, context);
+    }
+  }
+
+  private async initializePublicSummaries() {
+    const catalog = (await this.harness.snapshot(CatalogDoc, context))!;
+    for (const chat of catalog.chats) {
+      while (!await this.harness.commit(tx => this.shared.initializeSummary(tx, nativeId(chat.id)), context)) {
+        // Each page and cursor commit atomically. Restart resumes at the next page, before serving clients.
+      }
     }
   }
 
