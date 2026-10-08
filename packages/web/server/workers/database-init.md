@@ -162,7 +162,27 @@ refused before any store role existed. Repeat-create refusal and password-free
 client/server logs also passed. The initial fixture needed an explicit safe
 server default; after correction, all eleven observations passed and the stopped
 fixture was removed. Receipt: `.local/rds-settings-result.json` in the initializer
-worktree. These observations do not establish the corrected image's RDS execution.
-Successful live creation, complete RDS logging/privilege qualification and live application/browser behavior
-remain unverified. This helper is preparation toward the live Surton URL, not
-completion of that handoff.
+worktree. These observations alone do not establish the corrected image's RDS execution.
+
+### Live RDS create and separate verification
+
+Later October 8, Deployer ran the corrected application image at `94c02c4` against
+the private Surton RDS PostgreSQL 17.9 instance. Pi independently read ECS
+`DescribeTasks` and CloudWatch records for create task
+`136412ba87e74504ae24ab5ca476f54f` and separate verify task
+`38060a8ae70747f08d8fb60cae17828b`. Both used operator definition
+`surton-dispatch-db-init:2` and image manifest
+`sha256:a5e498c1b5be4695de9c98753d6d71651527b6689f5537ab0e2b62df74ebd2b4`.
+Each task was confirmed STOPPED with initializer and volume-init exit codes zero;
+the respective reports were `created` and `verified`, with verified TLS, all seven
+stores, separate database owners and worker-provisioner-only CREATEROLE. Successful
+creation also establishes that this actual operator session passed the required
+logging-value checks before any role/password provisioning. It does not constitute
+a complete server/audit/proxy logging audit.
+
+Temporary operator-task/IAM/SG removal is separate from database creation and must
+preserve the databases and original secret versions. Pi reviewed the saved removal
+plan as deleting only that temporary authority and caller guard; applying it remains
+Deployer-owned. Live application/worker workflows, executor replacement and browser
+acceptance remain unverified. This scoped database result does not complete the
+login-ready URL handoff.
