@@ -32,8 +32,9 @@ export class Contributions {
             const item = (await tx.doc(ContributionsDoc, task.input.roomId)).items[task.input.id];
             if (item) await this.reconcile(tx, task.input.roomId, item);
             done = !item || item.phase === "closed";
+            if (done) return completed();
           }, ctx);
-          if (done) { await runtime.commit(() => completed(), ctx); return; }
+          if (done) return;
           await runtime.sleep(runtime.now() + 200, ctx);
         }
       } },

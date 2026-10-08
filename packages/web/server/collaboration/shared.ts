@@ -1119,10 +1119,10 @@ function publicAssistant(message: AssistantMessage): AssistantMessage {
 }
 
 function publicLive(live: LiveState): LiveState {
-  const result = copyJson(live, { omitUndefinedProperties: true }) as LiveState;
-  if (result.generation?.message) result.generation.message = copyJson(publicAssistant(result.generation.message), { omitUndefinedProperties: true }) as NonNullable<NonNullable<LiveState["generation"]>["message"]>;
-  result.tools = result.tools?.filter(tool => !tool.name.startsWith("conversation_"));
-  return result;
+  return copyJson({ ...live,
+    ...(live.generation?.message ? { generation: { ...live.generation, message: publicAssistant(live.generation.message) } } : {}),
+    tools: live.tools?.filter(tool => !tool.name.startsWith("conversation_")),
+  }, { omitUndefinedProperties: true }) as LiveState;
 }
 
 function isContextBoundary(entry: EntryRecord) { return entry.kind === "pi.reset" || entry.kind === "pi.compaction"; }
