@@ -4,6 +4,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
+import { createServer as createHttpsServer } from "node:https";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { S3Artifacts, s3ArtifactsConfigSchema } from "./s3-artifacts.js";
@@ -25,7 +26,12 @@ import { WriteAdmission } from "./admission.js";
 
 const filename = process.env.DISPATCH_BACKEND_WORKERS_CONFIG_FILE;
 if (!filename) throw new Error("DISPATCH_BACKEND_WORKERS_CONFIG_FILE is required.");
-const workerConfig = z.object({ postgresStores: z.object({ adminUrlFile: z.string().startsWith("/") }).strict(), artifacts: s3ArtifactsConfigSchema, installationId: z.string().min(1), workerKeyFile: z.string(), launcherTokenFile: z.string(), operatorTokenFile: z.string(), launcherUrl: z.url(), launcherTimeoutMs: z.number().int().min(1000).max(3_600_000).default(300_000), configurationRevision: z.string().min(1) }).strict().parse(JSON.parse(await readFile(filename, "utf8")));
+const workerConfig = z.object({ tls: z.object({ keyFile: z.string().startsWith("/"), certFile: z.string().startsWith("/") }).strict().optional(), postgresStores: z.object({ adminUrlFile: z.string().startsWith("/") }).strict(), artifacts: s3ArtifactsConfigSchema, installationId: z.string().min(1), workerKeyFile: z.string(), launcherTokenFile: z.string(), operatorTokenFile: z.string(), launcherUrl: z.url(), launcherTimeoutMs: z.number().int().min(1000).max(3_600_000).default(300_000), configurationRevision: z.string().min(1) }).strict().parse(JSON.parse(await readFile(filename, "utf8")));
+// Load configured identity before opening stores; missing/invalid TLS never falls back to HTTP.
+const tls = workerConfig.tls ? {
+  key: await readFile(workerConfig.tls.keyFile), cert: await readFile(workerConfig.tls.certFile),
+  minVersion: "TLSv1.2" as const,
+} : undefined;
 const artifacts = await S3Artifacts.open(workerConfig.artifacts);
 const workerKey = (await readFile(workerConfig.workerKeyFile, "utf8")).trim();
 const stores = await WorkerStoreProvisioner.open({ connectionString: (await readFile(workerConfig.postgresStores.adminUrlFile, "utf8")).trim(), installationId: workerConfig.installationId, credentialKey: workerKey });
@@ -175,7 +181,10 @@ app.route("/", createApp({ auth, runtime, mcpConnections: connections, origin: c
 app.onError((error, c) => error instanceof RuntimeError && error.status === 403
   ? c.json({ error: "Forbidden" }, 403)
   : c.json({ error: "Internal worker request failed" }, 503));
-const server = serve({ fetch: app.fetch, hostname: config.host, port: config.port });
+const listener = { fetch: app.fetch, hostname: config.host, port: config.port };
+const server = tls
+  ? serve({ ...listener, createServer: createHttpsServer, serverOptions: tls })
+  : serve(listener);
 let closing = false;
 async function close() { if (closing) return; closing = true; server.close(); await runtime.close(); await connections.close(); artifacts.close(); await stores.close(); auth.close(); if ("closeAllConnections" in server) server.closeAllConnections(); }
 process.once("SIGTERM", () => { void close(); }); process.once("SIGINT", () => { void close(); });
