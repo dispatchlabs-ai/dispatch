@@ -97,11 +97,16 @@ Passwords are bind parameters to a temporary SECURITY INVOKER function, not SQL
 text sent by Node. Before sending them the operator session disables statement,
 duration/sample, error-statement and parameter logging, sets terse error verbosity,
 and disables pgAudit/pg_stat_statements utility capture when those settings exist.
-The function masks internal password-assignment errors. If RDS denies a required
-session setting, creation fails **before creating roles or sending passwords**;
-resolve its operator-only parameter authority, never grant that authority to app
-roles or bypass this protection. Database audit/proxy/monitoring policy remains an
-operator responsibility; actual RDS privileges and logging need live observation.
+The function masks internal password-assignment errors. Each required session
+setting is read first; an already-effective safe value needs no `SET` privilege.
+Otherwise the helper sets it and checks the effective value again. If the value
+cannot be made safe, creation fails **before creating roles or sending passwords**.
+RDS can deny operator `SET` on bound-parameter logging even though its dedicated
+parameter group can enforce `log_parameter_max_length=0` and
+`log_parameter_max_length_on_error=0`; configure those dynamic DB parameters in
+Terraform and verify the new session sees them. Never grant setting authority to
+app roles or skip a logging protection. Database audit/proxy/monitoring policy
+remains an operator responsibility; actual RDS behavior needs live observation.
 
 Success verifies authentication/TLS, owner and installation markers, role flags,
 no role memberships, absence of PUBLIC database/schema grants, and all 42
@@ -139,6 +144,18 @@ passed volume initialization, nonroot/read-only bootstrap `database-init --help`
 These are packaging checks, not database initialization; their local image IDs
 are not registry/index digests. No database, hosted model or ECS was exercised.
 
-RDS master privileges, operator-task execution, IAM/network rules, secret delivery,
-real database logs and live application/browser behavior remain unverified. This
-helper is preparation toward the live Surton URL, not completion of that handoff.
+The first October 8 Surton operator task reached private RDS PostgreSQL 17.9 with
+verified TLS and completed volume initialization, then failed before role creation
+because RDS denied `SET log_parameter_max_length`. Its sanitized stage error and
+private RDS log were independently inspected; `DescribeTasks` confirmed STOPPED,
+initializer exit 1 and volume-init exit 0. Original inputs remain preserved.
+The correction checks effective values before changing settings, with the two
+bound-parameter settings enforced by the dedicated RDS parameter group. A new
+image and explicit operator-controlled attempt are required; this is not an
+automatic retry/resume or permission to reset partial state. Correction source/deslop
+review, TypeScript/application checks and Apple Silicon Nix build passed; flake
+evaluation passed with zero runnable checks and omitted Linux systems. No new
+runtime check or Linux image build is claimed here. Successful creation,
+complete RDS logging/privilege qualification and live application/browser behavior
+remain unverified. This helper is preparation toward the live Surton URL, not
+completion of that handoff.
