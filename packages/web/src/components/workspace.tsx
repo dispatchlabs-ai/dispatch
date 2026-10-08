@@ -130,12 +130,14 @@ export function Workspace() {
   const [createFailed, setCreateFailed] = useState(false);
 
   const [loadError, setLoadError] = useState<string | null>(null);
+  const knownChats = useRef(new Set<string>());
   const lostAccess = useRef(new Set<string>());
   const refreshRequest = useRef<{ controller: AbortController; observed: Map<string, ChatSummary> } | null>(null);
   const load = useCallback(async () => {
     refreshRequest.current?.controller.abort();
     const request = { controller: new AbortController(), observed: new Map<string, ChatSummary>() };
     refreshRequest.current = request;
+    const knownAtStart = new Set(knownChats.current);
     const { signal } = request.controller;
     try {
       const [nextConfig, chatResult, agentResult, projectResult] = await Promise.all([
@@ -145,9 +147,15 @@ export function Workspace() {
       if (signal.aborted) return;
       // New chats observed while the list was in flight may be absent from that response.
       const listed = new Map(chatResult.chats.map(chat => [chat.id, chat]));
+      // Omissions of already-known chats revoke access, even without an SSE error.
+      for (const id of knownAtStart) if (!listed.has(id)) lostAccess.current.add(id);
       // Only a fresh authorized list can lift an access-loss fence.
-      for (const id of listed.keys()) lostAccess.current.delete(id);
+      for (const id of listed.keys()) {
+        lostAccess.current.delete(id);
+        knownChats.current.add(id);
+      }
       for (const chat of request.observed.values()) {
+        if (lostAccess.current.has(chat.id)) continue;
         if (!listed.has(chat.id) || listed.get(chat.id)!.revision < chat.revision) listed.set(chat.id, chat);
       }
       setConfig(nextConfig);
@@ -208,6 +216,7 @@ export function Workspace() {
 
   const onSnapshot = useCallback((snapshot: ChatSnapshot) => {
     if (lostAccess.current.has(snapshot.conversation.id)) return;
+    knownChats.current.add(snapshot.conversation.id);
     const observed = refreshRequest.current?.observed;
     const previous = observed?.get(snapshot.conversation.id);
     if (!previous || previous.revision <= snapshot.conversation.revision) observed?.set(snapshot.conversation.id, snapshot.conversation);
