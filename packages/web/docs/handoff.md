@@ -1647,7 +1647,7 @@ Developer delivered authenticated desktop and 390 px running-version recordings 
 | Verified evidence | Same-history before/after backend/browser replay; final authenticated actual-service desktop/390 px runs; independent source/native/deslop review; integrated Apple Silicon checks and documentation link/whitespace checks. |
 | Delivered | Remote source verified; guarded backup/local installation at `e87c0ab`; served-module/fresh-browser and post-install metadata checks; source-equivalent authenticated running-version demonstrations delivered to Chris. |
 
-This closes the agreed local performance package under the recorded reference/workload and verification limits. Keep the disposable native/capture evidence for review; only its owner may stop the task-owned service. Do not stop or delete the installed live owner/state or unrelated `imagegen/` artifacts as cleanup.
+This closes the agreed local performance package under the recorded reference/workload and verification limits. After receipt review, Developer stopped only the disposable verification service and retained its native/capture evidence. Documenter independently confirmed no listener on the task-owned QA port and HTTP 200 from the installed localhost app. Do not assume the archived QA origin is still running; only its owner may restart it for newly authorized work. Do not stop or delete the installed live owner/state or unrelated `imagegen/` artifacts as cleanup.
 
 
 ## Five-finding simplification — October 8, 2026
