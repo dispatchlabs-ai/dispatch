@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — project-row chat creation
+
+- Start a chat directly from a project row using its default agents, without a setup dialog; focus the new composer and retain existing drafts. Use Chat terminology in product controls.
+- Remove obsolete personal-project creation/listing/move paths; preserve ungrouped access and stored retry identities. Source/build checked; rendered and functional qualification remains outstanding in [WP-053](docs/handoff.md#wp-053--project-row-chat-creation-and-shared-only-projects).
+
 ## Unreleased — multiple agent instances
 
 - Add explicit same-definition instances with optional names and creation-only instruction supplements, immutable instance targeting and stable creation retries. Source/build checked; runtime and rendered UI remain unqualified. Evidence in [WP-050](docs/handoff.md#wp-050--multiple-agent-instances-and-supplemental-instructions).
