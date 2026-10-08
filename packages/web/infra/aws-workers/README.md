@@ -21,7 +21,10 @@ values belong in a separate consumer repository. The Surton consumer is
   generated RDS master secret is **operator-only**. Provision separate application
   roles/databases before activation; only the worker-store provisioner needs
   CREATEROLE. Workers obtain scoped credentials from the backend. Do not inject
-  the RDS master identity into either service or workers.
+  the RDS master identity into either service or workers. No initial application
+  database is requested from `CreateDBInstance`: RDS rejected the former `dispatch`
+  placeholder as reserved. The operator connects to `postgres` and separately
+  creates the seven application databases.
 - Private versioned AES256-encrypted ordinary S3; only backend task identity can
   read/write `artifacts/*`. No S3 version-read/delete/list or worker S3 grant.
   Noncurrent versions remain retained pending an explicit retention decision.
@@ -124,6 +127,18 @@ reviewed (63,822 ARM64 / 63,824 AMD64 entries) with no matched host-state/creden
 paths. These bounded inspections are not an exhaustive secret audit. No network,
 real credentials, application database or AWS execution was used. Candidate image
 `99ae730` is superseded for actual activation by subsequent cold-start fixes.
+
+## AWS readback corrections
+
+Module `28a35fc` makes Cloud Map custom health checks explicit with
+`failure_threshold = 1` and records `rds.force_ssl = 1` with
+`apply_method = "pending-reboot"`. Empty custom-health blocks disappeared from
+AWS readback and triggered repeated discovery replacements; the implicit RDS
+apply method also drifted. These source corrections do not prove runtime health.
+Review exact state-backed actions and registrations before applying: replacing
+empty discovery services before activation does not authorize replacing services
+with live owners. Preserve partial state after failed apply and replan in place;
+do not tear down the installation to retry provisioning.
 
 ## Optional operator database initializer
 
