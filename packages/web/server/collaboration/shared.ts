@@ -715,10 +715,6 @@ export class SharedConversations {
     return room;
   }
 
-  async authorized(scope: RuntimeScope, roomId: ConversationId, action: ProjectAction = "read", readAllProjects = false) {
-    return this.harness.commit(async tx => copyJson(await this.authorize(tx, scope, roomId, action, readAllProjects), { omitUndefinedProperties: true }), context);
-  }
-
   /** Materialize attribution only for an authorized participant; a read-all observer does not become a member. */
   async ensureHuman(tx: Tx, roomId: ConversationId, person: Person) {
     const room = await tx.doc(SharedDoc, roomId);

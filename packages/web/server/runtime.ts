@@ -678,7 +678,7 @@ export class DispatchRuntime {
   }
 
   async authorizeAttachmentUpload(scope: RuntimeScope, id: string) {
-    await this.shared.authorized(scope, nativeId(id), "participate", this.readAll(scope));
+    await this.harness.commit(async tx => { await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope)); }, context);
   }
 
   async uploadAttachment(scope: RuntimeScope, id: string, file: File) {
