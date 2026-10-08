@@ -298,7 +298,7 @@ export function createWebBackend(config: WebBackendConfig = {}): WebBackend {
     },
 
     async search(query: { q: string; recency?: number; domains?: string[] }, signal?: AbortSignal) {
-      if (!searchApiKey) throw new WebBackendError("Web search is not configured (no search API key); only direct URL reads are available.");
+      if (!searchApiKey) throw new WebBackendError("Web search has no authorized credential. In Settings → Secrets, configure Exa and allow this agent to use it. Direct URL reads remain available.");
       const q = query.q.trim();
       if (!q) throw new WebBackendError("The search query is blank.");
       // Fixed public endpoint, so there is no URL surface to validate; the key is sent only to this host.
