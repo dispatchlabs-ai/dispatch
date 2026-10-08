@@ -137,6 +137,12 @@ New agent opens an editor with the saved default agent's model/thinking values. 
 
 Instructions format Markdown while you type or paste, using the same editor as chat. Headings, lists, quotes, emphasis, links and code remain editable. Enter adds a paragraph or list item; Shift+Enter adds a line. Use Create agent or Save new revision to save. Saved instructions stay rendered when viewing the agent. Instructions remain Markdown text; formatting may normalize when edited. Drafts over 50,000 characters including Markdown formatting stay editable and show an error until shortened. Unsupported editor syntax remains text, and drafts are not saved across page reloads.
 
+### Agent overview and authoring navigation
+
+The Agents sidebar has a named ellipsis menu for Edit and, except for the default agent, Archive. Select an agent to read its instructions, skills and connections. **Overview** and **Evaluations** share that agent context. **Edit agent** opens one draft with Identity, Instructions, Model, Capabilities, Skills and Connections shortcuts. These shortcuts scroll to sections without saving. Instructions offers bold, italic, inline code and list formatting; Markdown remains the stored format. The desktop Configuration column opens with the editor and shows draft values; phones expose it through **Details**. **Discard** and **Save new revision** remain in the footer.
+
+Switching back to **Overview** retains an evaluation draft in memory. To discard it, use the evaluation editor's **Cancel** or **Back to agent** and confirm when asked. Reloads still lose in-memory drafts.
+
 ### Agent evaluation profiles
 
 WP-047 adds a separate Evaluation profile section for saved agents. Focused disposable-data demonstrations cover persistence, conflict recovery and desktop/390 px rendering; broader accessibility, real-device and crash-recovery qualification remain outside that evidence. See the [data contract](spec.md#individual-agent-evaluation) and [acceptance scope](handoff.md#wp-047--agent-evaluation-profiles-and-editor).
@@ -526,9 +532,3 @@ Generation may incur provider charges. There is no automatic retry. After interr
 After generating a file, an agent calls `conversation_attach` with its workspace-relative path. This snapshots the file privately and returns an attachment ID. The agent then includes that ID in `conversation_post`'s `attachmentIds`. Preparation alone does not share the file; it becomes readable by conversation members only when the post is admitted. The same workflow supports ordinary generated files as well as images, using the existing 10 MiB per-file, 25 MiB per-message and 10-file limits.
 
 Do not paste base64 into messages or treat workspace paths as browser links. A stopped or discarded draft leaves its prepared files private. Retained prepared/orphan blobs may consume storage; no automatic cleanup is promised. The tool omits `input_fidelity` for generation and GPT Image 2/2.5 edits. It forwards an explicitly supplied value only for supported legacy edit models. Provider rejections identify a safe parameter name when available. For localized edits, supply a PNG alpha mask matching the first reference: transparent pixels mark the edit region. Inspect output pixels and text before publishing; neither a prompt nor a mask proves unchanged regions are pixel-identical. A revised shared skill must be explicitly selected and saved on an agent definition; active conversation instances adopt that selection at the next safe idle base upgrade.
-
-### Agent overview and authoring navigation
-
-The Agents sidebar has a named ellipsis menu for Edit and, except for the default agent, Archive. Select an agent to read its instructions, skills and connections. **Overview** and **Evaluations** share that agent context. **Edit agent** opens one draft with Identity, Instructions, Model, Capabilities, Skills and Connections shortcuts. These shortcuts scroll to sections without saving. Instructions offers bold, italic, inline code and list formatting; Markdown remains the stored format. The desktop Configuration column opens with the editor and shows draft values; phones expose it through **Details**. **Discard** and **Save new revision** remain in the footer.
-
-Switching back to **Overview** retains an evaluation draft in memory. To discard it, use the evaluation editor's **Cancel** or **Back to agent** and confirm when asked. Reloads still lose in-memory drafts.
