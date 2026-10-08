@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — chat Definition of Done
+
+- Add shared Markdown completion criteria in chat Details, with authorized editing, revision conflicts, retained drafts and refresh-before-retry. Agents receive current criteria as guidance, not completion or work authorization.
+
 ## Unreleased — agent management eligibility
 
 - Allow explicitly granted agent management for agents with tools, skills, extensions or connections, including default-agent and granted-editor targets. Preserve human grants, revision pins and permitted tuning fields.
