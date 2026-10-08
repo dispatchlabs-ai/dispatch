@@ -83,6 +83,8 @@ This slice does not implement per-conversation workers, distributed executor own
 
 ## Testing policy
 
+**October 8 clarification for portability qualification:** Chris clarified that the restriction is on automated tests, and explicitly requires `agent-browser` proof of working flows. Manual browser/runtime qualification of the agreed first version with disposable data is authorized; do not add or run an automated test suite. Earlier portability references treating manual/browser checks as blocked are superseded. Preserve live installations; no live-state copying or live-service stops. [The portability qualification entry](handoff.md#portability-manual-qualification--october-8-2026) owns evidence and remaining criteria.
+
 **Accepted October 3, 2026.** Do not add or run tests at the current stage. Make enough implementation progress to establish useful, stable behavior before investing in regression coverage. During this exploratory stage, use source review, TypeScript checks, and builds; record functional outcomes that remain unverified.
 
 **October 7 scoped exception:** Chris requested first-deployment SQLite qualification for the AWS container target above. Focused deployment/storage checks with disposable data are authorized for that work; this does not authorize a broad application test suite or qualify the deployment by itself.

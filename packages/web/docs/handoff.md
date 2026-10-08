@@ -1704,3 +1704,13 @@ Final reconciliation preserved concurrently published chat-performance source an
 
 
 Continuing-pass source publication: Deslop published the integrated cleanup at `e9dddd7`. Documenter independently verified remote `main` and the synchronized canonical checkout at `e9dddd7187c6594c27430e2d594f82453c5bdada`. This closes source delivery for the scoped audits, not runtime/rendered qualification, deployment or the broader chat-performance acceptance. No further cleanup is justified by the reviewed scope; uncertain compatibility and intentional artifacts remain preserved.
+||||||| parent of 2a1133b (docs(web): record manual portability qualification authorization)
+
+
+### Portability manual qualification — October 8, 2026
+
+Chris clarified the restriction as automated tests only and explicitly requires `agent-browser` proof. This supersedes earlier portability statements that manual runtime/browser checks need additional authorization; it does not change the historical absence of functional evidence. The saved chat Definition of Done fixes first-version scope, excluding PostgreSQL recovery and migration of running tasks. Source delivery remains complete; qualification and Chris's acceptance remain outstanding.
+
+Developer owns archive/starter/project desktop and 390 px browser flows and integration; Dev 2 owns stopped-writer backup/restore on a separate disposable SQLite installation and browser inspection of restored state; Pi Durable Expert owns GitHub conflicts/retries and independent-host capability qualification. Documenter reconciles observed evidence here and updates operator guidance when findings settle. Use separate browser sessions and disposable data; do not copy live state, stop live services or run an automated test suite. Keep authenticated artifacts private.
+
+Acceptance evidence must name the exercised revision/environment and actual cases: round trips, authorization, conflict handling, duplicate retries, restart/recovery, host capability installation/execution, desktop/390 px layout and keyboard/touch/accessibility. Record failures, fixes and unexercised boundaries separately; screenshots alone do not prove interaction or recovery. No new portability qualification results are claimed by this authorization entry.
