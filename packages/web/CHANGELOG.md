@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — starter and GitHub bundles
+
+- Add an explicit-model Developer starter through the existing archive preview/import path.
+- Add public GitHub commit-pinned imports and tracked updates with durable reviewed previews, conservative local-edit conflicts, retained removed entries and atomic retry receipts. Updated definitions follow the existing safe-idle adoption policy. Source/build checked; runtime and rendered UI remain unverified. See [portability evidence](docs/handoff.md#portable-definitions-and-project-data--october-8-2026).
+
 ## Unreleased — portable agent and skill bundles
 
 - Add Agents import/export with bounded ZIP parsing, requirement preview, exact assigned skill revisions and independent local copies. Native atomic receipts preserve same-operation retries; connections, credentials and existing instances remain untouched. Source/build checked; runtime and rendered UI qualification remain outstanding in the [handoff](docs/handoff.md#portable-definitions-and-project-data--october-8-2026). GitHub updates, starter distribution, project exports and backups remain later work.
