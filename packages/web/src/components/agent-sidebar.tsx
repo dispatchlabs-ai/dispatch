@@ -1,4 +1,4 @@
-import { Archive, Pencil, Plus } from "lucide-react";
+import { Archive, Package, Pencil, Plus } from "lucide-react";
 import type { AgentDefinition } from "../shared/contracts";
 import { SidebarSearch } from "./sidebar-search";
 import { Button, IconButton } from "./ui";
@@ -14,6 +14,7 @@ export function AgentSidebar({
   showArchived,
   onShowArchivedChange,
   onCreate,
+  onBundles,
   onSelect,
   onEdit,
   onArchive,
@@ -28,6 +29,7 @@ export function AgentSidebar({
   showArchived: boolean;
   onShowArchivedChange: (show: boolean) => void;
   onCreate: () => void;
+  onBundles: () => void;
   onSelect: (id: string) => void;
   onEdit: (agent: AgentDefinition) => void;
   onArchive: (agent: AgentDefinition) => void;
@@ -42,6 +44,7 @@ export function AgentSidebar({
       <Button className="sidebar-create" disabled={busy} onClick={onCreate}>
         <Plus /> New agent
       </Button>
+      <Button variant="secondary" disabled={busy} onClick={onBundles}><Package size={16} /> Import / export</Button>
       <SidebarSearch
         label="Find an agent"
         value={search}

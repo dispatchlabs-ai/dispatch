@@ -1,3 +1,4 @@
+import { BundlesDialog } from "./bundles";
 import { useAttachmentDrafts, emptyAttachments } from "../lib/attachments";
 import { Tabs } from "@base-ui/react/tabs";
 import { Bot, ChevronLeft, ChevronRight, CircleHelp, Folder, LogOut, Menu, MessageSquare, PanelLeft, PanelRight, Plus, Settings2, X } from "lucide-react";
@@ -51,6 +52,7 @@ export function Workspace() {
   const [editingAgent, setEditingAgent] = useState<AgentEditing | null>(null);
   const [pendingAgentAction, setPendingAgentAction] = useState<(() => void) | null>(null);
   const [archivingAgent, setArchivingAgent] = useState<AgentDefinition | null>(null);
+  const [bundlesOpen, setBundlesOpen] = useState(false);
   const [agentSearch, setAgentSearch] = useState("");
   const [showArchivedAgents, setShowArchivedAgents] = useState(false);
   const [config, setConfig] = useState<ApplicationConfig | null>(null);
@@ -498,7 +500,7 @@ export function Workspace() {
         selectedAgentId={editingAgent?.saved?.id ?? selectedAgent?.id}
         editing={editingAgent ? editingAgent.saved ? agentEditIsDirty(editingAgent) : "new" : false} busy={editingAgent?.busy ?? false}
         search={agentSearch} onSearchChange={setAgentSearch} showArchived={showArchivedAgents} onShowArchivedChange={setShowArchivedAgents}
-        onCreate={() => editAgent()}
+        onBundles={() => { setNavigationOpen(false); setBundlesOpen(true); }} onCreate={() => editAgent()}
         onSelect={id => requestAgentAction(() => { setEditingAgent(null); setSelectedAgentId(id); })}
         onEdit={editAgent}
         onArchive={agent => requestAgentAction(() => { setEditingAgent(null); setArchivingAgent(agent); })} />
@@ -659,6 +661,7 @@ export function Workspace() {
     {invitingChatId && snapshots[invitingChatId] ? <InviteParticipantsDialog key={invitingChatId} snapshot={snapshots[invitingChatId]} agents={agents} onSnapshot={onSnapshot} onClose={() => setInvitingChatId(null)} /> : null}
     {newConversation ? <NewConversationDialog agents={agents} initialAgentIds={newConversation.agentIds} projectName={projects.find(project => project.id === newConversation.projectId)?.name} busy={creating} error={error} onClose={() => setNewConversation(null)} onCreate={(ids, title) => void createChat(ids, newConversation.projectId, undefined, title)} /> : null}
     {renamingChat ? <RenameConversationDialog key={renamingChat.id} chat={renamingChat} onClose={() => setRenamingChat(null)} onRename={saveChatTitle} /> : null}
+    <BundlesDialog open={bundlesOpen} onClose={() => setBundlesOpen(false)} agents={agents} onImported={load} />
     <Modal title="Discard agent changes?" description="Your unsaved changes will be lost."
       open={pendingAgentAction !== null} onOpenChange={open => { if (!open) setPendingAgentAction(null); }}
       finalFocus={() => document.getElementById("main-workspace")}>

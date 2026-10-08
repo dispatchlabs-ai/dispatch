@@ -1,3 +1,4 @@
+import { BUNDLE_MAX_BYTES, BundleError, bundleExportSchema, decodeBundle, encodeBundle } from "./bundles.js";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { serveStatic } from "@hono/node-server/serve-static";
@@ -95,9 +96,10 @@ export function createApp(options: AppOptions) {
     </script></html>`);
   });
   const jsonLimit = bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: { code: "too_large", message: "Request is too large." } }, 413) });
+  const bundleLimit = bodyLimit({ maxSize: 12 * 1024 * 1024, onError: c => c.json({ error: { code: "too_large", message: "Bundle request is too large." } }, 413) });
   const isUpload = (method: string, path: string) => method === "POST" && /^\/api\/chats\/[^/]+\/attachments$/.test(path);
   // Upload bytes are counted only after authentication and conversation authorization below.
-  app.use("/api/*", (c, next) => isUpload(c.req.method, c.req.path) ? next() : jsonLimit(c, next));
+  app.use("/api/*", (c, next) => isUpload(c.req.method, c.req.path) ? next() : /^\/api\/bundles\/(preview|import)$/.test(c.req.path) ? bundleLimit(c, next) : jsonLimit(c, next));
   app.use("/api/*", async (c, next) => {
     c.header("Cache-Control", "no-store");
     if (!["GET", "HEAD"].includes(c.req.method)) {
@@ -234,6 +236,19 @@ export function createApp(options: AppOptions) {
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-store", "X-Accel-Buffering": "no" },
     });
   });
+  const archiveSchema = z.object({ archive: z.string().max(Math.ceil(BUNDLE_MAX_BYTES / 3) * 4).regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/), requestId: requestId.optional() }).strict();
+  app.post("/api/bundles/export", async c => {
+    const bundle = await runtime.exportBundle(c.get("principal"), bundleExportSchema.parse(await c.req.json()));
+    return c.json({ archive: encodeBundle(bundle).toString("base64"), filename: `${bundle.id}-${bundle.version}.zip` });
+  });
+  app.post("/api/bundles/preview", async c => {
+    const input = archiveSchema.parse(await c.req.json());
+    return c.json(await runtime.previewBundle(c.get("principal"), decodeBundle(Buffer.from(input.archive, "base64"))));
+  });
+  app.post("/api/bundles/import", async c => {
+    const input = archiveSchema.extend({ requestId }).parse(await c.req.json());
+    return c.json(await runtime.importBundle(c.get("principal"), decodeBundle(Buffer.from(input.archive, "base64")), input.requestId));
+  });
   app.get("/api/skills", async (c) => c.json({ skills: await runtime.listSkills(c.get("principal")) }));
   app.get("/api/skills/:id/revisions/:revision", async (c) => c.json({ skill: await runtime.getSkill(c.get("principal"), z.string().uuid().parse(c.req.param("id")), z.coerce.number().int().positive().parse(c.req.param("revision"))) }));
   app.post("/api/skills", async (c) => c.json({ skill: await runtime.saveSkill(c.get("principal"), z.object({
@@ -264,7 +279,7 @@ export function createApp(options: AppOptions) {
   }
   app.onError((error, c) => {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return c.json({ error: { code: "invalid_request", message: "The request is invalid. Check the fields and try again." } }, 400);
-    if (error instanceof EvaluationError || error instanceof ManagementError || error instanceof AttachmentError || error instanceof ProjectAccessError || error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
+    if (error instanceof BundleError || error instanceof EvaluationError || error instanceof ManagementError || error instanceof AttachmentError || error instanceof ProjectAccessError || error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
     console.error("Dispatch request failed:", error);
     return c.json({ error: { code: "internal", message: "The request could not be completed. Try again." } }, 500);
   });
