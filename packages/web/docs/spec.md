@@ -13,6 +13,10 @@
 
 Dispatch Web is a browser workspace for companies doing general-purpose client problem-solving with agents. It uses stock Pi Durable for durable execution and recovery. The maintained product account and previous decisions are linked from the [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/).
 
+## Product terminology
+
+**Accepted October 8, 2026:** use **chat** for the user-facing shared space, including navigation, actions, search, tooltips and accessibility labels (for example, **New chat** and **Search chats**). Use **Pi conversation** for the underlying durable transcript scope in technical documentation; one Dispatch chat coordinates shared history and individual agent-instance conversations. This is a presentation change, not an API, stored-identifier or historical-title migration. Older sections use conversation for the Dispatch chat unless explicitly discussing Pi.
+
 ## Language and development requirements
 
 Accepted October 3, 2026:
@@ -362,7 +366,16 @@ The current editor groups Identity, Instructions, Model, installed Capabilities,
 
 ## Projects in Conversations
 
-**Current scope:** new projects created in the browser are shared projects governed by [shared project access and default agents](#shared-project-access-and-default-agents). Their members, manager settings and default agents are part of the product contract. Shared and legacy projects use the approved sidebar grouping and active-conversation list: search includes project names and conversation titles, archived chats are excluded from active counts/lists, and opening a project preserves mounted chats/drafts while clearing stale conversation context. A shared-project New conversation action requires participation and starts the chooser with that project's defaults; operator read-only observers can inspect history but cannot create conversations or edit settings. Legacy personal groups remain creator-private organizational preferences; they do not grant conversation access. Audience-changing moves into or out of shared projects are unsupported.
+**Current scope:** new projects created in the browser are shared projects governed by [shared project access and default agents](#shared-project-access-and-default-agents). Their members, manager settings and default agents are part of the product contract. Shared and legacy projects use the approved sidebar grouping and active-conversation list: search includes project names and conversation titles, archived chats are excluded from active counts/lists, and opening a project preserves mounted chats/drafts while clearing stale conversation context. Shared-project chat creation requires participation; the setup flow preselects project defaults, while the project-row action below bypasses the chooser; operator read-only observers can inspect history but cannot create conversations or edit settings. Legacy personal groups remain creator-private organizational preferences; they do not grant conversation access. Audience-changing moves into or out of shared projects are unsupported.
+
+### Project-row chat creation
+
+**Accepted October 8, 2026; implementation/qualification tracked in the handoff.** Add a compose action directly on each shared-project sidebar row, separate from its overflow menu. It creates a fresh chat in that specific project with the current project-default agents, activates its tab and focuses the composer in one action, without a chooser or naming dialog. Do not copy the active chat's history or participants; preserve existing tabs and drafts. Empty project defaults allow a people-only chat.
+
+- Tooltip and accessible name: **New chat in [project name]**. The action is available on desktop hover/keyboard focus and remains visible on touch layouts. It must not toggle the project group or require opening the project view first.
+- Apply current project participation checks; read-only observers cannot create chats. Missing or unavailable defaults must not silently create an unassigned chat or substitute a different team.
+- Send `sharedProjectId` and omit `agentDefinitionIds` so defaults resolve atomically on the server; an explicit empty list instead requests a people-only chat. Preserve stored “New conversation” creation titles and retry identities while updating presentation wording. Reuse the existing creation and stable-request retry contract. Prevent duplicate activation while pending, expose failure without losing existing work, and preserve the original request on uncertain retry.
+- The sidebar's **New chat** and project-view setup flow remain available for explicit agent/name selection. This decision does not add a tab-bar creation button, restore the single-view tab header, or introduce a separate temporary “Quick chat” type or keyboard shortcut.
 
 ### Legacy personal groups
 
