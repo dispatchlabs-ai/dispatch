@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { z } from "zod";
+import { fromHttp } from "@aws-sdk/credential-provider-http";
 import { AttachmentError, prepareAttachment, type StoredAttachment } from "../attachments.js";
 import { ATTACHMENT_MAX_BYTES } from "../../src/shared/contracts.js";
 import { attachmentReadRequestSchema } from "./attachments.js";
@@ -12,8 +13,14 @@ export const s3ArtifactsConfigSchema = z.object({
   endpoint: z.url().refine(value => { const url = new URL(value); return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash; }),
   region: z.string().min(1).max(100), bucket: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/),
   prefix: z.string().min(1).max(512).refine(value => /^[a-zA-Z0-9._/-]+$/.test(value) && value.replace(/\/$/, "").split("/").every(segment => segment && segment !== "." && segment !== "..")),
-  credentialsFile: z.string().min(1),
-}).strict();
+  credentialsFile: z.string().min(1).optional(),
+  taskRole: z.boolean().optional(),
+}).strict().superRefine((value, context) => {
+  if (Boolean(value.credentialsFile) === (value.taskRole === true))
+    context.addIssue({ code: "custom", message: "Select exactly one artifact credentialsFile or taskRole." });
+  if (value.taskRole && new URL(value.endpoint).origin !== `https://s3.${value.region}.amazonaws.com`)
+    context.addIssue({ code: "custom", message: "Task-role artifact access requires the regional AWS S3 endpoint." });
+});
 export type S3ArtifactsConfig = z.infer<typeof s3ArtifactsConfigSchema>;
 const credentialsSchema = z.object({ accessKeyId: z.string().min(1), secretAccessKey: z.string().min(1), sessionToken: z.string().min(1).optional() }).strict();
 const identity = z.string().min(1).max(200);
@@ -27,16 +34,18 @@ export class S3Artifacts {
 
   static async open(input: S3ArtifactsConfig): Promise<S3Artifacts> {
     const config = s3ArtifactsConfigSchema.parse(input);
+    let credentials: z.infer<typeof credentialsSchema> | undefined;
+    if (config.credentialsFile) {
     const file = await open(config.credentialsFile, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-    let credentials: z.infer<typeof credentialsSchema>;
     try {
       const info = await file.stat();
       if (!info.isFile() || (info.mode & 0o077) !== 0 || info.size > 16 * 1024) throw new Error("Artifact credentials must be a restricted regular file.");
       try { credentials = credentialsSchema.parse(JSON.parse(await file.readFile("utf8"))); }
       catch { throw new Error("Invalid artifact credential file."); }
     } finally { await file.close(); }
+    }
     return new S3Artifacts(config, new S3Client({
-      endpoint: config.endpoint, region: config.region, forcePathStyle: true, credentials, maxAttempts: 1,
+      endpoint: config.endpoint, region: config.region, forcePathStyle: true, credentials: config.taskRole ? fromHttp() : credentials, maxAttempts: 1,
       // Ordinary PutObject payloads support S3-compatible servers without optional AWS checksum trailers.
       requestChecksumCalculation: "WHEN_REQUIRED", responseChecksumValidation: "WHEN_REQUIRED",
     }));

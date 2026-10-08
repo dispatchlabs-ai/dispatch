@@ -1,3 +1,4 @@
+import { isIPv4 } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { DispatchRuntime, RuntimeError } from "../runtime.js";
 import type { RuntimeService } from "../runtime-service.js";
@@ -50,13 +51,13 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
       }
       const attempt = await launcher<LaunchAttempt>("ensure", { attemptId: route.attemptId, conversationId: route.conversationId, storeId: route.storeId, configurationRevision: route.configurationRevision });
       if (attempt.phase !== "running") throw new RuntimeError(503, "Conversation worker requires reconciliation.");
-      if (!/^dispatch-worker-[a-f0-9]+$/.test(attempt.name)) throw new Error("Invalid worker network identity.");
-      const origin = `http://${attempt.name}:8831`;
+      const address = workerAddress(attempt);
+      const origin = `http://${address}:8831`;
       for (let i = 0; i < 40; i++) {
         try {
           const ready = await workerRequest<{ roomId: string; conversationId: string; attemptId: string }>(origin, token(route), "/ready");
           if (ready.conversationId !== route.conversationId || ready.attemptId !== route.attemptId) throw new Error("Worker readiness identity mismatch.");
-          return await routes.ready(route.conversationId, route.attemptId, ready.roomId, attempt.name);
+          return await routes.ready(route.conversationId, route.attemptId, ready.roomId, address);
         } catch (error) { if (i === 39) throw error; await delay(250); }
       }
       throw new RuntimeError(503, "Worker did not become ready.");
@@ -102,8 +103,8 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
       if (attempt.phase === "stopped" && attempt.observed === "absent") continue;
       const { catalog, membership } = await directory.directoryWorkerBootstrap(route.companyId, route.conversationId);
       try {
-        if (attempt.phase !== "running" || !/^dispatch-worker-[a-f0-9]+$/.test(attempt.name)) throw new Error("Worker is not ready for policy acknowledgement.");
-        const receipt = await workerRequest<{ revision: number; membershipRevision: number }>(`http://${attempt.name}:8831`, token(route), "/sync", { catalog, membership });
+        if (attempt.phase !== "running") throw new Error("Worker is not ready for policy acknowledgement.");
+        const receipt = await workerRequest<{ revision: number; membershipRevision: number }>(`http://${workerAddress(attempt)}:8831`, token(route), "/sync", { catalog, membership });
         if (receipt.revision !== catalog.revision || receipt.membershipRevision !== membership.revision) throw new Error("Policy acknowledgement mismatch.");
       } catch {
         // No acknowledgement is safe only after independent irreversible retirement.
@@ -225,4 +226,14 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
     const value = Reflect.get(target, property);
     return typeof value === "function" ? value.bind(target) : value;
   } });
+}
+
+/** Only the authenticated launcher selects the host; never accept arbitrary RPC URLs. */
+function workerAddress(attempt: LaunchAttempt): string {
+  if (attempt.address !== undefined) {
+    if (!isIPv4(attempt.address)) throw new Error("Invalid worker ENI address.");
+    return attempt.address;
+  }
+  if (!/^dispatch-worker-[a-f0-9]+$/.test(attempt.name)) throw new Error("Invalid worker network identity.");
+  return attempt.name;
 }

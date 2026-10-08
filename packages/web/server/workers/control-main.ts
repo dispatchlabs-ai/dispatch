@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { serve } from "@hono/node-server";
 import { z } from "zod";
+import { EcsContainerDriver } from "./ecs-driver.js";
 import { DockerContainerDriver } from "./docker-driver.js";
 import { WorkerLauncher } from "./launcher.js";
 import { createLauncherControl } from "./control.js";
@@ -15,6 +16,7 @@ const config = z.object({
   backendCaFile: z.string().startsWith("/").optional(),
   postgres: z.object({ caFile: z.string().startsWith("/").optional(), urlFile: z.string().startsWith("/"), recoverOwnerId: z.string().uuid().optional() }).strict().optional(),
   tokenFile: z.string().startsWith("/"), workerKeyFile: z.string().startsWith("/"), host: z.string().default("127.0.0.1"),
+  driverType: z.enum(["docker", "ecs"]).default("docker"),
   port: z.number().int().min(1).max(65535).default(8830), driver: z.record(z.string(), z.unknown()),
 }).strict().parse(JSON.parse(await readFile(filename, "utf8")));
 const token = (await readFile(config.tokenFile, "utf8")).trim();
@@ -26,10 +28,14 @@ if (backendCa !== undefined) {
   const origin = (config.driver.environment as Record<string, string> | undefined)?.DISPATCH_BACKEND_INTERNAL_URL;
   if (!origin || new URL(origin).protocol !== "https:") throw new Error("Backend CA requires an HTTPS backend URL.");
 }
-const driver = new DockerContainerDriver({ ...config.driver, installationId: config.installationId } as ConstructorParameters<typeof DockerContainerDriver>[0], spec => ({
+const workerEnvironment = (spec: import("./launcher.js").ContainerSpec) => ({
   DISPATCH_WORKER_TOKEN: workerToken(workerKey, config.installationId, spec),
   ...(backendCa === undefined ? {} : { DISPATCH_BACKEND_CA_PEM: backendCa }),
-}));
+});
+const driver = config.driverType === "ecs"
+  ? new EcsContainerDriver({ ...config.driver, installationId: config.installationId } as ConstructorParameters<typeof EcsContainerDriver>[0], workerEnvironment)
+  : new DockerContainerDriver({ ...config.driver, installationId: config.installationId } as ConstructorParameters<typeof DockerContainerDriver>[0], workerEnvironment);
+if (config.driverType === "ecs" && !config.postgres) throw new Error("ECS launcher requires PostgreSQL journal persistence.");
 if (Boolean(config.stateDir) === Boolean(config.postgres)) throw new Error("Select exactly one launcher stateDir or postgres configuration.");
 const launcher = config.postgres
   ? await WorkerLauncher.openPostgres({ connectionString: (await readFile(config.postgres.urlFile, "utf8")).trim(), ca: config.postgres.caFile === undefined ? undefined : await readFile(config.postgres.caFile, "utf8"), installationId: config.installationId, driver, recoverOwnerId: config.postgres.recoverOwnerId })
