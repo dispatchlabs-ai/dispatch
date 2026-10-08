@@ -2,6 +2,8 @@
 
 ## Unreleased — agent evaluation profiles
 
+- Refine editing into a focused evaluation workspace with scannable expectations/cases, progressive disclosure, persistent save controls and profile history in context/phone Details. Gemini’s scoped designer-agent assessment is 91/100 (A−); human comprehension, broader accessibility and native-select arrow behavior remain unverified. See [WP-047](docs/handoff.md#wp-047--agent-evaluation-profiles-and-editor) for receipt-review limits.
+
 - Add independently versioned evaluation profiles, criteria and standalone cases to saved agent definitions, with immutable history, conflict checks and retry receipts. Keep evaluator-only material out of operating instructions.
 - Preserve archived profile access and company boundaries. This slice edits evaluation definitions; it does not execute cases, assess real conversations or produce results.
 
