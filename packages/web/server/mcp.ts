@@ -254,7 +254,7 @@ class McpConnection {
     const instructions = client.instructions ?? "";
     if (!this.managed) verifyLegacyOperatorIdentity(this.config.identity, instructions, tools.map(tool => tool.name));
     const serverName = client.serverInfo?.title || client.serverInfo?.name || "";
-    this.managed?.recordServer(this.config.id, serverName, instructions);
+    await this.managed?.recordServer(this.config.id, serverName, instructions);
     this.catalog = { tools: JSON.parse(JSON.stringify(tools)) as JsonRepresentation<Tool>[], instructions, checkedAt: Date.now(), ...(serverName ? { serverName } : {}) };
     this.error = undefined;
     this.install();
