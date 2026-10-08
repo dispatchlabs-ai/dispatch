@@ -1097,8 +1097,8 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .agent-library .sidebar-row.selected { background: var(--color-aqua-soft); border-color: transparent; border-left-color: var(--color-navy); box-shadow: none; }
 .agent-library .sidebar-row.selected .icon-button { opacity: 1; pointer-events: auto; }
 .agent-library .sidebar-archive-toggle { border-top: 1px solid var(--color-border); border-radius: 0; padding-top: var(--space-5); }
-.agent-heading { padding-top: var(--space-6); padding-bottom: var(--space-6); align-items: center; }
-.agent-heading > div:first-child { flex: 1; min-width: 0; }
+.agent-heading { padding-top: var(--space-6); padding-bottom: var(--space-6); align-items: center; flex-wrap: wrap; }
+.agent-heading > div:first-child { flex: 1 1 300px; min-width: 0; }
 .agent-heading h1 { font-size: var(--text-2xl); line-height: 1.2; letter-spacing: -.025em; }
 .agent-heading p { font-size: var(--text-sm); max-width: 70ch; }
 .agent-heading .page-eyebrow { font-size: var(--text-xs); margin-bottom: var(--space-4); }
