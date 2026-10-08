@@ -392,7 +392,7 @@ export class McpConnections {
   private async saveCredential(id: string, credential: Credential) {
     const row = this.row(id);
     await this.db!.write([id], async query => {
-      await query("UPDATE mcp_connections SET secret=$1,refreshing=0 WHERE id=$2", [this.seal(JSON.stringify(credential), this.binding(row)), id]);
+      await query("UPDATE mcp_connections SET secret=$1,refreshing=0,error=CASE WHEN state='authorized' THEN NULL ELSE error END WHERE id=$2", [this.seal(JSON.stringify(credential), this.binding(row)), id]);
       if (credential.tokens) await query("UPDATE mcp_connections SET scopes=$1 WHERE id=$2", [JSON.stringify(credential.tokens.scope?.split(/\s+/).filter(Boolean) ?? []), id]);
     });
   }
@@ -454,7 +454,9 @@ export class McpConnections {
     } catch (error) {
       if (!this.authorized(this.row(row.id))) throw new ConnectionError(401, "This connection was disconnected during renewal.");
       const failure = error instanceof RenewalError ? error : new RenewalError(false, "Credential renewal could not be saved. Authorize this connection again.");
-      await this.mark(row.id, failure.retryable ? "authorized" : "reauthorize", failure.message);
+      // A queued disconnect must not be overwritten while this failure write waits.
+      await this.db!.write([row.id], query => query("UPDATE mcp_connections SET state=$1,error=$2,refreshing=0 WHERE id=$3 AND state='authorized'",
+        [failure.retryable ? "authorized" : "reauthorize", failure.message, row.id]));
       throw failure;
     }
   }
