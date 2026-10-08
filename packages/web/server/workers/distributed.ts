@@ -45,8 +45,8 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
       if (status.drained || !status.driverReachable) throw new RuntimeError(503, "Worker admission unavailable.");
       const previous = status.attempts.find(attempt => attempt.attemptId === route.attemptId);
       if (previous?.phase === "stopped" && previous.observed === "absent") {
-        routes.retiring(route.conversationId, route.attemptId);
-        route = routes.replaceRetired(route.conversationId, route.attemptId, options.configurationRevision);
+        await routes.retiring(route.conversationId, route.attemptId);
+        route = await routes.replaceRetired(route.conversationId, route.attemptId, options.configurationRevision);
       }
       const attempt = await launcher<LaunchAttempt>("ensure", { attemptId: route.attemptId, conversationId: route.conversationId, storeId: route.storeId, configurationRevision: route.configurationRevision });
       if (attempt.phase !== "running") throw new RuntimeError(503, "Conversation worker requires reconciliation.");
@@ -56,7 +56,7 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
         try {
           const ready = await workerRequest<{ roomId: string; conversationId: string; attemptId: string }>(origin, token(route), "/ready");
           if (ready.conversationId !== route.conversationId || ready.attemptId !== route.attemptId) throw new Error("Worker readiness identity mismatch.");
-          return routes.ready(route.conversationId, route.attemptId, ready.roomId, attempt.name);
+          return await routes.ready(route.conversationId, route.attemptId, ready.roomId, attempt.name);
         } catch (error) { if (i === 39) throw error; await delay(250); }
       }
       throw new RuntimeError(503, "Worker did not become ready.");
@@ -71,7 +71,7 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
     // Recheck backend-authoritative project/membership policy on every request.
     await directory.getChat(scope, id);
     const bootstrap = await directory.directoryChatBootstrap(scope, id);
-    const route = routes.get(id) ?? routes.ensure(id, bootstrap.scope, bootstrap.input, options.configurationRevision);
+    const route = routes.get(id) ?? await routes.ensure(id, bootstrap.scope, bootstrap.input, options.configurationRevision);
     if (route.companyId !== scope.companyId) throw new RuntimeError(503, "Conversation worker unavailable.");
     const active = await activate(route);
     const membership = await directory.directoryWorkerMembership(scope, id);
@@ -95,8 +95,8 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
           || fresh.containers.some(item => item.attemptId === route.attemptId)
           || (retired && (retired.phase !== "stopped" || retired.observed !== "absent")))
           throw new RuntimeError(503, "Worker policy update remains unresolved.");
-        routes.retiring(route.conversationId, route.attemptId);
-        routes.replaceRetired(route.conversationId, route.attemptId, options.configurationRevision);
+        await routes.retiring(route.conversationId, route.attemptId);
+        await routes.replaceRetired(route.conversationId, route.attemptId, options.configurationRevision);
         continue;
       }
       if (attempt.phase === "stopped" && attempt.observed === "absent") continue;
@@ -112,7 +112,7 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
         const retired = fresh.attempts.find(item => item.attemptId === route.attemptId);
         if (!fresh.driverReachable || retired?.phase !== "stopped" || retired.observed !== "absent")
           throw new RuntimeError(503, "Worker policy update remains unresolved.");
-        routes.retiring(route.conversationId, route.attemptId);
+        await routes.retiring(route.conversationId, route.attemptId);
       }
     }
   }
@@ -163,7 +163,7 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
     async createChat(scope, input) {
       const chat = await directory.createChat(scope, input);
       const bootstrap = await directory.directoryChatBootstrap(scope, chat.conversation.id);
-      routes.ensure(chat.conversation.id, bootstrap.scope, bootstrap.input, options.configurationRevision);
+      await routes.ensure(chat.conversation.id, bootstrap.scope, bootstrap.input, options.configurationRevision);
       return snapshot(await call<ChatSnapshot>(scope, chat.conversation.id, "getChat"), chat.conversation.id);
     },
     async getChat(scope, id) { return snapshot(await call<ChatSnapshot>(scope, id, "getChat"), id); },

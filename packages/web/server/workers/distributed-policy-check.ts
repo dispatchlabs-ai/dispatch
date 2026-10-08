@@ -173,7 +173,7 @@ try {
 
   const dormant = await directory.createChat(scope, { requestId: "dormant", sharedProjectId: project.id });
   const dormantBoot = await directory.directoryChatBootstrap(scope, dormant.conversation.id);
-  const unknown = routes.ensure(dormant.conversation.id, dormantBoot.scope, dormantBoot.input, "probe");
+  const unknown = await routes.ensure(dormant.conversation.id, dormantBoot.scope, dormantBoot.input, "probe");
   project = await change(false, "fence-unknown-ensure");
   assert(tombstones.has(unknown.attemptId));
   assert.notEqual(routes.get(dormant.conversation.id)!.attemptId, unknown.attemptId);
