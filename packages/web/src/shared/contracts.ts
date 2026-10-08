@@ -27,7 +27,11 @@ export interface ChatSummary {
   error?: string;
 }
 
+export interface TranscriptQuery { threadId?: string | null; before?: string }
+export interface TranscriptPage { revision?: number; generation: string; messages: ConversationMessage[]; activities: ParticipantActivity[]; before: string | null; threadId: string | null; root?: ConversationMessage; replyCount?: number }
+
 export interface ChatSnapshot {
+  history?: { before: string | null; generation: string };
   definitionOfDone: { markdown: string; revision: number };
   conversation: ChatSummary;
   participants: ConversationParticipant[];
@@ -95,6 +99,9 @@ export type Attachment = {
 };
 
 export interface ConversationMessage {
+  timelineOrder?: number;
+  truncated?: boolean;
+  replySummary?: { count: number; authorIds: string[]; lastAt: number };
   id: string;
   /** Prior IDs of the same native reply; preserved for thread and history references. */
   aliases?: string[];
@@ -111,6 +118,8 @@ export interface ConversationMessage {
 }
 
 export interface ParticipantActivity {
+  timelineOrder?: number;
+  detail?: { count: number; version: string; active: boolean };
   id: string;
   participantId: string;
   threadId: string | null;

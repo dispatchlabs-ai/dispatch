@@ -18,11 +18,11 @@ Integrated source/build checks passed; runtime/rendered qualification remains un
 
 Integrated source review and TypeScript/application/Apple Silicon Nix checks passed; no deployment or new runtime/UI qualification is established. See [acceptance evidence](docs/handoff.md#five-finding-simplification--october-8-2026).
 
-## Unreleased — chat presentation performance candidate
+## Unreleased — chat presentation performance
 
 - Replace sidebar transcript projection with transactionally maintained public summaries and checkpointed existing-chat initialization.
 - Load recent chat/thread previews first, fetch older history on demand, stream delivered-state deltas, and virtualize transcript rows. Expand paired tool activity in pages; complete message/activity downloads retain access to oversized content.
-- Candidate implementation and scoped measurements are recorded in the [performance package](docs/handoff.md#chat-presentation-performance--october-8-2026). Final authenticated-service responsiveness, integrated checks, local installation and demonstration remain acceptance gates; no general performance or deployment qualification is claimed.
+- Source-published at `e87c0ab`: scoped authenticated desktop/390 px presence-update measurements meet the <100 ms typing budget; native cancellation/paging/SSE and integrated Apple Silicon checks passed. Guarded local installation and source-equivalent authenticated desktop/390 px demonstrations are recorded. See the [performance package](docs/handoff.md#chat-presentation-performance--october-8-2026) for measurement limits; arbitrary model-output loads are not qualified.
 
 ## Unreleased — chat criteria response
 

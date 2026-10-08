@@ -534,7 +534,10 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `POST /api/chats/:id/title` | Rename the shared Dispatch display title |
 | `POST /api/chats/:id/definition-of-done` | Save or clear shared Markdown criteria with an expected revision |
 | `POST /api/chats/:id/preferences` | Set pin/archive flags or assign, move, or remove project membership |
-| `GET /api/chats/:id` | Public messages, participants and sanitized native activity |
+| `GET /api/chats/:id` | Recent public previews, participants, sanitized activity disclosures and history cursor |
+| `GET /api/chats/:id/history` | Page older main/thread public history |
+| `GET /api/chats/:id/detail/message/:item` | Complete public message or JSON download |
+| `GET /api/chats/:id/detail/activity/:item` | Paired activity-detail blocks or complete JSON download |
 | `POST /api/chats/:id/messages` | Admit a message idempotently; return a snapshot with status 202 |
 | `POST /api/chats/:id/attachments` | Upload one multipart `file`; return `{ attachment }` |
 | `GET /api/chats/:id/attachments/:attachmentId` | Session/access-checked image or download |
@@ -572,17 +575,21 @@ The composing command accepts `{ clientId, sequence, active }`, where each mount
 
 A public message can include `aliases`, prior IDs for a reconciled duplicate of the same native reply. History lookup and reply targets accept those IDs; the visible history retains one message and combines its replies. Raw native records remain intact.
 
-### Paged chat presentation (performance candidate)
+### Paged chat presentation
 
-**Candidate contract, October 8; not yet installed on the target or fully qualified.** The [performance package](handoff.md#chat-presentation-performance--october-8-2026) tracks exact source/build revisions, publication, real-service verification and remaining acceptance. The following replaces the full-history GET/SSE behavior only after this candidate is installed; the API table above describes the prior transport.
+<a id="paged-chat-presentation-performance-candidate"></a>
+
+**Published and locally installed at `e87c0ab`, October 8; scoped verification and demonstration complete.** The [performance package](handoff.md#chat-presentation-performance--october-8-2026) tracks exact source/build revisions, scoped real-service measurements, delivery receipts and workload/platform limitations. The API table reflects this paged transport; older installations retain their prior full-history GET/SSE behavior until updated.
 
 - Chat opening and mutation responses carry recent main-timeline previews plus `history: { before, generation }`, not the entire transcript. Choose **Load older** for earlier content. Threads have independent paging, a separately supplied root, and authoritative reply counts.
 - `GET /api/chats/:id/history` accepts optional `threadId` (root ID or alias, at most 300 characters) and opaque `before` (at most 1,000 characters). Response: `TranscriptPage` with `messages`, `activities`, `threadId`, `generation`, nullable `before`, and optional `revision`/`root`/`replyCount`. The runtime includes its current presentation revision for thread refresh tracking; this does not replace the opaque cursor or alias-generation check. Use the returned cursor unchanged. Invalid or invalidated cursors return 409 / `HISTORY_CHANGED`; discard the stale page cursor and reload the current timeline. Alias-map generation changes invalidate loaded pages so suppressed duplicates do not survive.
-- The candidate targets 40 timeline items and a 256 KiB page budget including the separate root, with 24 KiB message previews. Large messages carry `truncated: true` and **Download complete message** rather than silently discarding their stored body, including the separately displayed thread root. **Copy message** fetches the complete text for a truncated preview; browser text selection still sees only mounted preview content. These are candidate presentation budgets, not a proven bound on complete snapshots, participant metadata or every exceptional item; byte-bound qualification remains in the package.
+- The implementation targets 40 timeline items and a 256 KiB page budget including the separate root, with 24 KiB message previews. Large messages carry `truncated: true` and **Download complete message** rather than silently discarding their stored body, including the separately displayed thread root. **Copy message** fetches the complete text for a truncated preview; browser text selection still sees only mounted preview content. These are presentation budgets, not a proven bound on complete snapshots, participant metadata or every exceptional item; observed byte-bound qualification is recorded in the package.
 - Activity rows start as disclosures. `GET /api/chats/:id/detail/activity/:item` returns `{ items, before, total }`; optional nonnegative integer `before` pages older logical blocks. Calls/results are paired before paging; pages target at most 20 blocks / 256 KiB, and oversized blocks become a **Download** placeholder. **Older activity**, **Latest activity**, and **Download complete activity** are separate actions. `detail/message/:item` returns the complete public message; `?download=1` on either detail route downloads `chat-detail.json`. Complete detail/download responses are intentionally outside preview budgets. Keep downloads private when their content is sensitive.
 - SSE starts with `snapshot`, then `delta`. Deltas contain `baseRevision`, current metadata in `snapshot`, changed `messages`/`activities`, and `removedMessages`/`removedActivities`; omitted `participants` means unchanged. Apply each delta only against the matching chat and last delivered stream revision, not a newer HTTP mutation response. Preserve native `timelineOrder` as the tie-break for equal timestamps; do not substitute lexicographic ID order. A missing reset or revision gap requires reopening GET/SSE. A new SSE connection starts fresh; no Last-Event-ID replay guarantee is introduced. Removal from the recent live window does not delete separately loaded historical pages or native history.
 
-All history/detail reads and stream delivery retain current session/company/chat authorization and public-content sanitization. Browser virtualization bounds mounted rows, not retained native history; ordinary browser find/copy can only see currently mounted content. The exact candidate types are `src/shared/contracts.ts`, `src/shared/chat-updates.ts`, and `src/shared/activity-page.ts`.
+After a dependency-changing local update, refresh existing tabs if Vite reports mixed old/new dependency errors. Copy unsent drafts before refreshing: drafts remain memory-only, not reload-persistent.
+
+All history/detail reads and stream delivery retain current session/company/chat authorization and public-content sanitization. Browser virtualization bounds mounted rows, not retained native history; ordinary browser find/copy can only see currently mounted content. The exact shared types are `src/shared/contracts.ts`, `src/shared/chat-updates.ts`, and `src/shared/activity-page.ts`.
 
 The precise shared types are in `src/shared/contracts.ts` and `src/shared/auth-contracts.ts`. See [runtime.md](runtime.md) for native storage, cancellation, and request identity. The browser never sends an authoritative user or company ID for access checks.
 

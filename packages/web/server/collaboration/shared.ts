@@ -1,3 +1,5 @@
+import { transcriptPage } from "../chat-pages.js";
+import type { TranscriptQuery, TranscriptPage } from "../../src/shared/contracts.js";
 import { createHash, randomUUID } from "node:crypto";
 import { awaitWithContext, BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { copyJson, type Context } from "@earendil-works/chord";
@@ -985,7 +987,7 @@ export class SharedConversations {
     return { status: "failed", error: typeof latest.detail === "string" ? latest.detail : `Response ended: ${latest.reason}.` };
   }
 
-  async presentation(tx: Tx, roomId: ConversationId): Promise<Presentation> {
+  async presentation(tx: Tx, roomId: ConversationId, query?: TranscriptQuery): Promise<Presentation & { history?: { before: string | null; generation: string }; page?: TranscriptPage }> {
     const room = await tx.doc(SharedDoc, roomId);
     const turns = await tx.doc(TurnsDoc, roomId);
     const activities: ParticipantActivity[] = [];
@@ -1009,7 +1011,8 @@ export class SharedConversations {
       else participants.push({ ...participant, status: Object.values(turns.presence).some(presence => presence.participantId === member.id && presence.until > Date.now()) ? "typing" : "idle" } as ConversationParticipant);
     }
     // Native document drafts are revoked at the end of the enclosing commit.
-    return copyJson({ participants, messages, activities }, { omitUndefinedProperties: true }) as unknown as Presentation;
+    const page = query ? transcriptPage(messages, activities, query, createHash("sha256").update(JSON.stringify(room.messageAliases ?? {})).digest("hex")) : undefined;
+    return copyJson(page ? { participants, messages: page.messages, activities: page.activities, history: { before: page.before, generation: page.generation }, page } : { participants, messages, activities }, { omitUndefinedProperties: true }) as unknown as Presentation & { history?: { before: string | null; generation: string }; page?: TranscriptPage };
   }
 }
 

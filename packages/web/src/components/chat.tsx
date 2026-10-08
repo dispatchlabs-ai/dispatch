@@ -1,3 +1,4 @@
+import { applyChatDelta, type ChatDelta } from "../shared/chat-updates";
 import type { OpenInstanceForm } from "./add-instance";
 import type { AttachmentComposerProps } from "./composer-attachments";
 import { ArrowDown, RotateCcw, Square, Users } from "lucide-react";
@@ -57,6 +58,7 @@ export function ChatPanel({ focusComposer, onComposerFocused, agents, active: vi
     const controller = new AbortController();
     let stream: EventSource | null = null;
     let active = true;
+    let delivered: ChatSnapshot | undefined;
     onConnection(chatId, "connecting");
     setLoadError(null);
     api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}`, undefined, controller.signal).then(initial => {
@@ -68,12 +70,24 @@ export function ChatPanel({ focusComposer, onComposerFocused, agents, active: vi
         try {
           const next = JSON.parse((event as MessageEvent<string>).data) as ChatSnapshot;
           if (next.conversation.id !== chatId) return;
+          delivered = next;
           onSnapshot(next);
           onConnection(chatId, "connected");
           setLoadError(null);
         } catch {
           setLoadError("An update could not be read. Reconnect to restore the chat.");
           onConnection(chatId, "error");
+        }
+      });
+      stream.addEventListener("delta", event => {
+        if (!active) return;
+        try {
+          if (!delivered) throw new Error("Missing initial snapshot");
+          delivered = applyChatDelta(delivered, JSON.parse((event as MessageEvent<string>).data) as ChatDelta);
+          onSnapshot(delivered);
+        } catch {
+          stream?.close();
+          setAttempt(value => value + 1);
         }
       });
       stream.addEventListener("session-ended", () => {

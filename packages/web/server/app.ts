@@ -1,3 +1,5 @@
+import { activityPage, HistoryCursorError } from "./chat-pages.js";
+import { chatDelta } from "../src/shared/chat-updates.js";
 import { decodeProjectArchive, projectArchivePreview, ProjectArchiveError } from "./project-archives.js";
 import { createDeveloperStarter } from "./starters.js";
 import { fetchGithubBundle, githubSourceSchema } from "./github-bundles.js";
@@ -198,6 +200,23 @@ export function createApp(options: AppOptions) {
     return c.json(await runtime.createChat(c.get("principal"), input), 201);
   });
   app.get("/api/chats/:id", async (c) => c.json(await runtime.getChat(c.get("principal"), c.req.param("id"))));
+  app.get("/api/chats/:id/history", async c => {
+    const query = z.object({ threadId: z.string().max(300).optional(), before: z.string().max(1000).optional() }).parse(c.req.query());
+    try { return c.json(await runtime.transcriptPage(c.get("principal"), c.req.param("id"), query)); }
+    catch (error) { if (error instanceof HistoryCursorError) return c.json({ error: { code: "HISTORY_CHANGED", message: error.message } }, 409); throw error; }
+  });
+  app.get("/api/chats/:id/detail/:kind/:item", async c => {
+    const kind = z.enum(["message", "activity"]).parse(c.req.param("kind"));
+    const value = await runtime.publicDetail(c.get("principal"), c.req.param("id"), kind, c.req.param("item"));
+    if (c.req.query("download") === "1") {
+      c.header("Content-Disposition", 'attachment; filename="chat-detail.json"');
+      return c.json(value);
+    }
+    if (kind === "message") return c.json(value);
+    const activity = value as import("../src/shared/contracts.js").ParticipantActivity;
+    const before = z.coerce.number().int().nonnegative().optional().parse(c.req.query("before"));
+    return c.json(activityPage(activity, before));
+  });
   app.post("/api/chats/:id/definition-of-done", async (c) => {
     const input = z.object({ markdown: z.string().max(20000), expectedRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }).strict().parse(await c.req.json());
     return c.json(await runtime.saveDefinitionOfDone(c.get("principal"), c.req.param("id"), input));
@@ -338,6 +357,7 @@ function snapshotStream(watch: ChatWatch, isValid: () => boolean, signal: AbortS
   const encoder = new TextEncoder();
   let controller: ReadableStreamDefaultController<Uint8Array>;
   let pending: ChatSnapshot | undefined = watch.value;
+  let delivered: ChatSnapshot | undefined;
   let stopped = false;
   let unsubscribe = () => {};
   let heartbeat: ReturnType<typeof setInterval>;
@@ -365,7 +385,12 @@ function snapshotStream(watch: ChatWatch, isValid: () => boolean, signal: AbortS
     pending = undefined;
     try {
       await watch.deliver(() => {
-        if (valid()) controller.enqueue(encoder.encode(`event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`));
+        if (valid()) {
+          const event = delivered ? "delta" : "snapshot";
+          const payload = delivered ? chatDelta(delivered, snapshot) : snapshot;
+          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`));
+          delivered = snapshot;
+        }
       });
     } catch { close(); }
     finally { flushing = false; }

@@ -1,3 +1,4 @@
+import { reconcileChat } from "../shared/chat-updates";
 import type { CriteriaDraft } from "./definition-of-done";
 import { ProjectArchiveImport } from "./project-archives";
 import { SecretsPage } from "./secrets";
@@ -221,7 +222,7 @@ export function Workspace() {
     const previous = observed?.get(snapshot.conversation.id);
     if (!previous || previous.revision <= snapshot.conversation.revision) observed?.set(snapshot.conversation.id, snapshot.conversation);
     setSnapshots(current => current[snapshot.conversation.id]?.conversation.revision > snapshot.conversation.revision
-      ? current : { ...current, [snapshot.conversation.id]: snapshot });
+      ? current : { ...current, [snapshot.conversation.id]: reconcileChat(current[snapshot.conversation.id], snapshot) });
     setChats(current => mergeChat(current, snapshot.conversation));
   }, []);
   const onConnection = useCallback((chatId: string, connection: ConnectionState) => setConnections(current => ({ ...current, [chatId]: connection })), []);
