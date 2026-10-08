@@ -120,19 +120,32 @@ startupCleanup.push(async () => { try { await support.quiesce(); } finally { awa
 const mcpPolicy = new McpPolicyGate();
 const runtime = distributedRuntime({ runPolicyChange: operation => mcpPolicy.change(operation), ...workerConfig, workerKey, launcherToken, directory, routes, runBackground: operation => admission.run(operation) });
 let credentialsQuiesced = true;
-async function resumeCredentials() {
+async function resumeCredentials(refresh = true) {
   credentialsQuiesced = false;
   await credentials?.resume();
   await auth.resume();
   await connections.resume();
   if ((credentials && !credentials.admitting) || !auth.admitting || !connections.admitting)
     throw new Error("Credential admission remains closed.");
-  await provider.models.refresh({ allowNetwork: false });
+  if (refresh) await provider.models.refresh({ allowNetwork: false });
 }
 if (!routes.admissionBlocked()) {
   await resumeCredentials();
   await support.resume();
   await support.run(() => directory.startMcpConnections());
+} else {
+  // Public admission closure can precede worker retirement. Until fresh launcher
+  // evidence confirms retirement, retain authenticated callbacks needed to drain.
+  // Do not proactively refresh models or discover MCP connections in this mode.
+  let retired = false;
+  try {
+    const status = await workerRequest<LauncherStatus>(workerConfig.launcherUrl, launcherToken, "/v1/status");
+    retired = status.drainComplete;
+  } catch { /* Unreachable launcher is not retirement evidence. */ }
+  if (!retired) {
+    await resumeCredentials(false);
+    await support.resume();
+  }
 }
 let transition: Promise<unknown> = Promise.resolve();
 function operatorTransition<T>(operation: () => Promise<T>): Promise<T> {
