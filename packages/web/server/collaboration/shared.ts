@@ -546,7 +546,9 @@ export class SharedConversations {
     requireActiveMember(room, item.participantId);
     if (draft.threadId) draft.threadId = room.messageAliases?.[draft.threadId] ?? draft.threadId;
     if (draft.threadId && !messages.some(message => message.id === draft.threadId && message.threadId === null && message.kind === "message")) throw new CollaborationError(400, "Reply thread not found.");
-    if (draft.mentions.some(id => !room.members.some(member => member.id === id && activeMember(member)))) throw new CollaborationError(400, "Mentioned participant is no longer active in this conversation.");
+    // A target can leave after this draft was prepared. Retain its historical reference;
+    // append() only notifies active members, rather than cancelling this unrelated author.
+    if (draft.mentions.some(id => !room.members.some(member => member.id === id))) throw new CollaborationError(400, "Mentioned participant is not in this conversation.");
     const id = item.id;
     if (!messages.some(message => message.id === id)) {
       for (const generation of item.finalGenerations ?? []) {
