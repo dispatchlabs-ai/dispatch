@@ -48,7 +48,7 @@ export function Field({ label, children, hint, error, hintPosition = "after" }: 
   );
 }
 
-export function Modal({ title, description, children, trigger, open, onOpenChange, side, finalFocus }: {
+export function Modal({ title, description, children, trigger, open, onOpenChange, side, finalFocus, keepMounted = false }: {
   title: string;
   description?: string;
   children: ReactNode;
@@ -56,12 +56,13 @@ export function Modal({ title, description, children, trigger, open, onOpenChang
   open: boolean;
   onOpenChange: (open: boolean) => void;
   side?: "left" | "right";
+  keepMounted?: boolean;
   finalFocus?: ComponentProps<typeof Dialog.Popup>["finalFocus"];
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       {trigger ? <Dialog.Trigger render={trigger} /> : null}
-      <Dialog.Portal>
+      <Dialog.Portal keepMounted={keepMounted}>
         <Dialog.Backdrop className="dialog-overlay" />
         <Dialog.Popup finalFocus={finalFocus} className={`dialog ${side ? `dialog-drawer dialog-${side}` : "dialog-modal"}`}>
           <header className="dialog-heading">

@@ -88,7 +88,7 @@ export function BundlesDialog({ open, onClose, agents, models, onImported }: {
     });
   }
   function toggle(values: string[], id: string) { return values.includes(id) ? values.filter(value => value !== id) : [...values, id]; }
-  return <Modal title="Agent bundles" open={open} onOpenChange={value => { if (!value) close(); }}>
+  return <Modal keepMounted title="Agent bundles" open={open} onOpenChange={value => { if (!value) close(); }}>
     <div className="bundle-content">
       <div className="bundle-actions" aria-label="Bundle action">
         <Button variant={mode === "import" ? "primary" : "secondary"} disabled={busy || githubBusy} aria-pressed={mode === "import"} onClick={() => setMode("import")}>Import</Button>
