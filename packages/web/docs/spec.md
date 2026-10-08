@@ -50,6 +50,9 @@ Use RDS PostgreSQL for durable conversation history, private agent context, task
 | Information | Authoritative home |
 | --- | --- |
 | Conversation/task state and durable tool history | RDS PostgreSQL |
+| Authentication/session, catalog/directory and lifecycle state | PostgreSQL, separately scoped application schemas/roles |
+| Provider/MCP credentials and pending OAuth secrets | Application-encrypted PostgreSQL records; retain one credential owner initially |
+| Encryption, signing and derivation root keys | Separately controlled secret management, outside PostgreSQL |
 | Curated notes and long-term knowledge | Wiki through authorized MCP access |
 | Project source and versioned documents | A remote Git repository per project |
 | Large files and artifacts | Ordinary S3 |
