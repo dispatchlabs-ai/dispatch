@@ -126,6 +126,7 @@ export type RuntimeOptions = {
   peopleDirectory?: PeopleDirectory;
   /** Backend catalog/directory store only: no agent construction and no scheduler resume. */
   directoryOnly?: boolean;
+  connectMcpOnOpen?: boolean;
   runMcpBackground?: <T>(operation: () => Promise<T>) => Promise<T>;
   workerManagement?: WorkerManagement;
   workerMcp?: WorkerMcp;
@@ -233,7 +234,7 @@ export class DispatchRuntime {
       if (worker) {
         await runtime.applyWorkerCatalog(worker.catalog);
         if (options.runMcpBackground) connections.runBackground = options.runMcpBackground;
-        await connections.open(harness);
+        await connections.open(harness, options.connectMcpOnOpen);
         const reopenedRoom = Boolean((await harness.snapshot(RuntimeModeDoc, context))?.worker?.roomId);
         if (worker.membership) await runtime.prepareWorkerMcp(worker.membership);
         runtime.boundRoomId = await runtime.createChatRecord(worker.scope, worker.input);
@@ -288,7 +289,7 @@ export class DispatchRuntime {
         await runtime.migrateWorkspaces(options.companyId);
       }
       if (options.runMcpBackground) connections.runBackground = options.runMcpBackground;
-      await connections.open(harness);
+      await connections.open(harness, options.connectMcpOnOpen);
       await runtime.configureConnections(options.companyId);
       connections.onChanged = () => runtime.configureConnections(options.companyId);
       if (!runtime.directoryOnly) harness.resume();
@@ -1242,6 +1243,8 @@ export class DispatchRuntime {
           usedBy: agent ? [{ id: agent.id, name: agent.name }] : [], ...(record.error ? { error: record.error } : {}) };
       });
   }
+
+  async startMcpConnections() { await this.connections.start(); }
 
   async refreshMcpConnections(id?: string) { await this.connections.reloadManaged(id); }
 
