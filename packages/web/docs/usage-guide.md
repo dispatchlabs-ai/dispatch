@@ -422,6 +422,10 @@ In default SQLite mode, the state directory contains `auth.sqlite`, `auth.key`, 
 - **Import:** choose a bundle ZIP, inspect definitions/instructions, model requirements, capabilities, skills and excluded connections. Resolve blockers, then explicitly allow the listed capabilities and choose **Import copies**. Imports create independent definitions and do not replace the default agent or alter existing chats. Configure connections separately.
 - **Retry:** after an uncertain failure use **Retry same import**, retaining the operation ID and file. Hiding/reopening the dialog preserves this state while the workspace component remains mounted; a page reload does not preserve it. Replacing a file after an uncertain attempt warns that the earlier import may have completed. After success, **Import another copy** deliberately starts a new operation and requires authorization again.
 
+### Developer starter
+
+**Standalone candidate; route/dialog integration pending.** The Developer starter uses repository-owned guidance, files/commands only and no skills or connections. Choose a **Model** and its supported **Thinking** level explicitly, then **Preview starter**. The generated package is `dispatch-starter-developer` version `1.0.0`; it enters the ordinary archive preview/authorization/import flow rather than modifying the existing default. Review capabilities before creating your independent copy. This is not a copy of a live Developer's settings, and runtime/browser behavior remains unverified.
+
 ### Bundle archive profile
 
 Use Dispatch-generated archives or construct the restricted format, not arbitrary ZIP output. The archive contains `dispatch.json` and only its referenced UTF-8 `.md` instruction files; agent/skill keys are package-local. The reader never extracts files or executes code.
