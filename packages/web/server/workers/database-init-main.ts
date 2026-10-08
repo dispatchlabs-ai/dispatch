@@ -35,6 +35,14 @@ async function transaction(db: Client, action: () => Promise<void>): Promise<voi
   catch { await db.query("ROLLBACK").catch(() => {}); throw new Error("Initialization transaction failed."); }
 }
 
+async function requireSessionSetting(db: Client, name: string, value: string): Promise<void> {
+  const read = async () => (await db.query("SELECT current_setting($1) AS value", [name])).rows[0].value;
+  // RDS can enforce a safe parameter-group value while denying the operator SET permission.
+  if (await read() === value) return;
+  await db.query("SELECT set_config($1, $2, false)", [name, value]);
+  if (await read() !== value) throw new Error("Required provisioning session setting is not effective.");
+}
+
 async function main() {
   const { values } = parseArgs({ options: {
     config: { type: "string" }, create: { type: "boolean" }, verify: { type: "boolean" },
@@ -92,13 +100,15 @@ async function main() {
       // Refuse to send password parameters until ordinary/error/audit query logging is disabled.
       // Keep passwords out of SQL text too: use a temporary SECURITY INVOKER function with bind parameters.
       stage = "private provisioning session";
-      await admin.query(`SET log_statement='none'; SET log_min_duration_statement=-1;
-        SET log_min_duration_sample=-1; SET log_min_error_statement='panic'; SET log_error_verbosity='terse';
-        SET log_parameter_max_length=0; SET log_parameter_max_length_on_error=0;
-        SET password_encryption='scram-sha-256'`);
+      for (const [setting, value] of [
+        ["log_statement", "none"], ["log_min_duration_statement", "-1"],
+        ["log_min_duration_sample", "-1"], ["log_min_error_statement", "panic"], ["log_error_verbosity", "terse"],
+        ["log_parameter_max_length", "0"], ["log_parameter_max_length_on_error", "0"],
+        ["password_encryption", "scram-sha-256"],
+      ] as const) await requireSessionSetting(admin, setting, value);
       for (const setting of ["pgaudit.log", "pg_stat_statements.track_utility"]) {
         const { rows: [current] } = await admin.query("SELECT current_setting($1, true) AS value", [setting]);
-        if (current.value !== null) await admin.query("SELECT set_config($1, $2, false)", [setting, setting === "pgaudit.log" ? "none" : "off"]);
+        if (current.value !== null) await requireSessionSetting(admin, setting, setting === "pgaudit.log" ? "none" : "off");
       }
       await admin.query(`CREATE FUNCTION pg_temp.dispatch_set_password(role_name text, secret text) RETURNS void
         LANGUAGE plpgsql SECURITY INVOKER AS $$ BEGIN
