@@ -1,4 +1,5 @@
-import { Archive, Pencil, Plus } from "lucide-react";
+import { Menu } from "@base-ui/react/menu";
+import { Archive, Bot, MoreHorizontal, Pencil, Plus } from "lucide-react";
 import type { AgentDefinition } from "../shared/contracts";
 import { SidebarSearch } from "./sidebar-search";
 import { Button, IconButton } from "./ui";
@@ -38,8 +39,8 @@ export function AgentSidebar({
   );
   const archivedCount = agents.filter((agent) => agent.archived).length;
   return (
-    <div className="collection-sidebar">
-      <Button className="sidebar-create" disabled={busy} onClick={onCreate}>
+    <div className="collection-sidebar agent-library">
+      <Button variant="secondary" className="sidebar-create" disabled={busy} onClick={onCreate}>
         <Plus /> New agent
       </Button>
       <SidebarSearch
@@ -80,7 +81,7 @@ export function AgentSidebar({
               title={agent.name}
               onClick={() => onSelect(agent.id)}
             >
-              <span>{agent.name}</span>
+              <Bot className="agent-library-icon" size={21} aria-hidden="true" /><span>{agent.name}</span>
               {editing === true && agent.id === selectedAgentId ? (
                 <span className="sidebar-tag">Unsaved</span>
               ) : null}
@@ -90,20 +91,15 @@ export function AgentSidebar({
             </button>
             {!agent.archived ? (
               <div className="sidebar-row-actions">
-                <IconButton
-                  label={`Edit agent: ${agent.name}`}
-                  disabled={busy}
-                  onClick={() => onEdit(agent)}
-                >
-                  <Pencil size={15} />
-                </IconButton>
-                {agent.id !== defaultAgentId ? <IconButton
-                  label={`Archive agent: ${agent.name}`}
-                  disabled={busy}
-                  onClick={() => onArchive(agent)}
-                >
-                  <Archive size={15} />
-                </IconButton> : null}
+                <Menu.Root>
+                  <Menu.Trigger render={<IconButton label={`Actions for ${agent.name}`} disabled={busy}><MoreHorizontal size={18} /></IconButton>} />
+                  <Menu.Portal><Menu.Positioner className="menu-positioner" sideOffset={6} align="end" collisionPadding={12}>
+                    <Menu.Popup className="action-menu">
+                      <Menu.Item onClick={() => onEdit(agent)}><Pencil size={16} />Edit agent</Menu.Item>
+                      {agent.id !== defaultAgentId ? <Menu.Item onClick={() => onArchive(agent)}><Archive size={16} />Archive agent</Menu.Item> : null}
+                    </Menu.Popup>
+                  </Menu.Positioner></Menu.Portal>
+                </Menu.Root>
               </div>
             ) : null}
           </div>

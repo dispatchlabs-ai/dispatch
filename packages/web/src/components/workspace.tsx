@@ -431,7 +431,7 @@ export function Workspace() {
 
   function editAgent(agent?: AgentDefinition) {
     requestAgentAction(() => {
-      setOtherDetailsVisible(false);
+      setOtherDetailsVisible(true);
       setEditingAgent(beginAgentEdit(agent, agents.find(item => item.id === config?.defaultAgentId)));
       if (agent) setSelectedAgentId(agent.id);
       else { setAgentSearch(""); setShowArchivedAgents(false); }
