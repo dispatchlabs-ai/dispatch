@@ -130,8 +130,9 @@ resource "aws_db_parameter_group" "this" {
   name_prefix = "${var.name}-"
   family      = "postgres17"
   parameter {
-    name  = "rds.force_ssl"
-    value = "1"
+    name         = "rds.force_ssl"
+    value        = "1"
+    apply_method = "pending-reboot"
   }
   tags = local.tags
 }
