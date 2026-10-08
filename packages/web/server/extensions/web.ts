@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Type } from "@earendil-works/pi-ai";
-import { defineDoc, defineExtension, defineTool, section } from "@earendil-works/pi-durable";
+import { defineDoc, defineDocFamily, defineExtension, defineTool, section } from "@earendil-works/pi-durable";
 import { WebBackendError, type WebBackend } from "../web/types.js";
 
 const MAX_TEXT = 200_000;
@@ -22,9 +22,14 @@ type WebReference = {
 
 // Snapshots are immutable once committed. Rewind/fork follow the corresponding transcript.
 // Never resolve another agent's reference by looking outside its native conversation.
-const WebReferences = defineDoc<{ references: Record<string, WebReference> }>({
-  kind: "dispatch.web-references", version: 1, scope: "conversation", history: "rewindable", fork: "asOf",
-  initial: () => ({ references: {} }),
+const WebReferenceDoc = defineDocFamily<WebReference, WebReference>({
+  kind: "dispatch.web-reference", family: true, version: 1, scope: "conversation", history: "rewindable", fork: "asOf",
+  initial: reference => reference,
+});
+type ReferenceSummary = Pick<WebReference, "id" | "kind" | "url" | "retrievedAt">;
+const RecentReferences = defineDoc<{ references: ReferenceSummary[] }>({
+  kind: "dispatch.web-recent", version: 1, scope: "conversation", history: "rewindable", fork: "asOf",
+  initial: () => ({ references: [] }),
 });
 
 class WebInputError extends Error {}
@@ -108,19 +113,18 @@ export function createWebResearch(backend: WebBackend) {
       const count = WINDOW_LINES[args.response_length ?? "medium"];
       const signal = context.abortSignal;
       signal?.throwIfAborted();
-      const saved = await api.snapshot(WebReferences, api.conversationId, context);
-      const references = new Map(Object.entries(saved?.references ?? {}));
-
       const save = async (reference: WebReference) => {
         signal?.throwIfAborted();
         await api.commit(async tx => {
-          (await tx.doc(WebReferences, api.conversationId)).references[reference.id] = reference;
+          await tx.doc(WebReferenceDoc, api.conversationId, reference.id, reference);
+          const recent = await tx.doc(RecentReferences, api.conversationId);
+          recent.references.push({ id: reference.id, kind: reference.kind, url: reference.url, retrievedAt: reference.retrievedAt });
+          recent.references = recent.references.slice(-8);
         }, context);
-        references.set(reference.id, reference);
         return reference;
       };
-      const lookup = (id: string) => {
-        const reference = references.get(id);
+      const lookup = async (id: string) => {
+        const reference = await api.snapshot(WebReferenceDoc, api.conversationId, id, context);
         if (!reference) throw new WebInputError("Unknown reference in this agent instance. Use the source URL instead.");
         return reference;
       };
@@ -145,7 +149,7 @@ export function createWebResearch(backend: WebBackend) {
       };
       const resolvePage = async (id: string, refresh = false) => {
         if (/^https?:\/\//i.test(id)) return fetchPage(id);
-        const reference = lookup(id);
+        const reference = await lookup(id);
         return reference.kind === "page" && !refresh ? reference : fetchPage(reference.url);
       };
       const operation = async (name: string, input: unknown, work: () => Promise<unknown>) => {
@@ -202,7 +206,7 @@ export function createWebResearch(backend: WebBackend) {
         return { ...metadata(reference), matches, next_lineno: nextLine, note: "Matches cover the stored extraction, not omitted source content. Use open with lineno for surrounding context." };
       }));
       for (const input of args.click ?? []) work.push(operation("click", input, async () => {
-        const reference = lookup(input.ref_id);
+        const reference = await lookup(input.ref_id);
         if (reference.kind !== "page") throw new WebInputError("Open the search result before selecting a numbered link.");
         const link = reference.links[input.id - 1];
         if (!link) throw new WebInputError(`Link ID is not present; this snapshot has ${reference.links.length} links.`);
@@ -221,8 +225,8 @@ export function createWebResearch(backend: WebBackend) {
     name: "dispatch-web", tools: [run],
     sections: [section("web_research", async (input, context) => {
       if (!input.agent.tools.some(tool => tool.name === run.name)) return undefined;
-      const saved = await input.read.snapshot(WebReferences, input.conversationId, context);
-      const recent = Object.values(saved?.references ?? {}).slice(-8).map(reference => ({
+      const saved = await input.read.snapshot(RecentReferences, input.conversationId, context);
+      const recent = (saved?.references ?? []).map(reference => ({
         ref_id: reference.id, kind: reference.kind, url: reference.url, retrieved_at: reference.retrievedAt,
       }));
       return [
