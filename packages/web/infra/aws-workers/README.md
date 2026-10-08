@@ -124,3 +124,34 @@ reviewed (63,822 ARM64 / 63,824 AMD64 entries) with no matched host-state/creden
 paths. These bounded inspections are not an exhaustive secret audit. No network,
 real credentials, application database or AWS execution was used. Candidate image
 `99ae730` is superseded for actual activation by subsequent cold-start fixes.
+
+## Optional operator database initializer
+
+`database_initializer = {command, environment, secrets}` (default null) registers
+one operator task definition only when `image` is set. It never creates a service
+or calls RunTask. It has its own no-ingress security group, SQL access to RDS and
+HTTPS outbound, execution role restricted to its declared secret ARNs/log group/
+ECR, and a task role with no IAM permissions. No application role gains master
+secret access. The same volume initializer and UID 65532 runtime apply.
+
+The task definition precondition requires `desired_count=0`; this is not proof of
+actual old-task termination. Before the operator invokes it, independently confirm
+all backend/launcher/worker and maintenance owners STOPPED, reject uncertain state,
+and pin exact task definition/secret versions. Run it in `service_cluster_arn`,
+`private_subnet_ids` and the output `database_initializer.security_group_id`, with
+public addressing and ECS Exec disabled. Retain `--verify` as the task's default;
+creation and stopped-owner confirmation flags belong only to the reviewed RunTask
+invocation. Its master credential is the directly injected RDS managed JSON secret,
+not a second retained master-password URL.
+
+After successful stopped-task verification, remove this optional input before
+activating stable services: its definition is deregistered and dedicated IAM/SG
+resources removed, without deleting database state. Caller owns helper arguments,
+restricted-file manifest, seven distinct store URL secrets and private receipts.
+A successful RunTask response is not completion; inspect task STOPPED and the
+actual initializer exit code/logs, then explicitly run read-only verification.
+Unknown outcomes must be investigated, never blindly recreated/reset.
+
+Both engines' synthetic optional-initializer module plans agree on eight extra
+AWS resources and no scheduled operator service. Runtime helper/RDS compatibility
+is separate application work; no live invocation is established by these plans.
