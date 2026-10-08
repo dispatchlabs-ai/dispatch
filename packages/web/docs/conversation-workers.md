@@ -51,6 +51,8 @@ Discussion consensus, October 8, 2026: make backend and launcher state recoverab
 
 Chris subsequently sized the next package to close all application/rehearsal prerequisites for the AWS Terraform module, not host independence alone; see the [pre-AWS readiness requirement](spec.md#pre-aws-application-readiness). The scope below is a starting point pending a complete gap inventory, concrete completion design and ordered acceptance criteria.
 
+**Completion boundary:** this package ends when application startup/lifecycle integration is implemented and reviewed, the isolated Linux rehearsal proves authorization/transport/failure recovery, an encrypted paired restore performs new model/tool work without overlapping or retired executors, and every pre-AWS checklist gate below is closed with scoped evidence and maintained runbooks. Component builds and logical/file restores alone do not meet that boundary. AWS apply/cost approval, replicas and full HA are separate; existing installations remain intact.
+
 ### Scope and sequence
 
 1. Move authoritative authentication/session, encrypted connection, catalog/directory and lifecycle state into PostgreSQL with separate schemas and restricted roles. Retain one active backend, launcher, catalog owner and provider-credential owner initially; backend replicas must not independently open the same Pi catalog store. Pi continues owning execution inside each conversation worker.
