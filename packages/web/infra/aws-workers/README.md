@@ -149,6 +149,15 @@ HTTPS outbound, execution role restricted to its declared secret ARNs/log group/
 ECR, and a task role with no IAM permissions. No application role gains master
 secret access. The same volume initializer and UID 65532 runtime apply.
 
+The dedicated RDS parameter group prepares `log_parameter_max_length` and
+`log_parameter_max_length_on_error` at `0` with dynamic (`immediate`) application.
+RDS can deny session SET even to its managed master identity. Parameter-group
+configuration is not proof of effective operator-session values: the helper must
+still enforce its logging protections before password-bearing provisioning. Do
+not grant application roles parameter authority to work around an initializer
+failure. The helper's owning contract is
+[`database-init.md`](../../server/workers/database-init.md).
+
 The task definition precondition requires `desired_count=0`; this is not proof of
 actual old-task termination. Before the operator invokes it, independently confirm
 all backend/launcher/worker and maintenance owners STOPPED, reject uncertain state,
