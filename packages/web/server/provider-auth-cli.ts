@@ -49,11 +49,13 @@ function deviceId(installation: string) {
 async function prompt(input: AuthPrompt, stop: AbortController): Promise<string> {
   const signal = input.signal ? AbortSignal.any([input.signal, stop.signal]) : stop.signal;
   signal.throwIfAborted();
+  const output = new Writable({ write(_chunk, _encoding, done) { done(); } });
+  // Enter raw/no-echo mode before publishing the prompt. Otherwise an immediate
+  // paste can reach the terminal driver while echo is still enabled.
+  const terminal = createInterface({ input: process.stdin, output, terminal: true, historySize: 0 });
   line(input.message);
   if (input.type === "select") input.options.forEach((option, index) => line(`${index + 1}. ${option.label}`));
   line("Input is hidden; press Enter to submit.");
-  const output = new Writable({ write(_chunk, _encoding, done) { done(); } });
-  const terminal = createInterface({ input: process.stdin, output, terminal: true, historySize: 0 });
   try {
     const answer = await new Promise<string>((resolve, reject) => {
       const abort = () => reject(new UsageError("Authorization prompt cancelled."));
