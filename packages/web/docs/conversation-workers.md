@@ -1,6 +1,6 @@
 # Single-server conversation workers
 
-Status: application integration in progress. A private, sealed backend/launcher/PostgreSQL/Garage stack was established on Omarchy; the backend is now deliberately stopped for corrective activation, with launcher drain verified and zero workers. No HTTPS/DNS publication. Conversation execution and integrated acceptance remain unqualified. Implements the [accepted target](spec.md#aws-container-deployment-target) and [single-server rehearsal](spec.md#single-server-container-rehearsal). Chris authorized implementation, isolated Omarchy deployment and focused testing on October 7, 2026. Existing installations and their data remain untouched.
+Status: application integration in progress. The private Omarchy stack was reactivated on October 8 for a disposable-account smoke check at checkpoint `55d6247`. Enrollment/password/TOTP passed; first conversation creation hit a worker-DNS readiness failure despite a running container. No model request was admitted and no HTTPS/DNS publication occurred. Conversation execution and integrated acceptance remain unqualified. Implements the [accepted target](spec.md#aws-container-deployment-target) and [single-server rehearsal](spec.md#single-server-container-rehearsal). Chris authorized implementation, isolated Omarchy deployment and focused testing on October 7, 2026. Existing installations and their data remain untouched.
 
 ## Ownership and boundaries
 
