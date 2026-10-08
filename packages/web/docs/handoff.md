@@ -1318,3 +1318,17 @@ Acceptance evidence:
 - Catalog/UI availability, assignment/loading, restart preservation and browser execution through these imported skills remain functionally unverified. The earlier disposable CLI pilot does not qualify this integration. Credential-safe enrollment/TOTP entry and useful full-use-case recording remain unresolved. No automated regression suite was introduced.
 
 Source publication remains pending. The running canonical checkout will not be fast-forwarded during this slice because its backend watcher would activate the change; local activation requires a separate rollout decision. No live service or global tooling changes were performed.
+
+## In-place agent upgrades — October 8, 2026
+
+**Accepted and implementation authorized; implementation pending.** Chris requested in-place fixes and authorized the team to deliver after consensus. Developer owns implementation, Pi Durable Expert native lifecycle/recovery review and wiki alignment, Deslop simplification review, Documenter package documentation. Scope follows [the contract](spec.md#in-place-agent-revision-upgrades). Depends on revisioned definitions, trusted native bindings, WP-049 removal fences and WP-050 separate instance supplements.
+
+Acceptance criteria:
+- All authorized definition-save paths retain immutable revisions/conflicts/receipts and make active instances follow the latest saved configuration without replacement or history loss. Coalesce unapplied edits without discarding revision history; no general pinning mode.
+- Apply only at a reviewed idle boundary through Pi Durable public interfaces. Review an edit during a request/tool call, several pending edits, save/application failure, restart during adoption and unloaded-instance recovery. Do not cancel active work, replay completed actions or publish unadmitted prose.
+- Persist actual applied revision with configuration; expose latest saved versus applied/pending status truthfully. Do not declare adoption after a failed or incomplete commit.
+- Preserve IDs, histories, names overridden per instance, instruction supplements and workspace paths. Keep removing/removed instances historical; don't reactivate them or alter independent siblings' supplements.
+- Retain revision-pinned management grants and explicit human reauthorization. Do not copy personal/external credentials, silently assign newly selected MCP connections, or expand an editor's allowed fields/capabilities. Preserve explicit connection-rollout authorization; document the exact interaction with applied revision reporting after source review.
+- Review source/lifecycle and deslop; run permitted TypeScript/application and applicable Nix builds, full diff/whitespace and changed local links. No tests or runtime probes under the standing policy without explicit authorization. Record rendered desktop/390 px, keyboard/touch/accessibility and runtime/recovery gaps separately from build success.
+
+Product-history destination is the existing [agent-management record](https://wiki.chrisreynolds.me/wiki/dispatch-agent-management/). Documenter's unauthenticated access returns HTTP 401; Pi Durable Expert was asked to update it through their authorized connector. No wiki publication, implementation, functional qualification or deployment is established by this entry.
