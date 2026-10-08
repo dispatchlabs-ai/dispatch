@@ -1288,7 +1288,7 @@ Chris approved the ImageGen project overview and authorized implementation. The 
 
 Acceptance evidence:
 
-- Source/deslop review covers filter scope, observed status labels, existing ordering/actions, active-context selection, shared workspace editing state and manager gates. No API, runtime or persisted data changes.
+- Source/deslop review covers filter scope, observed status labels, existing ordering/actions, active-context selection, shared workspace editing/search state, close confirmation for typed searches and manager gates. No API, runtime or persisted data changes.
 - Rendered isolated frontend against the existing authenticated local service reviewed at desktop, a narrow desktop center column and 390 px. Corrected cramped title columns using container queries and search-icon padding. Phone overview, details and settings form were inspected without saving settings, changing membership or sending messages. Captures remain private in `.local/project-design/`.
 - TypeScript/application build passed during implementation. Final integrated Nix/build/publication evidence follows below.
 - No tests under the standing policy. Keyboard/touch, measured contrast, assistive technology, save/conflict/recovery and runtime functional qualification remain unverified. The preview browser did not complete the existing native discard confirmation; reloading cleared its unchanged preview-only draft. No saved settings were changed.

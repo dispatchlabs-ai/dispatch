@@ -55,6 +55,7 @@ export function Workspace() {
   const [showArchivedAgents, setShowArchivedAgents] = useState(false);
   const [config, setConfig] = useState<ApplicationConfig | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [projectSearch, setProjectSearch] = useState<Record<string, string>>({});
   const [projectEditing, setProjectEditing] = useState<Record<string, ProjectEditing | null>>({});
   const createInFlight = useRef(false);
   const [focusChatId, setFocusChatId] = useState<string | null>(null);
@@ -230,13 +231,16 @@ export function Workspace() {
     const tab = tabs.find(item => item.id === tabId);
     const dirty = tab?.kind === "chat" ? [...new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions), ...Object.keys(attachmentDrafts.drafts)])].some(key => (key === tab.chatId || key.startsWith(`${tab.chatId}:`)) && (Boolean(drafts[key]?.trim()) || Boolean(pending[key]) || Boolean(mentions[key]?.length) || Boolean(attachmentDrafts.drafts[key]?.length))) : false;
     if (tab?.kind === "project" && projectEditing[tab.projectId]?.busy) return;
-    if (dirty || (tab?.kind === "project" && projectEditing[tab.projectId])) setClosingTab(tabId);
+    if (dirty || (tab?.kind === "project" && (projectEditing[tab.projectId] || projectSearch[tab.projectId]))) setClosingTab(tabId);
     else closeTab(tabId);
   }
 
   function closeTab(tabId: string) {
     const closing = tabs.find(tab => tab.id === tabId);
-    if (closing?.kind === "project") setProjectEditing(current => ({ ...current, [closing.projectId]: null }));
+    if (closing?.kind === "project") {
+      setProjectEditing(current => ({ ...current, [closing.projectId]: null }));
+      setProjectSearch(current => { const next = { ...current }; delete next[closing.projectId]; return next; });
+    }
     if (closing?.kind === "chat") {
       for (const key of new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions), ...Object.keys(attachmentDrafts.drafts)])) {
         if (key !== closing.chatId && !key.startsWith(`${closing.chatId}:`)) continue;
@@ -626,6 +630,7 @@ export function Workspace() {
               onConnection={onConnection}
               onAccessLost={onAccessLost}
             /> : tab.kind === "project" ? <ProjectPage
+              search={projectSearch[tab.projectId] ?? ""} onSearchChange={search => setProjectSearch(current => ({ ...current, [tab.projectId]: search }))}
               project={projects.find(project => project.id === tab.projectId)} chats={chats} creating={creating || createFailed} updating={updatingChats}
               onCreate={() => chooseAgents(config.defaultAgentId, tab.projectId)} onSelect={selectChat}
               onRename={renameChat} onUpdate={updateChatAction}

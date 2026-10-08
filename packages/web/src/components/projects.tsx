@@ -41,7 +41,9 @@ export function NewProjectButton({ name, busy, error, compact, onNameChange, onC
   </Popover.Root>;
 }
 
-export function ProjectPage({ project, chats, creating, updating, onCreate, onSelect, onRename, onUpdate }: {
+export function ProjectPage({ project, chats, creating, updating, onCreate, onSelect, onRename, onUpdate, search, onSearchChange }: {
+  search: string;
+  onSearchChange: (search: string) => void;
   project?: Project;
   chats: ChatSummary[];
   creating: boolean;
@@ -51,7 +53,6 @@ export function ProjectPage({ project, chats, creating, updating, onCreate, onSe
   onRename: (chat: ChatSummary) => void;
   onUpdate: (id: string, input: UpdateChatInput) => void;
 }) {
-  const [search, setSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(false);
   if (!project) return <div className="project-page"><h1>Project unavailable</h1><p className="text-muted">Choose a project from Chats.</p></div>;
   const projectChats = chats.filter(chat => chat.projectId === project.id && !chat.archived);
@@ -62,7 +63,7 @@ export function ProjectPage({ project, chats, creating, updating, onCreate, onSe
       <Button disabled={creating || project.canParticipate === false} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New chat</Button>
     </header>
     <div className="project-toolbar">
-      <div className="search-input"><Search size={18} aria-hidden="true" /><Input type="search" aria-label="Search chats in this project" placeholder="Search chats in this project…" value={search} onChange={event => setSearch(event.target.value)} /></div>
+      <div className="search-input"><Search size={18} aria-hidden="true" /><Input type="search" aria-label="Search chats in this project" placeholder="Search chats in this project…" value={search} onChange={event => onSearchChange(event.target.value)} /></div>
       <div className="segmented-control" role="group" aria-label="Filter project chats">
         <Button variant="ghost" aria-pressed={!activeOnly} onClick={() => setActiveOnly(false)}>All chats</Button>
         <Button variant="ghost" aria-pressed={activeOnly} onClick={() => setActiveOnly(true)}>Active</Button>
@@ -79,7 +80,7 @@ export function ProjectPage({ project, chats, creating, updating, onCreate, onSe
         </button>
         <ConversationActions chat={chat} busy={updating.has(chat.id)} onRename={onRename} onUpdate={onUpdate} />
       </li>)}
-    </ul> : <div className="project-empty"><p>{projectChats.length ? "No matching chats." : "No chats yet."}</p>{projectChats.length ? <Button variant="ghost" onClick={() => { setSearch(""); setActiveOnly(false); }}>Clear filters</Button> : <p>Start a chat in this project.</p>}</div>}
+    </ul> : <div className="project-empty"><p>{projectChats.length ? "No matching chats." : "No chats yet."}</p>{projectChats.length ? <Button variant="ghost" onClick={() => { onSearchChange(""); setActiveOnly(false); }}>Clear filters</Button> : <p>Start a chat in this project.</p>}</div>}
   </section>;
 }
 
