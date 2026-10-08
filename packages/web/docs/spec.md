@@ -439,13 +439,13 @@ Chris requested Slack as the conversation screen's visual model, approved the [I
 
 ### Opt-in agent Definition of Done editing
 
-**Accepted October 8, 2026; not implemented.** Add an agent-facing tool gated by an explicit per-agent **Edit Definition of Done** capability, disabled by default. Instructions alone do not grant mutation authority. Reuse shared chat criteria storage and revision protection; no new execution system.
+**Accepted October 8, 2026; implemented, functional/rendered qualification pending.** An agent-facing tool is gated by an explicit per-agent **Edit Definition of Done** capability, disabled by default. Instructions alone do not grant mutation authority. Reuse shared chat criteria storage and revision protection; no new execution system.
 
 - Resolve the acting agent and current chat from its trusted native instance binding. Limit edits to that chat and enforce current active participation and capability permission at the mutation boundary, not merely tool visibility. Capability permission is the instance's currently applied definition; enabling/disabling follows existing safe idle-boundary adoption, not instantaneous revocation of an active request. Tool calls, including replay, must reject a conversation still transitioning through Stop.
 - Require the expected saved revision; stale edits must conflict rather than overwrite a human or another agent's change. Preserve the existing Markdown size, clearing and detached-response contracts. Use a durable retry receipt so native recovery cannot apply the same logical edit twice; identical replay returns its detached original result rather than rewriting newer criteria, and changed input conflicts.
 - Enabling editing does not authorize changing the team's goal contrary to human direction, additional work, automatic completion or Stop/approval bypass. Human editing and read-only observer restrictions remain unchanged.
 
-Delivery and functional evidence follow the [extension work package](handoff.md#opt-in-agent-criteria-editing--october-8-2026); existing human-only behavior remains the implemented contract until that slice is delivered.
+Delivery and functional evidence follow the [extension work package](handoff.md#opt-in-agent-criteria-editing--october-8-2026); human editing remains available alongside explicitly enabled agent editing.
 
 ### Work continuity before ending a turn
 
