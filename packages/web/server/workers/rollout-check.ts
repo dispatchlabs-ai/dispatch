@@ -52,7 +52,7 @@ const json = (id: unknown, result: unknown) => Response.json({ jsonrpc: "2.0", i
 const managed = {
   initialize: () => {}, list: () => records, record: (id: string) => records.find(record => record.id === id)!,
   requireAssignment: (_scope: unknown, id: string) => { assert.equal(managed.record(id).authorization, "authorized"); },
-  beforeConnect: async () => {}, recordServer: () => {},
+  beforeConnect: async () => {}, recordServer: async () => {},
   authProvider: () => ({ token: async () => "disposable-token", onUnauthorized: async () => {} }),
   fetch: async (_id: string, _input: string | URL, init?: RequestInit) => {
     if (init?.method === "GET") return new Response(null, { status: 405 });
