@@ -424,7 +424,26 @@ In default SQLite mode, the state directory contains `auth.sqlite`, `auth.key`, 
 
 ### Developer starter
 
-**Standalone candidate; route/dialog integration pending.** The Developer starter uses repository-owned guidance, files/commands only and no skills or connections. Choose a **Model** and its supported **Thinking** level explicitly, then **Preview starter**. The generated package is `dispatch-starter-developer` version `1.0.0`; it enters the ordinary archive preview/authorization/import flow rather than modifying the existing default. Review capabilities before creating your independent copy. This is not a copy of a live Developer's settings, and runtime/browser behavior remains unverified.
+**Integrated route/dialog candidate; runtime/browser qualification pending.** The Developer starter uses repository-owned guidance, files/commands only and no skills or connections. Choose a **Model** and its supported **Thinking** level explicitly, then **Preview starter**. The generated package is `dispatch-starter-developer` version `1.0.0`; it enters the ordinary archive preview/authorization/import flow rather than modifying the existing default. Review capabilities before creating your independent copy. This is not a copy of a live Developer's settings, and runtime/browser behavior remains unverified.
+
+### GitHub bundles
+
+**Integrated UI/routes candidate; native runtime integration/qualification pending.** In Agent bundles, choose **GitHub**. Destination **New independent copy** imports new local records; selecting an existing tracked installation previews its update. Enter public GitHub owner/repository, package directory (empty for root) and a full 40-character commit SHA, not a branch/tag, then **Preview commit**.
+
+Inspect Last imported, Local now and Incoming definitions, blockers, warnings, capability changes and retained local authority. Approve definitions/capability changes explicitly, then **Import copy** or **Apply update**. Updates preserve local connections and active instances adopt changed base definitions when idle. Local-edit overwrite conflicts block the whole update; **Preview independent copy** offers a separate import instead. Removed-upstream definitions remain local, not archived/deleted.
+
+After an uncertain response use **Retry same operation**. Changing destination/source or requesting another preview warns before abandoning uncertain retry identity. Hidden dialog modes retain state while mounted; page reload does not restore the browser's operation ID. Fetch is bounded to 30 seconds total, 512 KiB/file and 8 MiB combined UTF-8 manifest/Markdown data, without redirects or credentials. Private repositories, arbitrary hosts, branch/tag resolution and executable installation are unsupported.
+
+Authenticated routes:
+
+| Route | Request/result |
+| --- | --- |
+| `POST /api/bundles/starters/developer` | `{ provider, modelId, thinkingLevel }` → `{ archive, filename }`; archive is base64 ZIP |
+| `GET /api/bundles/github` | `{ installations }` |
+| `POST /api/bundles/github/preview` | `{ source: { owner, repository, commit, path }, installationId? }` → actor/company-bound durable preview |
+| `POST /api/bundles/github/apply` | `{ previewId, requestId }` → installation/result mapping |
+
+Apply references exactly the server-saved preview, not browser package content or a refetched commit. Preserve the request ID for retries. These routes do not make GitHub a live dependency of imported agents. See [update contracts](spec.md#github-sources-and-updates) and [acceptance evidence](handoff.md#github-bundle-imports-and-updates--october-8-2026).
 
 ### Bundle archive profile
 
