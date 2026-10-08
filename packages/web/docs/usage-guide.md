@@ -319,6 +319,10 @@ Agents waiting to publish show **Listening**. An agent with the speaking turn sh
 - Restarting the service invokes native Pi recovery. An interrupted provider request can run again from its committed checkpoint, rather than continuing the exact streamed token; another provider charge is possible.
 - The right column follows the active main tab. Participants exposes each agent’s saved configuration and usage. Narrow screens expose navigation and context through panels; per-chat drafts remain in browser memory while switching layouts and tabs.
 
+### Chat Definition of Done
+
+**Implementation candidate; runtime and rendered UI qualification pending.** Optional shared Markdown criteria guide all chat participants; checklists are supported. Only authorized human participants can edit them. Clearing criteria leaves chat history intact. Criteria do not declare the chat complete, stop agents or authorize additional work. Agents receive the saved value on their next shared-context refresh; saving alone does not activate them. See [the contract](spec.md#chat-definition-of-done).
+
 ### Adding another agent instance
 
 **Implemented in candidate `a3a7fdf`; runtime/UI qualification outstanding ([WP-050](handoff.md#wp-050--multiple-agent-instances-and-supplemental-instructions)).** Use Participants → Add instance, or the picker's explicit add-another action. Select the definition, optionally name the instance (for example, Developer · Backend), and supply additional instructions. Inspect its base and instance instructions separately in Participants. Supplements are creation-only; they do not edit the shared definition, alter siblings or grant permissions.
@@ -511,6 +515,8 @@ Restore requires the exact manifest code revision and creates numbered root dire
 
 `POST /api/chats/:id/preferences` accepts any combination of boolean `pinned`/`archived` and nullable `projectId`, and returns the current chat snapshot. Any human member may update their own conversation preferences; the destination project must belong to that same user/company. `GET /api/chats` includes archived records and project membership so the browser can present active, archived, and grouped lists.
 
+`POST /api/chats/:id/definition-of-done` accepts `{ markdown: string, expectedRevision: number }` and returns `ChatSnapshot`. Markdown is limited to 20,000 characters before trimming; blank clears the criteria. Snapshots expose `definitionOfDone: { markdown, revision }`, defaulting to empty text and revision 0 in existing chats. Use the saved revision; successful saves increment it, and stale revisions return 409. Following an uncertain response, read the current snapshot before deciding whether another save is needed; this endpoint has no request-ID replay receipt. Read-only observers cannot save. Saves change metadata only, not messages or agent activation.
+
 `POST /api/chats/:id/title` accepts `{ title: string }` (trimmed, 1–200 characters) and returns `ChatSnapshot`. Any authenticated human member may rename the shared display title. The original creation title is preserved so renaming does not invalidate creation retries.
 
 `POST /api/projects` accepts `{ requestId, name }` and returns `{ project }`. A project contains `id`, `name`, and `createdAt`. Retrying the same request ID and trimmed name returns the original project; changed content returns 409. `POST /api/chats` accepts optional `projectId` (null or omitted means unassigned). Chat creation retries compare the original creation project, even after the conversation has moved. Names are labels; stable UUIDs identify projects.
@@ -524,6 +530,7 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `GET/POST /api/chats` | List conversations you belong to / create with a request ID |
 | `GET/POST /api/projects` | List private projects / create a name-only project with a request ID |
 | `POST /api/chats/:id/title` | Rename the shared Dispatch display title |
+| `POST /api/chats/:id/definition-of-done` | Save or clear shared Markdown criteria with an expected revision |
 | `POST /api/chats/:id/preferences` | Set pin/archive flags or assign, move, or remove project membership |
 | `GET /api/chats/:id` | Public messages, participants and sanitized native activity |
 | `POST /api/chats/:id/messages` | Admit a message idempotently; return a snapshot with status 202 |

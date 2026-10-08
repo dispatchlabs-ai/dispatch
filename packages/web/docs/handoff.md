@@ -1544,3 +1544,5 @@ Acceptance criteria:
 - Source/deslop and independent native review; TypeScript/application builds, applicable Nix build/flake checks, whitespace and changed documentation links. No tests or runtime probes under the standing policy. Desktop and 390 px rendered review is required for UI; report missing evidence explicitly rather than claiming completion.
 
 Status: contract recorded; implementation, interface details and all acceptance evidence pending. Usage instructions follow verified source interfaces. No deployment, runtime behavior or functional qualification is established by this documentation update.
+
+Candidate backend source inspection: Documenter checked the route schema, snapshot default, native participation/revision commit and per-request context field. The source exposes a 20,000-character pre-trim limit and 409 stale-edit response; usage records these and the absence of request-ID replay. UI instructions, independent native review, integrated builds and runtime/rendered qualification remain pending. No tests, runtime probes or live-state edits were performed.
