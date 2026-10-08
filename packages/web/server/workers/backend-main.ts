@@ -1,3 +1,4 @@
+import { backendWorkerMcp } from "./mcp.js";
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,6 +53,7 @@ function operatorTransition<T>(operation: () => Promise<T>): Promise<T> {
   transition = result.catch(() => {});
   return result;
 }
+const mcp = backendWorkerMcp(directory);
 const app = new Hono();
 app.use("*", async (c, next) => {
   if (c.req.path === "/internal/replace" || c.req.path === "/internal/status" || c.req.path === "/internal/drain" || c.req.path === "/internal/undrain") return next();
@@ -76,6 +78,8 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
   }
   if (c.req.method !== "POST") return c.json({ error: "Not found" }, 404);
   const input = await c.req.json();
+  if (operation === "mcp/definitions") return c.json(await mcp.definitions(route, input));
+  if (operation === "mcp/call") return c.json(await mcp.call(route, input, c.req.raw.signal));
   if (operation === "summary") {
     routes.updateSummary(route.conversationId, route.attemptId, route.storeId, input);
     return c.json({ accepted: true });
