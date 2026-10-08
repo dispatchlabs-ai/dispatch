@@ -111,8 +111,8 @@ operator binaries, not whichever `terraform` happens to be first on PATH.
 Source/deslop review preserves direct Terraform resources, separate worker cluster,
 scoped IAM/SGs, no secrets in state, restricted service ownership, stop-before-start,
 matched recovery and retained state. Pi reviewed the initializer/bootstrap contract;
-Application Linux/Fargate execution is not established. Live task IAM, SQL role
-provisioning/connectivity, ALB/path behavior, AWS recovery, credential lifetime, performance and full application
+Application Linux/Fargate execution is not established. Application task IAM and
+SQL isolation, ALB/path behavior, AWS recovery, credential lifetime, performance and full application
 security qualification remain unverified. The Surton consumer records access,
 actual cost assumptions, missing operator decisions and publication separately.
 
