@@ -1,6 +1,6 @@
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
-import { X509Certificate } from "node:crypto";
+import { verifiedPostgresConfig } from "./postgres/tls.js";
 import { z } from "zod";
 import { PostgresCredentialStore } from "./provider-credentials.js";
 
@@ -40,20 +40,12 @@ export async function openConfiguredProviderCredentials(input: ProviderCredentia
     const config = providerCredentialConfigSchema.parse(input);
     urlBytes = await readConfigurationFile(config.databaseUrlFile, true);
     const connectionString = urlBytes.toString("utf8").trim();
-    const url = new URL(connectionString);
-    // pg URL SSL parameters can replace an explicit ssl object. Reject all URL
-    // parameters, including libpq options/service/socket overrides, not just sslmode.
-    if (!["postgres:", "postgresql:"].includes(url.protocol) || !url.hostname || !url.username || url.pathname.length < 2 || url.pathname.slice(1).includes("/") || url.href.includes("?") || url.href.includes("#"))
-      throw new Error("Invalid provider credential database URL.");
     const ca = (await readConfigurationFile(config.databaseCaFile, false)).toString("utf8");
-    const certificates = ca.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g);
-    if (!certificates?.length || ca.replace(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g, "").trim())
-      throw new Error("Invalid provider credential database CA bundle.");
-    for (const pem of certificates) if (!new X509Certificate(pem).ca) throw new Error("Database trust bundle must contain CA certificates.");
+    const database = verifiedPostgresConfig(connectionString, ca);
     encryptionKey = await readConfigurationFile(config.encryptionKeyFile, true);
     return await PostgresCredentialStore.open({
       installationId: config.installationId, encryptionKey, recoverOwnerId,
-      database: { connectionString, ssl: { ca, rejectUnauthorized: true } },
+      database,
     });
   } catch {
     throw new Error("Cannot open provider credential configuration/store; check verified TLS, restricted files, key and retired-owner recovery.");
