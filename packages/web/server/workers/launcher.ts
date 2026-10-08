@@ -131,7 +131,7 @@ export class WorkerLauncher {
         if (!status.driverReachable || status.orphanContainerIds.length)
           throw new LauncherError(503, "Reconcile unresolved launcher state before admitting a new worker.");
         const digest = createHash("sha256").update(JSON.stringify([this.journal.installationId, request.attemptId])).digest("hex");
-        attempt = { ...request, name: `dispatch-worker-${digest}`, phase: "creating" };
+        attempt = { ...request, name: `dispatch-worker-${digest.slice(0, 40)}`, phase: "creating" };
         this.save({ ...this.journal, attempts: [...this.journal.attempts, attempt] });
       }
       return this.advance(attempt);
