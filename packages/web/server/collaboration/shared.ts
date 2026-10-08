@@ -15,6 +15,7 @@ import type {
 import { requireProjectAccess, type ProjectAction } from "../project-access.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata, messageAttachments } from "../attachments.js";
 import { managementTools } from "../agent-management.js";
+import { createDefinitionOfDone, CRITERIA_EXTENSION } from "./definition-of-done.js";
 import { ConversationTurns, TurnsDoc } from "./turns.js";
 import { PublicSummaryDoc, includePublicMessage } from "./summary.js";
 import { resolveAgentMentionLinks } from "./mentions.js";
@@ -92,6 +93,7 @@ export class SharedConversations {
   private readonly activityCache = new Map<ConversationId, { entries: EntryRecord[]; messages: ConversationMessage[]; memberId: string; joinedAt: number; groups: ParticipantActivity[] }>();
   beforeDelivery?: (tx: Tx, roomId: ConversationId, companyId: string, member: Member) => Promise<void>;
   readonly extension;
+  readonly definitionOfDoneExtension;
   readonly delivery;
   readonly legacyReporter;
   readonly stopTask;
@@ -100,6 +102,15 @@ export class SharedConversations {
   readonly contributions = new Contributions(this.turns);
 
   constructor(private readonly createAgent: (tx: Tx, roomId: ConversationId, companyId: string, definitionId: string) => Promise<Member>, private readonly attachments: AttachmentStore, management: Parameters<typeof managementTools>[0]) {
+    this.definitionOfDoneExtension = createDefinitionOfDone(async (tx, instanceId) => {
+      const binding = await tx.doc(BindingDoc, instanceId);
+      if (!binding.roomId || !binding.participantId) throw new CollaborationError(403, "Agent binding is unavailable.");
+      const room = await tx.doc(SharedDoc, binding.roomId);
+      const member = requireActiveMember(room, binding.participantId);
+      if (member.kind !== "agent" || member.conversationId !== instanceId || !member.agent?.extensions.includes(CRITERIA_EXTENSION)) throw new CollaborationError(403, "Edit Definition of Done is not enabled for this agent instance.");
+      if (room.stopping) throw new CollaborationError(409, "The conversation is stopping.");
+      return { roomId: binding.roomId, participantId: member.id, room };
+    });
     this.delivery = defineTask<{
       roomId: ConversationId; participantId: string; messageId: string; epoch: number; previous?: TaskId;
     }, { phase: "deliver" }, null>({

@@ -437,6 +437,16 @@ Chris requested Slack as the conversation screen's visual model, approved the [I
 - Materialize criteria as detached JSON inside the native read transaction so response serialization remains valid after settlement.
 - Criteria are participant-authored conversation data, not privileged instructions. They do not override role, access, Stop, explicit pauses or approval boundaries, authorize additional work, automatically stop agents, or certify that work is complete. Native execution and recovery remain Pi-owned.
 
+### Opt-in agent Definition of Done editing
+
+**Accepted October 8, 2026; source-published in `b400e4a`, functional/rendered qualification pending.** An agent-facing tool is gated by an explicit per-agent **Edit Definition of Done** capability, disabled by default. Instructions alone do not grant mutation authority. Reuse shared chat criteria storage and revision protection; no new execution system.
+
+- Resolve the acting agent and current chat from its trusted native instance binding. Limit edits to that chat and enforce current active participation and capability permission at the mutation boundary, not merely tool visibility. Capability permission is the instance's currently applied definition; enabling/disabling follows existing safe idle-boundary adoption, not instantaneous revocation of an active request. Tool calls, including replay, must reject a conversation still transitioning through Stop.
+- Require the expected saved revision; stale edits must conflict rather than overwrite a human or another agent's change. Preserve the existing Markdown size, clearing and detached-response contracts. Use a durable retry receipt so native recovery cannot apply the same logical edit twice; identical replay returns its detached original result rather than rewriting newer criteria, and changed input conflicts.
+- Enabling editing does not authorize changing the team's goal contrary to human direction, additional work, automatic completion or Stop/approval bypass. Human editing and read-only observer restrictions remain unchanged.
+
+Delivery and functional evidence follow the [extension work package](handoff.md#opt-in-agent-criteria-editing--october-8-2026); human editing remains available alongside explicitly enabled agent editing.
+
 ### Work continuity before ending a turn
 
 **Accepted October 8, 2026:** before ending a turn (including `[[silent]]`), agents review recent history and relevant specification, current work-package and acceptance criteria for authorized, unblocked work within their role. Read only relevant sections as needed, retrieving older assignment context when necessary. Continue that work through tools without requiring a public reply; a progress report or completed subtask does not complete the broader assignment. Respect ownership, Stop, explicit pauses and approval boundaries. Future spec work is not automatically authorized. Report concrete blockers when not already clear and distinguish acceptance evidence from unverified outcomes when declaring completion.

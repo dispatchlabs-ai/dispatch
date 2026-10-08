@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — agent criteria editing
+
+- Add opt-in Edit Definition of Done capability with current-chat read/write tool, revision protection and durable retry receipts. Disabled by default; existing instances adopt capability changes at safe idle boundaries.
+
 ## Unreleased — continuing simplification
 
 - Align runtime/setup and agent workflow guidance with current contracts and testing-policy exceptions; distinguish historical editor proposals and deployment/qualification evidence from current claims.

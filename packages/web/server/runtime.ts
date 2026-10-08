@@ -41,6 +41,7 @@ const IMAGE_GENERATION_SKILL_ID = "d6f5a67d-5c7b-4813-910f-b29d97d29cd1";
 const capabilityDefinitions: { id: NonNullable<AgentDefinition["capabilities"]>[number]; marker: string; extensions: string[]; tools: string[] }[] = [
   { id: "files-and-commands", marker: CodingTools.name, extensions: [Coding.name, CodingTools.name], tools: ["read", "write", "edit", "bash"] },
   { id: "image-generation", marker: "dispatch-image-gen", extensions: ["dispatch-image-gen"], tools: ["generate_image"] },
+  { id: "edit-definition-of-done", marker: "dispatch-definition-of-done", extensions: ["dispatch-definition-of-done"], tools: ["conversation_definition_of_done"] },
   { id: "web-research", marker: "dispatch-web", extensions: ["dispatch-web"], tools: ["web_run"] },
 ];
 const capabilityExtensions = new Set(capabilityDefinitions.flatMap(item => item.extensions));
@@ -152,6 +153,7 @@ export class DispatchRuntime {
         save: (tx, instance, callId, input) => runtime.saveManagedAgent(tx, instance, callId, input),
       });
       registry.install(shared.extension);
+      registry.install(shared.definitionOfDoneExtension);
       registry.install(CodingTools);
       registry.install(Coding);
       registry.install(Skills);
