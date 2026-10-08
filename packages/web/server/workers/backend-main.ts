@@ -76,6 +76,10 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
   }
   if (c.req.method !== "POST") return c.json({ error: "Not found" }, 404);
   const input = await c.req.json();
+  if (operation === "summary") {
+    routes.updateSummary(route.conversationId, route.attemptId, route.storeId, input);
+    return c.json({ accepted: true });
+  }
   if (operation === "attachment/save") {
     const file = attachmentSaveRequestSchema.parse(input);
     const bytes = decodeAttachmentBytes(file.dataBase64);
