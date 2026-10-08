@@ -43,11 +43,11 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
   function begin() {
     if (!project.canManage || project.revision === undefined) return;
     onEditingChange({ busy: false, input: {
-      requestId: crypto.randomUUID(), expectedRevision: project.revision, name: project.name,
+      requestId: crypto.randomUUID(), expectedRevision: project.revision, name: project.name, cwd: project.cwd ?? "",
       members: project.members ?? [], defaultAgentDefinitionIds: project.defaultAgentDefinitionIds ?? [],
     } });
   }
-  function update(patch: Partial<Pick<SaveProjectInput, "name" | "members" | "defaultAgentDefinitionIds">>) {
+  function update(patch: Partial<Pick<SaveProjectInput, "name" | "cwd" | "members" | "defaultAgentDefinitionIds">>) {
     if (!editing || disabled) return;
     onEditingChange({ ...editing, input: { ...editing.input, ...patch, requestId: crypto.randomUUID() } });
   }
@@ -76,6 +76,7 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
       {!project.canManage ? <Notice>Management permission removed. Draft retained.</Notice> : null}
       {editing.error ? <Notice>{editing.error}{editing.conflict ? " Draft retained. Discard to load current settings." : " Retry to save."}</Notice> : null}
       <Field label="Project name">{props => <Input {...props} value={editing.input.name} maxLength={100} disabled={disabled} onChange={event => update({ name: event.target.value })} />}</Field>
+      <Field label="Working directory (optional)" hint="Service-host path · Blank uses default · New instances only · Not a sandbox">{props => <Input {...props} value={editing.input.cwd ?? ""} disabled={disabled} autoComplete="off" spellCheck={false} onChange={event => update({ cwd: event.target.value })} />}</Field>
       <fieldset className="agent-form-section" disabled={disabled}>
         <legend>Members</legend>
         <p className="field-hint">Members access all project history. Keep at least one manager.</p>
