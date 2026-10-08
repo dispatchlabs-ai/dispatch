@@ -1500,3 +1500,14 @@ Acceptance criteria:
 - Source/deslop review, TypeScript/application and Nix builds, whitespace and changed local links. No tests or model/browser probes under the standing policy; effectiveness against premature idle remains unverified.
 
 Evidence: source/deslop review confirms only prompt strings change in runtime code; native admission, publication receipts, discard/recovery handoffs, Stop and tool execution are unchanged. Nix-shell TypeScript/application/capability builds, Apple Silicon Nix build, flake evaluation (zero runnable checks; Linux omitted), whitespace and changed documentation diff checks passed. No tests, model calls, browser probes or live-state edits were performed. Behavioral effectiveness and loaded-service adoption remain unverified.
+
+## Project working directory — October 8, 2026
+
+Chris authorized an optional `cwd` in Project settings. Developer owns settings UI; Pi Durable Expert owns backend persistence/session-path integration and lifecycle review; Documenter owns contract/usage updates. See the [shared-project contract](spec.md#shared-project-access-and-default-agents).
+
+Acceptance criteria (implementation evidence pending):
+
+- Managers save an optional directory through existing revision/request conflict handling. Blank preserves the installation default; unavailable or invalid directories fail explicitly without discarding the draft.
+- New workspace-using participants in project chats, including later invitations, receive the resolved directory through native Pi configuration. Existing saved paths, histories and recovered work remain unchanged by project edits or definition upgrades.
+- Settings explain host-local paths, new-instance scope and the non-sandbox boundary. No cloud provisioning, clone, file movement or automatic retargeting.
+- Source/deslop review, TypeScript/application builds, Nix build/flake checks and documentation/whitespace review follow the standing policy. Rendered desktop/390 px evidence and functional qualification must be reported separately; no tests are authorized by this setting request.
