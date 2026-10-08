@@ -1726,3 +1726,9 @@ Capability/GitHub evidence (Pi Durable Expert, `261d1ec`): an independent dispos
 
 
 Project retry/admission evidence (Dev 2, Developer-owned isolated browser-review instance): with a separately enrolled disposable account, repeating an empty-archive import with the same request ID returned the same project ID; altered content under that ID returned 409. Destination membership contained only the importing account as manager, with no default agents. Unauthenticated history reads and exports returned 401. Nonmember export/history denial checks are still pending; these observations alone do not establish cross-account authorization enforcement. The instance owner remains Developer and was not stopped by Dev 2.
+
+
+Corrected-build UI/build evidence (Developer): Apple Silicon Nix build and flake check passed. Manual export-dialog keyboard Tab navigation remained within the dialog; Escape returned focus to **Export history**. Document widths at 390 and 1440 CSS px had no horizontal overflow. These observations qualify those specific focus/layout cases, not measured contrast, touch, every modal state or complete accessibility.
+
+
+Additional Expert evidence on the same capability artifact: a host-injected fixed-URL backend retrieved `https://example.com/`; after process restart with retrieval disabled, `web_run` reopened the saved snapshot. Another conversation was denied access to its reference. This exercises retrieval/snapshot persistence and conversation isolation, not search-provider integration or paid image execution. At 390 px the GitHub dialog retained fields across tab switching and close/reopen, with keyboard focus wrapping inside the dialog; this does not establish successful GitHub import/update.
