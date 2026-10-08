@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — project working directories
+
+- Add an optional service-host working directory in Project settings. New agent instances retain the selected workspace; changing project settings never redirects existing instances. Blank uses the installation default.
+
 ## Unreleased — shared work continuity
 
 - Align shared-chat instructions and both history notifications: check recent history and relevant spec/work-package criteria before ending, and continue authorized, unblocked work without redundant public replies. No scheduling, native lifecycle or agent-definition changes.
