@@ -4,11 +4,12 @@
   "type": "module",
   "scripts": {
     "dev": "react-router dev",
-    "build": "react-router build && tsc -p tsconfig.server.json",
+    "build": "react-router build && tsc -p tsconfig.server.json && npm run build:capabilities",
     "preview": "node build/service/server/index.js",
     "typecheck": "react-router typegen && tsc --noEmit && tsc -p tsconfig.tooling.json",
     "start": "node build/service/server/index.js",
-    "auth": "tsx server/auth-cli.ts"
+    "auth": "tsx server/auth-cli.ts",
+    "build:capabilities": "tsc -p tsconfig.capabilities.json"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",

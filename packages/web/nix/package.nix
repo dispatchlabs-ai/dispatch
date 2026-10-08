@@ -18,6 +18,9 @@ buildNpmPackage {
       ../tsconfig.json
       ../tsconfig.server.json
       ../tsconfig.tooling.json
+      ../tsconfig.capabilities.json
+      ../capabilities/package.json
+      ../capabilities/README.md
       ../src
       ../server
     ];
@@ -47,6 +50,7 @@ buildNpmPackage {
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-auth" \
       --add-flags "$app/packages/web/build/service/server/auth-cli.js"
     mkdir -p "$out/share/dispatch-web"
+    cp -R packages/web/capabilities "$out/share/dispatch-web/capabilities"
     cp packages/web/server/storage/postgres/NOTICE "$out/share/dispatch-web/postgres-storage-NOTICE"
     mkdir -p "$out/share/dispatch-web/agent-browser"
     cp packages/web/server/skills/agent-browser/{LICENSE,NOTICE} "$out/share/dispatch-web/agent-browser/"
