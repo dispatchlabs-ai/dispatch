@@ -860,6 +860,16 @@ The first codec/API/UI candidate uses a restricted ZIP profile and base64 JSON t
 
 Fetch an immutable commit and record provenance; imported local definitions work without GitHub afterward. Updates show a diff and create explicit local revisions, preserving local edits and existing instances. No automatic upstream execution dependency or live instance rollout. A later marketplace can index these bundles without changing execution ownership.
 
+**GitHub update contract selected October 8 by Pi Durable Expert; not implemented.** Track repository/package path, immutable commit, content digest, package-local keys, local record mappings and last imported definition snapshots. Fetch outside native commits; apply exactly the previewed content, never a fresh moving-branch read.
+
+Preview upstream/local changes, capability additions/removals and retained local connections: changed instructions will operate with that existing authority. Explicitly approve capability changes. Never import credentials, connections or grants. Block the whole update when an upstream change would overwrite a locally changed field; offer an independent copy, not automatic merge or force-overwrite. New upstream entries receive new local records, never display-name matches. Removed upstream entries remain local and are marked removed upstream, not deleted or archived.
+
+Append definition/skill revisions, update mappings/provenance and save the retry receipt in one native commit. Expected local revisions fence changes after preview. Existing conversations remain unchanged; new instances use updated definitions. Exact field-comparison rules, source-fetch constraints, preview retention and API/UI shapes require implementation review. [The GitHub work package](handoff.md#github-bundle-imports-and-updates--october-8-2026) owns acceptance evidence.
+
+### Starter packages and onboarding
+
+**Assigned October 8; not implemented.** Repository-owned starter definitions use the public bundle preview/import path, not private live-agent exports or a second seeding mechanism. Preserve the default agent and saved edits. Dev 2 must present the starter inventory for Pi Durable Expert review before implementation. Starter UI/packaging and GitHub fetch/UI are independent workstreams with coordinated bundle-dialog ownership. [The starter work package](handoff.md#starter-packages-and-onboarding--october-8-2026) owns the settled inventory, workflow and qualification.
+
 ### Project content and operational recovery
 
 Project export selects user content, history and attachments. Import requires explicit identity/access mapping; historical authorship does not grant destination membership or recreate running tasks. Project-scoped resumable migration requires separate design; do not carve projects out of native Pi storage or invent task serialization.

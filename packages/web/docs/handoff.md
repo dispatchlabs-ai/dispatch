@@ -1400,3 +1400,25 @@ Acceptance evidence:
 - Functional acceptance remains unverified under the zero-tests policy: toolbar editing, save/reopen, conflicts, discard confirmations, keyboard traversal, touch and recovery were not requalified. Full WCAG contrast/accessibility conformance and Linux builds remain unverified. The earlier WP-047 one-time exception is not reused. No evaluation was executed and no service deployment is included.
 
 The normal localhost window exposed a narrow desktop header with both side panels open. The header now gives the identity block a wrapping flex basis so actions move to another row before the title becomes cramped. This correction is visually reviewed at the normal desktop width and 390 CSS px; candidate `b46ac23` passed Nix-shell TypeScript/application builds, Apple Silicon Nix build and flake check (zero runnable checks, Linux omitted).
+
+
+## Starter packages and onboarding — October 8, 2026
+
+**Assigned to Dev 2; proposed inventory/workflow awaiting Pi Durable Expert review.** Depends on the published archive codec/preview/import path. Scope follows [the starter contract](spec.md#starter-packages-and-onboarding). Documenter owns package records; Developer and Dev 2 coordinate shared bundle-dialog ownership and use separate worktrees.
+
+Acceptance criteria:
+- Review repository-owned starter inventory before implementation; no private live-agent exports, credentials/grants, machine paths or implicit connection authority.
+- Use the public format and existing preview/compatibility/authorization/native import receipt path, not a second seeding mechanism. Preserve the existing default, saved edits and participant snapshots; explicit copies and stable retry identity remain visible.
+- Define optional onboarding/discovery and failure/cancel/retry behavior before implementation; record actual UI labels and source usage once settled.
+- Source/Pi/deslop review, TypeScript/application and applicable Nix builds, full diff/whitespace and changed documentation links. Review desktop/390 px rendering and record keyboard/touch/accessibility gaps separately. Standing zero-tests policy applies; focused runtime/browser verification requested but not authorized by adding Dev 2. No deployment or starter qualification claimed.
+
+## GitHub bundle imports and updates — October 8, 2026
+
+**Assigned to Developer; contract selected by Pi Durable Expert, implementation pending.** Depends on the published bundle import path. Developer owns GitHub fetch/API/UI; native persistence ownership must be coordinated with Expert before overlapping runtime edits. [The specification](spec.md#github-sources-and-updates) owns update semantics.
+
+Acceptance criteria:
+- Track repository/path/immutable commit/digest, package keys, local mappings and baseline definition snapshots. Fetch outside native commits and apply the exact reviewed content. Settle bounded source-fetch and preview-retention rules before implementation.
+- Preview local/upstream differences and capabilities; whole-update conflicts protect locally changed fields, with an independent-copy alternative and no forced overwrite. Retain removed-upstream records without deletion/archive; new keys create new records, never name matches.
+- Require explicit capability-change approval, exclude imported connections/credentials/grants and show retained local connections/authority. Preserve existing instances.
+- One native commit appends revisions, updates provenance/mappings and saves a stable retry receipt. Expected revisions reject intervening local edits; settle request replay/fingerprint rules consistently with first-slice receipts.
+- Source/Pi/deslop review, TypeScript/application and applicable Nix builds, full diff/whitespace and changed links. Desktop/390 px UI and runtime fetch/update/conflict/replay/restart remain unverified until authorized evidence. Adding a developer changes no testing/deployment authorization. Project content export and operational backup remain separate work packages.
