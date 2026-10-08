@@ -221,6 +221,7 @@ export class AuthService {
   private readonly operations = new Set<Promise<unknown>>();
   private readonly operationContext = new AsyncLocalStorage<{ active: boolean }>();
   private accepting = true;
+  private lifecycleGeneration = 0;
   private closing?: Promise<void>;
 
   private readonly now = Date.now;
@@ -296,16 +297,21 @@ export class AuthService {
   }
 
   async quiesce(): Promise<void> {
+    ++this.lifecycleGeneration;
     this.accepting = false;
     await Promise.allSettled([...this.operations]);
   }
 
   async resume(): Promise<void> {
     if (this.closing) throw new Error("Authentication service is closing");
-    await this.quiesce();
+    const generation = ++this.lifecycleGeneration;
+    this.accepting = false;
+    await Promise.allSettled([...this.operations]);
+    if (generation !== this.lifecycleGeneration) return;
     await this.store.one("SELECT 1");
     if (this.closing) throw new Error("Authentication service is closing");
-    this.accepting = true;
+    // A later drain or resume supersedes this attempt, including while SQL awaited.
+    if (generation === this.lifecycleGeneration) this.accepting = true;
   }
 
   close(): Promise<void> {
