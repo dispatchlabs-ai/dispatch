@@ -1,7 +1,7 @@
 /*
  * Dispatch image generation: direct OpenAI Images API calls with injected
  * runtime auth (createImageGen(models)). Generation/editing only; evidence,
- * cancellation and workspace-containment behavior per the WP-042 review.
+ * cancellation and workspace containment follow the image-generation contract.
  */
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
@@ -203,14 +203,8 @@ export function createImageGen(models: Models) {
           throw new ToolError("The workspace imagegen directory resolves outside the workspace.");
 
         // Exclusive directory creation: a collision fails instead of reusing or overwriting.
-        let runDir: string | undefined;
-        let lastError: unknown;
-        for (let attempt = 0; attempt < 4 && !runDir; attempt++) {
-          const candidate = join(outputRoot, `${slugify(args.name)}-${api.conversationId}-${randomUUID()}`);
-          try { await mkdir(candidate); runDir = candidate; }
-          catch (error) { lastError = error; }
-        }
-        if (!runDir) throw lastError instanceof Error ? lastError : new ToolError("Could not create a unique run directory.");
+        const runDir = join(outputRoot, `${slugify(args.name)}-${api.conversationId}-${randomUUID()}`);
+        await mkdir(runDir);
         await mkdir(join(runDir, "outputs"));
         metadataPath = join(runDir, "metadata.json");
         record = {
