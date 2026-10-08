@@ -1,3 +1,4 @@
+import type { CriteriaDraft } from "./definition-of-done";
 import { ProjectArchiveImport } from "./project-archives";
 import { SecretsPage } from "./secrets";
 import { BundlesDialog } from "./bundles";
@@ -45,6 +46,7 @@ function initialTab(params: URLSearchParams): WorkspaceTab {
 export function Workspace() {
   const { state, api, auth, setState } = useSession();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [criteriaDrafts, setCriteriaDrafts] = useState<Record<string, CriteriaDraft | undefined>>({});
   const [section, setSection] = useState<WorkspaceSection>(searchParams.get("section") === "secrets" ? "secrets" : searchParams.get("section") === "connections" ? "connections" : "chats");
   const [visited, setVisited] = useState({ agents: false, security: false, secrets: searchParams.get("section") === "secrets", connections: searchParams.get("section") === "connections" });
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -236,7 +238,8 @@ export function Workspace() {
     const tab = tabs.find(item => item.id === tabId);
     const dirty = tab?.kind === "chat" ? [...new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions), ...Object.keys(attachmentDrafts.drafts)])].some(key => (key === tab.chatId || key.startsWith(`${tab.chatId}:`)) && (Boolean(drafts[key]?.trim()) || Boolean(pending[key]) || Boolean(mentions[key]?.length) || Boolean(attachmentDrafts.drafts[key]?.length))) : false;
     if (tab?.kind === "project" && projectEditing[tab.projectId]?.busy) return;
-    if (dirty || (tab?.kind === "project" && (projectEditing[tab.projectId] || projectSearch[tab.projectId]))) setClosingTab(tabId);
+    if (tab?.kind === "chat" && criteriaDrafts[tab.chatId]?.busy) return;
+    if (dirty || (tab?.kind === "chat" && criteriaDrafts[tab.chatId]) || (tab?.kind === "project" && (projectEditing[tab.projectId] || projectSearch[tab.projectId]))) setClosingTab(tabId);
     else closeTab(tabId);
   }
 
@@ -247,6 +250,7 @@ export function Workspace() {
       setProjectSearch(current => { const next = { ...current }; delete next[closing.projectId]; return next; });
     }
     if (closing?.kind === "chat") {
+      setCriteriaDrafts(current => ({ ...current, [closing.chatId]: undefined }));
       for (const key of new Set([...Object.keys(drafts), ...Object.keys(pending), ...Object.keys(mentions), ...Object.keys(attachmentDrafts.drafts)])) {
         if (key !== closing.chatId && !key.startsWith(`${closing.chatId}:`)) continue;
         messageRequests.current[key] = undefined;
@@ -467,6 +471,7 @@ export function Workspace() {
     editing={projectEditing[selectedProject.id] ?? null}
     onEditingChange={editing => setProjectEditing(current => ({ ...current, [selectedProject.id]: editing }))}
     onSaved={project => { setProjects(current => mergeProjects(current, [project])); void load(); }} /> : section === "agents" && !editingAgent && evaluationAgent === selectedAgent?.id ? <div className="agent-details">{!inDrawer ? <header className="context-header"><h2>Evaluation profile</h2></header> : null}<div className="context-body">{evaluationContext}</div></div> : section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : active.kind === "chat" && snapshot ? <SharedContextPanel agents={agents} key={snapshot.conversation.id} snapshot={snapshot} models={config?.models ?? []} threadId={threads[active.chatId] ?? null}
+    criteriaDraft={criteriaDrafts[active.chatId]} onCriteriaDraft={draft => setCriteriaDrafts(current => ({ ...current, [active.chatId]: draft }))}
     attachments={attachmentDrafts.drafts[`${active.chatId}:${threads[active.chatId]}`] ?? emptyAttachments}
     onAddFiles={files => attachmentDrafts.add(`${active.chatId}:${threads[active.chatId]}`, active.chatId, files)}
     onRemoveAttachment={id => attachmentDrafts.remove(`${active.chatId}:${threads[active.chatId]}`, id)}

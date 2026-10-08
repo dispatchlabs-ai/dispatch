@@ -28,6 +28,7 @@ export interface ChatSummary {
 }
 
 export interface ChatSnapshot {
+  definitionOfDone: { markdown: string; revision: number };
   conversation: ChatSummary;
   participants: ConversationParticipant[];
   messages: ConversationMessage[];

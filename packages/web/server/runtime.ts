@@ -497,6 +497,18 @@ export class DispatchRuntime {
     return this.getChat(scope, id);
   }
 
+  async saveDefinitionOfDone(scope: RuntimeScope, id: string, input: { markdown: string; expectedRevision: number }): Promise<ChatSnapshot> {
+    if (typeof input.markdown !== "string" || input.markdown.length > 20000 || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0) throw new RuntimeError(400, "Invalid completion criteria.");
+    await this.authorize(scope, id);
+    await this.harness.commit(async tx => {
+      const room = await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
+      const revision = room.definitionOfDone?.revision ?? 0;
+      if (revision !== input.expectedRevision) throw new RuntimeError(409, "Criteria changed. Review the saved version before saving again.");
+      room.definitionOfDone = { markdown: input.markdown.trim(), revision: revision + 1 };
+    }, context);
+    return this.getChat(scope, id);
+  }
+
   async renameChat(scope: RuntimeScope, id: string, title: string): Promise<ChatSnapshot> {
     title = title.trim();
     requireText(title, "Title", 200);
@@ -542,7 +554,7 @@ export class DispatchRuntime {
         ...(error ? { error } : {}),
       };
       // Compatibility carries no private native transcript, inbox, reasoning or agent context.
-      return { conversation, ...presentation, view: { conversation: (await tx.conversation(nativeId(id)))!, entries: [], docs: {} }, submissions: [] } as ChatSnapshot;
+      return { conversation, definitionOfDone: room.definitionOfDone ?? { markdown: "", revision: 0 }, ...presentation, view: { conversation: (await tx.conversation(nativeId(id)))!, entries: [], docs: {} }, submissions: [] } as ChatSnapshot;
     }, context);
   }
 

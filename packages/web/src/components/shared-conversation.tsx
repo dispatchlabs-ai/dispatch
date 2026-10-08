@@ -1,3 +1,4 @@
+import { DefinitionOfDone, type CriteriaDraft } from "./definition-of-done";
 import type { OpenInstanceForm } from "./add-instance";
 import { ATTACHMENT_IMAGE_MAX_BYTES } from "../shared/contracts";
 import { AttachmentPicker, DraftAttachments, type AttachmentComposerProps } from "./composer-attachments";
@@ -215,7 +216,8 @@ export function ConversationComposer({ id, chatId, active = true, draft, pending
   </div>;
 }
 
-export function SharedContextPanel({ snapshot, agents, models, threadId, draft, pending, error, mentions, onMentionsChange, onDraftChange, onSend, onInvite, onAddInstance, onSnapshot, onClose, showHeader = true, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment }: AttachmentComposerProps & {
+export function SharedContextPanel({ criteriaDraft, onCriteriaDraft, snapshot, agents, models, threadId, draft, pending, error, mentions, onMentionsChange, onDraftChange, onSend, onInvite, onAddInstance, onSnapshot, onClose, showHeader = true, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment }: AttachmentComposerProps & {
+  criteriaDraft?: CriteriaDraft; onCriteriaDraft: (draft: CriteriaDraft | undefined) => void;
   snapshot: ChatSnapshot; agents: AgentDefinition[]; models: ApplicationConfig["models"]; threadId: string | null;
   draft: string; pending?: PendingMessage; error?: string; mentions: string[]; onMentionsChange: (ids: string[]) => void;
   onDraftChange: (text: string) => void; onSend: (mentions: string[]) => void; onInvite: () => void; onAddInstance: OpenInstanceForm; onSnapshot: (snapshot: ChatSnapshot) => void; onClose: () => void; showHeader?: boolean;
@@ -249,6 +251,7 @@ export function SharedContextPanel({ snapshot, agents, models, threadId, draft, 
       </ConversationComposer>
       {stopError ? <Notice>{stopError}</Notice> : null}
     </> : <div className="participants-body">
+      <DefinitionOfDone snapshot={snapshot} draft={criteriaDraft} onDraft={onCriteriaDraft} onSnapshot={onSnapshot} />
       <Button className="invite-participants" variant="secondary" disabled={snapshot.conversation.canParticipate === false} onClick={onInvite}><UserPlus size={18} /> Add participants</Button>
       <Button variant="secondary" disabled={snapshot.conversation.canParticipate === false || !agents.some(agent => !agent.archived)} onClick={() => onAddInstance()}><UserPlus size={18} /> Add agent instance</Button>
       <div className="participant-list">{snapshot.participants.map(member => <button type="button" className={`participant-row ${participant?.id === member.id ? "selected" : ""}`} key={member.id} onClick={() => setSelectedId(member.id)} aria-pressed={participant?.id === member.id}>

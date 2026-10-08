@@ -198,6 +198,10 @@ export function createApp(options: AppOptions) {
     return c.json(await runtime.createChat(c.get("principal"), input), 201);
   });
   app.get("/api/chats/:id", async (c) => c.json(await runtime.getChat(c.get("principal"), c.req.param("id"))));
+  app.post("/api/chats/:id/definition-of-done", async (c) => {
+    const input = z.object({ markdown: z.string().max(20000), expectedRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }).strict().parse(await c.req.json());
+    return c.json(await runtime.saveDefinitionOfDone(c.get("principal"), c.req.param("id"), input));
+  });
   app.post("/api/chats/:id/title", async (c) => {
     const input = z.object({ title: z.string().trim().min(1).max(200) }).strict().parse(await c.req.json());
     return c.json(await runtime.renameChat(c.get("principal"), c.req.param("id"), input.title));
