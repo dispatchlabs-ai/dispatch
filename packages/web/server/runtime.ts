@@ -14,6 +14,8 @@ import { isManagedConnection } from "../src/shared/contracts.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata } from "./attachments.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
+import { createWebResearch } from "./extensions/web.js";
+import { createWebBackend } from "./web/backend.js";
 import { Skills, SkillBindingsDoc } from "./extensions/skills.js";
 import { imageGenerationSkill } from "./skills/image-generation.js";
 import { createImageGen } from "./extensions/image-gen.js";
@@ -114,6 +116,7 @@ export class DispatchRuntime {
       registry.install(CodingTools);
       registry.install(Coding);
       registry.install(Skills);
+      registry.install(createWebResearch(createWebBackend({ searchApiKey: process.env.EXA_API_KEY })));
       registry.install(createImageGen(models));
       connections = await AgentConnections.load(options.connectionsFile ?? join(owner.directory, "agent-connections.json"), registry, options.mcpConnections, options.companyId);
       const harness = await Harness.open(storage, {
