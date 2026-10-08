@@ -574,7 +574,7 @@ export class DispatchRuntime {
     await this.authorize(scope, id);
     return this.harness.commit(async tx => {
       await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
-      return (await this.shared.presentation(tx, nativeId(id), query)).page!;
+      return { ...(await this.shared.presentation(tx, nativeId(id), query)).page!, revision: this.commitRevision };
     }, context);
   }
 

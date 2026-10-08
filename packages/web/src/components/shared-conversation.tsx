@@ -7,14 +7,14 @@ import { describeAgentTools } from "../lib/agent-tools";
 import type { Message } from "@earendil-works/pi-ai";
 import { Tabs } from "@base-ui/react/tabs";
 import { ArrowUp, Check, Copy, Ear, LockKeyhole, Pencil, Reply, RotateCcw, Square, UserPlus, X } from "lucide-react";
-import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { AddParticipantsInput, AgentDefinition, AgentParticipant, ApplicationConfig, ChatSnapshot, CompanyPerson, ConversationMessage, ConversationParticipant, ParticipantActivity } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
 import type { PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
 import { useComposingPresence } from "../lib/composing";
 import { agentMentionPrefix, mentionUrl } from "../lib/mentions";
-import { toolActivities, toolOutput, type ToolActivity } from "../lib/tool-activity";
+import { toolActivities, type ToolActivity } from "../lib/tool-activity";
 import { AgentChoices, ParticipantAvatar } from "./conversation-people";
 import { Markdown } from "./markdown";
 import { MarkdownComposer } from "./markdown-composer";
@@ -57,13 +57,14 @@ function ParticipantContent({ author, participants, createdAt, showAuthor = true
 export function PublicMessage({ message, participants, replies = [], onThread, outputInActivity = false, selected = false, chatId }: {
   chatId?: string; message: ConversationMessage; participants: ConversationParticipant[]; replies?: ConversationMessage[]; selected?: boolean; onThread?: (id: string) => void; outputInActivity?: boolean;
 }) {
+  const { api } = useSession();
   const author = participants.find(participant => participant.id === message.authorId);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const timer = useRef<number | null>(null);
   const replyCount = message.replySummary?.count ?? replies.length;
   const replyAuthors = [...new Set(message.replySummary?.authorIds ?? replies.map(reply => reply.authorId))].map(id => participants.find(participant => participant.id === id)).filter((participant): participant is ConversationParticipant => Boolean(participant));
-  const lastReply = replies.reduce<ConversationMessage | undefined>((last, reply) => !last || reply.createdAt > last.createdAt ? reply : last, undefined);
+  const lastReplyAt = message.replySummary?.lastAt ?? replies.reduce((last, reply) => Math.max(last, reply.createdAt), 0);
   const detachedMentions = message.mentions.filter(id => !message.text.includes(`](${mentionUrl(id)})`));
   useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
   if (message.kind === "membership") return <p className="membership-event"><UserPlus size={14} aria-hidden="true" /><span>{message.text}</span><time dateTime={new Date(message.createdAt).toISOString()}>{formatTime(message.createdAt)}</time></p>;
@@ -81,14 +82,15 @@ export function PublicMessage({ message, participants, replies = [], onThread, o
       <div className="message-actions shared-message-actions" aria-label="Message actions">
         {onThread ? <IconButton label="Reply in thread" onClick={() => onThread(message.threadId || message.id)}><Reply size={15} /></IconButton> : null}
         <IconButton label={copied ? "Copied message" : "Copy message"} onClick={() => {
-          void navigator.clipboard.writeText(message.text).then(() => { setCopied(true); setCopyError(false); timer.current = window.setTimeout(() => setCopied(false), 2000); }).catch(() => setCopyError(true));
+          const text = message.truncated && chatId ? api<ConversationMessage>(`/api/chats/${encodeURIComponent(chatId)}/detail/message/${encodeURIComponent(message.id)}`).then(full => full.text) : Promise.resolve(message.text);
+          void text.then(value => navigator.clipboard.writeText(value)).then(() => { setCopied(true); setCopyError(false); timer.current = window.setTimeout(() => setCopied(false), 2000); }).catch(() => setCopyError(true));
         }}>{copied ? <Check size={15} /> : <Copy size={15} />}</IconButton>
       </div>
       {copyError ? <p className="message-copy-error" role="status">Couldn’t copy. Select the text to copy it.</p> : null}
       {replyCount && onThread ? <button type="button" className="thread-summary" onClick={() => onThread(message.id)} aria-label={`${replyCount} ${replyCount === 1 ? "reply" : "replies"}${replyAuthors.length ? ` from ${replyAuthors.map(author => author.name).join(", ")}` : ""}`} aria-expanded={selected}>
         <span className="thread-summary-avatars" aria-hidden="true">{replyAuthors.slice(0, 3).map(author => <ParticipantAvatar key={author.id} kind={author.kind} name={author.name} />)}</span>
         <span className="thread-summary-count">{replyCount} {replyCount === 1 ? "reply" : "replies"}</span>
-        {lastReply ? <span className="thread-summary-time">Last reply <time dateTime={new Date(lastReply.createdAt).toISOString()} title={new Date(lastReply.createdAt).toLocaleString()}>{formatTime(lastReply.createdAt)}</time></span> : null}
+        {lastReplyAt ? <span className="thread-summary-time">Last reply <time dateTime={new Date(lastReplyAt).toISOString()} title={new Date(lastReplyAt).toLocaleString()}>{formatTime(lastReplyAt)}</time></span> : null}
       </button> : null}
     </ParticipantContent>
   </article>;
@@ -141,20 +143,6 @@ export function PublicActivity({ activity, participants }: { activity: Participa
   </section>;
 }
 
-function repeatsBashOutput(message: ConversationMessage, activity: ParticipantActivity): boolean {
-  if (activity.messageId !== message.id || activity.participantId !== message.authorId || message.images?.length || message.attachments?.length) return false;
-  const results = activity.entries.flatMap(entry => entry.model ?? []).filter(message => message.role === "toolResult");
-  const last = results.at(-1);
-  if (!last || last.toolName !== "bash") return false;
-  const tools = toolActivities(activity.entries, activity.live);
-  const tool = [...tools.calls.values(), ...tools.results.values()].find(tool => tool?.result === last);
-  if (!tool) return false;
-  const output = toolOutput(tool).trim();
-  const text = message.text.trim();
-  const fenced = text.match(/^(`{3,}|~{3,})[^\n]*\n([\s\S]*?)\n\1$/);
-  return Boolean(output && (fenced?.[2] ?? text).trim() === output);
-}
-
 export const SharedTranscript = PagedTranscript;
 
 function formatTime(timestamp: number) { return new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
@@ -205,8 +193,6 @@ export function SharedContextPanel({ criteriaDraft, onCriteriaDraft, snapshot, a
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const participant = snapshot.participants.find(member => member.id === selectedId);
   useEffect(() => { setSelectedId(null); }, [snapshot.conversation.id, threadId]);
-  const root = snapshot.messages.find(message => message.id === threadId || (threadId && message.aliases?.includes(threadId)));
-  const replyCount = snapshot.messages.filter(message => message.threadId === (root?.id ?? threadId)).length;
   const scroller = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   useEffect(() => { atBottom.current = true; }, [threadId]);
@@ -216,7 +202,7 @@ export function SharedContextPanel({ criteriaDraft, onCriteriaDraft, snapshot, a
     {threadId ? <>
       <div className="thread-transcript" ref={scroller} onScroll={event => { const element = event.currentTarget; atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100; }}>
         
-        <SharedTranscript snapshot={snapshot} threadId={root?.id ?? threadId} />
+        <SharedTranscript snapshot={snapshot} threadId={threadId} />
         <ConversationPresence participants={snapshot.participants} />
       </div>
       <ConversationComposer attachments={attachments} onAddFiles={onAddFiles} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} id={`thread-${snapshot.conversation.id}-${threadId}`} chatId={snapshot.conversation.id} draft={draft} pending={pending} error={error} participants={snapshot.participants} agents={agents} mentions={mentions} onMentionsChange={onMentionsChange} onDraftChange={onDraftChange} onSend={onSend} onAddInstance={onAddInstance} disabled={snapshot.conversation.canParticipate === false} thread>

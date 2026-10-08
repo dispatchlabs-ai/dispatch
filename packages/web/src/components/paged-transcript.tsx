@@ -1,11 +1,11 @@
 import type { ActivityPage } from "../shared/activity-page";
 import { ToolActivityView } from "./tool-activity";
 import { Markdown } from "./markdown";
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ChatSnapshot, ConversationMessage, ParticipantActivity, TranscriptPage } from "../shared/contracts";
 import { useSession } from "../lib/session";
-import { errorMessage } from "../lib/api";
+import { ApiError, errorMessage } from "../lib/api";
 import { PublicActivity, PublicMessage } from "./shared-conversation";
 import { Button, Notice, Spinner } from "./ui";
 
@@ -40,6 +40,9 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
   const historyLoaded = useRef(false);
+  const inFlight = useRef(false);
+  const loadedRevision = useRef(-1);
+  const [expired, setExpired] = useState(false);
   const alive = useRef(true);
   const revision = useRef(snapshot.conversation.revision);
   revision.current = snapshot.conversation.revision;
@@ -49,6 +52,9 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
   const base = `/api/chats/${encodeURIComponent(snapshot.conversation.id)}`;
   const query = threadId ? `threadId=${encodeURIComponent(threadId)}&` : "";
   const load = useCallback(async (before?: string) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    const requestedRevision = revision.current;
     setLoading(true); setError(undefined);
     const scroll = getScrollElement();
     const first = virtualizer.getVirtualItems().find(item => item.end > (scroll?.scrollTop ?? 0));
@@ -56,13 +62,15 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
     try {
       const page = await api<TranscriptPage>(`${base}/history?${query}${before ? `before=${encodeURIComponent(before)}` : ""}`);
       if (!alive.current) return;
-      setRows(old => merge(old, items(page)));
+      if (page.generation !== (snapshot.history?.generation ?? page.generation)) return;
+      loadedRevision.current = page.revision ?? requestedRevision;
+      setRows(old => before ? merge(items(page), old) : merge(old, items(page)));
       if (before || !historyLoaded.current) setCursor(page.before);
       if (before) historyLoaded.current = true;
       if (page.root) { setRoot(page.root); setReplyCount(page.replyCount ?? 0); }
-    } catch (error) { if (alive.current) setError(errorMessage(error)); }
-    finally { if (alive.current) setLoading(false); }
-  }, [api, base, query, getScrollElement, virtualizer]);
+    } catch (error) { if (alive.current) { setError(errorMessage(error)); setExpired(error instanceof ApiError && error.code === "HISTORY_CHANGED"); } }
+    finally { inFlight.current = false; if (alive.current) setLoading(false); }
+  }, [api, base, query, getScrollElement, virtualizer, snapshot.history?.generation]);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => {
     if (!threadId) {
@@ -81,8 +89,8 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
   // Thread pages are bounded and refreshed only when the room revision changed.
   useEffect(() => {
     if (!threadId) return;
-    void load(); let seen = revision.current;
-    const timer = window.setInterval(() => { if (seen !== revision.current) { seen = revision.current; void load(); } }, 1000);
+    void load();
+    const timer = window.setInterval(() => { if (loadedRevision.current !== revision.current) void load(); }, 1000);
     return () => window.clearInterval(timer);
   }, [threadId, load]);
   useLayoutEffect(() => {
@@ -107,16 +115,20 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
     if (index >= 0) { virtualizer.scrollToIndex(index, { align: "start" }); const scroll = getScrollElement(); if (scroll) scroll.scrollTop += pending.offset; }
     anchor.current = undefined;
   }, [rows, virtualizer, getScrollElement]);
-  const participants = useMemo(() => snapshot.participants, [snapshot.participants]);
+  const participants = snapshot.participants;
   return <div ref={host} className="paged-transcript">
-    {root ? <><PublicMessage message={root} participants={participants} /><p className="thread-reply-count">{replyCount} {replyCount === 1 ? "reply" : "replies"}</p></> : null}
+    {root ? <><PublicMessage message={root} participants={participants} chatId={snapshot.conversation.id} /><p className="thread-reply-count">{replyCount} {replyCount === 1 ? "reply" : "replies"}</p></> : null}
     {cursor ? <Button variant="secondary" disabled={loading} onClick={() => void load(cursor)}>Load older</Button> : null}
     {loading ? <Spinner label="Loading history" /> : null}
-    {error ? <Notice>{error}<Button variant="secondary" onClick={() => void load(cursor ?? undefined)}>Retry</Button></Notice> : null}
+    {error ? <Notice>{error}<Button variant="secondary" onClick={() => { if (expired) { historyLoaded.current = false; setRows([]); setCursor(null); setExpired(false); } void load(expired ? undefined : cursor ?? undefined); }}>{expired ? "Reload history" : "Retry"}</Button></Notice> : null}
     <div ref={list} style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}>
       {virtualizer.getVirtualItems().map(row => {
         const item = rows[row.index]!;
+        const date = new Date(item.at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+        const previous = rows[row.index - 1];
+        const showDate = !previous || new Date(previous.at).toDateString() !== new Date(item.at).toDateString();
         return <div key={row.key} data-index={row.index} ref={virtualizer.measureElement} style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${row.start - scrollMargin}px)` }}>
+          {showDate ? <div className="transcript-date"><span>{date}</span></div> : null}
           <TimelineRow item={item} participants={participants} chatId={snapshot.conversation.id} activeThreadId={activeThreadId} onThread={onThread} />
         </div>;
       })}

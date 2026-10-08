@@ -28,7 +28,7 @@ export interface ChatSummary {
 }
 
 export interface TranscriptQuery { threadId?: string | null; before?: string }
-export interface TranscriptPage { generation: string; messages: ConversationMessage[]; activities: ParticipantActivity[]; before: string | null; threadId: string | null; root?: ConversationMessage; replyCount?: number }
+export interface TranscriptPage { revision?: number; generation: string; messages: ConversationMessage[]; activities: ParticipantActivity[]; before: string | null; threadId: string | null; root?: ConversationMessage; replyCount?: number }
 
 export interface ChatSnapshot {
   history?: { before: string | null; generation: string };
