@@ -1,10 +1,13 @@
 import { createHash } from "node:crypto";
 import { Client, types } from "pg";
+import { verifiedPostgresConfig } from "./tls.js";
 import { migrate } from "./migrations.js";
 import { verifyWorkerAccess } from "./worker-access.js";
 
 export type PostgresStorageOptions = {
   connectionString: string;
+  /** Explicit verified TLS trust; omission preserves legacy local configurations. */
+  ca?: string;
   storeId: string;
   /** Only backend-provisioned, RLS-bound workers use this mode; no schema migration privileges. */
   access?: "worker";
@@ -58,7 +61,7 @@ export class PostgresDatabase implements PostgresExecutor {
       throw new Error("PostgreSQL store ID must be 1–200 ASCII letters, digits, dots, underscores, colons or hyphens, starting with a letter or digit");
     }
     const client = new Client({
-      connectionString: options.connectionString,
+      ...(options.ca === undefined ? { connectionString: options.connectionString } : verifiedPostgresConfig(options.connectionString, options.ca)),
       application_name: "dispatch-pi-storage",
       connectionTimeoutMillis: 10_000,
       keepAlive: true,
