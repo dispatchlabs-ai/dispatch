@@ -1202,3 +1202,20 @@ Product wiki tools are unavailable to Documenter in this session; no wiki public
 
 
 **Request hardening follow-up:** `8ce93b5` caps both human HTTP invitation paths at 50 agent-definition targets per request, matching initial creation's existing bound. Documenter reviewed the two schema changes; Developer reports local integration and TypeScript/application and Apple Silicon Nix checks passing. The retained non-null assertion relies on successful `invite()`'s find-or-add invariant. Security Engineer reviewed `8ce93b5` and closed the low-severity finding with no remaining security issues from its source review. Oversized-request rejection has not been exercised at runtime. Existing archived-definition instances remain usable; only new instance creation rechecks definition availability.
+
+
+## WP-049 — Remove conversation agents
+
+**Authorized October 8, 2026; implementation in progress, functional acceptance outstanding.** Chris accepted per-instance removal with preserved history and fresh-instance human re-addition, then directed the team to implement together. Pi Durable Expert owns backend/shared contracts and integration, Developer participant UI/client wiring, and Documenter package documentation. Scope follows [agent removal](spec.md#removing-an-agent-from-a-conversation); no definition deletion, human removal or deployment is included.
+
+Agreed interface: `POST /api/chats/:id/participants/:participantId/remove`, empty body, returns a refreshed snapshot; retries address the same immutable participant ID. Agent snapshots expose `membership: "active" | "removing" | "removed"` and optional `removalError`. [Usage](usage-guide.md#removing-a-conversation-agent) explains the planned controls and boundaries.
+
+Acceptance criteria:
+- Authorize an authenticated participating human, excluding project read-all-only observers, cross-company callers, human targets and agent-tool self/asserted callers. Fence every delivery/publication/invitation path for an inactive agent, including already-running hooks and contribution final review.
+- Persist the per-member removal fence and durable cleanup together. Release its speaking reservations; abort/join its delivery/contribution tasks before aborting the native conversation. Retry/restart finishes cleanup or retains a retryable error without reactivation. Other agents and human send/drafts remain unaffected, including during conversation-wide Stop.
+- Retain messages, threads, historical mentions, native activity/configuration and attribution. Mark the member Removing/Removed; exclude inactive members from mention targets and active-work indicators. Never publish an unadmitted draft or private prepared attachment through cleanup.
+- Human re-addition via Participants or a definition mention creates a fresh current-definition instance. Agent invitations cannot reverse removal. Same-ID removal retries and concurrent removal/invitation must not revive or cancel the wrong instance.
+- Review source/Pi lifecycle and behavior-preserving simplification; run TypeScript/application and applicable Nix builds, full diff/whitespace and changed-document links. Build success does not qualify runtime cancellation, authorization or recovery.
+- Review rendered desktop/390 px controls, status, cleanup-error retry and historical identity; record unverified keyboard/touch/accessibility/runtime flows explicitly. The zero-tests policy remains active; request focused authorization before prohibited browser/runtime probes.
+
+Documentation records the accepted design and API agreement, not observed implementation. Wiki access returned HTTP 401 and no authenticated wiki tool is available to Documenter; intended product-history home is the established [repository wiki](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/). No wiki publication, runtime verification, tests or deployment is claimed.

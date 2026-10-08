@@ -309,6 +309,14 @@ Agents waiting to publish show **Listening**. An agent with the speaking turn sh
 - Restarting the service invokes native Pi recovery. An interrupted provider request can run again from its committed checkpoint, rather than continuing the exact streamed token; another provider charge is possible.
 - The right column follows the active main tab. Participants exposes each agent’s saved configuration and usage. Narrow screens expose navigation and context through panels; per-chat drafts remain in browser memory while switching layouts and tabs.
 
+### Removing a conversation agent
+
+**Approved workflow; implementation in progress ([WP-049](handoff.md#wp-049--remove-conversation-agents)).** Open Participants, select the agent, and choose **Remove**. Removal cancels only that instance's queued and running work; other agents continue. Its messages, tool history and saved identity remain visible. Removing becomes Removed when cleanup finishes; retry a reported cleanup failure. The agent stays fenced while cleanup is incomplete.
+
+Removal does not archive its company definition or undo file changes, external actions or charges. Unlike Stop all, sending a later message does not reactivate it. To add the definition again, explicitly invite it through Participants or an **Invite on send** definition mention. This starts a fresh instance with the current saved definition and full public history; the old instance remains historical. Agents cannot reverse the removal themselves. Human access is managed separately.
+
+The agreed endpoint is `POST /api/chats/:id/participants/:participantId/remove` with an empty body and refreshed snapshot response. Retry using the same participant ID, not a replacement instance's ID. Agent snapshots expose `membership` (`active`, `removing`, `removed`) and optional `removalError`. Only an authenticated participating human can remove an agent; project read-all access alone is insufficient.
+
 Sessions last at most twelve hours and expire after thirty minutes without an authenticated request. Stream heartbeats do not extend idle expiry. Expiry or revocation ends protected access; agent work remains owned by the service.
 
 The left rail selects Chats, Agents, or Account and changes both the sidebar and main content. It never adds tabs. Chats retains its open conversations and selected tab while you visit another section; open agent/account forms also remain in memory. Agents lists saved agents in its sidebar, and Account links to its settings sections. Reloading returns to Chats.
@@ -423,7 +431,7 @@ All `/api` access requires a fully authenticated session except the authenticati
 `POST /api/chats` accepts `agentDefinitionIds` (one or more), or the legacy singular `agentDefinitionId`. Message commands accept `threadId`, participant-ID `mentions`, and optional
 `agentMentions` containing at most 50 company agent-definition IDs. Participants
 invitation commands likewise accept at most 50 `agentDefinitionIds` per request.
-Existing instances are reused even after definition archival; only creating new
+Active instances are reused even after definition archival; only creating new
 instances requires an active definition. For an invitation mention,
 the draft Markdown uses `[@Name](mention:agent-definition%3A<encoded definition ID>)`.
 Submit the corresponding definition in `agentMentions`; do not put it in `mentions`.
