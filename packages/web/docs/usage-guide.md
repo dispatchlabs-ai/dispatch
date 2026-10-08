@@ -463,6 +463,10 @@ Authenticated JSON routes use base64 archive bytes, not multipart uploads:
 
 Reuse the same `requestId` and contents for the same import; changed contents under the same operation conflict. Use a new ID only for a deliberate additional copy. Native receipts are actor/company-scoped. Transport base64 increases request size and is not encryption. See [the first-slice contract](spec.md#first-archive-slice) for atomicity and compatibility requirements.
 
+### Host-installed capabilities
+
+Capabilities are distributed separately from agent bundles. Candidate `07563ae` provides private `@dispatch/pi-capabilities` JS/types for Pi Durable 1.0.4; it is not published to npm or automatically installed by import. Follow [the artifact README](../capabilities/README.md) for build/pack, provenance and approved-host integration. Explicit extension/tool selection and compatible host credentials/backend/environment remain required. Packaging checks do not verify installation, execution or restart.
+
 ## Project historical archives
 
 **Integrated candidate `124a4a6`; runtime/browser qualification pending.** Separate from agent ZIP bundles and installation recovery. The data-only UTF-8 JSON format is `dispatch-project-content`, version `1`, containing project name, public chats/threads, historical authors and referenced attachment bytes as canonical base64 with size/SHA-256 checks. Limits: 32 MiB serialized archive, 10 MiB/file, 100 chats, 10,000 messages and 1,000 files total. No ZIP extraction or executable installation.

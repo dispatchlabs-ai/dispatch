@@ -870,6 +870,12 @@ Append definition/skill revisions, update mappings/provenance and save the retry
 
 **Source-published October 8 at `ce244ca`; runtime/UI qualification pending.** Repository-owned starter definitions use the public bundle preview/import path, not private live-agent exports or a second seeding mechanism. Preserve the default agent and saved edits. Pi Durable Expert selected Developer-only for the first inventory: repository-owned guidance and coding capability, no live settings. Show the model choice before import; never silently rewrite a downloaded package model. Starter UI/packaging and GitHub fetch/UI are independent workstreams with coordinated bundle-dialog ownership. [The starter work package](handoff.md#starter-packages-and-onboarding--october-8-2026) owns the settled inventory, workflow and qualification.
 
+### Host capability artifact
+
+**Candidate `07563ae`; packaging evidence, not host/runtime qualification.** The private `@dispatch/pi-capabilities` version `0.1.0` artifact compiles the existing native coding/skills/web/image-generation modules with JavaScript/types and exact Pi AI/Durable `1.0.4` peers. It introduces no plugin loader, duplicate implementations, lifecycle scripts or bundle-triggered installation. [The artifact README](../capabilities/README.md) owns build/pack commands, exported factories, host responsibilities and qualification.
+
+Distribute reviewed tarballs with source commit and SHA-256; version alone is not immutable provenance. Install through the consuming host's approved deployment workflow, with scripts disabled, before native recovery. Installation is not authorization: explicitly select harness defaults and per-conversation extensions/tools so native all-installed defaults do not broaden unrelated agents' authority. Coding tools remain stock Pi; web retrieval requires an injected host backend. Credentials/environment remain host-owned. Agent bundles still contain requirements only.
+
 ### Project content and operational recovery
 
 Project export selects user content, history and attachments. Import requires explicit identity/access mapping; historical authorship does not grant destination membership or recreate running tasks. Imports create fresh local identities, exclude private model state and never turn historical messages into new submissions. Project-scoped resumable migration requires separate design; do not carve projects out of native Pi storage or invent task serialization.
