@@ -1317,3 +1317,17 @@ Acceptance criteria/evidence:
 - New implicit selections use Developer; committed creation retries retain original selections across the change. Explicit unavailable definitions still reject new creation.
 - Source review of the candidate informed these documentation updates. Pi Durable Expert confirmed the startup migration and rechecked the retry fixes: explicit selections are deduplicated, new requests retain omission intent, and legacy fallback is limited to historical/current default singletons. No remaining blockers were found in that source review. Integrated `nix develop --command npm run check`, `nix build --no-link`, and `nix flake check` passed on Apple Silicon (zero runnable flake checks; Linux omitted). Source/deslop and full-diff review passed; the existing large-chunk advisory remains. Documentation whitespace and 166 local file/anchor checks passed.
 - No tests, rendered review or deployment are claimed. Live migration, restart/retry recovery and Default-tag/archived-list browser behavior remain unverified under the standing check policy.
+
+
+## Bundled agent-browser and dogfood skills
+
+Chris authorized making upstream browser and exploratory-QA skills available within Dispatch. The selected scope is seed-once company-catalog text skills with explicit assignments and unchanged participant snapshots, not CLI installation, a Browser capability, automatic agent assignment or live rollout. Catalog names are **Agent browser** and **Dogfood**. Source/assembly, license, Dispatch NOTICE and hashed provenance are in [the source guide](../server/skills/agent-browser/README.md).
+
+Acceptance evidence:
+
+- Pinned upstream 0.38.2 core/trust-boundary and dogfood/report/taxonomy content is embedded in compiled text; optional filesystem references are explicitly unavailable. Dispatch guidance overrides unsafe examples and defaults without claiming credentials, targets or tools are authorized by a skill. Deslop and Security independently report assembled lengths of 46,937/21,299 characters, below the 50,000 limit. Security verified all six source hashes and reports final preface/provenance review without a blocker.
+- Pi Durable Expert source-reviewed company-scoped stable-ID insertion in the pre-recovery startup transaction; it preserves user-edited revisions, assignments and participant snapshots. Developer reports final integration/source review without a blocker and confirms existing loader output limits cover the texts. Documenter inspected the seed delta, assembled preface and documentation; whitespace and new local links checked.
+- Developer reports TypeScript/application builds passing (existing Vite chunk-size advisory only). Deployer reports Apple Silicon `nix build --no-link` and `nix flake check` passing from Git-indexed source; output contains compiled skill modules and byte-identical LICENSE/Dispatch NOTICE. Linux/container builds remain unverified.
+- Catalog/UI availability, assignment/loading, restart preservation and browser execution through these imported skills remain functionally unverified. The earlier disposable CLI pilot does not qualify this integration. Credential-safe enrollment/TOTP entry and useful full-use-case recording remain unresolved. No automated regression suite was introduced.
+
+Source publication remains pending. The running canonical checkout will not be fast-forwarded during this slice because its backend watcher would activate the change; local activation requires a separate rollout decision. No live service or global tooling changes were performed.

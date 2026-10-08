@@ -480,6 +480,18 @@ Only assigned skills are advertised to the model, which can call `load_skill` wi
 
 `GET /api/skills` returns the company's latest skill revisions. `POST /api/skills` creates or revises a text skill with name, description, instructions and requestId; updates also require id and expectedRevision. Agent saves accept `skills: [{ id, revision }]` (up to fifty). Text skills do not include uploaded files, package imports or automatically available scripts.
 
+#### Bundled browser and dogfood skills
+
+**Activation pending:** source integration does not update the running service. A separately approved rollout/startup is needed before these catalog entries are available in that installation.
+
+The browser-skill integration seeds **Agent browser** (agent-browser core) and **Dogfood** (exploratory QA) text playbooks from pinned upstream 0.38.2 once per company. In the agent editor, select the desired skill revisions and save the agent; neither skill is automatically assigned. Assign both for a QA agent that needs browser-operation and bug-reporting guidance. Existing participants keep their saved snapshots; use a new instance to receive newly saved assignments. Startup does not overwrite user-edited skill revisions.
+
+Loading either playbook requires no Files and commands capability, but **executing agent-browser does** require an authorized command tool and an independently installed, reviewed CLI, Chrome and recording prerequisites on the execution host. This integration supplies no Browser capability and installs nothing. Before use, check the executable/version and recording support; missing prerequisites are a blocker, not permission to install or upgrade tooling.
+
+Use only explicitly authorized targets/accounts. The current pilot uses disposable loopback state; broader targets need separate approval. Keep unique owned sessions, close them after the run, and retain account-bearing evidence privately under gitignored `.local/` with directories 0700/files 0600. Start recordings after authentication and scrub secrets/sensitive URLs before sharing. Verify actual outcomes: an exit code of zero or a “Saved” message is not a QA pass. Credential-safe enrollment/TOTP entry remains unverified; do not copy upstream secrets-in-CLI-arguments examples.
+
+Pinned upstream provenance, licensing and the distinction between upstream text and Dispatch guidance belong in [the source provenance guide](../server/skills/agent-browser/README.md). Required dogfood report/taxonomy material is embedded; optional upstream filesystem references are not automatically available. General skill-package import and script execution remain unsupported.
+
 ### Shared projects
 
 Select a project to search its chats by title or show only Active chats. Status and last activity come from the current chat summaries. The right-hand Project details panel lists members and default agents; managers open Project settings there. On phones, open Details in the bottom bar. Search and settings drafts remain available while switching views.
