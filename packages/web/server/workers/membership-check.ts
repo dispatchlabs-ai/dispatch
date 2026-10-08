@@ -55,8 +55,7 @@ try {
   const chat = await directory.createChat(scope, { requestId: "human-room", agentDefinitionIds: [editor.id] });
   await directory.saveAgent(scope, { ...draft, id: editor.id, expectedRevision: 1, name: "Editor v2" });
   const bootstrap = async (id: string, storeId: string): Promise<ConversationWorkerBootstrap> => ({ conversationKey: id, storeId,
-    ...await directory!.directoryChatBootstrap(scope, id), initialAgentRevisions: await directory!.workerInitialAgentRevisions(scope, id),
-    catalog: await directory!.exportWorkerCatalog(scope.companyId), membership: await directory!.directoryWorkerMembership(scope, id) });
+    ...await directory!.directoryChatBootstrap(scope, id), ...await directory!.directoryWorkerBootstrap(scope.companyId, id) });
   const boot = await bootstrap(chat.conversation.id, `membership:${randomUUID()}`);
   const workerOptions = { ...common, stateDir: join(workspaceDir, "state"), attachmentStore: new AttachmentStore(join(root, "artifacts")), piStorage: await provisioner.ensure(boot.storeId) };
   worker = await DispatchRuntime.openConversation(workerOptions, boot);
@@ -123,11 +122,73 @@ try {
   passed.push("Actual Pi invitation tool uses backend actor authority and reconciles membership without a transaction callback deadlock");
   passed.push("Forged nonparticipant inviter and direct worker invitation bypass fail closed");
   await worker.close(); worker = undefined;
+  // Preserve immutable routing before removing the creator. Exercise both a not-yet-started
+  // room and an existing store, using the same current backend projection in each case.
+  let project = await directory.createProject(scope, { kind: "shared", name: "Revocation", requestId: "project" });
+  project = await directory.saveProject(scope, project.id, { requestId: "add-manager", expectedRevision: project.revision!, name: project.name,
+    members: [{ userId: scope.userId, role: "manager" }, { userId: invitedScope.userId, role: "manager" }], defaultAgentDefinitionIds: [] });
+  const cold = await directory.createChat(scope, { requestId: "cold-project", sharedProjectId: project.id, agentDefinitionIds: [] });
+  const warm = await directory.createChat(scope, { requestId: "warm-project", sharedProjectId: project.id, agentDefinitionIds: [] });
+  const coldBoot = await bootstrap(cold.conversation.id, `cold:${randomUUID()}`);
+  const warmBoot = await bootstrap(warm.conversation.id, `warm:${randomUUID()}`);
+  const warmOptions = { ...workerOptions, piStorage: await provisioner.ensure(warmBoot.storeId) };
+  await rm(workspaceDir, { recursive: true }); await mkdir(workspaceDir);
+  worker = await DispatchRuntime.openConversation(warmOptions, warmBoot);
+  const warmRoomId = (await worker.workerBinding()).roomId;
+  await worker.getChat(scope, warmRoomId);
+  await worker.close(); worker = undefined;
+  project = await directory.saveProject(invitedScope, project.id, { requestId: "remove-creator", expectedRevision: project.revision!, name: project.name,
+    members: [{ userId: invitedScope.userId, role: "manager" }], defaultAgentDefinitionIds: [] });
+  await assert.rejects(directory.directoryWorkerMembership(scope, cold.conversation.id));
+  await assert.rejects(directory.directoryWorkerBootstrap("wrong-company", cold.conversation.id));
+  await directory.close(); directory = await DispatchRuntime.open(directoryOptions);
+  // Recovery needs no live people-directory lookup for the removed creator.
+  const absentCreator = { ...common.peopleDirectory, get: async (_company: string, id: string) => id === scope.userId ? null : people.find(person => person.id === id) ?? null };
+  for (const original of [coldBoot, warmBoot]) {
+    const current = await directory.directoryWorkerBootstrap(scope.companyId, original.conversationKey);
+    assert.equal(current.creator.id, scope.userId);
+    assert.deepEqual(current.catalog.sharedProjects.find(item => item.id === project.id)!.members, project.members);
+    await rm(workspaceDir, { recursive: true }); await mkdir(workspaceDir);
+    worker = await DispatchRuntime.openConversation({ ...workerOptions, peopleDirectory: absentCreator,
+      piStorage: await provisioner.ensure(original.storeId) }, { ...original, ...current });
+    const roomId = (await worker.workerBinding()).roomId;
+    if (original === warmBoot) assert.equal(roomId, warmRoomId);
+    await worker.getChat(invitedScope, roomId);
+    await worker.submit(invitedScope, roomId, { requestId: "remaining-member", text: "Still authorized" });
+    await assert.rejects(worker.getChat(scope, roomId));
+    await assert.rejects(worker.submit(scope, roomId, { requestId: "revoked-member", text: "Forbidden" }));
+    await assert.rejects(worker.downloadAttachment(scope, roomId, randomUUID()));
+    await worker.close(); worker = undefined;
+  }
+  passed.push("Atomic route-bound bootstrap supports first start and fresh-disk replacement after creator revocation without restoring read/write access");
+  // Race real directory operations against projection reads; every exported pin must be
+  // resolvable in its accompanying catalog, regardless of where the transaction is ordered.
+  const concurrentChat = await directory.createChat(scope, { requestId: "concurrent-room", agentDefinitionIds: [] });
+  const projections = [];
+  const edits = (async () => {
+    for (let i = 0; i < 3; i++) {
+      const agent = await directory!.saveAgent(scope, { ...draft, name: `Concurrent ${i}` });
+      await directory!.inviteWorkerParticipants(scope, concurrentChat.conversation.id, { requestId: `concurrent-${i}`, agentDefinitionIds: [agent.id] });
+    }
+  })();
+  for (let i = 0; i < 12; i++) projections.push(await directory.directoryWorkerBootstrap(scope.companyId, concurrentChat.conversation.id));
+  await edits;
+  projections.push(await directory.directoryWorkerBootstrap(scope.companyId, concurrentChat.conversation.id));
+  assert.equal(projections.at(-1)!.membership.agents.length, 3);
+  for (const projection of projections) for (const pin of projection.membership.agents) {
+    assert.equal(projection.initialAgentRevisions[pin.definitionId], pin.revision);
+    assert(projection.catalog.agents.some(agent => agent.id === pin.definitionId && agent.revision === pin.revision));
+  }
+  passed.push("Concurrent definition/invitation writes and atomic bootstrap reads retain matching catalog, membership and revision pins");
   worker = await DispatchRuntime.open({ ...common, stateDir: join(root, "native") });
   const nativeRoom = await worker.createChat(scope, { requestId: "native-room", agentDefinitionIds: [] });
   await worker.addParticipants(scope, nativeRoom.conversation.id, { requestId: "native-invite", userIds: [invitedScope.userId], agentDefinitionIds: ["default"] });
   assert.equal((await worker.getChat(invitedScope, nativeRoom.conversation.id)).participants.length, 3);
-  passed.push("Native human/agent invitations remain local and preserve access");
+  const nativeProject = await worker.createProject(scope, { kind: "shared", requestId: "native-project", name: "Native" });
+  await worker.saveProject(scope, nativeProject.id, { requestId: "native-remove", expectedRevision: nativeProject.revision!, name: nativeProject.name,
+    members: [{ userId: invitedScope.userId, role: "manager" }], defaultAgentDefinitionIds: [] });
+  await assert.rejects(worker.createChat(scope, { requestId: "native-denied", sharedProjectId: nativeProject.id, agentDefinitionIds: [] }));
+  passed.push("Native human/agent invitations remain local and unauthorized native project creation still fails");
   console.log(JSON.stringify({ scope: "directory/worker runtime APIs and real Pi invitation tool; disposable SQLite/scoped PostgreSQL and scripted model, not HTTP/Docker acceptance", passed }, null, 2));
 } finally {
   await worker?.close(); await directory?.close(); await provisioner?.close(); await admin?.end();
