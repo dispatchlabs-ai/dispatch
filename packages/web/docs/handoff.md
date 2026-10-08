@@ -1441,7 +1441,7 @@ Integrated `nix develop --command npm run check`, Apple Silicon `nix build --no-
 
 ## Project content portability — October 8, 2026
 
-**Assigned to Developer; first historical-archive contract approved by Pi Durable Expert, implementation pending.** Chris asked the team to continue the remaining portability scope. Pi Durable Expert reviews native boundaries; Documenter maintains contracts/usage. Use a separate worktree and coordinate runtime/shared-file ownership before edits. [The specification](spec.md#project-content-and-operational-recovery) owns the content/recovery distinction.
+**Source-published at `64298d7`; runtime/UI qualification pending.** Chris asked the team to continue the remaining portability scope. Pi Durable Expert reviews native boundaries; Documenter maintains contracts/usage. Use a separate worktree and coordinate runtime/shared-file ownership before edits. [The specification](spec.md#project-content-and-operational-recovery) owns the content/recovery distinction.
 
 Acceptance criteria:
 - Manager-only selected public chats/threads and historical author labels; only publicly referenced attachments, missing bytes reject export, manager access rechecked before return. Destination has only importing-human manager and no default agents; preview authorship separately. Settle archive limits before implementation.
@@ -1451,7 +1451,7 @@ Acceptance criteria:
 
 ## Installation backup and restore — October 8, 2026
 
-**Assigned to Dev 2; first offline-SQLite contract approved by Pi Durable Expert, implementation pending.** Pi Durable Expert reviews recovery ownership; Documenter owns operator guidance. This is a restricted installation recovery set, not project sharing or visible-message export.
+**Source-published at `64298d7`; functional qualification pending.** Pi Durable Expert reviews recovery ownership; Documenter owns operator guidance. This is a restricted installation recovery set, not project sharing or visible-message export.
 
 Acceptance criteria:
 - First slice is offline SQLite, explicitly rejecting PostgreSQL. Include state/workspace/Pi credentials/external connection configuration and SQLite sidecars; reject symlinks/special files and overlapping trees. Identify every writer; runtime-directory locking alone does not establish a consistent recovery boundary.
@@ -1468,7 +1468,7 @@ Project UI candidate `124a4a6`: Documenter inspected archive selection/full-cont
 
 ## Native capability artifact — October 8, 2026
 
-**Pi Durable Expert owns artifact/README; candidate `07563ae`, integration pending.** [The artifact README](../capabilities/README.md) owns procedures; [the web contract](spec.md#host-capability-artifact) owns its relationship to bundles. Documenter inspected package export/file allowlists, exact 1.0.4 peers, no lifecycle scripts and same-source compiler inputs. Expert reports TypeScript/application and actual tarball/content inspection passing (12 expected files, no runtime/auth state); Nix attempts interrupted/rerunning, no pass claimed yet. Source provenance plus tarball digest is required. Host installation/execution/recovery, network/provider/credential integration remain unverified. No new executor, plugin loader or import-triggered installation is introduced.
+**Pi Durable Expert owns artifact/README; source-published at `64298d7`, host/runtime qualification pending.** [The artifact README](../capabilities/README.md) owns procedures; [the web contract](spec.md#host-capability-artifact) owns its relationship to bundles. Documenter inspected package export/file allowlists, exact 1.0.4 peers, no lifecycle scripts and same-source compiler inputs. Expert reports TypeScript/application and actual tarball/content inspection passing (12 expected files, no runtime/auth state); Nix attempts interrupted/rerunning, no pass claimed yet. Source provenance plus tarball digest is required. Host installation/execution/recovery, network/provider/credential integration remain unverified. No new executor, plugin loader or import-triggered installation is introduced.
 
 ## Local integration secrets — October 8
 
@@ -1483,6 +1483,8 @@ Visual evidence: Developer captured the authenticated disposable preview at 1440
 
 ### Integrated portability closeout — October 8, 2026
 
-Integrated candidate `7a26350` includes project history archives, offline SQLite recovery with synced completion publication, and native capability packaging. Reconciled current main's owner-scoped secrets work without removing its UI or documentation. Expert approved the reviewed native admission/recovery paths; the reported missing archive parent-directory sync was retracted after inspecting `124a4a6`, where it was already present. Source/deslop review preserves inert history, current authorization rechecks, immutable blob-before-pointer admission and retry receipts; capability packaging uses existing implementations, not a plugin runtime.
+Remote `main` publication at `64298d7` was independently verified by Documenter. The first-version source scope is delivered; qualification is not complete. Procedures and limitations are in [usage](usage-guide.md#project-historical-archives), [recovery guidance](usage-guide.md#offline-installation-recovery) and [capability README](../capabilities/README.md). Earlier candidate notes retain their historical evidence; this closeout supersedes their integration-pending status.
+
+Source-published `64298d7` (integrated candidate `7a26350`) includes project history archives, offline SQLite recovery with synced completion publication, and native capability packaging. Reconciled current main's owner-scoped secrets work without removing its UI or documentation. Expert approved the reviewed native admission/recovery paths; the reported missing archive parent-directory sync was retracted after inspecting `124a4a6`, where it was already present. Source/deslop review preserves inert history, current authorization rechecks, immutable blob-before-pointer admission and retry receipts; capability packaging uses existing implementations, not a plugin runtime.
 
 Combined TypeScript/application/capability builds, Apple Silicon Nix build and flake check passed after reconciliation (zero runnable flake checks; Linux omitted). Whitespace reviewed. No portability API/runtime/browser probes, recovery execution, live-state changes or service stops were performed. Desktop/390 px rendering, keyboard/touch/contrast/accessibility, import/retry/restart, recovery correctness and independent-host capability execution remain unverified pending explicit authorization. The separate secrets visual evidence above does not qualify these portability screens. Publication is separate from deployment. PostgreSQL recovery and resumable project-task migration remain outside this first version.

@@ -465,11 +465,11 @@ Reuse the same `requestId` and contents for the same import; changed contents un
 
 ### Host-installed capabilities
 
-Capabilities are distributed separately from agent bundles. Candidate `07563ae` provides private `@dispatch/pi-capabilities` JS/types for Pi Durable 1.0.4; it is not published to npm or automatically installed by import. Follow [the artifact README](../capabilities/README.md) for build/pack, provenance and approved-host integration. Explicit extension/tool selection and compatible host credentials/backend/environment remain required. Packaging checks do not verify installation, execution or restart.
+Capabilities are distributed separately from agent bundles. Source-published `64298d7` includes private `@dispatch/pi-capabilities` JS/types for Pi Durable 1.0.4; it is not published to npm or automatically installed by import. Follow [the artifact README](../capabilities/README.md) for build/pack, provenance and approved-host integration. Explicit extension/tool selection and compatible host credentials/backend/environment remain required. Packaging checks do not verify installation, execution or restart.
 
 ## Project historical archives
 
-**Integrated candidate `124a4a6`; runtime/browser qualification pending.** Separate from agent ZIP bundles and installation recovery. The data-only UTF-8 JSON format is `dispatch-project-content`, version `1`, containing project name, public chats/threads, historical authors and referenced attachment bytes as canonical base64 with size/SHA-256 checks. Limits: 32 MiB serialized archive, 10 MiB/file, 100 chats, 10,000 messages and 1,000 files total. No ZIP extraction or executable installation.
+**Source-published at `64298d7`; runtime/browser qualification pending.** Separate from agent ZIP bundles and installation recovery. The data-only UTF-8 JSON format is `dispatch-project-content`, version `1`, containing project name, public chats/threads, historical authors and referenced attachment bytes as canonical base64 with size/SHA-256 checks. Limits: 32 MiB serialized archive, 10 MiB/file, 100 chats, 10,000 messages and 1,000 files total. No ZIP extraction or executable installation.
 
 Export requires project-manager access, selects chat IDs and rechecks authorization/membership before return; missing referenced bytes fail rather than creating an incomplete archive. Inspect content and historical author labels before sharing. Import creates a new project with only the importing human as manager, no default agents, source memberships or private model state. History remains read-only, not resumed conversations or new submissions.
 
@@ -490,7 +490,7 @@ Preview is a summary, not a durable reviewed-content token; import sends the arc
 
 ## Offline installation recovery
 
-**CLI candidates `1291f49` + `b3be52a`; source-reviewed instructions, not verified recovery.** This is secret-bearing installation material, not a shareable project archive. SQLite only; PostgreSQL, symlinks/special files and overlapping roots are rejected. See [recovery contract](spec.md#project-content-and-operational-recovery) and [acceptance evidence](handoff.md#installation-backup-and-restore--october-8-2026).
+**CLI source-published at `64298d7`; source-reviewed instructions, not verified recovery.** This is secret-bearing installation material, not a shareable project archive. SQLite only; PostgreSQL, symlinks/special files and overlapping roots are rejected. See [recovery contract](spec.md#project-content-and-operational-recovery) and [acceptance evidence](handoff.md#installation-backup-and-restore--october-8-2026).
 
 Before any authorized operational use, stop supervisors, services, auth CLI, provider refreshers and every other writer. The runtime lock is only an additional guard. Fence the original executor before recovery. These acknowledgments are operator assertions, not automatic shutdown/proof; documentation does not authorize stopping a live service.
 
