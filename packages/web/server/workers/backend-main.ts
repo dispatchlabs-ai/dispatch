@@ -39,11 +39,6 @@ if (tls) createSecureContext(tls);
 const storeUrl = (await readFile(workerConfig.postgresStores.adminUrlFile, "utf8")).trim();
 const storeCa = workerConfig.postgresStores.caFile === undefined ? undefined : await readFile(workerConfig.postgresStores.caFile, "utf8");
 if (storeCa !== undefined) verifiedPostgresConfig(storeUrl, storeCa);
-const artifacts = await S3Artifacts.open(workerConfig.artifacts);
-const workerKey = (await readFile(workerConfig.workerKeyFile, "utf8")).trim();
-const stores = await WorkerStoreProvisioner.open({ connectionString: storeUrl, ca: storeCa, installationId: workerConfig.installationId, credentialKey: workerKey });
-const launcherToken = (await readFile(workerConfig.launcherTokenFile, "utf8")).trim();
-const operatorToken = (await readFile(workerConfig.operatorTokenFile, "utf8")).trim();
 if (workerConfig.directoryStoreConfigFile !== undefined) {
   if (["DISPATCH_PI_STORAGE", "DISPATCH_POSTGRES_URL", "DISPATCH_POSTGRES_STORE_ID"].some(name => process.env[name] !== undefined))
     throw new Error("directoryStoreConfigFile cannot be combined with legacy Pi storage environment settings.");
@@ -52,6 +47,11 @@ if (workerConfig.directoryStoreConfigFile !== undefined) {
 const config = readConfig();
 const directoryStorage = workerConfig.directoryStoreConfigFile === undefined ? config.piStorage
   : await readDirectoryStoreConfig(workerConfig.directoryStoreConfigFile);
+const artifacts = await S3Artifacts.open(workerConfig.artifacts);
+const workerKey = (await readFile(workerConfig.workerKeyFile, "utf8")).trim();
+const stores = await WorkerStoreProvisioner.open({ connectionString: storeUrl, ca: storeCa, installationId: workerConfig.installationId, credentialKey: workerKey });
+const launcherToken = (await readFile(workerConfig.launcherTokenFile, "utf8")).trim();
+const operatorToken = (await readFile(workerConfig.operatorTokenFile, "utf8")).trim();
 await mkdir(config.stateDir, { recursive: true, mode: 0o700 });
 await mkdir(config.workspaceDir, { recursive: true, mode: 0o700 });
 const provider = await openModels();
