@@ -39,6 +39,8 @@ export function AgentEvaluation({ agentId, readOnly, onGuardChange }: {
   }
   async function save() {
     if (!draft || readOnly || busy) return;
+    const missingCriteria = draft.cases.find(item => !item.criterionIds.length);
+    if (missingCriteria) { setError(`Select at least one applicable criterion for case "${missingCriteria.name || "Unnamed case"}".`); return; }
     setBusy(true); setError(null); setConflict(false);
     const body = { ...draft, expectedRevision: data?.profile?.revision ?? null, changeReason: reason };
     const fingerprint = JSON.stringify(body);
