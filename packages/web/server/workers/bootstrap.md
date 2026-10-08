@@ -10,7 +10,7 @@ Container command:
 dispatch-bootstrap backend
 ```
 
-Supported roles are `backend`, `launcher`, `auth` and `provider-auth`. Remaining arguments pass directly to that role's entrypoint. The authentication CLIs retain their existing stopped-owner requirements; the wrapper does not make concurrent maintenance safe. Use Node 24 on Linux; the wrapper replaces its process using `process.execve`, preserving PID, stdio and signal delivery without a shell or supervising child.
+Supported roles are `backend`, `launcher`, `auth`, `provider-auth` and operator-only [`database-init`](database-init.md). Remaining arguments pass directly to that role's entrypoint. The authentication CLIs retain their existing stopped-owner requirements; the wrapper does not make concurrent maintenance safe. Use Node 24 on Linux; the wrapper replaces its process using `process.execve`, preserving PID, stdio and signal delivery without a shell or supervising child.
 
 `DISPATCH_BOOTSTRAP_FILES` is a **public** JSON object mapping flat output names to environment sources. For example (names only; no secret values):
 

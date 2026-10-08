@@ -49,6 +49,9 @@ buildNpmPackage {
     test -f "$app/packages/web/build/service/server/workers/bootstrap-main.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-bootstrap" \
       --add-flags "$app/packages/web/build/service/server/workers/bootstrap-main.js"
+    test -f "$app/packages/web/build/service/server/workers/database-init-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-database-init" \
+      --add-flags "$app/packages/web/build/service/server/workers/database-init-main.js"
     test -f "$app/packages/web/build/service/server/workers/backend-main.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-backend" \
       --add-flags "$app/packages/web/build/service/server/workers/backend-main.js"
