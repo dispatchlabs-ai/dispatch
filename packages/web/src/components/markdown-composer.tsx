@@ -1,7 +1,9 @@
+import { Bold, Italic, Code, List, ListOrdered } from "lucide-react";
+import { IconButton } from "./ui";
 import type { OpenInstanceForm } from "./add-instance";
 import { $isCodeNode, CodeNode } from "@lexical/code";
 import { LinkNode } from "@lexical/link";
-import { ListItemNode, ListNode } from "@lexical/list";
+import { $isListNode, INSERT_ORDERED_LIST_COMMAND, INSERT_UNORDERED_LIST_COMMAND, REMOVE_LIST_COMMAND, ListItemNode, ListNode } from "@lexical/list";
 import { $convertFromMarkdownString, $convertSelectionToMarkdownString, $convertToMarkdownString, $generateNodesFromMarkdownString, TRANSFORMERS, type Transformer } from "@lexical/markdown";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
@@ -14,8 +16,8 @@ import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPl
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
-import { $findMatchingParent, $getSelection, $isRangeSelection, $isTextNode, CLEAR_HISTORY_COMMAND, COMMAND_PRIORITY_HIGH, COMMAND_PRIORITY_NORMAL, COPY_COMMAND, CUT_COMMAND, INSERT_PARAGRAPH_COMMAND, KEY_ENTER_COMMAND, PASTE_COMMAND, SKIP_DOM_SELECTION_TAG } from "lexical";
-import { useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
+import { $findMatchingParent, $getSelection, $isRangeSelection, $isTextNode, FORMAT_TEXT_COMMAND, CLEAR_HISTORY_COMMAND, COMMAND_PRIORITY_HIGH, COMMAND_PRIORITY_NORMAL, COPY_COMMAND, CUT_COMMAND, INSERT_PARAGRAPH_COMMAND, KEY_ENTER_COMMAND, PASTE_COMMAND, SKIP_DOM_SELECTION_TAG } from "lexical";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { MentionParticipant } from "../lib/mentions";
 import { $getMentionIds, MentionNode, mentionTransformers } from "./mention-node";
 import { MentionsPlugin } from "./mentions";
@@ -60,6 +62,7 @@ export function MarkdownComposer(props: MarkdownComposerProps) {
     },
     onError: error => { throw error; },
   }}>
+    {!conversation ? <DocumentToolbar disabled={props.disabled || props.readOnly} /> : null}
     <div className="composer-editor">
       <RichTextPlugin ErrorBoundary={LexicalErrorBoundary} contentEditable={<ContentEditable
         id={props.id}
@@ -85,6 +88,23 @@ export function MarkdownComposer(props: MarkdownComposerProps) {
     {conversation ? <MentionsPlugin people={conversation.participants} instanceChoices={conversation.instanceChoices} onAddInstance={conversation.onAddInstance} /> : null}
     <ComposerSync {...props} transformers={transformers} />
   </LexicalComposer>;
+}
+
+function DocumentToolbar({ disabled }: { disabled: boolean }) {
+  const [editor] = useLexicalComposerContext();
+  const [format, setFormat] = useState({ bold: false, italic: false, code: false, list: "" });
+  useEffect(() => editor.registerUpdateListener(({ editorState }) => editorState.read(() => {
+    const selection = $getSelection();
+    if (!$isRangeSelection(selection)) return;
+    const list = $findMatchingParent(selection.anchor.getNode(), $isListNode);
+    setFormat({ bold: selection.hasFormat("bold"), italic: selection.hasFormat("italic"), code: selection.hasFormat("code"), list: $isListNode(list) ? list.getListType() : "" });
+  })), [editor]);
+  return <div className="document-toolbar" role="group" aria-label="Text formatting">
+    {([ ["bold", "Bold", Bold], ["italic", "Italic", Italic], ["code", "Inline code", Code] ] as const).map(([key, label, Icon]) => <IconButton key={key} label={label} disabled={disabled} aria-pressed={format[key]} onMouseDown={event => event.preventDefault()} onClick={() => { editor.dispatchCommand(FORMAT_TEXT_COMMAND, key); editor.focus(); }}><Icon size={17} /></IconButton>)}
+    <IconButton label="Bulleted list" disabled={disabled} aria-pressed={format.list === "bullet"} onMouseDown={event => event.preventDefault()} onClick={() => { editor.dispatchCommand(format.list === "bullet" ? REMOVE_LIST_COMMAND : INSERT_UNORDERED_LIST_COMMAND, undefined); editor.focus(); }}><List size={18} /></IconButton>
+    <IconButton label="Numbered list" disabled={disabled} aria-pressed={format.list === "number"} onMouseDown={event => event.preventDefault()} onClick={() => { editor.dispatchCommand(format.list === "number" ? REMOVE_LIST_COMMAND : INSERT_ORDERED_LIST_COMMAND, undefined); editor.focus(); }}><ListOrdered size={18} /></IconButton>
+    <span>Markdown</span>
+  </div>;
 }
 
 function ComposerSync(props: MarkdownComposerProps & { transformers: Transformer[] }) {
