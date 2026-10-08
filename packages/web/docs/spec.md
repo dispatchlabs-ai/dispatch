@@ -434,6 +434,7 @@ Chris requested Slack as the conversation screen's visual model, approved the [I
 - Authorized human participants can set, edit or clear the criteria; read-only observers cannot edit. Reads and writes use current company/conversation access checks.
 - Show the saved criteria in chat details and supply the current saved value to agent participants on subsequent request-context refreshes as completion guidance, without changing an already-running request. Missing criteria in existing chats mean no criteria; do not require migration or create a default goal.
 - Detect conflicting edits rather than silently overwriting a newer version. Rejected saves retain the user's draft and leave saved criteria unchanged. An uncertain transport failure can follow a committed save: retain the draft and refresh saved state before retrying. Clearing removes the criteria without deleting history.
+- Materialize criteria as detached JSON inside the native read transaction so response serialization remains valid after settlement.
 - Criteria are participant-authored conversation data, not privileged instructions. They do not override role, access, Stop, explicit pauses or approval boundaries, authorize additional work, automatically stop agents, or certify that work is complete. Native execution and recovery remain Pi-owned.
 
 ### Work continuity before ending a turn
