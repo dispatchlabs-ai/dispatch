@@ -1726,7 +1726,7 @@ Chris agreed to explicit opt-in editing after Developer and Pi Durable Expert di
 
 Acceptance criteria:
 - Per-agent **Edit Definition of Done** is disabled by default; only enabled active agent participants may mutate criteria through an agent-facing tool. Resolve current chat and actor from trusted native bindings, with no caller-supplied cross-chat authority.
-- Enforce current participation and capability permission at execution/mutation time. Reuse shared criteria storage, expected-revision conflict detection, 20,000-character limit and blank-clear behavior. Return detached values; preserve uncertain-response reconciliation.
+- Enforce current participation and capability permission at execution/mutation time. Reuse shared criteria storage, expected-revision conflict detection, 20,000-character limit and blank-clear behavior. Use a durable logical-edit receipt: identical recovery/retry returns the original detached result without another revision increment or overwriting newer criteria; changed input conflicts. Preserve uncertain-response reconciliation.
 - No automatic stop/completion, implicit work authorization, human impersonation or new execution machinery. Human editing remains available; observers remain read-only.
 - Source/deslop and independent native authorization/lifetime review; TypeScript/application and applicable Nix builds, whitespace and documentation links. Record runtime/tool/revocation/conflict evidence separately under the current testing policy; UI desktop/390 px review applies if capability controls change.
 
