@@ -6,6 +6,7 @@ import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import { DispatchRuntime, RuntimeError, type ConversationWorkerBootstrap, type WorkerCatalogSnapshot } from "../runtime.js";
 import { openModels } from "../model-auth.js";
+import { WriteAdmission } from "./admission.js";
 import { workerModels } from "./models.js";
 import { ATTACHMENT_RPC_MAX_BYTES, decodeAttachmentBytes, RemoteAttachmentStore } from "./attachments.js";
 import type { WorkerStoreConfig } from "./postgres-stores.js";
@@ -40,11 +41,13 @@ const runtime = await DispatchRuntime.openConversation({
 const binding = await runtime.workerBinding();
 if (!binding?.roomId) throw new Error("Worker room binding missing.");
 const roomId = String(binding.roomId);
+const admission = new WriteAdmission(false, async () => {});
 const app = new Hono();
 app.use("*", async (c, next) => {
   c.header("Cache-Control", "no-store");
   if (c.req.header("Origin") || !tokenMatches(env.DISPATCH_WORKER_TOKEN, c.req.header("Authorization"))) return c.json({ error: "Unauthorized" }, 401);
-  await next();
+  if (!admission.admitting) return c.json({ error: "Worker is closing" }, 503);
+  await admission.run(next);
 });
 app.use("*", bodyLimit({ maxSize: ATTACHMENT_RPC_MAX_BYTES, onError: c => c.json({ error: "Request too large" }, 413) }));
 app.get("/ready", c => c.json({ roomId, conversationId: env.DISPATCH_CONVERSATION_ID, attemptId: env.DISPATCH_WORKER_ATTEMPT_ID }));
@@ -100,8 +103,24 @@ app.onError((error, c) => {
 });
 const server = serve({ fetch: app.fetch, hostname: "0.0.0.0", port: 8831 });
 let closing = false;
+let summaryPending: Promise<void> | undefined;
+function publishSummary() {
+  if (closing || summaryPending) return;
+  summaryPending = admission.run(async () => {
+    const summary = await runtime.workerSummary();
+    await backend("/summary", summary);
+  }).catch(() => {
+    // Observations are idempotent; the next poll republishes durable state.
+    console.warn("Worker summary publication failed");
+  }).finally(() => { summaryPending = undefined; });
+}
+const summaryTimer = setInterval(publishSummary, 1_000);
+summaryTimer.unref();
+publishSummary();
 async function close() {
   if (closing) return; closing = true; server.close();
+  clearInterval(summaryTimer);
+  await admission.quiesce();
   console.info("Worker shutdown: runtime close started");
   await runtime.close();
   console.info("Worker shutdown: runtime close completed");
