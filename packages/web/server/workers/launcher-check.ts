@@ -72,6 +72,8 @@ try {
   launcher = await open();
   const recoveredCreate = await launcher.ensure(request("lost-create"));
   assert.equal(recoveredCreate.phase, "running");
+  assert.match(recoveredCreate.name, /^dispatch-worker-[a-f0-9]{40}$/);
+  assert(recoveredCreate.name.length <= 63);
   assert.equal(driver.calls.create, 1);
   assert.equal(driver.calls.start, 1);
   passed.push("lost create response reconciles same stopped container across reopen");
