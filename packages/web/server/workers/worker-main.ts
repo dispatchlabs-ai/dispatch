@@ -1,3 +1,4 @@
+import { cleanupSessionResources } from "@earendil-works/pi-ai";
 import { mkdir } from "node:fs/promises";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
@@ -104,6 +105,9 @@ async function close() {
   console.info("Worker shutdown: runtime close started");
   await runtime.close();
   console.info("Worker shutdown: runtime close completed");
+  // This process owns only this conversation. Release provider session sockets
+  // after Pi has joined execution and closed durable storage.
+  cleanupSessionResources();
   if ("closeAllConnections" in server) server.closeAllConnections();
   console.info("Worker shutdown: remaining resources", process.getActiveResourcesInfo());
 }
