@@ -134,7 +134,10 @@ Module `28a35fc` makes Cloud Map custom health checks explicit with
 `failure_threshold = 1` and records `rds.force_ssl = 1` with
 `apply_method = "pending-reboot"`. Empty custom-health blocks disappeared from
 AWS readback and triggered repeated discovery replacements; the implicit RDS
-apply method also drifted. These source corrections do not prove runtime health.
+apply method also drifted. Module `097d21b` also makes ECS's empty container
+arrays, `capabilities.add = []` and awsvpc host ports explicit: AWS supplies these
+on readback, and omitting them caused unnecessary task-definition replacements.
+These source corrections do not prove runtime health.
 Review exact state-backed actions and registrations before applying: replacing
 empty discovery services before activation does not authorize replacing services
 with live owners. Preserve partial state after failed apply and replan in place;
