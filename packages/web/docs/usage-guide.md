@@ -311,11 +311,11 @@ Agents waiting to publish show **Listening**. An agent with the speaking turn sh
 
 ### Removing a conversation agent
 
-**Approved workflow; implementation in progress ([WP-049](handoff.md#wp-049--remove-conversation-agents)).** Open Participants, select the agent, choose **Remove from conversation**, and confirm **Remove**. Removal cancels only that instance's queued and running work; other agents continue. Its messages, tool history and saved identity remain visible. Removing becomes Removed when cleanup finishes; retry a reported cleanup failure. The agent stays fenced while cleanup is incomplete. Re-addition during Removing returns a conflict; finish or retry cleanup first.
+**Implemented in candidate `54a9d3b`; runtime/UI qualification outstanding ([WP-049](handoff.md#wp-049--remove-conversation-agents)).** Open Participants, select the agent, choose **Remove from conversation**, and confirm **Remove**. Removal cancels only that instance's queued and running work; other agents continue. Its messages, tool history and saved identity remain visible. Removing becomes Removed when cleanup finishes; retry a reported cleanup failure. The agent stays fenced while cleanup is incomplete. Re-addition during Removing returns a conflict; finish or retry cleanup first.
 
 Removal does not archive its company definition or undo file changes, external actions or charges. Unlike Stop all, sending a later message does not reactivate it. To add the definition again, explicitly invite it through Participants or an **Invite on send** definition mention. This starts a fresh instance with the current saved definition and full public history; the old instance remains historical. Use a new invitation request ID for this deliberate re-addition; replaying the original successful invitation does not add it again. Agents cannot reverse the removal themselves. Human access is managed separately.
 
-The agreed endpoint is `POST /api/chats/:id/participants/:participantId/remove` with JSON body `{}` and refreshed snapshot response. Retry using the same participant ID, not a replacement instance's ID. Agent snapshots expose `membership` (`active`, `removing`, `removed`) and optional `removalError`. Only an authenticated participating human can remove an agent; project read-all access alone is insufficient.
+The endpoint is `POST /api/chats/:id/participants/:participantId/remove` with JSON body `{}` and refreshed snapshot response. Retry using the same participant ID, not a replacement instance's ID. Agent snapshots expose `membership` (`active`, `removing`, `removed`) and optional `removalError`. Only an authenticated participating human can remove an agent; project read-all access alone is insufficient.
 
 Sessions last at most twelve hours and expire after thirty minutes without an authenticated request. Stream heartbeats do not extend idle expiry. Expiry or revocation ends protected access; agent work remains owned by the service.
 
@@ -420,6 +420,7 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `POST /api/chats/:id/composing` | Publish expiring human typing presence; no draft text |
 | `GET /api/chats/:id/events` | SSE `snapshot` events; `session-ended` closes access on invalidation |
 | `GET /api/people` | Active company people available for invitation |
+| `POST /api/chats/:id/participants/:participantId/remove` | Remove one agent instance; JSON `{}`, refreshed snapshot on completion |
 | `POST /api/chats/:id/participants` | Invite company agents or people with an idempotent request ID |
 | `GET/POST /api/agent-management/grants` | Inspect company grant/change/save history / versioned human grant update or revocation |
 | `GET/POST /api/agents` | List company definitions / append a revision using optimistic concurrency |

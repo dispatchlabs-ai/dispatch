@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased — agent removal contract (implementation pending)
+## Unreleased — conversation agent removal
 
-- Record approved per-instance removal: fence participation, cancel native work durably, preserve history and require explicit human re-addition as a fresh instance. Implementation and qualification are tracked in [WP-049](docs/handoff.md#wp-049--remove-conversation-agents).
+- Add per-instance removal: fence participation, cancel native work durably, preserve history and require explicit human re-addition as a fresh instance after cleanup. Source/build checked; runtime and rendered UI remain unqualified. Evidence and outstanding acceptance are tracked in [WP-049](docs/handoff.md#wp-049--remove-conversation-agents).
 
 ## Unreleased — inline agent invitations
 
