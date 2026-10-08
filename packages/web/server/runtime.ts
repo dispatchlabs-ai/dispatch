@@ -736,6 +736,41 @@ export class DispatchRuntime {
     return summaries.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
   }
 
+  workerMcpBridge() {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    return {
+      definition: this.connections.workerDefinition.bind(this.connections),
+      call: this.connections.callWorkerTool.bind(this.connections),
+    };
+  }
+
+  /** Directory authority and title policy are read together; no worker is started. */
+  async directoryChatSummaries(scope: RuntimeScope): Promise<{ conversation: ChatSummary; automaticTitle: boolean }[]> {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    return this.harness.commit(async tx => {
+      const catalog = await tx.doc(CatalogDoc);
+      const projects = await tx.doc(ProjectsDoc);
+      const entries: { conversation: ChatSummary; automaticTitle: boolean }[] = [];
+      for (const chat of catalog.chats.filter(chat => chat.companyId === scope.companyId)) {
+        try {
+          const room = await this.shared.authorize(tx, scope, nativeId(chat.id), "read", this.readAll(scope));
+          const preference = room.preferences[scope.userId] ?? { projectId: null, pinned: false, archived: false };
+          const access = room.sharedProjectId ? projectAccess(projects.projects[room.sharedProjectId], scope, this.readAll(scope)) : { participate: true };
+          entries.push({ automaticTitle: chat.displayTitle === undefined && chat.title === "New conversation", conversation: {
+            id: chat.id, title: chat.displayTitle ?? chat.title,
+            sharedProjectId: room.sharedProjectId ?? null, canParticipate: access.participate,
+            projectId: room.sharedProjectId ?? preference.projectId, pinned: preference.pinned, archived: preference.archived,
+            createdAt: chat.createdAt, updatedAt: chat.createdAt, revision: this.commitRevision,
+            agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, agentName: chat.agentName ?? "Saved agent", status: "idle",
+          } });
+        } catch (error) {
+          if (!(error instanceof Error && "status" in error && error.status === 404)) throw error;
+        }
+      }
+      return entries;
+    }, context);
+  }
+
   async listProjects(scope: RuntimeScope): Promise<Project[]> {
     return this.harness.commit(async tx => {
       const catalog = await tx.doc(CatalogDoc);
