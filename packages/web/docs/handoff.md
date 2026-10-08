@@ -1772,3 +1772,5 @@ Integrated opt-in criteria delivery: Developer independently reviewed the native
 
 
 Opt-in delivery publication: Documenter independently verified remote `main` and the canonical checkout at `b400e4a`. This establishes source delivery only, not deployment, loaded-instance adoption or live tool correctness. Tool/replay/conflict/revocation/restart and desktop/390 px acceptance remain open.
+
+Visual evidence follow-up: Developer inspected native image pixels through prepared conversation attachments (the text file reader limitation was not a blocker). Desktop 1440×900 populated-history view and 390×844 populated history/attachment, project export, reviewed project import and starter/import dialog captures show readable text, contained controls and no overlapping content. Mobile history download and import/export interactions succeeded; keyboard Tab remained within export modal and Escape restored its trigger. This is bounded manual visual/keyboard evidence, not an automated accessibility audit or real-device touch/screen-reader claim. Real GitHub success-flow visuals remain blocked on fixture publication approval.
