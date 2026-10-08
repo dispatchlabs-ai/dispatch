@@ -23,20 +23,24 @@ import { tokenMatches, workerToken } from "./identity.js";
 import { workerRequest } from "./transport.js";
 import type { LauncherStatus } from "./launcher.js";
 import { WorkerStoreProvisioner } from "./postgres-stores.js";
+import { verifiedPostgresConfig } from "../storage/postgres/tls.js";
 import { WriteAdmission } from "./admission.js";
 
 const filename = process.env.DISPATCH_BACKEND_WORKERS_CONFIG_FILE;
 if (!filename) throw new Error("DISPATCH_BACKEND_WORKERS_CONFIG_FILE is required.");
-const workerConfig = z.object({ tls: z.object({ keyFile: z.string().startsWith("/"), certFile: z.string().startsWith("/") }).strict().optional(), postgresStores: z.object({ adminUrlFile: z.string().startsWith("/") }).strict(), artifacts: s3ArtifactsConfigSchema, installationId: z.string().min(1), workerKeyFile: z.string(), launcherTokenFile: z.string(), operatorTokenFile: z.string(), launcherUrl: z.url(), launcherTimeoutMs: z.number().int().min(1000).max(3_600_000).default(300_000), configurationRevision: z.string().min(1) }).strict().parse(JSON.parse(await readFile(filename, "utf8")));
+const workerConfig = z.object({ tls: z.object({ keyFile: z.string().startsWith("/"), certFile: z.string().startsWith("/") }).strict().optional(), postgresStores: z.object({ adminUrlFile: z.string().startsWith("/"), caFile: z.string().startsWith("/").optional() }).strict(), artifacts: s3ArtifactsConfigSchema, installationId: z.string().min(1), workerKeyFile: z.string(), launcherTokenFile: z.string(), operatorTokenFile: z.string(), launcherUrl: z.url(), launcherTimeoutMs: z.number().int().min(1000).max(3_600_000).default(300_000), configurationRevision: z.string().min(1) }).strict().parse(JSON.parse(await readFile(filename, "utf8")));
 // Load configured identity before opening stores; missing/invalid TLS never falls back to HTTP.
 const tls = workerConfig.tls ? {
   key: await readFile(workerConfig.tls.keyFile), cert: await readFile(workerConfig.tls.certFile),
   minVersion: "TLSv1.2" as const,
 } : undefined;
 if (tls) createSecureContext(tls);
+const storeUrl = (await readFile(workerConfig.postgresStores.adminUrlFile, "utf8")).trim();
+const storeCa = workerConfig.postgresStores.caFile === undefined ? undefined : await readFile(workerConfig.postgresStores.caFile, "utf8");
+if (storeCa !== undefined) verifiedPostgresConfig(storeUrl, storeCa);
 const artifacts = await S3Artifacts.open(workerConfig.artifacts);
 const workerKey = (await readFile(workerConfig.workerKeyFile, "utf8")).trim();
-const stores = await WorkerStoreProvisioner.open({ connectionString: (await readFile(workerConfig.postgresStores.adminUrlFile, "utf8")).trim(), installationId: workerConfig.installationId, credentialKey: workerKey });
+const stores = await WorkerStoreProvisioner.open({ connectionString: storeUrl, ca: storeCa, installationId: workerConfig.installationId, credentialKey: workerKey });
 const launcherToken = (await readFile(workerConfig.launcherTokenFile, "utf8")).trim();
 const operatorToken = (await readFile(workerConfig.operatorTokenFile, "utf8")).trim();
 const config = readConfig();
