@@ -63,6 +63,7 @@ export function Workspace() {
   const [updatingChats, setUpdatingChats] = useState<Set<string>>(() => new Set());
   const [agents, setAgents] = useState<AgentDefinition[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tabs, setTabs] = useState<WorkspaceTab[]>(() => [initialTab(searchParams)]);
   const [activeId, setActiveId] = useState(() => initialTab(searchParams).id);
@@ -131,8 +132,8 @@ export function Workspace() {
       setSnapshots(current => Object.fromEntries(Object.entries(current).filter(([id]) => chatResult.chats.some(chat => chat.id === id))));
       setAgents(agentResult.agents);
       setProjects(projectResult.projects);
-      setError(null);
-    } catch (error) { setError(errorMessage(error)); } finally { setLoading(false); }
+      setLoadError(null);
+    } catch (error) { setLoadError(errorMessage(error)); } finally { setLoading(false); }
   }, [api]);
 
   useEffect(() => { void load(); }, [load]);
@@ -578,6 +579,9 @@ export function Workspace() {
               </IconButton> : null}
             </div>
         </header> : null}
+        {loadError ? <div className="workspace-notice">
+          <Notice>Workspace refresh failed: {loadError}</Notice><Button variant="secondary" onClick={() => void load()}>Retry refresh</Button>
+        </div> : null}
         {error ? <div className="workspace-notice">
           <Notice>{error}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat([], null, createRequest.current ?? undefined)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}
         </div> : null}
