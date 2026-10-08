@@ -137,7 +137,7 @@ Instructions format Markdown while you type or paste, using the same editor as c
 
 ### Agent evaluation profiles
 
-WP-047 adds a separate Evaluation profile section for saved agents. This describes the current source implementation; persistence, conflict recovery and desktop/390 px rendering still require demonstration before acceptance. See the [data contract](spec.md#individual-agent-evaluation) and [acceptance scope](handoff.md#wp-047--agent-evaluation-profiles-and-editor).
+WP-047 adds a separate Evaluation profile section for saved agents. Focused disposable-data demonstrations cover persistence, conflict recovery and desktop/390 px rendering; broader accessibility, real-device and crash-recovery qualification remain outside that evidence. See the [data contract](spec.md#individual-agent-evaluation) and [acceptance scope](handoff.md#wp-047--agent-evaluation-profiles-and-editor).
 
 1. Save the agent definition first, then select **Configure evaluations** (or **Edit evaluation profile**).
 2. Enter responsibilities, expected behavior and at least one criterion. Criteria choose direct checks, judge or human review; critical-failure flags and grading guidance describe how to assess work, not an assessment already performed.
