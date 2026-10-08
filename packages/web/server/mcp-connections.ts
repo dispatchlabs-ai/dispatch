@@ -71,8 +71,10 @@ export class McpConnections {
   }
 
   private authorized(row: ConnectionRow) { return row.state === "authorized" && !this.denied.has(row.id); }
-  private binding(row: Pick<ConnectionRow, "id" | "company_id" | "owner_id" | "endpoint" | "authentication">) {
-    return ["connection", row.company_id, row.owner_id, row.id, row.endpoint, row.authentication];
+  private binding(row: Pick<ConnectionRow, "id" | "company_id" | "owner_id" | "endpoint" | "authentication" | "config">) {
+    // OAuth metadata controls where decrypted client/refresh credentials go.
+    // Authenticate it too: database-only edits must not redirect those secrets.
+    return ["connection", row.company_id, row.owner_id, row.id, row.endpoint, row.authentication, row.config];
   }
   private pendingBinding(row: ConnectionRow, pending: PendingRow, purpose: string) {
     return [...this.binding(row), "attempt", pending.session_id, pending.request_id, pending.state_hash, pending.fingerprint, String(pending.expires_at), purpose];
@@ -212,7 +214,7 @@ export class McpConnections {
     }
     const id = existing?.id ?? randomUUID();
     const state = randomToken();
-    const binding = { id, company_id: scope.companyId, owner_id: scope.userId, endpoint, authentication: input.authentication };
+    const binding = { id, company_id: scope.companyId, owner_id: scope.userId, endpoint, authentication: input.authentication, config: existing?.config ?? "{}" };
     // OAuth discovery may dynamically register a client. Commit a request receipt
     // before setup, not just before exchanging its eventual authorization code.
     // No pending callback means setup is unconfirmed: same-request replay refuses
@@ -224,7 +226,7 @@ export class McpConnections {
           name=excluded.name,state=excluded.state,config=excluded.config,secret=excluded.secret,scopes=excluded.scopes,
           error=excluded.error,refreshing=0,disconnect_notice=NULL`,
           [id, scope.companyId, scope.userId, input.name.trim(), endpoint, input.authentication, existing?.provider ?? "",
-            existing?.config ?? "{}", this.seal(JSON.stringify({ client: priorCredential?.client }), this.binding(binding)),
+            binding.config, this.seal(JSON.stringify({ client: priorCredential?.client }), this.binding(binding)),
             existing?.scopes ?? JSON.stringify(input.scopes ?? []), Date.now(), "Authorization setup is unconfirmed. Start a new attempt if interrupted."]);
         await query("UPDATE mcp_oauth_pending SET consumed=1 WHERE connection_id=$1", [id]);
         await query("INSERT INTO mcp_connection_requests VALUES ($1,$2,$3,$4)", [scope.sessionId, input.requestId, id, fingerprint]);
@@ -248,6 +250,7 @@ export class McpConnections {
     } else if (input.authentication === "bearer") {
       credential.headers = { Authorization: `Bearer ${input.token}` };
     } else if (input.authentication === "headers") credential.headers = input.headers;
+    binding.config = JSON.stringify(config ?? {});
     const pending: PendingRow = { state_hash: digest(state), connection_id: id, session_id: scope.sessionId,
       verifier: "", expires_at: Date.now() + 15 * 60_000, request_id: input.requestId, fingerprint,
       authorization_url: "", consumed: 0 };
@@ -256,7 +259,7 @@ export class McpConnections {
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(id) DO UPDATE SET name=excluded.name,state=excluded.state,config=excluded.config,
         secret=excluded.secret,scopes=excluded.scopes,error=NULL,refreshing=0,disconnect_notice=NULL`,
         [id, scope.companyId, scope.userId, input.name.trim(), endpoint, authorization ? "pending" : "authorized", input.authentication,
-          existing?.provider ?? "", JSON.stringify(config ?? {}), this.seal(JSON.stringify(credential), this.binding(binding)), JSON.stringify(config?.requestedScopes ?? []), Date.now()]);
+          existing?.provider ?? "", binding.config, this.seal(JSON.stringify(credential), this.binding(binding)), JSON.stringify(config?.requestedScopes ?? []), Date.now()]);
       await query("UPDATE mcp_oauth_pending SET consumed=1 WHERE connection_id=$1", [id]);
       if (authorization) {
         const context = [...this.binding(binding), "attempt", pending.session_id, pending.request_id, pending.state_hash, pending.fingerprint, String(pending.expires_at)];
