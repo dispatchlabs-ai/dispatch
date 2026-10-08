@@ -600,6 +600,7 @@ function AgentEditor({
               <summary><strong>Capabilities</strong><span>{describeCapabilities(draft.capabilities)}</span></summary>
               <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("files-and-commands") ?? false} onChange={event => update("capabilities", event.target.checked ? [...(draft.capabilities ?? []), "files-and-commands"] : (draft.capabilities ?? []).filter(capability => capability !== "files-and-commands"))} /><span>Files and commands<small>Read and edit files, and run commands in the agent's working directory. Commands use the Dispatch service account.</small></span></label>
               <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("image-generation") ?? false} onChange={event => update("capabilities", event.target.checked ? [...(draft.capabilities ?? []), "image-generation"] : (draft.capabilities ?? []).filter(capability => capability !== "image-generation"))} /><span>Image generation<small>OpenAI · paid generation and editing</small></span></label>
+              <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("web-research") ?? false} onChange={event => update("capabilities", event.target.checked ? [...(draft.capabilities ?? []), "web-research"] : (draft.capabilities ?? []).filter(capability => capability !== "web-research"))} /><span>Web research<small>Search, read pages and follow source links</small></span></label>
             </details>
             <div data-agent-section="Skills" tabIndex={-1}><AgentSkillsEditor selections={draft.skills ?? []} onChange={skills => update("skills", skills)} busy={busy}
               editing={editing.skillEditing} onEditingChange={skillEditing => onChange({ ...editing, skillEditing, busy: skillEditing?.busy ?? false })} /></div>
@@ -629,5 +630,5 @@ function AgentEditor({
 }
 
 function describeCapabilities(capabilities: AgentDraft["capabilities"]) {
-  return capabilities?.map(capability => capability === "files-and-commands" ? "Files and commands" : "Image generation").join(", ") || "Conversation only";
+  return capabilities?.map(capability => capability === "files-and-commands" ? "Files and commands" : capability === "web-research" ? "Web research" : "Image generation").join(", ") || "Conversation only";
 }

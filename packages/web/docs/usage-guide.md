@@ -558,3 +558,21 @@ Generation may incur provider charges. There is no automatic retry. After interr
 After generating a file, an agent calls `conversation_attach` with its workspace-relative path. This snapshots the file privately and returns an attachment ID. The agent then includes that ID in `conversation_post`'s `attachmentIds`. Preparation alone does not share the file; it becomes readable by conversation members only when the post is admitted. The same workflow supports ordinary generated files as well as images, using the existing 10 MiB per-file, 25 MiB per-message and 10-file limits.
 
 Do not paste base64 into messages or treat workspace paths as browser links. A stopped or discarded draft leaves its prepared files private. Retained prepared/orphan blobs may consume storage; no automatic cleanup is promised. The tool omits `input_fidelity` for generation and GPT Image 2/2.5 edits. It forwards an explicitly supplied value only for supported legacy edit models. Provider rejections identify a safe parameter name when available. For localized edits, supply a PNG alpha mask matching the first reference: transparent pixels mark the edit region. Inspect output pixels and text before publishing; neither a prompt nor a mask proves unchanged regions are pixel-identical. A revised shared skill must be explicitly selected and saved on an agent definition; active conversation instances adopt that selection at the next safe idle base upgrade.
+
+## Web research
+
+Enable **Agents → Edit → Web research** and save the definition. New instances receive `web_run`; active instances adopt the saved capability at the next safe idle base upgrade. Files and commands, MCP connections and skills are not required.
+
+Direct public HTML/text URL reads need no API key. Search uses the service-side `EXA_API_KEY` environment variable and may incur Exa charges. Set it in the service launch environment, never agent instructions, then restart the launcher. Without a key, direct URL reading, saved-page find and hyperlink traversal still work; search reports a configuration error. This is independent of the Exa MCP skill/connection and does not inherit its credentials.
+
+The tool accepts `search_query`, `open`, `find` and `click` arrays. For example:
+
+```json
+{"open":[{"ref_id":"https://example.com/docs"}],"response_length":"short"}
+```
+
+Use the returned `web_…` reference for subsequent reads and literal finds. `open` accepts `lineno`; `find` accepts `pattern` and optional starting `lineno`; `click` accepts the page reference and its numbered link `id`. Lines and links start at 1. Short/medium/long windows contain 20/60/120 display lines. `refresh:true` fetches a new snapshot rather than changing the saved one. Search results are snippets; open them before claiming full-page evidence. Cite source URLs with normal Markdown links.
+
+References are private to the agent's working conversation, not portable across participants. Snapshots remain stored with native conversation state; there is no automatic expiry. Evidence is retained without application-imposed text/link/body caps; pagination bounds presentation only. No application-imposed request deadline is added; Stop supplies cancellation. Memory/storage and upstream provider limits still apply. Interrupted batches are not automatically repeated, even if they include cached reads; a new retrieval may repeat charges. Completed saved snapshots remain accessible.
+
+Direct extraction is not a browser: JavaScript-only pages, authenticated content, PDFs and image interpretation are unsupported. Public HTTP(S) only; private/local destinations and nonstandard ports are blocked. Websites and search content remain untrusted evidence. Extraction can omit layout or content; respect truncation/error markers and do not claim an inaccessible page was read.

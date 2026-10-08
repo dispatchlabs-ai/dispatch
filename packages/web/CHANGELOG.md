@@ -4,6 +4,10 @@
 
 - Add Agents import/export with bounded ZIP parsing, requirement preview, exact assigned skill revisions and independent local copies. Native atomic receipts preserve same-operation retries; connections, credentials and existing instances remain untouched. Source/build checked; runtime and rendered UI qualification remain outstanding in the [handoff](docs/handoff.md#portable-definitions-and-project-data--october-8-2026). GitHub updates, starter distribution, project exports and backups remain later work.
 
+## Unreleased — native web research
+
+- Add the Web research capability with native search, page reading, literal find and numbered-link traversal, durable instance-local evidence and source citations. Interrupted network batches are not automatically replayed. Qualification tracked in [WP-054](docs/handoff.md#wp-054--native-web-research).
+
 ## Unreleased — agent authoring design
 
 - Redesign agent overview, editor, sidebar and evaluation configuration around the approved concepts. Add section/case navigation, a persistent required evaluation change reason and shared Markdown formatting controls. Preserve existing draft, revision and profile-only boundaries. See [acceptance evidence](docs/handoff.md#agent-authoring-redesign--october-8-2026).

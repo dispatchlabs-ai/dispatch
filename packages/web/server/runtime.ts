@@ -15,6 +15,8 @@ import { isManagedConnection } from "../src/shared/contracts.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata } from "./attachments.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
+import { createWebResearch } from "./extensions/web.js";
+import { createWebBackend } from "./web/backend.js";
 import { Skills, SkillBindingsDoc } from "./extensions/skills.js";
 import { imageGenerationSkill } from "./skills/image-generation.js";
 import { agentBrowserSkill, dogfoodSkill } from "./skills/agent-browser/index.js";
@@ -128,6 +130,7 @@ export class DispatchRuntime {
       registry.install(CodingTools);
       registry.install(Coding);
       registry.install(Skills);
+      registry.install(createWebResearch(createWebBackend({ searchApiKey: process.env.EXA_API_KEY })));
       registry.install(createImageGen(models));
       connections = await AgentConnections.load(options.connectionsFile ?? join(owner.directory, "agent-connections.json"), registry, options.mcpConnections, options.companyId);
       const harness = await Harness.open(storage, {
@@ -697,7 +700,7 @@ export class DispatchRuntime {
         blockers.push(`${agent.name}: ${error.message}`);
       }
       for (const capability of agent.capabilities) {
-        if (capability !== "files-and-commands" && capability !== "image-generation") {
+        if (capability !== "files-and-commands" && capability !== "image-generation" && capability !== "web-research") {
           blockers.push(`${agent.name}: unsupported capability ${capability}.`);
           continue;
         }
@@ -806,8 +809,8 @@ export class DispatchRuntime {
       let extensions = (prior?.extensions ?? []).filter(name => !isMcpExtension(name));
       let tools = (prior?.tools ?? []).filter(name => !isMcpTool(name));
       if (input.capabilities !== undefined) {
-        extensions = extensions.filter(name => name !== Coding.name && name !== CodingTools.name && name !== "dispatch-image-gen");
-        tools = tools.filter(name => !["read", "write", "edit", "bash", "generate_image"].includes(name));
+        extensions = extensions.filter(name => name !== Coding.name && name !== CodingTools.name && name !== "dispatch-image-gen" && name !== "dispatch-web");
+        tools = tools.filter(name => !["read", "write", "edit", "bash", "generate_image", "web_run"].includes(name));
         const capabilities = capabilitySelection(input.capabilities);
         extensions.push(...capabilities.extensions);
         tools.push(...capabilities.tools);
@@ -1249,7 +1252,7 @@ function nativeId(id: string): ConversationId {
 function owns(scope: RuntimeScope, chat: RuntimeScope) { return scope.companyId === chat.companyId && scope.userId === chat.userId; }
 function publicAgent({ companyId: _companyId, savedBy: _savedBy, saveRequestId: _request, saveFingerprint: _fingerprint, ...agent }: StoredAgent): AgentDefinition {
   // Nested catalog values may be transaction proxies; detach before the transaction settles.
-  return JSON.parse(JSON.stringify({ ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [], capabilities: [...(agent.extensions?.includes(CodingTools.name) ? ["files-and-commands" as const] : []), ...(agent.extensions?.includes("dispatch-image-gen") ? ["image-generation" as const] : [])] })) as AgentDefinition;
+  return JSON.parse(JSON.stringify({ ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [], capabilities: [...(agent.extensions?.includes(CodingTools.name) ? ["files-and-commands" as const] : []), ...(agent.extensions?.includes("dispatch-image-gen") ? ["image-generation" as const] : []), ...(agent.extensions?.includes("dispatch-web") ? ["web-research" as const] : [])] })) as AgentDefinition;
 }
 function managedIds(agent: Pick<AgentDefinition, "connections">) { return (agent.connections ?? []).filter(isManagedConnection).map(connection => connection.id); }
 function requireText(value: unknown, field: string, max: number, allowEmpty = false): asserts value is string {
@@ -1271,6 +1274,7 @@ function capabilitySelection(capabilities: readonly string[]) {
     extensions.push("dispatch-image-gen");
     tools.push("generate_image");
   }
+  if (capabilities.includes("web-research")) { extensions.push("dispatch-web"); tools.push("web_run"); }
   return { extensions, tools };
 }
 

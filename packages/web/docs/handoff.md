@@ -1281,6 +1281,18 @@ Removed personal-project listing/creation/move paths, the move dialog and relate
 
 Acceptance evidence: Developer integrated Documenter's contract updates and Deslop's removal. Pi Durable Expert reviewed creation/default resolution, uncertain retries, persistence and authorization; the refresh-hidden retry notice was corrected. Source/deslop and whitespace review completed. Integrated `nix develop --command npm run check`, `nix build --no-link`, and `nix flake check` passed on Apple Silicon. No tests run. Desktop/390 px rendered review, keyboard/touch focus, duplicate-click and lost-response recovery remain unverified; this is an outstanding UI-rule qualification requirement, not a runtime correctness claim. Existing large-chunk build advisory remains.
 
+## WP-054 — Native web research
+
+Authorized October 8, 2026 for all four operations together. Pi Durable Expert owns the native extension and durable references; Reverse owns retrieval/security; Developer owns capability/runtime/UI integration, documentation and publication.
+
+Acceptance criteria:
+- Expose Web research in agent configuration, validate the capability on the service and register its implementation before native recovery. Active instances adopt saved capability changes through the in-place upgrade contract at the next safe idle boundary.
+- Search, open, literal find and hyperlink traversal return bounded evidence with source URLs, stable instance-local references, retrieval times and explicit truncation. Cached reads retain the same snapshot; refresh creates a new reference.
+- Preserve native cancellation/recovery; never automatically replay interrupted paid work. Reject unsafe destinations and sanitize backend failures without leaking credentials.
+- Source/deslop review, TypeScript/application and applicable Nix builds, whitespace/link review. No functional tests under the standing policy. Record desktop/390 px rendered and runtime security/restart evidence separately; successful builds are not functional qualification.
+
+Implementation source-reviewed by Pi Durable Expert through `11b6b10`: DNS pinning, public-address checks, credential redirect rejection and maintained HTML parsing address all reported blockers. Native keyed snapshots avoid loading accumulated evidence on every lookup. TypeScript/application and Apple Silicon Nix builds passed; final publication checks are recorded below. No tests ran. Live fetching, search credentials, TLS rejection, cancellation, restart and rendered desktop/390 px UI remain unverified, including the required UI-rule layout review. No existing agent is automatically granted this capability.
+
 
 ## Project overview redesign — October 8, 2026
 
@@ -1354,6 +1366,8 @@ Acceptance evidence:
 
 Published source: `f055974`, independently verified on remote main. Chris subsequently approved local activation and clarified that development hot reload needs no manual restart. Developer checked that the canonical checkout already includes this commit and corrected the earlier activation-pending report. Catalog entries and assigned-skill loading remain unverified; checkout presence is not runtime evidence. No manual restart or global tooling change was needed.
 
+Final integrated candidate `429ebad` passed Nix-shell TypeScript/application builds, Apple Silicon `nix build --no-link`, `nix flake check` (zero runnable checks; Linux omitted) and whitespace review. Pi's independent source review closed the reported backend findings at `11b6b10`; deadline documentation was corrected afterward. Source/deslop review retained native runtime ownership and removed the handwritten entity/attribute parsing. Search requires operator-provided `EXA_API_KEY`; no credential was provisioned and no live search is claimed. Rendered UI and functional qualification above remain outstanding.
+
 ## In-place agent upgrades — October 8, 2026
 
 **Accepted October 8, 2026; source published as `00dc7cc`, source/build reviewed, functional qualification outstanding.** Chris requested in-place fixes and authorized the team to deliver after consensus. Developer owns implementation, Pi Durable Expert native lifecycle/recovery review and wiki alignment, Deslop simplification review, Documenter package documentation. Scope follows [the contract](spec.md#in-place-agent-revision-upgrades). Depends on revisioned definitions, trusted native bindings, WP-049 removal fences and WP-050 separate instance supplements.
@@ -1381,3 +1395,5 @@ Acceptance evidence:
 - Rendered desktop and 390 CSS px phone review: agent overview, agent editor, evaluation authoring and sidebar were inspected against the approved visual direction. Phone navigation spacing and document toolbar were corrected after rendering. Captures are private ignored files in `.local/agent-design/`. No agent or profile data was saved during this review.
 - Integrated candidate `affc325` passed Nix-shell TypeScript/application builds, Apple Silicon `nix build --no-link` and `nix flake check` (zero runnable checks; Linux omitted). Final diff/deslop and whitespace review passed; 179 local documentation links/anchors passed. The follow-up documentation-only commit records this evidence and places the usage section beside agent configuration.
 - Functional acceptance remains unverified under the zero-tests policy: toolbar editing, save/reopen, conflicts, discard confirmations, keyboard traversal, touch and recovery were not requalified. Full WCAG contrast/accessibility conformance and Linux builds remain unverified. The earlier WP-047 one-time exception is not reused. No evaluation was executed and no service deployment is included.
+
+The normal localhost window exposed a narrow desktop header with both side panels open. The header now gives the identity block a wrapping flex basis so actions move to another row before the title becomes cramped. This correction is visually reviewed at the normal desktop width and 390 CSS px; candidate `b46ac23` passed Nix-shell TypeScript/application builds, Apple Silicon Nix build and flake check (zero runnable checks, Linux omitted).
