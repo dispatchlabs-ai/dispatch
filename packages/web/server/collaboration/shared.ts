@@ -36,7 +36,7 @@ export type Member = {
 type Presentation = { participants: ConversationParticipant[]; messages: ConversationMessage[]; activities: ParticipantActivity[] };
 type SharedState = {
   companyId: string; sharedProjectId?: string; legacyCreatorId?: string; legacyQueued?: Record<string, string>; members: Member[]; epoch: number; stopping?: TaskId;
-  preferences: Record<string, { projectId: string | null; pinned: boolean; archived: boolean }>;
+  preferences: Record<string, { pinned: boolean; archived: boolean }>;
   requests: Record<string, { hash: string; messageId?: string; participantId?: string }>;
   deliveries: TaskId[];
   messageAliases?: Record<string, string>;
@@ -596,7 +596,7 @@ export class SharedConversations {
     else if (agent.tools) agent.tools.remove = agent.tools.remove.filter(name => !names.includes(name));
   }
 
-  async initialize(tx: Tx, roomId: ConversationId, companyId: string, human: Person, agentIds: string[], preferences: { projectId: string | null; pinned: boolean; archived: boolean }, sharedProjectId?: string) {
+  async initialize(tx: Tx, roomId: ConversationId, companyId: string, human: Person, agentIds: string[], preferences: { pinned: boolean; archived: boolean }, sharedProjectId?: string) {
     if (sharedProjectId !== undefined) await requireProjectAccess(tx, { companyId, userId: human.id }, sharedProjectId, "participate");
     const room = await tx.doc(SharedDoc, roomId);
     await tx.doc(TurnsDoc, roomId);
@@ -622,7 +622,7 @@ export class SharedConversations {
     return member;
   }
 
-  async migrate(tx: Tx, roomId: ConversationId, human: Person, legacy: Member, companyId: string, preferences: { projectId: string | null; pinned: boolean; archived: boolean }) {
+  async migrate(tx: Tx, roomId: ConversationId, human: Person, legacy: Member, companyId: string, preferences: { pinned: boolean; archived: boolean }) {
     const room = await tx.doc(SharedDoc, roomId);
     await tx.doc(TurnsDoc, roomId);
     if (room.companyId) return;
@@ -704,7 +704,7 @@ export class SharedConversations {
       member = { id: `human:${person.id}`, kind: "human", userId: person.id, name: person.name, joinedAt: Date.now(), status: "idle" };
       room.members.push(member);
     }
-    room.preferences[person.id] ??= { projectId: null, pinned: false, archived: false };
+    room.preferences[person.id] ??= { pinned: false, archived: false };
     return member;
   }
 
@@ -833,7 +833,7 @@ export class SharedConversations {
       if (!person) throw new CollaborationError(404, "Person is unavailable.");
       const member: Member = { id: `human:${id}`, kind: "human", userId: id, name: person.name, joinedAt: Date.now(), status: "idle" };
       room.members.push(member); added.push(member);
-      room.preferences[id] = { projectId: null, pinned: false, archived: false };
+      room.preferences[id] = { pinned: false, archived: false };
     }
     for (const definitionId of [...new Set(input.agentDefinitionIds ?? [])]) {
       // Ensure-existing invitations do not create siblings. Explicit human instance creation does.

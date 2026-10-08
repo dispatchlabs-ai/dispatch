@@ -2,9 +2,8 @@ import { Popover } from "@base-ui/react/popover";
 import { FolderPlus, Pin, Plus } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ChatSummary, Project, UpdateChatInput } from "../shared/contracts";
-import { errorMessage } from "../lib/api";
 import { ConversationActions } from "./conversation-actions";
-import { Button, Field, Input, Modal, Notice, Select, Spinner } from "./ui";
+import { Button, Field, Input, Notice, Spinner } from "./ui";
 
 export type NewProjectProps = {
   name: string;
@@ -41,7 +40,7 @@ export function NewProjectButton({ name, busy, error, compact, onNameChange, onC
   </Popover.Root>;
 }
 
-export function ProjectPage({ project, chats, creating, updating, onCreate, onSelect, onMove, onRename, onUpdate, settings }: {
+export function ProjectPage({ project, chats, creating, updating, onCreate, onSelect, onRename, onUpdate, settings }: {
   settings?: ReactNode;
   project?: Project;
   chats: ChatSummary[];
@@ -50,14 +49,13 @@ export function ProjectPage({ project, chats, creating, updating, onCreate, onSe
   onCreate: () => void;
   onSelect: (id: string) => void;
   onRename: (chat: ChatSummary) => void;
-  onMove: (chat: ChatSummary) => void;
   onUpdate: (id: string, input: UpdateChatInput) => void;
 }) {
-  if (!project) return <div className="project-page"><h1>Project unavailable</h1><p className="text-muted">Choose a project from Conversations.</p></div>;
+  if (!project) return <div className="project-page"><h1>Project unavailable</h1><p className="text-muted">Choose a project from Chats.</p></div>;
   const visible = chats.filter(chat => chat.projectId === project.id && !chat.archived);
   return <section className="project-page">
     <header className="project-page-header">
-      <div><p className="eyebrow">{project.kind === "shared" ? "Shared project" : "Personal grouping"}</p><h1>{project.name}</h1></div>
+      <div><p className="eyebrow">Shared project</p><h1>{project.name}</h1></div>
       <Button disabled={creating || project.canParticipate === false} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New chat</Button>
     </header>
     {settings}
@@ -69,40 +67,10 @@ export function ProjectPage({ project, chats, creating, updating, onCreate, onSe
           <span>{chat.title}</span>
           <time dateTime={new Date(chat.updatedAt).toISOString()}>{conversationDate(chat.updatedAt)}</time>
         </button>
-        <ConversationActions chat={chat} busy={updating.has(chat.id)} onMove={onMove} onRename={onRename} onUpdate={onUpdate} />
+        <ConversationActions chat={chat} busy={updating.has(chat.id)} onRename={onRename} onUpdate={onUpdate} />
       </li>)}
-    </ul> : <div className="project-empty"><p>No chats yet.</p><p>{project.kind === "shared" ? "Project members can start a chat here. Existing chats cannot be moved into shared projects." : "Start a chat here, or move one from its actions menu."}</p></div>}
+    </ul> : <div className="project-empty"><p>No chats yet.</p><p>Start a chat in this project.</p></div>}
   </section>;
-}
-
-export function MoveConversationDialog({ chat, projects, onClose, onMove }: {
-  chat: ChatSummary;
-  projects: Project[];
-  onClose: () => void;
-  onMove: (id: string, projectId: string | null) => Promise<void>;
-}) {
-  const [destination, setDestination] = useState(chat.projectId ?? "");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  return <Modal title="Move to project" description={chat.title} open onOpenChange={open => { if (!open && !busy) onClose(); }} finalFocus={() => document.getElementById("main-workspace")}>
-    <form className="stack" onSubmit={async event => {
-      event.preventDefault();
-      setBusy(true); setError(null);
-      try { await onMove(chat.id, destination || null); onClose(); }
-      catch (error) { setError(errorMessage(error)); }
-      finally { setBusy(false); }
-    }}>
-      <Field label="Project">{props => <Select {...props} value={destination} disabled={busy} onChange={event => setDestination(event.target.value)}>
-        <option value="">Without a project</option>
-        {projects.filter(project => project.kind !== "shared").map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
-      </Select>}</Field>
-      {error ? <Notice>{error}</Notice> : null}
-      <div className="button-row project-form-actions">
-        <Button variant="secondary" disabled={busy} onClick={onClose}>Cancel</Button>
-        <Button type="submit" disabled={busy || destination === (chat.projectId ?? "")}>{busy ? <Spinner label="Moving conversation" /> : null} Move conversation</Button>
-      </div>
-    </form>
-  </Modal>;
 }
 
 function conversationDate(timestamp: number) {

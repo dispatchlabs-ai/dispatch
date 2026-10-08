@@ -23,15 +23,12 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    if (project.kind !== "shared") return;
     const controller = new AbortController();
     void api<{ people: CompanyPerson[] }>("/api/people", undefined, controller.signal)
       .then(result => { if (!controller.signal.aborted) { setPeople(result.people); setError(""); } })
       .catch(error => { if (!controller.signal.aborted) setError(errorMessage(error)); });
     return () => controller.abort();
-  }, [api, project.kind, attempt]);
-
-  if (project.kind !== "shared") return <p className="field-hint">Personal grouping. Chat invitations control access; this grouping does not share chats.</p>;
+  }, [api, attempt]);
 
   const members = editing?.input.members ?? project.members ?? [];
   const defaults = editing?.input.defaultAgentDefinitionIds ?? project.defaultAgentDefinitionIds ?? [];

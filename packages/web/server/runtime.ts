@@ -28,11 +28,10 @@ import type { McpConnections } from "./mcp-connections.js";
 
 const context = BACKGROUND_CONTEXT;
 const IMAGE_GENERATION_SKILL_ID = "d6f5a67d-5c7b-4813-910f-b29d97d29cd1";
-type StoredChat = Omit<ChatSummary, "sharedProjectId" | "canParticipate" | "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { creationFingerprint?: string; creationTitleExplicit?: boolean; displayTitle?: string; pinned?: boolean; archived?: boolean; agentName?: string; projectId?: string | null; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
+type StoredChat = Omit<ChatSummary, "sharedProjectId" | "canParticipate" | "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { creationFingerprint?: string; creationTitleExplicit?: boolean; displayTitle?: string; pinned?: boolean; archived?: boolean; agentName?: string; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[] };
 type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: string; extensions?: string[]; tools?: string[]; savedBy?: string; saveRequestId?: string; saveFingerprint?: string };
-type StoredProject = Project & { companyId: string; userId: string; requestId: string };
 type StoredSkill = SkillDefinition & { companyId: string; savedBy: string; requestId: string; fingerprint: string };
-type Catalog = { skills?: StoredSkill[]; chats: StoredChat[]; agents: StoredAgent[]; projects?: StoredProject[]; runtimeInstance?: string; connectionOwners?: Record<string, string> };
+type Catalog = { skills?: StoredSkill[]; chats: StoredChat[]; agents: StoredAgent[]; runtimeInstance?: string; connectionOwners?: Record<string, string> };
 type ManagementActor = Awaited<ReturnType<SharedConversations["managementActor"]>>;
 type ManagementReceipt = {
   companyId: string; definitionId: string; revision: number; instanceId: string; participantId: string; roomId: string;
@@ -194,10 +193,8 @@ export class DispatchRuntime {
 
   async listProjects(scope: RuntimeScope): Promise<Project[]> {
     return this.harness.commit(async tx => {
-      const catalog = await tx.doc(CatalogDoc);
       const shared = await tx.doc(ProjectsDoc);
-      return [...(catalog.projects ?? []).filter(project => owns(scope, project)).map(projectSummary),
-        ...Object.values(shared.projects).filter(project => projectAccess(project, scope, this.readAll(scope)).read).map(project => this.projectSummary(project, scope))]
+      return Object.values(shared.projects).filter(project => projectAccess(project, scope, this.readAll(scope)).read).map(project => this.projectSummary(project, scope))
         .sort((a, b) => a.name.localeCompare(b.name));
     }, context);
   }
@@ -215,30 +212,20 @@ export class DispatchRuntime {
     const name = input.name.trim();
     requireText(name, "Project name", 100);
     return this.harness.commit(async tx => {
-      if (input.kind === "shared") {
-        const doc = await tx.doc(ProjectsDoc);
-        const key = JSON.stringify([scope.companyId, scope.userId, "create", input.requestId]);
-        const fingerprint = JSON.stringify([name, input.kind]);
-        const prior = doc.requests[key];
-        if (prior) {
-          if (prior.fingerprint !== fingerprint) throw requestConflict();
-          const project = await requireProjectAccess(tx, scope, prior.projectId, "read", this.readAll(scope));
-          return this.projectSummary(project, scope);
-        }
-        const now = Date.now();
-        const project: SharedProjectRecord = { id: randomUUID(), name, companyId: scope.companyId, createdBy: scope.userId,
-          createdAt: now, updatedAt: now, revision: 1, members: [{ userId: scope.userId, role: "manager" }], defaultAgentDefinitionIds: ["default"] };
-        doc.projects[project.id] = project; doc.requests[key] = { fingerprint, projectId: project.id };
+      const doc = await tx.doc(ProjectsDoc);
+      const key = JSON.stringify([scope.companyId, scope.userId, "create", input.requestId]);
+      const fingerprint = JSON.stringify([name, "shared"]);
+      const prior = doc.requests[key];
+      if (prior) {
+        if (prior.fingerprint !== fingerprint) throw requestConflict();
+        const project = await requireProjectAccess(tx, scope, prior.projectId, "read", this.readAll(scope));
         return this.projectSummary(project, scope);
       }
-      // Preserve pre-upgrade create requests as private organizational groups.
-      const catalog = await tx.doc(CatalogDoc);
-      catalog.projects ??= [];
-      const existing = catalog.projects.find(project => owns(scope, project) && project.requestId === input.requestId);
-      if (existing) { if (existing.name !== name) throw requestConflict(); return projectSummary(existing); }
-      const project = { id: randomUUID(), name, createdAt: Date.now(), companyId: scope.companyId, userId: scope.userId, requestId: input.requestId };
-      catalog.projects.push(project);
-      return projectSummary(project);
+      const now = Date.now();
+      const project: SharedProjectRecord = { id: randomUUID(), name, companyId: scope.companyId, createdBy: scope.userId,
+        createdAt: now, updatedAt: now, revision: 1, members: [{ userId: scope.userId, role: "manager" }], defaultAgentDefinitionIds: ["default"] };
+      doc.projects[project.id] = project; doc.requests[key] = { fingerprint, projectId: project.id };
+      return this.projectSummary(project, scope);
     }, context);
   }
 
@@ -267,10 +254,8 @@ export class DispatchRuntime {
     requireText(input.requestId, "Request ID", 200);
     const explicitTitle = Boolean(input.title?.trim());
     const title = input.title?.trim() || "New conversation";
-    const projectId = input.projectId ?? null;
     const requestedAgents = input.agentDefinitionIds ?? (input.agentDefinitionId ? [input.agentDefinitionId] : undefined);
     let agentIds = [...new Set(requestedAgents ?? ["default"])];
-    if (input.sharedProjectId && projectId !== null) throw new RuntimeError(400, "Choose either a shared project or a personal grouping.");
     const creationFingerprint = input.sharedProjectId ? JSON.stringify([title, input.sharedProjectId, requestedAgents ?? null]) : undefined;
     for (const agentId of agentIds) requireText(agentId, "Agent ID", 200);
     requireText(title, "Title", 200);
@@ -283,7 +268,7 @@ export class DispatchRuntime {
           ? existing.creationFingerprint === creationFingerprint
           : creationFingerprint === undefined && existing.title === title
             && JSON.stringify([...(existing.creationAgentIds ?? [existing.agentDefinitionId])].sort()) === JSON.stringify([...agentIds].sort())
-            && (existing.creationProjectId ?? null) === projectId;
+            && (existing.creationProjectId ?? null) === null;
         if (!matches || (existing.creationTitleExplicit !== undefined && existing.creationTitleExplicit !== explicitTitle)) throw requestConflict();
         return existing.id;
       }
@@ -291,13 +276,12 @@ export class DispatchRuntime {
         const project = await requireProjectAccess(tx, scope, input.sharedProjectId, "participate", this.readAll(scope));
         agentIds = [...new Set(requestedAgents ?? project.defaultAgentDefinitionIds)];
       }
-      if (projectId !== null) this.findProject(catalog, scope, projectId);
       for (const agentId of agentIds) this.validateAgent(this.findAgent(catalog, scope, agentId));
       const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
-      await this.shared.initialize(tx, record.id, scope.companyId, human, agentIds, { projectId, pinned: false, archived: false }, input.sharedProjectId ?? undefined);
+      await this.shared.initialize(tx, record.id, scope.companyId, human, agentIds, { pinned: false, archived: false }, input.sharedProjectId ?? undefined);
       const first = agentIds.length ? this.findAgent(catalog, scope, agentIds[0]) : undefined;
       const id = String(record.id);
-      catalog.chats.push({ ...(creationFingerprint ? { creationFingerprint } : {}), id, title, creationTitleExplicit: explicitTitle, ...(explicitTitle ? { displayTitle: title } : {}), projectId, creationProjectId: projectId, creationAgentIds: agentIds, createdAt: Date.now(), agentDefinitionId: first?.id ?? "", agentRevision: first?.revision ?? 0, agentName: first?.name ?? "People", companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
+      catalog.chats.push({ ...(creationFingerprint ? { creationFingerprint } : {}), id, title, creationTitleExplicit: explicitTitle, ...(explicitTitle ? { displayTitle: title } : {}), creationAgentIds: agentIds, createdAt: Date.now(), agentDefinitionId: first?.id ?? "", agentRevision: first?.revision ?? 0, agentName: first?.name ?? "People", companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
       return id;
     }, context);
     return this.getChat(scope, id);
@@ -306,14 +290,8 @@ export class DispatchRuntime {
   async updateChat(scope: RuntimeScope, id: string, input: UpdateChatInput): Promise<ChatSnapshot> {
     await this.authorize(scope, id);
     await this.harness.commit(async tx => {
-      const catalog = await tx.doc(CatalogDoc);
       const room = await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
-      const preference = room.preferences[scope.userId] ??= { projectId: null, pinned: false, archived: false };
-      if (input.projectId !== undefined) {
-        if (room.sharedProjectId) throw new RuntimeError(400, "Shared-project conversations cannot be moved through personal preferences.");
-        if (input.projectId !== null) this.findProject(catalog, scope, input.projectId);
-        preference.projectId = input.projectId;
-      }
+      const preference = room.preferences[scope.userId] ??= { pinned: false, archived: false };
       if (input.pinned !== undefined) preference.pinned = input.pinned;
       if (input.archived !== undefined) preference.archived = input.archived;
     }, context);
@@ -335,12 +313,6 @@ export class DispatchRuntime {
     return this.getChat(scope, id);
   }
 
-  private findProject(catalog: Catalog, scope: RuntimeScope, id: string): StoredProject {
-    const project = catalog.projects?.find(project => project.id === id && owns(scope, project));
-    if (!project) throw new RuntimeError(404, "Project not found.");
-    return project;
-  }
-
   async getChat(scope: RuntimeScope, id: string): Promise<ChatSnapshot> {
     await this.authorize(scope, id);
     // Hold the native commit line while reading all participating streams. No read commits write state.
@@ -349,16 +321,16 @@ export class DispatchRuntime {
       const chat = catalog.chats.find(item => item.id === id && item.companyId === scope.companyId)!;
       const room = await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
       const presentation = await this.shared.presentation(tx, nativeId(id));
-      const preference = room.preferences[scope.userId] ?? { projectId: null, pinned: false, archived: false };
+      const preference = room.preferences[scope.userId] ?? { pinned: false, archived: false };
       const access = room.sharedProjectId ? projectAccess((await tx.doc(ProjectsDoc)).projects[room.sharedProjectId], scope, this.readAll(scope)) : { participate: true };
       const first = presentation.messages.find(message => message.kind === "message");
       const agents = presentation.participants.filter(member => member.kind === "agent").filter(member => member.membership === "active");
       const status = agents.some(agent => ["working", "listening", "responding"].includes(agent.status)) ? "running" : agents.some(agent => agent.status === "failed") ? "failed" : agents.some(agent => agent.status === "stopped") ? "stopped" : "idle";
       const error = agents.find(agent => agent.status === "failed")?.error;
       const conversation: ChatSummary = {
-        id, title: chat.displayTitle ?? (chat.title === "New conversation" && first?.text ? first.text.slice(0, 80) : chat.title),
+        id, title: chat.displayTitle ?? (chat.title === "New conversation" && !chat.creationTitleExplicit ? first?.text.slice(0, 80) || "New chat" : chat.title),
         sharedProjectId: room.sharedProjectId ?? null, canParticipate: access.participate,
-        projectId: room.sharedProjectId ?? preference.projectId, pinned: preference.pinned, archived: preference.archived,
+        projectId: room.sharedProjectId ?? null, pinned: preference.pinned, archived: preference.archived,
         createdAt: chat.createdAt, updatedAt: presentation.messages.reduce((latest, message) => Math.max(latest, message.createdAt), chat.createdAt), revision: this.commitRevision,
         agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, agentName: chat.agentName ?? "Saved agent", status,
         ...(error ? { error } : {}),
@@ -952,7 +924,7 @@ export class DispatchRuntime {
       const native = await conversation.agent(context);
       const definition = catalog.agents.find(agent => agent.companyId === chat.companyId && agent.id === chat.agentDefinitionId && agent.revision === chat.agentRevision);
       const legacy: Member = { id: `agent:${chat.id}`, kind: "agent", name: chat.agentName ?? definition?.name ?? "Saved agent", joinedAt: chat.createdAt, agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, conversationId: roomId, status: "idle", agent: { name: chat.agentName ?? definition?.name ?? "Saved agent", description: definition?.description ?? "", instructions: native.instructions ?? "", provider: native.model?.provider ?? "", modelId: native.model?.modelId ?? "", thinkingLevel: native.thinkingLevel ?? "off", extensions: native.extensions.map(extension => extension.name), tools: native.tools.map(tool => tool.name), ...(native.cwd ? { cwd: native.cwd } : {}) } };
-      await this.harness.commit(tx => this.shared.migrate(tx, roomId, human, legacy, chat.companyId, { projectId: chat.projectId ?? null, pinned: chat.pinned ?? false, archived: chat.archived ?? false }), context);
+      await this.harness.commit(tx => this.shared.migrate(tx, roomId, human, legacy, chat.companyId, { pinned: chat.pinned ?? false, archived: chat.archived ?? false }), context);
     }
   }
 
@@ -1013,9 +985,6 @@ function nativeId(id: string): ConversationId {
 }
 
 function owns(scope: RuntimeScope, chat: RuntimeScope) { return scope.companyId === chat.companyId && scope.userId === chat.userId; }
-function projectSummary(project: StoredProject): Project {
-  return { id: project.id, name: project.name, createdAt: project.createdAt, kind: "personal", canManage: false, canParticipate: true };
-}
 function publicAgent({ companyId: _companyId, savedBy: _savedBy, saveRequestId: _request, saveFingerprint: _fingerprint, ...agent }: StoredAgent): AgentDefinition {
   // Nested catalog values may be transaction proxies; detach before the transaction settles.
   return JSON.parse(JSON.stringify({ ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [], capabilities: [...(agent.extensions?.includes(CodingTools.name) ? ["files-and-commands" as const] : []), ...(agent.extensions?.includes("dispatch-image-gen") ? ["image-generation" as const] : [])] })) as AgentDefinition;

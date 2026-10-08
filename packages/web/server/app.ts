@@ -24,7 +24,6 @@ type AppOptions = {
   clientDir?: string;
 };
 const requestId = z.string().trim().min(1).max(200);
-const projectId = z.string().uuid().nullable().optional();
 const identity = z.string().min(1).max(200);
 const identities = z.array(identity).refine(values => new Set(values).size === values.length, "Choose each participant once.");
 const agentSchema = z.object({
@@ -147,7 +146,7 @@ export function createApp(options: AppOptions) {
   app.get("/api/people", (c) => c.json({ people: auth.listCompanyPeople(c.get("principal").companyId) }));
   app.get("/api/projects", async (c) => c.json({ projects: await runtime.listProjects(c.get("principal")) }));
   app.post("/api/projects", async (c) => {
-    const input = z.object({ requestId, name: z.string().trim().min(1).max(100), kind: z.literal("shared").optional() }).strict().parse(await c.req.json());
+    const input = z.object({ requestId, name: z.string().trim().min(1).max(100), kind: z.literal("shared") }).strict().parse(await c.req.json());
     return c.json({ project: await runtime.createProject(c.get("principal"), input) }, 201);
   });
   app.post("/api/projects/:id", async c => {
@@ -162,7 +161,7 @@ export function createApp(options: AppOptions) {
   app.post("/api/chats", async (c) => {
     const input = z.object({
       requestId, title: z.string().trim().min(1).max(200).optional(),
-      agentDefinitionId: identity.optional(), agentDefinitionIds: identities.max(50).optional(), projectId, sharedProjectId: z.string().uuid().nullable().optional(),
+      agentDefinitionId: identity.optional(), agentDefinitionIds: identities.max(50).optional(), sharedProjectId: z.string().uuid().nullable().optional(),
     }).strict().refine(value => value.agentDefinitionId === undefined || value.agentDefinitionIds === undefined).parse(await c.req.json());
     return c.json(await runtime.createChat(c.get("principal"), input), 201);
   });
@@ -188,8 +187,8 @@ export function createApp(options: AppOptions) {
     return c.json(await runtime.removeParticipant(c.get("principal"), c.req.param("id"), participantId));
   });
   app.post("/api/chats/:id/preferences", async (c) => {
-    const input = z.object({ pinned: z.boolean().optional(), archived: z.boolean().optional(), projectId }).strict()
-      .refine(value => value.pinned !== undefined || value.archived !== undefined || value.projectId !== undefined).parse(await c.req.json());
+    const input = z.object({ pinned: z.boolean().optional(), archived: z.boolean().optional() }).strict()
+      .refine(value => value.pinned !== undefined || value.archived !== undefined).parse(await c.req.json());
     return c.json(await runtime.updateChat(c.get("principal"), c.req.param("id"), input));
   });
   app.post("/api/chats/:id/attachments", async c => {

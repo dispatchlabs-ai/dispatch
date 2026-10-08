@@ -26,11 +26,10 @@ type ConversationSidebarProps = {
   onCreate: () => void;
   onCreateProjectChat: (project: Project) => void;
   onRename: (chat: ChatSummary) => void;
-  onMove: (chat: ChatSummary) => void;
   onUpdate: (id: string, input: UpdateChatInput) => void;
 };
 
-export function ConversationSidebar({ chats, projects, activeChatId, activeProjectId, search, onSearchChange, creating, updating, showArchived, onShowArchivedChange, collapsedProjects, onToggleProject, newProject, onSelect, onSelectProject, onCreate, onCreateProjectChat, onMove, onRename, onUpdate }: ConversationSidebarProps) {
+export function ConversationSidebar({ chats, projects, activeChatId, activeProjectId, search, onSearchChange, creating, updating, showArchived, onShowArchivedChange, collapsedProjects, onToggleProject, newProject, onSelect, onSelectProject, onCreate, onCreateProjectChat, onRename, onUpdate }: ConversationSidebarProps) {
   const groupPrefix = useId();
   const visible = chats.filter(chat => chat.archived === showArchived);
   const query = search.trim().toLowerCase();
@@ -50,7 +49,7 @@ export function ConversationSidebar({ chats, projects, activeChatId, activeProje
         {chat.pinned ? <Pin size={13} aria-label="Pinned" /> : null}
         <span className={`conversation-dot dot-${chat.status}`} aria-label={statusLabels[chat.status]} />
       </button>
-      <div className="sidebar-row-actions"><ConversationActions chat={chat} busy={updating.has(chat.id)} onMove={onMove} onRename={onRename} onUpdate={onUpdate} /></div>
+      <div className="sidebar-row-actions"><ConversationActions chat={chat} busy={updating.has(chat.id)} onRename={onRename} onUpdate={onUpdate} /></div>
     </div>;
   }
 
@@ -70,7 +69,7 @@ export function ConversationSidebar({ chats, projects, activeChatId, activeProje
               <button type="button" className="project-select" onClick={() => onSelectProject(project.id)} aria-current={project.id === activeProjectId ? "page" : undefined} title={project.name}>
                 <Folder size={16} /><span>{project.name}</span>
               </button>
-              {project.kind === "shared" && project.canParticipate !== false ? <IconButton className="project-compose" label={`New chat in ${project.name}`} disabled={creating} onClick={() => onCreateProjectChat(project)}><SquarePen size={16} /></IconButton> : null}
+              {project.canParticipate !== false ? <IconButton className="project-compose" label={`New chat in ${project.name}`} disabled={creating} onClick={() => onCreateProjectChat(project)}><SquarePen size={16} /></IconButton> : null}
             </div>
             <div id={groupId} className="project-group-conversations" hidden={!expanded}>
               {filtered.map(row)}

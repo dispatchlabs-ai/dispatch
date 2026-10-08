@@ -214,14 +214,12 @@ export interface CreateChatInput {
   title?: string;
   agentDefinitionId?: string;
   agentDefinitionIds?: string[];
-  projectId?: string | null;
   sharedProjectId?: string | null;
 }
 
 export interface UpdateChatInput {
   pinned?: boolean;
   archived?: boolean;
-  projectId?: string | null;
 }
 
 export type ProjectMember = { userId: string; role: "manager" | "member" };
@@ -231,7 +229,7 @@ export interface SaveProjectInput {
 }
 
 export type Project = {
-  kind?: "personal" | "shared";
+  kind: "shared";
   revision?: number;
   members?: ProjectMember[];
   defaultAgentDefinitionIds?: string[];
@@ -243,7 +241,7 @@ export type Project = {
 };
 
 export interface CreateProjectInput {
-  kind?: "shared";
+  kind: "shared";
   requestId: string;
   name: string;
 }

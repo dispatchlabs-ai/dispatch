@@ -20,7 +20,7 @@ import { ConversationSidebar } from "./conversation-sidebar";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ContextPanel } from "./context-panel";
 import { ProjectSettings, type ProjectEditing } from "./project-settings";
-import { MoveConversationDialog, ProjectPage } from "./projects";
+import { ProjectPage } from "./projects";
 import { SecurityPage } from "./security";
 import { McpConnectionsPage } from "./mcp-connections";
 import { Button, IconButton, Modal, Notice, Spinner } from "./ui";
@@ -66,7 +66,6 @@ export function Workspace() {
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(() => new Set());
   const [showArchivedChats, setShowArchivedChats] = useState(false);
   const [renamingChat, setRenamingChat] = useState<ChatSummary | null>(null);
-  const [movingChat, setMovingChat] = useState<ChatSummary | null>(null);
   const [updatingChats, setUpdatingChats] = useState<Set<string>>(() => new Set());
   const [agents, setAgents] = useState<AgentDefinition[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -271,17 +270,16 @@ export function Workspace() {
     setError(null);
     const project = projects.find(item => item.id === projectId);
     if (project?.canParticipate === false) return;
-    setNewConversation({ agentIds: project?.kind === "shared" ? project.defaultAgentDefinitionIds ?? [] : agentId ? [agentId] : [], projectId });
+    setNewConversation({ agentIds: project ? project.defaultAgentDefinitionIds ?? [] : agentId ? [agentId] : [], projectId });
   }
 
   async function createChat(agentIds: string[] | undefined, projectId: string | null = null, retry?: CreateChatInput, title?: string) {
     if (creating || createInFlight.current || (createFailed && !retry)) return;
     createInFlight.current = true;
-    const sharedProjectId = projects.find(project => project.id === projectId)?.kind === "shared" ? projectId : null;
-    const personalProjectId = sharedProjectId ? null : projectId;
-    const sameRequest = createRequest.current?.title === title && JSON.stringify(createRequest.current?.agentDefinitionIds) === JSON.stringify(agentIds) && (createRequest.current?.projectId ?? null) === personalProjectId && (createRequest.current?.sharedProjectId ?? null) === sharedProjectId;
+    const sharedProjectId = projectId;
+    const sameRequest = createRequest.current?.title === title && JSON.stringify(createRequest.current?.agentDefinitionIds) === JSON.stringify(agentIds) && (createRequest.current?.sharedProjectId ?? null) === sharedProjectId;
     if (retry) createRequest.current = retry;
-    else if (!sameRequest) createRequest.current = { requestId: crypto.randomUUID(), agentDefinitionIds: agentIds, projectId: personalProjectId, sharedProjectId, title };
+    else if (!sameRequest) createRequest.current = { requestId: crypto.randomUUID(), agentDefinitionIds: agentIds, sharedProjectId, title };
     setCreating(true); setError(null); setCreateFailed(false);
     try {
       const snapshot = await api<ChatSnapshot>("/api/chats", createRequest.current);
@@ -331,8 +329,6 @@ export function Workspace() {
     setUpdatingChats(current => new Set(current).add(id));
     try {
       onSnapshot(await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(id)}/preferences`, input));
-      const projectId = input.projectId;
-      if (projectId) setCollapsedProjects(current => { const next = new Set(current); next.delete(projectId); return next; });
       if (input.archived !== undefined) requestAnimationFrame(() => {
         const sidebar = navigationOpen ? document.querySelector(".dialog-drawer") : document.getElementById("workspace-sidebar");
         sidebar?.querySelector<HTMLButtonElement>(".sidebar-archive-toggle")?.focus();
@@ -354,11 +350,6 @@ export function Workspace() {
 
   async function saveChatTitle(id: string, title: string) {
     onSnapshot(await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(id)}/title`, { title }));
-  }
-
-  function moveChat(chat: ChatSummary) {
-    setNavigationOpen(false);
-    setMovingChat(chat);
   }
 
   function changeMentions(key: string, ids: string[]) {
@@ -488,9 +479,9 @@ export function Workspace() {
     newProject={{ name: projectName, busy: creatingProject, error: projectError, compact: viewportWidth <= 1100,
       onNameChange: name => { setProjectName(name); setProjectError(null); }, onCreate: createProject,
       onCancel: () => { setProjectName(""); setProjectError(null); projectRequest.current = null; } }}
-    onCreateProjectChat={project => { if (project.kind !== "shared" || project.canParticipate === false) return; void createChat(undefined, project.id); }}
+    onCreateProjectChat={project => { if (project.canParticipate === false) return; void createChat(undefined, project.id); }}
     onSelect={selectChat} onSelectProject={selectProject} onCreate={() => chooseAgents(config?.defaultAgentId, activeProjectId)}
-    onMove={moveChat} onRename={renameChat} onUpdate={updateChatAction} />;
+    onRename={renameChat} onUpdate={updateChatAction} />;
   const sidebar = <>
     <div className="section-sidebar-panel" hidden={section !== "chats"}>{conversations}</div>
     <div className="section-sidebar-panel" hidden={section !== "agents"}>
@@ -632,8 +623,8 @@ export function Workspace() {
             /> : tab.kind === "project" ? <ProjectPage
               project={projects.find(project => project.id === tab.projectId)} chats={chats} creating={creating || createFailed} updating={updatingChats}
               onCreate={() => chooseAgents(config.defaultAgentId, tab.projectId)} onSelect={selectChat}
-              onMove={moveChat} onRename={renameChat} onUpdate={updateChatAction}
-              settings={projects.find(project => project.id === tab.projectId)?.kind === "shared" ? <ProjectSettings
+              onRename={renameChat} onUpdate={updateChatAction}
+              settings={projects.find(project => project.id === tab.projectId) ? <ProjectSettings
                 project={projects.find(project => project.id === tab.projectId)!} agents={agents}
                 editing={projectEditing[tab.projectId] ?? null} onEditingChange={editing => setProjectEditing(current => ({ ...current, [tab.projectId]: editing }))}
                 onSaved={project => { setProjects(current => mergeProjects(current, [project])); void load(); }} /> : undefined}
@@ -662,7 +653,6 @@ export function Workspace() {
     {invitingChatId && snapshots[invitingChatId] ? <InviteParticipantsDialog key={invitingChatId} snapshot={snapshots[invitingChatId]} agents={agents} onSnapshot={onSnapshot} onClose={() => setInvitingChatId(null)} /> : null}
     {newConversation ? <NewConversationDialog agents={agents} initialAgentIds={newConversation.agentIds} projectName={projects.find(project => project.id === newConversation.projectId)?.name} busy={creating} error={error} onClose={() => setNewConversation(null)} onCreate={(ids, title) => void createChat(ids, newConversation.projectId, undefined, title)} /> : null}
     {renamingChat ? <RenameConversationDialog key={renamingChat.id} chat={renamingChat} onClose={() => setRenamingChat(null)} onRename={saveChatTitle} /> : null}
-    {movingChat ? <MoveConversationDialog key={movingChat.id} chat={movingChat} projects={projects} onClose={() => setMovingChat(null)} onMove={(id, projectId) => updateChat(id, { projectId })} /> : null}
     <Modal title="Discard agent changes?" description="Your unsaved changes will be lost."
       open={pendingAgentAction !== null} onOpenChange={open => { if (!open) setPendingAgentAction(null); }}
       finalFocus={() => document.getElementById("main-workspace")}>
