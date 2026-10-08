@@ -223,12 +223,12 @@ export function createImageGen(models: Models) {
           status: "intent",
         };
 
-        const references: { path: string; bytes: Uint8Array<ArrayBuffer> }[] = [];
+        const references: Uint8Array<ArrayBuffer>[] = [];
         for (const pathArgument of args.images ?? []) {
           const bytes = await readWorkspacePng(workspaceRoot, workspace, pathArgument, "Reference image");
           if (!bytes) continue;
           record.references.push({ path: pathArgument, sha256: sha256(bytes) });
-          references.push({ path: pathArgument, bytes });
+          references.push(bytes);
         }
         const maskBytes = await readWorkspacePng(workspaceRoot, workspace, args.mask, "Mask");
         if (args.mask && maskBytes) record.mask = { path: args.mask, sha256: sha256(maskBytes) };
@@ -264,8 +264,8 @@ export function createImageGen(models: Models) {
         if (references.length > 0) {
           const form = new FormData();
           for (const [key, value] of Object.entries(request)) form.append(key, String(value));
-          for (const [index, reference] of references.entries())
-            form.append("image[]", new Blob([reference.bytes], { type: "image/png" }), `reference-${index}.png`);
+          for (const [index, bytes] of references.entries())
+            form.append("image[]", new Blob([bytes], { type: "image/png" }), `reference-${index}.png`);
           if (args.mask && maskBytes)
             form.append("mask", new Blob([maskBytes], { type: "image/png" }), "mask.png");
           body = form;
