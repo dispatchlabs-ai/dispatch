@@ -262,7 +262,8 @@ checks current availability on Send and may reject the target.
 Draft invitation tokens use `[@Name](mention:agent-definition%3A<encoded definition ID>)`.
 Submission separates current participant IDs in `mentions` from definition IDs in
 `agentMentions`; both come only from remaining mention nodes. The server rewrites
-accepted invitation-token URLs to participant IDs before public persistence. Public messages
+accepted inline invitation-token URLs to participant IDs before public persistence;
+inline/fenced code and escaped literal syntax remain unchanged. Public messages
 render authorized references inline; older messages with detached mention metadata
 retain their historical badges. Mention selection requests attention under the
 existing participation policy and does not change authorship. Existing-participant
