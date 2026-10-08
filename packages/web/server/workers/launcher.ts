@@ -16,6 +16,7 @@ export type ContainerSpec = LaunchRequest & { installationId: string; name: stri
 const containerSchema = launchRequestSchema.extend({
   id: identity, name: identity, installationId: identity,
   state: z.enum(["created", "running", "exited", "unknown"]),
+  address: z.string().optional(),
 }).strict();
 export type LauncherContainer = z.infer<typeof containerSchema>;
 
@@ -36,10 +37,16 @@ export interface ContainerDriver {
   create(spec: ContainerSpec): Promise<void>;
   start(containerId: string): Promise<void>;
   retire(containerId: string): Promise<void>;
+  /** ECS starts on creation. The launcher journals intent BEFORE this call, never retries it,
+   * and blocks retirement of an unresolved launch without an immutable returned identity. */
+  launchFingerprint?(spec: ContainerSpec): string;
+  run?(spec: ContainerSpec, fingerprint: string): Promise<LauncherContainer>;
+  /** Required with run: absence is an error, not termination evidence. */
+  inspectTask?(containerId: string): Promise<LauncherContainer>;
 }
 
 const attemptSchema = launchRequestSchema.extend({
-  name: identity, containerId: identity.optional(),
+  name: identity, containerId: identity.optional(), address: z.string().optional(), launchFingerprint: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   phase: z.enum(["creating", "starting", "running", "stopping", "stopped"]),
 });
 export type LaunchAttempt = z.infer<typeof attemptSchema>;
@@ -144,6 +151,8 @@ export class WorkerLauncher {
         throw new LauncherError(409, "Stopped launch attempts cannot be restarted; reconcile stop before replacement.");
       if (this.journal.drained) throw new LauncherError(409, "Worker admission is drained.");
       if (!attempt) {
+        if (this.driver.run && this.journal.attempts.some(item => item.phase === "starting" && !item.containerId))
+          throw new LauncherError(503, "An ECS launch outcome is unresolved; operator reconciliation is required.");
         if (this.journal.attempts.some(item => item.phase !== "stopped" && (item.conversationId === request.conversationId || item.storeId === request.storeId)))
           throw new LauncherError(409, "A previous executor attempt must be retired before replacement.");
         const status = await this.readStatus();
@@ -187,7 +196,7 @@ export class WorkerLauncher {
   drain(): Promise<LauncherStatus> {
     return this.serial(async () => {
       // Persist the admission seal and every stop intent before transport effects.
-      await this.save({ ...this.journal, drained: true, attempts: this.journal.attempts.map(attempt => attempt.phase === "stopped" ? attempt : { ...attempt, phase: "stopping" }) });
+      await this.save({ ...this.journal, drained: true, attempts: this.journal.attempts.map(attempt => attempt.phase === "stopped" || (this.driver.run && !attempt.containerId) ? attempt : { ...attempt, phase: "stopping" }) });
       for (const attempt of this.journal.attempts) {
         try { await this.retire(attempt); }
         catch { if (this.poisoned) throw new LauncherError(503, "Launcher journal failed; reopen before continuing."); }
@@ -212,6 +221,7 @@ export class WorkerLauncher {
   }
 
   private async advance(attempt: LaunchAttempt): Promise<LaunchAttempt> {
+    if (this.driver.run) return this.advanceRun(attempt);
     let containers = await this.inventory();
     let container = this.match(attempt, containers);
     if (attempt.containerId && !container) throw new LauncherError(409, "Previously created container is absent; retire the attempt before replacement.");
@@ -245,12 +255,66 @@ export class WorkerLauncher {
     return structuredClone(attempt);
   }
 
+  private async advanceRun(attempt: LaunchAttempt): Promise<LaunchAttempt> {
+    if (!this.driver.inspectTask || !this.driver.launchFingerprint) throw new LauncherError(503, "Run driver requires immutable request and identity inspection.");
+    if (!attempt.containerId && attempt.phase === "starting") {
+      const existing = this.match(attempt, await this.inventory());
+      if (existing) {
+        attempt = { ...attempt, containerId: existing.id };
+        await this.update(attempt);
+      }
+    }
+    if (!attempt.containerId) {
+      if (attempt.phase !== "creating") throw new LauncherError(503, "Launch outcome unresolved; do not repeat RunTask.");
+      const spec = { ...pickRequest(attempt), installationId: this.journal.installationId, name: attempt.name };
+      attempt = { ...attempt, phase: "starting", launchFingerprint: this.driver.launchFingerprint(spec) };
+      await this.update(attempt);
+      this.storage.assertHealthy();
+      const container = containerSchema.parse(await this.driver.run!(spec, attempt.launchFingerprint!));
+      if (!sameRequest(container, attempt) || container.name !== attempt.name || container.installationId !== this.journal.installationId)
+        throw new LauncherError(503, "Launch identity mismatch.");
+      attempt = { ...attempt, containerId: container.id };
+      await this.update(attempt);
+    }
+    const container = await this.driver.inspectTask(attempt.containerId!);
+    if (!sameRequest(container, attempt) || container.name !== attempt.name || container.id !== attempt.containerId || container.installationId !== this.journal.installationId)
+      throw new LauncherError(503, "Task inspection identity mismatch.");
+    if (container.state !== "running" || !container.address)
+      throw new LauncherError(503, "Task is not running; reconcile this same attempt.");
+    attempt = { ...attempt, phase: "running", address: container.address };
+    await this.update(attempt);
+    return structuredClone(attempt);
+  }
+
   private async retire(attempt: LaunchAttempt): Promise<LaunchAttempt> {
+    // RunTask may still arrive after a timeout. Never tombstone an ambiguous launch on
+    // an eventually consistent empty inventory, including after controller restart.
+    if (this.driver.run) {
+      if (attempt.phase === "stopped") return structuredClone(attempt);
+      if (!attempt.containerId && attempt.phase === "creating") {
+        attempt = { ...attempt, phase: "stopped" }; // no launch intent ever committed
+        await this.update(attempt);
+        return structuredClone(attempt);
+      }
+      if (!attempt.containerId) {
+        const existing = this.match(attempt, await this.inventory());
+        if (!existing) throw new LauncherError(503, "Unresolved launch cannot be retired without its immutable task identity.");
+        attempt = { ...attempt, containerId: existing.id };
+        await this.update(attempt);
+      }
+    }
     if (attempt.phase !== "stopped" && attempt.phase !== "stopping") {
       attempt = { ...attempt, phase: "stopping" };
       await this.update(attempt);
     }
     // Retirement addresses every matching immutable ID, including a late stopped-only create.
+    if (this.driver.run && attempt.containerId) {
+      this.storage.assertHealthy();
+      await this.driver.retire(attempt.containerId); // authoritative STOPPED, never ListTasks absence
+      attempt = { ...attempt, phase: "stopped" };
+      await this.update(attempt);
+      return structuredClone(attempt);
+    }
     const containers = await this.inventory();
     const targets = containers.filter(container => container.attemptId === attempt.attemptId || container.name === attempt.name || container.id === attempt.containerId);
     for (const container of targets) { this.storage.assertHealthy(); await this.driver.retire(container.id); }
@@ -266,7 +330,17 @@ export class WorkerLauncher {
   }
 
   private async inventory(): Promise<LauncherContainer[]> {
-    const containers = z.array(containerSchema).parse(await this.driver.list(this.journal.installationId));
+    const inventory = await this.driver.list(this.journal.installationId);
+    if (this.driver.run) {
+      if (!this.driver.inspectTask) throw new LauncherError(503, "Task inspection unavailable.");
+      for (const attempt of this.journal.attempts) {
+        if (attempt.phase === "stopped" || !attempt.containerId) continue;
+        const observed = await this.driver.inspectTask(attempt.containerId);
+        const index = inventory.findIndex(item => item.id === attempt.containerId);
+        if (index < 0) inventory.push(observed); else inventory[index] = observed;
+      }
+    }
+    const containers = z.array(containerSchema).parse(inventory);
     if (containers.some(container => container.installationId !== this.journal.installationId) || new Set(containers.map(container => container.id)).size !== containers.length)
       throw new LauncherError(503, "Invalid installation container inventory.");
     return containers;

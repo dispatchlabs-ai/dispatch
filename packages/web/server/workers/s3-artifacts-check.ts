@@ -74,7 +74,7 @@ try {
     assert(objects.has(key));
     objects.set(key, Buffer.alloc(ATTACHMENT_MAX_BYTES + 1));
     await assert.rejects(client.read(storeId, file.id), /byte limit/);
-    await chmod(config.credentialsFile, 0o644);
+    await chmod(config.credentialsFile!, 0o644);
     await assert.rejects(S3Artifacts.open(config), /restricted regular file/);
     passed.push("AWS4 signing, conditional PUT, explicit single attempt, read byte bound and private credentials checked against HTTP double");
   }
