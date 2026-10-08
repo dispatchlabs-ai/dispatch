@@ -114,14 +114,14 @@ export function AgentConnectionsEditor({ agent, selectedIds, onChange, applyExis
     {!operator.length && !selectedIds.length && !operatorError ? <p className="connection-empty">No connections added.</p> : null}
     {savedIds.filter(id => !selectedIds.includes(id)).map(id => <div className="connection-removal" key={id}><span>{agent?.connections?.find(connection => connection.id === id)?.name} · Pending removal</span><Button variant="ghost" disabled={busy} onClick={() => onChange([...selectedIds, id])}>Undo</Button></div>)}
     {changed ? <fieldset className="connection-application" disabled={busy}><legend>Apply connection changes</legend>
-      <label className="choice-row"><input type="radio" name="connection-application" checked={!applyExisting} onChange={() => onApplyExisting(false)} /><span>New agent instances only<small>Existing conversations keep their current connections.</small></span></label>
-      {agent ? <label className="choice-row"><input type="radio" name="connection-application" checked={applyExisting} onChange={() => onApplyExisting(true)} /><span>New and existing instances<small>Update connections in this agent's existing conversations. Other settings stay at their saved revision.</small></span></label> : null}
-      <p className="field-hint">People in this shared agent's conversations can receive content from its connected services, and teammates can edit its instructions.</p>
+      <label className="choice-row"><input type="radio" name="connection-application" checked={!applyExisting} onChange={() => onApplyExisting(false)} /><span>New agent instances only<small>Existing chats keep their current connections.</small></span></label>
+      {agent ? <label className="choice-row"><input type="radio" name="connection-application" checked={applyExisting} onChange={() => onApplyExisting(true)} /><span>New and existing instances<small>Update connections in this agent's existing chats. Other settings stay at their saved revision.</small></span></label> : null}
+      <p className="field-hint">People in this shared agent's chats can receive content from its connected services, and teammates can edit its instructions.</p>
     </fieldset> : null}
     {choosing ? <Modal title="Add an MCP connection" description="Choose a connection for this agent or connect another server. Each connection is reserved for one agent definition and shared by its instances." open onOpenChange={setChoosing}>
       <div className="connection-picker">{available.map(connection => <Button variant="secondary" key={connection.id} onClick={() => { onChange([...selectedIds, connection.id]); setChoosing(false); }}>{connection.name} · {connection.identity || connection.serverName || connection.endpoint}</Button>)}
         {!available.length ? <p>No unused connections are available.</p> : null}
-        <Notice tone="info">Saving gives this company-shared agent access. Its conversations can share connected content with every participant, including people invited later.</Notice>
+        <Notice tone="info">Saving gives this company-shared agent access. Its chats can share connected content with every participant, including people invited later.</Notice>
         <Button onClick={() => { setChoosing(false); setAuthorizing(true); }}><Plus /> Connect another server</Button>
       </div>
     </Modal> : null}

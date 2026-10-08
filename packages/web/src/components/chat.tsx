@@ -12,6 +12,8 @@ import { Button, Notice, Spinner } from "./ui";
 
 interface ChatPanelProps extends AttachmentComposerProps {
   chatId: string;
+  focusComposer?: boolean;
+  onComposerFocused?: () => void;
   agents: AgentDefinition[];
   active: boolean;
   connection: ConnectionState;
@@ -32,7 +34,7 @@ interface ChatPanelProps extends AttachmentComposerProps {
   onConnection: (chatId: string, state: ConnectionState) => void;
 }
 
-export function ChatPanel({ agents, active: visible, connection, chatId, snapshot, draft, pending, sendError, mentions, onMentionsChange, onDraftChange, onSend, activeThreadId, onParticipants, onAddInstance, onThread, onSnapshot, onConnection, onAccessLost, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment }: ChatPanelProps) {
+export function ChatPanel({ focusComposer, onComposerFocused, agents, active: visible, connection, chatId, snapshot, draft, pending, sendError, mentions, onMentionsChange, onDraftChange, onSend, activeThreadId, onParticipants, onAddInstance, onThread, onSnapshot, onConnection, onAccessLost, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment }: ChatPanelProps) {
   const { api, refreshSession } = useSession();
   const openThread = useCallback((id: string) => onThread(chatId, id), [chatId, onThread]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -43,6 +45,12 @@ export function ChatPanel({ agents, active: visible, connection, chatId, snapsho
   const transcript = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   const scrollPosition = useRef(0);
+
+  useEffect(() => {
+    if (!focusComposer || !visible || !snapshot || snapshot.conversation.canParticipate === false) return;
+    document.getElementById(`composer-${chatId}`)?.focus();
+    onComposerFocused?.();
+  }, [focusComposer, visible, snapshot, chatId, onComposerFocused]);
 
   useEffect(() => {
     if (!visible) return;
@@ -64,7 +72,7 @@ export function ChatPanel({ agents, active: visible, connection, chatId, snapsho
           onConnection(chatId, "connected");
           setLoadError(null);
         } catch {
-          setLoadError("An update could not be read. Reconnect to restore the conversation.");
+          setLoadError("An update could not be read. Reconnect to restore the chat.");
           onConnection(chatId, "error");
         }
       });
@@ -77,7 +85,7 @@ export function ChatPanel({ agents, active: visible, connection, chatId, snapsho
         if (!active) return;
         onConnection(chatId, "reconnecting");
         void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}`, undefined, controller.signal).then(next => { if (active) onSnapshot(next); }).catch(error => {
-          if (active && error instanceof ApiError && [403, 404].includes(error.status)) { stream?.close(); onAccessLost(chatId); setLoadError("Conversation unavailable or access removed."); }
+          if (active && error instanceof ApiError && [403, 404].includes(error.status)) { stream?.close(); onAccessLost(chatId); setLoadError("Chat unavailable or access removed."); }
         });
         void refreshSession().catch(() => { });
       };
@@ -115,14 +123,14 @@ export function ChatPanel({ agents, active: visible, connection, chatId, snapsho
   return <div className="chat-panel shared-chat-panel">
     <header className="view-heading">
       <div>
-        <h1 title={snapshot?.conversation.title || "Conversation"}>{snapshot?.conversation.title || "Conversation"}</h1>
-        <p>{snapshot ? "Shared conversation" : "Loading conversation…"}</p>
+        <h1 title={snapshot?.conversation.title || "Chat"}>{snapshot?.conversation.title || "Chat"}</h1>
+        <p>{snapshot ? "Shared chat" : "Loading chat…"}</p>
       </div>
       <div className="conversation-header-actions"><Button variant="secondary" className="participants-button" id={`participants-${chatId}`} onClick={onParticipants} disabled={!snapshot}><Users size={16} />{snapshot?.participants.length ?? 0} participants</Button>
       {snapshot?.conversation.status !== "idle" ? <span className={`status-badge status-${snapshot?.conversation.status || "idle"}`}>{snapshot ? chatStatusLabel(snapshot) : "Loading"}</span> : null}</div>
     </header>
     {connection === "reconnecting" ? <div className="chat-connection-notice">
-      <Notice tone="info">Reconnecting to this conversation. Agent work continues; updates will appear when the connection returns.</Notice>
+      <Notice tone="info">Reconnecting to this chat. Agent work continues; updates will appear when the connection returns.</Notice>
     </div> : null}
         {loadError ? <div className="chat-load-error">
           <Notice>{loadError}</Notice>
@@ -138,7 +146,7 @@ export function ChatPanel({ agents, active: visible, connection, chatId, snapsho
     }}>
       <div className="transcript-inner">
         {!snapshot && !loadError ? <div className="page-state">
-          <Spinner label="Loading conversation" />
+          <Spinner label="Loading chat" />
         </div> : null}
         {snapshot && !hasMessages ? <div className="chat-empty">
           <div className="chat-empty-mark">
@@ -150,7 +158,7 @@ export function ChatPanel({ agents, active: visible, connection, chatId, snapsho
         {snapshot ? <SharedTranscript snapshot={snapshot} activeThreadId={activeThreadId} onThread={openThread} /> : null}
         {snapshot ? <ConversationPresence participants={snapshot.participants} /> : null}
         {snapshot?.conversation.status === "stopped" ? <p className="run-outcome" role="status">
-          <Square size={13} /> Response stopped. You can continue the conversation.</p> : null}
+          <Square size={13} /> Response stopped. You can continue the chat.</p> : null}
         {snapshot?.conversation.status === "failed" ? <Notice>{snapshot.conversation.error || "The response could not be completed. You can send another message to continue."}</Notice> : null}
       </div>
     </div>

@@ -46,7 +46,7 @@ export function AddInstanceDialog({ chatId, initialDefinitionId, agents, canPart
       if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429) request.current = null;
     } finally { setBusy(false); }
   }
-  return <Modal title="Add agent instance" description="Separate context. Shared conversation." open onOpenChange={open => { if (!open) close(); }}>
+  return <Modal title="Add agent instance" description="Separate context. Shared chat." open onOpenChange={open => { if (!open) close(); }}>
     <form className="instance-form" onSubmit={event => { event.preventDefault(); void create(); }}>
       <Field label="Agent">{props => <Select {...props} value={definitionId} disabled={busy} onChange={event => setDefinitionId(event.target.value)}><option value="">Choose an agent</option>{agents.filter(agent => !agent.archived).map(agent => <option key={agent.id} value={agent.id} disabled={removingDefinitionIds.includes(agent.id)}>{agent.name}</option>)}</Select>}</Field>
       <Field label="Instance name (optional)" hint="Leave blank to use the agent’s name.">{props => <Input {...props} value={name} maxLength={100} disabled={busy} onChange={event => setName(event.target.value)} placeholder="e.g. Developer · Backend" />}</Field>

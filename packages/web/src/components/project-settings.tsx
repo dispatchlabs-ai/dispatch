@@ -31,7 +31,7 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
     return () => controller.abort();
   }, [api, project.kind, attempt]);
 
-  if (project.kind !== "shared") return <p className="field-hint">Personal grouping. Conversation invitations control access; this grouping does not share conversations.</p>;
+  if (project.kind !== "shared") return <p className="field-hint">Personal grouping. Chat invitations control access; this grouping does not share chats.</p>;
 
   const members = editing?.input.members ?? project.members ?? [];
   const defaults = editing?.input.defaultAgentDefinitionIds ?? project.defaultAgentDefinitionIds ?? [];
@@ -69,7 +69,7 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
 
   return <section className="agent-connections">
     <h2>Project settings</h2>
-    <p className="field-hint">Members can read the full project history and participate in its conversations. Managers also control membership and default agents. Operator-designated readers can read all shared projects without membership.</p>
+    <p className="field-hint">Members can read the full project history and participate in its chats. Managers also control membership and default agents. Operator-designated readers can read all shared projects without membership.</p>
     {error ? <Notice>People could not be loaded. {error} <Button variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></Notice> : null}
     {!people && !error ? <Spinner label="Loading people" /> : null}
     {editing ? <div className="stack">
@@ -78,7 +78,7 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
       <Field label="Project name">{props => <Input {...props} value={editing.input.name} maxLength={100} disabled={disabled} onChange={event => update({ name: event.target.value })} />}</Field>
       <fieldset className="agent-form-section" disabled={disabled}>
         <legend>Members</legend>
-        <p className="field-hint">Saving additions grants access to all existing conversations. Saving removals immediately revokes project membership, but cannot retract copies already seen or an operator-granted read-all permission. Keep at least one manager.</p>
+        <p className="field-hint">Saving additions grants access to all existing chats. Saving removals immediately revokes project membership, but cannot retract copies already seen or an operator-granted read-all permission. Keep at least one manager.</p>
         {members.map(member => <div className="connection-card" key={member.userId}>
           <Field label={`Role for ${personName(member.userId)}`}>{props => <Select {...props} value={member.role} disabled={member.role === "manager" && managerCount === 1} onChange={event => update({ members: members.map(item => item.userId === member.userId ? { ...item, role: event.target.value as "manager" | "member" } : item) })}>
             <option value="member">Member</option><option value="manager">Manager</option>
@@ -93,7 +93,7 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
       </fieldset>
       <fieldset className="agent-form-section" disabled={disabled}>
         <legend>Default agents</legend>
-        <p className="field-hint">Preselected for new conversations only. Existing participants and their saved configurations stay unchanged.</p>
+        <p className="field-hint">Preselected for new chats only. Existing participants and their saved configurations stay unchanged.</p>
         {agents.filter(agent => !agent.archived).map(agent => <label className="choice-row" key={agent.id}>
           <input type="checkbox" checked={defaults.includes(agent.id)} onChange={event => update({ defaultAgentDefinitionIds: event.target.checked ? [...defaults, agent.id] : defaults.filter(id => id !== agent.id) })} />
           <span>{agent.name}<small>{agent.description}</small></span>

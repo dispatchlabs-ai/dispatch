@@ -207,11 +207,11 @@ export function ConversationComposer({ id, chatId, active = true, draft, pending
     <form className="composer" onInput={composing.pulse} onCompositionStart={composing.pulse} onCompositionUpdate={composing.pulse} onPaste={composing.pulse} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) composing.clear(); }} onSubmit={event => { event.preventDefault(); send(); }}>
       <DraftAttachments attachments={attachments} disabled={disabled || Boolean(pending?.sending)} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} />
       <MarkdownComposer onPasteFiles={addFiles} id={id} value={draft} disabled={disabled} readOnly={Boolean(pending?.sending)} onChange={onDraftChange} onSend={send}
-        instanceChoices={agents.filter(agent => !agent.archived && !participants.some(person => person.kind === "agent" && person.membership === "removing" && person.agentDefinitionId === agent.id) && participants.some(person => person.kind === "agent" && person.membership === "active" && person.agentDefinitionId === agent.id)).map(agent => ({ id: agent.id, name: agent.name, kind: "agent" as const }))} onAddInstance={onAddInstance} participants={mentionPeople} mentions={mentions} onMentionsChange={onMentionsChange} placeholder={thread ? "Reply to thread…" : conversationTitle ? `Message ${conversationTitle}…` : "Message conversation…"}
+        instanceChoices={agents.filter(agent => !agent.archived && !participants.some(person => person.kind === "agent" && person.membership === "removing" && person.agentDefinitionId === agent.id) && participants.some(person => person.kind === "agent" && person.membership === "active" && person.agentDefinitionId === agent.id)).map(agent => ({ id: agent.id, name: agent.name, kind: "agent" as const }))} onAddInstance={onAddInstance} participants={mentionPeople} mentions={mentions} onMentionsChange={onMentionsChange} placeholder={thread ? "Reply to thread…" : conversationTitle ? `Message ${conversationTitle}…` : "Message chat…"}
         toolbar={<><AttachmentPicker disabled={disabled || Boolean(pending?.sending)} onAddFiles={addFiles} /><div className="button-row">{children}<Button type="submit" className="send-button" disabled={!canSend} aria-label={pending?.error ? "Retry sending message" : thread ? "Send reply" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}</Button></div></>}
       />
     </form>
-    {thread ? <p className="thread-visibility"><LockKeyhole size={12} /> Replies are visible to everyone in this conversation.</p> : null}
+    {thread ? <p className="thread-visibility"><LockKeyhole size={12} /> Replies are visible to everyone in this chat.</p> : null}
   </div>;
 }
 
@@ -293,7 +293,7 @@ function AgentRemoval({ participant, chatId, canParticipate, onSnapshot }: {
   return <>
     <p role="status">{agentStatus(participant)}</p>
     {participant.removalError ? <Notice>{participant.removalError}</Notice> : null}
-    {canParticipate && (participant.membership === "active" || retry) ? <Button variant="danger" disabled={busy} onClick={() => setConfirming(true)}>{retry ? "Retry removal" : "Remove from conversation"}</Button> : null}
+    {canParticipate && (participant.membership === "active" || retry) ? <Button variant="danger" disabled={busy} onClick={() => setConfirming(true)}>{retry ? "Retry removal" : "Remove from chat"}</Button> : null}
     <Modal title={retry ? `Retry removing ${participant.name}?` : `Remove ${participant.name}?`} description="Stops this instance. Its history stays." open={confirming} onOpenChange={open => { if (!busy) setConfirming(open); }}>
       <p>Completed file changes and external actions cannot be undone.</p>
       {error ? <Notice>{error}</Notice> : null}
@@ -358,7 +358,7 @@ export function InviteParticipantsDialog({ snapshot, agents, onSnapshot, onClose
           })}{!people.some(person => person.name.toLowerCase().includes(search.toLowerCase())) ? <p className="collection-empty">No people match your search.</p> : null}</div>}
         </Tabs.Panel>
       </Tabs.Root>
-      <p className="history-access"><LockKeyhole size={15} /> {snapshot.conversation.sharedProjectId ? "Add people through project settings. New agent participants can read the full project conversation history." : "New participants can read the full conversation history."}</p>
+      <p className="history-access"><LockKeyhole size={15} /> {snapshot.conversation.sharedProjectId ? "Add people through project settings. New agent participants can read the full project chat history." : "New participants can read the full chat history."}</p>
       {error ? <Notice>{error} You can retry this invitation.</Notice> : null}
       <footer className="picker-actions"><span>{selected} selected</span><div className="button-row"><Button variant="secondary" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy || !selected} onClick={() => void invite()}>{busy ? <Spinner /> : <UserPlus size={16} />} Add {selected === 1 ? "participant" : "participants"}</Button></div></footer>
     </div>

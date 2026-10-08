@@ -15,12 +15,12 @@ export function ConversationActions({ chat, busy, onMove, onRename, onUpdate }: 
     <Menu.Portal>
       <Menu.Positioner className="menu-positioner" sideOffset={6} align="end" collisionPadding={12}>
         <Menu.Popup className="action-menu">
-          <Menu.Item disabled={chat.canParticipate === false} onClick={() => onRename(chat)}><Pencil size={16} /> Rename conversation</Menu.Item>
+          <Menu.Item disabled={chat.canParticipate === false} onClick={() => onRename(chat)}><Pencil size={16} /> Rename chat</Menu.Item>
           {!chat.sharedProjectId ? <Menu.Item onClick={() => onMove(chat)}><FolderInput size={16} /> Move to personal grouping</Menu.Item> : null}
-          <Menu.Item onClick={() => onUpdate(chat.id, { pinned: !chat.pinned })}><Pin size={16} /> {chat.pinned ? "Unpin" : "Pin"} conversation</Menu.Item>
+          <Menu.Item onClick={() => onUpdate(chat.id, { pinned: !chat.pinned })}><Pin size={16} /> {chat.pinned ? "Unpin" : "Pin"} chat</Menu.Item>
           <Menu.Item onClick={() => onUpdate(chat.id, { archived: !chat.archived })}>
             {chat.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
-            {chat.archived ? "Restore" : "Archive"} conversation
+            {chat.archived ? "Restore" : "Archive"} chat
           </Menu.Item>
         </Menu.Popup>
       </Menu.Positioner>

@@ -181,7 +181,7 @@ export function AgentsPage({
           <AgentConnectionsPanel key={agent.id} agentId={agent.id} />
           {agent.archived ? (
             <Notice tone="info">
-              This agent is archived. Existing conversations keep their saved
+              This agent is archived. Existing chats keep their saved
               configuration.
             </Notice>
           ) : null}
@@ -212,7 +212,7 @@ export function AgentArchiveDialog({
   return (
     <Modal
       title={`Archive ${agent.name}?`}
-      description="This agent will no longer be available for new chats. Existing conversations will keep their saved configuration."
+      description="This agent will no longer be available for new chats. Existing chats will keep their saved configuration."
       open
       onOpenChange={(open) => {
         if (!open && !busy) onClose();

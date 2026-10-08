@@ -56,6 +56,8 @@ export function Workspace() {
   const [config, setConfig] = useState<ApplicationConfig | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [projectEditing, setProjectEditing] = useState<Record<string, ProjectEditing | null>>({});
+  const createInFlight = useRef(false);
+  const [focusChatId, setFocusChatId] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectName, setProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
@@ -272,8 +274,9 @@ export function Workspace() {
     setNewConversation({ agentIds: project?.kind === "shared" ? project.defaultAgentDefinitionIds ?? [] : agentId ? [agentId] : [], projectId });
   }
 
-  async function createChat(agentIds: string[], projectId: string | null = null, retry?: CreateChatInput, title?: string) {
-    if (creating) return;
+  async function createChat(agentIds: string[] | undefined, projectId: string | null = null, retry?: CreateChatInput, title?: string) {
+    if (creating || createInFlight.current || (createFailed && !retry)) return;
+    createInFlight.current = true;
     const sharedProjectId = projects.find(project => project.id === projectId)?.kind === "shared" ? projectId : null;
     const personalProjectId = sharedProjectId ? null : projectId;
     const sameRequest = createRequest.current?.title === title && JSON.stringify(createRequest.current?.agentDefinitionIds) === JSON.stringify(agentIds) && (createRequest.current?.projectId ?? null) === personalProjectId && (createRequest.current?.sharedProjectId ?? null) === sharedProjectId;
@@ -285,12 +288,17 @@ export function Workspace() {
       onSnapshot(snapshot);
       createRequest.current = null;
       setNewConversation(null);
+      setFocusChatId(snapshot.conversation.id);
+      setShowArchivedChats(false);
+      setSearch("");
+      const projectId = snapshot.conversation.projectId;
+      if (projectId) setCollapsedProjects(current => { const next = new Set(current); next.delete(projectId); return next; });
       activate({ id: `chat:${snapshot.conversation.id}`, kind: "chat", chatId: snapshot.conversation.id });
     } catch (error) {
       setError(errorMessage(error));
       if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429) createRequest.current = null;
       else setCreateFailed(true);
-    } finally { setCreating(false); }
+    } finally { createInFlight.current = false; setCreating(false); }
   }
 
   function selectProject(projectId: string) {
@@ -474,12 +482,13 @@ export function Workspace() {
   const selectChat = (chatId: string) => activate({ id: `chat:${chatId}`, kind: "chat", chatId });
   const conversations = <ConversationSidebar chats={chats} projects={projects}
     activeChatId={active.kind === "chat" ? active.chatId : undefined} activeProjectId={active.kind === "project" ? active.projectId : undefined}
-    search={search} onSearchChange={setSearch} creating={creating} updating={updatingChats}
+    search={search} onSearchChange={setSearch} creating={creating || createFailed} updating={updatingChats}
     showArchived={showArchivedChats} onShowArchivedChange={setShowArchivedChats} collapsedProjects={collapsedProjects}
     onToggleProject={id => setCollapsedProjects(current => { const next = new Set(current); if (!next.delete(id)) next.add(id); return next; })}
     newProject={{ name: projectName, busy: creatingProject, error: projectError, compact: viewportWidth <= 1100,
       onNameChange: name => { setProjectName(name); setProjectError(null); }, onCreate: createProject,
       onCancel: () => { setProjectName(""); setProjectError(null); projectRequest.current = null; } }}
+    onCreateProjectChat={project => { if (project.kind !== "shared" || project.canParticipate === false) return; void createChat(undefined, project.id); }}
     onSelect={selectChat} onSelectProject={selectProject} onCreate={() => chooseAgents(config?.defaultAgentId, activeProjectId)}
     onMove={moveChat} onRename={renameChat} onUpdate={updateChatAction} />;
   const sidebar = <>
@@ -552,7 +561,7 @@ export function Workspace() {
         </span>
       </div>
     </nav>
-    <aside className="workspace-sidebar" id="workspace-sidebar" aria-label={section === "chats" ? "Conversations" : section === "agents" ? "Agents" : "Account"}>
+    <aside className="workspace-sidebar" id="workspace-sidebar" aria-label={section === "chats" ? "Chats" : section === "agents" ? "Agents" : "Account"}>
       {sidebar}
       <ColumnResizeHandle side="left" controls="workspace-sidebar" width={sidebarWidth} min={200} max={sidebarMax} onResize={setSidebarWidth} />
     </aside>
@@ -566,7 +575,7 @@ export function Workspace() {
               </IconButton> : null}
               <Tabs.List ref={tabList} className="main-tabs" aria-label="Open work" aria-describedby="tab-keyboard-help" activateOnFocus={false} onScroll={updateTabOverflow}>
                 {tabs.map(tab => {
-                  const title = tab.kind === "chat" ? chats.find(chat => chat.id === tab.chatId)?.title || "Conversation" : tab.kind === "project" ? projects.find(project => project.id === tab.projectId)?.name || "Project" : "Workspace";
+                  const title = tab.kind === "chat" ? chats.find(chat => chat.id === tab.chatId)?.title || "Chat" : tab.kind === "project" ? projects.find(project => project.id === tab.projectId)?.name || "Project" : "Workspace";
                   return <div key={tab.id} role="presentation" className={`main-tab-item ${tab.id === activeId ? "selected" : ""}`}>
                     <Tabs.Tab value={tab.id} data-work-tab={tab.id} className="main-tab"
                       onKeyDown={event => {
@@ -589,8 +598,8 @@ export function Workspace() {
               </IconButton> : null}
             </div>
         </header> : null}
-        {error ? <div className="workspace-notice">
-          <Notice>{error}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat([], null, createRequest.current ?? undefined)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}
+        {error || createFailed ? <div className="workspace-notice">
+          <Notice>{error ?? "Chat creation could not be confirmed. Retry to recover it."}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat([], null, createRequest.current ?? undefined)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}
         </div> : null}
         <main className="workspace-main" id="main-workspace" tabIndex={-1}>
           <div className="workspace-section" hidden={section !== "chats"}>
@@ -598,6 +607,8 @@ export function Workspace() {
             {tab.kind === "chat" ? <ChatPanel agents={agents}
               active={section === "chats" && tab.id === activeId}
               connection={connections[tab.chatId] || "connecting"}
+              focusComposer={focusChatId === tab.chatId}
+              onComposerFocused={() => setFocusChatId(null)}
               chatId={tab.chatId}
               snapshot={snapshots[tab.chatId]}
               attachments={attachmentDrafts.drafts[tab.chatId] ?? emptyAttachments}
@@ -619,7 +630,7 @@ export function Workspace() {
               onConnection={onConnection}
               onAccessLost={onAccessLost}
             /> : tab.kind === "project" ? <ProjectPage
-              project={projects.find(project => project.id === tab.projectId)} chats={chats} creating={creating} updating={updatingChats}
+              project={projects.find(project => project.id === tab.projectId)} chats={chats} creating={creating || createFailed} updating={updatingChats}
               onCreate={() => chooseAgents(config.defaultAgentId, tab.projectId)} onSelect={selectChat}
               onMove={moveChat} onRename={renameChat} onUpdate={updateChatAction}
               settings={projects.find(project => project.id === tab.projectId)?.kind === "shared" ? <ProjectSettings
@@ -628,7 +639,7 @@ export function Workspace() {
                 onSaved={project => { setProjects(current => mergeProjects(current, [project])); void load(); }} /> : undefined}
             /> : <Welcome
               name={state.user.name} config={config}
-              onCreate={() => chooseAgents()} creating={creating}
+              onCreate={() => chooseAgents()} creating={creating || createFailed}
             />}
           </Tabs.Panel>)}
           </div>
@@ -636,7 +647,7 @@ export function Workspace() {
             <AgentsPage evaluationAgent={evaluationAgent} onEvaluationAgentChange={setEvaluationAgent} onEvaluationContextChange={setEvaluationContext} onEvaluationGuardChange={setEvaluationGuard} agent={selectedAgent} editing={editingAgent} config={config} onEditingChange={setEditingAgent}
               onSaved={finishAgentEdit} onConnectionsSettings={() => selectSection("connections")}
               onCancel={() => requestAgentAction(() => finishAgentEdit())} onEdit={editAgent}
-              onStartChat={agentId => chooseAgents(agentId)} creating={creating} />
+              onStartChat={agentId => chooseAgents(agentId)} creating={creating || createFailed} />
           </div> : null}
           {visited.connections ? <div className="workspace-section" hidden={section !== "connections"}><McpConnectionsPage /></div> : null}
           {visited.security ? <div className="workspace-section" hidden={section !== "security"}><SecurityPage /></div> : null}
@@ -710,11 +721,11 @@ function Welcome({ name, config, creating, onCreate }: {
   return <section className="welcome-view">
     <span className="eyebrow">Hello, {name.split(" ")[0]}</span>
     <h1>Your workspace</h1>
-    <p>A question, a plan, a problem to untangle.<br />Start a conversation and make some headway.</p>
+    <p>A question, a plan, a problem to untangle.<br />Start a chat and make some headway.</p>
     <div className="welcome-actions">
-      <Button disabled={creating} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New conversation</Button>
+      <Button disabled={creating} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New chat</Button>
     </div>{!config.providerReady ? <Notice tone="info">The default agent is not connected yet. Choose another configured agent or ask your operator to connect it.</Notice> : null}
     <p className="welcome-footnote">
-      <CircleHelp size={14} /> Each conversation starts fresh and keeps its own history.</p>
+      <CircleHelp size={14} /> Each chat starts fresh and keeps its own history.</p>
   </section>;
 }

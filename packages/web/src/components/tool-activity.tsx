@@ -126,7 +126,7 @@ function toolSummary(activity: ToolActivity, completed: boolean) {
   if (/^mcp_.+_wiki_search_[a-f0-9]{10}$/.test(activity.name)) return completed ? "searched the wiki" : "Wiki search";
   if (/^mcp_.+_wiki_read_[a-f0-9]{10}$/.test(activity.name)) return completed ? "read the wiki" : "Wiki read";
   if (/^mcp_.+_wiki_save_[a-f0-9]{10}$/.test(activity.name)) return "Wiki save";
-  if (activity.name === "conversation_history") return completed ? "read conversation history" : "Conversation history";
+  if (activity.name === "conversation_history") return completed ? "read chat history" : "Conversation history";
   if (activity.name === "conversation_post") return "Conversation post";
   if (activity.name === "conversation_invite_agent") return "Agent invitation tools";
   return "Tool activity";

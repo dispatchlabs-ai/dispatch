@@ -58,7 +58,7 @@ export function ProjectPage({ project, chats, creating, updating, onCreate, onSe
   return <section className="project-page">
     <header className="project-page-header">
       <div><p className="eyebrow">{project.kind === "shared" ? "Shared project" : "Personal grouping"}</p><h1>{project.name}</h1></div>
-      <Button disabled={creating || project.canParticipate === false} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New conversation</Button>
+      <Button disabled={creating || project.canParticipate === false} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New chat</Button>
     </header>
     {settings}
     <p className="project-conversation-count">{visible.length} {visible.length === 1 ? "conversation" : "conversations"}</p>
@@ -71,7 +71,7 @@ export function ProjectPage({ project, chats, creating, updating, onCreate, onSe
         </button>
         <ConversationActions chat={chat} busy={updating.has(chat.id)} onMove={onMove} onRename={onRename} onUpdate={onUpdate} />
       </li>)}
-    </ul> : <div className="project-empty"><p>No conversations yet.</p><p>{project.kind === "shared" ? "Project members can start a conversation here. Existing conversations cannot be moved into shared projects." : "Start a conversation here, or move one from its actions menu."}</p></div>}
+    </ul> : <div className="project-empty"><p>No chats yet.</p><p>{project.kind === "shared" ? "Project members can start a chat here. Existing chats cannot be moved into shared projects." : "Start a chat here, or move one from its actions menu."}</p></div>}
   </section>;
 }
 
