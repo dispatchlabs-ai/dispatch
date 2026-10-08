@@ -49,6 +49,9 @@ buildNpmPackage {
       --add-flags "$app/packages/web/build/service/server/index.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-auth" \
       --add-flags "$app/packages/web/build/service/server/auth-cli.js"
+    test -f "$app/packages/web/build/service/server/workers/bootstrap-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-bootstrap" \
+      --add-flags "$app/packages/web/build/service/server/workers/bootstrap-main.js"
     test -f "$app/packages/web/build/service/server/workers/backend-main.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-backend" \
       --add-flags "$app/packages/web/build/service/server/workers/backend-main.js"
