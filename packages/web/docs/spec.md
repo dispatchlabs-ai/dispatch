@@ -812,7 +812,41 @@ The first slice stores name, description and Markdown instructions as immutable 
 
 One installed native extension advertises only the assigned names/descriptions/IDs and provides `load_skill({ id })`, checking only the calling conversation's saved binding. Empty assignments install neither the section nor loader. Loading uses the existing native safe tool/recovery mechanism, not a separate executor; assigned skills may be loaded by the model when relevant. No filesystem discovery, inheritance or name guessing grants another skill. Skill text is guidance, not additional tool permissions or an enforced workflow.
 
-This slice supports text skills only. Repository package import/export, supporting-file upload, immutable package materialization, script execution helpers, skill deletion/archive, manual-only invocation and live instance rollout are deferred. Existing unrestricted coding tools are not a confidentiality sandbox: assignment enforcement applies to the skills extension, not arbitrary access to service-account files or shared messages.
+This slice supports text skills only. Repository package import/export is now authorized as a separate [portability slice](#portable-definitions-and-project-data), not part of this implemented skill slice. Supporting-file upload, immutable package materialization, script execution helpers, skill deletion/archive, manual-only invocation and live instance rollout remain deferred. Existing unrestricted coding tools are not a confidentiality sandbox: assignment enforcement applies to the skills extension, not arbitrary access to service-account files or shared messages.
+
+## Portable definitions and project data
+
+**Accepted and implementation authorized October 8, 2026; not implemented or functionally qualified.** Chris accepted Pi Durable Expert's architecture call: a thin Dispatch packaging layer over stock Pi Durable, not a new plugin runtime. Separate reusable definitions, executable extensions and private recovery state.
+
+### Agent and skill bundles
+
+Use one Git-friendly directory/archive format with a versioned manifest (`dispatch.json`), package identity/version, included agent/text-skill definitions and capability requirements. References use package-local keys, never installation UUIDs. Agents include instructions, model preferences and explicit skill assignments. Connection requirements describe setup, not existing authorization. Exclude conversations, private memory, grants, credentials and machine-specific paths. This is a Dispatch format, not an upstream Pi standard; the exact schema and archive validation limits require review before implementation.
+
+Import follows preview, requirement resolution, authorization and local save. Missing/incompatible capabilities block activation rather than silently weakening the agent. Executable capabilities remain approved host-installed extensions using Pi's public tools/hooks/tasks interfaces; importing definitions never executes installation scripts or grants extensions to unrelated agents. Install compatible implementations before native recovery, preserving the [upstream registry boundary](https://github.com/earendil-works/pi/blob/v1.0.4/packages/durable/README.md#extensions).
+
+Use native document commits for atomic definition/reference/import-receipt changes. Package fetching, software installation and external authorization are separate operations, not a universal transaction. Preserve existing immutable revisions and participant skill/configuration snapshots. The first slice uses independent-copy imports with request replay; upstream update/merge choices belong to the GitHub slice. Starter agents use this same public format and import path.
+
+### First archive slice
+
+**Contract selected October 8 by Pi Durable Expert; implementation pending.** Manifest `formatVersion: 1` identifies the package and version, with package-local agent/skill keys and UTF-8 Markdown instruction references. Agent skill references resolve entirely inside the bundle. Agent entries hold name/description, instruction reference, provider/model/thinking preferences and explicit capability requirements, not raw native extension/tool names or local identifiers.
+
+Import creates independent local copies, never overwrites definitions or the default agent, and leaves conversation configuration and skill snapshots unchanged. An identical actor/company-scoped request returns the original mapping; another-copy import uses a new operation. Check the receipt/fingerprint before mutable compatibility checks on retry; new requests revalidate requirements. Commit the complete catalog changes and receipt/mapping together, not a loop over independently committing save methods.
+
+Preview shows definitions, assignments, capabilities, model compatibility and excluded connection bindings. Unsupported requirements block import; no model substitution or dropped capabilities. First-slice connections are reported as excluded, not recreated or presented as fully connected.
+
+Parse archives as data without filesystem extraction or code execution. Reject unsafe/duplicate paths, unsupported entries and missing references; bound compressed and uncompressed sizes and file counts. Export exact assigned skill revisions, not latest revisions. Warn that instruction text may contain private information: excluding credential fields does not redact secrets embedded in user content.
+
+### GitHub sources and updates
+
+Fetch an immutable commit and record provenance; imported local definitions work without GitHub afterward. Updates show a diff and create explicit local revisions, preserving local edits and existing instances. No automatic upstream execution dependency or live instance rollout. A later marketplace can index these bundles without changing execution ownership.
+
+### Project content and operational recovery
+
+Project export selects user content, history and attachments. Import requires explicit identity/access mapping; historical authorship does not grant destination membership or recreate running tasks. Project-scoped resumable migration requires separate design; do not carve projects out of native Pi storage or invent task serialization.
+
+Operational backup is a separate, consistent recovery set: native Pi storage, required Dispatch databases/files, workspace/attachment data and protected credential material, with compatible runtime implementations available. Initially stop the runtime owner and back up the installation together. Keep secret-bearing backups restricted and prevent overlapping original/restored executors. An archive of visible messages is not an operational backup.
+
+Implementation order: agent/skill archive import-export, pinned GitHub imports/updates, then project content export. Reliable installation backup has its own work package. This broader product feature does not redefine the earlier one-time operator-assisted migration scope. Scope and remaining acceptance evidence belong in [the portability handoff](handoff.md#portable-definitions-and-project-data--october-8-2026).
 
 ## Shared project access and default agents
 

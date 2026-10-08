@@ -1304,3 +1304,29 @@ Acceptance criteria/evidence:
 - New implicit selections use Developer; committed creation retries retain original selections across the change. Explicit unavailable definitions still reject new creation.
 - Source review of the candidate informed these documentation updates. Pi Durable Expert confirmed the startup migration and rechecked the retry fixes: explicit selections are deduplicated, new requests retain omission intent, and legacy fallback is limited to historical/current default singletons. No remaining blockers were found in that source review. Integrated `nix develop --command npm run check`, `nix build --no-link`, and `nix flake check` passed on Apple Silicon (zero runnable flake checks; Linux omitted). Source/deslop and full-diff review passed; the existing large-chunk advisory remains. Documentation whitespace and 166 local file/anchor checks passed.
 - No tests, rendered review or deployment are claimed. Live migration, restart/retry recovery and Default-tag/archived-list browser behavior remain unverified under the standing check policy.
+
+
+## Portable definitions and project data — October 8, 2026
+
+**Architecture accepted and implementation authorized; no implementation or verification claimed.** Chris delegated the architecture call to Pi Durable Expert, then accepted its direction and asked the team to implement it. [The specification](spec.md#portable-definitions-and-project-data) owns the execution, privacy and recovery boundaries. Documenter owns these package records; Developer owns first-slice implementation; Pi Durable Expert owns manifest/import contracts and native commit review.
+
+Ordered work:
+
+1. **Agent/text-skill archive import-export:** implement the [selected first-slice contract](spec.md#first-archive-slice): format version 1, UTF-8 instruction references, bounded data-only archive parsing, package-local references, explicit compatibility and independent local-copy semantics. Preview complete requirements before native atomic catalog/reference/receipt saves; no credentials, grants or executable install scripts. Use the same format/path for starters. Preserve existing revisions, snapshots and request/conflict behavior.
+2. **Pinned GitHub imports and updates:** immutable commit provenance, local operation after import, explicit diff/revision updates and preservation of local edits/instances. Define fetch, authorization and failure boundaries separately from native commits.
+3. **Project content export:** selected content/history/attachments, with explicit audience/identity mapping on subsequent import. Exported history never recreates running tasks. Define privacy/selection and attachment completeness before implementation.
+4. **Separate installation backup work package:** stopped-owner consistent native/application/files/credential recovery set, compatible code and exclusive restore ownership. Project-scoped resumable migration and custom task serialization are not included.
+
+Acceptance requirements for each implementation slice:
+
+- Review native ownership and behavior-preserving simplification; run TypeScript/application and applicable Nix build checks, full diff/whitespace and changed documentation links. Record exact revisions and remaining evidence here; do not equate builds with runtime qualification.
+- Preserve company authorization, definition revision conflicts, assigned-skill snapshots and existing instances. No silent privilege expansion, credential copying, runtime code installation or live rollout.
+- Follow the standing zero-tests policy. Runtime archive rejection, replay/conflict, interruption/recovery and content/backup round trips remain unverified until explicitly authorized and exercised. Review rendered desktop/390 px UI under repository rules, recording unverified interaction/accessibility flows without claiming qualification.
+
+No wiki publication is claimed: authenticated wiki publication tools are unavailable in this session. Durable product intent belongs in the Dispatch Works knowledgebase; an unpublished safe decision draft is retained locally pending review of the canonical destination. Repository records are implementation contracts, not a substitute-company wiki.
+
+First-slice acceptance additions selected by Pi Durable Expert:
+
+- Export exact assigned skill revisions; preview excluded connection bindings and warn about sensitive instruction text. Import unsupported requirements fails without substitutions or partial records.
+- One native commit saves every imported agent/skill and an actor/company-scoped fingerprint/result receipt. Do not call independently committing catalog save methods in a loop. Receipt replay precedes mutable compatibility checks; changed-request reuse conflicts, and a new operation creates another copy.
+- Never overwrite the default/other definitions or change existing conversation/skill snapshots. Reject unsafe/duplicate archive paths, unsupported entries and unresolved references without extraction/execution; document concrete size/count limits once implemented.
