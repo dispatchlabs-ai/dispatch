@@ -7,13 +7,15 @@ locals {
     name                   = "volume-init", image = var.image, essential = false, user = "0:0",
     entryPoint             = ["/bin/sh", "-c"],
     command                = ["touch /data/.dispatch-volume-init /tmp/.dispatch-volume-init /workspace/.dispatch-volume-init && chown 65532:65532 /data /tmp /workspace && chmod 0700 /data /workspace && chmod 1777 /tmp"],
-    readonlyRootFilesystem = true, mountPoints = local.mounts
+    readonlyRootFilesystem = true, mountPoints = local.mounts,
+    environment            = [], portMappings = [], systemControls = [], volumesFrom = []
   }
   runtime = {
     image                  = var.image, essential = true, user = "65532:65532",
     readonlyRootFilesystem = true, mountPoints = local.mounts,
     dependsOn              = [{ containerName = "volume-init", condition = "SUCCESS" }],
-    linuxParameters        = { initProcessEnabled = true, capabilities = { drop = ["ALL"] } },
+    linuxParameters        = { initProcessEnabled = true, capabilities = { add = [], drop = ["ALL"] } },
+    portMappings           = [], systemControls = [], volumesFrom = [],
     stopTimeout            = 120
   }
 }
@@ -40,7 +42,7 @@ resource "aws_ecs_task_definition" "stable" {
       name         = each.key, command = ["dispatch-bootstrap", each.key],
       environment  = [for name, value in each.value.environment : { name = name, value = value }],
       secrets      = [for name, arn in each.value.secrets : { name = name, valueFrom = arn }],
-      portMappings = [{ containerPort = each.key == "backend" ? 3001 : 8830, protocol = "tcp" }],
+      portMappings = [{ containerPort = each.key == "backend" ? 3001 : 8830, hostPort = each.key == "backend" ? 3001 : 8830, protocol = "tcp" }],
       logConfiguration = { logDriver = "awslogs", options = {
         awslogs-group  = aws_cloudwatch_log_group.this[each.key].name,
         awslogs-region = data.aws_region.current.region, awslogs-stream-prefix = each.key
@@ -72,7 +74,7 @@ resource "aws_ecs_task_definition" "worker" {
       name             = "worker", command = ["dispatch-worker"],
       workingDirectory = "/workspace",
       environment      = [{ name = "DISPATCH_WORKSPACE_DIR", value = "/workspace" }],
-      portMappings     = [{ containerPort = 8831, protocol = "tcp" }],
+      portMappings     = [{ containerPort = 8831, hostPort = 8831, protocol = "tcp" }],
       logConfiguration = { logDriver = "awslogs", options = {
         awslogs-group  = aws_cloudwatch_log_group.this["worker"].name,
         awslogs-region = data.aws_region.current.region, awslogs-stream-prefix = "worker"
