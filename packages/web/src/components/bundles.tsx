@@ -1,3 +1,4 @@
+import { downloadBlob } from "../lib/download";
 import { GitHubBundles } from "./github-bundles";
 import { StarterPicker } from "./starters";
 import { useEffect, useRef, useState } from "react";
@@ -82,9 +83,7 @@ export function BundlesDialog({ open, onClose, agents, models, onImported }: {
       const output = await api<{ archive: string; filename: string }>("/api/bundles/export", { id, version, agentIds: selectedAgents,
         skills: skills.filter(item => selectedSkills.includes(item.id)).map(({ id, revision }) => ({ id, revision })) });
       const bytes = Uint8Array.from(atob(output.archive), char => char.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" }));
-      const link = document.createElement("a"); link.href = url; link.download = output.filename; link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      downloadBlob(new Blob([bytes], { type: "application/zip" }), output.filename);
     });
   }
   function toggle(values: string[], id: string) { return values.includes(id) ? values.filter(value => value !== id) : [...values, id]; }

@@ -148,25 +148,3 @@ export interface AuthEndpoints {
     response: SecurityState | { state: "signed_out" };
   };
 }
-
-export const AUTH_ENDPOINTS = {
-  session: "/api/auth/session",
-  password: "/api/auth/password",
-  totp: "/api/auth/totp",
-  passkeyLoginOptions: "/api/auth/passkey/login/options",
-  passkeyLoginVerify: "/api/auth/passkey/login/verify",
-  logout: "/api/auth/logout",
-  enrollmentStart: "/api/auth/enrollment/start",
-  enrollmentTotpStart: "/api/auth/enrollment/totp/start",
-  enrollmentTotpVerify: "/api/auth/enrollment/totp/verify",
-  enrollmentPasskeyOptions: "/api/auth/enrollment/passkey/options",
-  enrollmentPasskeyVerify: "/api/auth/enrollment/passkey/verify",
-  recoveryStart: "/api/auth/recovery/start",
-  security: "/api/auth/security",
-  securityPasskeyOptions: "/api/auth/security/passkey/options",
-  securityPasskeyVerify: "/api/auth/security/passkey/verify",
-  securityPasskeyRemove: "/api/auth/security/passkey/remove",
-  securityTotpStart: "/api/auth/security/totp/start",
-  securityTotpVerify: "/api/auth/security/totp/verify",
-  securitySessionsRevoke: "/api/auth/security/sessions/revoke",
-} as const;

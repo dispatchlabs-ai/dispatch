@@ -1,14 +1,9 @@
+import { downloadBlob } from "../lib/download";
 import { useState } from "react";
 import type { ChatSummary, Project } from "../shared/contracts";
 import { PROJECT_ARCHIVE_MAX_BYTES, type ProjectArchive, type ProjectArchivePreview } from "../shared/project-archives";
 import { errorMessage, request } from "../lib/api";
 import { Button, Field, Input, Modal, Notice, Spinner } from "./ui";
-
-function download(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a"); link.href = url; link.download = name; link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 export function ProjectArchiveImport({ open, onOpenChange, onImported }: { open: boolean; onOpenChange: (open: boolean) => void; onImported: (project: Project) => void }) {
   const [source, setSource] = useState("");
@@ -69,7 +64,7 @@ export function ProjectArchiveActions({ project, chats }: { project: Project; ch
     try {
       if (exporting) {
         const { archive } = await request<{ archive: ProjectArchive }>(`/api/projects/${project.id}/export`, { chatIds: selected });
-        download(new Blob([JSON.stringify(archive)], { type: "application/json" }), "project-history.json");
+        downloadBlob(new Blob([JSON.stringify(archive)], { type: "application/json" }), "project-history.json");
       } else {
         const { archive } = await request<{ archive: ProjectArchive | null }>(`/api/projects/${project.id}/history`);
         setArchive(archive); setLoaded(true);
@@ -100,7 +95,7 @@ function ArchiveContents({ archive }: { archive: ProjectArchive }) {
       <pre>{message.text}</pre>
       {message.files.map(key => { const file = chat.files.find(file => file.key === key)!; return <Button key={key} variant="secondary" onClick={() => {
         const bytes = Uint8Array.from(atob(file.data), char => char.charCodeAt(0));
-        download(new Blob([bytes], { type: "application/octet-stream" }), file.name.replace(/[\\/\u0000-\u001f\u007f]/g, "_") || "attachment");
+        downloadBlob(new Blob([bytes], { type: "application/octet-stream" }), file.name.replace(/[\\/\u0000-\u001f\u007f]/g, "_") || "attachment");
       }}>Download {file.name}</Button>; })}
     </article>)}
   </details>)}</div>;
