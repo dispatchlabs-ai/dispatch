@@ -16,3 +16,12 @@ output "alb_zone_id" { value = try(aws_lb.this[0].zone_id, null) }
 output "task_role_arns" { value = { for key, role in aws_iam_role.task : key => role.arn } }
 
 output "worker_cluster_arn" { value = aws_ecs_cluster.workers.arn }
+output "database_initializer" {
+  value = local.database_initializer_enabled ? {
+    task_definition_arn = aws_ecs_task_definition.database_initializer[0].arn
+    security_group_id   = aws_security_group.database_initializer[0].id
+    execution_role_arn  = aws_iam_role.database_initializer_execution[0].arn
+    task_role_arn       = aws_iam_role.database_initializer_task[0].arn
+  } : null
+  description = "Operator-only RunTask inputs, using service_cluster_arn/private_subnet_ids and no public IP. Not scheduled by Terraform."
+}

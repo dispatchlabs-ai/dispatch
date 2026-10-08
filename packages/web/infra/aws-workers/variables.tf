@@ -100,3 +100,16 @@ variable "client_cidrs" {
   type    = set(string)
   default = []
 }
+variable "database_initializer" {
+  description = "Optional operator-only one-off task definition. Never scheduled; resolved master/provisioning credentials stay out of Terraform. Remove after bootstrap."
+  type = object({
+    command     = list(string)
+    environment = map(string)
+    secrets     = map(string)
+  })
+  default = null
+  validation {
+    condition     = var.database_initializer == null ? true : length(var.database_initializer.command) > 0 && length(setintersection(toset(keys(var.database_initializer.environment)), toset(keys(var.database_initializer.secrets)))) == 0
+    error_message = "Provide an explicit operator command and distinct environment/secret variable names."
+  }
+}
