@@ -5,7 +5,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, getSupportedThinkingLevels, type Models } from "@earendil-works/pi-ai/models";
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
-import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, type ConversationId, type HarnessSettings, type RegistryReader, type Storage, type Tx } from "@earendil-works/pi-durable";
+import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, LiveDoc, type ConversationId, type HarnessSettings, type RegistryReader, type Storage, type Tx } from "@earendil-works/pi-durable";
 import { openPiStorage, type PiStorageConfig } from "./storage/open.js";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
@@ -17,6 +17,7 @@ import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
 import { Skills, SkillBindingsDoc } from "./extensions/skills.js";
 import { imageGenerationSkill } from "./skills/image-generation.js";
+import { agentBrowserSkill, dogfoodSkill } from "./skills/agent-browser/index.js";
 import { createImageGen } from "./extensions/image-gen.js";
 import { Coding } from "./extensions/coding.js";
 import { SharedConversations, SharedDoc, type Member, type PeopleDirectory } from "./collaboration/shared.js";
@@ -84,6 +85,9 @@ export class DispatchRuntime {
   private owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>;
   private commitRevision = 0;
   private closed = false;
+  private upgradeDrain?: Promise<void>;
+  private upgradesDirty = false;
+  private unsubscribeUpgrades?: () => void;
   private shared: SharedConversations;
   private peopleDirectory?: PeopleDirectory;
   private connections: AgentConnections;
@@ -95,6 +99,7 @@ export class DispatchRuntime {
     this.shared = shared;
     this.peopleDirectory = peopleDirectory;
     shared.bind(harness, storage);
+    shared.beforeDelivery = (tx, roomId, companyId, member) => this.upgradeParticipant(tx, roomId, companyId, member);
     shared.availableAgents = async companyId => (await this.listAgents({ companyId, userId: "" })).filter(agent => !agent.archived).map(({id,name,description}) => ({id,name,description}));
     this.harness = harness;
     this.models = models;
@@ -179,6 +184,18 @@ export class DispatchRuntime {
             requestId: "seed:image-generation", fingerprint: "seed:image-generation:1",
           });
         }
+        for (const seed of [
+          { id: "f0f71a7c-2268-4b27-80ec-837c76845592", key: "agent-browser", content: agentBrowserSkill },
+          { id: "e0ae224c-e456-48ca-9575-6391bb39918e", key: "agent-browser-dogfood", content: dogfoodSkill },
+        ]) {
+          if (catalog.skills.some(skill => skill.companyId === options.companyId && skill.id === seed.id)) continue;
+          const now = Date.now();
+          catalog.skills.push({
+            ...seed.content, id: seed.id, companyId: options.companyId,
+            revision: 1, createdAt: now, updatedAt: now, savedBy: "system",
+            requestId: `seed:${seed.key}`, fingerprint: `seed:${seed.key}:1`,
+          });
+        }
         catalog.runtimeInstance = randomUUID();
       }, context);
       await runtime.migrateChats();
@@ -186,6 +203,10 @@ export class DispatchRuntime {
       await connections.open(harness);
       await runtime.configureConnections(options.companyId);
       connections.onChanged = () => runtime.configureConnections(options.companyId);
+      await runtime.reconcileUpgrades();
+      runtime.unsubscribeUpgrades = harness.subscribeCommits(publication => {
+        if (publication.changes.length) runtime.scheduleUpgrades();
+      });
       harness.resume();
       return runtime;
     } catch (error) {
@@ -340,6 +361,13 @@ export class DispatchRuntime {
       const chat = catalog.chats.find(item => item.id === id && item.companyId === scope.companyId)!;
       const room = await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
       const presentation = await this.shared.presentation(tx, nativeId(id));
+      for (const participant of presentation.participants) {
+        if (participant.kind !== "agent" || participant.membership !== "active") continue;
+        const latest = latestAgent(catalog, scope.companyId, participant.agentDefinitionId);
+        participant.savedAgentRevision = latest && !latest.archived ? latest.revision : participant.agentRevision;
+        const member = room.members.find(item => item.id === participant.id)!;
+        if (member.conversationId) participant.agent = { ...participant.agent, connections: await this.connections.boundConnections(tx, member.conversationId) };
+      }
       const preference = room.preferences[scope.userId] ?? { pinned: false, archived: false };
       const access = room.sharedProjectId ? projectAccess((await tx.doc(ProjectsDoc)).projects[room.sharedProjectId], scope, this.readAll(scope)) : { participate: true };
       const first = presentation.messages.find(message => message.kind === "message");
@@ -797,9 +825,8 @@ export class DispatchRuntime {
           const room = await tx.doc(SharedDoc, nativeId(chat.id));
           for (const member of room.members) {
             if (member.kind !== "agent" || member.agentDefinitionId !== id || !member.conversationId || !member.agent) continue;
-            const connected = await this.connections.bind(tx, member.conversationId, id, true, selectedManaged, true);
-            member.agent.extensions = [...member.agent.extensions.filter(name => !isMcpExtension(name)), ...connected.extensions];
-            member.agent.tools = [...member.agent.tools.filter(name => !isMcpTool(name)), ...connected.tools];
+            if (member.membership && member.membership !== "active") continue;
+            member.pendingConnectionIds = [...selectedManaged];
           }
         }
       }
@@ -843,7 +870,7 @@ export class DispatchRuntime {
     const editor = latestAgent(catalog, actor.companyId, actor.definitionId);
     if (!grant?.policy || !editor || editor.archived) throw new ManagementError(403, "No current management grant for this editor and target.");
     if (grant.policy.editorRevision !== actor.revision || editor.revision !== actor.revision)
-      throw new ManagementError(403, `Grant is pinned to revision ${grant.policy.editorRevision}; current definition is ${editor.revision}, acting instance is ${actor.revision}. Re-grant and start a matching instance.`);
+      throw new ManagementError(403, `Grant is pinned to revision ${grant.policy.editorRevision}; current definition is ${editor.revision}, acting instance is ${actor.revision}. Wait for base adoption and explicitly re-grant the current revision.`);
     this.requireUnprivileged(editor);
     this.requireUnprivileged(actor.configuration);
     if (this.connections.forAgent(editor.id, managedIds(editor)).length) throw new ManagementError(403, "Connected editors cannot manage agents.");
@@ -891,7 +918,7 @@ export class DispatchRuntime {
     const receipt = receipts.receipts.find(item => item.companyId === actor.companyId && item.instanceId === String(actor.instanceId) &&
       (item.callId === callId || item.operationId === input.operationId));
     if (receipt) {
-      if (receipt.fingerprint !== fingerprint || receipt.operationId !== input.operationId || receipt.definitionId !== actor.definitionId || receipt.revision !== actor.revision)
+      if (receipt.fingerprint !== fingerprint || receipt.operationId !== input.operationId || receipt.definitionId !== actor.definitionId)
         throw new ManagementError(409, "Operation ID was already used with different content.");
       return managementReceipt(receipt);
     }
@@ -942,6 +969,8 @@ export class DispatchRuntime {
   async close() {
     if (this.closed) return;
     this.closed = true;
+    this.unsubscribeUpgrades?.();
+    await this.upgradeDrain;
     try { await this.harness.close(context); } finally {
       try { await this.connections.close(); } finally { this.owner.release(); }
     }
@@ -957,10 +986,106 @@ export class DispatchRuntime {
     return person;
   }
 
-  private async createParticipant(tx: Tx, _roomId: ConversationId, companyId: string, definitionId: string): Promise<Member> {
+  // Notifications are only wakeups. Durable definition/member state is the source of truth.
+  private scheduleUpgrades() {
+    if (this.closed) return;
+    this.upgradesDirty = true;
+    if (this.upgradeDrain) return;
+    this.upgradeDrain = (async () => {
+      while (this.upgradesDirty && !this.closed) {
+        this.upgradesDirty = false;
+        await this.reconcileUpgrades();
+      }
+    })().catch(() => { console.error("Agent upgrade reconciliation failed; pending revisions remain saved."); })
+      .finally(() => { this.upgradeDrain = undefined; });
+  }
+
+  private async reconcileUpgrades() {
+    const catalog = (await this.harness.snapshot(CatalogDoc, context))!;
+    for (const chat of catalog.chats) {
+      const roomId = nativeId(chat.id);
+      const room = await this.harness.snapshot(SharedDoc, roomId, context);
+      for (const member of room?.members ?? []) {
+        if (member.kind !== "agent" || !member.agentDefinitionId || (member.membership && member.membership !== "active")) continue;
+        const latest = latestAgent(catalog, chat.companyId, member.agentDefinitionId);
+        if ((!latest || latest.archived || latest.revision === member.agentRevision) && !member.pendingConnectionIds && !member.connectionsRefreshPending) continue;
+        try {
+          await this.harness.commit(async tx => {
+            const current = (await tx.doc(SharedDoc, roomId)).members.find(item => item.id === member.id);
+            if (current) await this.upgradeParticipant(tx, roomId, chat.companyId, current);
+          }, context);
+        } catch {
+          // The failed configuration transaction rolls back before recording its safe public status.
+          await this.harness.commit(async tx => {
+            const current = (await tx.doc(SharedDoc, roomId)).members.find(item => item.id === member.id);
+            const error = "Update could not be applied. It will retry at the next idle boundary.";
+            if (current && current.upgradeError !== error) current.upgradeError = error;
+          }, context);
+        }
+      }
+    }
+  }
+
+  private async upgradeParticipant(tx: Tx, roomId: ConversationId, companyId: string, member: Member) {
+    if (!member.conversationId || !member.agent || !member.agentDefinitionId || (member.membership && member.membership !== "active")) return;
     const catalog = await tx.doc(CatalogDoc);
-    const agent = this.findAgent(catalog, { companyId }, definitionId);
-    this.validateAgent(agent);
+    const latest = latestAgent(catalog, companyId, member.agentDefinitionId);
+    const agent = latest && !latest.archived ? latest : undefined;
+    const updateBase = agent && agent.revision !== member.agentRevision;
+    if (!updateBase && !member.pendingConnectionIds && !member.connectionsRefreshPending) return;
+    const id = member.conversationId;
+    if ((await tx.doc(LiveDoc, id)).run || (await tx.doc(InboxDoc, id)).items.length || await this.hasUnfinishedAgentWork(tx, id, roomId)) return;
+    if (member.pendingConnectionIds || member.connectionsRefreshPending) {
+      const connected = await this.connections.bind(tx, id, member.agentDefinitionId, true, member.pendingConnectionIds, member.pendingConnectionIds !== undefined);
+      member.agent.extensions = [...member.agent.extensions.filter(name => !isMcpExtension(name)), ...connected.extensions];
+      member.agent.tools = [...member.agent.tools.filter(name => !isMcpTool(name)), ...connected.tools];
+      member.agent.connections = await this.connections.boundConnections(tx, id);
+      delete member.pendingConnectionIds;
+      delete member.connectionsRefreshPending;
+    }
+    if (updateBase) {
+      this.validateAgent(agent);
+      // Connection authority is independent of base revision adoption.
+      const configuration = { ...agent,
+        extensions: [...(agent.extensions ?? []).filter(name => !isMcpExtension(name)), ...member.agent.extensions.filter(isMcpExtension)],
+        tools: [...(agent.tools ?? []).filter(name => !isMcpTool(name)), ...member.agent.tools.filter(isMcpTool)],
+      };
+      const { extensions, tools, snapshots } = this.resolveConfiguration(catalog, companyId, configuration);
+      const cwd = member.agent.cwd ?? (configuration.extensions.some(name => name === CodingTools.name || name === "dispatch-image-gen") ? this.workspaceDir : undefined);
+      await configure(tx, id, {
+        model: { provider: agent.provider, modelId: agent.modelId }, thinkingLevel: agent.thinkingLevel,
+        instructions: [agent.instructions, ...(member.instanceInstructions ? ["## Instance instructions", member.instanceInstructions] : [])].filter(Boolean).join("\n\n"),
+        extensions, tools, ...(cwd ? { cwd } : {}),
+      });
+      (await tx.doc(SkillBindingsDoc, id)).skills = snapshots;
+      await this.shared.enable(tx, id);
+      const connections = member.agent.connections;
+      member.agent = { ...publicAgent(agent), connections, extensions: extensions.map(item => item.name), tools: tools.map(item => item.name), ...(cwd ? { cwd } : {}) };
+      member.agentRevision = agent.revision;
+    }
+    if (member.upgradeError) delete member.upgradeError;
+  }
+
+  private async hasUnfinishedAgentWork(tx: Tx, id: ConversationId, roomId: ConversationId) {
+    if (id !== roomId) return hasUnfinishedTasks(tx, id);
+    // Legacy agents share the room stream. Room deliveries/presence are not native agent work.
+    const roomTasks = new Set([
+      this.shared.delivery.definition.name, this.shared.legacyReporter.definition.name,
+      this.shared.turns.expirePresence.definition.name, this.shared.turns.wait.definition.name,
+      this.shared.contributions.guard.definition.name,
+    ]);
+    for (const status of ["pending", "running", "waiting", "completing"] as const) {
+      let page = await tx.scanTasks({ conversationId: id, status }, 100);
+      while (true) {
+        if (page.items.some(task => !roomTasks.has(task.kind))) return true;
+        if (!page.next) break;
+        page = await tx.scanTasks({ conversationId: id, status }, 100, page.next);
+      }
+    }
+    return false;
+  }
+
+  private resolveConfiguration(catalog: Catalog, companyId: string, agent: StoredAgent) {
     const registry = this.registry.snapshot();
     const extensions = (agent.extensions ?? []).map(name => {
       const found = registry.extension(name);
@@ -978,6 +1103,14 @@ export class DispatchRuntime {
       return { id: skill.id, revision: skill.revision, name: skill.name, description: skill.description, instructions: skill.instructions };
     });
     if (snapshots.length) { extensions.push(Skills); tools.push(...Skills.tools!); }
+    return { extensions, tools, snapshots };
+  }
+
+  private async createParticipant(tx: Tx, _roomId: ConversationId, companyId: string, definitionId: string): Promise<Member> {
+    const catalog = await tx.doc(CatalogDoc);
+    const agent = this.findAgent(catalog, { companyId }, definitionId);
+    this.validateAgent(agent);
+    const { extensions, tools, snapshots } = this.resolveConfiguration(catalog, companyId, agent);
     const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
     if (snapshots.length) (await tx.doc(SkillBindingsDoc, record.id)).skills = snapshots;
     const cwd = agent.extensions?.some(name => name === CodingTools.name || name === "dispatch-image-gen") ? this.workspaceDir : undefined;
@@ -1006,9 +1139,8 @@ export class DispatchRuntime {
         for (const member of room.members) {
           if (member.kind !== "agent" || !member.conversationId || !member.agentDefinitionId || !member.agent) continue;
           if (!this.connections.has(member.agentDefinitionId) && !member.agent.extensions.some(isMcpExtension)) continue;
-          const selection = await this.connections.bind(tx, member.conversationId, member.agentDefinitionId, true);
-          member.agent.extensions = [...member.agent.extensions.filter(name => !isMcpExtension(name)), ...selection.extensions];
-          member.agent.tools = [...member.agent.tools.filter(name => !isMcpTool(name)), ...selection.tools];
+          if (member.membership && member.membership !== "active") continue;
+          member.connectionsRefreshPending = true;
         }
       }
     }, context);

@@ -1,4 +1,4 @@
-import { ArrowRight, Archive, Pencil } from "lucide-react";
+import { ArrowRight, Archive, Bot, Pencil } from "lucide-react";
 import { useRef, useState } from "react";
 import type {
   AgentDefinition,
@@ -136,19 +136,14 @@ export function AgentsPage({
     <section className="agent-view">
       <header className="view-heading agent-heading">
         <div>
-          <h1>{agent.name}{evaluationOpen ? " / Evaluation profile" : ""}</h1>
-          <p>
-            {agent.archived
-              ? "Archived agent"
-              : isDefault
-                ? "Default agent · Shared with your company"
-                : "Shared with your company"}
-          </p>
+          <p className="page-eyebrow">Agents{evaluationOpen ? ` / ${agent.name}` : ""}</p>
+          <div className="agent-title-line"><span className="agent-object-icon"><Bot size={30} aria-hidden="true" /></span><h1>{evaluationOpen ? "Evaluations" : agent.name}</h1>{isDefault && !evaluationOpen ? <span className="sidebar-tag">Default</span> : null}</div>
+          <p>{agent.archived ? "Archived agent" : evaluationOpen ? "Define evaluations · Runs not available yet" : agent.description || "Shared with your company"}</p>
         </div>
         {!agent.archived && !evaluationOpen ? (
           <div className="button-row agent-actions">
             <Button variant="ghost" onClick={() => onEdit(agent)}>
-              <Pencil /> Edit
+              <Pencil /> Edit agent
             </Button>
             <Button
               className="agent-start-chat"
@@ -160,6 +155,10 @@ export function AgentsPage({
           </div>
         ) : null}
       </header>
+      <nav className="object-section-nav" aria-label="Agent views">
+        <Button variant="ghost" aria-current={!evaluationOpen ? "page" : undefined} onClick={() => onEvaluationAgentChange(null)}>Overview</Button>
+        <Button variant="ghost" className="evaluation-entry" aria-current={evaluationOpen ? "page" : undefined} onClick={() => onEvaluationAgentChange(agent.id)}>Evaluations</Button>
+      </nav>
       <div className={evaluationOpen ? "agent-content evaluation-workspace" : "agent-content"}>
         <div className="agent-content-inner">
           <div hidden={evaluationOpen}>
@@ -167,16 +166,12 @@ export function AgentsPage({
             {model?.name || agent.modelId || "No model configured"} ·{" "}
             {thinkingLabel(agent.thinkingLevel)} thinking · {agent.tools.length || agent.skills?.length ? `${agent.tools.length + (agent.skills?.length ? 1 : 0)} tools` : "No tools"}
           </p>
-          <p className="agent-description">
-            {agent.description || "No description added."}
-          </p>
           <section className="agent-instructions">
             <h2>Instructions</h2>
             <Markdown>
               {agent.instructions || "No additional instructions."}
             </Markdown>
           </section>
-          <Button className="evaluation-entry" variant="secondary" onClick={() => { onEvaluationAgentChange(agent.id); }}>Configure evaluations</Button>
           <AgentSkillsPanel selections={agent.skills ?? []} />
           <AgentConnectionsPanel key={agent.id} agentId={agent.id} />
           {agent.archived ? (
@@ -310,13 +305,12 @@ export function AgentDetails({
   return (
     <div className={current ? "agent-details" : "context-empty"}>
       {showHeader ? <header className="context-header">
-        <h2>{editing ? "Draft preview" : "Agent details"}</h2>
+        <h2>{editing ? "Draft configuration" : "Configuration"}</h2>
       </header> : null}
       <div className="context-body">
         {current ? (
           <>
             <div className="context-title">
-              <h2>{current.name || "Untitled agent"}</h2>
               <span className="revision-badge">
                 {editing ? agentEditIsDirty(editing) ? "Unsaved changes" : "Draft" : `Revision ${saved!.revision}`}
               </span>
@@ -324,8 +318,8 @@ export function AgentDetails({
             {editing ? (
               <p className="context-description">
                 {saved
-                  ? `Saved configuration: revision ${saved.revision}. Changed settings are marked below.`
-                  : "Not saved yet. Your settings update here as you edit."}
+                  ? `Based on revision ${saved.revision}`
+                  : "New agent draft"}
               </p>
             ) : null}
             <dl className="context-facts">
@@ -361,7 +355,7 @@ export function AgentDetails({
               <DraftFact label="Skills" value={String(current.skills?.length ?? 0)} saved={editing && saved ? String(saved.skills?.length ?? 0) : undefined} />
               <div>
                 <dt>Tools</dt>
-                <dd>{editing ? `${describeCapabilities(editing.draft.capabilities)} · ${editing.connectionIds.length + (saved?.connections?.filter(connection => connection.source !== "oauth").length ?? 0)} connections` : describeAgentTools([...(saved?.tools ?? []), ...(saved?.skills?.length ? ["load_skill"] : [])])}</dd>
+                <dd>{editing ? `${describeCapabilities(editing.draft.capabilities)} · ${editing.connectionIds.length + (saved?.connections?.filter(connection => connection.source === "operator").length ?? 0)} connections` : describeAgentTools([...(saved?.tools ?? []), ...(saved?.skills?.length ? ["load_skill"] : [])])}</dd>
               </div>
             </dl>
             {contentChanged.length ? (
@@ -404,7 +398,15 @@ function AgentEditor({
   const { saved: agent, draft, busy } = editing;
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
-  const [capabilitiesOpen] = useState(() => typeof window === "undefined" || window.innerWidth > 600);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [section, setSection] = useState("Identity");
+  function selectSection(name: string) {
+    setSection(name);
+    const target = formRef.current?.querySelector<HTMLElement>(`[data-agent-section="${name}"]`);
+    if (target instanceof HTMLDetailsElement) target.open = true;
+    target?.scrollIntoView({ block: "start" });
+    target?.focus({ preventScroll: true });
+  }
   const saveRequest = useRef<{ fingerprint: string; requestId: string } | null>(null);
   const dirty = agentEditIsDirty(editing);
   const instructionsTooLong = draft.instructions.length > 50000;
@@ -421,16 +423,17 @@ function AgentEditor({
       <header className="view-heading agent-heading">
         <div>
           <p className="page-eyebrow">Agents / {agent?.name || "New agent"}</p>
-          <h1>{agent ? "Edit definition" : "New agent"}</h1>
+          <h1>{agent ? "Edit agent" : "New agent"}</h1>
           <p>
             {agent
-              ? `Based on revision ${agent.revision}. Saving creates a new revision.`
+              ? `Based on revision ${agent.revision}`
               : "Shared with your company"}
           </p>
         </div>
         <span className="revision-badge">{dirty ? "Unsaved changes" : agent ? `Revision ${agent.revision}` : "Draft"}</span>
       </header>
-      <form
+      <nav className="object-section-nav" aria-label="Agent editor sections">{["Identity", "Instructions", "Model", "Capabilities", "Skills", "Connections"].map(name => <Button key={name} variant="ghost" aria-current={section === name ? "location" : undefined} onClick={() => selectSection(name)}>{name}</Button>)}</nav>
+      <form ref={formRef}
         className="agent-editor-form"
         onSubmit={(event) => {
           event.preventDefault();
@@ -468,8 +471,8 @@ function AgentEditor({
                   : ""}
               </Notice>
             ) : null}
-            <fieldset disabled={busy} className="agent-form-section">
-              <legend>Identity</legend>
+            <fieldset disabled={busy} className="agent-form-section agent-identity-fields" data-agent-section="Identity" tabIndex={-1}>
+              <legend className="sr-only">Identity</legend>
               <Field label="Name">
                 {(props) => (
                   <Input
@@ -483,10 +486,7 @@ function AgentEditor({
                   />
                 )}
               </Field>
-              <Field
-                label="Description"
-                hint="Help your teammates know when to use this agent."
-              >
+              <Field label="Description">
                 {(props) => (
                   <Input
                     {...props}
@@ -500,10 +500,9 @@ function AgentEditor({
                 )}
               </Field>
             </fieldset>
-            <div className="agent-instructions-field">
+            <div className="agent-instructions-field" data-agent-section="Instructions" tabIndex={-1}>
               <Field
                 label="Instructions"
-                hint="Describe its role and what makes a useful result. Markdown formats as you type or paste."
                 hintPosition="before"
                 error={instructionsTooLong ? "Shorten instructions to 50,000 characters or fewer, including Markdown formatting." : undefined}
               >
@@ -523,7 +522,7 @@ function AgentEditor({
                 )}
               </Field>
             </div>
-            <details className="agent-settings-section">
+            <details className="agent-settings-section" data-agent-section="Model" tabIndex={-1} open>
               <summary><strong>Model</strong><span>{model?.name || draft.modelId || "Not configured"} · {thinkingLabel(draft.thinkingLevel)} thinking</span></summary>
             <fieldset disabled={busy} className="agent-form-section">
               <legend className="sr-only">Model settings</legend>
@@ -597,22 +596,22 @@ function AgentEditor({
               </div>
             </fieldset>
             </details>
-            <details className="agent-settings-section" open={capabilitiesOpen}>
+            <details className="agent-settings-section" data-agent-section="Capabilities" tabIndex={-1} open>
               <summary><strong>Capabilities</strong><span>{describeCapabilities(draft.capabilities)}</span></summary>
               <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("files-and-commands") ?? false} onChange={event => update("capabilities", event.target.checked ? [...(draft.capabilities ?? []), "files-and-commands"] : (draft.capabilities ?? []).filter(capability => capability !== "files-and-commands"))} /><span>Files and commands<small>Read and edit files, and run commands in the agent's working directory. Commands use the Dispatch service account.</small></span></label>
               <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("image-generation") ?? false} onChange={event => update("capabilities", event.target.checked ? [...(draft.capabilities ?? []), "image-generation"] : (draft.capabilities ?? []).filter(capability => capability !== "image-generation"))} /><span>Image generation<small>OpenAI · paid generation and editing</small></span></label>
             </details>
-            <AgentSkillsEditor selections={draft.skills ?? []} onChange={skills => update("skills", skills)} busy={busy}
-              editing={editing.skillEditing} onEditingChange={skillEditing => onChange({ ...editing, skillEditing, busy: skillEditing?.busy ?? false })} />
-            <AgentConnectionsEditor agent={agent} selectedIds={editing.connectionIds} busy={busy}
+            <div data-agent-section="Skills" tabIndex={-1}><AgentSkillsEditor selections={draft.skills ?? []} onChange={skills => update("skills", skills)} busy={busy}
+              editing={editing.skillEditing} onEditingChange={skillEditing => onChange({ ...editing, skillEditing, busy: skillEditing?.busy ?? false })} /></div>
+            <div data-agent-section="Connections" tabIndex={-1}><AgentConnectionsEditor agent={agent} selectedIds={editing.connectionIds} busy={busy}
               onChange={connectionIds => onChange({ ...editing, connectionIds })}
               applyExisting={editing.applyConnectionsToExisting} onApplyExisting={applyConnectionsToExisting => onChange({ ...editing, applyConnectionsToExisting })}
-              onSettings={onConnectionsSettings} />
+              onSettings={onConnectionsSettings} /></div>
           </div>
         </div>
         <footer className="agent-editor-actions">
           <div className="agent-editor-actions-inner">
-          <p className="editor-note">{agentConnectionsChanged(editing) && editing.applyConnectionsToExisting ? "Connection changes also apply to existing instances." : "Existing instances keep their saved configuration."}</p>
+          <p className="editor-note">{agentConnectionsChanged(editing) && editing.applyConnectionsToExisting ? "Base and connection updates apply when idle." : "Base updates apply to existing instances when idle."}</p>
           <div className="button-row">
             <Button variant="secondary" disabled={busy} onClick={onCancel}>
               Discard

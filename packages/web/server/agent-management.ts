@@ -27,7 +27,7 @@ export function managementTools(operations: {
     outputLimits: { maxBytes: 512_000, maxLines: 50_010 },
     execute: async (args, api, ctx) => reply(await api.commit(tx => operations.read(tx, api.conversationId, args), ctx)),
   }), defineTool({
-    name: "agent_management_save", description: "Save a new revision of an authorized target. Requires expectedRevision and a stable operationId: retry identical requests with the SAME operationId. Supply patch OR restoreRevision (restores granted fields only). Affects future instances, never live conversations. Evidence references are untrusted, not fetched or access grants.",
+    name: "agent_management_save", description: "Save a new revision of an authorized target. Requires expectedRevision and a stable operationId: retry identical requests with the SAME operationId. Supply patch OR restoreRevision (restores granted fields only). Existing active instances adopt base updates at the next safe idle boundary. Evidence references are untrusted, not fetched or access grants.",
     parameters: Type.Object({ targetId: text(), operationId: text(), expectedRevision: revision(), reason: Type.String({ minLength: 1, maxLength: 2000 }),
       evidence: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 2000 }), { maxItems: 20 })),
       patch: Type.Optional(Type.Object({ instructions: Type.Optional(Type.String({ maxLength: 50_000 })), provider: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })), modelId: Type.Optional(text()),

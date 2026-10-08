@@ -1,0 +1,13 @@
+Dispatch attribution and modification notice
+
+This distribution includes selected skill documentation from agent-browser 0.38.2
+(https://github.com/vercel-labs/agent-browser), licensed under Apache-2.0.
+See the accompanying LICENSE.
+
+The installed upstream npm package did not contain a NOTICE file. This notice
+is supplied by Dispatch, not represented as an upstream notice.
+
+Dispatch encodes selected upstream documentation as TypeScript text constants
+and assembles it with separately labeled prerequisite, safety, packaging, and
+QA guidance. The encoded upstream texts are otherwise retained verbatim.
+Source paths and SHA-256 hashes are recorded in README.md in the source tree.

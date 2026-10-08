@@ -4,13 +4,25 @@
 
 - Add Agents import/export with bounded ZIP parsing, requirement preview, exact assigned skill revisions and independent local copies. Native atomic receipts preserve same-operation retries; connections, credentials and existing instances remain untouched. Source/build checked; runtime and rendered UI qualification remain outstanding in the [handoff](docs/handoff.md#portable-definitions-and-project-data--october-8-2026). GitHub updates, starter distribution, project exports and backups remain later work.
 
+## Unreleased — agent authoring design
+
+- Redesign agent overview, editor, sidebar and evaluation configuration around the approved concepts. Add section/case navigation, a persistent required evaluation change reason and shared Markdown formatting controls. Preserve existing draft, revision and profile-only boundaries. See [acceptance evidence](docs/handoff.md#agent-authoring-redesign--october-8-2026).
+
 ## Unreleased — Developer default
 
 - Make Developer the company default and archive retired Dash/Dispatch without deleting revisions or changing existing conversation instances. Preserve Developer settings and migrate project defaults; new projects and implicit chat selections use Developer. Acceptance evidence and remaining qualification are tracked in the [handoff](docs/handoff.md#developer-default-and-dash-retirement--october-8-2026).
 
+## Unreleased — browser skills
+
+- Add pinned agent-browser core and dogfood exploratory-QA guidance for explicit skill assignment, without installing browser tooling or changing existing instance snapshots. Checks and activation limits are recorded in [the handoff](docs/handoff.md#bundled-agent-browser-and-dogfood-skills).
+
 ## Unreleased — project overview
 
 - Add project chat search, All chats/Active filters, status and last activity. Move members, default agents and existing settings into the contextual details panel, with adaptive desktop/phone rows. See [implementation evidence](docs/handoff.md#project-overview-redesign--october-8-2026).
+
+## Unreleased — in-place agent base upgrades
+
+- Apply saved base revisions to active instances at safe idle boundaries, preserving identity/history, instance supplements and workspace paths. Retain immutable revisions and explicit MCP assignment; display applied base revision separately from actual connections. Source/build candidate evidence and outstanding recovery/UI qualification are tracked in [the handoff](docs/handoff.md#in-place-agent-upgrades--october-8-2026).
 
 ## Unreleased — project-row chat creation
 

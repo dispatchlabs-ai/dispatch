@@ -29,6 +29,9 @@ export type Member = {
   agent?: { [K in keyof AgentParticipant["agent"]]: AgentParticipant["agent"][K] };
   status: "idle" | "working" | "listening" | "silent" | "stopped" | "failed"; error?: string;
   instanceInstructions?: string;
+  pendingConnectionIds?: string[];
+  connectionsRefreshPending?: boolean;
+  upgradeError?: string;
   membership?: AgentParticipant["membership"]; removalTask?: TaskId;
   threadId?: string | null; lastDelivery?: TaskId;
   activeDelivery?: TaskId; consideredThrough?: string; publicationPriority?: boolean; superseded?: TaskId[];
@@ -81,6 +84,7 @@ export class SharedConversations {
   private readonly entryCache = new Map<ConversationId, EntryRecord[]>();
   private readonly messageCache = new Map<ConversationId, { entries: EntryRecord[]; aliases: string; messages: MessageData[] }>();
   private readonly activityCache = new Map<ConversationId, { entries: EntryRecord[]; messages: ConversationMessage[]; memberId: string; joinedAt: number; groups: ParticipantActivity[] }>();
+  beforeDelivery?: (tx: Tx, roomId: ConversationId, companyId: string, member: Member) => Promise<void>;
   readonly extension;
   readonly delivery;
   readonly legacyReporter;
@@ -122,6 +126,7 @@ export class SharedConversations {
           const room = await tx.doc(SharedDoc, task.input.roomId);
           if (room.epoch !== task.input.epoch || room.stopping || !activeMember(room.members.find(item => item.id === member.id))) { cancelled = true; return terminal(); }
           const target = room.members.find(item => item.id === member.id)!;
+          if (!prior) await this.beforeDelivery?.(tx, task.input.roomId, room.companyId, target);
           target.status = "listening"; delete target.error; target.threadId = incoming.threadId; target.activeDelivery = task.id; target.publicationPriority = incoming.mentions.includes(target.id);
         }, ctx);
         if (cancelled) return;
@@ -947,7 +952,7 @@ export class SharedConversations {
       if (owner && !owner.abortRequested && owner.state.status !== "terminal") activeTickets.add(ticket.key);
     }
     for (const member of room.members) {
-      const { conversationId, removalTask, lastDelivery: _last, threadId, activeDelivery: _delivery, consideredThrough: _through, superseded: _superseded, publicationPriority: _priority, ...participant } = member;
+      const { pendingConnectionIds, connectionsRefreshPending, conversationId, removalTask, lastDelivery: _last, threadId, activeDelivery: _delivery, consideredThrough: _through, superseded: _superseded, publicationPriority: _priority, ...participant } = member;
       if (conversationId) {
         const live = await tx.doc(LiveDoc, conversationId);
         if (live.run) participant.status = "working";
@@ -967,7 +972,7 @@ export class SharedConversations {
         const removal = removalTask ? await tx.task(removalTask) : undefined;
         const removalError = member.membership === "removing" && (!removal || removal.state.status === "terminal")
           ? "Removal incomplete. Retry removal." : undefined;
-        participants.push({ ...participant, membership: member.membership ?? "active", ...(removalError ? { removalError } : {}),
+        participants.push({ ...participant, ...(pendingConnectionIds || connectionsRefreshPending ? { connectionsPending: true } : {}), membership: member.membership ?? "active", ...(removalError ? { removalError } : {}),
           status: !activeMember(member) ? "stopped" : participant.status === "failed" ? "failed" : speaking ? "responding" : listening ? "listening" : participant.status, usage } as ConversationParticipant);
       }
       else participants.push({ ...participant, status: Object.values(turns.presence).some(presence => presence.participantId === member.id && presence.until > Date.now()) ? "typing" : "idle" } as ConversationParticipant);
