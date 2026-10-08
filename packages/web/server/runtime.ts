@@ -1,3 +1,5 @@
+import { ProjectArchiveStore, ProjectArchivesDoc, archiveDigest, decodeProjectArchive } from "./project-archives.js";
+import { PROJECT_ARCHIVE_MAX_BYTES, type ProjectArchive, type ArchivedChat } from "../src/shared/project-archives.js";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -278,6 +280,115 @@ export class DispatchRuntime {
       doc.projects[project.id] = project; doc.requests[key] = { fingerprint, projectId: project.id };
       return this.projectSummary(project, scope);
     }, context);
+  }
+
+  private get projectArchiveStore() { return new ProjectArchiveStore(join(this.owner.directory, "project-archives")); }
+
+  async exportProjectArchive(scope: RuntimeScope, id: string, chatIds: string[]): Promise<ProjectArchive> {
+    if (chatIds.length > 100 || new Set(chatIds).size !== chatIds.length) throw new RuntimeError(400, "Choose up to 100 unique chats.");
+    const snapshot = await this.harness.commit(async tx => {
+      const project = await requireProjectAccess(tx, scope, id, "manage");
+      const catalog = await tx.doc(CatalogDoc);
+      const chats = [];
+      for (const chatId of chatIds) {
+        const stored = catalog.chats.find(chat => chat.id === chatId && chat.companyId === scope.companyId);
+        if (!stored) throw new RuntimeError(404, "Chat not found.");
+        const room = await this.shared.authorize(tx, scope, nativeId(chatId), "read", false);
+        if (room.sharedProjectId !== id) throw new RuntimeError(409, "Selected chat no longer belongs to this project.");
+        const presentation = await this.shared.presentation(tx, nativeId(chatId));
+        const attachments = await tx.doc(AttachmentsDoc, nativeId(chatId));
+        for (const message of presentation.messages) for (const file of message.attachments ?? []) {
+          if (!attachments.records[file.id] || attachments.records[file.id].private) throw new RuntimeError(409, "Public attachment metadata is unavailable.");
+        }
+        chats.push({ id: chatId, title: stored.displayTitle ?? stored.title, messages: presentation.messages,
+          authors: room.members.map(member => ({ id: member.id, name: member.name, kind: member.kind })) });
+      }
+      return { name: project.name, chats, prior: (await tx.doc(ProjectArchivesDoc)).records[id] };
+    }, context);
+    const archive: ProjectArchive = { format: "dispatch-project-content", version: 1, name: snapshot.name, exportedAt: Date.now(), chats: [] };
+    // Existing imported history is retained when re-exporting, separate from native selected chats.
+    if (snapshot.prior) archive.chats.push(...(await this.projectArchiveStore.read(snapshot.prior)).chats);
+    let size = Buffer.byteLength(JSON.stringify(archive));
+    for (const source of snapshot.chats) {
+      const authors = new Map(source.authors.map((author, index) => [author.id, { key: `a${index}`, name: author.name, kind: author.kind as "human" | "agent" | "unknown" }]));
+      for (const message of source.messages) for (const id of [message.authorId, ...message.mentions]) {
+        if (!authors.has(id)) authors.set(id, { key: `a${authors.size}`, name: "Unknown historical author", kind: "unknown" });
+      }
+      const ids = new Map<string, string>();
+      source.messages.forEach((message, index) => { ids.set(message.id, `m${index}`); message.aliases?.forEach(alias => ids.set(alias, `m${index}`)); });
+      const chat: ArchivedChat = { key: `c${archive.chats.length}`, title: source.title, authors: [...authors.values()], messages: [], files: [] };
+      const files = new Map<string, string>();
+      for (const message of source.messages) {
+        const references: string[] = [];
+        for (const file of message.attachments ?? []) {
+          if (!files.has(file.id)) {
+            if (size + Math.ceil(file.size / 3) * 4 > PROJECT_ARCHIVE_MAX_BYTES) throw new RuntimeError(413, "Selected content exceeds 32 MiB.");
+            const bytes = await this.attachments.read(file);
+            if (bytes.length !== file.size) throw new RuntimeError(409, "Attachment size changed.");
+            const item = { key: `f${files.size}`, name: file.name, mimeType: file.mimeType, size: bytes.length, sha256: archiveDigest(bytes), data: bytes.toString("base64") };
+            size += Buffer.byteLength(JSON.stringify(item)); chat.files.push(item); files.set(file.id, item.key);
+          }
+          references.push(files.get(file.id)!);
+        }
+        if (message.images?.length) throw new RuntimeError(409, "This chat contains legacy inline images; export is not supported without losing content.");
+        const thread = message.threadId === null ? null : ids.get(message.threadId);
+        if (thread === undefined) throw new RuntimeError(409, "A historical thread reference is unavailable.");
+        const item = { key: ids.get(message.id)!, author: authors.get(message.authorId)!.key, kind: message.kind, text: message.text, createdAt: message.createdAt,
+          thread, mentions: message.mentions.map(id => authors.get(id)!.key), files: references };
+        size += Buffer.byteLength(JSON.stringify(item));
+        if (size > PROJECT_ARCHIVE_MAX_BYTES) throw new RuntimeError(413, "Selected content exceeds 32 MiB.");
+        chat.messages.push(item);
+      }
+      archive.chats.push(chat);
+    }
+    // Re-key chats so re-exported archives cannot collide with newly selected native history.
+    archive.chats.forEach((chat, index) => { chat.key = `c${index}`; });
+    const validated = decodeProjectArchive(JSON.stringify(archive));
+    await this.harness.commit(async tx => {
+      await requireProjectAccess(tx, scope, id, "manage");
+      for (const chatId of chatIds) {
+        const room = await this.shared.authorize(tx, scope, nativeId(chatId), "read", false);
+        if (room.sharedProjectId !== id) throw new RuntimeError(409, "Selected chat moved during export; retry.");
+      }
+    }, context);
+    return validated;
+  }
+
+  async importProjectArchive(scope: RuntimeScope, archive: ProjectArchive, requestId: string): Promise<Project> {
+    requireText(requestId, "Request ID", 200);
+    const fingerprint = archiveDigest(JSON.stringify(archive));
+    const key = JSON.stringify([scope.companyId, scope.userId, "project-archive", requestId]);
+    const replay = async (tx: Tx) => {
+      const prior = (await tx.doc(ProjectsDoc)).requests[key];
+      if (!prior) return;
+      if (prior.fingerprint !== fingerprint) throw requestConflict();
+      return this.projectSummary(await requireProjectAccess(tx, scope, prior.projectId, "read", this.readAll(scope)), scope);
+    };
+    const prior = await this.harness.commit(replay, context);
+    if (prior) return prior;
+    const blob = await this.projectArchiveStore.save(archive);
+    return this.harness.commit(async tx => {
+      const prior = await replay(tx);
+      if (prior) return prior;
+      const now = Date.now();
+      const project: SharedProjectRecord = { id: randomUUID(), name: archive.name, companyId: scope.companyId, createdBy: scope.userId,
+        createdAt: now, updatedAt: now, revision: 1, members: [{ userId: scope.userId, role: "manager" }], defaultAgentDefinitionIds: [] };
+      const doc = await tx.doc(ProjectsDoc);
+      doc.projects[project.id] = project;
+      (await tx.doc(ProjectArchivesDoc)).records[project.id] = blob;
+      doc.requests[key] = { fingerprint, projectId: project.id };
+      return this.projectSummary(project, scope);
+    }, context);
+  }
+
+  async getProjectArchive(scope: RuntimeScope, id: string): Promise<ProjectArchive | null> {
+    const blob = await this.harness.commit(async tx => {
+      await requireProjectAccess(tx, scope, id, "read", this.readAll(scope));
+      return (await tx.doc(ProjectArchivesDoc)).records[id];
+    }, context);
+    const archive = blob ? await this.projectArchiveStore.read(blob) : null;
+    await this.harness.commit(async tx => { await requireProjectAccess(tx, scope, id, "read", this.readAll(scope)); }, context);
+    return archive;
   }
 
   async saveProject(scope: RuntimeScope, id: string, input: SaveProjectInput): Promise<Project> {

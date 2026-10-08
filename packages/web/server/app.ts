@@ -1,3 +1,4 @@
+import { decodeProjectArchive, projectArchivePreview, ProjectArchiveError } from "./project-archives.js";
 import { createDeveloperStarter } from "./starters.js";
 import { fetchGithubBundle, githubSourceSchema } from "./github-bundles.js";
 import { BUNDLE_MAX_BYTES, BundleError, bundleExportSchema, decodeBundle, encodeBundle } from "./bundles.js";
@@ -99,9 +100,10 @@ export function createApp(options: AppOptions) {
   });
   const jsonLimit = bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: { code: "too_large", message: "Request is too large." } }, 413) });
   const bundleLimit = bodyLimit({ maxSize: 12 * 1024 * 1024, onError: c => c.json({ error: { code: "too_large", message: "Bundle request is too large." } }, 413) });
+  const projectArchiveLimit = bodyLimit({ maxSize: 64 * 1024 * 1024 + 1024, onError: c => c.json({ error: { code: "too_large", message: "Project archive request is too large." } }, 413) });
   const isUpload = (method: string, path: string) => method === "POST" && /^\/api\/chats\/[^/]+\/attachments$/.test(path);
   // Upload bytes are counted only after authentication and conversation authorization below.
-  app.use("/api/*", (c, next) => isUpload(c.req.method, c.req.path) ? next() : /^\/api\/bundles\/(preview|import)$/.test(c.req.path) ? bundleLimit(c, next) : jsonLimit(c, next));
+  app.use("/api/*", (c, next) => isUpload(c.req.method, c.req.path) ? next() : /^\/api\/project-archives\/(preview|import)$/.test(c.req.path) ? projectArchiveLimit(c, next) : /^\/api\/bundles\/(preview|import)$/.test(c.req.path) ? bundleLimit(c, next) : jsonLimit(c, next));
   app.use("/api/*", async (c, next) => {
     c.header("Cache-Control", "no-store");
     if (!["GET", "HEAD"].includes(c.req.method)) {
@@ -148,6 +150,19 @@ export function createApp(options: AppOptions) {
     return c.json({ connections: await runtime.listMcpConnections(c.get("principal")) });
   });
   app.get("/api/people", (c) => c.json({ people: auth.listCompanyPeople(c.get("principal").companyId) }));
+  app.post("/api/project-archives/preview", async c => {
+    const input = z.object({ archive: z.string().max(32 * 1024 * 1024) }).strict().parse(await c.req.json());
+    return c.json({ preview: projectArchivePreview(decodeProjectArchive(input.archive)) });
+  });
+  app.post("/api/project-archives/import", async c => {
+    const input = z.object({ archive: z.string().max(32 * 1024 * 1024), requestId }).strict().parse(await c.req.json());
+    return c.json({ project: await runtime.importProjectArchive(c.get("principal"), decodeProjectArchive(input.archive), input.requestId) });
+  });
+  app.post("/api/projects/:id/export", async c => {
+    const input = z.object({ chatIds: identities.max(100) }).strict().parse(await c.req.json());
+    return c.json({ archive: await runtime.exportProjectArchive(c.get("principal"), c.req.param("id"), input.chatIds) });
+  });
+  app.get("/api/projects/:id/history", async c => c.json({ archive: await runtime.getProjectArchive(c.get("principal"), c.req.param("id")) }));
   app.get("/api/projects", async (c) => c.json({ projects: await runtime.listProjects(c.get("principal")) }));
   app.post("/api/projects", async (c) => {
     const input = z.object({ requestId, name: z.string().trim().min(1).max(100), kind: z.literal("shared") }).strict().parse(await c.req.json());
@@ -292,7 +307,7 @@ export function createApp(options: AppOptions) {
   }
   app.onError((error, c) => {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return c.json({ error: { code: "invalid_request", message: "The request is invalid. Check the fields and try again." } }, 400);
-    if (error instanceof BundleError || error instanceof EvaluationError || error instanceof ManagementError || error instanceof AttachmentError || error instanceof ProjectAccessError || error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
+    if (error instanceof ProjectArchiveError || error instanceof BundleError || error instanceof EvaluationError || error instanceof ManagementError || error instanceof AttachmentError || error instanceof ProjectAccessError || error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
     console.error("Dispatch request failed:", error);
     return c.json({ error: { code: "internal", message: "The request could not be completed. Try again." } }, 500);
   });

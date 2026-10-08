@@ -1,3 +1,4 @@
+import { ProjectArchiveImport } from "./project-archives";
 import { BundlesDialog } from "./bundles";
 import { useAttachmentDrafts, emptyAttachments } from "../lib/attachments";
 import { Tabs } from "@base-ui/react/tabs";
@@ -61,6 +62,7 @@ export function Workspace() {
   const [projectEditing, setProjectEditing] = useState<Record<string, ProjectEditing | null>>({});
   const createInFlight = useRef(false);
   const [focusChatId, setFocusChatId] = useState<string | null>(null);
+  const [importingProject, setImportingProject] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectName, setProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
@@ -490,6 +492,7 @@ export function Workspace() {
     newProject={{ name: projectName, busy: creatingProject, error: projectError, compact: viewportWidth <= 1100,
       onNameChange: name => { setProjectName(name); setProjectError(null); }, onCreate: createProject,
       onCancel: () => { setProjectName(""); setProjectError(null); projectRequest.current = null; } }}
+    onImportProject={() => setImportingProject(true)}
     onCreateProjectChat={project => { if (project.canParticipate === false) return; void createChat(undefined, project.id); }}
     onSelect={selectChat} onSelectProject={selectProject} onCreate={() => chooseAgents(config?.defaultAgentId, activeProjectId)}
     onRename={renameChat} onUpdate={updateChatAction} />;
@@ -657,6 +660,7 @@ export function Workspace() {
         <div className="context-column-content">{supporting()}</div>
       </aside>
     </Tabs.Root>
+    <ProjectArchiveImport open={importingProject} onOpenChange={setImportingProject} onImported={project => { setProjects(current => mergeProjects(current, [project])); selectProject(project.id); }} />
     {addingInstance ? <AddInstanceDialog key={addingInstance.chatId} chatId={addingInstance.chatId} initialDefinitionId={addingInstance.definitionId} onCreated={addingInstance.onCreated} removingDefinitionIds={(snapshots[addingInstance.chatId]?.participants ?? []).flatMap(person => person.kind === "agent" && person.membership === "removing" ? [person.agentDefinitionId] : [])} agents={agents} canParticipate={Boolean(snapshots[addingInstance.chatId]) && snapshots[addingInstance.chatId]?.conversation.canParticipate !== false} onSnapshot={onSnapshot} onClose={() => setAddingInstance(null)} /> : null}
     {invitingChatId && snapshots[invitingChatId] ? <InviteParticipantsDialog key={invitingChatId} snapshot={snapshots[invitingChatId]} agents={agents} onSnapshot={onSnapshot} onClose={() => setInvitingChatId(null)} /> : null}
     {newConversation ? <NewConversationDialog agents={agents} initialAgentIds={newConversation.agentIds} projectName={projects.find(project => project.id === newConversation.projectId)?.name} busy={creating} error={error} onClose={() => setNewConversation(null)} onCreate={(ids, title) => void createChat(ids, newConversation.projectId, undefined, title)} /> : null}

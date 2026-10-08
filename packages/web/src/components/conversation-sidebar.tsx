@@ -24,12 +24,13 @@ type ConversationSidebarProps = {
   onSelect: (id: string) => void;
   onSelectProject: (id: string) => void;
   onCreate: () => void;
+  onImportProject: () => void;
   onCreateProjectChat: (project: Project) => void;
   onRename: (chat: ChatSummary) => void;
   onUpdate: (id: string, input: UpdateChatInput) => void;
 };
 
-export function ConversationSidebar({ chats, projects, activeChatId, activeProjectId, search, onSearchChange, creating, updating, showArchived, onShowArchivedChange, collapsedProjects, onToggleProject, newProject, onSelect, onSelectProject, onCreate, onCreateProjectChat, onRename, onUpdate }: ConversationSidebarProps) {
+export function ConversationSidebar({ chats, projects, activeChatId, activeProjectId, search, onSearchChange, creating, updating, showArchived, onShowArchivedChange, collapsedProjects, onToggleProject, newProject, onSelect, onSelectProject, onCreate, onImportProject, onCreateProjectChat, onRename, onUpdate }: ConversationSidebarProps) {
   const groupPrefix = useId();
   const visible = chats.filter(chat => chat.archived === showArchived);
   const query = search.trim().toLowerCase();
@@ -57,7 +58,7 @@ export function ConversationSidebar({ chats, projects, activeChatId, activeProje
     <Button variant="secondary" className="sidebar-create" onClick={() => { onShowArchivedChange(false); onCreate(); }} disabled={creating}>{creating ? <Spinner /> : <Plus />} New chat</Button>
     <SidebarSearch label="Search chats" value={search} onChange={onSearchChange} />
     <div className="sidebar-list-heading"><h2>{showArchived ? "Archived" : "Chats"}</h2></div>
-    {!showArchived ? <NewProjectButton {...newProject} /> : null}
+    {!showArchived ? <><NewProjectButton {...newProject} /><Button variant="ghost" onClick={onImportProject}>Import project history</Button></> : null}
     <nav className="sidebar-list conversation-groups" aria-label={showArchived ? "Archived chats" : "Saved chats"}>
       {showArchived ? archived.map(row) : <>
         {groups.map(({ project, filtered }) => {

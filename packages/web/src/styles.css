@@ -1183,3 +1183,11 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .bundle-provenance { overflow-wrap: anywhere; font-size: var(--text-sm); color: var(--color-muted); }
 
 .bundle-content[hidden] { display: none; }
+
+.project-archive-panel { display: grid; gap: 1rem; min-width: 0; }
+.project-archive-panel summary { cursor: pointer; min-height: 2.75rem; padding-block: .75rem; overflow-wrap: anywhere; }
+.project-archive-panel ul { padding-left: 1.25rem; }
+.archived-message { padding-block: 1rem; border-top: 1px solid var(--color-border); }
+.archived-message header { display: flex; flex-wrap: wrap; gap: .5rem; }
+.archived-message time { color: var(--color-muted); font-size: var(--text-sm); }
+.archived-message pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; max-width: 80ch; margin-block: .75rem; }

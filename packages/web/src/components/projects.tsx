@@ -1,3 +1,4 @@
+import { ProjectArchiveActions } from "./project-archives";
 import { Popover } from "@base-ui/react/popover";
 import { FolderPlus, MessageSquare, Pin, Plus, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -62,6 +63,7 @@ export function ProjectPage({ project, chats, creating, updating, onCreate, onSe
       <div><p className="eyebrow">Shared project</p><h1>{project.name}</h1></div>
       <Button disabled={creating || project.canParticipate === false} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New chat</Button>
     </header>
+    <ProjectArchiveActions key={project.id} project={project} chats={chats} />
     <div className="project-toolbar">
       <div className="search-input"><Search size={18} aria-hidden="true" /><Input type="search" aria-label="Search chats in this project" placeholder="Search chats in this project…" value={search} onChange={event => onSearchChange(event.target.value)} /></div>
       <div className="segmented-control" role="group" aria-label="Filter project chats">
