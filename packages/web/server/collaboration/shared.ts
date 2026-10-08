@@ -171,7 +171,7 @@ export class SharedConversations {
     });
 
     // One migration task drains already admitted work without resubmitting or cancelling it.
-    this.legacyReporter = defineTask<{ roomId: ConversationId; participantId: string; afterEntry: number }, { phase: "observe" }, null>({
+    this.legacyReporter = defineTask<{ roomId: ConversationId; participantId: string }, { phase: "observe" }, null>({
       name: "dispatch.legacy-reporter", version: 1, initial: () => ({ phase: "observe" }),
       phases: { observe: async (task, runtime, ctx) => {
         const conversation = (await runtime.conversation(task.input.roomId, ctx))!;
@@ -669,7 +669,7 @@ export class SharedConversations {
       await this.appendPublic(tx, roomId, { data: { id, kind: "message", authorId: `human:${human.id}`, text, ...(images.length ? { images } : {}), createdAt: Date.now(), threadId: null, mentions: [] } });
     }
     if (live.run) {
-      const reporter = await tx.createTask(this.legacyReporter, { roomId, participantId: legacy.id, afterEntry: Number(entries.at(-1)?.id ?? 0) }, { conversationId: roomId, ownership: { kind: "conversation" }, background: true });
+      const reporter = await tx.createTask(this.legacyReporter, { roomId, participantId: legacy.id }, { conversationId: roomId, ownership: { kind: "conversation" }, background: true });
       room.deliveries.push(reporter); legacy.lastDelivery = reporter;
     }
   }
