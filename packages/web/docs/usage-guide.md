@@ -309,6 +309,14 @@ Agents waiting to publish show **Listening**. An agent with the speaking turn sh
 - Restarting the service invokes native Pi recovery. An interrupted provider request can run again from its committed checkpoint, rather than continuing the exact streamed token; another provider charge is possible.
 - The right column follows the active main tab. Participants exposes each agent’s saved configuration and usage. Narrow screens expose navigation and context through panels; per-chat drafts remain in browser memory while switching layouts and tabs.
 
+### Adding another agent instance
+
+**Planned in [WP-050](handoff.md#wp-050--multiple-agent-instances-and-supplemental-instructions); not yet verified or available in the published candidate.** Use Participants → Add instance, or the picker's explicit add-another action. Select the definition, optionally name the instance (for example, Developer · Backend), and supply additional instructions. Inspect its base and instance instructions separately in Participants. Supplements are creation-only; they do not edit the shared definition, alter siblings or grant permissions.
+
+Each instance has separate working context but reads the shared public history and considers new messages. Mention the specific instance to request attention; ordinary mentions do not create duplicates. Coding instances share configured files, so coordinate task ownership or separate worktrees. Removing one instance leaves siblings active.
+
+Planned API: `POST /api/chats/:id/instances`, JSON `{ requestId, agentDefinitionId, name?, instructions? }`, returns `{ ...snapshot, createdParticipantId }`. Name limit: 100 characters; supplement: 50,000. Use the returned ID, not a participant-list diff. Retry identical requests with the same ID; replay after removal returns that historical ID without recreating it. Changed input needs a new request ID. New creation conflicts while a same-definition instance is Removing. Only participating humans can create duplicates. Ordinary invitations reuse an existing instance; ambiguous definition mentions return 409, so select a participant directly.
+
 ### Removing a conversation agent
 
 **Implemented in candidate `54a9d3b`; runtime/UI qualification outstanding ([WP-049](handoff.md#wp-049--remove-conversation-agents)).** Open Participants, select the agent, choose **Remove from conversation**, and confirm **Remove**. Removal cancels only that instance's queued and running work; other agents continue. Its messages, tool history and saved identity remain visible. Removing becomes Removed when cleanup finishes; retry a reported cleanup failure. The agent stays fenced while cleanup is incomplete. Re-addition during Removing returns a conflict; finish or retry cleanup first.

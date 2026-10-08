@@ -1,5 +1,9 @@
 # Changelog
 
+## Planned — multiple agent instances
+
+- Approve explicit same-definition instances with optional names and creation-only instruction supplements, immutable instance targeting and stable creation retries. Implementation and verification pending in [WP-050](docs/handoff.md#wp-050--multiple-agent-instances-and-supplemental-instructions).
+
 ## Unreleased — conversation agent removal
 
 - Add per-instance removal: fence participation, cancel native work durably, preserve history and require explicit human re-addition as a fresh instance after cleanup. Source/build checked; runtime and rendered UI remain unqualified. Evidence and outstanding acceptance are tracked in [WP-049](docs/handoff.md#wp-049--remove-conversation-agents).

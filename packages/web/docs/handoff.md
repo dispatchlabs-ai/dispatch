@@ -1230,3 +1230,18 @@ Pi Durable Expert reports Nix-shell TypeScript/application builds, Apple Silicon
 
 
 Final code candidate `51dda24` preserves historical mention references in contributions prepared before a target leaves, rather than aborting the unrelated author. New mention admission still requires active targets and public delivery excludes removing/removed recipients. Developer reviewed the final diff without a blocker. Pi Durable Expert applied source/deslop review, including legacy room/agent stream sharing, closed-contribution reacquisition, immutable-ID retries and concurrent Stop boundaries; these are source findings, not executed scenarios. Nix-shell TypeScript/application builds, Apple Silicon `nix build --no-link`, `nix flake check` (zero runnable checks; Linux omitted) and whitespace checks passed again. Remote `main` was verified at `51dda24` before this documentation-only closeout. The remaining runtime and rendered desktop/390 px evidence gaps above remain open; no tests, probes or deployment were performed.
+
+
+## WP-050 — Multiple agent instances and supplemental instructions
+
+**Authorized October 8, 2026; implementation pending.** Chris approved explicit same-definition instances with creation-time instruction supplements. Pi Durable Expert owns backend/shared contracts and integration, Developer UI/client wiring, Documenter package docs. Depends on WP-049; scope follows [the contract](spec.md#multiple-instances-and-supplemental-instructions) and [planned usage](usage-guide.md#adding-another-agent-instance). No live instruction editing, workspace isolation, permission expansion or deployment is included.
+
+Acceptance criteria:
+- Human creation checks current participation/company/definition availability; observers and agent tools cannot create duplicates. Preserve existing invitation behavior and prohibit agents reversing removal.
+- Persist immutable participant identity, base snapshot and separate supplement with native conversation creation and stable receipt. Identical request replay returns the original ID, including after removal; changed inputs conflict. Concurrent requests never make the client guess identity. Block new creation during same-definition cleanup.
+- Native prompts include base plus supplement across restart without mutating siblings or definitions. Participant inspection separates both instruction sources; names remain attributable in history.
+- Explicit participant mentions disambiguate siblings; ambiguous definition mentions return 409. Removal fences/cancels one immutable ID without disturbing siblings.
+- Participants and main/thread pickers expose explicit creation with optional name/instructions, retain drafts on cancel/error and insert the returned ID. Ordinary mention selection does not create duplicates. Review rendered desktop/390 px, contrast, keyboard/touch and accessibility; record gaps honestly.
+- Review source/lifecycle and deslop, TypeScript/application and applicable Nix builds, full diff/whitespace and changed links. Runtime creation/replay/conflict/restart/authorization/removal and UI behavior remain unverified until authorized evidence; zero tests remains in force.
+
+Documentation records approved intent, not verified behavior. Wiki returned HTTP 401; no wiki update published. The established repository wiki remains the intended product-history home; no alternate-company fallback is used.

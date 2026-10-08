@@ -225,7 +225,7 @@ participant identity in the same native Pi Durable commit as the public message
 and delivery tasks. It remains an independent participant with access to the full
 public history, including the inviting message. Existing instances are reused,
 not recreated or reconfigured, even if their definition has since been archived.
-Archival prevents new instances, not participation by existing ones. Human invitations still use Participants; no
+Archival prevents new instances, not participation by existing ones. With multiple active siblings, definition mentions conflict rather than selecting arbitrarily; explicit participant mentions remain unambiguous. See [multiple instances](#multiple-instances-and-supplemental-instructions). Human invitations still use Participants; no
 broadcast mentions such as `@everyone` are added. [WP-048](handoff.md#wp-048--invite-agents-through-inline-mentions)
 owns implementation and local acceptance evidence.
 
@@ -417,6 +417,15 @@ Chris requested Slack as the conversation screen's visual model, approved the [I
 - Mentions reference participant IDs through the [inline picker](#inline-mentions). Selecting a participant inserts its readable name in the text and identifies that member in the submitted message; a mention requests attention without requiring an answer. Existing-participant mentions do not change access; available company-agent targets join on successful Send under the inline-mention contract. Plain text cannot impersonate a participant.
 - Keep main and thread drafts, request identities and scroll state associated with their conversation/root. Navigation, responsive remounts and late acknowledgements must not discard or overwrite newer input. Closing a conversation with either draft asks before discarding it.
 - New conversation lets the user select one or more active company agent definitions. The saved default can be initially selected; starting from an agent preselects that definition. In unbound conversations, human invitations choose existing active company accounts and grant access to that conversation only. Shared-project conversations direct human access changes to project membership management; membership grants access to every conversation in that project.
+
+### Multiple instances and supplemental instructions
+
+**Accepted October 8, 2026; implementation pending in [WP-050](handoff.md#wp-050--multiple-agent-instances-and-supplemental-instructions).** A participating human can explicitly add another instance of an available company definition in the same conversation. Each gets an immutable participant ID, separate native working conversation and saved base configuration. Optional instance name (100 characters) and supplemental instructions (50,000 characters) are set at creation; neither changes the definition or siblings. Store the supplement separately as `instanceInstructions`; `agent.instructions` remains the base snapshot. The native prompt includes both, persisted across restart. No live supplement editing is included.
+
+- Participants offers explicit Add instance; the inline picker lists active instances individually and an explicit add-another action. Ordinary mentions never silently create duplicates. Inspect base and instance instructions separately. Preserve drafts when the form is cancelled or fails; use the returned participant ID for insertion, not a snapshot-diff guess.
+- Human-only `POST /api/chats/:id/instances` accepts `CreateAgentInstanceInput` `{ requestId, agentDefinitionId, name?, instructions? }` and returns `CreateAgentInstanceResult` `{ ...snapshot, createdParticipantId }`. Require current participation, company scope and an available definition; project read-all alone is insufficient. Stable identical retries return the original ID even after removal, never recreate it; changed requests conflict. New creation waits until any same-definition Removing instance completes cleanup.
+- Ordinary invitations retain ensure-existing behavior, not duplicate creation. Ambiguous definition mentions return 409; choose an explicit participant ID instead. Agent invitation tools cannot create duplicates or reverse human removal. Per-instance removal leaves active siblings untouched.
+- All active siblings consider new public messages. Independent context does not isolate files: configured workspaces remain shared unless worktrees/task assignments provide separation. Supplements guide behavior, not permissions or filesystem enforcement.
 
 ### Removing an agent from a conversation
 
