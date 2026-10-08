@@ -23,7 +23,7 @@ buildNpmPackage {
     ];
   };
 
-  npmDepsHash = "sha256-Lf4LyJOzp7lgxRV7NdfXyc/4kGca1C+MdkOrCFFwBFg=";
+  npmDepsHash = "sha256-34kGo1R0Q/E4WkPHELfzFLjFNePVztUUK29pzYkbc/8=";
   npmBuildScript = "build";
 
   doCheck = true;
@@ -46,6 +46,9 @@ buildNpmPackage {
       --add-flags "$app/packages/web/build/service/server/index.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-auth" \
       --add-flags "$app/packages/web/build/service/server/auth-cli.js"
+    test -f "$app/packages/web/build/service/server/workers/bootstrap-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-bootstrap" \
+      --add-flags "$app/packages/web/build/service/server/workers/bootstrap-main.js"
     test -f "$app/packages/web/build/service/server/workers/backend-main.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-backend" \
       --add-flags "$app/packages/web/build/service/server/workers/backend-main.js"
