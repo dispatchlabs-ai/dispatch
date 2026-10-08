@@ -255,7 +255,10 @@ that mention; undo/redo restores it with its identity. Drafts remain Markdown,
 using `[@Name](mention:<encoded participant ID>)` internally so identity survives
 draft switching and copying between compatible conversation contexts. Importing a
 reference to someone outside the current conversation yields ordinary text unless
-it is an available company-agent invitation target.
+it carries an agent-definition invitation identity. Such tokens remain intact
+through catalog loading, archival changes and draft remounts so failed sends retain
+their original invitation intent. Preservation is not authorization: the server
+checks current availability on Send and may reject the target.
 Draft invitation tokens use `[@Name](mention:agent-definition%3A<encoded definition ID>)`.
 Submission separates current participant IDs in `mentions` from definition IDs in
 `agentMentions`; both come only from remaining mention nodes. The server rewrites
