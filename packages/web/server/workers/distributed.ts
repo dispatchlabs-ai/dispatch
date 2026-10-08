@@ -13,11 +13,29 @@ import type { LaunchAttempt, LauncherStatus } from "./launcher.js";
 export type DistributedOptions = {
   launcherTimeoutMs?: number; installationId: string; workerKey: string; launcherUrl: string; launcherToken: string;
   runBackground<T>(operation: () => Promise<T>): Promise<T>;
+  runPolicyChange?: <T>(operation: () => Promise<T>) => Promise<T>;
   configurationRevision: string; directory: DispatchRuntime; routes: WorkerRoutes;
 };
 export function distributedRuntime(options: DistributedOptions): RuntimeService {
   const { directory, routes } = options;
   const launching = new Map<string, Promise<WorkerRoute>>();
+  // Read leases cover authorization, activation and RPC completion. A policy writer
+  // seals later leases synchronously, then joins the earlier ones before changing
+  // policy or taking launcher inventory. Ordinary conversations remain concurrent.
+  let policyTail: Promise<unknown> = Promise.resolve();
+  const reads = new Set<Promise<unknown>>();
+  function policyRead<T>(operation: () => Promise<T>): Promise<T> {
+    const result = policyTail.then(operation);
+    reads.add(result);
+    void result.then(() => reads.delete(result), () => reads.delete(result));
+    return result;
+  }
+  function policyChange<T>(operation: () => Promise<T>): Promise<T> {
+    const result = Promise.allSettled([policyTail, ...reads]).then(() =>
+      options.runPolicyChange ? options.runPolicyChange(operation) : operation());
+    policyTail = result.catch(() => {});
+    return result;
+  }
   const launcher = <T>(path: string, body?: unknown) => workerRequest<T>(options.launcherUrl, options.launcherToken, `/v1/${path}`, body, undefined, options.launcherTimeoutMs ?? 300_000);
   const token = (route: WorkerRoute) => workerToken(options.workerKey, options.installationId, route);
   async function activate(route: WorkerRoute): Promise<WorkerRoute> {
@@ -46,7 +64,10 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
     launching.set(route.conversationId, work);
     try { return await work; } finally { launching.delete(route.conversationId); }
   }
-  async function call<T>(scope: RuntimeScope, id: string, method: string, input?: unknown): Promise<T> {
+  function call<T>(scope: RuntimeScope, id: string, method: string, input?: unknown): Promise<T> {
+    return policyRead(() => callNow<T>(scope, id, method, input));
+  }
+  async function callNow<T>(scope: RuntimeScope, id: string, method: string, input?: unknown): Promise<T> {
     // Recheck backend-authoritative project/membership policy on every request.
     await directory.getChat(scope, id);
     const bootstrap = await directory.directoryChatBootstrap(scope, id);
@@ -63,7 +84,22 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
     if (!status.driverReachable) throw new RuntimeError(503, "Cannot confirm worker policy propagation.");
     for (const route of routes.list().filter(route => !companyId || route.companyId === companyId)) {
       const attempt = status.attempts.find(item => item.attemptId === route.attemptId);
-      if (!attempt || (attempt.phase === "stopped" && attempt.observed === "absent")) continue;
+      if (!attempt) {
+        // Absence is not a stop fence: an earlier ensure may have timed out in
+        // transport before reaching the launcher. Tombstone that exact identity
+        // before acknowledging policy, then leave a fresh dormant route intent.
+        const stopped = await launcher<{ attemptId: string; phase: string }>("stop", { attemptId: route.attemptId });
+        const fresh = await launcher<LauncherStatus>("status");
+        const retired = fresh.attempts.find(item => item.attemptId === route.attemptId);
+        if (stopped.attemptId !== route.attemptId || stopped.phase !== "stopped" || !fresh.driverReachable
+          || fresh.containers.some(item => item.attemptId === route.attemptId)
+          || (retired && (retired.phase !== "stopped" || retired.observed !== "absent")))
+          throw new RuntimeError(503, "Worker policy update remains unresolved.");
+        routes.retiring(route.conversationId, route.attemptId);
+        routes.replaceRetired(route.conversationId, route.attemptId, options.configurationRevision);
+        continue;
+      }
+      if (attempt.phase === "stopped" && attempt.observed === "absent") continue;
       const { catalog, membership } = await directory.directoryWorkerBootstrap(route.companyId, route.conversationId);
       try {
         if (attempt.phase !== "running" || !/^dispatch-worker-[a-f0-9]+$/.test(attempt.name)) throw new Error("Worker is not ready for policy acknowledgement.");
@@ -88,18 +124,32 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
         .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
     },
     async saveAgent(scope, input) {
-      const result = await directory.saveAgent(scope, input);
-      if (input.applyConnectionsToExisting) await acknowledgePolicy(scope.companyId);
-      return result;
+      if (!input.applyConnectionsToExisting) return directory.saveAgent(scope, input);
+      return policyChange(async () => {
+        const result = await directory.saveAgent(scope, input);
+        await acknowledgePolicy(scope.companyId);
+        return result;
+      });
     },
     async saveProject(scope, id, input) {
-      const result = await directory.saveProject(scope, id, input);
-      await acknowledgePolicy(scope.companyId);
-      return result;
+      return policyChange(async () => {
+        const result = await directory.saveProject(scope, id, input);
+        await acknowledgePolicy(scope.companyId);
+        return result;
+      });
     },
     async refreshMcpConnections(id) {
-      await directory.refreshMcpConnections(id);
-      await acknowledgePolicy();
+      return policyChange(async () => {
+        await directory.refreshMcpConnections(id);
+        await acknowledgePolicy();
+      });
+    },
+    async reconnectAgentConnection(scope, agentId, connectionId) {
+      return policyChange(async () => {
+        const result = await directory.reconnectAgentConnection(scope, agentId, connectionId);
+        await acknowledgePolicy(scope.companyId);
+        return result;
+      });
     },
     async authorizeAttachmentUpload(scope, id) { return call(scope, id, "authorizeAttachmentUpload"); },
     async uploadAttachment(scope, id, file) {
@@ -138,7 +188,7 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
       let finish!: (value: { reason: "stopped" | "listener_error" | "session_closed" }) => void;
       const closed = new Promise<{ reason: "stopped" | "listener_error" | "session_closed" }>(resolve => { finish = resolve; });
       return { value, closed,
-        async deliver(deliver: () => void) { await options.runBackground(async () => { await directory.getChat(scope, id); if (!stopped) deliver(); }); },
+        async deliver(deliver: () => void) { await options.runBackground(() => policyRead(async () => { await directory.getChat(scope, id); if (!stopped) deliver(); })); },
         start(listener: (value: ChatSnapshot) => Promise<void>) {
           if (started) throw new Error("Watch already started"); started = true;
           void (async () => {
@@ -149,10 +199,10 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
                 const next = await options.runBackground(async () => snapshot(await call<ChatSnapshot>(scope, id, "getChat"), id));
                 const encoded = JSON.stringify(next);
                 if (encoded !== previous && !stopped) {
-                  await options.runBackground(async () => {
+                  await options.runBackground(() => policyRead(async () => {
                     await directory.getChat(scope, id);
                     if (!stopped) await listener(next);
-                  });
+                  }));
                   previous = encoded;
                 }
               }
