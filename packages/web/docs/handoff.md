@@ -1441,20 +1441,20 @@ Integrated `nix develop --command npm run check`, Apple Silicon `nix build --no-
 
 ## Project content portability — October 8, 2026
 
-**Assigned to Developer; source-grounded design review pending.** Chris asked the team to continue the remaining portability scope. Pi Durable Expert reviews native boundaries; Documenter maintains contracts/usage. Use a separate worktree and coordinate runtime/shared-file ownership before edits. [The specification](spec.md#project-content-and-operational-recovery) owns the content/recovery distinction.
+**Assigned to Developer; first historical-archive contract approved by Pi Durable Expert, implementation pending.** Chris asked the team to continue the remaining portability scope. Pi Durable Expert reviews native boundaries; Documenter maintains contracts/usage. Use a separate worktree and coordinate runtime/shared-file ownership before edits. [The specification](spec.md#project-content-and-operational-recovery) owns the content/recovery distinction.
 
 Acceptance criteria:
-- Select authorized project content, public history and attachments; settle privacy/selection, completeness, archive limits and destination identity/access mapping before implementation.
+- Manager-only selected public chats/threads and historical author labels; only publicly referenced attachments, missing bytes reject export, manager access rechecked before return. Destination has only importing-human manager and no default agents; preview authorship separately. Settle archive limits before implementation.
 - Fresh destination identities, no inherited grants or private model state. Historical messages are inert history, never new submissions; no task reconstruction, project carving from Pi storage or custom task serialization.
-- Preserve company authorization and immutable existing history. Settle atomic apply/retry and attachment failure behavior in the reviewed design; document actual route/UI workflow after implementation.
+- Preserve company authorization and immutable existing history. Write immutable attachment bytes before the atomic project/history/retry-receipt commit; never expose partial history; document actual route/UI workflow after implementation.
 - Source/native/deslop review, TypeScript/application and applicable Nix builds, whitespace/links. Runtime round trips/retry/restart and rendered desktop/390 px remain unverified until authorized evidence; standing zero-tests policy remains active.
 
 ## Installation backup and restore — October 8, 2026
 
-**Assigned to Dev 2; source-grounded design review pending.** Pi Durable Expert reviews recovery ownership; Documenter owns operator guidance. This is a restricted installation recovery set, not project sharing or visible-message export.
+**Assigned to Dev 2; first offline-SQLite contract approved by Pi Durable Expert, implementation pending.** Pi Durable Expert reviews recovery ownership; Documenter owns operator guidance. This is a restricted installation recovery set, not project sharing or visible-message export.
 
 Acceptance criteria:
-- Inventory native Pi storage, SQLite/PostgreSQL application/authentication/connection databases, attachments, external workspaces and protected credentials. Identify every writer; runtime-directory locking alone does not establish a consistent recovery boundary.
-- Design stopped-owner capture and restore with compatible host-installed native extensions, complete recovery-set identification and exclusive executor ownership. Prevent concurrent original/restored execution; settle external database/file coordination and failure handling before implementation.
-- Keep secret-bearing sets restricted. Document coverage/exclusions and operator prerequisites without publishing real paths, credentials or private backup contents. No live-state changes or service stops are authorized by this work assignment.
+- First slice is offline SQLite, explicitly rejecting PostgreSQL. Include state/workspace/Pi credentials/external connection configuration and SQLite sidecars; reject symlinks/special files and overlapping trees. Identify every writer; runtime-directory locking alone does not establish a consistent recovery boundary.
+- Design stopped-owner capture and restore with compatible host-installed native extensions, complete recovery-set identification and exclusive executor ownership. Prevent concurrent original/restored execution. Restore into new destinations only, never overwrite or auto-start; check stored working-directory/credential-path compatibility.
+- Keep secret-bearing sets restricted. Document coverage/exclusions and operator prerequisites without publishing real paths, credentials or private backup contents. Checksums establish integrity, not provenance; accept trusted recovery material only. No live-state changes or service stops are authorized by this work assignment.
 - Source/native/deslop review, TypeScript/application and applicable build checks, whitespace/links. Backup/restore/restart correctness remains unverified under the zero-tests policy until explicitly authorized; never present source review as recovery qualification.
