@@ -280,7 +280,14 @@ export class WorkerLauncher {
     if (!sameRequest(container, attempt) || container.name !== attempt.name || container.id !== attempt.containerId || container.installationId !== this.journal.installationId)
       throw new LauncherError(503, "Task inspection identity mismatch.");
     if (container.state === "exited") throw new LauncherError(409, "Task exited; explicit retirement is required.");
-    if (container.state !== "running" || !container.address) return structuredClone(attempt);
+    if (container.state !== "running" || !container.address) {
+      if (attempt.phase !== "starting") {
+        attempt = { ...attempt, phase: "starting" };
+        delete attempt.address;
+        await this.update(attempt);
+      }
+      return structuredClone(attempt);
+    }
     attempt = { ...attempt, phase: "running", address: container.address };
     await this.update(attempt);
     return structuredClone(attempt);
