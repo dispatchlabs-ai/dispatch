@@ -14,11 +14,14 @@ export class RenewalError extends ConnectionError {
   constructor(readonly retryable: boolean, message: string) { super(retryable ? 503 : 401, message); }
 }
 
-function connectionNotEstablished(error: unknown): boolean {
-  if (error instanceof AggregateError) return error.errors.length > 0 && error.errors.every(connectionNotEstablished);
-  if (!(error instanceof Error)) return false;
-  if ("code" in error && ["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "ENETUNREACH", "EHOSTUNREACH", "UND_ERR_CONNECT_TIMEOUT"].includes(String(error.code))) return true;
-  return connectionNotEstablished(error.cause);
+function connectionFailure(error: unknown): string | undefined {
+  if (error instanceof AggregateError) {
+    const codes = error.errors.map(connectionFailure);
+    return codes.length > 0 && codes.every(Boolean) ? codes.join(", ") : undefined;
+  }
+  if (!(error instanceof Error)) return undefined;
+  if ("code" in error && ["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "ENETUNREACH", "EHOSTUNREACH", "UND_ERR_CONNECT_TIMEOUT"].includes(String(error.code))) return String(error.code);
+  return connectionFailure(error.cause);
 }
 
 export function connectionURL(value: string | URL) {
@@ -164,8 +167,9 @@ export async function refreshTokens(config: OAuthConfiguration, client: OAuthCli
     // Only failures known not to have exchanged the token can be retried.
     // A timeout/reset after sending, or a malformed success, may hide rotation.
     if (error instanceof RenewalError) throw error;
-    if (connectionNotEstablished(error)) {
-      throw new RenewalError(true, "Credential renewal is temporarily unavailable. Try again.");
+    const connectionError = connectionFailure(error);
+    if (connectionError) {
+      throw new RenewalError(true, `Credential renewal could not connect (${connectionError}). Try again.`);
     }
     // Never retain provider descriptions: they can contain credential material.
     throw new RenewalError(false, "Credential renewal has an uncertain outcome. Authorize this connection again.");
