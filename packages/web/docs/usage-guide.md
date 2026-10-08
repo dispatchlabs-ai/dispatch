@@ -484,7 +484,7 @@ Only assigned skills are advertised to the model, which can call `load_skill` wi
 
 #### Bundled browser and dogfood skills
 
-**Activation pending:** source integration does not update the running service. A separately approved rollout/startup is needed before these catalog entries are available in that installation.
+In development, the backend hot reloads when the watched checkout receives these changes; no manual restart is needed. Source publication alone does not verify catalog availability or assigned-skill loading; see [the recorded evidence and remaining checks](handoff.md#bundled-agent-browser-and-dogfood-skills).
 
 The browser-skill integration seeds **Agent browser** (agent-browser core) and **Dogfood** (exploratory QA) text playbooks from pinned upstream 0.38.2 once per company. In the agent editor, select the desired skill revisions and save the agent; neither skill is automatically assigned. Assign both for a QA agent that needs browser-operation and bug-reporting guidance. Existing participants keep their saved snapshots; use a new instance to receive newly saved assignments. Startup does not overwrite user-edited skill revisions.
 
