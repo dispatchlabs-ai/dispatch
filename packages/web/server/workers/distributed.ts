@@ -54,7 +54,7 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
     const active = await activate(route);
     const membership = await directory.directoryWorkerMembership(scope, id);
     const catalog = await directory.exportWorkerCatalog(scope.companyId);
-    const response = await workerRequest<{ result: T }>(`http://${active.containerName}:8831`, token(active), "/rpc", { scope, method, input, catalog, membership });
+    const response = await workerRequest<{ result: T }>(`http://${active.containerName}:8831`, token(active), "/rpc", { scope: { companyId: scope.companyId, userId: scope.userId }, method, input, catalog, membership });
     return response.result;
   }
   async function acknowledgePolicy(companyId?: string) {
