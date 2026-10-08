@@ -406,6 +406,32 @@ Use HTTPS for any non-loopback origin. HTTP configurations must bind to loopback
 
 In default SQLite mode, the state directory contains `auth.sqlite`, `auth.key`, and `runtime/` with Pi storage and its ownership lock. Back up the authentication database and encryption key together, along with the complete runtime directory, including `runtime/attachments/` blobs and their native Pi metadata. Attachment references without their blobs cannot be restored by rebuilding; missing bytes return 410. Stop the service before a simple file-copy backup so SQLite journals are settled. A missing encryption key must be restored; generating another key cannot decrypt existing TOTP factors. Do not copy these files into build inputs or source control.
 
+## Agent and skill bundles
+
+**First-slice candidate; source-reviewed usage, not runtime/browser qualification.** In Agents, choose **Import / export** to open Agent bundles.
+
+- **Export:** select agents and optional additional skills, enter a package ID/version, then **Download ZIP**. Assigned skills use the exact selected revisions. Connections and credentials are excluded; inspect instructions for private information before sharing. This is not a project or installation backup.
+- **Import:** choose a bundle ZIP, inspect definitions/instructions, model requirements, capabilities, skills and excluded connections. Resolve blockers, then explicitly allow the listed capabilities and choose **Import copies**. Imports create independent definitions and do not replace the default agent or alter existing chats. Configure connections separately.
+- **Retry:** after an uncertain failure use **Retry same import**, retaining the operation ID and file. Hiding/reopening the dialog preserves this state while the workspace component remains mounted; a page reload does not preserve it. Replacing a file after an uncertain attempt warns that the earlier import may have completed. After success, **Import another copy** deliberately starts a new operation and requires authorization again.
+
+### Bundle archive profile
+
+Use Dispatch-generated archives or construct the restricted format, not arbitrary ZIP output. The archive contains `dispatch.json` and only its referenced UTF-8 `.md` instruction files; agent/skill keys are package-local. The reader never extracts files or executes code.
+
+Limits: 8 MiB archive and total expanded file contents, 512 KiB per file, 201 entries, and at most 100 agents/100 skills. JSON instruction text is additionally limited to 50,000 characters per definition. ZIP entries must be regular stored or deflated files, with matching local/central headers, sizes and CRC. Extra fields, comments, data descriptors, ZIP64, encryption, directories/symlinks, duplicate or unsafe paths, trailing data and unreferenced files are unsupported. Many general-purpose ZIP tools add unsupported metadata; rejection does not imply their ZIP is corrupt.
+
+### Bundle API
+
+Authenticated JSON routes use base64 archive bytes, not multipart uploads:
+
+| POST route | Request | Response |
+| --- | --- | --- |
+| `/api/bundles/export` | `{ id, version, agentIds, skills: [{ id, revision }] }` | `{ archive, filename }` |
+| `/api/bundles/preview` | `{ archive }` | Parsed bundle, blockers and warnings |
+| `/api/bundles/import` | `{ archive, requestId }` | Imported agent/skill ID mapping |
+
+Reuse the same `requestId` and contents for the same import; changed contents under the same operation conflict. Use a new ID only for a deliberate additional copy. Native receipts are actor/company-scoped. Transport base64 increases request size and is not encryption. See [the first-slice contract](spec.md#first-archive-slice) for atomicity and compatibility requirements.
+
 ## Application API
 
 `POST /api/chats/:id/preferences` accepts any combination of boolean `pinned`/`archived` and nullable `projectId`, and returns the current chat snapshot. Any human member may update their own conversation preferences; the destination project must belong to that same user/company. `GET /api/chats` includes archived records and project membership so the browser can present active, archived, and grouped lists.
