@@ -1,4 +1,4 @@
-import type { BundleImportResult, BundlePreview, PortableAgent, PortableSkill } from "./bundles.js";
+import type { BundlePreview, PortableAgent, PortableSkill } from "./bundles.js";
 
 /** Server-verified public GitHub source; commit is a full immutable SHA. */
 export type GitHubBundleSource = { owner: string; repository: string; commit: string; path: string };
@@ -18,4 +18,4 @@ export type GitHubBundlePreview = BundlePreview & {
   installationId: string | null; changes: GitHubBundleChange[];
 };
 export type GitHubBundleApplyInput = { previewId: string; requestId: string };
-export type GitHubBundleApplyResult = BundleImportResult & { installation: GitHubInstallation };
+export type GitHubBundleApplyResult = { agents: { key: string; id: string }[]; skills: { key: string; id: string }[]; installation: GitHubInstallation };

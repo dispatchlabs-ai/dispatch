@@ -10,7 +10,8 @@ import { openPiStorage, type PiStorageConfig } from "./storage/open.js";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
 import type { CreateAgentInstanceInput, CreateAgentInstanceResult, AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
-import type { BundleExportInput, BundleImportResult, BundlePreview, PortableBundle } from "../src/shared/bundles.js";
+import type { BundleExportInput, BundleImportResult, BundlePreview, PortableBundle, PortableAgent, PortableSkill } from "../src/shared/bundles.js";
+import type { GitHubInstallation, GitHubBundleSource, GitHubBundlePreview, GitHubBundleApplyInput, GitHubBundleApplyResult } from "../src/shared/github-bundles.js";
 import { isManagedConnection } from "../src/shared/contracts.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata } from "./attachments.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
@@ -52,6 +53,17 @@ type BundleImportReceipt = {
 };
 const BundleImportsDoc = defineDoc<{ imports: BundleImportReceipt[] }>({
   kind: "dispatch.bundle-imports", version: 1, scope: "session", initial: () => ({ imports: [] }),
+});
+type TrackedBundleEntry = { key: string; id: string; revision: number; baseline: string; upstream: string; present: boolean };
+type TrackedBundle = GitHubInstallation & { companyId: string; agents: TrackedBundleEntry[]; skills: TrackedBundleEntry[] };
+type SavedGitHubPreview = {
+  id: string; companyId: string; userId: string; preview: string; expectedInstallationRevision: number;
+  expectedAgents: { id: string; revision: number }[]; expectedSkills: { id: string; revision: number }[];
+  agents: StoredAgent[]; skills: StoredSkill[]; next: TrackedBundle;
+};
+type GitHubReceipt = { companyId: string; userId: string; requestId: string; previewId: string; result: GitHubBundleApplyResult };
+const GitHubBundlesDoc = defineDoc<{ installations: TrackedBundle[]; previews: SavedGitHubPreview[]; receipts: GitHubReceipt[] }>({
+  kind: "dispatch.github-bundles", version: 1, scope: "session", initial: () => ({ installations: [], previews: [], receipts: [] }),
 });
 const CatalogDoc = defineDoc<Catalog>({
   kind: "dispatch.catalog", version: 1, scope: "session",
@@ -589,6 +601,141 @@ export class DispatchRuntime {
       const agent = latestAgent(await tx.doc(CatalogDoc), scope.companyId, agentId);
       if (!agent) throw new RuntimeError(404, "Agent not found.");
       return saveEvaluationProfile(tx, scope, agentId, agent.archived, input);
+    }, context);
+  }
+
+  async listGitHubBundles(scope: RuntimeScope): Promise<GitHubInstallation[]> {
+    const state = await this.harness.snapshot(GitHubBundlesDoc, context);
+    return (state?.installations ?? []).filter(item => item.companyId === scope.companyId).map(publicInstallation);
+  }
+
+  /** Receives only bounded, validated content fetched by the trusted server route. */
+  async previewGitHubBundle(scope: RuntimeScope, bundle: PortableBundle, source: GitHubBundleSource, installationId?: string): Promise<GitHubBundlePreview> {
+    return this.harness.commit(async tx => {
+      const state = await tx.doc(GitHubBundlesDoc);
+      const catalog = await tx.doc(CatalogDoc);
+      const prior = installationId ? state.installations.find(item => item.companyId === scope.companyId && item.id === installationId) : undefined;
+      if (installationId && !prior) throw new RuntimeError(404, "Tracked bundle not found.");
+      if (prior && (prior.source.owner.toLowerCase() !== source.owner.toLowerCase() || prior.source.repository.toLowerCase() !== source.repository.toLowerCase() || prior.source.path !== source.path || prior.packageId !== bundle.id))
+        throw new RuntimeError(409, "Updates must use the same repository, package directory and package ID. Import a separate copy instead.");
+      const preview: GitHubBundlePreview = { ...this.bundlePreview(bundle), previewId: randomUUID(), source,
+        digest: bundleFingerprint(bundle), installationId: prior?.id ?? null, changes: [] };
+      if (prior) preview.warnings.push("Updated agent definitions also apply to active instances at their next safe idle boundary. Existing connection bindings keep their separate rollout policy.");
+      const next: TrackedBundle = { id: prior?.id ?? randomUUID(), revision: (prior?.revision ?? 0) + 1,
+        companyId: scope.companyId, packageId: bundle.id, packageVersion: bundle.version, source, digest: preview.digest,
+        updatedAt: Date.now(), agents: detached(prior?.agents ?? []), skills: detached(prior?.skills ?? []) };
+      const saved: SavedGitHubPreview = { id: preview.previewId, companyId: scope.companyId, userId: scope.userId,
+        preview: "", expectedInstallationRevision: prior?.revision ?? 0, expectedAgents: [], expectedSkills: [], agents: [], skills: [], next };
+      const now = Date.now();
+      // Removed entries retain both their local records and identity for a later reappearance.
+      for (const kind of ["skills", "agents"] as const) {
+        for (const entry of next[kind]) {
+          if (bundle[kind].some(item => item.key === entry.key)) continue;
+          entry.present = false;
+          const local = kind === "skills" ? catalog.skills?.findLast(item => item.companyId === scope.companyId && item.id === entry.id)
+            : latestAgent(catalog, scope.companyId, entry.id);
+          if (local) (kind === "skills" ? saved.expectedSkills : saved.expectedAgents).push({ id: local.id, revision: local.revision });
+          preview.changes.push({ kind: kind === "skills" ? "skill" : "agent", key: entry.key, name: local?.name ?? entry.key,
+            action: "removed", before: JSON.parse(entry.upstream), local: local ? (kind === "skills" ? portableSkill(entry.key, local as StoredSkill) : portableTrackedAgent(entry.key, local as StoredAgent, next.skills)) : null, incoming: null });
+        }
+      }
+      for (const incoming of bundle.skills) {
+        const entry = next.skills.find(item => item.key === incoming.key);
+        const local = entry ? catalog.skills?.findLast(item => item.companyId === scope.companyId && item.id === entry.id) : undefined;
+        if (local) saved.expectedSkills.push({ id: local.id, revision: local.revision });
+        const desired = skillContent(incoming);
+        const changed = !entry || desired !== skillContent(JSON.parse(entry.upstream));
+        // Conservative first slice: do not combine local and upstream edits within one definition.
+        const conflict = !!entry && (!local || (changed && skillContent(local) !== entry.baseline && skillContent(local) !== desired));
+        preview.changes.push({ kind: "skill", key: incoming.key, name: incoming.name, action: conflict ? "conflict" : !entry ? "add" : changed && skillContent(local!) !== desired ? "update" : "unchanged",
+          before: entry ? JSON.parse(entry.upstream) : null, local: local ? portableSkill(incoming.key, local) : null, incoming });
+        if (conflict) { preview.blockers.push(`${incoming.name}: local skill edits conflict with this update. Import a separate copy.`); continue; }
+        const write = !local || (changed && skillContent(local) !== desired);
+        const record: StoredSkill = write ? { id: entry?.id ?? randomUUID(), revision: (local?.revision ?? 0) + 1,
+          name: incoming.name, description: incoming.description, instructions: incoming.instructions,
+          companyId: scope.companyId, savedBy: scope.userId, requestId: `github:${preview.previewId}:${incoming.key}`, fingerprint: preview.digest,
+          createdAt: local?.createdAt ?? now, updatedAt: now } : local!;
+        if (write) saved.skills.push(record);
+        const updated: TrackedBundleEntry = { key: incoming.key, id: record.id, revision: changed ? record.revision : entry!.revision,
+          baseline: changed ? skillContent(record) : entry!.baseline, upstream: JSON.stringify(incoming), present: true };
+        if (entry) Object.assign(entry, updated); else next.skills.push(updated);
+      }
+      for (const incoming of bundle.agents) {
+        const entry = next.agents.find(item => item.key === incoming.key);
+        const local = entry ? latestAgent(catalog, scope.companyId, entry.id) : undefined;
+        if (local) saved.expectedAgents.push({ id: local.id, revision: local.revision });
+        const selection = capabilitySelection(incoming.capabilities);
+        const bindings = incoming.skills.map(key => next.skills.find(item => item.key === key && item.present));
+        if (bindings.some(item => !item)) { preview.blockers.push(`${incoming.name}: an assigned skill has an unresolved update.`); continue; }
+        const skills = bindings.map(item => ({ id: item!.id, revision: item!.revision }));
+        const desired = { name: incoming.name, description: incoming.description, instructions: incoming.instructions,
+          provider: incoming.provider, modelId: incoming.modelId, thinkingLevel: incoming.thinkingLevel,
+          skills, extensions: selection.extensions, tools: selection.tools };
+        // The upstream text may be unchanged while a pinned assigned skill revision changes.
+        const upstreamChanged = !entry || agentUpstreamContent(incoming) !== agentUpstreamContent(JSON.parse(entry.upstream));
+        const baseline = entry ? JSON.parse(entry.baseline) as ReturnType<typeof agentContent> : undefined;
+        const assignmentsChanged = !!baseline && JSON.stringify(baseline.skills) !== JSON.stringify(skills);
+        const changed = upstreamChanged || assignmentsChanged;
+        const desiredContent = JSON.stringify(agentContent(desired));
+        const conflict = !!entry && (!local || local.archived || (changed && JSON.stringify(agentContent(local)) !== entry.baseline && JSON.stringify(agentContent(local)) !== desiredContent));
+        preview.changes.push({ kind: "agent", key: incoming.key, name: incoming.name, action: conflict ? "conflict" : !entry ? "add" : changed && JSON.stringify(agentContent(local!)) !== desiredContent ? "update" : "unchanged",
+          before: entry ? JSON.parse(entry.upstream) : null, local: local ? portableTrackedAgent(incoming.key, local, next.skills) : null, incoming });
+        if (conflict) { preview.blockers.push(`${incoming.name}: local agent edits or archive state conflict with this update. Import a separate copy.`); continue; }
+        const retainedConnections = local ? [...new Set([...(local.connections ?? []), ...this.connections.forAgent(local.id, managedIds(local))].map(connection => connection.name))] : [];
+        if (retainedConnections.length)
+          preview.warnings.push(`${incoming.name}: retained local connections: ${retainedConnections.join(", ")}. Updated instructions can use their existing authority.`);
+        const write = !local || (changed && JSON.stringify(agentContent(local)) !== desiredContent);
+        const record: StoredAgent = write ? { ...desired, id: entry?.id ?? randomUUID(), revision: (local?.revision ?? 0) + 1, archived: false,
+          extensions: [...selection.extensions, ...(local?.extensions ?? []).filter(isMcpExtension)],
+          tools: [...selection.tools, ...(local?.tools ?? []).filter(isMcpTool)], connections: detached(local?.connections ?? []),
+          companyId: scope.companyId, savedBy: scope.userId, createdAt: local?.createdAt ?? now, updatedAt: now } : local!;
+        if (write) saved.agents.push(record);
+        const updated: TrackedBundleEntry = { key: incoming.key, id: record.id, revision: record.revision,
+          baseline: changed ? JSON.stringify(agentContent(record)) : entry!.baseline, upstream: JSON.stringify(incoming), present: true };
+        if (entry) Object.assign(entry, updated); else next.agents.push(updated);
+      }
+      saved.preview = JSON.stringify(preview);
+      state.previews.push(saved);
+      return detached(preview);
+    }, context);
+  }
+
+  async applyGitHubBundle(scope: RuntimeScope, input: GitHubBundleApplyInput): Promise<GitHubBundleApplyResult> {
+    return this.harness.commit(async tx => {
+      const state = await tx.doc(GitHubBundlesDoc);
+      const replay = state.receipts.find(item => item.companyId === scope.companyId && item.userId === scope.userId && item.requestId === input.requestId);
+      if (replay) {
+        if (replay.previewId !== input.previewId) throw requestConflict();
+        return detached(replay.result);
+      }
+      const saved = state.previews.find(item => item.id === input.previewId && item.companyId === scope.companyId && item.userId === scope.userId);
+      if (!saved) throw new RuntimeError(404, "Bundle preview not found. Preview the pinned commit again.");
+      // A preview is a single admission, even if a client mistakenly supplies a fresh request ID.
+      if (state.receipts.some(item => item.previewId === saved.id)) throw new RuntimeError(409, "This preview was already applied. Preview again to create another copy.");
+      const preview = JSON.parse(saved.preview) as GitHubBundlePreview;
+      if (preview.blockers.length) throw new RuntimeError(409, "Resolve the preview conflicts or import a separate copy.");
+      const prior = state.installations.find(item => item.id === saved.next.id && item.companyId === scope.companyId);
+      if ((prior?.revision ?? 0) !== saved.expectedInstallationRevision) throw new RuntimeError(409, "The tracked bundle changed. Preview again.");
+      const catalog = await tx.doc(CatalogDoc);
+      for (const expected of saved.expectedAgents) {
+        if (latestAgent(catalog, scope.companyId, expected.id)?.revision !== expected.revision) throw new RuntimeError(409, "An agent changed after preview. Preview again.");
+      }
+      for (const expected of saved.expectedSkills) {
+        if (catalog.skills?.findLast(item => item.companyId === scope.companyId && item.id === expected.id)?.revision !== expected.revision) throw new RuntimeError(409, "A skill changed after preview. Preview again.");
+      }
+      const compatibility = this.bundlePreview(preview.bundle);
+      if (compatibility.blockers.length) throw new RuntimeError(409, compatibility.blockers.join("\n"));
+      catalog.skills ??= [];
+      catalog.skills.push(...detached(saved.skills));
+      catalog.agents.push(...detached(saved.agents));
+      const next = detached(saved.next);
+      next.updatedAt = Date.now();
+      if (prior) Object.assign(prior, next); else state.installations.push(next);
+      const result: GitHubBundleApplyResult = { installation: publicInstallation(next),
+        agents: next.agents.filter(item => item.present).map(({ key, id }) => ({ key, id })),
+        skills: next.skills.filter(item => item.present).map(({ key, id }) => ({ key, id })) };
+      state.receipts.push({ companyId: scope.companyId, userId: scope.userId, requestId: input.requestId, previewId: input.previewId, result });
+      return detached(result);
     }, context);
   }
 
@@ -1288,4 +1435,32 @@ function bundleFingerprint(bundle: PortableBundle) {
     bundle.agents.map(agent => [agent.key, agent.name, agent.description, agent.instructions, agent.provider,
       agent.modelId, agent.thinkingLevel, agent.capabilities, agent.skills, agent.omittedConnections]),
     bundle.skills.map(skill => [skill.key, skill.name, skill.description, skill.instructions])])).digest("hex");
+}
+
+function publicInstallation(item: TrackedBundle): GitHubInstallation {
+  const { id, revision, packageId, packageVersion, source, digest, updatedAt } = item;
+  return detached({ id, revision, packageId, packageVersion, source, digest, updatedAt });
+}
+function portableSkill(key: string, skill: Pick<StoredSkill, "name" | "description" | "instructions">): PortableSkill {
+  return { key, name: skill.name, description: skill.description, instructions: skill.instructions };
+}
+function skillContent(skill: Pick<StoredSkill, "name" | "description" | "instructions">) {
+  return JSON.stringify([skill.name, skill.description, skill.instructions]);
+}
+function agentContent(agent: Pick<StoredAgent, "name" | "description" | "instructions" | "provider" | "modelId" | "thinkingLevel" | "skills" | "extensions" | "tools">) {
+  return { name: agent.name, description: agent.description, instructions: agent.instructions, provider: agent.provider,
+    modelId: agent.modelId, thinkingLevel: agent.thinkingLevel, skills: agent.skills ?? [],
+    extensions: (agent.extensions ?? []).filter(name => !isMcpExtension(name)).sort(), tools: (agent.tools ?? []).filter(name => !isMcpTool(name)).sort() };
+}
+function agentUpstreamContent(agent: PortableAgent) {
+  return JSON.stringify([agent.name, agent.description, agent.instructions, agent.provider, agent.modelId, agent.thinkingLevel,
+    [...agent.capabilities].sort(), agent.skills]);
+}
+function portableTrackedAgent(key: string, agent: StoredAgent, skills: TrackedBundleEntry[]): PortableAgent {
+  return { key, name: agent.name, description: agent.description, instructions: agent.instructions, provider: agent.provider,
+    modelId: agent.modelId, thinkingLevel: agent.thinkingLevel, capabilities: publicAgent(agent).capabilities ?? [],
+    skills: (agent.skills ?? []).map(selection => {
+      const entry = skills.find(item => item.id === selection.id);
+      return entry ? `${entry.key} (local revision ${selection.revision})` : `local skill (revision ${selection.revision})`;
+    }), omittedConnections: agent.connections?.length ?? 0 };
 }
