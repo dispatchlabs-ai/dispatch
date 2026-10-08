@@ -1,6 +1,6 @@
 # Single-server conversation workers
 
-Status: application integration in progress. The private Omarchy stack was reactivated on October 8 for a disposable-account smoke check at checkpoint `55d6247`. Enrollment/password/TOTP passed; first conversation creation hit a worker-DNS readiness failure despite a running container. No model request was admitted and no HTTPS/DNS publication occurred. Conversation execution and integrated acceptance remain unqualified. Implements the [accepted target](spec.md#aws-container-deployment-target) and [single-server rehearsal](spec.md#single-server-container-rehearsal). Chris authorized implementation, isolated Omarchy deployment and focused testing on October 7, 2026. Existing installations and their data remain untouched.
+Status: application integration in progress. On October 8, Deployer reported a passing private Omarchy smoke check at source `995c696`: disposable password/TOTP enrollment, authenticated conversation creation, scoped worker startup and an actual model reply. DNS naming and strict RPC scope faults were fixed and retested. No HTTPS/DNS publication; integrated acceptance remains pending. Implements the [accepted target](spec.md#aws-container-deployment-target) and [single-server rehearsal](spec.md#single-server-container-rehearsal). Chris authorized implementation, isolated Omarchy deployment and focused testing on October 7, 2026. Existing installations and their data remain untouched.
 
 ## Ownership and boundaries
 
