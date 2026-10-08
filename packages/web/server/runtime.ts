@@ -8,7 +8,8 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, getSupportedThinkingLevels, type Models } from "@earendil-works/pi-ai/models";
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
-import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, LiveDoc, type CommitPublication, type ConversationId, type HarnessSettings, type RegistryReader, type Storage, type Tx } from "@earendil-works/pi-durable";
+import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, LiveDoc, type CommitPublication, type ConversationId, type HarnessSettings, type Registry, type RegistryReader, type Storage, type Tx } from "@earendil-works/pi-durable";
+import type { WorkerSummary } from "./workers/summaries.js";
 import { prepareWorkerWorkspace, workerWorkspaceSection, WorkerWorkspaceDoc } from "./workers/workspace.js";
 import { openPiStorage, type PiStorageConfig } from "./storage/open.js";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
@@ -64,9 +65,13 @@ export type WorkerManagement = {
   read(actor: WorkerManagementActor, input: unknown): Promise<unknown>;
   save(actor: WorkerManagementActor, callId: string, input: unknown): Promise<unknown>;
 };
+export type WorkerMcpSelection = { connections: NonNullable<AgentDefinition["connections"]>; extensions: string[]; tools: string[] };
+export type WorkerMcp = {
+  prepare(registry: Registry, membership: WorkerMembershipSnapshot, actorForInstance: (id: ConversationId) => Promise<WorkerManagementActor>): Promise<void>;
+};
 type WorkerInvitationEvent = { revision: number; authorUserId?: string; authorDefinitionId?: string; names: string[]; at: number };
 export type WorkerMembershipSnapshot = {
-  conversationKey: string; revision: number; humans: Person[]; agents: { definitionId: string; revision: number }[];
+  conversationKey: string; revision: number; humans: Person[]; agents: { definitionId: string; revision: number; mcp: WorkerMcpSelection }[];
   events: WorkerInvitationEvent[];
 };
 export type WorkerInvitationResult = { membership: WorkerMembershipSnapshot; catalog: WorkerCatalogSnapshot };
@@ -92,11 +97,14 @@ const RuntimeModeDoc = defineDoc<{ mode?: "native" | "directory" | "conversation
 const WorkerActorsDoc = defineDoc<{ actors: Record<string, ManagementActor[]> }>({
   kind: "dispatch.worker-actors", version: 1, scope: "session", initial: () => ({ actors: {} }),
 });
-const WorkerInvitationsDoc = defineDoc<{ rooms: Record<string, { revision: number; requests: Record<string, string>; events: WorkerInvitationEvent[] }> }>({
+const WorkerInvitationsDoc = defineDoc<{ rooms: Record<string, { revision: number; mcpSelections?: boolean; requests: Record<string, string>; events: WorkerInvitationEvent[] }> }>({
   kind: "dispatch.worker-invitations", version: 1, scope: "session", initial: () => ({ rooms: {} }),
 });
 const WorkerMembershipReceiptDoc = defineDoc<{ revision: number; fingerprint: string }>({
   kind: "dispatch.worker-membership-receipt", version: 1, scope: "session", initial: () => ({ revision: 0, fingerprint: "" }),
+});
+const WorkerSummaryReceiptDoc = defineDoc<{ revision: number; fingerprint: string }>({
+  kind: "dispatch.worker-summary-receipt", version: 1, scope: "session", initial: () => ({ revision: 0, fingerprint: "" }),
 });
 const WorkerExportsDoc = defineDoc<{ sourceId?: string; companies: Record<string, { revision: number; fingerprint: string }> }>({
   kind: "dispatch.worker-catalog-exports", version: 1, scope: "session", initial: () => ({ companies: {} }),
@@ -156,6 +164,7 @@ export type RuntimeOptions = {
   directoryOnly?: boolean;
   runMcpBackground?: <T>(operation: () => Promise<T>) => Promise<T>;
   workerManagement?: WorkerManagement;
+  workerMcp?: WorkerMcp;
   workerInvitations?: WorkerInvitations;
   /** Workers must inject durable remote blob storage; native installations keep their local default. */
   attachmentStore?: AttachmentStore;
@@ -165,7 +174,7 @@ export type RuntimeOptions = {
 export class DispatchRuntime {
   private harness: Harness;
   private models: Models;
-  private registry: RegistryReader;
+  private registry: Registry;
   private owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>;
   private commitRevision = 0;
   private closed = false;
@@ -182,9 +191,11 @@ export class DispatchRuntime {
   private directoryOnly = false;
   private worker?: ConversationWorkerBootstrap;
   private workerManagement?: WorkerManagement;
+  private workerMcp?: WorkerMcp;
   private boundRoomId?: string;
+  private membershipTail: Promise<unknown> = Promise.resolve();
 
-  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: RegistryReader, shared: SharedConversations, connections: AgentConnections, private readonly workspaceDir: string, private readonly attachments: AttachmentStore, peopleDirectory?: PeopleDirectory) {
+  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: Registry, shared: SharedConversations, connections: AgentConnections, private readonly workspaceDir: string, private readonly attachments: AttachmentStore, peopleDirectory?: PeopleDirectory) {
     this.connections = connections;
     this.shared = shared;
     this.peopleDirectory = peopleDirectory;
@@ -263,6 +274,7 @@ export class DispatchRuntime {
       runtime.directoryOnly = options.directoryOnly ?? false;
       runtime.worker = worker;
       runtime.workerManagement = options.workerManagement;
+      runtime.workerMcp = options.workerMcp;
       if (worker) shared.inviteRemote = async (instanceId, requestId, definitionIds) => {
         if (!options.workerInvitations) throw new RuntimeError(503, "Backend invitation service is unavailable.");
         const actor = await harness.commit(async tx => runtime.remoteActor(await shared.managementActor(tx, instanceId)), context);
@@ -278,6 +290,7 @@ export class DispatchRuntime {
         if (options.runMcpBackground) connections.runBackground = options.runMcpBackground;
         await connections.open(harness);
         const reopenedRoom = Boolean((await harness.snapshot(RuntimeModeDoc, context))?.worker?.roomId);
+        if (worker.membership) await runtime.prepareWorkerMcp(worker.membership);
         runtime.boundRoomId = await runtime.createChatRecord(worker.scope, worker.input);
         // No whole-installation migrations or catalog revisions generated by worker discovery.
         // The stable workspace path must be identical after replacement; its bytes are disposable.
@@ -557,9 +570,12 @@ export class DispatchRuntime {
     const actors = (await tx.doc(WorkerActorsDoc)).actors[id];
     const invitations = (await tx.doc(WorkerInvitationsDoc)).rooms[id];
     if (!actors || !invitations) throw new RuntimeError(409, "Conversation has no backend membership journal.");
+    // Upgrade old trial projections once, so the new MCP fields cannot conflict with an
+    // already-acknowledged membership revision in a surviving worker store.
+    if (!invitations.mcpSelections) { invitations.mcpSelections = true; invitations.revision++; }
     return detached({ conversationKey: id, revision: invitations.revision,
       humans: room.members.filter(member => member.kind === "human").map(member => ({ id: member.userId!, name: member.name })),
-      agents: actors.map(actor => ({ definitionId: actor.definitionId, revision: actor.revision })), events: invitations.events });
+      agents: actors.map(actor => ({ definitionId: actor.definitionId, revision: actor.revision, mcp: workerMcpSelection(actor.configuration) })), events: invitations.events });
   }
 
   private async admitWorkerInvitation(tx: Tx, id: string, companyId: string, author: { userId?: string; definitionId?: string }, input: AddParticipantsInput, people: Person[]) {
@@ -618,6 +634,14 @@ export class DispatchRuntime {
    * content; participant creation and membership notices commit with the receipt.
    */
   async applyWorkerMembership(input: WorkerMembershipSnapshot) {
+    // Agent invitation callbacks and HTTP reconciliation can arrive independently.
+    // Order registry preparation with the durable selection commit, without holding a Pi transaction over I/O.
+    const operation = this.membershipTail.then(() => this.applyWorkerMembershipNow(input));
+    this.membershipTail = operation.catch(() => {});
+    return operation;
+  }
+
+  private async applyWorkerMembershipNow(input: WorkerMembershipSnapshot) {
     if (!this.worker || !this.boundRoomId) throw new RuntimeError(409, "Worker room is not open.");
     const snapshot = detached(input);
     if (snapshot.conversationKey !== this.worker.conversationKey || !Number.isSafeInteger(snapshot.revision) || snapshot.revision < 1)
@@ -626,6 +650,11 @@ export class DispatchRuntime {
       || new Set(snapshot.agents.map(agent => agent.definitionId)).size !== snapshot.agents.length)
       throw new RuntimeError(409, "Duplicate worker membership identity.");
     const hash = fingerprint(snapshot);
+    const prior = await this.harness.snapshot(WorkerMembershipReceiptDoc, context);
+    if (prior && (snapshot.revision < prior.revision || (snapshot.revision === prior.revision && hash !== prior.fingerprint)))
+      throw new RuntimeError(409, "Stale or conflicting worker membership.");
+    if (prior?.revision === snapshot.revision) return { revision: snapshot.revision };
+    await this.prepareWorkerMcp(snapshot);
     await this.harness.commit(async tx => {
       const receipt = await tx.doc(WorkerMembershipReceiptDoc);
       if (snapshot.revision < receipt.revision || (snapshot.revision === receipt.revision && hash !== receipt.fingerprint))
@@ -643,6 +672,8 @@ export class DispatchRuntime {
         if (existing) {
           if (existing.agentRevision !== agent.revision) throw new RuntimeError(409, "Worker participant revision conflicts with backend pin.");
         } else await this.shared.addAgent(tx, roomId, agent.definitionId, {}, agent.revision);
+        const member = room.members.find(member => member.kind === "agent" && member.agentDefinitionId === agent.definitionId)!;
+        await this.applyWorkerMcpSelection(tx, member, agent.mcp);
       }
       // Invitation snapshots only add members. Project revocation is checked separately through catalog ACLs.
       if (room.members.some(member => member.kind === "agent" && !snapshot.agents.some(agent => agent.definitionId === member.agentDefinitionId)))
@@ -666,6 +697,61 @@ export class DispatchRuntime {
       const actors = (await tx.doc(WorkerActorsDoc)).actors[id];
       if (!actors) throw new RuntimeError(409, "Conversation has no backend actor pins.");
       return Object.fromEntries(actors.map(actor => [actor.definitionId, actor.revision]));
+    }, context);
+  }
+
+  private async prepareWorkerMcp(membership: WorkerMembershipSnapshot) {
+    if (!this.worker) throw new RuntimeError(409, "Not a conversation worker.");
+    if (membership.conversationKey !== this.worker.conversationKey) throw new RuntimeError(409, "Worker membership identity mismatch.");
+    for (const { mcp } of membership.agents) {
+      if (!mcp || mcp.extensions.some(name => !isMcpExtension(name)) || mcp.tools.some(name => !isMcpTool(name)))
+        throw new RuntimeError(409, "Invalid worker MCP selection.");
+    }
+    if (this.workerMcp) await this.workerMcp.prepare(this.registry, membership, id => this.harness.commit(async tx => this.remoteActor(await this.shared.managementActor(tx, id)), context));
+    else if (membership.agents.some(agent => agent.mcp.extensions.length || agent.mcp.tools.length))
+      throw new RuntimeError(503, "Worker MCP registrations are unavailable.");
+  }
+
+  private async applyWorkerMcpSelection(tx: Tx, member: Member, selection: WorkerMcpSelection) {
+    if (!member.conversationId || !member.agent) throw new RuntimeError(409, "Worker agent binding is unavailable.");
+    const registry = this.registry.snapshot();
+    const extensions = selection.extensions.map(name => {
+      const extension = registry.extension(name);
+      if (!extension) throw new RuntimeError(503, `Agent extension ${name} is unavailable.`);
+      return extension;
+    });
+    if (selection.tools.some(name => !extensions.some(extension => extension.tools?.some(tool => tool.name === name))))
+      throw new RuntimeError(503, "Worker MCP tool registration is unavailable.");
+    const agent = await tx.doc(AgentDoc, member.conversationId);
+    // These instances originate from configure() with explicit lists. Preserve native
+    // collaboration/skill/coding selections and reject unsupported selection shapes.
+    if (!Array.isArray(agent.extensions) || !Array.isArray(agent.tools)) throw new RuntimeError(409, "Worker agent selections must be explicit.");
+    agent.extensions = [...agent.extensions.filter(name => !isMcpExtension(name)), ...selection.extensions];
+    agent.tools = [...agent.tools.filter(name => !isMcpTool(name)), ...selection.tools];
+    member.agent.extensions = [...member.agent.extensions.filter(name => !isMcpExtension(name)), ...selection.extensions];
+    member.agent.tools = [...member.agent.tools.filter(name => !isMcpTool(name)), ...selection.tools];
+    member.agent.connections = detached(selection.connections ?? []);
+  }
+
+  /** Attempt authentication belongs to the backend route. Never execute the returned
+   * authorization after a concurrent revocation barrier; the invocation owns that ordering.
+   */
+  async authorizeWorkerMcp(claim: WorkerManagementActor, connectionId: string, toolName: string) {
+    this.requireDirectoryActor(claim);
+    return this.harness.commit(async tx => {
+      const actor = await this.authoritativeWorkerActor(tx, claim);
+      const mcp = workerMcpSelection(actor.configuration);
+      const connection = mcp.connections?.find(item => item.id === connectionId);
+      const installed = connection && this.registry.snapshot().extension(connection.extension);
+      if (!connection || !mcp.extensions.includes(connection.extension) || !mcp.tools.includes(toolName)
+        || !installed?.tools?.some(tool => tool.name === toolName)) throw new RuntimeError(403, "MCP tool is not authorized for this participant.");
+      const current = this.connections.forAgent(actor.definitionId, managedIds(actor.configuration)).find(item => item.id === connectionId && item.extension === connection.extension);
+      if (!current) throw new RuntimeError(403, "MCP connection is unavailable.");
+      if (isManagedConnection(connection)) {
+        const record = this.managed?.record(connectionId);
+        if (!record || record.companyId !== actor.companyId || record.authorization !== "authorized") throw new RuntimeError(403, "MCP connection is disabled.");
+      }
+      return detached({ actor, connection });
     }, context);
   }
 
@@ -999,7 +1085,7 @@ export class DispatchRuntime {
             configuration: detached(publicAgent(definition)) });
         }
         (await tx.doc(WorkerActorsDoc)).actors[id] = actors;
-        (await tx.doc(WorkerInvitationsDoc)).rooms[id] = { revision: 1, requests: {}, events: [] };
+        (await tx.doc(WorkerInvitationsDoc)).rooms[id] = { revision: 1, mcpSelections: true, requests: {}, events: [] };
       }
       catalog.chats.push({ ...(creationFingerprint ? { creationFingerprint } : {}), id, title, creationTitleExplicit: explicitTitle, ...(explicitTitle ? { displayTitle: title } : {}), creationAgentIds: agentIds, creationAgentsOmitted: requestedAgents === undefined, createdAt: Date.now(), agentDefinitionId: first?.id ?? "", agentRevision: first?.revision ?? 0, agentName: first?.name ?? "People", companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
       if (this.worker) {
@@ -1104,6 +1190,29 @@ export class DispatchRuntime {
       const value = kind === "message" ? presentation.messages.find(item => item.id === itemId || item.aliases?.includes(itemId)) : presentation.activities.find(item => item.id === itemId);
       if (!value) throw new RuntimeError(404, "History item unavailable.");
       return value;
+    }, context);
+  }
+
+  /** Internal public-summary projection. This never borrows the creator's current access.
+   * Its durable content revision survives replacement and also orders transient status changes.
+   */
+  async workerSummary(): Promise<WorkerSummary> {
+    if (!this.worker || !this.boundRoomId) throw new RuntimeError(409, "Worker room is not open.");
+    return this.harness.commit(async tx => {
+      const chat = (await tx.doc(CatalogDoc)).chats.find(chat => chat.id === this.boundRoomId);
+      if (!chat) throw new RuntimeError(409, "Worker room is unavailable.");
+      const presentation = await this.shared.presentation(tx, nativeId(this.boundRoomId!));
+      const agents = presentation.participants.filter(member => member.kind === "agent");
+      const status: ChatSummary["status"] = agents.some(agent => ["working", "listening", "responding"].includes(agent.status)) ? "running"
+        : agents.some(agent => agent.status === "failed") ? "failed" : agents.some(agent => agent.status === "stopped") ? "stopped" : "idle";
+      const error = agents.find(agent => agent.status === "failed")?.error;
+      const first = presentation.messages.find(message => message.kind === "message");
+      const summary = { updatedAt: presentation.messages.reduce((latest, message) => Math.max(latest, message.createdAt), chat.createdAt), status,
+        ...(error ? { error } : {}), ...(first?.text ? { suggestedTitle: first.text.slice(0, 80) } : {}) };
+      const receipt = await tx.doc(WorkerSummaryReceiptDoc);
+      const hash = fingerprint(summary);
+      if (receipt.fingerprint !== hash) { receipt.revision++; receipt.fingerprint = hash; }
+      return { ...summary, revision: receipt.revision };
     }, context);
   }
 
@@ -1701,6 +1810,15 @@ export class DispatchRuntime {
       catalog.agents.push(agent);
       if (input.applyConnectionsToExisting && prior) {
         for (const chat of catalog.chats.filter(chat => chat.companyId === scope.companyId)) {
+          if (this.directoryOnly) {
+            const actors = (await tx.doc(WorkerActorsDoc)).actors[chat.id] ?? [];
+            const actor = actors.find(actor => actor.definitionId === id);
+            if (actor) {
+              const desired = workerMcpSelection(publicAgent(agent));
+              if (setWorkerMcpSelection(actor, desired)) (await tx.doc(WorkerInvitationsDoc)).rooms[chat.id].revision++;
+            }
+            continue;
+          }
           const room = await tx.doc(SharedDoc, nativeId(chat.id));
           for (const member of room.members) {
             if (member.kind !== "agent" || member.agentDefinitionId !== id || !member.conversationId || !member.agent) continue;
@@ -2021,9 +2139,12 @@ export class DispatchRuntime {
       throw new RuntimeError(403, "Participant is outside this worker room.");
     const catalog = await tx.doc(CatalogDoc);
     const pinnedRevision = revision ?? (!this.boundRoomId ? this.worker?.initialAgentRevisions?.[definitionId] : undefined);
-    const agent = pinnedRevision === undefined ? this.findAgent(catalog, { companyId }, definitionId)
+    const saved = pinnedRevision === undefined ? this.findAgent(catalog, { companyId }, definitionId)
       : catalog.agents.find(item => item.companyId === companyId && item.id === definitionId && item.revision === pinnedRevision);
-    if (!agent) throw new RuntimeError(409, "Pinned worker agent revision is unavailable.");
+    if (!saved) throw new RuntimeError(409, "Pinned worker agent revision is unavailable.");
+    // Worker MCP selection is applied from the authoritative membership, not historical
+    // definition names which may no longer have installed implementations after a rollout.
+    const agent = this.worker ? { ...saved, extensions: (saved.extensions ?? []).filter(name => !isMcpExtension(name)), tools: (saved.tools ?? []).filter(name => !isMcpTool(name)) } : saved;
     this.validateAgent(agent);
     const { extensions, tools, snapshots } = this.resolveConfiguration(catalog, companyId, agent);
     const room = await tx.doc(SharedDoc, roomId);
@@ -2034,7 +2155,7 @@ export class DispatchRuntime {
     if (snapshots.length) (await tx.doc(SkillBindingsDoc, record.id)).skills = snapshots;
     const cwd = agent.extensions?.some(name => name === CodingTools.name || name === "dispatch-image-gen") ? workspaceDefault : undefined;
     await configure(tx, record.id, { model: { provider: agent.provider, modelId: agent.modelId }, instructions: agent.instructions, thinkingLevel: agent.thinkingLevel, extensions, tools, ...(cwd ? { cwd } : {}) });
-    await this.connections.bind(tx, record.id, definitionId, false, managedIds(agent));
+    if (!this.worker) await this.connections.bind(tx, record.id, definitionId, false, managedIds(agent));
     return { id: randomUUID(), kind: "agent", workspaceDefault, name: agent.name, joinedAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, conversationId: record.id, status: "idle", agent: { ...publicAgent(agent), extensions: extensions.map(extension => extension.name), tools: tools.map(tool => tool.name), ...(cwd ? { cwd } : {}) } };
   }
 
@@ -2054,6 +2175,20 @@ export class DispatchRuntime {
         }
       }
       for (const chat of catalog.chats.filter(chat => chat.companyId === companyId)) {
+        if (this.directoryOnly) {
+          // Discovery refreshes tools for previously selected connections; it never grants
+          // a latest definition's newly attached connection to older pinned participants.
+          let changed = false;
+          for (const actor of (await tx.doc(WorkerActorsDoc)).actors[chat.id] ?? []) {
+            const connections = this.connections.forAgent(actor.definitionId, managedIds(actor.configuration))
+              .filter(current => actor.configuration.connections?.some(selected => selected.id === current.id && selected.extension === current.extension));
+            const extensions = connections.map(connection => connection.extension);
+            const tools = extensions.flatMap(name => this.registry.snapshot().extension(name)?.tools?.map(tool => tool.name) ?? []);
+            changed = setWorkerMcpSelection(actor, { connections, extensions, tools }) || changed;
+          }
+          if (changed) (await tx.doc(WorkerInvitationsDoc)).rooms[chat.id].revision++;
+          continue;
+        }
         const room = await tx.doc(SharedDoc, nativeId(chat.id));
         for (const member of room.members) {
           if (member.kind !== "agent" || !member.conversationId || !member.agentDefinitionId || !member.agent) continue;
@@ -2179,6 +2314,16 @@ function publicAgent({ companyId: _companyId, savedBy: _savedBy, saveRequestId: 
   // Nested catalog values may be transaction proxies; detach before the transaction settles.
   return detached({ ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [],
     capabilities: capabilityDefinitions.filter(item => agent.extensions?.includes(item.marker)).map(item => item.id) });
+}
+function workerMcpSelection(agent: Pick<AgentDefinition, "connections" | "extensions" | "tools">): WorkerMcpSelection {
+  return detached({ connections: agent.connections ?? [], extensions: agent.extensions.filter(isMcpExtension), tools: agent.tools.filter(isMcpTool) });
+}
+function setWorkerMcpSelection(actor: ManagementActor, selection: WorkerMcpSelection): boolean {
+  if (fingerprint(workerMcpSelection(actor.configuration)) === fingerprint(selection)) return false;
+  actor.configuration.connections = detached(selection.connections);
+  actor.configuration.extensions = [...actor.configuration.extensions.filter(name => !isMcpExtension(name)), ...selection.extensions];
+  actor.configuration.tools = [...actor.configuration.tools.filter(name => !isMcpTool(name)), ...selection.tools];
+  return true;
 }
 function managedIds(agent: Pick<AgentDefinition, "connections">) { return (agent.connections ?? []).filter(isManagedConnection).map(connection => connection.id); }
 function requireText(value: unknown, field: string, max: number, allowEmpty = false): asserts value is string {

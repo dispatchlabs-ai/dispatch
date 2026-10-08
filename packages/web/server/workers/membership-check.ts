@@ -156,6 +156,9 @@ try {
     await worker.getChat(invitedScope, roomId);
     await worker.submit(invitedScope, roomId, { requestId: "remaining-member", text: "Still authorized" });
     await assert.rejects(worker.getChat(scope, roomId));
+    const summary = await worker.workerSummary();
+    assert.equal(summary.suggestedTitle, "Still authorized");
+    assert.deepEqual(await worker.workerSummary(), summary); // No creator reauthorization or revision churn.
     await assert.rejects(worker.submit(scope, roomId, { requestId: "revoked-member", text: "Forbidden" }));
     await assert.rejects(worker.downloadAttachment(scope, roomId, randomUUID()));
     await worker.close(); worker = undefined;
