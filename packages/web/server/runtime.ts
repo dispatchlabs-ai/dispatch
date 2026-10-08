@@ -16,6 +16,7 @@ import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
 import { Skills, SkillBindingsDoc } from "./extensions/skills.js";
 import { imageGenerationSkill } from "./skills/image-generation.js";
+import { agentBrowserSkill, dogfoodSkill } from "./skills/agent-browser/index.js";
 import { createImageGen } from "./extensions/image-gen.js";
 import { Coding } from "./extensions/coding.js";
 import { SharedConversations, SharedDoc, type Member, type PeopleDirectory } from "./collaboration/shared.js";
@@ -169,6 +170,18 @@ export class DispatchRuntime {
             ...imageGenerationSkill, id: IMAGE_GENERATION_SKILL_ID, companyId: options.companyId,
             revision: 1, createdAt: now, updatedAt: now, savedBy: "system",
             requestId: "seed:image-generation", fingerprint: "seed:image-generation:1",
+          });
+        }
+        for (const seed of [
+          { id: "f0f71a7c-2268-4b27-80ec-837c76845592", key: "agent-browser", content: agentBrowserSkill },
+          { id: "e0ae224c-e456-48ca-9575-6391bb39918e", key: "agent-browser-dogfood", content: dogfoodSkill },
+        ]) {
+          if (catalog.skills.some(skill => skill.companyId === options.companyId && skill.id === seed.id)) continue;
+          const now = Date.now();
+          catalog.skills.push({
+            ...seed.content, id: seed.id, companyId: options.companyId,
+            revision: 1, createdAt: now, updatedAt: now, savedBy: "system",
+            requestId: `seed:${seed.key}`, fingerprint: `seed:${seed.key}:1`,
           });
         }
         catalog.runtimeInstance = randomUUID();
