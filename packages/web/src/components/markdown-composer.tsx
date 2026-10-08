@@ -1,3 +1,4 @@
+import type { OpenInstanceForm } from "./add-instance";
 import { $isCodeNode, CodeNode } from "@lexical/code";
 import { LinkNode } from "@lexical/link";
 import { ListItemNode, ListNode } from "@lexical/list";
@@ -33,6 +34,8 @@ type MarkdownComposerProps = {
   mode?: "message";
   onSend: () => void;
   participants: MentionParticipant[];
+  instanceChoices?: MentionParticipant[];
+  onAddInstance?: OpenInstanceForm;
   mentions: string[];
   onMentionsChange: (ids: string[]) => void;
   toolbar: ReactNode;
@@ -79,7 +82,7 @@ export function MarkdownComposer(props: MarkdownComposerProps) {
     <ListPlugin />
     <LinkPlugin />
     <MarkdownShortcutPlugin transformers={transformers} />
-    {conversation ? <MentionsPlugin people={conversation.participants} /> : null}
+    {conversation ? <MentionsPlugin people={conversation.participants} instanceChoices={conversation.instanceChoices} onAddInstance={conversation.onAddInstance} /> : null}
     <ComposerSync {...props} transformers={transformers} />
   </LexicalComposer>;
 }

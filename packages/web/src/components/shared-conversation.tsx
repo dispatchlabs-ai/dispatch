@@ -1,3 +1,4 @@
+import type { OpenInstanceForm } from "./add-instance";
 import { ATTACHMENT_IMAGE_MAX_BYTES } from "../shared/contracts";
 import { AttachmentPicker, DraftAttachments, type AttachmentComposerProps } from "./composer-attachments";
 import { describeAgentTools } from "../lib/agent-tools";
@@ -180,9 +181,10 @@ export const SharedTranscript = memo(function SharedTranscript({ snapshot, threa
 
 function formatTime(timestamp: number) { return new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
 
-export function ConversationComposer({ id, chatId, active = true, draft, pending, error, participants, agents, mentions, onMentionsChange, onDraftChange, onSend, thread = false, conversationTitle, disabled = false, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment, children }: AttachmentComposerProps & {
+export function ConversationComposer({ id, chatId, active = true, draft, pending, error, participants, agents, mentions, onMentionsChange, onDraftChange, onSend, onAddInstance, thread = false, conversationTitle, disabled = false, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment, children }: AttachmentComposerProps & {
   id: string; chatId: string; active?: boolean; draft: string; pending?: PendingMessage; error?: string; participants: ConversationParticipant[]; agents: AgentDefinition[]; mentions: string[];
   onMentionsChange: (ids: string[]) => void; onDraftChange: (text: string) => void; onSend: (mentions: string[]) => void;
+  onAddInstance: OpenInstanceForm;
   thread?: boolean; conversationTitle?: string; disabled?: boolean; children?: ReactNode;
 }) {
   const mentionPeople = useMemo(() => [
@@ -205,7 +207,7 @@ export function ConversationComposer({ id, chatId, active = true, draft, pending
     <form className="composer" onInput={composing.pulse} onCompositionStart={composing.pulse} onCompositionUpdate={composing.pulse} onPaste={composing.pulse} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) composing.clear(); }} onSubmit={event => { event.preventDefault(); send(); }}>
       <DraftAttachments attachments={attachments} disabled={disabled || Boolean(pending?.sending)} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} />
       <MarkdownComposer onPasteFiles={addFiles} id={id} value={draft} disabled={disabled} readOnly={Boolean(pending?.sending)} onChange={onDraftChange} onSend={send}
-        participants={mentionPeople} mentions={mentions} onMentionsChange={onMentionsChange} placeholder={thread ? "Reply to thread…" : conversationTitle ? `Message ${conversationTitle}…` : "Message conversation…"}
+        instanceChoices={agents.filter(agent => !agent.archived && !participants.some(person => person.kind === "agent" && person.membership === "removing" && person.agentDefinitionId === agent.id) && participants.some(person => person.kind === "agent" && person.membership === "active" && person.agentDefinitionId === agent.id)).map(agent => ({ id: agent.id, name: agent.name, kind: "agent" as const }))} onAddInstance={onAddInstance} participants={mentionPeople} mentions={mentions} onMentionsChange={onMentionsChange} placeholder={thread ? "Reply to thread…" : conversationTitle ? `Message ${conversationTitle}…` : "Message conversation…"}
         toolbar={<><AttachmentPicker disabled={disabled || Boolean(pending?.sending)} onAddFiles={addFiles} /><div className="button-row">{children}<Button type="submit" className="send-button" disabled={!canSend} aria-label={pending?.error ? "Retry sending message" : thread ? "Send reply" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}</Button></div></>}
       />
     </form>
@@ -213,10 +215,10 @@ export function ConversationComposer({ id, chatId, active = true, draft, pending
   </div>;
 }
 
-export function SharedContextPanel({ snapshot, agents, models, threadId, draft, pending, error, mentions, onMentionsChange, onDraftChange, onSend, onInvite, onSnapshot, onClose, showHeader = true, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment }: AttachmentComposerProps & {
+export function SharedContextPanel({ snapshot, agents, models, threadId, draft, pending, error, mentions, onMentionsChange, onDraftChange, onSend, onInvite, onAddInstance, onSnapshot, onClose, showHeader = true, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment }: AttachmentComposerProps & {
   snapshot: ChatSnapshot; agents: AgentDefinition[]; models: ApplicationConfig["models"]; threadId: string | null;
   draft: string; pending?: PendingMessage; error?: string; mentions: string[]; onMentionsChange: (ids: string[]) => void;
-  onDraftChange: (text: string) => void; onSend: (mentions: string[]) => void; onInvite: () => void; onSnapshot: (snapshot: ChatSnapshot) => void; onClose: () => void; showHeader?: boolean;
+  onDraftChange: (text: string) => void; onSend: (mentions: string[]) => void; onInvite: () => void; onAddInstance: OpenInstanceForm; onSnapshot: (snapshot: ChatSnapshot) => void; onClose: () => void; showHeader?: boolean;
 }) {
   const { state, api } = useSession();
   const [stopping, setStopping] = useState(false);
@@ -239,7 +241,7 @@ export function SharedContextPanel({ snapshot, agents, models, threadId, draft, 
         <SharedTranscript snapshot={snapshot} threadId={root?.id ?? threadId} />
         <ConversationPresence participants={snapshot.participants} />
       </div>
-      <ConversationComposer attachments={attachments} onAddFiles={onAddFiles} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} id={`thread-${snapshot.conversation.id}-${threadId}`} chatId={snapshot.conversation.id} draft={draft} pending={pending} error={error} participants={snapshot.participants} agents={agents} mentions={mentions} onMentionsChange={onMentionsChange} onDraftChange={onDraftChange} onSend={onSend} disabled={snapshot.conversation.canParticipate === false} thread>
+      <ConversationComposer attachments={attachments} onAddFiles={onAddFiles} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} id={`thread-${snapshot.conversation.id}-${threadId}`} chatId={snapshot.conversation.id} draft={draft} pending={pending} error={error} participants={snapshot.participants} agents={agents} mentions={mentions} onMentionsChange={onMentionsChange} onDraftChange={onDraftChange} onSend={onSend} onAddInstance={onAddInstance} disabled={snapshot.conversation.canParticipate === false} thread>
         {snapshot.conversation.status === "running" && snapshot.conversation.canParticipate !== false ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
           setStopping(true); setStopError(null);
           void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(snapshot.conversation.id)}/stop`, {}).then(onSnapshot).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));
@@ -248,6 +250,7 @@ export function SharedContextPanel({ snapshot, agents, models, threadId, draft, 
       {stopError ? <Notice>{stopError}</Notice> : null}
     </> : <div className="participants-body">
       <Button className="invite-participants" variant="secondary" disabled={snapshot.conversation.canParticipate === false} onClick={onInvite}><UserPlus size={18} /> Add participants</Button>
+      <Button variant="secondary" disabled={snapshot.conversation.canParticipate === false || !agents.some(agent => !agent.archived)} onClick={() => onAddInstance()}><UserPlus size={18} /> Add agent instance</Button>
       <div className="participant-list">{snapshot.participants.map(member => <button type="button" className={`participant-row ${participant?.id === member.id ? "selected" : ""}`} key={member.id} onClick={() => setSelectedId(member.id)} aria-pressed={participant?.id === member.id}>
         <ParticipantAvatar kind={member.kind} name={member.name} /><span className="participant-choice-copy"><strong>{participantName(member, snapshot.participants)}</strong><span>{member.kind === "agent" ? `Agent · ${agentStatus(member)}` : `${state?.state === "authenticated" && state.user.id === member.userId ? "You" : "Person"}${member.status === "typing" ? " · Typing" : ""}`}</span></span>
       </button>)}</div>
@@ -258,7 +261,9 @@ export function SharedContextPanel({ snapshot, agents, models, threadId, draft, 
           <AgentRemoval key={`${snapshot.conversation.id}:${participant.id}`} participant={participant} chatId={snapshot.conversation.id} canParticipate={snapshot.conversation.canParticipate !== false} onSnapshot={onSnapshot} />
           <dl className="context-facts"><div><dt>Based on</dt><dd>{participant.agent.name} · revision {participant.agentRevision}</dd></div><div><dt>Model</dt><dd>{models.find(model => model.id === participant.agent.modelId && model.provider === participant.agent.provider)?.name || participant.agent.modelId}</dd></div><div><dt>Provider</dt><dd>{participant.agent.provider}</dd></div><div><dt>Thinking</dt><dd>{participant.agent.thinkingLevel}</dd></div><div><dt>Tools</dt><dd>{describeAgentTools(participant.agent.tools)}</dd></div>{participant.agent.cwd ? <div><dt>Local workspace</dt><dd>{participant.agent.cwd}</dd></div> : null}</dl>
           {participant.error ? <Notice>{participant.error}</Notice> : null}
-          <details><summary>Saved instructions</summary><Markdown>{participant.agent.instructions || "No additional instructions."}</Markdown></details>
+          <details><summary>Base instructions</summary><Markdown>{participant.agent.instructions || "No base instructions."}</Markdown></details>
+          <details><summary>Instance instructions</summary><Markdown>{participant.instanceInstructions || "No additional instructions."}</Markdown></details>
+          {snapshot.conversation.canParticipate !== false && agents.some(agent => agent.id === participant.agentDefinitionId && !agent.archived) && !snapshot.participants.some(person => person.kind === "agent" && person.agentDefinitionId === participant.agentDefinitionId && person.membership === "removing") ? <Button variant="secondary" onClick={() => onAddInstance(participant.agentDefinitionId)}>Add another instance</Button> : null}
           <ParticipantRunDetails participant={participant} activities={snapshot.activities} />
           <p>Coding tools use the service machine’s access. This workspace is not a sandbox.</p>
         </> : <p>Human participant since {new Date(participant.joinedAt).toLocaleDateString()}.</p>}

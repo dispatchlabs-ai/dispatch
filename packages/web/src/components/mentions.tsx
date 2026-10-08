@@ -1,9 +1,10 @@
+import type { OpenInstanceForm } from "./add-instance";
 import { autoUpdate, computePosition, flip, offset, shift, size } from "@floating-ui/dom";
 import { $isCodeNode } from "@lexical/code";
 import { $isLinkNode } from "@lexical/link";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { LexicalTypeaheadMenuPlugin, MenuOption, type MenuRenderFn, type TriggerFn } from "@lexical/react/LexicalTypeaheadMenuPlugin";
-import { $createTextNode, $findMatchingParent, $getSelection, $isRangeSelection, $isTextNode, BLUR_COMMAND, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_HIGH, KEY_ENTER_COMMAND, KEY_ESCAPE_COMMAND } from "lexical";
+import { $createTextNode, $getNodeByKey, $findMatchingParent, $getSelection, $isRangeSelection, $isTextNode, BLUR_COMMAND, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_HIGH, KEY_ENTER_COMMAND, KEY_ESCAPE_COMMAND } from "lexical";
 import { CornerDownLeft } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Ref } from "react";
 import { createPortal } from "react-dom";
@@ -12,7 +13,7 @@ import { $createMentionNode } from "./mention-node";
 import { ParticipantAvatar } from "./conversation-people";
 
 class MentionOption extends MenuOption {
-  constructor(readonly person: MentionParticipant, readonly label: string) { super(person.id); }
+  constructor(readonly person: MentionParticipant, readonly label: string, readonly createInstance = false) { super(createInstance ? `instance:${person.id}` : person.id); }
 }
 
 const matchMention: TriggerFn = (text, editor) => {
@@ -38,7 +39,7 @@ export function MentionMenu({ options, selectedIndex, selectOptionAndCleanUp, se
         onMouseEnter={() => setHighlightedIndex(index)} onClick={() => selectOptionAndCleanUp(option)}>
         <ParticipantAvatar kind={option.person.kind} name={option.person.name} />
         <span className="mention-option-name">{option.label}</span>
-        <span className="mention-option-kind">{option.person.inviteOnSend ? "Invite on send" : option.person.kind === "agent" ? "Agent" : "Person"}</span>
+        <span className="mention-option-kind">{option.createInstance ? "New instance" : option.person.inviteOnSend ? "Invite on send" : option.person.kind === "agent" ? "Agent" : "Person"}</span>
         {selectedIndex === index ? <CornerDownLeft size={14} className="mention-option-selected" aria-hidden="true" /> : null}
       </li>)}
       {!options.length ? <li className="mention-no-results" role="status">No one matches {query ? `“${query}”` : "your search"}.</li> : null}
@@ -73,7 +74,7 @@ function PositionedMentionMenu(props: MenuProps & { query: string }) {
   return <div className="mention-menu-positioner"><MentionMenu {...props} menuRef={menu} /></div>;
 }
 
-export function MentionsPlugin({ people }: { people: MentionParticipant[] }) {
+export function MentionsPlugin({ people, instanceChoices = [], onAddInstance }: { people: MentionParticipant[]; instanceChoices?: MentionParticipant[]; onAddInstance?: OpenInstanceForm }) {
   const [editor] = useLexicalComposerContext();
   const [query, setQuery] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -81,8 +82,9 @@ export function MentionsPlugin({ people }: { people: MentionParticipant[] }) {
   useEffect(() => editor.registerRootListener(root => setParent(root?.parentElement ?? undefined)), [editor]);
   const options = useMemo(() => {
     const search = (query ?? "").trim().toLocaleLowerCase();
-    return people.filter(person => person.name.toLocaleLowerCase().includes(search)).map(person => new MentionOption(person, mentionLabel(person, people)));
-  }, [people, query]);
+    return [...people.filter(person => person.name.toLocaleLowerCase().includes(search)).map(person => new MentionOption(person, mentionLabel(person, people))),
+      ...instanceChoices.filter(person => person.name.toLocaleLowerCase().includes(search)).map(person => new MentionOption(person, `Add another ${person.name}…`, true))];
+  }, [people, instanceChoices, query]);
   const opened = useCallback(() => setOpen(true), []);
   const closed = useCallback(() => setOpen(false), []);
 
@@ -101,6 +103,22 @@ export function MentionsPlugin({ people }: { people: MentionParticipant[] }) {
   return <LexicalTypeaheadMenuPlugin<MentionOption> options={options} triggerFn={matchMention} onQueryChange={setQuery}
     commandPriority={COMMAND_PRIORITY_HIGH} onOpen={opened} onClose={closed} anchorClassName="mention-menu-anchor" parent={parent}
     onSelectOption={(option, node, close) => {
+      if (option.createInstance) {
+        const key = node?.getKey();
+        const original = node?.getTextContent();
+        close();
+        onAddInstance?.(option.person.id, participant => {
+          editor.update(() => {
+            const target = key ? $getNodeByKey(key) : null;
+            // Do not overwrite a draft edited while the creation request was outstanding.
+            if (!$isTextNode(target) || target.getTextContent() !== original) return;
+            const mention = $createMentionNode(participant.id, `@${participant.name}`);
+            target.replace(mention);
+            mention.insertAfter($createTextNode(" ")).selectEnd();
+          });
+        });
+        return;
+      }
       if (!node) return;
       const mention = $createMentionNode(option.person.id, `@${option.label}`);
       node.replace(mention);

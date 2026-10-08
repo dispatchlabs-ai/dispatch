@@ -13,6 +13,7 @@ import { AgentSidebar } from "./agent-sidebar";
 import { Brand } from "./brand";
 import { ChatPanel } from "./chat";
 import { NewConversationDialog } from "./conversation-people";
+import { AddInstanceDialog, type OpenInstanceForm } from "./add-instance";
 import { InviteParticipantsDialog, SharedContextPanel } from "./shared-conversation";
 import { RenameConversationDialog } from "./rename-conversation-dialog";
 import { ConversationSidebar } from "./conversation-sidebar";
@@ -98,6 +99,7 @@ export function Workspace() {
   const [signingOut, setSigningOut] = useState(false);
   const [search, setSearch] = useState("");
   const [newConversation, setNewConversation] = useState<{ agentIds: string[]; projectId: string | null } | null>(null);
+  const [addingInstance, setAddingInstance] = useState<{ chatId: string; definitionId?: string; onCreated?: Parameters<OpenInstanceForm>[1] } | null>(null);
   const [invitingChatId, setInvitingChatId] = useState<string | null>(null);
   const [threads, setThreads] = useState<Record<string, string | null>>({});
   const [closingTab, setClosingTab] = useState<string | null>(null);
@@ -460,7 +462,7 @@ export function Workspace() {
     draft={drafts[threads[active.chatId] ? `${active.chatId}:${threads[active.chatId]}` : active.chatId] || ""}
     pending={pending[`${active.chatId}:${threads[active.chatId]}`]} error={sendErrors[`${active.chatId}:${threads[active.chatId]}`]}
     onDraftChange={text => changeDraft(`${active.chatId}:${threads[active.chatId]}`, text)}
-    onSnapshot={onSnapshot} onSend={mentions => void sendMessage(active.chatId, threads[active.chatId] ?? null, mentions)} onInvite={() => setInvitingChatId(active.chatId)}
+    onSnapshot={onSnapshot} onSend={mentions => void sendMessage(active.chatId, threads[active.chatId] ?? null, mentions)} onInvite={() => setInvitingChatId(active.chatId)} onAddInstance={(definitionId, onCreated) => setAddingInstance({ chatId: active.chatId, definitionId, onCreated })}
     onClose={() => {
       setThreads(current => ({ ...current, [active.chatId]: null }));
       setDetailsVisible(false);
@@ -611,6 +613,7 @@ export function Workspace() {
               onSend={mentions => void sendMessage(tab.chatId, null, mentions)}
               activeThreadId={(viewportWidth <= 800 ? contextOpen : chatDetailsVisible[tab.chatId]) ? threads[tab.chatId] : null}
               onParticipants={() => openSupporting(tab.chatId, null)}
+              onAddInstance={(definitionId, onCreated) => setAddingInstance({ chatId: tab.chatId, definitionId, onCreated })}
               onThread={openSupporting}
               onSnapshot={onSnapshot}
               onConnection={onConnection}
@@ -644,6 +647,7 @@ export function Workspace() {
         <div className="context-column-content">{supporting()}</div>
       </aside>
     </Tabs.Root>
+    {addingInstance ? <AddInstanceDialog key={addingInstance.chatId} chatId={addingInstance.chatId} initialDefinitionId={addingInstance.definitionId} onCreated={addingInstance.onCreated} removingDefinitionIds={(snapshots[addingInstance.chatId]?.participants ?? []).flatMap(person => person.kind === "agent" && person.membership === "removing" ? [person.agentDefinitionId] : [])} agents={agents} canParticipate={Boolean(snapshots[addingInstance.chatId]) && snapshots[addingInstance.chatId]?.conversation.canParticipate !== false} onSnapshot={onSnapshot} onClose={() => setAddingInstance(null)} /> : null}
     {invitingChatId && snapshots[invitingChatId] ? <InviteParticipantsDialog key={invitingChatId} snapshot={snapshots[invitingChatId]} agents={agents} onSnapshot={onSnapshot} onClose={() => setInvitingChatId(null)} /> : null}
     {newConversation ? <NewConversationDialog agents={agents} initialAgentIds={newConversation.agentIds} projectName={projects.find(project => project.id === newConversation.projectId)?.name} busy={creating} error={error} onClose={() => setNewConversation(null)} onCreate={(ids, title) => void createChat(ids, newConversation.projectId, undefined, title)} /> : null}
     {renamingChat ? <RenameConversationDialog key={renamingChat.id} chat={renamingChat} onClose={() => setRenamingChat(null)} onRename={saveChatTitle} /> : null}

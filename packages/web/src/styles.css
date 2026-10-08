@@ -1047,3 +1047,7 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .evaluation-empty { margin: var(--space-8) 0; }
 .evaluation-empty p, .evaluation-empty li { color: var(--color-muted); margin-top: var(--space-3); }
 .evaluation-empty ul { padding-left: var(--space-5); list-style: disc; }
+
+.instance-form { display: grid; gap: var(--space-4); }
+.instance-instructions-editor .composer-input { min-height: 160px; max-height: 35dvh; }
+.instance-form > .button-row { justify-content: flex-end; }
