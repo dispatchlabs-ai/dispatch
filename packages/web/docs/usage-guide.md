@@ -465,9 +465,13 @@ Reuse the same `requestId` and contents for the same import; changed contents un
 
 ## Project historical archives
 
-**Codec/native/API candidate; UI integration and functional qualification pending.** Separate from agent ZIP bundles and installation recovery. The data-only UTF-8 JSON format is `dispatch-project-content`, version `1`, containing project name, public chats/threads, historical authors and referenced attachment bytes as canonical base64 with size/SHA-256 checks. Limits: 32 MiB serialized archive, 10 MiB/file, 100 chats, 10,000 messages and 1,000 files total. No ZIP extraction or executable installation.
+**Integrated candidate `124a4a6`; runtime/browser qualification pending.** Separate from agent ZIP bundles and installation recovery. The data-only UTF-8 JSON format is `dispatch-project-content`, version `1`, containing project name, public chats/threads, historical authors and referenced attachment bytes as canonical base64 with size/SHA-256 checks. Limits: 32 MiB serialized archive, 10 MiB/file, 100 chats, 10,000 messages and 1,000 files total. No ZIP extraction or executable installation.
 
 Export requires project-manager access, selects chat IDs and rechecks authorization/membership before return; missing referenced bytes fail rather than creating an incomplete archive. Inspect content and historical author labels before sharing. Import creates a new project with only the importing human as manager, no default agents, source memberships or private model state. History remains read-only, not resumed conversations or new submissions.
+
+In the Projects navigation choose **Import project history**, select a `.json` archive, inspect counts/historical authors and **Review archived content**, then explicitly approve content/destination access and **Import as new project**. After an uncertain response use **Retry same import**; replacing the file asks before discarding the prior operation. Closing/reopening retains mounted state, not page reload.
+
+On a project, **Export history** lets managers select current chats, acknowledge privacy and **Download history** (`project-history.json`, compact JSON). **Previously imported history is always included in full**, independently of current-chat selection; review it before sharing. **View imported history** shows the read-only archive. Attachment buttons download bytes as files, not inline executable content.
 
 Authenticated candidate routes:
 
@@ -482,7 +486,7 @@ Preview is a summary, not a durable reviewed-content token; import sends the arc
 
 ## Offline installation recovery
 
-**CLI candidate `1291f49`; source-reviewed instructions, not verified recovery.** This is secret-bearing installation material, not a shareable project archive. SQLite only; PostgreSQL, symlinks/special files and overlapping roots are rejected. See [recovery contract](spec.md#project-content-and-operational-recovery) and [acceptance evidence](handoff.md#installation-backup-and-restore--october-8-2026).
+**CLI candidates `1291f49` + `b3be52a`; source-reviewed instructions, not verified recovery.** This is secret-bearing installation material, not a shareable project archive. SQLite only; PostgreSQL, symlinks/special files and overlapping roots are rejected. See [recovery contract](spec.md#project-content-and-operational-recovery) and [acceptance evidence](handoff.md#installation-backup-and-restore--october-8-2026).
 
 Before any authorized operational use, stop supervisors, services, auth CLI, provider refreshers and every other writer. The runtime lock is only an additional guard. Fence the original executor before recovery. These acknowledgments are operator assertions, not automatic shutdown/proof; documentation does not authorize stopping a live service.
 
@@ -497,7 +501,7 @@ node packages/web/build/service/server/recovery-cli.js restore --backup BACKUP_D
 
 Backup includes the listed roots and SQLite sidecars, omitting ephemeral runtime-owner lock files. It writes numbered roots plus `manifest.json`, SHA-256 inventories and restricted permissions. Protect the directory and transfer medium as credentials. Checksums detect changed bytes, not malicious provenance: use only trusted recovery material.
 
-Restore requires the exact manifest code revision and creates numbered root directories plus `RECOVERY.json`. It neither overwrites nor starts anything. Before manual startup reconcile stored absolute working-directory/credential paths, origin/company, external environment secrets and compatible runtime/extensions/configuration. A copy is not automatically relocatable or ready to run. Never run original and restored owners together. Failure can leave an incomplete restricted destination: inspect it, never start it. Missing dependencies in the operator plan are not discovered automatically. Backup/restore execution and restart correctness remain unverified.
+Restore requires the exact manifest code revision and creates numbered root directories plus `RECOVERY.json`. It neither overwrites nor starts anything. Before manual startup reconcile stored absolute working-directory/credential paths, origin/company, external environment secrets and compatible runtime/extensions/configuration. A copy is not automatically relocatable or ready to run. Never run original and restored owners together. Copied files/directory entries are synced before publishing completion JSON via a synced `.pending` file and rename. Failure can leave an incomplete restricted destination: a `.pending` file is not a completed manifest; inspect incomplete output, never start it. Missing dependencies in the operator plan are not discovered automatically. Backup/restore execution and restart correctness remain unverified.
 
 ## Application API
 
