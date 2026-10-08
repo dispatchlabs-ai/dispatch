@@ -321,7 +321,7 @@ Agents waiting to publish show **Listening**. An agent with the speaking turn sh
 
 ### Chat Definition of Done
 
-**Implementation candidate; runtime and rendered UI qualification pending.** Open **Participants** from the chat header (or **Details** on a phone). Under **Definition of Done**, choose **Set criteria** or **Edit criteria**, enter Markdown and choose **Save criteria**. To clear, remove the text and save. **Cancel** discards the edit after confirmation when changed. Drafts remain in browser memory while switching open tabs or responsive layouts, not across a reload. If another edit wins, review the saved criteria and use **Review latest; keep my draft** before saving again.
+**Implementation candidate; runtime and rendered UI qualification pending.** Open **Participants** from the chat header (or **Details** on a phone). Under **Definition of Done**, choose **Set criteria** or **Edit criteria**, enter Markdown and choose **Save criteria**. To clear, remove the text and save. **Cancel** discards the edit after confirmation when changed. Drafts remain in browser memory while switching open tabs or responsive layouts, not across a reload. After any save error or conflicting edit, review the saved criteria using **Review latest; keep my draft** before saving again; a lost response may follow a successful save.
 
 Optional shared Markdown criteria guide all chat participants; checklists are supported. Only authorized human participants can edit them. Clearing criteria leaves chat history intact. Criteria do not declare the chat complete, stop agents or authorize additional work. Agents receive the saved value on their next shared-context refresh; saving alone does not activate them. See [the contract](spec.md#chat-definition-of-done).
 
