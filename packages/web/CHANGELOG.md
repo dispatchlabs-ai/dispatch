@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — project overview
+
+- Add project chat search, All chats/Active filters, status and last activity. Move members, default agents and existing settings into the contextual details panel, with adaptive desktop/phone rows. See [implementation evidence](docs/handoff.md#project-overview-redesign--october-8-2026).
+
 ## Unreleased — project-row chat creation
 
 - Start a chat directly from a project row using its default agents, without a setup dialog; focus the new composer and retain existing drafts. Use Chat terminology in product controls.

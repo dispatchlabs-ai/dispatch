@@ -1,7 +1,8 @@
 import { Popover } from "@base-ui/react/popover";
-import { FolderPlus, Pin, Plus } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { FolderPlus, MessageSquare, Pin, Plus, Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { ChatSummary, Project, UpdateChatInput } from "../shared/contracts";
+import { statusLabels } from "../lib/chat";
 import { ConversationActions } from "./conversation-actions";
 import { Button, Field, Input, Notice, Spinner } from "./ui";
 
@@ -40,8 +41,7 @@ export function NewProjectButton({ name, busy, error, compact, onNameChange, onC
   </Popover.Root>;
 }
 
-export function ProjectPage({ project, chats, creating, updating, onCreate, onSelect, onRename, onUpdate, settings }: {
-  settings?: ReactNode;
+export function ProjectPage({ project, chats, creating, updating, onCreate, onSelect, onRename, onUpdate }: {
   project?: Project;
   chats: ChatSummary[];
   creating: boolean;
@@ -51,25 +51,35 @@ export function ProjectPage({ project, chats, creating, updating, onCreate, onSe
   onRename: (chat: ChatSummary) => void;
   onUpdate: (id: string, input: UpdateChatInput) => void;
 }) {
+  const [search, setSearch] = useState("");
+  const [activeOnly, setActiveOnly] = useState(false);
   if (!project) return <div className="project-page"><h1>Project unavailable</h1><p className="text-muted">Choose a project from Chats.</p></div>;
-  const visible = chats.filter(chat => chat.projectId === project.id && !chat.archived);
+  const projectChats = chats.filter(chat => chat.projectId === project.id && !chat.archived);
+  const visible = projectChats.filter(chat => (!activeOnly || chat.status === "running") && chat.title.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   return <section className="project-page">
     <header className="project-page-header">
       <div><p className="eyebrow">Shared project</p><h1>{project.name}</h1></div>
       <Button disabled={creating || project.canParticipate === false} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New chat</Button>
     </header>
-    {settings}
-    <p className="project-conversation-count">{visible.length} {visible.length === 1 ? "conversation" : "conversations"}</p>
+    <div className="project-toolbar">
+      <div className="search-input"><Search size={18} aria-hidden="true" /><Input type="search" aria-label="Search chats in this project" placeholder="Search chats in this project…" value={search} onChange={event => setSearch(event.target.value)} /></div>
+      <div className="segmented-control" role="group" aria-label="Filter project chats">
+        <Button variant="ghost" aria-pressed={!activeOnly} onClick={() => setActiveOnly(false)}>All chats</Button>
+        <Button variant="ghost" aria-pressed={activeOnly} onClick={() => setActiveOnly(true)}>Active</Button>
+      </div>
+    </div>
+    <div className="project-list-heading" aria-hidden="true"><span>Chat</span><span>Status</span><span>Last activity</span><span /></div>
+    <p className="sr-only" role="status">{visible.length} {visible.length === 1 ? "chat" : "chats"}</p>
     {visible.length ? <ul className="project-conversations">
       {visible.map(chat => <li key={chat.id}>
         <button className="project-conversation-link" onClick={() => onSelect(chat.id)} type="button">
-          {chat.pinned ? <Pin size={14} aria-label="Pinned" /> : null}
-          <span>{chat.title}</span>
+          <span className="project-chat-title"><span className="project-chat-icon"><MessageSquare size={21} aria-hidden="true" /></span><span>{chat.title}</span>{chat.pinned ? <Pin size={14} aria-label="Pinned" /> : null}</span>
+          <span className={`status-badge project-chat-status status-${chat.status}`}>{statusLabels[chat.status]}</span>
           <time dateTime={new Date(chat.updatedAt).toISOString()}>{conversationDate(chat.updatedAt)}</time>
         </button>
         <ConversationActions chat={chat} busy={updating.has(chat.id)} onRename={onRename} onUpdate={onUpdate} />
       </li>)}
-    </ul> : <div className="project-empty"><p>No chats yet.</p><p>Start a chat in this project.</p></div>}
+    </ul> : <div className="project-empty"><p>{projectChats.length ? "No matching chats." : "No chats yet."}</p>{projectChats.length ? <Button variant="ghost" onClick={() => { setSearch(""); setActiveOnly(false); }}>Clear filters</Button> : <p>Start a chat in this project.</p>}</div>}
   </section>;
 }
 

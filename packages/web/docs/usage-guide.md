@@ -480,6 +480,8 @@ Only assigned skills are advertised to the model, which can call `load_skill` wi
 
 ### Shared projects
 
+Select a project to search its chats by title or show only Active chats. Status and last activity come from the current chat summaries. The right-hand Project details panel lists members and default agents; managers open Project settings there. On phones, open Details in the bottom bar. Search and settings drafts remain available while switching views.
+
 New project now creates an empty shared project with you as its manager. Project settings lets managers rename it, select default agents and add/remove members or managers. Keep at least one manager. Members can read every project conversation, including history from before they joined, and participate. Removing membership denies later requests and snapshot delivery; previously delivered information cannot be recalled. Already admitted agent work is not canceled.
 
 **Implemented October 8; browser behavior and rendered UI remain unverified (see [WP-053](handoff.md#wp-053--project-row-chat-creation-and-shared-only-projects)):** the compose icon on a shared-project sidebar row starts a fresh chat in that project with its default agents and focuses the message box, without a setup dialog. Its tooltip is **New chat in [project name]**. Existing tabs/drafts stay intact; the new chat does not inherit another chat's history. The action requires project participation, not read-only access.

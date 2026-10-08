@@ -1280,3 +1280,15 @@ Authorized October 8, 2026. Implemented the project-row compose action, bypassin
 Removed personal-project listing/creation/move paths, the move dialog and related UI. Explicit shared creation is required; obsolete grouping inputs are rejected rather than interpreted as access-changing transfers. Ungrouped chats retain explicit membership. The stored unnamed title sentinel remains unchanged, with a display-only New chat fallback.
 
 Acceptance evidence: Developer integrated Documenter's contract updates and Deslop's removal. Pi Durable Expert reviewed creation/default resolution, uncertain retries, persistence and authorization; the refresh-hidden retry notice was corrected. Source/deslop and whitespace review completed. Integrated `nix develop --command npm run check`, `nix build --no-link`, and `nix flake check` passed on Apple Silicon. No tests run. Desktop/390 px rendered review, keyboard/touch focus, duplicate-click and lost-response recovery remain unverified; this is an outstanding UI-rule qualification requirement, not a runtime correctness claim. Existing large-chunk build advisory remains.
+
+
+## Project overview redesign — October 8, 2026
+
+Chris approved the ImageGen project overview and authorized implementation. The chat collection now has title search, All chats/Active filtering, observed status and last activity. A contextual project panel replaces inline membership/default settings. Existing creation, personal chat actions, project authorization and revisioned editing remain; main-pane chat icons implement the approved reference without guessing title-specific categories. Existing sidebar behavior is preserved.
+
+Acceptance evidence:
+
+- Source/deslop review covers filter scope, observed status labels, existing ordering/actions, active-context selection, shared workspace editing state and manager gates. No API, runtime or persisted data changes.
+- Rendered isolated frontend against the existing authenticated local service reviewed at desktop, a narrow desktop center column and 390 px. Corrected cramped title columns using container queries and search-icon padding. Phone overview, details and settings form were inspected without saving settings, changing membership or sending messages. Captures remain private in `.local/project-design/`.
+- TypeScript/application build passed during implementation. Final integrated Nix/build/publication evidence follows below.
+- No tests under the standing policy. Keyboard/touch, measured contrast, assistive technology, save/conflict/recovery and runtime functional qualification remain unverified. The preview browser did not complete the existing native discard confirmation; reloading cleared its unchanged preview-only draft. No saved settings were changed.
