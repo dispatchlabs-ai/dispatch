@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { parseArgs } from "node:util";
+import { readAuthStoreConfig, openConfiguredAuth } from "./auth/config.js";
 import { createAuth } from "./auth.js";
 import { readConfig } from "./config.js";
 
@@ -18,12 +19,17 @@ existing sign-in methods until the owner completes fresh factor enrollment.
 
 The command uses DISPATCH_DATA_DIR, DISPATCH_ORIGIN, and company settings from
 the same configuration as the application. No password is accepted on the CLI.
+For PostgreSQL, supply --auth-store-config with the backend authStoreConfigFile.
+When DISPATCH_BACKEND_WORKERS_CONFIG_FILE is set, explicit selection is required
+to avoid silently targeting SQLite; use --sqlite only for intentional local access.
 `;
 
 try {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
     options: {
+      "auth-store-config": { type: "string" },
+      sqlite: { type: "boolean", default: false },
       email: { type: "string" },
       name: { type: "string" },
       hours: { type: "string", default: "1" },
@@ -43,8 +49,13 @@ try {
     }
     const hours = Number(values.hours);
     if (!Number.isFinite(hours) || hours <= 0 || hours > 24) throw new Error("--hours must be greater than zero and at most 24.");
+    if (values["auth-store-config"] && values.sqlite) throw new Error("Choose --auth-store-config or --sqlite, not both.");
+    if (process.env.DISPATCH_BACKEND_WORKERS_CONFIG_FILE && !values["auth-store-config"] && !values.sqlite)
+      throw new Error("Backend configuration is present; explicitly select --auth-store-config or --sqlite.");
     const config = readConfig();
-    const auth = await createAuth({
+    const auth = values["auth-store-config"]
+      ? await openConfiguredAuth(await readAuthStoreConfig(values["auth-store-config"]), config)
+      : await createAuth({
       databasePath: join(config.stateDir, "auth.sqlite"),
       secretPath: join(config.stateDir, "auth.key"),
       origin: config.origin,
@@ -53,6 +64,8 @@ try {
       companyName: config.companyName,
     });
     try {
+      await auth.resume();
+      if (!auth.admitting) throw new Error("Authentication admission remains closed.");
       const input = { email: values.email, name: values.name, expiresInMs: Math.floor(hours * 60 * 60_000) };
       const invitation = command === "reset" ? await auth.issueRecoveryInvitation(input) : await auth.issueInvitation(input);
       console.log(`Single-use ${command === "reset" ? "recovery" : "enrollment"} link; expires ${new Date(invitation.expiresAt).toISOString()}:`);
