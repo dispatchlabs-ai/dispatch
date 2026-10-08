@@ -898,9 +898,9 @@ export class DispatchRuntime {
         } catch {
           // The failed configuration transaction rolls back before recording its safe public status.
           await this.harness.commit(async tx => {
-              const current = (await tx.doc(SharedDoc, roomId)).members.find(item => item.id === member.id);
-              const error = "Update could not be applied. It will retry at the next idle boundary.";
-              if (current && current.upgradeError !== error) current.upgradeError = error;
+            const current = (await tx.doc(SharedDoc, roomId)).members.find(item => item.id === member.id);
+            const error = "Update could not be applied. It will retry at the next idle boundary.";
+            if (current && current.upgradeError !== error) current.upgradeError = error;
           }, context);
         }
       }
