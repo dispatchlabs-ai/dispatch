@@ -3,8 +3,6 @@ import { Type } from "@earendil-works/pi-ai";
 import { defineDoc, defineDocFamily, defineExtension, defineTool, section } from "@earendil-works/pi-durable";
 import { WebBackendError, type WebBackend } from "../web/types.js";
 
-const MAX_TEXT = 200_000;
-const MAX_LINKS = 300;
 const LINE_WIDTH = 240;
 const WINDOW_LINES = { short: 20, medium: 60, long: 120 } as const;
 
@@ -34,11 +32,11 @@ const RecentReferences = defineDoc<{ references: ReferenceSummary[] }>({
 
 class WebInputError extends Error {}
 
-const refId = Type.String({ minLength: 1, maxLength: 8192, description: "An HTTP(S) URL or a reference returned to this agent by web_run." });
+const refId = Type.String({ minLength: 1, description: "An HTTP(S) URL or a reference returned to this agent by web_run." });
 const lineNumber = Type.Integer({ minimum: 1, description: "1-based line number in the saved snapshot." });
 const parameters = Type.Object({
   search_query: Type.Optional(Type.Array(Type.Object({
-    q: Type.String({ minLength: 1, maxLength: 2000 }),
+    q: Type.String({ minLength: 1 }),
     recency: Type.Optional(Type.Integer({ minimum: 1, description: "Limit results to this many recent days." })),
     domains: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 253 }))),
   }, { additionalProperties: false }))),
@@ -49,7 +47,7 @@ const parameters = Type.Object({
   }, { additionalProperties: false }))),
   find: Type.Optional(Type.Array(Type.Object({
     ref_id: refId,
-    pattern: Type.String({ minLength: 1, maxLength: 500, description: "Case-insensitive literal text, not a regular expression." }),
+    pattern: Type.String({ minLength: 1, description: "Case-insensitive literal text, not a regular expression." }),
     lineno: Type.Optional(lineNumber),
   }, { additionalProperties: false }))),
   click: Type.Optional(Type.Array(Type.Object({
@@ -75,7 +73,7 @@ function linesOf(text: string): string[] {
 function webUrl(value: string, base?: string): string {
   let url: URL;
   try { url = new URL(value, base); } catch { throw new WebInputError("Expected an HTTP(S) URL or an existing web reference."); }
-  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.href.length > 8192)
+  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password)
     throw new WebInputError("Only HTTP(S) URLs without embedded credentials are supported.");
   // The backend, not this syntax check, must enforce public IP/DNS/redirect safety.
   return url.href;
@@ -133,18 +131,18 @@ export function createWebResearch(backend: WebBackend) {
         const page = await backend.open(webUrl(url), signal);
         signal?.throwIfAborted();
         const finalUrl = webUrl(page.url);
-        const links = page.links.slice(0, MAX_LINKS).flatMap(link => {
-          try { return [{ url: webUrl(link.url, finalUrl), text: clean(link.text).slice(0, 300) }]; }
+        const links = page.links.flatMap(link => {
+          try { return [{ url: webUrl(link.url, finalUrl), text: clean(link.text) }]; }
           catch { return []; }
         });
-        const lines = linesOf(page.text.slice(0, MAX_TEXT));
+        const lines = linesOf(page.text);
         const linksStartLine = links.length ? lines.length + 1 : null;
         if (links.length && !lines.at(-1)!.endsWith("\n")) lines[lines.length - 1] += "\n";
         for (const [index, link] of links.entries()) lines.push(...linesOf(`[link ${index + 1}] ${link.text} — ${link.url}\n`));
         return save({
-          id: `web_${randomUUID()}`, kind: "page", url: finalUrl, title: clean(page.title).slice(0, 500),
+          id: `web_${randomUUID()}`, kind: "page", url: finalUrl, title: clean(page.title),
           retrievedAt: new Date().toISOString(), lines, links, linksStartLine,
-          truncated: page.truncated === true || page.text.length > MAX_TEXT || page.links.length > MAX_LINKS,
+          truncated: page.truncated === true,
         });
       };
       const resolvePage = async (id: string, refresh = false) => {
@@ -171,9 +169,9 @@ export function createWebResearch(backend: WebBackend) {
         signal?.throwIfAborted();
         const found = await Promise.all(results.map(async result => {
           const reference = await save({
-            id: `web_${randomUUID()}`, kind: "search", url: webUrl(result.url), title: clean(result.title).slice(0, 500),
-            retrievedAt: new Date().toISOString(), lines: linesOf(result.snippet.slice(0, 4000)),
-            links: [], linksStartLine: null, truncated: result.snippet.length > 4000,
+            id: `web_${randomUUID()}`, kind: "search", url: webUrl(result.url), title: clean(result.title),
+            retrievedAt: new Date().toISOString(), lines: linesOf(result.snippet),
+            links: [], linksStartLine: null, truncated: false,
           });
           return { ...metadata(reference), snippet: reference.lines.join("") };
         }));
