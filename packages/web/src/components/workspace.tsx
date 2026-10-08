@@ -565,8 +565,11 @@ export function Workspace() {
               </IconButton> : null}
             </div>
         </header> : null}
-        {error || loadError || createFailed ? <div className="workspace-notice">
-          <Notice>{error ?? loadError ?? "Chat creation could not be confirmed. Retry to recover it."}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat([], null, createRequest.current ?? undefined)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => { setError(null); setLoadError(null); }}>Dismiss</Button>}
+        {loadError ? <div className="workspace-notice">
+          <Notice>Workspace refresh failed: {loadError}</Notice><Button variant="secondary" onClick={() => void load()}>Retry refresh</Button>
+        </div> : null}
+        {error || createFailed ? <div className="workspace-notice">
+          <Notice>{error ?? "Chat creation could not be confirmed. Retry to recover it."}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat([], null, createRequest.current ?? undefined)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}
         </div> : null}
         <main className="workspace-main" id="main-workspace" tabIndex={-1}>
           <div className="workspace-section" hidden={section !== "chats"}>
