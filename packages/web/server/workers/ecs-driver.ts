@@ -81,18 +81,22 @@ export class EcsContainerDriver implements ContainerDriver {
   async list(installationId: string): Promise<LauncherContainer[]> {
     if (installationId !== this.config.installationId) throw new Error("Installation mismatch.");
     const result: LauncherContainer[] = [];
-    let nextToken: string | undefined;
-    const seen = new Set<string>();
-    do {
-      const response = await this.client.send(new ListTasksCommand({ cluster: this.config.cluster, desiredStatus: "RUNNING", nextToken }), this.deadline());
-      for (const arn of response.taskArns ?? []) {
-        const task = await this.inspectTask(arn);
-        if (task.state !== "exited") result.push(task);
-      }
-      nextToken = response.nextToken;
-      if (nextToken && seen.has(nextToken)) throw new LauncherError(503, "ECS inventory pagination failed.");
-      if (nextToken) seen.add(nextToken);
-    } while (nextToken);
+    const arns = new Set<string>();
+    for (const desiredStatus of ["RUNNING", "STOPPED"] as const) {
+      let nextToken: string | undefined;
+      const seen = new Set<string>();
+      do {
+        const response = await this.client.send(new ListTasksCommand({ cluster: this.config.cluster, desiredStatus, nextToken }), this.deadline());
+        for (const arn of response.taskArns ?? []) arns.add(arn);
+        nextToken = response.nextToken;
+        if (nextToken && seen.has(nextToken)) throw new LauncherError(503, "ECS inventory pagination failed.");
+        if (nextToken) seen.add(nextToken);
+      } while (nextToken);
+    }
+    for (const arn of arns) {
+      const task = await this.inspectTask(arn);
+      if (task.state !== "exited") result.push(task);
+    }
     return result;
   }
   async retire(id: string): Promise<void> {
