@@ -1572,3 +1572,8 @@ Overall acceptance (open until evidence is recorded):
 - Verify source publication, identify the local target and running revision, verify local deployment and demonstrate the running version to Chris. Neither source publication nor a fixture-only profile proves deployed responsiveness. Record private evidence paths without publishing transcripts, credentials or authenticated captures.
 
 Baseline: the read-only recorded-data scaling evidence is maintained under [WP-039](#wp-039--composer-render-isolation). No optimized implementation, new runtime/browser result, deployment or final demonstration is claimed at package creation. Focused verification follows the [testing-policy scope](spec.md#testing-policy); avoid unrelated tests, billable model load and destructive live-state changes.
+
+
+### Criteria response lifetime correction
+
+October 8 follow-up: Chris supplied a cropped capture of the retained criteria draft and save-error/review controls. This establishes the displayed error state only, not successful persistence or full desktop/390 px qualification. Pi Durable Expert reported `Cannot use a settled overlay` in the service log; source inspection confirms that `getChat()` returned the native document's criteria proxy directly. Native document values must be detached inside the transaction before snapshots are serialized after settlement. Earlier no-blocker source reviews missed this lifetime defect and do not establish save/read correctness. A save can commit before response serialization fails: preserve the draft and reconcile the current saved value rather than assuming rollback. Correction and post-fix evidence are pending. No screenshot contents, chat criteria or installation details are copied into this record.
