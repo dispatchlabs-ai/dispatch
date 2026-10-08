@@ -100,13 +100,20 @@ interface Destination {
 
 /** DNS lookup has no signal support; caller cancellation stops waiting. */
 async function resolvePublicHost(host: string, signal?: AbortSignal): Promise<string> {
-  const addresses: { address: string }[] = await Promise.race([
-    lookup(host, { all: true }),
-    new Promise<never>((_, reject) => {
-      if (signal?.aborted) { reject(signal?.reason); return; }
-      signal?.addEventListener("abort", () => reject(signal?.reason), { once: true });
-    }),
-  ]);
+  signal?.throwIfAborted();
+  let onAbort: (() => void) | undefined;
+  let addresses: { address: string }[];
+  try {
+    addresses = await Promise.race([
+      lookup(host, { all: true }),
+      new Promise<never>((_, reject) => {
+        onAbort = () => reject(signal?.reason);
+        signal?.addEventListener("abort", onAbort, { once: true });
+      }),
+    ]);
+  } finally {
+    if (onAbort) signal?.removeEventListener("abort", onAbort);
+  }
   if (!Array.isArray(addresses) || addresses.length === 0)
     throw new WebBackendError(`Could not resolve the hostname (${host}).`);
   // Every resolved address must be public, so an attacker-controlled record cannot mix in a private target.
@@ -296,15 +303,14 @@ export function createWebBackend(config: WebBackendConfig = {}): WebBackend {
       if (!q) throw new WebBackendError("The search query is blank.");
       // Fixed public endpoint, so there is no URL surface to validate; the key is sent only to this host.
       const request: Record<string, unknown> = {
-        query: q.slice(0, 2000),
+        query: q,
         numResults: MAX_RESULTS,
         type: "auto",
         contents: { text: true },
       };
       const domains = query.domains
         ?.map(domain => domain.trim().toLowerCase().replace(/^[.*]+|[.*]+$/g, ""))
-        .filter(domain => domain.length > 0 && domain.length <= 253)
-        .slice(0, 10);
+        .filter(domain => domain.length > 0);
       if (domains?.length) request.includeDomains = domains;
       if (typeof query.recency === "number" && Number.isFinite(query.recency) && query.recency >= 1)
         request.startPublishedDate = new Date(Date.now() - Math.floor(query.recency) * 86_400_000).toISOString().slice(0, 10);
@@ -330,7 +336,7 @@ export function createWebBackend(config: WebBackendConfig = {}): WebBackend {
         const { url, title, text: snippet } = item as { url?: unknown; title?: unknown; text?: unknown };
         if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return [];
         return [{
-          url: url.slice(0, 8192),
+          url: url,
           title: typeof title === "string" ? title.replace(/\s+/g, " ").trim() : "",
           snippet: typeof snippet === "string" ? snippet : "",
         }];
