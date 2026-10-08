@@ -31,7 +31,7 @@ const agentSchema = z.object({
   name: z.string().trim().min(1).max(100), description: z.string().max(500), instructions: z.string().max(50_000),
   provider: z.string().min(1).max(100), modelId: z.string().min(1).max(200),
   thinkingLevel: z.enum(["off", "minimal", "low", "medium", "high", "xhigh", "max"]),
-  capabilities: z.array(z.enum(["files-and-commands", "image-generation"])).max(2).optional(),
+  capabilities: z.array(z.enum(["files-and-commands", "image-generation", "web-research"])).max(3).optional(),
   skills: z.array(z.object({ id: z.string().uuid(), revision: z.number().int().positive() }).strict()).max(50).refine(values => new Set(values.map(value => value.id)).size === values.length).optional(),
   connectionIds: z.array(z.string().uuid()).refine(values => new Set(values).size === values.length).optional(),
   applyConnectionsToExisting: z.boolean().optional(), requestId: requestId.optional(),

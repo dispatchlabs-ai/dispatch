@@ -649,10 +649,11 @@ export class DispatchRuntime {
       let extensions = (prior?.extensions ?? []).filter(name => !isMcpExtension(name));
       let tools = (prior?.tools ?? []).filter(name => !isMcpTool(name));
       if (input.capabilities !== undefined) {
-        extensions = extensions.filter(name => name !== Coding.name && name !== CodingTools.name && name !== "dispatch-image-gen");
-        tools = tools.filter(name => !["read", "write", "edit", "bash", "generate_image"].includes(name));
+        extensions = extensions.filter(name => name !== Coding.name && name !== CodingTools.name && name !== "dispatch-image-gen" && name !== "dispatch-web");
+        tools = tools.filter(name => !["read", "write", "edit", "bash", "generate_image", "web_run"].includes(name));
         if (input.capabilities.includes("files-and-commands")) { extensions.push(Coding.name, CodingTools.name); tools.push("read", "write", "edit", "bash"); }
         if (input.capabilities.includes("image-generation")) { extensions.push("dispatch-image-gen"); tools.push("generate_image"); }
+        if (input.capabilities.includes("web-research")) { extensions.push("dispatch-web"); tools.push("web_run"); }
       }
       const agent: StoredAgent = {
         id, name: input.name.trim(), description: input.description.trim(),
@@ -987,7 +988,7 @@ function nativeId(id: string): ConversationId {
 function owns(scope: RuntimeScope, chat: RuntimeScope) { return scope.companyId === chat.companyId && scope.userId === chat.userId; }
 function publicAgent({ companyId: _companyId, savedBy: _savedBy, saveRequestId: _request, saveFingerprint: _fingerprint, ...agent }: StoredAgent): AgentDefinition {
   // Nested catalog values may be transaction proxies; detach before the transaction settles.
-  return JSON.parse(JSON.stringify({ ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [], capabilities: [...(agent.extensions?.includes(CodingTools.name) ? ["files-and-commands" as const] : []), ...(agent.extensions?.includes("dispatch-image-gen") ? ["image-generation" as const] : [])] })) as AgentDefinition;
+  return JSON.parse(JSON.stringify({ ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [], capabilities: [...(agent.extensions?.includes(CodingTools.name) ? ["files-and-commands" as const] : []), ...(agent.extensions?.includes("dispatch-image-gen") ? ["image-generation" as const] : []), ...(agent.extensions?.includes("dispatch-web") ? ["web-research" as const] : [])] })) as AgentDefinition;
 }
 function managedIds(agent: Pick<AgentDefinition, "connections">) { return (agent.connections ?? []).filter(isManagedConnection).map(connection => connection.id); }
 function requireText(value: unknown, field: string, max: number, allowEmpty = false): asserts value is string {
