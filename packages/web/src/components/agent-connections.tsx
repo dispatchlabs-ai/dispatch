@@ -7,13 +7,13 @@ import { useSession } from "../lib/session";
 import { Button, Modal, Notice, Spinner } from "./ui";
 import { ConnectMcpDialog, authenticationLabels, useMcpConnections } from "./mcp-connections";
 
-export function AgentConnectionsPanel({ agentId }: { agentId: string }) {
+function useAgentConnections(agentId?: string) {
   const { api } = useSession();
   const [connections, setConnections] = useState<AgentConnectionStatus[] | null>(null);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    if (!agentId) return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     const refresh = async () => {
@@ -26,10 +26,16 @@ export function AgentConnectionsPanel({ agentId }: { agentId: string }) {
     void refresh();
     return () => { controller.abort(); clearTimeout(timer); };
   }, [api, agentId, attempt]);
+  return { connections, error, setConnections, setError, refresh: () => setAttempt(value => value + 1) };
+}
 
+export function AgentConnectionsPanel({ agentId }: { agentId: string }) {
+  const { api } = useSession();
+  const { connections, error, setConnections, setError, refresh } = useAgentConnections(agentId);
+  const [busy, setBusy] = useState<string | null>(null);
   return <section className="agent-connections" aria-labelledby={`connections-${agentId}`}>
     <h2 id={`connections-${agentId}`}>Connections</h2>
-    {error ? <Notice tone="error">Connection status is unavailable. {error} <Button variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></Notice> : null}
+    {error ? <Notice tone="error">Connection status is unavailable. {error} <Button variant="ghost" onClick={refresh}>Retry</Button></Notice> : null}
     {!connections && !error ? <p className="connection-loading"><Spinner /> Loading connections…</p> : null}
     {connections?.length === 0 ? <p className="connection-empty">No connections configured.</p> : null}
     {connections?.map(connection => <ConnectionCard key={connection.id} connection={connection} stale={Boolean(error)} busy={busy === connection.id} onReconnect={() => {
@@ -77,34 +83,18 @@ export function AgentConnectionsEditor({ agent, selectedIds, onChange, applyExis
   agent?: AgentDefinition; selectedIds: string[]; onChange: (ids: string[]) => void;
   applyExisting: boolean; onApplyExisting: (value: boolean) => void; busy: boolean; onSettings: () => void;
 }) {
-  const { api } = useSession();
   const { connections, error, refresh } = useMcpConnections();
-  const [operator, setOperator] = useState<AgentConnectionStatus[]>([]);
-  const [operatorError, setOperatorError] = useState("");
-  const [operatorAttempt, setOperatorAttempt] = useState(0);
+  const { connections: agentConnections, error: operatorError, refresh: refreshOperator } = useAgentConnections(agent?.id);
+  const operator = agentConnections?.filter(connection => !isManagedConnection(connection)) ?? [];
   const [choosing, setChoosing] = useState(false);
   const [authorizing, setAuthorizing] = useState(false);
   const savedIds = agent?.connections?.filter(isManagedConnection).map(connection => connection.id) ?? [];
   const changed = JSON.stringify([...savedIds].sort()) !== JSON.stringify([...selectedIds].sort());
-  useEffect(() => {
-    if (!agent) return;
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-    const load = async () => {
-      try {
-        const result = await api<{ connections: AgentConnectionStatus[] }>(`/api/agents/${encodeURIComponent(agent.id)}/connections`, undefined, controller.signal);
-        if (!controller.signal.aborted) { setOperator(result.connections.filter(connection => !isManagedConnection(connection))); setOperatorError(""); }
-      } catch (error) { if (!controller.signal.aborted) setOperatorError(errorMessage(error)); }
-      if (!controller.signal.aborted) timer = setTimeout(() => { void load(); }, 15_000);
-    };
-    void load();
-    return () => { controller.abort(); clearTimeout(timer); };
-  }, [api, agent?.id, operatorAttempt]);
   const available = connections?.filter(connection => connection.canManage && connection.authorization === "authorized" && !selectedIds.includes(connection.id) && connection.usedBy.every(owner => owner.id === agent?.id)) ?? [];
   return <section className="agent-connections agent-connections-editor" aria-label="MCP connections">
     <div className="editor-section-heading"><div><h2>MCP connections</h2><p>Give this agent access to the services it needs.</p></div><Button variant="secondary" disabled={busy} onClick={() => setChoosing(true)}><Plus /> Add connection</Button></div>
     <p className="field-hint">Manage authorization in <button className="text-link" type="button" disabled={busy} onClick={onSettings}>Settings → Connections</button>. Your draft stays here.</p>
-    {error || operatorError ? <Notice>{error || operatorError}<Button variant="ghost" onClick={() => { refresh(); setOperatorAttempt(value => value + 1); }}>Refresh</Button></Notice> : null}
+    {error || operatorError ? <Notice>{error || operatorError}<Button variant="ghost" onClick={() => { refresh(); refreshOperator(); }}>Refresh</Button></Notice> : null}
     {operator.map(connection => <ConnectionCard key={connection.id} connection={connection} stale={Boolean(operatorError)} />)}
     {selectedIds.map(id => {
       const connection = connections?.find(connection => connection.id === id);
