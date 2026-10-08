@@ -16,6 +16,7 @@ const defaultsSchema = z.object({
 export async function openModels(
   environment: NodeJS.ProcessEnv = process.env,
   credentials?: NonNullable<Parameters<typeof ModelRuntime.create>[0]>["credentials"],
+  refreshOnCreate = credentials === undefined,
 ) {
   const agentDir = resolve(environment.DISPATCH_PI_AGENT_DIR ?? join(homedir(), ".pi", "agent"));
   let defaults: z.infer<typeof defaultsSchema> = {};
@@ -25,7 +26,7 @@ export async function openModels(
   const modelId = environment.DISPATCH_MODEL ?? defaults.defaultModel ?? "gpt-6-sol";
   const models = await ModelRuntime.create({
     ...(credentials ? { credentials, refreshOnCreate: false } : { authPath: join(agentDir, "auth.json") }),
-    modelsPath: join(agentDir, "models.json"), allowModelNetwork: false,
+    modelsPath: join(agentDir, "models.json"), allowModelNetwork: false, refreshOnCreate,
   });
   const thinkingLevel = (environment.DISPATCH_THINKING ?? defaults.defaultThinkingLevel ?? "off") as ThinkingLevel;
   return {
