@@ -1208,7 +1208,7 @@ Product wiki tools are unavailable to Documenter in this session; no wiki public
 
 **Authorized October 8, 2026; implementation in progress, functional acceptance outstanding.** Chris accepted per-instance removal with preserved history and fresh-instance human re-addition, then directed the team to implement together. Pi Durable Expert owns backend/shared contracts and integration, Developer participant UI/client wiring, and Documenter package documentation. Scope follows [agent removal](spec.md#removing-an-agent-from-a-conversation); no definition deletion, human removal or deployment is included.
 
-Agreed interface: `POST /api/chats/:id/participants/:participantId/remove`, empty body, returns a refreshed snapshot; retries address the same immutable participant ID. Agent snapshots expose `membership: "active" | "removing" | "removed"` and optional `removalError`. [Usage](usage-guide.md#removing-a-conversation-agent) explains the planned controls and boundaries.
+Agreed interface: `POST /api/chats/:id/participants/:participantId/remove`, JSON body `{}`, returns a refreshed snapshot; retries address the same immutable participant ID. Agent snapshots expose `membership: "active" | "removing" | "removed"` and optional `removalError`. [Usage](usage-guide.md#removing-a-conversation-agent) explains the planned controls and boundaries.
 
 Acceptance criteria:
 - Authorize an authenticated participating human, excluding project read-all-only observers, cross-company callers, human targets and agent-tool self/asserted callers. Fence every delivery/publication/invitation path for an inactive agent, including already-running hooks and contribution final review.
