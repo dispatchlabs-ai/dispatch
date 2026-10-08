@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { CreateChatInput, RuntimeScope } from "../../src/shared/contracts.js";
 import { acquireRuntimeOwner } from "../runtime-owner.js";
+import { storedWorkerSummarySchema, workerSummarySchema, type WorkerSummaryObservation } from "./summaries.js";
 
 const routeSchema = z.object({
   conversationId: z.string().min(1), companyId: z.string().min(1), storeId: z.string().min(1),
@@ -13,6 +14,7 @@ const routeSchema = z.object({
   scope: z.custom<RuntimeScope>(value => typeof value === "object" && value !== null),
   input: z.custom<CreateChatInput>(value => typeof value === "object" && value !== null),
   phase: z.enum(["pending", "ready", "retiring"]),
+  summary: storedWorkerSummarySchema.optional(),
 }).strict();
 export type WorkerRoute = z.infer<typeof routeSchema>;
 
@@ -74,6 +76,26 @@ export class WorkerRoutes {
     const next: WorkerRoute = { ...route, configurationRevision, attemptId: randomUUID(), phase: "pending" };
     delete next.containerName;
     this.save(next); return next;
+  }
+  /** Caller authenticates the worker token first. Synchronous validation and save
+   * share the routing owner's exclusive lock and cannot interleave replacement. */
+  updateSummary(conversationId: string, attemptId: string, storeId: string, input: unknown): void {
+    const route = this.requireAttempt(conversationId, attemptId);
+    if (route.storeId !== storeId || route.phase === "retiring") throw new Error("Stale worker summary binding.");
+    const value = workerSummarySchema.parse(input);
+    const previous = route.summary;
+    if (previous && value.revision < previous.value.revision) throw new Error("Stale worker summary revision.");
+    if (previous && value.revision === previous.value.revision) {
+      if (JSON.stringify(value) !== JSON.stringify(previous.value)) throw new Error("Conflicting worker summary revision.");
+      if (previous.attemptId === attemptId) return;
+    }
+    this.save({ ...route, summary: { attemptId, value } });
+  }
+  /** Historical observations survive replacement, but are not current liveness. */
+  readSummary(conversationId: string): WorkerSummaryObservation | undefined {
+    const route = this.get(conversationId);
+    if (!route?.summary) return undefined;
+    return { value: route.summary.value, stale: route.phase === "retiring" || route.summary.attemptId !== route.attemptId };
   }
   close() { try { this.db.close(); } finally { this.release(); } }
   private requireAttempt(conversationId: string, attemptId: string) {
