@@ -134,6 +134,18 @@ resource "aws_db_parameter_group" "this" {
     value        = "1"
     apply_method = "pending-reboot"
   }
+  # RDS restricts session SET for these even for its managed master identity.
+  # Suppress bound values at the dedicated database boundary, without role grants.
+  parameter {
+    name         = "log_parameter_max_length"
+    value        = "0"
+    apply_method = "immediate"
+  }
+  parameter {
+    name         = "log_parameter_max_length_on_error"
+    value        = "0"
+    apply_method = "immediate"
+  }
   tags = local.tags
 }
 resource "aws_db_instance" "this" {
