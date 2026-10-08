@@ -1,12 +1,12 @@
 # Changelog
 
-## Unreleased — five-finding simplification (integration pending)
+## Unreleased — five-finding simplification
 
 - Replace full-transcript chat listing with lightweight summaries and target pending base upgrades instead of scanning all chats after unrelated commits.
 - Consolidate composer state and coordinate list refreshes with stale-response protection, preserving draft and retry safeguards.
 - Reconcile current agent-management status/default-target eligibility and link check guidance to the canonical testing policy.
 
-Implementation and integrated checks remain pending; no deployment or runtime/UI qualification is established. See [acceptance evidence](docs/handoff.md#five-finding-simplification--october-8-2026).
+Integrated source review and TypeScript/application/Apple Silicon Nix checks passed; no deployment or new runtime/UI qualification is established. See [acceptance evidence](docs/handoff.md#five-finding-simplification--october-8-2026).
 
 ## Unreleased — chat presentation performance candidate
 
