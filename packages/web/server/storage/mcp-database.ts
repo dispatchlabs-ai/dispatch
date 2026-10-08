@@ -160,9 +160,11 @@ export class McpDatabase {
         return result;
       } catch {
         // Even a rejected/uncertain commit invalidates every cached authorization.
+        // Seal synchronous cache reads before rollback can yield, including when
+        // ownership validation (rather than raw SQL) caused the failure.
+        this.failure ??= new Error("MCP transaction failed; cached authorization is disabled until recovery.");
         // Rollback uses the underlying connection because raw() is now poisoned.
         try { if (this.sqlite) this.sqlite.exec("ROLLBACK"); else await this.postgres!.query("ROLLBACK"); } catch {}
-        this.failure ??= new Error("MCP transaction failed; cached authorization is disabled until recovery.");
         throw this.failure;
       }
     });
