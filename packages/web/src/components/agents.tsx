@@ -82,7 +82,11 @@ export function AgentsPage({
   creating,
   onConnectionsSettings,
   onEvaluationGuardChange,
+  evaluationAgent, onEvaluationAgentChange, onEvaluationContextChange,
 }: {
+  evaluationAgent: string | null;
+  onEvaluationAgentChange: (id: string | null) => void;
+  onEvaluationContextChange: (context: React.ReactNode) => void;
   onEvaluationGuardChange: (guard: { dirty: boolean; busy: boolean }) => void;
   agent?: AgentDefinition;
   editing: AgentEditing | null;
@@ -95,6 +99,7 @@ export function AgentsPage({
   creating: boolean;
   onConnectionsSettings: () => void;
 }) {
+  const evaluationOpen = !!agent && evaluationAgent === agent.id;
   if (editing)
     return (
       <AgentEditor
@@ -131,7 +136,7 @@ export function AgentsPage({
     <section className="agent-view">
       <header className="view-heading agent-heading">
         <div>
-          <h1>{agent.name}</h1>
+          <h1>{agent.name}{evaluationOpen ? " / Evaluation profile" : ""}</h1>
           <p>
             {agent.archived
               ? "Archived agent"
@@ -140,7 +145,7 @@ export function AgentsPage({
                 : "Shared with your company"}
           </p>
         </div>
-        {!agent.archived ? (
+        {!agent.archived && !evaluationOpen ? (
           <div className="button-row agent-actions">
             <Button variant="ghost" onClick={() => onEdit(agent)}>
               <Pencil /> Edit
@@ -155,8 +160,9 @@ export function AgentsPage({
           </div>
         ) : null}
       </header>
-      <div className="agent-content">
+      <div className={evaluationOpen ? "agent-content evaluation-workspace" : "agent-content"}>
         <div className="agent-content-inner">
+          <div hidden={evaluationOpen}>
           <p className="agent-phone-facts">
             {model?.name || agent.modelId || "No model configured"} ·{" "}
             {thinkingLabel(agent.thinkingLevel)} thinking · {agent.tools.length || agent.skills?.length ? `${agent.tools.length + (agent.skills?.length ? 1 : 0)} tools` : "No tools"}
@@ -170,7 +176,7 @@ export function AgentsPage({
               {agent.instructions || "No additional instructions."}
             </Markdown>
           </section>
-          <AgentEvaluation key={`evaluation:${agent.id}`} agentId={agent.id} readOnly={agent.archived} onGuardChange={onEvaluationGuardChange} />
+          <Button className="evaluation-entry" variant="secondary" onClick={() => { onEvaluationAgentChange(agent.id); }}>Configure evaluations</Button>
           <AgentSkillsPanel selections={agent.skills ?? []} />
           <AgentConnectionsPanel key={agent.id} agentId={agent.id} />
           {agent.archived ? (
@@ -179,6 +185,10 @@ export function AgentsPage({
               configuration.
             </Notice>
           ) : null}
+          </div>
+          <div hidden={!evaluationOpen} className="evaluation-workspace-content">
+            <AgentEvaluation active={evaluationOpen} key={`evaluation:${agent.id}`} agentId={agent.id} readOnly={agent.archived} onGuardChange={onEvaluationGuardChange} onContextChange={onEvaluationContextChange} onClose={() => { onEvaluationAgentChange(null); requestAnimationFrame(() => document.querySelector<HTMLElement>(".evaluation-entry")?.focus()); }} />
+          </div>
         </div>
       </div>
     </section>

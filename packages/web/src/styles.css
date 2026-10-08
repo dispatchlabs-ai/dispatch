@@ -995,3 +995,55 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .evaluation-saved-item > summary { cursor: pointer; min-height: 44px; overflow-wrap: anywhere; }
 .evaluation-artifact { display: grid; gap: var(--space-2); min-width: 0; }
 .agent-evaluation h3 { margin-top: var(--space-5); }
+
+/* Evaluation workspace: one scrolling surface and a stable save footer. */
+.evaluation-workspace { overflow: hidden; padding-bottom: 0; }
+.evaluation-workspace > .agent-content-inner, .evaluation-workspace-content { height: 100%; min-height: 0; }
+.evaluation-workspace .agent-evaluation { height: 100%; display: flex; flex-direction: column; border: 0; padding: 0; }
+.evaluation-workspace .evaluation-heading { flex-shrink: 0; margin-bottom: var(--space-4); }
+.evaluation-intro { font-size: var(--text-xl); font-weight: 600; margin-bottom: var(--space-2); }
+.evaluation-boundary { margin-bottom: var(--space-6); max-width: 65ch; }
+.evaluation-workspace .agent-evaluation > form { min-height: 0; flex: 1; display: flex; flex-direction: column; }
+.evaluation-form-scroll, .evaluation-overview { min-height: 0; flex: 1; overflow-y: auto; padding: 0 var(--space-2) var(--space-6) 0; }
+.evaluation-form-scroll > .field { margin-top: var(--space-6); }
+.evaluation-workspace .evaluation-actions { flex-shrink: 0; border-top: 1px solid var(--color-border); padding: var(--space-4) 0; margin: 0; background: var(--color-surface); justify-content: flex-end; }
+.evaluation-actions > .field-hint { margin-right: auto; }
+.evaluation-group + .evaluation-group { margin-top: var(--space-8); }
+.evaluation-workspace h3 { font-size: var(--text-lg); font-weight: 600; margin-top: 0; }
+.evaluation-case { border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+.evaluation-case > summary { cursor: pointer; padding: var(--space-4); display: grid; gap: var(--space-2); overflow-wrap: anywhere; }
+.evaluation-case-edit { color: var(--color-navy); font-size: var(--text-sm); text-decoration: underline; }
+.evaluation-case > .evaluation-item { border: 0; border-top: 1px solid var(--color-border); }
+.evaluation-save-status { color: var(--color-success); margin-bottom: var(--space-4); }
+.evaluation-overview > h3 { margin-top: var(--space-8); }
+@media (max-width: 600px) {
+  .evaluation-workspace { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .evaluation-boundary { margin-bottom: var(--space-4); }
+  .evaluation-actions { flex-wrap: wrap; }
+  .evaluation-actions > .field-hint { width: 100%; }
+  .evaluation-intro { font-size: var(--text-lg); }
+}
+
+.evaluation-workspace .evaluation-form-scroll > .evaluation-heading, .evaluation-workspace .evaluation-overview > .evaluation-heading { margin-top: var(--space-1); }
+.evaluation-section-links { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-4); margin-bottom: var(--space-6); }
+.evaluation-section-links a, .evaluation-section-links button { color: var(--color-navy); text-decoration: underline; text-underline-offset: 4px; font-size: var(--text-sm); min-height: 32px; display: inline-flex; align-items: center; cursor: pointer; }
+.evaluation-saved-expectations { margin-bottom: var(--space-6); }
+.evaluation-saved-expectations summary { display: grid; gap: var(--space-2); cursor: pointer; padding: var(--space-3) 0; }
+.evaluation-saved-expectations[open] summary > .field-hint { display: none; }
+.evaluation-case[open] .evaluation-case-preview, .evaluation-case[open] .case-closed-label, .evaluation-case:not([open]) .case-open-label { display: none; }
+.evaluation-case > .evaluation-item { border-top: 0; }
+.evaluation-case > .evaluation-item > legend { display: none; }
+.context-body > .field { margin: var(--space-6) 0; }
+@media (max-width: 600px) {
+  .evaluation-workspace .evaluation-actions { flex-wrap: nowrap; gap: var(--space-2); }
+  .evaluation-workspace .evaluation-actions > .field-hint { width: auto; flex: 1; }
+  .evaluation-workspace .evaluation-actions .button { padding-inline: var(--space-3); }
+}
+
+.evaluation-disclosure-label { color: var(--color-navy); font-size: var(--text-sm); text-decoration: underline; }
+.evaluation-saved-expectations[open] .expectations-closed-label, .evaluation-saved-expectations:not([open]) .expectations-open-label { display: none; }
+
+.evaluation-check-field > .field-hint { margin: var(--space-1) 0 0 var(--space-8); }
+.evaluation-empty { margin: var(--space-8) 0; }
+.evaluation-empty p, .evaluation-empty li { color: var(--color-muted); margin-top: var(--space-3); }
+.evaluation-empty ul { padding-left: var(--space-5); list-style: disc; }
