@@ -327,7 +327,7 @@ Optional shared Markdown criteria guide all chat participants; checklists are su
 
 #### Agent editing capability
 
-**Implementation candidate; integrated and runtime/rendered qualification pending.** In **Agents**, edit the definition, open **Capabilities**, select **Edit Definition of Done** and save a new revision. It is off by default. Existing instances adopt definition changes at their next safe idle boundary; an active instance's currently applied permission remains in effect until that adoption. Saving a definition is not evidence that a running instance has already upgraded.
+**Source-published in `b400e4a`; runtime/rendered qualification pending.** In **Agents**, edit the definition, open **Capabilities**, select **Edit Definition of Done** and save a new revision. It is off by default. Existing instances adopt definition changes at their next safe idle boundary; an active instance's currently applied permission remains in effect until that adoption. Saving a definition is not evidence that a running instance has already upgraded.
 
 Enabled active participants use `conversation_definition_of_done` in their current chat only:
 - Read with `{}`; the result is `{ markdown, revision }`.
