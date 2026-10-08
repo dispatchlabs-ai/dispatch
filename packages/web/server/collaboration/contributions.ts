@@ -99,7 +99,7 @@ export class Contributions {
     return item.phase !== "closed" && owner && !owner.abortRequested && owner.state.status !== "terminal" && turns.speaker?.requester === item.owner && !humansComposing(turns);
   }
 
-  async handoff(tx: Tx, roomId: ConversationId, item: Contribution, kind: Boundary["kind"], assistant?: EntryId, results?: readonly EntryId[]) {
+  async handoff(tx: Tx, item: Contribution, kind: Boundary["kind"], assistant?: EntryId, results?: readonly EntryId[]) {
     const tail = (await tx.scanEntries({ conversationId: item.conversationId }, 1)).items[0];
     if (!tail) throw new Error("Missing native contribution boundary.");
     const marker = kind === "final" ? `dispatch-review:${item.id}:${item.reviewer}` : undefined;

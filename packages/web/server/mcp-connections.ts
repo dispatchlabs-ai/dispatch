@@ -27,6 +27,13 @@ export type ManagedConnectionRecord = {
   scopes: string[]; createdAt: number; error?: string; disconnectNotice?: string;
 };
 
+function connectionRecord(row: ConnectionRow): ManagedConnectionRecord {
+  return { id: row.id, companyId: row.company_id, ownerId: row.owner_id, name: row.name, endpoint: row.endpoint,
+    authentication: row.authentication, authorization: row.state, identity: row.identity, serverName: row.server_name,
+    scopes: JSON.parse(row.scopes) as string[], createdAt: row.created_at, ...(row.error ? { error: row.error } : {}),
+    ...(row.disconnect_notice ? { disconnectNotice: row.disconnect_notice } : {}) };
+}
+
 export class McpConnections {
   private db?: DatabaseSync;
   private key!: Buffer;
@@ -169,15 +176,11 @@ export class McpConnections {
   }
 
   record(id: string): ManagedConnectionRecord {
-    const row = this.row(id);
-    return { id: row.id, companyId: row.company_id, ownerId: row.owner_id, name: row.name, endpoint: row.endpoint,
-      authentication: row.authentication, authorization: row.state, identity: row.identity, serverName: row.server_name,
-      scopes: JSON.parse(row.scopes) as string[], createdAt: row.created_at, ...(row.error ? { error: row.error } : {}),
-      ...(row.disconnect_notice ? { disconnectNotice: row.disconnect_notice } : {}) };
+    return connectionRecord(this.row(id));
   }
 
   list(companyId: string) {
-    return (this.db!.prepare("SELECT id FROM mcp_connections WHERE company_id=? ORDER BY created_at DESC").all(companyId) as { id: string }[]).map(({ id }) => this.record(id));
+    return (this.db!.prepare("SELECT * FROM mcp_connections WHERE company_id=? ORDER BY created_at DESC").all(companyId) as ConnectionRow[]).map(connectionRecord);
   }
 
   requireAssignment(scope: RuntimeScope, id: string) {

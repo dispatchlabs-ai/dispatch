@@ -541,7 +541,7 @@ export class SharedConversations {
           return this.harness.commit(async tx => {
             const markers: string[] = [];
             for (const item of await this.contributions.forReviewer(tx, roomId, api.conversationId, api.taskId)) {
-              const marker = await this.contributions.handoff(tx, roomId, item, kind, assistant, results);
+              const marker = await this.contributions.handoff(tx, item, kind, assistant, results);
               if (marker) markers.push(marker);
             }
             return markers;
