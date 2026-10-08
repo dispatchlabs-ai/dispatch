@@ -4,7 +4,7 @@ Dispatch Web has a local browser/service implementation with authentication, nat
 
 ## Current check policy
 
-Chris requested **zero tests at this stage** on October 3, 2026. Do not add or run automated tests, smoke tests, or browser acceptance tests. Use source review, TypeScript checks, and builds while this rule is active. Functional acceptance remains unverified unless prior evidence is explicitly dated; a successful build does not establish runtime correctness. The browser-testing workflow below is reserved for when this rule changes. Chris explicitly authorized focused manual browser validation for the October 6 conversation-layout work; [WP-028](packages/web/docs/handoff.md#wp-028--conversation-layout-refinement) records its observed scope and limits. Chris also authorized focused first-deployment SQLite/storage qualification on October 7 for the [AWS container target](packages/web/docs/spec.md#aws-container-deployment-target), using disposable data; this is not authorization for a broad application test suite. The October 7 [isolated Palm PostgreSQL trial](packages/web/docs/handoff.md#wp-043--isolated-palm-postgresql-trial) also authorizes its focused disposable-data deployment/recovery/restore checks, without changing existing installations. Automated tests otherwise remain deferred. Once useful behavior is stable enough to lock in, focus coverage on end-to-end and API tests; unit and implementation-level tests are not the default. Follow the [package testing policy](packages/web/docs/spec.md#testing-policy) before starting test work.
+Follow the package's [testing policy](packages/web/docs/spec.md#testing-policy), the canonical source for the October 3 zero-tests rule and explicitly scoped exceptions. Outside those exceptions, do not add or run tests, smoke checks or browser acceptance procedures; use source review, TypeScript checks and builds. An exception applies only to its authorized work package. Future coverage should prioritize stable end-to-end and API behavior, not implementation details or coverage counts. Builds do not establish runtime correctness; record dated observations and unverified outcomes in the package handoff.
 
 ## Local development and Nix builds
 
@@ -77,7 +77,7 @@ Use `/deslop` after implementing a work package, then rerun affected checks befo
 
 ## Checks and publication
 
-Run `npm run check` inside `nix develop` for code changes. Run `nix flake check` for the declared type/build check and `nix build` to produce artifacts. There is no functional test suite under the current zero-tests rule. Do not run the browser-testing procedure.
+Run `npm run check` inside `nix develop` for code changes. Run `nix flake check` for the declared type/build check and `nix build` to produce artifacts. There is no functional test suite under the current zero-tests rule. Run browser verification only within an explicit exception in the [package testing policy](packages/web/docs/spec.md#testing-policy).
 
 Also run `git diff --check` (and `git diff --cached --check` after staging), inspect the full diff, and verify changed local documentation links. Documentation checks do not verify application behavior.
 

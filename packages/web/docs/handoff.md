@@ -4,7 +4,7 @@ The local implementation covers the current features listed in [spec.md](spec.md
 
 ## Current testing policy
 
-Chris requested **zero tests during this stage**, then clarified that future coverage should focus on end-to-end and API tests once useful behavior is stable enough to lock in. Follow the [testing policy](spec.md#testing-policy). Do not add or run tests, smoke checks, or browser acceptance procedures now. Source review, TypeScript checks, and builds are permitted. The acceptance outcomes below define intended behavior; they are not permission to start test work.
+Chris requested **zero tests during this stage**, then clarified that future coverage should focus on end-to-end and API tests once useful behavior is stable enough to lock in. The [testing policy](spec.md#testing-policy) is the canonical source for this rule and scoped exceptions. Outside an explicitly authorized exception, do not add or run tests, smoke checks, or browser acceptance procedures. Source review, TypeScript checks, and builds are permitted. The acceptance outcomes below define intended behavior; they are not permission to start test work.
 
 No test suites or test frameworks are retained. Functional, security-flow, recovery, and real-device qualification of the integrated revision remains deferred. Successful type/build checks do not establish those outcomes. Earlier WP-001 evidence is historical.
 
@@ -32,7 +32,7 @@ Acceptance: source/deslop review, TypeScript/application builds, Apple Silicon N
 
 ## Specification reconciliation — October 7, 2026
 
-Chris requested a consistent product contract for future testing. Reconciled current versus legacy project policy, read-all exceptions, human invitation scope, admitted public replies and conversation-wide Stop, agent editor/context rules, and deployment/storage qualification boundaries. Explicitly separate current acceptance targets from future/proposed designs; source behavior is not permission to weaken an accepted requirement. Preserve the concurrently published permissioned-agent-management design as unimplemented.
+Chris requested a consistent product contract for future testing. Reconciled current versus legacy project policy, read-all exceptions, human invitation scope, admitted public replies and conversation-wide Stop, agent editor/context rules, and deployment/storage qualification boundaries. Explicitly separate current acceptance targets from future/proposed designs; source behavior is not permission to weaken an accepted requirement. At that reconciliation, permissioned agent management was a design only; its subsequent implementation is recorded in [WP-046](#wp-046--permissioned-agent-management).
 
 Documentation-only acceptance: source/deslop review findings on invitations, read-all removal and the ownership summary were resolved; changed-document local file/anchor checks and whitespace checks passed. No code, tests, builds, model calls, deployment or runtime qualification are included. Existing testing authorization is unchanged.
 
@@ -1107,17 +1107,17 @@ WP-045 check evidence: Developer ran `nix develop -c npm run check`, `nix build`
 
 **Implementation authorized October 7, 2026; published as `16ce61e`, source/build approved, runtime unqualified.** Chris subsequently requested execution through completion after the documentation-only package. Developer owns implementation, Pi Durable Expert and Security own their source reviews, and Documenter owns documentation. No grant or successful Doctor edit is established by this authorization. Depends on the current immutable definition catalog, trusted native participant bindings and Pi Durable 1.0.4 public document/commit interfaces. Scope follows [permissioned agent management](spec.md#permissioned-agent-management). Doctor is the selected trial editor, not an already authorized principal.
 
-Before enabling grants:
+Original Doctor trial choices (not prerequisites for other explicit human grants under the current [management contract](spec.md#permissioned-agent-management)):
 - Confirm the trial target and immutable IDs/effective privileges, direct-save mode, pinned editor revision, editable fields and explicit hourly limit. The first implementation supports human-session API grant administration, revision-pinned reads/direct saves and no proposal/promotion workflow.
 - Confirm the narrow trial allowlist. Do not provision grants, change Doctor/target configuration, run evals or start model calls as part of this documentation package.
 
-Implementation scope:
+Historical October 7 implementation scope (current behavior follows the linked management contract):
 - Shared identity-aware read/save service operations and narrow native tools; no borrowed human session, loopback API dependency or MCP server requirement.
 - Dedicated grant document and separately authorized human grant writer, with grant-change audit. Keep agent-edit paths unable to mutate grants.
 - Atomic authorization/target eligibility, expected-revision validation, immutable save, agent attribution and deduplication receipt. Retain all existing definition validation, including instruction-length limits, human saves and company isolation without treating agent identity as a human user ID.
 - No existing-instance rollout, permission expansion, self-editing or skill/connection/capability changes. Document restoration as a new revision, not history replacement.
 
-Implementation contract (pending final integration/review):
+Historical October 7 implementation contract (source/build review recorded below; rollout and eligibility restrictions superseded by [in-place upgrades](#in-place-agent-upgrades--october-8-2026) and the [eligibility correction](#agent-management-eligibility-correction--october-8-2026)):
 - `agent_management_read` and `agent_management_save` commit through the supplied native transaction. Grant writes are separate human-session operations at `/api/agent-management/grants`; no grants are seeded and no UI is added.
 - Both current and acting editor revisions match a human-granted pin. Both agents remain unprivileged; target eligibility includes external connections and management grants.
 - Explicit 1–100 rolling-hour save limit; committed editor saves across all targets count, receipt replay does not. Same-instance operation and durable call identity prevent replay duplication. Restore copies only granted fields into a forward revision.
@@ -1125,7 +1125,7 @@ Implementation contract (pending final integration/review):
 
 Acceptance criteria:
 - Source/security review covers forged caller/target IDs, cross-company reads/writes, absent/revoked grants, forbidden fields, changed target privileges, editor revisions, human-versus-agent principal handling and every grant-writing path.
-- Source/Pi review covers stale revisions, concurrent human edits/revocation, identical versus changed retries, crash before/after commit, cancellation after save and restart receipt recovery. No duplicate revision may result from replay of one committed operation. Existing participant configuration must remain unchanged.
+- Source/Pi review covers stale revisions, concurrent human edits/revocation, identical versus changed retries, crash before/after commit, cancellation after save and restart receipt recovery. No duplicate revision may result from replay of one committed operation. At this initial delivery, existing participant configuration remained unchanged; the subsequent [in-place upgrade contract](spec.md#in-place-agent-revision-upgrades) supersedes that restriction.
 - Review threat boundaries for Doctor and the target, including unrestricted host tools and access to application state; tool exposure or cwd cannot establish isolation. Keep eval evidence untrusted and independently access-controlled.
 - Record attributable before/after definition and grant changes; demonstrate the restoration contract through source review while execution remains deferred. If proposals are selected, specify candidate identity, diff review, promotion authorization and stale-base handling before implementing them.
 - Apply source/deslop review, TypeScript/application and applicable Nix builds for implementation, full diff/whitespace and changed-link checks. Any UI must satisfy desktop/390 px review rules. The zero-tests policy remains active; runtime, security, replay/revocation and actual Doctor edits remain unqualified until separately authorized and observed. No deployment is included.
@@ -1607,3 +1607,19 @@ The final-measurement freeze supersedes `4aa2133` with `0d27d4a190b64a7923af33ea
 
 
 Authenticated mutation evidence at `0d27d4a`: Documenter inspected `.local/chat-performance-instance/mutations.{mjs,json}`. Deslop created a disposable human-only chat with 45 posts, loaded its older page, replaced an initial draft with newer text and clicked Send. The native response retained the latest text, the composer cleared, and scrolling back still exposed the first loaded historical post. The direct idle Stop request returned 200 with zero agent participants. This qualifies that desktop Send/mutation/history case and the idle HTTP Stop response—not a browser Stop click, active cancellation, or post-Stop historical-row reconciliation. No live chat was mutated and no model was invoked; Pi Durable Expert owns separate deterministic active-cancellation evidence.
+
+
+## Five-finding simplification — October 8, 2026
+
+Chris authorized fixing the five findings ranked in the source review. Deslop owns integration and final review; Pi Durable Expert owns lightweight chat summaries and targeted base-upgrade reconciliation; Developer owns per-composer state and coordinated list refreshes; Documenter owns contract reconciliation and acceptance evidence. Reuse the lightweight-summary candidate from [chat presentation performance](#chat-presentation-performance--october-8-2026); this package does not complete that broader performance goal or authorize transcript transport/rendering changes, deployment or unrelated cleanup.
+
+Acceptance criteria:
+
+- List refresh reads lightweight summaries without full transcript/tool projection; preserve access checks, titles, ordering, status and preferences, including existing-chat initialization. Record observed evidence separately from source review.
+- Base upgrades reconcile relevant pending instances rather than scan every chat after unrelated commits; preserve startup/restart discovery, committed revision state, retry receipts and transactional safe-idle/removal/Stop checks.
+- One per-composer state representation owns explicit transitions; preserve stable uncertain-retry identity, newer-draft protection, latest text, mentions, independent main/thread attachments and tab-close cleanup.
+- Coordinate mount, visibility and timer refreshes with stale-response protection; list responses must not overwrite newer accepted summaries or revive removed state. Preserve background discovery and live revision reconciliation.
+- Current specification summaries identify agent management as implemented but runtime-unqualified and Developer as an eligible, explicitly granted target. Label superseded trial/rollout restrictions as history. Root and handoff check guidance link to the canonical testing policy without extending exceptions.
+- Source/deslop and independent native review, TypeScript/application and applicable Nix build/flake checks, diff/whitespace and changed-link checks. Record unverified runtime, security/recovery and rendered desktop/390 px outcomes explicitly; no new tests, deployment or artifact deletion is included. Verify source publication independently of deployment.
+
+Documentation candidate: specification/default-target summaries and historical WP-046 restrictions are reconciled with the accepted October 8 eligibility/base-adoption contracts; check-policy summaries now link to the canonical exceptions rather than duplicating incomplete lists. Documentation diff/behavior-preserving review, 194 local file/anchor links and whitespace checks passed. The correction was checked against the current source eligibility/grant boundary; no grant was provisioned. Code integration and package acceptance remain pending; no builds, tests, runtime checks or deployment were performed for this documentation-only slice.
