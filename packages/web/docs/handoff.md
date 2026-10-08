@@ -1437,3 +1437,24 @@ Runtime candidates `e20e99d`/`7aa376e`: Expert reports TypeScript/application/wh
 Source-published `ce244ca` (integrated candidate `8e35058`) combines Dev 2's repository-owned Developer starter, Developer's bounded fixed-host GitHub fetch/API/UI, and Pi Durable Expert's native durable previews, tracked updates and receipt replay. Expert source-reviewed fetch/routes/starter integration without an additional blocker. Developer source/deslop review covered strict pinned source validation, no redirect/credential forwarding or script execution, exact reviewed-content apply, actor/company scope, revision conflicts, preview storage limits and receipt-before-expiry replay. Dev 2's mode-switch state finding was corrected; bundle-only keepMounted additionally preserves child retry/selection state across dialog closure. Existing default and independent-copy behavior remain unchanged; updates follow safe-idle adoption, not a new pinning exception.
 
 Integrated `nix develop --command npm run check`, Apple Silicon `nix build --no-link`, and `nix flake check` passed (zero runnable checks; Linux omitted). The existing large-chunk advisory remains. Whitespace and local file links checked. No tests, network fetch probes, API round trips or browser probes ran. GitHub retrieval, starter/ZIP imports, conflicting updates, expiry/restart/lost-response replay, active-instance adoption and desktop/390 px, keyboard/touch/contrast/accessibility remain unverified. This is an outstanding UI-rule qualification gap, not completed acceptance. Private repositories, branch/tag resolution, broader starter inventory, project export and operational backup remain later work. Source publication and local checkout synchronization do not establish deployment or running-service availability.
+
+
+## Project content portability — October 8, 2026
+
+**Assigned to Developer; source-grounded design review pending.** Chris asked the team to continue the remaining portability scope. Pi Durable Expert reviews native boundaries; Documenter maintains contracts/usage. Use a separate worktree and coordinate runtime/shared-file ownership before edits. [The specification](spec.md#project-content-and-operational-recovery) owns the content/recovery distinction.
+
+Acceptance criteria:
+- Select authorized project content, public history and attachments; settle privacy/selection, completeness, archive limits and destination identity/access mapping before implementation.
+- Fresh destination identities, no inherited grants or private model state. Historical messages are inert history, never new submissions; no task reconstruction, project carving from Pi storage or custom task serialization.
+- Preserve company authorization and immutable existing history. Settle atomic apply/retry and attachment failure behavior in the reviewed design; document actual route/UI workflow after implementation.
+- Source/native/deslop review, TypeScript/application and applicable Nix builds, whitespace/links. Runtime round trips/retry/restart and rendered desktop/390 px remain unverified until authorized evidence; standing zero-tests policy remains active.
+
+## Installation backup and restore — October 8, 2026
+
+**Assigned to Dev 2; source-grounded design review pending.** Pi Durable Expert reviews recovery ownership; Documenter owns operator guidance. This is a restricted installation recovery set, not project sharing or visible-message export.
+
+Acceptance criteria:
+- Inventory native Pi storage, SQLite/PostgreSQL application/authentication/connection databases, attachments, external workspaces and protected credentials. Identify every writer; runtime-directory locking alone does not establish a consistent recovery boundary.
+- Design stopped-owner capture and restore with compatible host-installed native extensions, complete recovery-set identification and exclusive executor ownership. Prevent concurrent original/restored execution; settle external database/file coordination and failure handling before implementation.
+- Keep secret-bearing sets restricted. Document coverage/exclusions and operator prerequisites without publishing real paths, credentials or private backup contents. No live-state changes or service stops are authorized by this work assignment.
+- Source/native/deslop review, TypeScript/application and applicable build checks, whitespace/links. Backup/restore/restart correctness remains unverified under the zero-tests policy until explicitly authorized; never present source review as recovery qualification.
