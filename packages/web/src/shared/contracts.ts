@@ -60,6 +60,9 @@ export interface AgentParticipant extends ParticipantIdentity {
   kind: "agent";
   agentDefinitionId: string;
   agentRevision: number;
+  savedAgentRevision?: number;
+  upgradeError?: string;
+  connectionsPending?: boolean;
   membership: "active" | "removing" | "removed";
   removalError?: string;
   /** Creation-time supplement; agent.instructions retains the base definition snapshot. */
@@ -68,7 +71,7 @@ export interface AgentParticipant extends ParticipantIdentity {
   error?: string;
   usage: UsageState;
   /** Configuration saved for this instance, not the definition's latest revision. */
-  agent: AgentDraft & { extensions: string[]; tools: string[]; cwd?: string };
+  agent: AgentDraft & { extensions: string[]; tools: string[]; cwd?: string; connections?: AgentConnection[] };
 }
 
 export type ConversationParticipant = HumanParticipant | AgentParticipant;

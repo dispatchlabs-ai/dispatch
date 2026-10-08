@@ -613,7 +613,7 @@ function AgentEditor({
         </div>
         <footer className="agent-editor-actions">
           <div className="agent-editor-actions-inner">
-          <p className="editor-note">{agentConnectionsChanged(editing) && editing.applyConnectionsToExisting ? "Connection changes also apply to existing instances." : "Existing instances keep their saved configuration."}</p>
+          <p className="editor-note">{agentConnectionsChanged(editing) && editing.applyConnectionsToExisting ? "Base and connection updates apply when idle." : "Base updates apply to existing instances when idle."}</p>
           <div className="button-row">
             <Button variant="secondary" disabled={busy} onClick={onCancel}>
               Discard

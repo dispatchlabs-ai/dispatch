@@ -110,6 +110,11 @@ export class AgentConnections {
     return { extensions: connections.map(connection => connection.extensionName), tools: connections.flatMap(connection => connection.toolNames()) };
   }
 
+  async boundConnections(tx: Tx, conversationId: ConversationId) {
+    const binding = await tx.doc(BindingDoc, conversationId);
+    return this.connections.filter(connection => binding.connections.includes(connection.key)).map(connection => connection.descriptor());
+  }
+
   async bind(tx: Tx, conversationId: ConversationId, agentId: string, existing = false, managedIds: string[] = [], applyManaged = false) {
     const binding = await tx.doc(BindingDoc, conversationId);
     const connections = this.connections.filter(connection => connection.isManaged
