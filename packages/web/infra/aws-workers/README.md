@@ -76,8 +76,11 @@ match encrypted records. Configuration is not a backup.
    through an operator-only path. Select final origin before passkey enrollment.
    Task definitions may be prepared at count zero; never start with placeholder
    configuration, missing secret versions or a synthetic image digest.
-4. Activate only after application/configuration review. Verify actual runtime
-   UID/permissions, private bootstrap files, secret-source environment removal,
+4. Activate only after application/configuration review. Fresh routing storage
+   intentionally starts with admission blocked. After owner/inventory checks,
+   use authenticated private `POST /internal/undrain` to reopen admission; never
+   expose `/internal` publicly or bypass drain in code to make startup succeed.
+   Verify actual runtime UID/permissions, private bootstrap files, secret-source environment removal,
    database verified TLS, signed-out HTTPS, enrollment, real model/tool execution,
    artifacts and replacement with independently confirmed old-task STOPPED.
 5. For upgrades, seal admission and authenticate fresh drain/quiescence evidence;
@@ -111,7 +114,7 @@ operator binaries, not whichever `terraform` happens to be first on PATH.
 Source/deslop review preserves direct Terraform resources, separate worker cluster,
 scoped IAM/SGs, no secrets in state, restricted service ownership, stop-before-start,
 matched recovery and retained state. Pi reviewed the initializer/bootstrap contract;
-Application Linux/Fargate execution is not established. Application task IAM and
+Full application runtime acceptance is not established. Application task IAM and
 SQL isolation, ALB/path behavior, AWS recovery, credential lifetime, performance and full application
 security qualification remain unverified. The Surton consumer records access,
 actual cost assumptions, missing operator decisions and publication separately.
