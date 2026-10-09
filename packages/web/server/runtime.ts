@@ -585,8 +585,7 @@ export class DispatchRuntime {
   }
 
   async getChat(scope: RuntimeScope, id: string): Promise<ChatSnapshot> {
-    await this.authorize(scope, id);
-    // Hold the native commit line while reading all participating streams. No read commits write state.
+    // Authorize and read all participating streams on the same native commit line.
     return this.harness.commit(async tx => {
       const catalog = await tx.doc(CatalogDoc);
       const chat = catalog.chats.find(item => item.id === id && item.companyId === scope.companyId)!;
@@ -607,7 +606,6 @@ export class DispatchRuntime {
   }
 
   async transcriptPage(scope: RuntimeScope, id: string, query: TranscriptQuery) {
-    await this.authorize(scope, id);
     return this.harness.commit(async tx => {
       await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
       return { ...(await this.shared.presentation(tx, nativeId(id), query)).page!, revision: this.commitRevision };
@@ -615,7 +613,6 @@ export class DispatchRuntime {
   }
 
   async publicDetail(scope: RuntimeScope, id: string, kind: "message" | "activity", itemId: string) {
-    await this.authorize(scope, id);
     return this.harness.commit(async tx => {
       await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
       const presentation = await this.shared.presentation(tx, nativeId(id));
