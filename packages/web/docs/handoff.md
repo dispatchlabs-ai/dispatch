@@ -1733,6 +1733,8 @@ Snapshot/archive follow-up: independently reviewed `98cce11` removes the discard
 
 Reply-summary follow-up: independently reviewed `0d9f5ab` bounds author tracking to the first four distinct authors and removes the redundant slice/copy, preserving ordering, total count and last-reply time. Integrated TypeScript/application/capability, Apple Silicon Nix build and flake evaluation passed (zero runnable checks; Linux omitted). No tests or deployment; runtime and latency remain unmeasured.
 
+**Deployment authorization, October 9, 2026:** Chris requested deployment of reviewed `main` to `dispatch.surton.com` once the team is satisfied with the code. Deployer owns deployment preparation/execution; Developer retains source integration ownership. Finish pending authorization cleanup and final review first. Developer reports that Surton's recorded deployment uses the worker branch while `main` lacks that implementation: reconcile this compatibility gate before changing the running service, preserving worker support and existing state. The separate hosted-routing branch is not implicitly included. This supersedes the cleanup-only deployment restriction below for this target, not the testing policy or unrelated migrations. Deployment outcome and performance parity remain unverified until recorded.
+
 Acceptance:
 
 - Preserve supported behavior, public/persisted contracts, authorization, meaningful failures and native Pi execution/recovery ownership. Investigate compatibility consumers before removal; unresolved behavior changes require a decision, not speculative deletion.
