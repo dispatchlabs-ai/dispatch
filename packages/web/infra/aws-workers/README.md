@@ -89,8 +89,12 @@ match encrypted records. Configuration is not a backup.
    Verify actual runtime UID/permissions, private bootstrap files, secret-source environment removal,
    database verified TLS, signed-out HTTPS, enrollment, real model/tool execution,
    artifacts and replacement with independently confirmed old-task STOPPED.
-5. For upgrades, seal admission and authenticate fresh drain/quiescence evidence;
-   stop and confirm stable task termination before maintenance against its stores.
+5. For upgrades, seal admission and authenticate fresh drain/quiescence evidence.
+   Stop the backend first, prevent its supervisor from restarting it, and confirm
+   actual STOPPED while the launcher remains reachable; backend shutdown rechecks
+   launcher retirement even after a complete drain receipt. Then stop and confirm
+   the launcher. Do not scale both controllers down simultaneously. Complete
+   termination before maintenance against their stores.
    Preserve PostgreSQL, S3 artifacts and matched encryption/signing/token secret
    versions. Record exact prior/new image digests and schema compatibility. ECS
    stop-before-start does not automatically establish complete application drain.
@@ -98,7 +102,8 @@ match encrypted records. Configuration is not a backup.
    same immutable attempt; absence, expired leases and successful StopTask requests
    are not retirement proof. Recover stale backend ownership only after confirmed
    old process termination, using invocation-only recovery arguments. Do not put
-   those recovery flags into retained service configuration.
+   those recovery flags into retained service configuration. Follow the owning
+   [stopped-backend recovery guide](../../server/workers/backend-recovery.md).
 7. Rollback requires compatible schema or an independently verified matched restore
    set. Restoring old state can lose later writes and requires an explicit decision.
    POC is retained, not automatically destroyed. RDS and artifact bucket have
