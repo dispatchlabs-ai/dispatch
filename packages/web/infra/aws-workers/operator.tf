@@ -90,7 +90,7 @@ resource "aws_ecs_task_definition" "database_initializer" {
   ])
   lifecycle {
     precondition {
-      condition     = var.desired_count == 0
+      condition     = var.desired_count == 0 && alltrue([for count in values(var.service_desired_counts) : count == 0])
       error_message = "Prepare the initializer only with stable services at zero; separately confirm actual task termination before invoking it."
     }
   }
