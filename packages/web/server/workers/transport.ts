@@ -1,3 +1,4 @@
+import { HistoryCursorError } from "../chat-pages.js";
 import { X509Certificate } from "node:crypto";
 import { request } from "node:https";
 import { RuntimeError } from "../runtime.js";
@@ -18,6 +19,11 @@ export async function workerRequest<T>(origin: string, token: string, path: stri
     throw new RuntimeError(503, "Worker transport failed; reconnect to inspect persisted state before retrying.");
   }
   if (!response.ok) {
+    // Only this fixed recovery discriminator crosses the worker error boundary.
+    if (response.status === 409 && path === "/rpc") {
+      const body = await response.json().catch(() => null) as { error?: { code?: unknown } } | null;
+      if (body?.error?.code === "HISTORY_CHANGED") throw new HistoryCursorError("History changed. Reload to continue.");
+    }
     // Do not expose internal endpoint URLs, tokens or raw upstream bodies to clients.
     throw new RuntimeError(response.status >= 400 && response.status < 500 ? response.status : 503, "Worker request failed; reconnect to inspect persisted state before retrying.");
   }

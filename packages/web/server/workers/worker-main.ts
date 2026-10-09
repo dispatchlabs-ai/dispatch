@@ -1,3 +1,4 @@
+import { HistoryCursorError } from "../chat-pages.js";
 import { cleanupSessionResources } from "@earendil-works/pi-ai";
 import { mkdir } from "node:fs/promises";
 import { serve } from "@hono/node-server";
@@ -119,6 +120,7 @@ app.post("/rpc", async c => {
   return c.json({ result: result ?? null });
 });
 app.onError((error, c) => {
+  if (error instanceof HistoryCursorError) return c.json({ error: { code: "HISTORY_CHANGED" } }, 409);
   const status = error instanceof RuntimeError && [400, 403, 404, 409].includes(error.status) ? error.status as 400 | 403 | 404 | 409 : error instanceof z.ZodError ? 400 : 503;
   return c.json({ error: "Worker operation failed" }, status);
 });
