@@ -118,7 +118,7 @@ function ComposerSync(props: MarkdownComposerProps & { transformers: Transformer
   const lastValue = useRef(value);
   const lastParentValue = useRef(value);
   const lastMentions = useRef(mentions);
-  const scannedMentionState = useRef<EditorState | null>(null);
+  const scannedMentions = useRef<{ state: EditorState; ids: string[] } | null>(null);
 
   useEffect(() => { editor.setEditable(!disabled && !readOnly); }, [editor, disabled, readOnly]);
 
@@ -141,9 +141,10 @@ function ComposerSync(props: MarkdownComposerProps & { transformers: Transformer
     const ids = editor.read("latest", () => {
       const state = editor.getEditorState();
       // Local edits already collected IDs in OnChange; still scan imports/replacements.
-      if (state === scannedMentionState.current) return lastMentions.current;
-      scannedMentionState.current = state;
-      return $getMentionIds();
+      if (state === scannedMentions.current?.state) return scannedMentions.current.ids;
+      const ids = $getMentionIds();
+      scannedMentions.current = { state, ids };
+      return ids;
     });
     if (ids.join("\n") !== lastMentions.current.join("\n")) {
       lastMentions.current = ids;
@@ -201,7 +202,7 @@ function ComposerSync(props: MarkdownComposerProps & { transformers: Transformer
   return <OnChangePlugin ignoreSelectionChange ignoreHistoryMergeTagChange={false} onChange={(state, _editor, tags) => {
     if (tags.has("external-draft")) return;
     const { markdown, ids } = state.read(() => ({ markdown: $convertToMarkdownString(transformers, undefined, true), ids: onMentionsChange ? $getMentionIds() : noMentions }));
-    if (onMentionsChange) scannedMentionState.current = state;
+    if (onMentionsChange) scannedMentions.current = { state, ids };
     if (markdown !== lastValue.current) {
       lastValue.current = markdown;
       onChange(markdown);
