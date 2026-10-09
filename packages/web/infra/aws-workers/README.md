@@ -85,6 +85,65 @@ for exclusive 0700/0600 materialization and environment removal. Raw encryption
 keys are base64 inputs decoded to 32-byte files; retained secret versions must
 match encrypted records. Configuration is not a backup.
 
+## Reuse from a caller root
+
+The caller owns its AWS provider/region, restricted Terraform/OpenTofu state
+backend and provider lockfile. Pin this child module to an immutable commit;
+there are no Surton account, domain or credential dependencies in the module.
+This root-module example selects separate controller and Ubuntu worker images:
+
+```hcl
+module "dispatch" {
+  source = "git::https://github.com/dispatchlabs-ai/dispatch-web-next.git//packages/web/infra/aws-workers?ref=7330a23d88e275331a62ce95415a042940d66b92"
+
+  name               = var.installation_name
+  availability_zones = var.availability_zones # exactly two distinct zones
+  vpc_cidr           = var.vpc_cidr
+  tags               = var.tags
+
+  image                       = var.controller_image # repository@sha256:...
+  worker_image                = var.ubuntu_worker_image # same authorized ECR repository
+  worker_package_installation = true
+  cpu_architecture            = "ARM64" # "X86_64" selects linux/amd64
+
+  services                  = var.services
+  secret_kms_key_arns        = var.secret_kms_key_arns
+  certificate_arn           = var.certificate_arn
+  internal_alb              = var.internal_alb
+  client_cidrs              = var.client_cidrs
+  backend_health_check_path = "/internal/health"
+  desired_count             = 0 # explicit activation after bootstrap/owner checks
+}
+```
+
+Define those variables in the owning root. `services` must contain exactly
+`backend` and `launcher`, each with `{ environment = map(string), secrets =
+map(string) }`. Environment holds public rendered configuration/bootstrap maps;
+secrets holds exact Secrets Manager ARN references, **not resolved values**.
+Config containing tokens/credential URLs must itself use secret delivery.
+Supply separate backend/launcher bootstrap manifests and preserve key/secret
+versions; see the [bootstrap contract](../../server/workers/bootstrap.md).
+Never inject either controller bundle or the RDS master identity into workers.
+
+Prepare foundation first with `image = null`, `worker_image = null`, install mode
+false and counts zero. Use `ecr_repository_url` to publish matching native images
+from the [Containerfile/build guide](../../container/README.md), then pin their
+digests. Both controller and worker references must resolve to the selected Linux
+architecture; changing architecture affects all tasks, not just workers. A
+multi-platform index is useful only after each child is independently qualified.
+
+Before activation, provision the seven separate application stores/roles using
+[operator-only initialization](#optional-operator-database-initializer), retain
+matching secret/key recovery material, and render the application's backend and
+launcher configuration from this module's outputs: private service URLs, worker
+cluster/task definition, private subnets and worker security group. Set the ECS
+driver explicitly and pin its allowed task definition/configuration revision;
+Terraform registers a worker definition but does not launch chats. Provide the
+issued certificate and DNS alias to `alb_dns_name`/`alb_zone_id`, review public
+versus internal ALB/client CIDRs and choose the origin before passkey enrollment.
+Review the actual plan/cost, then follow ordered activation/undrain below.
+This example is configuration guidance, not a tested fresh-install receipt.
+
 ## Operation, safety and retained state
 
 1. Review exact Terraform/OpenTofu saved plan, account, network and cost; no apply
