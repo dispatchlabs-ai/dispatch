@@ -55,7 +55,8 @@ values belong in a separate consumer repository. The Surton consumer is
   filtered by SGs; no general VPC DNS-server rule is needed. Additional MCP ports
   need explicit review, not default all-port egress.
 
-All tasks use the same digest. A short same-image `volume-init` container runs as
+By default all tasks use `image`. `worker_image` optionally selects a separate
+digest in the same authorized ECR repository. A short same-image `volume-init` container runs as
 root without the app's secret/environment bundle, creates an empty marker in each
 volume to prevent Docker repopulating empty-volume metadata, then fixes ownership
 of only the three task-local volume roots `/data`, `/tmp`, `/workspace`, and exits successfully
@@ -64,6 +65,16 @@ ECS task-role identity is task-wide (including this trusted initializer), not an
 OS-user boundary. Main containers run UID/GID 65532, read-only root, dropped
 capabilities, init process and 120-second stop allowance. Workers' writable disk
 is disposable. Actual Fargate mount behavior remains unverified.
+
+For Ubuntu development workers, explicitly set `worker_image` and
+`worker_package_installation = true`. Only the worker then runs UID/GID 0 with
+writable root, ordinary container capabilities, no volume initializer and no
+mounts hiding prepared image contents. All local disk is disposable. This mode
+supports package installation and stock Pi cancellation, not hostile-code
+isolation: coding tools can read their worker's scoped credentials and modify its
+runtime. Controller settings, IAM, private networking, Exec-disabled behavior and
+confirmed-STOPPED replacement remain unchanged. Mirrors must use HTTPS to fit
+existing egress. Privileged mode, host mounts and nested Docker are not enabled.
 
 Backend/launcher commands are `dispatch-bootstrap backend|launcher`. The public
 `services` input carries rendered configuration and **exact secret ARN references**,

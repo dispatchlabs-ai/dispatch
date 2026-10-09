@@ -40,13 +40,27 @@ variable "log_retention_days" {
   default = 30
 }
 variable "image" {
-  description = "Immutable workers OCI registry digest. Null prepares foundation only."
+  description = "Immutable controller OCI registry digest (and worker fallback). Null prepares foundation only."
   type        = string
   default     = null
   validation {
     condition     = var.image == null ? true : can(regex("@sha256:[a-f0-9]{64}$", var.image))
     error_message = "Use an immutable registry digest."
   }
+}
+variable "worker_image" {
+  description = "Optional separate immutable worker image; null retains the controller image."
+  type        = string
+  default     = null
+  validation {
+    condition     = var.worker_image == null ? true : can(regex("@sha256:[a-f0-9]{64}$", var.worker_image))
+    error_message = "Use an immutable worker registry digest."
+  }
+}
+variable "worker_package_installation" {
+  description = "Opt in to trusted root workers with writable disposable root and ordinary container capabilities. Controllers remain hardened."
+  type        = bool
+  default     = false
 }
 variable "cpu_architecture" {
   type    = string

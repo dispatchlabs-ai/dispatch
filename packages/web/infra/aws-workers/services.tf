@@ -65,22 +65,34 @@ resource "aws_ecs_task_definition" "worker" {
     cpu_architecture        = var.cpu_architecture
   }
   dynamic "volume" {
-    for_each = local.mounted_paths
+    for_each = var.worker_package_installation ? {} : local.mounted_paths
     content { name = volume.key }
   }
-  container_definitions = jsonencode([
-    local.volume_init,
-    merge(local.runtime, {
-      name             = "worker", command = ["dispatch-worker"],
-      workingDirectory = "/workspace",
-      environment      = [{ name = "DISPATCH_WORKSPACE_DIR", value = "/workspace" }],
-      portMappings     = [{ containerPort = 8831, hostPort = 8831, protocol = "tcp" }],
+  container_definitions = jsonencode(concat(
+    var.worker_package_installation ? [] : [merge(local.volume_init, { image = coalesce(var.worker_image, var.image) })],
+    [merge(local.runtime, {
+      image                  = coalesce(var.worker_image, var.image),
+      user                   = var.worker_package_installation ? "0:0" : "65532:65532",
+      readonlyRootFilesystem = !var.worker_package_installation,
+      mountPoints            = var.worker_package_installation ? [] : local.mounts,
+      dependsOn              = var.worker_package_installation ? [] : local.runtime.dependsOn,
+      linuxParameters        = { initProcessEnabled = true, capabilities = { add = [], drop = var.worker_package_installation ? [] : ["ALL"] } },
+      name                   = "worker", command = ["dispatch-worker"],
+      workingDirectory       = "/workspace",
+      environment            = [{ name = "DISPATCH_WORKSPACE_DIR", value = "/workspace" }],
+      portMappings           = [{ containerPort = 8831, hostPort = 8831, protocol = "tcp" }],
       logConfiguration = { logDriver = "awslogs", options = {
         awslogs-group  = aws_cloudwatch_log_group.this["worker"].name,
         awslogs-region = data.aws_region.current.region, awslogs-stream-prefix = "worker"
       } }
-    })
-  ])
+      })
+  ]))
+  lifecycle {
+    precondition {
+      condition     = !var.worker_package_installation || var.worker_image != null
+      error_message = "Package installation requires an explicitly selected development worker image."
+    }
+  }
   tags = local.tags
 }
 resource "aws_service_discovery_private_dns_namespace" "this" {
