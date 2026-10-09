@@ -608,7 +608,7 @@ export class DispatchRuntime {
   async transcriptPage(scope: RuntimeScope, id: string, query: TranscriptQuery) {
     return this.harness.commit(async tx => {
       await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
-      return { ...(await this.shared.presentation(tx, nativeId(id), query)).page!, revision: this.commitRevision };
+      return { ...await this.shared.page(tx, nativeId(id), query), revision: this.commitRevision };
     }, context);
   }
 

@@ -1015,21 +1015,36 @@ export class SharedConversations {
     return value ? copyJson(value, { omitUndefinedProperties: true }) as unknown as typeof value : undefined;
   }
 
-  async presentation(tx: Tx, roomId: ConversationId, query?: TranscriptQuery): Promise<Presentation & { history?: { before: string | null; generation: string }; page?: TranscriptPage }> {
+  private async projectedHistory(tx: Tx, roomId: ConversationId, query?: TranscriptQuery) {
     const room = await tx.doc(SharedDoc, roomId);
-    const turns = await tx.doc(TurnsDoc, roomId);
-    const activities: ParticipantActivity[] = [];
-    const participants: ConversationParticipant[] = [];
     const messages = this.projectedMessages(roomId, await this.committedEntries(roomId), room.messageAliases);
+    const activities: ParticipantActivity[] = [];
+    for (const member of room.members) {
+      if (!member.conversationId) continue;
+      const live = await tx.doc(LiveDoc, member.conversationId);
+      const entries = await this.committedEntries(member.conversationId);
+      activities.push(...this.projectedActivities(member, entries, live, messages));
+    }
+    const page = query ? transcriptPage(messages, activities, query, createHash("sha256").update(JSON.stringify(room.messageAliases ?? {})).digest("hex")) : undefined;
+    return { room, messages, activities, page };
+  }
+
+  async page(tx: Tx, roomId: ConversationId, query: TranscriptQuery): Promise<TranscriptPage> {
+    const { page } = await this.projectedHistory(tx, roomId, query);
+    return copyJson(page!, { omitUndefinedProperties: true }) as unknown as TranscriptPage;
+  }
+
+  async presentation(tx: Tx, roomId: ConversationId, query?: TranscriptQuery): Promise<Presentation & { history?: { before: string | null; generation: string }; page?: TranscriptPage }> {
+    const { room, messages, activities, page } = await this.projectedHistory(tx, roomId, query);
+    const turns = await tx.doc(TurnsDoc, roomId);
+    const participants: ConversationParticipant[] = [];
     const activeTickets = await activeTurnTickets(tx, turns);
     for (const member of room.members) {
       const { pendingConnectionIds, connectionsRefreshPending, conversationId, removalTask, lastDelivery: _last, threadId, activeDelivery: _delivery, consideredThrough: _through, superseded: _superseded, publicationPriority: _priority, ...participant } = member;
       if (conversationId) {
         const live = await tx.doc(LiveDoc, conversationId);
         const observed = await participantStatus(tx, member, live, turns, activeTickets);
-        const entries = await this.committedEntries(conversationId);
         const usage = await tx.doc(UsageDoc, conversationId);
-        activities.push(...this.projectedActivities(member, entries, live, messages));
         const removal = removalTask ? await tx.task(removalTask) : undefined;
         const removalError = member.membership === "removing" && (!removal || removal.state.status === "terminal")
           ? "Removal incomplete. Retry removal." : undefined;
@@ -1039,7 +1054,6 @@ export class SharedConversations {
       else participants.push({ ...participant, status: Object.values(turns.presence).some(presence => presence.participantId === member.id && presence.until > Date.now()) ? "typing" : "idle" } as ConversationParticipant);
     }
     // Native document drafts are revoked at the end of the enclosing commit.
-    const page = query ? transcriptPage(messages, activities, query, createHash("sha256").update(JSON.stringify(room.messageAliases ?? {})).digest("hex")) : undefined;
     return copyJson(page ? { participants, messages: page.messages, activities: page.activities, history: { before: page.before, generation: page.generation }, page } : { participants, messages, activities }, { omitUndefinedProperties: true }) as unknown as Presentation & { history?: { before: string | null; generation: string }; page?: TranscriptPage };
   }
 }
