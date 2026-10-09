@@ -63,7 +63,9 @@ resource "aws_ecs_task_definition" "stable" {
   tags = local.tags
 }
 resource "aws_ecs_task_definition" "worker" {
-  count                    = var.image == null ? 0 : 1
+  count = var.image == null ? 0 : 1
+  # Old launchers keep a pinned revision until handover. Do not deregister it.
+  skip_destroy             = lookup(var.service_deployment_mode, "launcher", "stop-first") == "rolling"
   family                   = "${var.name}-worker"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"

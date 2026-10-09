@@ -116,6 +116,12 @@ flows and standalone worker rules are unchanged. During launcher overlap, its
 only, still restricted to its worker cluster. This lets the old launcher use its
 previous pinned worker definition while the new one starts; stop-first retains
 exact-revision permission. Backend/worker identities gain no ECS launch authority.
+Rolling launchers also set `skip_destroy` on the worker task definition, retaining
+old runnable revisions for old launchers. Enable rolling with the worker digest
+unchanged before later worker-image replacements: the previous definition's saved
+`skip_destroy` value controls whether its revision is deregistered. Retained
+revisions are not active workers and incur no running-task cost; do not deregister
+them while any launcher still references them.
 
 For a rolling backend, the module ALB targets `/internal/ready` instead of the
 legacy `backend_health_check_path`. A certificate/ALB is required so replacement
