@@ -62,6 +62,10 @@ Integrated source review and TypeScript/application/Apple Silicon Nix checks pas
 
 - Add Agents import/export with bounded ZIP parsing, requirement preview, exact assigned skill revisions and independent local copies. Native atomic receipts preserve same-operation retries; connections, credentials and existing instances remain untouched. Source/build checked; runtime and rendered UI qualification remain outstanding in the [handoff](docs/handoff.md#portable-definitions-and-project-data--october-8-2026). GitHub updates, starter distribution, project exports and backups remain later work.
 
+## Unreleased — separate web capabilities (pending integration)
+
+- Split Web research into independently assigned Web reading (`web_read`: open/find/click, no search key required) and Web search (`web_search`: search_query, requiring an Exa grant). Legacy combined assignments migrate to both without changing grants; saved evidence remains intact. Publication and qualification are pending in [WP-054](docs/handoff.md#capability-split--october-9-2026).
+
 ## Unreleased — native web research
 
 - Add the Web research capability with native search, page reading, literal find and numbered-link traversal, durable instance-local evidence and source citations. Interrupted network batches are not automatically replayed. Qualification tracked in [WP-054](docs/handoff.md#wp-054--native-web-research).

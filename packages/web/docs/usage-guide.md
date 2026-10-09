@@ -669,11 +669,13 @@ Do not paste base64 into messages or treat workspace paths as browser links. A s
 
 ## Web research
 
-Enable **Agents → Edit → Web research** and save the definition. New instances receive `web_run`; active instances adopt the saved capability at the next safe idle base upgrade. Files and commands, MCP connections and skills are not required.
+The capability split is pending integrated publication and qualification. In the updated application, open **Agents → Edit → Capabilities**, select **Web reading**, **Web search**, or both, and save. Web reading exposes `web_read` for `open`, `find` and `click`; Web search exposes `web_search` for `search_query`. Active instances adopt the saved selections at the next safe idle base upgrade. Files and commands, MCP connections and skills are not required.
 
-Direct public HTML/text URL reads need no API key. Search uses the service-side `EXA_API_KEY` environment variable and may incur Exa charges. Set it in the service launch environment, never agent instructions, then restart the launcher. Without a key, direct URL reading, saved-page find and hyperlink traversal still work; search reports a configuration error. This is independent of the Exa MCP skill/connection and does not inherit its credentials.
+Direct public HTML/text URL reads need no API key or paid retrieval API; normal model/network costs remain. Search additionally requires an Exa credential grant in **Settings → Secrets** and may incur Exa charges. Search-only agents receive snippets and source URLs, not full-page evidence; enable Web reading too if they must open results. This is independent of the Exa MCP skill/connection and does not inherit its credentials.
 
-The tool accepts `search_query`, `open`, `find` and `click` arrays. For example:
+Existing combined Web research assignments migrate to both capabilities without changing credential grants. To allow reading only, uncheck Web search and save. Historical evidence is preserved; disabled reading cannot be bypassed by using a saved reference. Legacy `web_run` remains only for persisted-call compatibility, with current permission checks.
+
+Call `web_read` with `open`, `find` and `click` arrays. For example:
 
 ```json
 {"open":[{"ref_id":"https://example.com/docs"}],"response_length":"short"}
@@ -687,7 +689,7 @@ Direct extraction is not a browser: JavaScript-only pages, authenticated content
 
 ### Exa search credentials
 
-Open **Settings → Secrets**. Choose encrypted storage and enter an Exa API key, or select the server's fixed `EXA_API_KEY` environment source. Select the agent definitions allowed to use it, then save. Enable **Web research** on those agents separately. Environment-only installations now need this explicit assignment; an unset grant never inherits the server key.
+Open **Settings → Secrets**. Choose encrypted storage and enter an Exa API key, or select the server's fixed `EXA_API_KEY` environment source. Select the agent definitions allowed to use it, then save. Enable **Web search** on those agents separately; the grant does not enable either capability. Environment-only installations now need this explicit assignment; an unset grant never inherits the server key.
 
 Only the saving user manages their credential. Grants cover the definition's existing and future instances and conversation audiences. Replacing a stored key takes effect on subsequent search calls without restarting agents. Changing the process environment still requires relaunching the server. “Configured” is not provider verification. A conflict means another tab changed these settings; reload before saving again.
 
