@@ -282,6 +282,11 @@ This example is configuration guidance, not a tested fresh-install receipt.
    intentionally starts with admission blocked. After owner/inventory checks,
    use authenticated private `POST /internal/undrain` to reopen admission; never
    expose `/internal` publicly or bypass drain in code to make startup succeed.
+   Handover-enabled backend startup also waits for admission before reporting
+   `/internal/ready`. Reach authenticated `/internal/status` and then
+   `/internal/undrain` through the private operator path before waiting for ALB/ECS
+   health; waiting for callback-target readiness first deadlocks drained startup.
+   The worker-only callback listener is not an operator/undrain route.
    Verify actual runtime UID/permissions, private bootstrap files, secret-source environment removal,
    database verified TLS, signed-out HTTPS, enrollment, real model/tool execution,
    artifacts and replacement with independently confirmed old-task STOPPED.
