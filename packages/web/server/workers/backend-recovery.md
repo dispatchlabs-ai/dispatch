@@ -23,7 +23,7 @@ If startup fails after only some owners recover, inspect the remaining retained 
 
 This is backend-owner recovery only. Launcher ownership, Pi endpoint markers, worker stores, encrypted backup/key pairing and retired executor denial retain their separate runbook requirements. No existing-installation migration or activation is authorized by these instructions. At introduction, only source/build checks were established.
 
-## Controller rendezvous recovery (implementation pending)
+## Controller rendezvous recovery (candidate source procedure)
 
 The planned rolling controller introduces a separate retained installation/role
 owner record. Its recovery does **not** clear provider, MCP, routing, launcher or
@@ -33,14 +33,60 @@ supervisor restart and independently confirm termination of both the retained
 owner and any named successor. Inspect the complete owner/phase/successor snapshot
 with scoped credentials. Recovery must match that exact snapshot and refuse live
 connected identities; changed or uncertain state requires fresh reconciliation,
-not forced takeover. Use the reviewed restricted-config operator CLI rather than
-SQL edits; its exact invocation will be documented after source integration.
-Never retain recovery assertions in normal deployment configuration.
+not forced takeover. Never retain recovery assertions in normal deployment
+configuration. The candidate `controller-recovery.ts` CLI supplies inspection and
+recovery without SQL edits; use a matching built artifact only after source review.
+It is not yet deployed/recovery-qualified.
+
+From `packages/web`, supply an absolute restricted controller database config
+using the existing routing-config shape:
+
+```json
+{
+  "installationId": "INSTALLATION_ID",
+  "databaseUrlFile": "/absolute/controller-db-url",
+  "databaseCaFile": "/absolute/database-ca.pem"
+}
+```
+
+The URL file contains that role's scoped database credentials; the CA establishes
+verified PostgreSQL TLS. Use the selected controller's database, not an unrelated
+store or the RDS master role. Config, URL, CA and snapshot files must meet the
+restricted-file reader's ownership/permissions policy. Keep the snapshot private;
+it includes internal controller identities/endpoints, even though it contains no
+credential values. Create its parent directory privately before inspection:
+
+```sh
+umask 077
+node build/service/server/workers/controller-recovery.js inspect \
+  --config /absolute/controller-db.json --role backend \
+  > /absolute/private/retained-controller.json
+```
+
+Use `--role launcher` for the launcher row. Inspect exit status and the complete
+snapshot; `null` means no retained row and is not a recoverable snapshot. Reconfirm
+actual termination of the owner and any named successor and prevent restarts before
+running the separate recovery operation:
+
+```sh
+node build/service/server/workers/controller-recovery.js recover \
+  --config /absolute/controller-db.json --role backend \
+  --expected /absolute/private/retained-controller.json \
+  --confirm-controllers-stopped
+```
+
+The confirmation is an operator assertion, not proof supplied by the CLI. Recovery
+refuses still-connected instance locks and deletes only an exact matching
+installation/role/owner/phase/successor record. Those locks add a guard; their
+availability does not replace task-termination evidence. A changed snapshot,
+connection failure or uncertain result requires fresh inspection, not blind replay.
+Reconcile underlying store latches separately. Confirm the one-off operator task
+STOPPED before reactivating normal flag-free controllers.
 
 Clean planned shutdown without a successor uses the same joined-operation and
 closed-store proof as handover before deleting its own rendezvous record. Mere
-connection closure or a startup failure cannot publish vacancy. These are selected
-implementation requirements, not observed recovery acceptance. The [rolling work
+connection closure or a startup failure cannot publish vacancy. These are candidate
+source contracts, not observed recovery acceptance. The [rolling work
 package](../../docs/handoff.md#safe-controller-overlap-for-ecs-rolling-deployment--october-9-2026)
 tracks source and runtime evidence separately.
 
