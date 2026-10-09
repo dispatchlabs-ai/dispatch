@@ -113,3 +113,13 @@ variable "database_initializer" {
     error_message = "Provide an explicit operator command and distinct environment/secret variable names."
   }
 }
+
+variable "backend_health_check_path" {
+  description = "ALB process-liveness path. Use /internal/health with a supporting image; it must remain healthy during intentional drain. Public /internal access stays blocked."
+  type        = string
+  default     = "/"
+  validation {
+    condition     = startswith(var.backend_health_check_path, "/")
+    error_message = "Health check path must start with /."
+  }
+}
