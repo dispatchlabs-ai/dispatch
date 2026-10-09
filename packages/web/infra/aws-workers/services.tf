@@ -107,7 +107,7 @@ resource "aws_ecs_service" "stable" {
   name                               = each.key
   cluster                            = aws_ecs_cluster.this.id
   task_definition                    = aws_ecs_task_definition.stable[each.key].arn
-  desired_count                      = var.desired_count
+  desired_count                      = lookup(var.service_desired_counts, each.key, var.desired_count)
   launch_type                        = "FARGATE"
   platform_version                   = "1.4.0"
   deployment_minimum_healthy_percent = 0

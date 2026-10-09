@@ -123,3 +123,13 @@ variable "backend_health_check_path" {
     error_message = "Health check path must start with /."
   }
 }
+
+variable "service_desired_counts" {
+  description = "Optional per-controller zero/one overrides for ordered maintenance: stop backend and confirm termination before stopping launcher."
+  type        = map(number)
+  default     = {}
+  validation {
+    condition     = alltrue([for role, count in var.service_desired_counts : contains(["backend", "launcher"], role) && contains([0, 1], count)])
+    error_message = "Only backend/launcher zero-or-one overrides are supported."
+  }
+}
