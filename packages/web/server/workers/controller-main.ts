@@ -53,6 +53,10 @@ export async function serveRollingController(role: "backend" | "launcher", openO
   const rendezvous = await ControllerRendezvous.open({ database: verifiedPostgresConfig(url.toString("utf8").trim(), ca),
     installationId: database.installationId, role, endpoint });
   url.fill(0);
+  function lifecycle(event: string) {
+    console.info(JSON.stringify({ timestamp: new Date().toISOString(), role,
+      instanceId: rendezvous.identity.instanceId, event }));
+  }
   const peerTls = config.peerTls ? { ca: (await readRestrictedConfigurationFile(config.peerTls.caFile, false)).toString("utf8"), servername: config.peerTls.serverName } : undefined;
   if ((new URL(endpoint!).protocol === "https:") !== !!config.tls || (config.tls && !peerTls))
     throw new Error("Controller listener and peer TLS configuration must agree.");
@@ -140,6 +144,7 @@ export async function serveRollingController(role: "backend" | "launcher", openO
         transferStarted = performance.now();
         await rendezvous.handover(target, async () => { await owner!.retire(() => supportGate.retire()); });
         retired = true;
+        lifecycle("ownership-released");
       })().catch(() => { gate.fail(); });
     }
     return c.json({ accepted: true }, 202);
@@ -200,6 +205,7 @@ export async function serveRollingController(role: "backend" | "launcher", openO
     if (stopping) throw new Error("Controller stopped during activation.");
     await rendezvous.markReady();
     activated = true;
+    lifecycle("activated");
     return true;
   }
   const activation = (async () => {
@@ -217,6 +223,8 @@ export async function serveRollingController(role: "backend" | "launcher", openO
   })();
   let shutdown: Promise<void> | undefined;
   function stop() {
+    if (shutdown) return;
+    lifecycle("shutdown-signal-received");
     void (shutdown ??= (async () => {
       stopping = true;
       // Withdraw the listener first; L7 deregistration must precede SIGTERM.
@@ -229,10 +237,14 @@ export async function serveRollingController(role: "backend" | "launcher", openO
       await activation;
       if (owner && !retired) {
         if (transfer) { await transfer; if (!retired) throw new Error("Handover incomplete."); }
-        else await rendezvous.handover(null, async () => { await gate.retire(); await owner!.retire(() => supportGate.retire()); });
+        else {
+          await rendezvous.handover(null, async () => { await gate.retire(); await owner!.retire(() => supportGate.retire()); });
+          lifecycle("ownership-released");
+        }
       }
       await proxyGate.retire();
       await listenerClosed;
+      lifecycle("request-drain-complete");
       await rendezvous.close();
     })()).catch(() => { gate.fail(); process.exitCode = 1; console.error("Controller shutdown incomplete; explicit recovery required."); });
   }
