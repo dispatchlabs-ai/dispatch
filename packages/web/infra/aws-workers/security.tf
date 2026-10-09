@@ -14,13 +14,17 @@ resource "aws_vpc_security_group_ingress_rule" "database" {
   to_port                      = 5432
 }
 locals {
-  private_flows = {
+  private_flows = merge({
     alb_backend      = { from = "alb", to = "backend", port = 3001 }
     worker_backend   = { from = "worker", to = "backend", port = 3001 }
     launcher_backend = { from = "launcher", to = "backend", port = 3001 }
     backend_launcher = { from = "backend", to = "launcher", port = 8830 }
     backend_worker   = { from = "backend", to = "worker", port = 8831 }
-  }
+    }, {
+    for role, mode in var.service_deployment_mode : "${role}_peer" => {
+      from = role, to = role, port = role == "backend" ? 3001 : 8830
+    } if mode == "rolling"
+  })
 }
 resource "aws_vpc_security_group_ingress_rule" "private" {
   for_each                     = local.private_flows
@@ -106,7 +110,8 @@ resource "aws_iam_role_policy" "launcher" {
   count = var.image == null ? 0 : 1
   role  = aws_iam_role.task["launcher"].id
   policy = jsonencode({ Version = "2012-10-17", Statement = [
-    { Effect = "Allow", Action = ["ecs:RunTask"], Resource = aws_ecs_task_definition.worker[0].arn,
+    { Effect   = "Allow", Action = ["ecs:RunTask"],
+      Resource = lookup(var.service_deployment_mode, "launcher", "stop-first") == "rolling" ? "arn:${data.aws_partition.current.partition}:ecs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:task-definition/${var.name}-worker:*" : aws_ecs_task_definition.worker[0].arn,
     Condition = { ArnEquals = { "ecs:cluster" = aws_ecs_cluster.workers.arn } } },
     { Effect   = "Allow", Action = ["ecs:DescribeTasks", "ecs:StopTask"],
       Resource = "arn:${data.aws_partition.current.partition}:ecs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:task/${aws_ecs_cluster.workers.name}/*",

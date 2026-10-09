@@ -47,8 +47,19 @@ resource "aws_ecs_task_definition" "stable" {
         awslogs-group  = aws_cloudwatch_log_group.this[each.key].name,
         awslogs-region = data.aws_region.current.region, awslogs-stream-prefix = each.key
       } }
-    })
+      }, each.key == "launcher" && lookup(var.service_deployment_mode, each.key, "stop-first") == "rolling" ? {
+      healthCheck = {
+        command  = ["CMD", "node", "-e", "const r=require('node:http').get('http://127.0.0.1:8830/internal/ready',s=>{s.resume();process.exitCode=s.statusCode===200?0:1});r.on('error',()=>{process.exitCode=1});r.setTimeout(4000,()=>r.destroy());"]
+        interval = 5, timeout = 5, retries = 3, startPeriod = 300
+      }
+    } : {})
   ])
+  lifecycle {
+    precondition {
+      condition     = each.key != "backend" || lookup(var.service_deployment_mode, each.key, "stop-first") != "rolling" || var.certificate_arn != null
+      error_message = "Rolling backend deployment requires the module ALB readiness check and a certificate."
+    }
+  }
   tags = local.tags
 }
 resource "aws_ecs_task_definition" "worker" {
@@ -167,7 +178,7 @@ resource "aws_lb_target_group" "backend" {
   vpc_id               = aws_vpc.this.id
   deregistration_delay = 30
   health_check {
-    path     = var.backend_health_check_path
+    path     = lookup(var.service_deployment_mode, "backend", "stop-first") == "rolling" ? "/internal/ready" : var.backend_health_check_path
     protocol = "HTTPS"
     matcher  = "200"
   }

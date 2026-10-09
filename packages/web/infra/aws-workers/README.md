@@ -89,7 +89,7 @@ match encrypted records. Configuration is not a backup.
 
 ## Controller deployment compatibility
 
-The current application requires exclusive backend routing and launcher ownership.
+Legacy application images require exclusive backend routing and launcher ownership.
 A replacement backend cannot become ready while its predecessor holds the routing
 owner lock (`server/workers/routing-database.ts`); the launcher has its own exclusive
 owner. ECS deployment percentages alone cannot make these controllers safely overlap.
@@ -97,7 +97,7 @@ Keep application ownership and confirmed executor retirement intact; never remov
 locks or infer termination from a failed replacement merely to complete a rollout.
 Use ECS-native rolling replacement only for an application/service configuration
 that supports overlapping ready tasks. Module settings, a successful plan and ECS
-service stability do not independently establish zero downtime. Current controller
+service stability do not independently establish zero downtime. Legacy controller
 upgrades follow the ordered stop/start procedure below and incur an availability gap.
 
 ## ECS service deployment selection
@@ -109,7 +109,38 @@ empty by default, preserving existing callers. Desired counts remain zero or one
 rolling allows ECS to run one temporary replacement alongside that service's owner.
 Standalone conversation workers are not controlled by this option.
 
-**Do not select rolling for the current Dispatch backend or launcher.** Both
+Rolling mode also opens only the selected role's peer traffic: backend-to-backend
+TCP 3001 or launcher-to-launcher TCP 8830. Existing public ingress, cross-role
+flows and standalone worker rules are unchanged. During launcher overlap, its
+`ecs:RunTask` permission covers revisions of this installation's worker task family
+only, still restricted to its worker cluster. This lets the old launcher use its
+previous pinned worker definition while the new one starts; stop-first retains
+exact-revision permission. Backend/worker identities gain no ECS launch authority.
+
+For a rolling backend, the module ALB targets `/internal/ready` instead of the
+legacy `backend_health_check_path`. A certificate/ALB is required so replacement
+retirement cannot proceed on task RUNNING state alone. Public `/internal/*`
+remains denied. A rolling launcher gets a loopback HTTP `/internal/ready` ECS
+container check: 5-second interval/timeout, three failures, 300-second startup
+period, with an internal 4-second request timeout. The controller image must
+provide this endpoint on port 8830; no token or state payload is part of the probe.
+Stop-first controllers retain their existing checks and networking.
+
+These gates require the application handover contract: a new controller stays
+unready until planned transfer and fresh-store activation finish, while the old
+listener remains able to serve or forward until ECS retires it. Readiness must be
+lightweight and bounded, not a full ECS inventory or a queued launcher mutation.
+The endpoint reports 200 only for a functioning serving path and otherwise 503.
+Liveness alone, an acquired SQL lock, or a merely listening standby is insufficient.
+
+Introducing handover-capable images into a legacy exclusive-owner installation is
+a separate one-time stop-first migration. Prepare and review that migration before
+enabling rolling; changing these percentages cannot upgrade an old owner's shutdown
+behavior. Subsequent rolling receipts must correlate old/new task identities,
+readiness before retirement, preserved workers and sampled request availability.
+No live migration or zero-downtime result is established by this module source.
+
+**Do not select rolling for legacy exclusive-owner Dispatch images.** Both
 require exclusive retained ownership, so a replacement cannot become ready while
 the old owner runs. Enabling 100/200 alone can stall or fail deployment; disabling
 owner locks is not a workaround. Retain ordered drain, confirmed retirement,
@@ -117,9 +148,10 @@ launcher-first startup and private readiness/undrain for these images.
 
 A caller may opt a service into rolling only after its application supports safe
 overlap and readiness-gated traffic/admission. The current `/internal/health`
-endpoint is liveness, not such a readiness gate. This option does not change
-health checks, owner fencing, circuit-breaker rollback, secrets, database state or
-admission behavior, and it does not establish zero-downtime operation. No live
+endpoint is liveness, not such a readiness gate. The option supplies ECS readiness
+gates, scoped peer networking and same-family worker launch permission, but does
+not change application owner fencing, circuit-breaker rollback, secrets, database state
+or admission behavior, and it does not establish zero-downtime operation. No live
 consumer is switched to rolling by this module update.
 
 ## Reuse from a caller root

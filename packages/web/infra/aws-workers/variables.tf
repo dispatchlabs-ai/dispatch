@@ -149,7 +149,7 @@ variable "service_desired_counts" {
 }
 
 variable "service_deployment_mode" {
-  description = "Per-controller ECS deployment mode. Omitted services use stop-first (0/100). Rolling (100/200) requires an application that safely supports overlapping owners and readiness-gated admission; current Dispatch controllers do not."
+  description = "Per-controller ECS deployment mode. Omitted services use stop-first (0/100). Rolling (100/200) enables readiness gates and same-role peer traffic; it requires a handover-capable controller image/configuration. Legacy exclusive-owner images do not support it."
   type        = map(string)
   default     = {}
   validation {
