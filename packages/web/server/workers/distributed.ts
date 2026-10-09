@@ -92,11 +92,12 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     const response = await workerRequest<{ result: T }>(`http://${active.containerName}:8831`, token(active), "/rpc", { scope: { companyId: scope.companyId, userId: scope.userId }, method, input, catalog, membership });
     return response.result;
   }
-  async function acknowledgePolicy(companyId?: string) {
+  async function acknowledgePolicy(companyId?: string, requireRevocationFence = true) {
     const status = await launcher<LauncherStatus>("status");
     if (!status.driverReachable) throw new RuntimeError(503, "Cannot confirm worker policy propagation.");
     for (const route of routes.list().filter(route => !companyId || route.companyId === companyId)) {
       const attempt = status.attempts.find(item => item.attemptId === route.attemptId);
+      if (!attempt && !requireRevocationFence) continue;
       if (!attempt) {
         // Absence is not a stop fence: an earlier ensure may have timed out in
         // transport before reaching the launcher. Tombstone that exact identity
@@ -119,6 +120,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
         const receipt = await workerRequest<{ revision: number; membershipRevision: number }>(`http://${workerAddress(attempt)}:8831`, token(route), "/sync", { catalog, membership });
         if (receipt.revision !== catalog.revision || receipt.membershipRevision !== membership.revision) throw new Error("Policy acknowledgement mismatch.");
       } catch {
+        if (!requireRevocationFence) throw new RuntimeError(503, "Catalog propagation remains pending; worker execution was not interrupted.");
         // No acknowledgement is safe only after independent irreversible retirement.
         await launcher("stop", { attemptId: route.attemptId });
         const fresh = await launcher<LauncherStatus>("status");
@@ -134,7 +136,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     // callback from the management RPC that its native transaction is awaiting.
     void options.runBackground(async () => {
       await delay(0);
-      await policyChange(() => acknowledgePolicy(companyId));
+      await policyChange(() => acknowledgePolicy(companyId, false));
     }).catch(() => {
       console.error("Deferred worker catalog reconciliation failed; reconciliation is required.");
     });
@@ -166,21 +168,21 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     async saveAgent(scope, input) {
       return policyChange(async () => {
         const result = await directory.saveAgent(scope, input);
-        await acknowledgePolicy(scope.companyId);
+        await acknowledgePolicy(scope.companyId, input.applyConnectionsToExisting === true);
         return result;
       });
     },
     async applyGitHubBundle(scope, input) {
       return policyChange(async () => {
         const result = await directory.applyGitHubBundle(scope, input);
-        await acknowledgePolicy(scope.companyId);
+        await acknowledgePolicy(scope.companyId, false);
         return result;
       });
     },
     async archiveAgent(scope, id, revision) {
       return policyChange(async () => {
         const result = await directory.archiveAgent(scope, id, revision);
-        await acknowledgePolicy(scope.companyId);
+        await acknowledgePolicy(scope.companyId, false);
         return result;
       });
     },
