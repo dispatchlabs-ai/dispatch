@@ -1,8 +1,13 @@
 # Changelog
 
+## Unreleased — planned controller handover
+
+- Add opt-in backend/launcher listener overlap with identity-bound planned ownership transfer, fresh-state activation, private readiness, bounded undispatched waiting and response-body draining. Preserve worker executors and store recovery latches; do not replay dispatched mutations or take over on timeout.
+- Add explicit snapshot-checked controller recovery and generic managed-launcher ingress with rolling drain budgets. Source review is not deployed continuity; see the [handover package](docs/handoff.md#safe-controller-overlap-for-ecs-rolling-deployment--october-9-2026) for activation prerequisites and outstanding acceptance.
+
 ## Unreleased — ECS deployment mode selection
 
-- Add explicit per-controller `stop-first` (0/100) or `rolling` (100/200) deployment selection to the reusable AWS module; preserve stop-first defaults. Rolling requires application-level overlap and readiness support, which current exclusive-owner controllers do not provide. No live deployment mode changed.
+- Add explicit per-controller `stop-first` (0/100) or `rolling` (100/200) deployment selection to the reusable AWS module; preserve stop-first defaults. Rolling requires application-level overlap and readiness support absent from legacy controllers. The selection option alone changes no live deployment mode.
 
 ## Unreleased — activity disclosure recovery
 
