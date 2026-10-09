@@ -36,6 +36,12 @@ values belong in a separate consumer repository. The Surton consumer is
   accepted client CIDRs by default. HTTPS 443 only, HTTPS target 3001, `/internal`
   and `/internal/*` denied at ingress. Caller owns certificate issuance/DNS and
   client routes; ALB TLS does not independently verify the backend certificate.
+- `backend_health_check_path` defaults to `/` for older images. With an image
+  containing `GET /internal/health`, select that private liveness path so an
+  intentional drain does not trigger unhealthy-target replacement. Backend
+  services attached to the ALB get 600 seconds of startup health-check grace;
+  grace alone does not make a root-path check drain-safe. Liveness is not readiness
+  or authorization to undrain, and public `/internal` remains blocked.
 - Cloud Map names `backend.NAME.internal` and `launcher.NAME.internal`. Backend
   callback trust uses the application's request-local private CA, not globally
   expanded provider/MCP trust. Backend-to-launcher and backend-to-worker RPC are
