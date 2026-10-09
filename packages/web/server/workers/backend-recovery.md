@@ -4,7 +4,9 @@ Backend PostgreSQL provider, MCP and routing stores retain owner latches after a
 
 Before recovery, independently confirm termination of the old backend and prevent its supervisor/host from restarting it. Record that evidence. Worker retirement is separate: surviving workers may still need authenticated backend callbacks to complete drain. Do not infer worker retirement from backend termination.
 
-Read the retained owner IDs using authorized, restricted operator access to the respective databases. Do not delete or update latches with SQL. Supply only IDs for retained latches, using the normal backend executable/configuration plus these one-invocation arguments:
+For ECS recovery, hold the backend service at zero throughout the one-off invocation. Keep the normal launcher reachable; if it also stopped, independently confirm its termination before bringing it back first. The recovery backend needs that launcher for its subsequent drain and graceful shutdown. Confirm the one-off backend STOPPED before starting the normal flag-free backend service.
+
+Read the retained owner IDs using existing scoped backend credentials for the respective databases, not the RDS master role. Do not delete or update latches with SQL. Supply only IDs for retained latches, using the normal backend executable/configuration plus these one-invocation arguments:
 
 ```text
 --confirm-retired-backend
