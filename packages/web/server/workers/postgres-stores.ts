@@ -30,6 +30,7 @@ export class WorkerStoreProvisioner {
     const provisioner = new WorkerStoreProvisioner(client, options);
     try {
       await client.connect();
+      await provisioner.requirePrivatePasswordDdl();
       const { rows: [role] } = await client.query(`SELECT r.rolsuper, r.rolcreaterole, r.rolbypassrls, d.datname, pg_get_userbyid(d.datdba) = current_user AS owner
         FROM pg_roles r CROSS JOIN pg_database d WHERE r.rolname = current_user AND d.datname = current_database()`);
       if (!role?.owner || !role.rolcreaterole || role.rolsuper || role.rolbypassrls) throw new Error("Provisioner must own its dedicated database with CREATEROLE, without superuser/RLS bypass.");
@@ -85,6 +86,7 @@ export class WorkerStoreProvisioner {
       const password = createHmac("sha256", this.options.credentialKey).update(identity).digest("base64url");
       const quoted = escapeIdentifier(role);
       try {
+        await this.requirePrivatePasswordDdl();
         await this.client.query("BEGIN");
         const { rows: [mapping] } = await this.client.query("SELECT store_id FROM dispatch_worker.roles WHERE role_name=$1", [role]);
         const { rows: [existing] } = await this.client.query("SELECT oid, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls FROM pg_roles WHERE rolname=$1", [role]);
@@ -119,6 +121,24 @@ export class WorkerStoreProvisioner {
     });
     this.tail = work.catch(() => {});
     return work;
+  }
+
+  private async requirePrivatePasswordDdl(): Promise<void> {
+    // Password DDL contains SQL literals: parameter redaction alone is insufficient.
+    // Verify inherited settings without granting this application privileged SET authority.
+    for (const [setting, expected] of [
+      ["log_statement", "none"], ["log_min_duration_statement", "-1"],
+      ["log_min_duration_sample", "-1"], ["log_min_error_statement", "panic"],
+      ["log_error_verbosity", "terse"], ["log_parameter_max_length", "0"],
+      ["log_parameter_max_length_on_error", "0"], ["password_encryption", "scram-sha-256"],
+      ["pgaudit.log", "none"], ["pg_stat_statements.track_utility", "off"],
+    ] as const) {
+      const { rows: [current] } = await this.client.query("SELECT current_setting($1, true) AS value", [setting]);
+      const optional = setting === "pgaudit.log" || setting === "pg_stat_statements.track_utility";
+      if (current.value !== expected && !(optional && current.value === null)) {
+        throw new Error(`Unsafe worker provisioning session setting: ${setting}.`);
+      }
+    }
   }
 
   close(): Promise<void> { return this.closing ??= this.tail.then(() => this.client.end()); }
