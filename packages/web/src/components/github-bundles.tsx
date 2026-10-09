@@ -37,6 +37,7 @@ export function GitHubBundles({ onImported, onBusyChange }: { onImported: () => 
     if (inFlight.current || !abandon()) return;
     await perform(async () => {
       const next = await api<GitHubBundlePreview>("/api/bundles/github/preview", { source, ...(installationId && !copy ? { installationId } : {}) });
+      setInstallationId(next.installationId ?? "");
       setPreview(next); operation.current = crypto.randomUUID();
     });
   }
