@@ -36,7 +36,7 @@ export function transcriptPage(messages: ConversationMessage[], activities: Part
   for (const m of messages) if (m.threadId) {
     const summary = replies.get(m.threadId) ?? { count: 0, authorIds: [], lastAt: 0 };
     summary.count++; summary.lastAt = Math.max(summary.lastAt, m.createdAt);
-    if (!summary.authorIds.includes(m.authorId)) summary.authorIds.push(m.authorId);
+    if (summary.authorIds.length < 4 && !summary.authorIds.includes(m.authorId)) summary.authorIds.push(m.authorId);
     replies.set(m.threadId, summary);
   }
   const items = [
@@ -59,7 +59,7 @@ export function transcriptPage(messages: ConversationMessage[], activities: Part
     const summary = message ? replies.get(message.id) : undefined;
     // Only page candidates need truncation, serialization and activity-version hashing.
     const item = { key, at,
-      message: message ? { ...messagePreview(message), timelineOrder, replySummary: summary ? { ...summary, authorIds: summary.authorIds.slice(0, 4) } : undefined } : undefined,
+      message: message ? { ...messagePreview(message), timelineOrder, replySummary: summary } : undefined,
       activity: activity ? { ...activityPreview(activity), timelineOrder } : undefined,
     };
     const length = bytes(item);
