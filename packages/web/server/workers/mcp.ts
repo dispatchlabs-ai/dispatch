@@ -29,7 +29,8 @@ export type WorkerMcpRoute = { companyId: string; conversationId: string; storeI
  */
 export function workerMcp(request: WorkerMcpRequest): WorkerMcp {
   return { prepare: async (registry, membership, actorForInstance) => {
-    if (!membership.agents.some(agent => agent.mcp.extensions.length)) return;
+    const agents = membership.agents.filter(agent => agent.membership === "active");
+    if (!agents.some(agent => agent.mcp.extensions.length)) return;
     const response = definitionsSchema.parse(await request("definitions", { revision: membership.revision }));
     if (response.conversationKey !== membership.conversationKey || response.revision !== membership.revision)
       throw new RuntimeError(409, "MCP definition projection changed.");
@@ -39,7 +40,7 @@ export function workerMcp(request: WorkerMcpRequest): WorkerMcp {
       if (keys.has(key) || new Set(connection.tools.map(tool => tool.name)).size !== connection.tools.length)
         throw new RuntimeError(409, "Duplicate MCP definition identity.");
       keys.add(key);
-      const pins = membership.agents.filter(agent => agent.mcp.connections.some(selected => selected.id === connection.id && selected.extension === connection.extension));
+      const pins = agents.filter(agent => agent.mcp.connections.some(selected => selected.id === connection.id && selected.extension === connection.extension));
       if (!pins.length || connection.tools.some(tool => !pins.some(pin => pin.mcp.tools.includes(tool.name))))
         throw new RuntimeError(409, "MCP definition exceeds participant selections.");
       registry.install(defineExtension({ name: connection.extension,
@@ -58,7 +59,7 @@ export function workerMcp(request: WorkerMcpRequest): WorkerMcp {
         })),
       }));
     }
-    for (const pin of membership.agents) for (const name of pin.mcp.tools) {
+    for (const pin of agents) for (const name of pin.mcp.tools) {
       if (!response.connections.some(connection => pin.mcp.extensions.includes(connection.extension) && connection.tools.some(tool => tool.name === name)))
         throw new RuntimeError(409, "Selected MCP tool is absent from the definition projection.");
     }
@@ -76,7 +77,7 @@ export function backendWorkerMcp(directory: DispatchRuntime) {
       const { membership } = await directory.directoryWorkerBootstrap(route.companyId, route.conversationId);
       if (membership.revision !== input.revision) throw new RuntimeError(409, "MCP membership changed; reconcile before preparing tools.");
       const connections = new Map<string, WorkerConnectionDefinition>();
-      for (const pin of membership.agents) for (const selected of pin.mcp.connections) {
+      for (const pin of membership.agents.filter(agent => agent.membership === "active")) for (const selected of pin.mcp.connections) {
         if (!pin.mcp.extensions.includes(selected.extension)) continue;
         const key = JSON.stringify([selected.id, selected.extension]);
         const definition = bridge.definition(selected);
