@@ -23,9 +23,9 @@ If startup fails after only some owners recover, inspect the remaining retained 
 
 This is backend-owner recovery only. Launcher ownership, Pi endpoint markers, worker stores, encrypted backup/key pairing and retired executor denial retain their separate runbook requirements. No existing-installation migration or activation is authorized by these instructions. At introduction, only source/build checks were established.
 
-## Controller rendezvous recovery (candidate source procedure)
+## Controller rendezvous recovery (source procedure)
 
-The planned rolling controller introduces a separate retained installation/role
+The source-published rolling controller introduces a separate retained installation/role
 owner record. Its recovery does **not** clear provider, MCP, routing, launcher or
 Pi ownership latches; recover those through their existing supported procedures.
 Before any rendezvous recovery, hold the affected service stopped, prevent
@@ -34,9 +34,9 @@ owner and any named successor. Inspect the complete owner/phase/successor snapsh
 with scoped credentials. Recovery must match that exact snapshot and refuse live
 connected identities; changed or uncertain state requires fresh reconciliation,
 not forced takeover. Never retain recovery assertions in normal deployment
-configuration. The candidate `controller-recovery.ts` CLI supplies inspection and
+configuration. Source `8fb001f` includes the `controller-recovery.ts` CLI for inspection and
 recovery without SQL edits; use a matching built artifact only after source review.
-It is not yet deployed/recovery-qualified.
+Its recovery behavior remains runtime-unqualified.
 
 From `packages/web`, supply an absolute restricted controller database config
 using the existing routing-config shape:
@@ -95,7 +95,7 @@ STOPPED before reactivating normal flag-free controllers.
 
 Clean planned shutdown without a successor uses the same joined-operation and
 closed-store proof as handover before deleting its own rendezvous record. Mere
-connection closure or a startup failure cannot publish vacancy. These are candidate
+connection closure or a startup failure cannot publish vacancy. These are published
 source contracts, not observed recovery acceptance. The [rolling work
 package](../../docs/handoff.md#safe-controller-overlap-for-ecs-rolling-deployment--october-9-2026)
 tracks source and runtime evidence separately.

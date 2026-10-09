@@ -8,7 +8,7 @@ The backend owns authenticated HTTP/SSE, company/project directories, definition
 
 The existing runtime combines catalog and conversation mutations in Pi transactions. Splitting those transactions requires explicit durable command receipts and revisioned catalog propagation; copying a whole catalog into workers without update/revocation semantics is not sufficient. Preserve membership checks, connection revocation, management grants and apply-to-existing behavior. Native single-runtime mode stays supported.
 
-**Rolling-deployment scope change, October 9, 2026; candidate under review:**
+**Rolling-deployment scope change, October 9, 2026; source-published, deployment pending:**
 Chris authorized safe controller overlap. The original single-owner rehearsal and
 ordered installation-drain procedure below remain historical/current fallback
 contracts, not a rule that all HTTP processes must stop for every future update.
@@ -259,7 +259,7 @@ These entrypoints exist in source; their presence does not establish a running s
 | `dispatch-launcher` | `build/service/server/workers/control-main.js` | `DISPATCH_LAUNCHER_CONFIG_FILE` |
 | `dispatch-worker` | `build/service/server/workers/worker-main.js` | Trusted driver-generated environment; internal port 8831 |
 
-**Candidate rolling-controller configuration (`31b357e`; not rollout acceptance).**
+**Rolling-controller configuration (source-published in `8fb001f`; not rollout acceptance).**
 Backend and launcher entrypoints opt into planned handover when
 `DISPATCH_CONTROLLER_CONFIG_FILE` names a restricted JSON file. Their existing
 owner configuration remains required; omitting this variable retains the legacy

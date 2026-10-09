@@ -68,7 +68,7 @@ EFS and S3 Files are not required by this target. Wiki notes do not replace priv
 
 Keep one active executor per conversation's logical store. Replacement must not overlap an executor that can still act; database transactions alone do not ensure scheduler ownership. The initial POC selects one backend/launcher owner with persisted journal ownership and confirmed ECS task termination before replacement; replicas and automatic takeover are not included. Exclusive ownership does not promise exactly-once external effects. Preserve existing company/user authorization, membership, definitions, skills, connection revocation and “apply to existing conversations” behavior; distribution and cross-store update guarantees require explicit design, not silent removal. The POC work package records implemented routing/lifecycle, catalog distribution, scoped bootstrap and PostgreSQL integration plus their unqualified boundaries; source implementation is not deployment or full contract acceptance.
 
-**Scope change, October 9, 2026:** Chris authorized removing the application-level blocker to ECS-native zero-downtime rolling deployments. Exclusive execution of each conversation remains required; it must not require exclusive existence of the entire HTTP service. Support safe controller overlap/handover without stale process-local decisions, duplicate executor launches or lost retained state. The [controller-overlap work package](handoff.md#safe-controller-overlap-for-ecs-rolling-deployment--october-9-2026) owns design and evidence. This supersedes the initial no-controller-overlap scope, not the executor-retirement guarantees; implementation and live rolling acceptance remain pending.
+**Scope change, October 9, 2026:** Chris authorized removing the application-level blocker to ECS-native zero-downtime rolling deployments. Exclusive execution of each conversation remains required; it must not require exclusive existence of the entire HTTP service. Support safe controller overlap/handover without stale process-local decisions, duplicate executor launches or lost retained state. The [controller-overlap work package](handoff.md#safe-controller-overlap-for-ecs-rolling-deployment--october-9-2026) owns design and evidence. This supersedes the initial no-controller-overlap scope, not the executor-retirement guarantees; implementation is source-published at `8fb001f`, while live rolling acceptance remains pending.
 
 Retain the ARM64 AWS target and a multi-platform OCI index with separately built, inspected and qualified `linux/arm64` and `linux/amd64` images. Preserve native host packages, local development and current LAN deployments. Generic infrastructure must remain independent of installation accounts, domains, credentials, state backends and private repositories; caller roots supply settings and immutable module/image pins. Review actual plan and cost and obtain explicit authorization before any AWS apply or storage migration.
 
@@ -1060,6 +1060,8 @@ The reusable conversation-worker AWS module supports explicit per-controller
 `service_deployment_mode`: `stop-first` (0/100) or `rolling` (100/200), defaulting
 to stop-first for omitted services. Rolling is available only to callers whose
 application safely supports overlapping owners and readiness-gated traffic.
-The current exclusive-owner backend/launcher remain stop-first; infrastructure
-percentages do not replace ownership fencing or make liveness a readiness check.
+Legacy exclusive-owner controllers must remain stop-first. Source `8fb001f` adds
+opt-in planned handover and private readiness; activation requires the
+[module prerequisites](../infra/aws-workers/README.md#ecs-service-deployment-selection).
+Infrastructure percentages do not replace ownership fencing or make liveness a readiness check.
 Standalone worker retirement and live consumer configuration remain unchanged.

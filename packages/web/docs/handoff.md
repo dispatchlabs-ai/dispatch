@@ -2024,11 +2024,11 @@ activation, functional/browser test or new qualification suite was performed.
 
 ## Safe controller overlap for ECS rolling deployment — October 9, 2026
 
-**Authorized target, not implemented acceptance:** after the module-only change,
+**Source-published; deployment acceptance pending:** after the module-only change,
 Chris directed the team to solve the application blocker to actual ECS-native
 zero-downtime rolling deployment. The published selection option alone did not
-meet that outcome. The current routing cache/exclusive owner and launcher ownership
-are implementation constraints to address, not permanent requirements that only
+meet that outcome. The legacy routing cache/exclusive owner and launcher ownership
+were implementation constraints to address, not permanent requirements that only
 one controller process may exist.
 
 Developer owns implementation, Pi Durable Expert ownership/handover safety,
@@ -2039,9 +2039,8 @@ application/module contracts here and company configuration/rollout receipts in
 the owning infrastructure repository. No RDS snapshot creation or waiting;
 application/typing acceptance remains Chris-owned.
 
-Acceptance remains pending: reviewed safe overlap/handover implementation and
-permitted source/build checks, then ECS-native replacement evidence that the new
-service becomes ready before the old service stops without an availability gap.
+Source review and permitted checks are recorded below. Runtime acceptance remains
+pending: ECS-native replacement evidence that the new service becomes ready before the old service stops without an availability gap.
 Readiness must mean requests can reach functioning ownership, not just liveness.
 Separate instance retirement from explicit installation-wide drain; preserve running
 workers and handle admitted requests/long-lived streams through bounded draining
@@ -2053,7 +2052,15 @@ plan success and a healthy post-rollout target alone do not establish zero downt
 The handover design and any further runtime verification must respect the repository
 testing policy and Chris's testing boundary.
 
-Planned design under implementation/review: identity-bound controller rendezvous
+Keep activation in separate phases. Migrate legacy controllers through the existing
+ordered installation drain/stop sequence, confirming their retirement before
+starting the new launcher and then backend; restore admission through the documented
+operator path and verify managed ingress. Only after migration is serving, enable
+rolling with the retained worker image/revision protections, then observe native
+ECS replacements. The one-time migration interruption is not rolling continuity
+evidence. Deployment commands and receipts belong to the consumer runbook.
+
+Published source design: identity-bound controller rendezvous
 serializes transfer to a named successor. The replacement initially opens no
 exclusive stores; transfer release is published only after old-owner operations
 and stores close cleanly, and the replacement loads fresh state rather than cached
@@ -2071,7 +2078,7 @@ with explicit SSE reconnection handling. A shorter client timeout does not prove
 that a dispatched mutation stopped. The remaining store-close/open gap must fit
 request deadlines; this sequencing is not itself zero-downtime evidence. ECS task
 stop remains 120 seconds. Stop-first backend ALB budgets are 30-second
-deregistration and 300-second idle timeout; rolling module candidate `a7ecbe2`
+deregistration and 300-second idle timeout; the published rolling module
 uses 360/400 seconds for managed backend/launcher ingress. See the
 [module runbook](../infra/aws-workers/README.md#ecs-service-deployment-selection)
 for activation prerequisites. Backend launcher calls default to 300 seconds and
@@ -2079,17 +2086,26 @@ worker calls to 60 seconds.
 Readiness must be bounded/lightweight and not queued behind full launcher mutations
 or ECS executor inventory.
 
-Source candidate `31b357e` implements controller handover, authenticated peer
-transport, separate worker-support admission, cancellable undispatched waiting
-and ordinary/proxy response-body joining. The [generic controller configuration](conversation-workers.md#entrypoints-and-private-configuration)
+Published source checkpoint **`8fb001f921699016dfcb6cca0323cd340ac97732`**
+is on `main`; Documenter independently verified the remote reference. It
+includes controller handover, authenticated peer transport, separate worker-support
+admission, cancellable undispatched waiting, ordinary/proxy response-body joining
+and explicit rendezvous recovery with the `dispatch-bootstrap controller-recovery`
+container mapping. The [generic controller configuration](conversation-workers.md#entrypoints-and-private-configuration)
 records the metadata-derived direct endpoint and peer TLS inputs; explicit
 rendezvous recovery is in [backend recovery](../server/workers/backend-recovery.md).
-Developer reports TypeScript and diff checks passing; Deslop reports the scoped
-transport, discovery, origin-confinement, body-lifetime and atomic-admission
-findings addressed. Full lifecycle review and deployment acceptance remain pending.
+Developer reports integrated application checks, Apple Silicon Nix build and flake
+evaluation passing; flake ran zero checks and omitted Linux systems. Pi and Deslop
+report their scoped application-source findings addressed, including waiter-capacity
+deadlock correction. Callback-ingress source `05339ca` is integrated; Pi reports
+isolated OpenTofu initialization/format/validation checks passing, and Deslop reports
+no additional source blocker. No application/typing tests ran for this package;
+Linux controller-image build and deployment acceptance remain pending.
 The selected deployment integration uses an internal launcher ALB rather than a
-new caller-routing protocol. Before rolling acceptance, migrate launcher callers,
-verify deregistration completes before SIGTERM, and account separately for direct
+new caller-routing protocol, plus private readiness-gated HTTPS worker callback
+ingress. The [module runbook](../infra/aws-workers/README.md#ecs-service-deployment-selection)
+owns URL/output, certificate/trust and activation requirements. Before rolling
+acceptance, migrate launcher callers, verify deregistration completes before SIGTERM, and account separately for direct
 peer/worker connections, including existing workers' pinned backend URLs.
 Draining admitted calls does not keep a cached old-task address reachable for
 later callbacks; worker URLs must retain a route to ready replacement ingress.
