@@ -12,7 +12,15 @@ export type ConnectionRow = {
 };
 export type McpQuery = <T extends object = Record<string, unknown>>(sql: string, values?: SQLInputValue[]) => Promise<T[]>;
 
-export const MCP_SCHEMA = `CREATE TABLE IF NOT EXISTS mcp_connections (
+export const MCP_SCHEMA = `CREATE TABLE IF NOT EXISTS integration_secrets (
+  company_id TEXT NOT NULL, owner_id TEXT NOT NULL, source TEXT NOT NULL, secret TEXT, revision INTEGER NOT NULL,
+  PRIMARY KEY(company_id, owner_id)
+);
+CREATE TABLE IF NOT EXISTS integration_secret_grants (
+  company_id TEXT NOT NULL, definition_id TEXT NOT NULL, owner_id TEXT NOT NULL, active INTEGER NOT NULL,
+  PRIMARY KEY(company_id, definition_id)
+);
+CREATE TABLE IF NOT EXISTS mcp_connections (
   id TEXT PRIMARY KEY, company_id TEXT NOT NULL, owner_id TEXT NOT NULL,
   name TEXT NOT NULL, endpoint TEXT NOT NULL, state TEXT NOT NULL,
   authentication TEXT NOT NULL, provider TEXT NOT NULL DEFAULT '', config TEXT NOT NULL,
