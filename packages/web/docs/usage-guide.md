@@ -490,9 +490,9 @@ Capabilities are distributed separately from agent bundles. Source-published `64
 
 Export requires project-manager access, selects chat IDs and rechecks authorization/membership before return; missing referenced bytes fail rather than creating an incomplete archive. Inspect content and historical author labels before sharing. Import creates a new project with only the importing human as manager, no default agents, source memberships or private model state. History remains read-only, not resumed conversations or new submissions.
 
-In the Projects navigation choose **Import project history**, select a `.json` archive, inspect counts/historical authors and **Review archived content**, then explicitly approve content/destination access and **Import as new project**. After an uncertain response use **Retry same import**; replacing the file asks before discarding the prior operation. Closing/reopening retains mounted state, not page reload.
+Open **Settings → Import & export → Choose file**. Choose or drop one `.json` project archive, then **Continue** to inspect counts/historical authors and **Review archived content**, then explicitly approve content/destination access and **Import as new project**. After an uncertain response use **Retry same import**; replacing the file asks before discarding the prior operation. Closing/reopening retains mounted state, not page reload.
 
-On a project, **Export history** lets managers select current chats, acknowledge privacy and **Download history** (`project-history.json`, compact JSON). **Previously imported history is always included in full**, independently of current-chat selection; review it before sharing. **View imported history** shows the read-only archive. Attachment buttons download bytes as files, not inline executable content.
+In **Settings → Import & export → Select project**, choose a project you manage. The project’s **Export history** shortcut opens the same flow. Both let managers select current chats, acknowledge privacy and **Download history** (`project-history.json`, compact JSON). **Previously imported history is always included in full**, independently of current-chat selection; review it before sharing. **View imported history** shows the read-only archive. Attachment buttons download bytes as files, not inline executable content.
 
 Authenticated candidate routes:
 

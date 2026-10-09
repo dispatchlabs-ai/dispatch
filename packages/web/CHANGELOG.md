@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — project import placement
+
+- Move project import from the chat sidebar into Settings → Import & export, with paired project export, a file drop area and Continue to archive review. Retain existing approval and retry behavior.
+
 ## Unreleased — agent criteria editing
 
 - Add opt-in Edit Definition of Done capability with current-chat read/write tool, revision protection and durable retry receipts. Disabled by default; existing instances adopt capability changes at safe idle boundaries.

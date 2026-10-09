@@ -1,6 +1,7 @@
 import { reconcileChat } from "../shared/chat-updates";
 import type { CriteriaDraft } from "./definition-of-done";
 import { ProjectArchiveImport } from "./project-archives";
+import { ImportExportPage } from "./import-export";
 import { SecretsPage } from "./secrets";
 import { BundlesDialog } from "./bundles";
 import { emptyAttachments } from "../lib/attachments";
@@ -31,7 +32,7 @@ import { McpConnectionsPage } from "./mcp-connections";
 import { Button, IconButton, Modal, Notice, Spinner } from "./ui";
 
 type WorkspaceTab = { id: string; kind: "chat"; chatId: string } | { id: string; kind: "project"; projectId: string } | { id: string; kind: "welcome" };
-type WorkspaceSection = "chats" | "agents" | "security" | "connections" | "secrets";
+type WorkspaceSection = "chats" | "agents" | "security" | "connections" | "secrets" | "import-export";
 const welcomeTab: WorkspaceTab = { id: "welcome", kind: "welcome" };
 
 function tabLocation(tab: WorkspaceTab): Record<string, string> {
@@ -48,8 +49,8 @@ export function Workspace() {
   const { state, api, auth, setState } = useSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const [criteriaDrafts, setCriteriaDrafts] = useState<Record<string, CriteriaDraft | undefined>>({});
-  const [section, setSection] = useState<WorkspaceSection>(searchParams.get("section") === "secrets" ? "secrets" : searchParams.get("section") === "connections" ? "connections" : "chats");
-  const [visited, setVisited] = useState({ agents: false, security: false, secrets: searchParams.get("section") === "secrets", connections: searchParams.get("section") === "connections" });
+  const [section, setSection] = useState<WorkspaceSection>(searchParams.get("section") === "import-export" ? "import-export" : searchParams.get("section") === "secrets" ? "secrets" : searchParams.get("section") === "connections" ? "connections" : "chats");
+  const [visited, setVisited] = useState({ "import-export": searchParams.get("section") === "import-export", agents: false, security: false, secrets: searchParams.get("section") === "secrets", connections: searchParams.get("section") === "connections" });
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [evaluationAgent, setEvaluationAgent] = useState<string | null>(null);
   const [evaluationContext, setEvaluationContext] = useState<React.ReactNode>(null);
@@ -232,7 +233,7 @@ export function Workspace() {
 
   function selectSection(next: WorkspaceSection) {
     setSection(next);
-    if (next === "connections" || next === "secrets") { setOtherDetailsVisible(false); setSearchParams({ section: next }, { replace: true }); }
+    if (next === "connections" || next === "secrets" || next === "import-export") { setOtherDetailsVisible(false); setSearchParams({ section: next }, { replace: true }); }
     else if (searchParams.has("section")) setSearchParams({}, { replace: true });
     if (next !== "chats") setVisited(current => ({ ...current, [next]: true }));
     setNavigationOpen(false);
@@ -409,8 +410,8 @@ export function Workspace() {
   }
 
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId) ?? agents.find(agent => agent.id === config?.defaultAgentId);
-  const active: WorkspaceTab | { id: string; kind: "agents" | "security" | "connections" | "secrets" } = section === "chats" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
-  const detailsVisible = active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : active.kind === "connections" || active.kind === "secrets" ? false : otherDetailsVisible;
+  const active: WorkspaceTab | { id: string; kind: "agents" | "security" | "connections" | "secrets" | "import-export" } = section === "chats" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
+  const detailsVisible = active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : active.kind === "connections" || active.kind === "secrets" || active.kind === "import-export" ? false : otherDetailsVisible;
   const detailsWidth = Math.min(preferredDetailsWidth ?? (active.kind === "chat" ? 440 : 360), detailsMax);
   function setDetailsVisible(visible: boolean) {
     if (active.kind === "chat") setChatDetailsVisible(current => ({ ...current, [active.chatId]: visible }));
@@ -442,7 +443,7 @@ export function Workspace() {
       setContextOpen(false);
       requestAnimationFrame(() => document.getElementById(`participants-${active.chatId}`)?.focus());
     }} showHeader={!inDrawer}
-    /> : <ContextPanel kind={active.kind === "connections" || active.kind === "secrets" ? "security" : active.kind} />;
+    /> : <ContextPanel kind={active.kind === "connections" || active.kind === "secrets" || active.kind === "import-export" ? "security" : active.kind} />;
   const chatNav = () => selectSection("chats");
   const selectChat = (chatId: string) => activate({ id: `chat:${chatId}`, kind: "chat", chatId });
   const conversations = <ConversationSidebar chats={chats} projects={projects}
@@ -453,7 +454,6 @@ export function Workspace() {
     newProject={{ name: projectName, busy: creatingProject, error: projectError, compact: viewportWidth <= 1100,
       onNameChange: name => { setProjectName(name); setProjectError(null); }, onCreate: createProject,
       onCancel: () => { setProjectName(""); setProjectError(null); projectRequest.current = null; } }}
-    onImportProject={() => { setNavigationOpen(false); setImportingProject(true); }}
     onCreateProjectChat={project => { if (project.canParticipate === false) return; void createChat(undefined, project.id); }}
     onSelect={selectChat} onSelectProject={selectProject} onCreate={() => chooseAgents(config?.defaultAgentId, activeProjectId)}
     onRename={renameChat} onUpdate={updateChatAction} />;
@@ -469,11 +469,12 @@ export function Workspace() {
         onEdit={editAgent}
         onArchive={agent => requestAgentAction(() => { setEditingAgent(null); setArchivingAgent(agent); })} />
     </div>
-    {section === "security" || section === "connections" || section === "secrets" ? <div className="section-sidebar">
+    {section === "security" || section === "connections" || section === "secrets" || section === "import-export" ? <div className="section-sidebar">
       <h2>Settings</h2>
       <nav aria-label="Settings">
         <Button variant="ghost" aria-current={section === "connections" ? "page" : undefined} onClick={() => selectSection("connections")}>Connections</Button>
         <Button variant="ghost" aria-current={section === "secrets" ? "page" : undefined} onClick={() => selectSection("secrets")}>Secrets</Button>
+        <Button variant="ghost" aria-current={section === "import-export" ? "page" : undefined} onClick={() => selectSection("import-export")}>Import &amp; export</Button>
         <Button variant="ghost" aria-current={section === "security" ? "page" : undefined} onClick={() => selectSection("security")}>Account and security</Button>
         {section === "security" ? [['passkeys', 'Passkeys'], ['password', 'Password & authenticator'], ['sessions', 'Active sessions']].map(([id, label]) => <Button key={id} variant="ghost" onClick={() => {
           setNavigationOpen(false);
@@ -515,12 +516,12 @@ export function Workspace() {
         <IconButton className="sidebar-toggle" label={sidebarVisible ? "Hide sidebar" : "Show sidebar"} aria-expanded={sidebarVisible} aria-controls="workspace-sidebar" onClick={() => setSidebarVisible(value => !value)}>
           <PanelLeft size={19} />
         </IconButton>
-        {section !== "connections" && section !== "secrets" ? <IconButton className="details-toggle" label={detailsVisible ? "Hide details" : "Show details"} aria-expanded={detailsVisible} aria-controls="details-column" onClick={() => setDetailsVisible(!detailsVisible)}>
+        {section !== "connections" && section !== "secrets" && section !== "import-export" ? <IconButton className="details-toggle" label={detailsVisible ? "Hide details" : "Show details"} aria-expanded={detailsVisible} aria-controls="details-column" onClick={() => setDetailsVisible(!detailsVisible)}>
           <PanelRight size={19} />
         </IconButton> : null}
       </div>
       <div className="rail-account">
-        <IconButton label="Settings" className={section === "security" || section === "connections" || section === "secrets" ? "active" : ""} aria-current={section === "security" || section === "connections" || section === "secrets" ? "page" : undefined} onClick={() => selectSection("connections")}>
+        <IconButton label="Settings" className={section === "security" || section === "connections" || section === "secrets" || section === "import-export" ? "active" : ""} aria-current={section === "security" || section === "connections" || section === "secrets" || section === "import-export" ? "page" : undefined} onClick={() => selectSection("connections")}>
           <Settings2 size={20} />
         </IconButton>
         <IconButton label="Sign out" disabled={signingOut} onClick={() => void signOut()}>{signingOut ? <Spinner /> : <LogOut size={19} />}</IconButton>
@@ -613,6 +614,7 @@ export function Workspace() {
               onCancel={() => requestAgentAction(() => finishAgentEdit())} onEdit={editAgent}
               onStartChat={agentId => chooseAgents(agentId)} creating={creating || createFailed} />
           </div> : null}
+          {visited["import-export"] ? <div className="workspace-section" hidden={section !== "import-export"}><ImportExportPage projects={projects} chats={chats} onImport={() => setImportingProject(true)} /></div> : null}
           {visited.secrets ? <div className="workspace-section" hidden={section !== "secrets"}><SecretsPage /></div> : null}
           {visited.connections ? <div className="workspace-section" hidden={section !== "connections"}><McpConnectionsPage /></div> : null}
           {visited.security ? <div className="workspace-section" hidden={section !== "security"}><SecurityPage /></div> : null}
@@ -656,13 +658,13 @@ export function Workspace() {
                 <MessageSquare /> Chats</Button>
               <Button variant="ghost" aria-current={active.kind === "agents" ? "page" : undefined} onClick={() => selectSection("agents")}>
                 <Bot /> Agents</Button>
-              <Button variant="ghost" aria-current={section === "security" || section === "connections" || section === "secrets" ? "page" : undefined} onClick={() => selectSection("connections")}>
+              <Button variant="ghost" aria-current={section === "security" || section === "connections" || section === "secrets" || section === "import-export" ? "page" : undefined} onClick={() => selectSection("connections")}>
                 <Settings2 /> Settings</Button>
             </nav>{sidebar}<Button className="mobile-signout" variant="ghost" onClick={() => void signOut()} disabled={signingOut}>
               <LogOut /> Sign out</Button>
           </Modal>
         </div>
-        {active.kind !== "welcome" && active.kind !== "connections" ? <div className="mobile-context">
+        {active.kind !== "welcome" && active.kind !== "connections" && active.kind !== "import-export" ? <div className="mobile-context">
           <Modal title={active.kind === "chat" ? threads[active.chatId] ? "Thread" : "Participants" : section === "agents" ? editingAgent ? "Draft preview" : "Agent details" : "Details"} description={active.kind === "chat" ? snapshot?.conversation.title || "Active conversation" : section === "agents" ? undefined : "For your current view"} side="right" open={contextOpen} onOpenChange={setContextOpen} trigger={<Button variant="ghost" className="workspace-action">
             <PanelRight size={19} /> Details</Button>}>{supporting(true)}</Modal>
         </div> : null}
