@@ -23,7 +23,7 @@ import { readAuthStoreConfig, openConfiguredAuth } from "../auth/config.js";
 import { readMcpConnectionConfig, openConfiguredMcpConnections } from "../storage/mcp-config.js";
 import { readProviderCredentialConfig, openConfiguredProviderCredentials } from "../storage/provider-credential-config.js";
 import { openModels } from "../model-auth.js";
-import { DispatchRuntime, RuntimeError, type WorkerManagementActor } from "../runtime.js";
+import { DEFAULT_AGENT_ID, DispatchRuntime, RuntimeError, type WorkerManagementActor } from "../runtime.js";
 import { McpConnections } from "../mcp-connections.js";
 import { WorkerRoutes } from "./routes.js";
 import { readRoutingStoreConfig, openConfiguredWorkerRoutes } from "./routing-config.js";
@@ -322,7 +322,7 @@ app.get("/internal/status", async c => {
 });
 const clientDir = process.env.DISPATCH_CLIENT_DIR ?? resolve(dirname(fileURLToPath(import.meta.url)), "../../../client");
 app.route("/", createApp({ auth, runtime, mcpConnections: connections, origin: config.origin, clientDir,
-  configuration: async () => ({ company: { id: config.companyId, name: config.companyName }, defaultAgentId: "default", ...await provider.configuration(await runtime.getDefaultAgent(config.companyId)) }),
+  configuration: async () => ({ company: { id: config.companyId, name: config.companyName }, defaultAgentId: DEFAULT_AGENT_ID, ...await provider.configuration(await runtime.getDefaultAgent(config.companyId)) }),
 }));
 app.onError((error, c) => error instanceof RuntimeError && error.status === 403
   ? c.json({ error: "Forbidden" }, 403)
