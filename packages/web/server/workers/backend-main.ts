@@ -275,7 +275,10 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
   if (operation === "management/read" || operation === "management/save") {
     const body = z.object({ actor: z.custom<WorkerManagementActor>(), input: z.unknown(), callId: z.string().optional() }).strict().parse(input);
     if (!body.actor || body.actor.companyId !== route.companyId || body.actor.conversationKey !== route.conversationId || body.actor.storeId !== route.storeId) return c.json({ error: "Forbidden" }, 403);
-    return c.json(operation === "management/read" ? await directory.readWorkerManagedAgent(body.actor, body.input) : await directory.saveWorkerManagedAgent(body.actor, z.string().min(1).parse(body.callId), body.input));
+    if (operation === "management/read") return c.json(await directory.readWorkerManagedAgent(body.actor, body.input));
+    const result = await directory.saveWorkerManagedAgent(body.actor, z.string().min(1).parse(body.callId), body.input);
+    runtime.deferCatalogReconciliation(route.companyId);
+    return c.json(result);
   }
   return c.json({ error: "Not found" }, 404);
 });
