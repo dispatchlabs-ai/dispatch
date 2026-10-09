@@ -56,7 +56,7 @@ type ManagementActor = Awaited<ReturnType<SharedConversations["managementActor"]
 /** Nonsecret backend projection. History is retained so pinned skill/agent revisions stay resolvable. */
 export type WorkerCatalogSnapshot = {
   sourceId: string; companyId: string; revision: number;
-  agents: AgentDefinition[]; skills: SkillDefinition[]; projects: StoredProject[];
+  agents: AgentDefinition[]; skills: SkillDefinition[]; projects: never[];
   sharedProjects: SharedProjectRecord[]; grants: Grant[];
   connectionOwners: Record<string, string>; readAllProjectUserIds: string[];
 };
@@ -255,7 +255,7 @@ export class DispatchRuntime {
           return { companyId: actor.companyId, definitionId: actor.definitionId };
         }, context);
         signal?.throwIfAborted();
-        const key = authorized ? options.mcpConnections?.resolveSearchSecret(authorized.companyId, authorized.definitionId) : undefined;
+        const key = authorized ? await options.mcpConnections?.resolveSearchSecret(authorized.companyId, authorized.definitionId) : undefined;
         return createWebBackend({ searchApiKey: key }).search(query, signal);
       }));
       registry.install(createImageGen(models));
@@ -426,7 +426,7 @@ export class DispatchRuntime {
       sourceId: exports.sourceId, companyId,
       agents: catalog.agents.filter(agent => agent.companyId === companyId).map(publicAgent),
       skills: (catalog.skills ?? []).filter(skill => skill.companyId === companyId).map(publicSkill),
-      projects: (catalog.projects ?? []).filter(project => project.companyId === companyId),
+      projects: [],
       sharedProjects: Object.values(shared.projects).filter(project => project.companyId === companyId),
       grants: await readGrants(tx, companyId),
       connectionOwners: Object.fromEntries(Object.entries(catalog.connectionOwners ?? {}).filter(([, agentId]) => agentIds.has(agentId))),
@@ -467,7 +467,7 @@ export class DispatchRuntime {
     requireText(snapshot.sourceId, "Catalog source ID", 200);
     if (snapshot.companyId !== this.worker.scope.companyId || !Number.isSafeInteger(snapshot.revision) || snapshot.revision < 1)
       throw new RuntimeError(409, "Worker catalog identity/revision mismatch.");
-    if (snapshot.projects.some(project => project.companyId !== snapshot.companyId)
+    if (snapshot.projects.length !== 0
       || snapshot.sharedProjects.some(project => project.companyId !== snapshot.companyId)
       || snapshot.grants.some(grant => grant.companyId !== snapshot.companyId))
       throw new RuntimeError(409, "Worker catalog contains another company's state.");
@@ -483,7 +483,6 @@ export class DispatchRuntime {
         catalog.agents = snapshot.agents.map(agent => ({ ...agent, companyId: snapshot.companyId }));
         catalog.skills = snapshot.skills.map(skill => ({ ...skill, companyId: snapshot.companyId, savedBy: "backend",
           requestId: `projection:${skill.id}:${skill.revision}`, fingerprint: "backend-projection" }));
-        catalog.projects = snapshot.projects;
         catalog.connectionOwners = snapshot.connectionOwners;
         const shared = await tx.doc(ProjectsDoc);
         shared.projects = Object.fromEntries(snapshot.sharedProjects.map(project => [project.id, project]));
@@ -515,7 +514,7 @@ export class DispatchRuntime {
       if (!chat) throw new RuntimeError(404, "Conversation not found.");
       return detached({ scope: { companyId: chat.companyId, userId: chat.userId }, input: {
         requestId: chat.requestId, ...(chat.creationTitleExplicit ? { title: chat.title } : {}),
-        agentDefinitionIds: chat.creationAgentIds ?? [chat.agentDefinitionId], projectId: chat.creationProjectId ?? null,
+        agentDefinitionIds: chat.creationAgentIds ?? [chat.agentDefinitionId],
         ...(room.sharedProjectId ? { sharedProjectId: room.sharedProjectId } : {}),
       } satisfies CreateChatInput });
     }, context);
@@ -603,7 +602,7 @@ export class DispatchRuntime {
       const person = people.find(person => person.id === author.userId);
       if (!person) throw new RuntimeError(404, "Invitation author is unavailable.");
       room.members.push({ id: `human:${person.id}`, kind: "human", userId: person.id, name: person.name, joinedAt: Date.now(), status: "idle" });
-      room.preferences[person.id] ??= { projectId: null, pinned: false, archived: false };
+      room.preferences[person.id] ??= { pinned: false, archived: false };
       authorAdded = true;
     }
     for (const definitionId of agentIds) {
@@ -620,7 +619,7 @@ export class DispatchRuntime {
       const person = people.find(person => person.id === userId);
       if (!person) throw new RuntimeError(404, "Company member not found.");
       room.members.push({ id: `human:${userId}`, kind: "human", userId, name: person.name, joinedAt: Date.now(), status: "idle" });
-      room.preferences[userId] = { projectId: null, pinned: false, archived: false };
+      room.preferences[userId] = { pinned: false, archived: false };
       names.push(person.name);
     }
     invitations.requests[key] = hash;
@@ -666,7 +665,7 @@ export class DispatchRuntime {
       for (const person of snapshot.humans) {
         if (room.members.some(member => member.kind === "human" && member.userId === person.id)) continue;
         room.members.push({ id: `human:${person.id}`, kind: "human", userId: person.id, name: person.name, joinedAt: Date.now(), status: "idle" });
-        room.preferences[person.id] ??= { projectId: null, pinned: false, archived: false };
+        room.preferences[person.id] ??= { pinned: false, archived: false };
       }
       for (const agent of snapshot.agents) {
         const existing = room.members.find(member => member.kind === "agent" && member.agentDefinitionId === agent.definitionId);
@@ -839,12 +838,12 @@ export class DispatchRuntime {
       for (const chat of catalog.chats.filter(chat => chat.companyId === scope.companyId)) {
         try {
           const room = await this.shared.authorize(tx, scope, nativeId(chat.id), "read", this.readAll(scope));
-          const preference = room.preferences[scope.userId] ?? { projectId: null, pinned: false, archived: false };
+          const preference = room.preferences[scope.userId] ?? { pinned: false, archived: false };
           const access = room.sharedProjectId ? projectAccess(projects.projects[room.sharedProjectId], scope, this.readAll(scope)) : { participate: true };
           entries.push({ automaticTitle: chat.displayTitle === undefined && chat.title === "New conversation", conversation: {
             id: chat.id, title: chat.displayTitle ?? chat.title,
             sharedProjectId: room.sharedProjectId ?? null, canParticipate: access.participate,
-            projectId: room.sharedProjectId ?? preference.projectId, pinned: preference.pinned, archived: preference.archived,
+            projectId: room.sharedProjectId ?? null, pinned: preference.pinned, archived: preference.archived,
             createdAt: chat.createdAt, updatedAt: chat.createdAt, revision: this.commitRevision,
             agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, agentName: chat.agentName ?? "Saved agent", status: "idle",
           } });

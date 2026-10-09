@@ -176,6 +176,9 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
       await routes.ensure(chat.conversation.id, bootstrap.scope, bootstrap.input, options.configurationRevision);
       return snapshot(await call<ChatSnapshot>(scope, chat.conversation.id, "getChat"), chat.conversation.id);
     },
+    async transcriptPage(scope, id, query) { return call(scope, id, "transcriptPage", query); },
+    async publicDetail(scope, id, kind, itemId) { return call(scope, id, "publicDetail", { kind, itemId }); },
+    async saveDefinitionOfDone(scope, id, input) { return snapshot(await call<ChatSnapshot>(scope, id, "saveDefinitionOfDone", input), id); },
     async getChat(scope, id) { return snapshot(await call<ChatSnapshot>(scope, id, "getChat"), id); },
     async submit(scope, id, input) { return call(scope, id, "submit", input); },
     async composing(scope, id, input) { return call(scope, id, "composing", input); },

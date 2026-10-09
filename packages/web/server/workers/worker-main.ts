@@ -60,7 +60,7 @@ app.use("*", bodyLimit({ maxSize: ATTACHMENT_RPC_MAX_BYTES, onError: c => c.json
 app.get("/ready", c => c.json({ roomId, conversationId: env.DISPATCH_CONVERSATION_ID, attemptId: env.DISPATCH_WORKER_ATTEMPT_ID }));
 const rpcSchema = z.object({
   scope: z.object({ companyId: z.string(), userId: z.string() }).strict(),
-  method: z.enum(["getChat", "submit", "composing", "addParticipants", "stop", "updateChat", "renameChat", "authorizeAttachmentUpload", "uploadAttachment", "downloadAttachment"]),
+  method: z.enum(["transcriptPage", "publicDetail", "saveDefinitionOfDone", "getChat", "submit", "composing", "addParticipants", "stop", "updateChat", "renameChat", "authorizeAttachmentUpload", "uploadAttachment", "downloadAttachment"]),
   input: z.unknown().optional(), catalog: z.custom<WorkerCatalogSnapshot>(),
   membership: z.custom<import("../runtime.js").WorkerMembershipSnapshot>(),
 }).strict();
@@ -93,6 +93,18 @@ app.post("/rpc", async c => {
     case "downloadAttachment": {
       const download = await runtime.downloadAttachment(scope, roomId, z.string().uuid().parse(input));
       result = { attachment: download.attachment, dataBase64: download.bytes.toString("base64") }; break;
+    }
+    case "transcriptPage": {
+      const query = z.object({ threadId: z.string().max(300).optional(), before: z.string().max(1000).optional() }).strict().parse(input);
+      result = await runtime.transcriptPage(scope, roomId, query); break;
+    }
+    case "publicDetail": {
+      const detail = z.object({ kind: z.enum(["message", "activity"]), itemId: z.string().min(1) }).strict().parse(input);
+      result = await runtime.publicDetail(scope, roomId, detail.kind, detail.itemId); break;
+    }
+    case "saveDefinitionOfDone": {
+      const value = z.object({ markdown: z.string().max(20000), expectedRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }).strict().parse(input);
+      result = await runtime.saveDefinitionOfDone(scope, roomId, value); break;
     }
     case "getChat": result = await runtime.getChat(scope, roomId); break;
     case "submit": result = await runtime.submit(scope, roomId, input as SendMessageInput); break;

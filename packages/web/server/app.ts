@@ -122,17 +122,17 @@ export function createApp(options: AppOptions) {
     await next();
   });
   app.get("/api/config", async (c) => c.json(await options.configuration()));
-  app.get("/api/secrets/exa", c => c.json(options.mcpConnections.searchSecret(c.get("principal"))));
+  app.get("/api/secrets/exa", async c => c.json(await options.mcpConnections.searchSecret(c.get("principal"))));
   app.post("/api/secrets/exa", async c => {
     const input = z.object({ revision: z.number().int().nonnegative(), source: z.enum(["stored", "environment"]), value: z.string().trim().min(1).optional(), agentIds: z.array(z.string().min(1)) }).strict().parse(await c.req.json());
     const scope = c.get("principal");
     const agents = await runtime.listAgents(scope);
     if (input.agentIds.some(id => !agents.some(agent => agent.id === id && !agent.archived))) throw new ConnectionError(400, "Choose current agents from this workspace.");
-    return c.json(options.mcpConnections.saveSearchSecret(scope, input));
+    return c.json(await options.mcpConnections.saveSearchSecret(scope, input));
   });
   app.post("/api/secrets/exa/disconnect", async c => {
     const input = z.object({ revision: z.number().int().nonnegative() }).strict().parse(await c.req.json());
-    return c.json(options.mcpConnections.disconnectSearchSecret(c.get("principal"), input.revision));
+    return c.json(await options.mcpConnections.disconnectSearchSecret(c.get("principal"), input.revision));
   });
   app.get("/api/connections", async c => c.json({ connections: await runtime.listMcpConnections(c.get("principal")) }));
   app.post("/api/connections/authorize", async c => {
