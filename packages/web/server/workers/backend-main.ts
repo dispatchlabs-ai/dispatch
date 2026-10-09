@@ -257,7 +257,7 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
 app.post("/internal/replace", async c => {
   if (!tokenMatches(operatorToken, c.req.header("Authorization"))) return c.json({ error: "Forbidden" }, 403);
   const { conversationId, attemptId } = z.object({ conversationId: z.string().min(1), attemptId: z.string().uuid() }).strict().parse(await c.req.json());
-  const replacement = await operatorTransition(() => admission.run(() => mcpPolicy.change(async () => {
+  const replacement = await operatorTransition(() => admission.run(() => runtime.runWorkerTransition(async () => {
     const route = routes.get(conversationId);
     if (!route || route.attemptId !== attemptId) throw new Error("Stale replacement request.");
     await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/stop", { attemptId }, undefined, workerConfig.launcherTimeoutMs);
