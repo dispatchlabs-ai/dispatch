@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — borderless activity labels
+
+- Remove the visible box around agent activity labels while retaining click-to-expand, hover feedback and keyboard focus styling.
+
 ## Unreleased — chat completion guidance
 
 - Point shared agents to the saved chat Definition of Done and latest human direction, use the conversation goal when blank, and finish after evidenced completion instead of expanding work from broader checklists.
