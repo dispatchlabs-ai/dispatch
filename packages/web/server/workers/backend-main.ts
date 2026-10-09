@@ -218,6 +218,11 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
   if (c.req.method !== "POST") return c.json({ error: "Not found" }, 404);
   const input = await c.req.json();
   assertCurrent();
+  if (operation === "participants/report") {
+    const result = await directory.acknowledgeWorkerParticipants(route.companyId, route.conversationId, route.storeId, input);
+    assertCurrent();
+    return c.json(result ?? { accepted: true });
+  }
   if (operation === "search") return c.json(await mcpPolicy.call(async () => {
     const request = z.object({
       actor: z.custom<import("../runtime.js").WorkerManagementActor>(value => typeof value === "object" && value !== null),
