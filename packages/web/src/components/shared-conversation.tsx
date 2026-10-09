@@ -161,12 +161,17 @@ export function ConversationComposer({ id, chatId, active = true, draft, pending
   const composing = useComposingPresence(chatId, active && !disabled && !pending?.sending);
   const send = () => { if (canSend) { composing.clear(); onSend(mentions); } };
   return <div className="composer-area">
+    {pending?.sending ? <div className="pending-message">
+      <p className="run-outcome" role="status"><Spinner /> Sending…</p>
+      {pending.text ? <div className="pending-message-text">{pending.text}</div> : null}
+      {attachments.length ? <DraftAttachments attachments={attachments} disabled onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} /> : null}
+    </div> : null}
     {pending?.error ? <Notice>{pending.error} Your message is kept here. Retry sends the same message once.</Notice> : error ? <Notice>{error}</Notice> : null}
     {attachmentError ? <Notice>{attachmentError}</Notice> : null}
     {tooLong ? <Notice>Shorten your message to 100,000 characters or fewer, including Markdown formatting.</Notice> : null}
     {composing.unavailable ? <p className="run-outcome" role="status">Typing status is unavailable. You can still send your message.</p> : null}
     <form className="composer" onInput={composing.pulse} onCompositionStart={composing.pulse} onCompositionUpdate={composing.pulse} onPaste={composing.pulse} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) composing.clear(); }} onSubmit={event => { event.preventDefault(); send(); }}>
-      <DraftAttachments attachments={attachments} disabled={disabled || Boolean(pending?.sending)} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} />
+      {!pending?.sending ? <DraftAttachments attachments={attachments} disabled={disabled} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} /> : null}
       <MarkdownComposer onPasteFiles={addFiles} id={id} value={draft} disabled={disabled} readOnly={Boolean(pending?.sending)} onChange={onDraftChange} onSend={send}
         instanceChoices={agents.filter(agent => !agent.archived && !participants.some(person => person.kind === "agent" && person.membership === "removing" && person.agentDefinitionId === agent.id) && participants.some(person => person.kind === "agent" && person.membership === "active" && person.agentDefinitionId === agent.id)).map(agent => ({ id: agent.id, name: agent.name, kind: "agent" as const }))} onAddInstance={onAddInstance} participants={mentionPeople} mentions={mentions} onMentionsChange={onMentionsChange} placeholder={thread ? "Reply to thread…" : conversationTitle ? `Message ${conversationTitle}…` : "Message chat…"}
         toolbar={<><AttachmentPicker disabled={disabled || Boolean(pending?.sending)} onAddFiles={addFiles} /><div className="button-row">{children}<Button type="submit" className="send-button" disabled={!canSend} aria-label={pending?.error ? "Retry sending message" : thread ? "Send reply" : "Send message"}>{pending?.sending ? <Spinner label="Sending message" /> : pending?.error ? <RotateCcw /> : <ArrowUp />}</Button></div></>}

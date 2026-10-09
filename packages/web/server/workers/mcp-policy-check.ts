@@ -1,0 +1,27 @@
+import assert from "node:assert/strict";
+import { McpPolicyGate } from "./mcp-policy.js";
+import { AdmissionClosedError } from "./admission.js";
+
+if (process.env.DISPATCH_MCP_POLICY_CHECK !== "disposable") throw new Error("Set DISPATCH_MCP_POLICY_CHECK=disposable");
+const gate = new McpPolicyGate();
+let release!: () => void;
+const held = new Promise<void>(resolve => { release = resolve; });
+let active = 0;
+const calls = [1, 2].map(() => gate.call(async () => { active++; await held; active--; }));
+assert.equal(active, 2);
+let changed = false;
+const transition = gate.change(async () => { assert.equal(active, 0); changed = true; });
+await assert.rejects(gate.call(async () => {}), AdmissionClosedError);
+await Promise.resolve();
+assert.equal(changed, false);
+release();
+await Promise.all([...calls, transition]);
+assert.equal(changed, true);
+assert.equal(await gate.call(async () => 42), 42);
+const failure = gate.change(async () => { throw new Error("mutation failed"); });
+const next = gate.change(async () => "next");
+await assert.rejects(gate.call(async () => {}), AdmissionClosedError);
+await assert.rejects(failure, /mutation failed/);
+assert.equal(await next, "next");
+assert.equal(await gate.call(async () => "recovered"), "recovered");
+console.log(JSON.stringify({ passed: true, checks: ["parallel calls", "joins admitted calls", "rejects during transition", "serial transitions", "failure releases gate"] }, null, 2));

@@ -8,7 +8,11 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, getSupportedThinkingLevels, type Models } from "@earendil-works/pi-ai/models";
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
-import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, LiveDoc, type CommitPublication, type ConversationId, type HarnessSettings, type RegistryReader, type Storage, type Tx } from "@earendil-works/pi-durable";
+import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, LiveDoc, type CommitPublication, type ConversationId, type HarnessSettings, type Registry, type RegistryReader, type Storage, type Tx } from "@earendil-works/pi-durable";
+import { WorkerActorsDoc, WorkerInstancesDoc, WorkerIdentityDoc, workerParticipantReportSchema, type BackendWorkerActor, type WorkerParticipantReport } from "./workers/participant-identity.js";
+export type { WorkerParticipantReport } from "./workers/participant-identity.js";
+import type { WorkerSummary } from "./workers/summaries.js";
+import { prepareWorkerWorkspace, workerWorkspaceSection, WorkerWorkspaceDoc } from "./workers/workspace.js";
 import { openPiStorage, type PiStorageConfig } from "./storage/open.js";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
@@ -26,7 +30,7 @@ import { imageGenerationSkill } from "./skills/image-generation.js";
 import { agentBrowserSkill, dogfoodSkill } from "./skills/agent-browser/index.js";
 import { createImageGen } from "./extensions/image-gen.js";
 import { Coding } from "./extensions/coding.js";
-import { SharedConversations, SharedDoc, type Member, type PeopleDirectory } from "./collaboration/shared.js";
+import { SharedConversations, SharedDoc, PublicEntry, type Member, type PeopleDirectory, type Person } from "./collaboration/shared.js";
 import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
 import type { AuthPrincipal } from "./auth.js";
 import { ManagementError, detached, grantHistory, managementFields, readGrants, writeGrant, type Grant } from "./agent-grants.js";
@@ -52,8 +56,67 @@ type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: 
 type StoredSkill = SkillDefinition & { companyId: string; savedBy: string; requestId: string; fingerprint: string };
 type Catalog = { skills?: StoredSkill[]; chats: StoredChat[]; agents: StoredAgent[]; runtimeInstance?: string; connectionOwners?: Record<string, string> };
 type ManagementActor = Awaited<ReturnType<SharedConversations["managementActor"]>>;
+/** Nonsecret backend projection. History is retained so pinned skill/agent revisions stay resolvable. */
+export type WorkerCatalogSnapshot = {
+  sourceId: string; companyId: string; revision: number;
+  agents: AgentDefinition[]; skills: SkillDefinition[]; projects: never[];
+  sharedProjects: SharedProjectRecord[]; grants: Grant[];
+  connectionOwners: Record<string, string>; readAllProjectUserIds: string[];
+};
+export type WorkerManagementActor = ManagementActor & { conversationKey: string; storeId: string; actorId: string; participantReport: WorkerParticipantReport };
+export type WorkerManagement = {
+  read(actor: WorkerManagementActor, input: unknown): Promise<unknown>;
+  save(actor: WorkerManagementActor, callId: string, input: unknown): Promise<unknown>;
+};
+export type WorkerMcpSelection = { connections: NonNullable<AgentDefinition["connections"]>; extensions: string[]; tools: string[] };
+export type WorkerMcp = {
+  prepare(registry: Registry, membership: WorkerMembershipSnapshot, actorForInstance: (id: ConversationId) => Promise<WorkerManagementActor>): Promise<void>;
+};
+type WorkerInvitationEvent = { revision: number; authorUserId?: string; authorDefinitionId?: string; authorActorId?: string; names: string[]; at: number };
+export type WorkerMembershipSnapshot = {
+  conversationKey: string; revision: number; humans: Person[]; agents: {
+    actorId: string; definitionId: string; revision: number; desiredRevision: number;
+    /** Desired membership; actual cleanup state is in the participant report. */
+    membership: "active" | "removing"; legacy: boolean;
+    creation?: { name?: string; instructions?: string }; removedByUserId?: string;
+    mcp: WorkerMcpSelection;
+  }[];
+  events: WorkerInvitationEvent[];
+};
+export type WorkerInvitationResult = { membership: WorkerMembershipSnapshot; catalog: WorkerCatalogSnapshot };
+export type WorkerInvitations = {
+  invite(actor: WorkerManagementActor, requestId: string, definitionIds: string[]): Promise<WorkerInvitationResult>;
+};
+export type ConversationWorkerBootstrap = {
+  conversationKey: string; storeId: string; scope: RuntimeScope; input: CreateChatInput;
+  catalog: WorkerCatalogSnapshot;
+  initialAgentRevisions?: Record<string, number>;
+  membership?: WorkerMembershipSnapshot;
+  /** Retained attribution supplied by the authenticated backend, not a current ACL grant. */
+  creator?: Person;
+};
+type WorkerBinding = {
+  conversationKey: string; storeId: string; companyId: string; creationFingerprint: string;
+  roomId?: string; sourceId: string; catalogRevision: number; catalogFingerprint: string;
+};
+const RuntimeModeDoc = defineDoc<{ mode?: "native" | "directory" | "conversation"; worker?: WorkerBinding }>({
+  kind: "dispatch.runtime-mode", version: 1, scope: "session", initial: () => ({}),
+});
+const WorkerInvitationsDoc = defineDoc<{ rooms: Record<string, { revision: number; mcpSelections?: boolean; instances?: boolean; requests: Record<string, string>; events: WorkerInvitationEvent[] }> }>({
+  kind: "dispatch.worker-invitations", version: 1, scope: "session", initial: () => ({ rooms: {} }),
+});
+const WorkerMembershipReceiptDoc = defineDoc<{ revision: number; fingerprint: string }>({
+  kind: "dispatch.worker-membership-receipt", version: 1, scope: "session", initial: () => ({ revision: 0, fingerprint: "" }),
+});
+const WorkerSummaryReceiptDoc = defineDoc<{ revision: number; fingerprint: string }>({
+  kind: "dispatch.worker-summary-receipt", version: 1, scope: "session", initial: () => ({ revision: 0, fingerprint: "" }),
+});
+const WorkerExportsDoc = defineDoc<{ sourceId?: string; companies: Record<string, { revision: number; fingerprint: string }> }>({
+  kind: "dispatch.worker-catalog-exports", version: 1, scope: "session", initial: () => ({ companies: {} }),
+});
 type ManagementReceipt = {
   companyId: string; definitionId: string; revision: number; instanceId: string; participantId: string; roomId: string;
+  workerStoreId?: string; conversationKey?: string;
   operationId: string; callId: string; fingerprint: string; targetId: string; beforeRevision: number; afterRevision: number;
   at: number; reason: string; evidence: string[]; fields: string[]; restoreRevision?: number; grantVersion: number;
 };
@@ -102,13 +165,25 @@ export type RuntimeOptions = {
   models?: Models;
   settings?: HarnessSettings;
   peopleDirectory?: PeopleDirectory;
+  /** Backend catalog/directory store only: no agent construction and no scheduler resume. */
+  directoryOnly?: boolean;
+  connectMcpOnOpen?: boolean;
+  runMcpBackground?: <T>(operation: () => Promise<T>) => Promise<T>;
+  workerManagement?: WorkerManagement;
+  workerSearch?: (actor: WorkerManagementActor, query: Parameters<import("./web/types.js").WebBackend["search"]>[0], signal?: AbortSignal) => ReturnType<import("./web/types.js").WebBackend["search"]>;
+  workerMcp?: WorkerMcp;
+  workerInvitations?: WorkerInvitations;
+  workerParticipants?: { report(report: WorkerParticipantReport): Promise<unknown> };
+  /** Workers must inject durable remote blob storage; native installations keep their local default. */
+  attachmentStore?: AttachmentStore;
+  projectArchiveStore?: Pick<ProjectArchiveStore, "save" | "read">;
 };
 
 /** Authentication supplies the scope; Pi remains the only owner of transcripts and work. */
 export class DispatchRuntime {
   private harness: Harness;
   private models: Models;
-  private registry: RegistryReader;
+  private registry: Registry;
   private owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>;
   private commitRevision = 0;
   private closed = false;
@@ -122,8 +197,18 @@ export class DispatchRuntime {
   private connections: AgentConnections;
   private managed?: McpConnections;
   private readAllProjectUserIds = new Set<string>();
+  private directoryOnly = false;
+  private worker?: ConversationWorkerBootstrap;
+  private workerManagement?: WorkerManagement;
+  private workerMcp?: WorkerMcp;
+  private workerParticipants?: RuntimeOptions["workerParticipants"];
+  private participantReportDrain?: Promise<void>;
+  private participantReportDirty = false;
+  private boundRoomId?: string;
+  private archiveStorage?: Pick<ProjectArchiveStore, "save" | "read">;
+  private membershipTail: Promise<unknown> = Promise.resolve();
 
-  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: RegistryReader, shared: SharedConversations, connections: AgentConnections, private readonly workspaceDir: string, private readonly attachments: AttachmentStore, peopleDirectory?: PeopleDirectory) {
+  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: Registry, shared: SharedConversations, connections: AgentConnections, private readonly workspaceDir: string, private readonly attachments: AttachmentStore, peopleDirectory?: PeopleDirectory) {
     this.connections = connections;
     this.shared = shared;
     this.peopleDirectory = peopleDirectory;
@@ -137,23 +222,39 @@ export class DispatchRuntime {
     harness.subscribeCommits((publication) => { this.commitRevision = publication.seq; });
   }
 
-  static async open(options: RuntimeOptions) {
+  static open(options: RuntimeOptions) { return this.openInternal(options); }
+
+  static openConversation(options: RuntimeOptions, bootstrap: ConversationWorkerBootstrap) {
+    if (options.directoryOnly) throw new RuntimeError(400, "A worker cannot be a directory runtime.");
+    if (!bootstrap.membership || !options.workerParticipants) throw new RuntimeError(400, "Workers require membership authority and participant reporting.");
+    if (!options.attachmentStore) throw new RuntimeError(400, "Workers require an explicitly supplied durable attachment store.");
+    if (options.piStorage?.kind !== "postgres" || options.piStorage.access !== "worker" || options.piStorage.storeId !== bootstrap.storeId)
+      throw new RuntimeError(400, "Conversation workers require their bound PostgreSQL store.");
+    if (options.companyId !== bootstrap.scope.companyId || bootstrap.catalog.companyId !== options.companyId)
+      throw new RuntimeError(400, "Worker company identity mismatch.");
+    requireText(bootstrap.conversationKey, "Conversation key", 200);
+    requireText(bootstrap.storeId, "Store ID", 200);
+    return this.openInternal(options, detached(bootstrap));
+  }
+
+  private static async openInternal(options: RuntimeOptions, worker?: ConversationWorkerBootstrap) {
     if (!(await stat(options.workspaceDir)).isDirectory()) throw new Error("DISPATCH_WORKSPACE_DIR must point to an existing directory.");
     const owner = await acquireRuntimeOwner(options.stateDir);
     let storage: Storage | undefined;
     let connections: AgentConnections | undefined;
+    let openedHarness: Harness | undefined;
     try {
       options.mcpConnections?.initialize();
       const models = options.models ?? productionModels();
       storage = await openPiStorage(owner.directory, options.piStorage ?? { kind: "sqlite" });
       const registry = createRegistry();
       let runtime: DispatchRuntime;
-      const attachments = new AttachmentStore(join(owner.directory, "attachments"));
-      const shared = new SharedConversations((tx, roomId, companyId, definitionId) => runtime.createParticipant(tx, roomId, companyId, definitionId), attachments, {
+      const attachments = options.attachmentStore ?? new AttachmentStore(join(owner.directory, "attachments"));
+      const shared = new SharedConversations((tx, roomId, companyId, definitionId, revision) => runtime.createParticipant(tx, roomId, companyId, definitionId, revision), attachments, {
         read: (tx, instance, input) => runtime.readManagedAgent(tx, instance, input),
         save: (tx, instance, callId, input) => runtime.saveManagedAgent(tx, instance, callId, input),
       });
-      registry.install(shared.extension);
+      registry.install(worker ? { ...shared.extension, sections: [...shared.extension.sections ?? [], workerWorkspaceSection] } : shared.extension);
       registry.install(shared.definitionOfDoneExtension);
       registry.install(CodingTools);
       registry.install(Coding);
@@ -165,7 +266,8 @@ export class DispatchRuntime {
           const catalog = await tx.doc(CatalogDoc);
           const definition = latestAgent(catalog, actor.companyId, actor.definitionId);
           if (!definition || definition.archived || !agentCapabilities(definition).includes(capability)) return undefined;
-          return { companyId: actor.companyId, definitionId: actor.definitionId };
+          return { companyId: actor.companyId, definitionId: actor.definitionId,
+            remote: worker && capability === "web-search" ? await runtime.remoteActor(tx, actor) : undefined };
         }, context);
         signal?.throwIfAborted();
         return authorized;
@@ -174,7 +276,11 @@ export class DispatchRuntime {
         authorize: async (instanceId, capability, signal) => Boolean(await authorizeWeb(instanceId, capability, signal)),
         search: async (instanceId, query, signal) => {
           const authorized = await authorizeWeb(instanceId, "web-search", signal);
-          const key = authorized ? options.mcpConnections?.resolveSearchSecret(authorized.companyId, authorized.definitionId) : undefined;
+          if (worker && authorized) {
+            if (!options.workerSearch || !authorized.remote) throw new RuntimeError(503, "Search mediation unavailable.");
+            return options.workerSearch(authorized.remote, query, signal);
+          }
+          const key = authorized ? await options.mcpConnections?.resolveSearchSecret(authorized.companyId, authorized.definitionId) : undefined;
           return createWebBackend({ searchApiKey: key }).search(query, signal);
         },
       });
@@ -192,9 +298,50 @@ export class DispatchRuntime {
           return new NodeExecutionEnv({ cwd });
         },
       }, context);
+      openedHarness = harness;
       runtime = new DispatchRuntime(harness, storage, models, owner, registry, shared, connections, options.workspaceDir, attachments, options.peopleDirectory);
       runtime.managed = options.mcpConnections;
+      runtime.directoryOnly = options.directoryOnly ?? false;
+      runtime.worker = worker;
+      runtime.workerManagement = options.workerManagement;
+      runtime.workerMcp = options.workerMcp;
+      runtime.workerParticipants = options.workerParticipants;
+      if (worker) shared.onParticipantStateChanged = tx => runtime.updateWorkerParticipantReport(tx);
+      if (worker) shared.inviteRemote = async (instanceId, requestId, definitionIds) => {
+        if (!options.workerInvitations) throw new RuntimeError(503, "Backend invitation service is unavailable.");
+        const actor = await harness.commit(async tx => runtime.remoteActor(tx, await shared.managementActor(tx, instanceId)), context);
+        const result = await options.workerInvitations.invite(actor, requestId, definitionIds);
+        // The backend never calls back into this worker; do not hold a Pi transaction over the RPC.
+        await runtime.applyWorkerCatalog(result.catalog);
+        await runtime.applyWorkerMembership(result.membership);
+      };
+      runtime.archiveStorage = options.projectArchiveStore;
       runtime.readAllProjectUserIds = new Set(options.readAllProjectUserIds ?? []);
+      await runtime.bindRuntimeMode();
+      if (worker) {
+        await runtime.applyWorkerCatalog(worker.catalog);
+        if (options.runMcpBackground) connections.runBackground = options.runMcpBackground;
+        await connections.open(harness, options.connectMcpOnOpen);
+        const reopenedRoom = Boolean((await harness.snapshot(RuntimeModeDoc, context))?.worker?.roomId);
+        if (worker.membership) await runtime.prepareWorkerMcp(worker.membership);
+        runtime.boundRoomId = await runtime.createChatRecord(worker.scope, worker.input);
+        // No whole-installation migrations or catalog revisions generated by worker discovery.
+        // The stable workspace path must be identical after replacement; its bytes are disposable.
+        if (worker.membership) await runtime.applyWorkerMembership(worker.membership);
+        await runtime.verifyWorkerWorkspace();
+        await prepareWorkerWorkspace(harness, owner.directory, reopenedRoom);
+        await runtime.initializePublicSummaries();
+        await runtime.reconcileUpgrades();
+        if (!runtime.workerParticipants) throw new RuntimeError(503, "Worker participant reporting is unavailable.");
+        await runtime.workerParticipants.report(await runtime.workerParticipantReport());
+        runtime.unsubscribeUpgrades = harness.subscribeCommits(publication => {
+          runtime.queueUpgrades(publication);
+          if (publication.changes.some(change => (change.type === "document" || change.type === "document.copy")
+            && change.record.kind === WorkerIdentityDoc.definition.kind)) runtime.queueParticipantReport();
+        });
+        harness.resume();
+        return runtime;
+      }
       // Seed once and publish a real commit before recovery so snapshots use Pi's persisted sequence.
       await harness.commit(async (tx) => {
         const catalog = await tx.doc(CatalogDoc);
@@ -264,22 +411,713 @@ export class DispatchRuntime {
           });
         }
       }, context);
-      await runtime.migrateChats();
-      await runtime.initializePublicSummaries();
-      await runtime.migrateWorkspaces(options.companyId);
-      await connections.open(harness);
+      if (!runtime.directoryOnly) {
+        await runtime.migrateChats();
+        await runtime.initializePublicSummaries();
+        await runtime.migrateWorkspaces(options.companyId);
+      }
+      if (options.runMcpBackground) connections.runBackground = options.runMcpBackground;
+      await connections.open(harness, options.connectMcpOnOpen);
       await runtime.configureConnections(options.companyId);
       connections.onChanged = () => runtime.configureConnections(options.companyId);
-      await runtime.reconcileUpgrades();
-      runtime.unsubscribeUpgrades = harness.subscribeCommits(publication => runtime.queueUpgrades(publication));
-      harness.resume();
+      if (!runtime.directoryOnly) {
+        await runtime.reconcileUpgrades();
+        runtime.unsubscribeUpgrades = harness.subscribeCommits(publication => runtime.queueUpgrades(publication));
+        harness.resume();
+      }
       return runtime;
     } catch (error) {
-      await connections?.close();
-      await storage?.close(context);
-      owner.release();
+      try { if (openedHarness) await openedHarness.close(context); else await storage?.close(context); }
+      finally { try { await connections?.close(); } finally { owner.release(); } }
       throw error;
     }
+  }
+
+  private async bindRuntimeMode() {
+    await this.harness.commit(async tx => {
+      const state = await tx.doc(RuntimeModeDoc);
+      const mode = this.worker ? "conversation" : this.directoryOnly ? "directory" : "native";
+      if (state.mode && state.mode !== mode) throw new RuntimeError(409, "This store belongs to another runtime mode; implicit migration is not supported.");
+      if (!state.mode && mode !== "native") {
+        const catalog = await tx.doc(CatalogDoc);
+        if (catalog.chats.length || catalog.agents.length || (await tx.scanConversations({}, 1)).items.length || (await tx.scanTasks({}, 1)).items.length)
+          throw new RuntimeError(409, "Split runtime initialization requires a new, empty store.");
+      }
+      state.mode = mode;
+      if (this.directoryOnly && (await tx.scanTasks({}, 1)).items.length)
+        throw new RuntimeError(409, "A directory runtime cannot own execution tasks.");
+      if (!this.worker) return;
+      const worker = this.worker;
+      const creationFingerprint = fingerprint([worker.scope, worker.input]);
+      if (state.worker) {
+        if (state.worker.conversationKey !== worker.conversationKey || state.worker.storeId !== worker.storeId
+          || state.worker.companyId !== worker.scope.companyId || state.worker.creationFingerprint !== creationFingerprint)
+          throw new RuntimeError(409, "Worker store/bootstrap binding conflict.");
+      } else {
+        state.worker = { conversationKey: worker.conversationKey, storeId: worker.storeId, companyId: worker.scope.companyId,
+          creationFingerprint, sourceId: worker.catalog.sourceId, catalogRevision: 0, catalogFingerprint: "" };
+      }
+      this.boundRoomId = state.worker.roomId;
+    }, context);
+  }
+
+  /** Backend-owned export receipt. Revision advances durably whenever the exported projection changes,
+   * including grant/project/connection changes; it is not a volatile subscription sequence.
+   */
+  async exportWorkerCatalog(companyId: string): Promise<WorkerCatalogSnapshot> {
+    this.requireCatalogOwner();
+    requireText(companyId, "Company ID", 200);
+    return this.harness.commit(tx => this.workerCatalog(tx, companyId), context);
+  }
+
+  private async workerCatalog(tx: Tx, companyId: string): Promise<WorkerCatalogSnapshot> {
+    const catalog = await tx.doc(CatalogDoc);
+    const shared = await tx.doc(ProjectsDoc);
+    const exports = await tx.doc(WorkerExportsDoc);
+    exports.sourceId ??= randomUUID();
+    const agentIds = new Set(catalog.agents.filter(agent => agent.companyId === companyId).map(agent => agent.id));
+    const payload = detached({
+      sourceId: exports.sourceId, companyId,
+      agents: catalog.agents.filter(agent => agent.companyId === companyId).map(publicAgent),
+      skills: (catalog.skills ?? []).filter(skill => skill.companyId === companyId).map(publicSkill),
+      projects: [],
+      sharedProjects: Object.values(shared.projects).filter(project => project.companyId === companyId),
+      grants: await readGrants(tx, companyId),
+      connectionOwners: Object.fromEntries(Object.entries(catalog.connectionOwners ?? {}).filter(([, agentId]) => agentIds.has(agentId))),
+      readAllProjectUserIds: [...this.readAllProjectUserIds].sort(),
+    });
+    const hash = fingerprint(payload);
+    const prior = exports.companies[companyId];
+    if (!prior || prior.fingerprint !== hash) exports.companies[companyId] = { revision: (prior?.revision ?? 0) + 1, fingerprint: hash };
+    return { ...payload, revision: exports.companies[companyId].revision };
+  }
+
+  /** Internal route-bound read: the backend authenticates the current launch attempt first.
+   * One transaction pins catalog history, membership and creation attribution together.
+   * Never authorize recovery as the original creator, who may since have lost project access.
+   */
+  async directoryWorkerBootstrap(companyId: string, conversationKey: string) {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    return this.harness.commit(async tx => {
+      const chat = (await tx.doc(CatalogDoc)).chats.find(chat => chat.companyId === companyId && chat.id === conversationKey);
+      if (!chat) throw new RuntimeError(404, "Conversation not found.");
+      const room = await tx.doc(SharedDoc, nativeId(conversationKey));
+      if (room.companyId !== companyId) throw new RuntimeError(404, "Conversation not found.");
+      const human = room.members.find(member => member.kind === "human" && member.userId === chat.userId);
+      if (!human) throw new RuntimeError(409, "Conversation creation attribution is unavailable.");
+      const membership = await this.workerMembership(tx, conversationKey);
+      return { catalog: await this.workerCatalog(tx, companyId), membership,
+        initialAgentRevisions: Object.fromEntries([...membership.agents].reverse().map(agent => [agent.definitionId, agent.revision])),
+        creator: { id: human.userId!, name: human.name } };
+    }, context);
+  }
+
+  /** Call only with an authenticated backend projection. A receipt is committed with the projection.
+   * Membership/grant snapshots are not an independent authority for cross-store management saves.
+   */
+  async applyWorkerCatalog(input: WorkerCatalogSnapshot) {
+    if (!this.worker) throw new RuntimeError(409, "Only conversation workers accept catalog projections.");
+    const snapshot = detached(input);
+    requireText(snapshot.sourceId, "Catalog source ID", 200);
+    if (snapshot.companyId !== this.worker.scope.companyId || !Number.isSafeInteger(snapshot.revision) || snapshot.revision < 1)
+      throw new RuntimeError(409, "Worker catalog identity/revision mismatch.");
+    if (snapshot.projects.length !== 0
+      || snapshot.sharedProjects.some(project => project.companyId !== snapshot.companyId)
+      || snapshot.grants.some(grant => grant.companyId !== snapshot.companyId))
+      throw new RuntimeError(409, "Worker catalog contains another company's state.");
+    const hash = fingerprint(snapshot);
+    const receipt = await this.harness.commit(async tx => {
+      const binding = (await tx.doc(RuntimeModeDoc)).worker!;
+      if (binding.sourceId !== snapshot.sourceId || snapshot.revision < binding.catalogRevision)
+        throw new RuntimeError(409, "Stale or unrelated worker catalog.");
+      if (snapshot.revision === binding.catalogRevision && binding.catalogFingerprint !== hash)
+        throw new RuntimeError(409, "Catalog revision was reused with different content.");
+      if (snapshot.revision > binding.catalogRevision) {
+        const catalog = await tx.doc(CatalogDoc);
+        catalog.agents = snapshot.agents.map(agent => ({ ...agent, companyId: snapshot.companyId }));
+        catalog.skills = snapshot.skills.map(skill => ({ ...skill, companyId: snapshot.companyId, savedBy: "backend",
+          requestId: `projection:${skill.id}:${skill.revision}`, fingerprint: "backend-projection" }));
+        catalog.connectionOwners = snapshot.connectionOwners;
+        const shared = await tx.doc(ProjectsDoc);
+        shared.projects = Object.fromEntries(snapshot.sharedProjects.map(project => [project.id, project]));
+        // Workers never write project-administration request receipts or management grants.
+        binding.catalogRevision = snapshot.revision;
+        binding.catalogFingerprint = hash;
+      }
+      return { sourceId: binding.sourceId, revision: binding.catalogRevision, fingerprint: binding.catalogFingerprint };
+    }, context);
+    this.readAllProjectUserIds = new Set(snapshot.readAllProjectUserIds);
+    return receipt;
+  }
+
+  async workerBinding() {
+    if (!this.worker) throw new RuntimeError(409, "Not a conversation worker.");
+    const binding = (await this.harness.snapshot(RuntimeModeDoc, context))?.worker;
+    if (!binding?.roomId) throw new RuntimeError(503, "Worker bootstrap is incomplete.");
+    return detached({ conversationKey: binding.conversationKey, storeId: binding.storeId, companyId: binding.companyId,
+      roomId: binding.roomId, sourceId: binding.sourceId, catalogRevision: binding.catalogRevision,
+      workspace: await this.harness.snapshot(WorkerWorkspaceDoc, context) });
+  }
+
+  /** Directory metadata only. Preserve resolved creation choices when the backend persists routing. */
+  async directoryChatBootstrap(scope: RuntimeScope, id: string) {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    return this.harness.commit(async tx => {
+      const room = await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
+      const chat = (await tx.doc(CatalogDoc)).chats.find(item => item.id === id && item.companyId === scope.companyId);
+      if (!chat) throw new RuntimeError(404, "Conversation not found.");
+      return detached({ scope: { companyId: chat.companyId, userId: chat.userId }, input: {
+        requestId: chat.requestId, ...(chat.creationTitleExplicit ? { title: chat.title } : {}),
+        agentDefinitionIds: chat.creationAgentIds ?? [chat.agentDefinitionId],
+        ...(room.sharedProjectId ? { sharedProjectId: room.sharedProjectId } : {}),
+      } satisfies CreateChatInput });
+    }, context);
+  }
+
+  /** RPC caller must first authenticate and bind the actor's store/key to the current launcher attempt.
+   * Never call the worker back from this backend transaction: the worker awaits it on its own commit line.
+   */
+  async readWorkerManagedAgent(actor: WorkerManagementActor, raw: unknown) {
+    this.requireDirectoryActor(actor);
+    return this.harness.commit(async tx => this.readManagedActor(tx, await this.authoritativeWorkerActor(tx, actor), managementReadSchema.parse(raw)), context);
+  }
+
+  async saveWorkerManagedAgent(actor: WorkerManagementActor, callId: string, raw: unknown) {
+    this.requireDirectoryActor(actor);
+    requireText(callId, "Tool call ID", 200);
+    return this.harness.commit(async tx => this.saveManagedActor(tx, await this.authoritativeWorkerActor(tx, actor), callId, managementSaveSchema.parse(raw)), context);
+  }
+
+  async directoryWorkerMembership(scope: RuntimeScope, id: string): Promise<WorkerMembershipSnapshot> {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    return this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
+      return this.workerMembership(tx, id);
+    }, context);
+  }
+
+  /** Commit backend intent first. The next authenticated RPC/bootstrap reconciles worker membership
+   * even if the response is lost or the worker disappears before applying it.
+   */
+  async inviteWorkerParticipants(scope: RuntimeScope, id: string, input: AddParticipantsInput): Promise<WorkerInvitationResult> {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    const people = await Promise.all([...new Set([scope.userId, ...input.userIds ?? []])].map(userId => this.person(scope.companyId, userId)));
+    return this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
+      const membership = await this.admitWorkerInvitation(tx, id, scope.companyId, { userId: scope.userId }, input, people);
+      return { membership, catalog: await this.workerCatalog(tx, scope.companyId) };
+    }, context);
+  }
+
+  async inviteWorkerAgents(claim: WorkerManagementActor, requestId: string, definitionIds: string[]): Promise<WorkerInvitationResult> {
+    this.requireDirectoryActor(claim);
+    return this.harness.commit(async tx => {
+      const actor = await this.authoritativeWorkerActor(tx, claim);
+      const membership = await this.admitWorkerInvitation(tx, claim.conversationKey, actor.companyId, { definitionId: actor.definitionId, actorId: actor.participantId },
+        { requestId, agentDefinitionIds: definitionIds }, []);
+      return { membership, catalog: await this.workerCatalog(tx, claim.companyId) };
+    }, context);
+  }
+
+  async admitWorkerInstance(scope: RuntimeScope, id: string, input: CreateAgentInstanceInput) {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    requireText(input.requestId, "Request ID", 200);
+    requireText(input.agentDefinitionId, "Agent ID", 200);
+    if (input.name !== undefined) requireText(input.name, "Instance name", 100, true);
+    if (input.instructions !== undefined) requireText(input.instructions, "Instance instructions", 50_000, true);
+    const person = await this.person(scope.companyId, scope.userId);
+    return this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
+      await this.shared.ensureHuman(tx, nativeId(id), person);
+      await this.workerMembership(tx, id);
+      const journal = (await tx.doc(WorkerInstancesDoc)).rooms[id] ??= { requests: {} };
+      const key = JSON.stringify([scope.userId, input.requestId]);
+      const name = input.name?.trim() || undefined;
+      const hash = fingerprint([input.agentDefinitionId, name ?? "", input.instructions ?? ""]);
+      const prior = journal.requests[key];
+      if (prior && prior.fingerprint !== hash) throw requestConflict();
+      let actorId = prior?.actorId;
+      if (!actorId) {
+        const actors = (await tx.doc(WorkerActorsDoc)).actors[id];
+        if (actors.some(actor => actor.definitionId === input.agentDefinitionId && actor.membership === "removing"))
+          throw new RuntimeError(409, "Agent removal is still pending. Retry after cleanup finishes.");
+        const definition = this.findAgent(await tx.doc(CatalogDoc), scope, input.agentDefinitionId);
+        this.validateAgent(definition);
+        const identity = await tx.createConversation({ ownership: { kind: "ownerless" } });
+        actorId = randomUUID();
+        actors.push({ companyId: scope.companyId, definitionId: definition.id, revision: definition.revision,
+          instanceId: identity.id, participantId: actorId, roomId: nativeId(id), configuration: detached(publicAgent(definition)),
+          legacy: false, membership: "active", creation: { ...(name ? { name } : {}), ...(input.instructions ? { instructions: input.instructions } : {}) } });
+        journal.requests[key] = { fingerprint: hash, actorId };
+        const invitations = (await tx.doc(WorkerInvitationsDoc)).rooms[id];
+        invitations.revision++;
+        invitations.events.push({ revision: invitations.revision, authorUserId: scope.userId, names: [name ?? definition.name], at: Date.now() });
+      }
+      return { actorId, membership: await this.workerMembership(tx, id), catalog: await this.workerCatalog(tx, scope.companyId) };
+    }, context);
+  }
+
+  async removeWorkerParticipant(scope: RuntimeScope, id: string, participantId: string) {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    requireText(participantId, "Participant ID", 200);
+    const person = await this.person(scope.companyId, scope.userId);
+    return this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
+      const room = await tx.doc(SharedDoc, nativeId(id));
+      const knownHuman = room.members.some(member => member.kind === "human" && member.userId === person.id);
+      await this.shared.ensureHuman(tx, nativeId(id), person);
+      if (!knownHuman) (await tx.doc(WorkerInvitationsDoc)).rooms[id].revision++;
+      await this.workerMembership(tx, id);
+      const actor = (await tx.doc(WorkerActorsDoc)).actors[id].find(actor => actor.worker?.participantId === participantId
+        || (!actor.legacy && actor.participantId === participantId));
+      if (!actor) throw new RuntimeError(404, "Agent participant not found.");
+      if (actor.membership === "active") {
+        actor.membership = "removing";
+        actor.removedByUserId = scope.userId;
+        (await tx.doc(WorkerInvitationsDoc)).rooms[id].revision++;
+      }
+      return { membership: await this.workerMembership(tx, id), catalog: await this.workerCatalog(tx, scope.companyId) };
+    }, context);
+  }
+
+  async workerInstanceResult(scope: RuntimeScope, id: string, actorId: string): Promise<CreateAgentInstanceResult> {
+    this.requireWorkerRoom(scope, id);
+    if (!this.worker) throw new RuntimeError(409, "Not a conversation worker.");
+    const createdParticipantId = await this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
+      const mapping = (await tx.doc(WorkerIdentityDoc)).mappings[actorId];
+      if (!mapping) throw new RuntimeError(409, "Worker instance has not been reconciled.");
+      return mapping.participantId;
+    }, context);
+    return { ...await this.getChat(scope, id), createdParticipantId };
+  }
+
+  /** Report only native state already committed with its identity/adoption/removal transition. */
+  async workerParticipantReport(): Promise<WorkerParticipantReport> {
+    if (!this.worker) throw new RuntimeError(409, "Not a conversation worker.");
+    const report = (await this.harness.snapshot(WorkerIdentityDoc, context))?.report;
+    if (!report) throw new RuntimeError(503, "Worker participant report is unavailable.");
+    return detached(report);
+  }
+
+  private async updateWorkerParticipantReport(tx: Tx) {
+    if (!this.worker || !this.boundRoomId) return;
+    const identities = await tx.doc(WorkerIdentityDoc);
+    const room = await tx.doc(SharedDoc, nativeId(this.boundRoomId));
+    const membership = await tx.doc(WorkerMembershipReceiptDoc);
+    if (!membership.revision) return;
+    const agents = Object.entries(identities.mappings).map(([actorId, mapping]) => {
+      const member = room.members.find(member => member.id === mapping.participantId);
+      if (!member?.conversationId || String(member.conversationId) !== mapping.instanceId || !member.agentDefinitionId || !member.agentRevision)
+        throw new RuntimeError(409, "Worker participant mapping conflicts with native state.");
+      return { actorId, participantId: mapping.participantId, instanceId: mapping.instanceId, definitionId: member.agentDefinitionId, appliedRevision: member.agentRevision,
+        membership: member.membership ?? "active" as const };
+    });
+    const payload = { conversationKey: this.worker.conversationKey, storeId: this.worker.storeId, roomId: this.boundRoomId,
+      membershipRevision: membership.revision, agents };
+    const revision = identities.report?.revision ?? 0;
+    const report = { ...payload, revision };
+    if (!identities.report || fingerprint(report) !== fingerprint(identities.report)) identities.report = { ...report, revision: revision + 1 };
+  }
+
+  private queueParticipantReport() {
+    if (this.closed || !this.workerParticipants) return;
+    this.participantReportDirty = true;
+    if (this.participantReportDrain) return;
+    // Publication callbacks are wakeups only; no Session or network operation runs in them.
+    this.participantReportDrain = Promise.resolve().then(async () => {
+      while (this.participantReportDirty && !this.closed) {
+        this.participantReportDirty = false;
+        await this.workerParticipants!.report(await this.workerParticipantReport());
+      }
+    }).catch(() => { console.error("Worker participant report failed; committed state remains available for reconciliation."); })
+      .finally(() => { this.participantReportDrain = undefined; if (this.participantReportDirty && !this.closed) this.queueParticipantReport(); });
+  }
+
+  /** Caller authenticates the current attempt and supplies its route, not worker-supplied scope. */
+  async acknowledgeWorkerParticipants(companyId: string, conversationKey: string, storeId: string, raw: unknown) {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    const report = workerParticipantReportSchema.parse(raw);
+    return this.harness.commit(tx => this.acknowledgeWorkerParticipantsIn(tx, companyId, conversationKey, storeId, report), context);
+  }
+
+  private async acknowledgeWorkerParticipantsIn(tx: Tx, companyId: string, conversationKey: string, storeId: string, report: WorkerParticipantReport) {
+    if (report.conversationKey !== conversationKey || report.storeId !== storeId)
+      throw new RuntimeError(403, "Participant report is outside the authenticated route.");
+    const catalog = await tx.doc(CatalogDoc);
+    if (!catalog.chats.some(chat => chat.companyId === companyId && chat.id === conversationKey)) throw new RuntimeError(404, "Conversation not found.");
+    await this.workerMembership(tx, conversationKey);
+    const actors = (await tx.doc(WorkerActorsDoc)).actors[conversationKey];
+    const invitations = (await tx.doc(WorkerInvitationsDoc)).rooms[conversationKey];
+    const journal = (await tx.doc(WorkerInstancesDoc)).rooms[conversationKey] ??= { requests: {} };
+    const hash = fingerprint(report);
+    if (journal.report) {
+      if (journal.report.storeId !== storeId || journal.report.roomId !== report.roomId) throw new RuntimeError(409, "Worker report binding changed.");
+      if (report.revision < journal.report.revision) return;
+      if (report.revision === journal.report.revision) {
+        if (journal.report.fingerprint !== hash) throw new RuntimeError(409, "Worker report revision conflicts.");
+        return;
+      }
+    }
+    if (report.membershipRevision > invitations.revision
+      || new Set(report.agents.map(agent => agent.actorId)).size !== report.agents.length
+      || new Set(report.agents.map(agent => agent.participantId)).size !== report.agents.length
+      || new Set(report.agents.map(agent => agent.instanceId)).size !== report.agents.length)
+      throw new RuntimeError(409, "Worker report contains conflicting membership identities.");
+    if (actors.some(actor => actor.worker && !report.agents.some(agent => agent.actorId === actor.participantId)))
+      throw new RuntimeError(409, "Worker report lost a retained participant.");
+    for (const applied of report.agents) {
+      const actor = actors.find(actor => actor.participantId === applied.actorId);
+      if (!actor || actor.companyId !== companyId || actor.definitionId !== applied.definitionId)
+        throw new RuntimeError(403, "Worker participant has no backend authority.");
+      const binding = { storeId, roomId: report.roomId, participantId: applied.participantId, instanceId: applied.instanceId };
+      if ((actor.worker && fingerprint(actor.worker) !== fingerprint(binding)) || (!actor.legacy && applied.participantId !== actor.participantId))
+        throw new RuntimeError(409, "Worker participant identity changed.");
+      if (applied.appliedRevision < (actor.appliedRevision ?? actor.revision)
+        || !catalog.agents.some(agent => agent.companyId === companyId && agent.id === actor.definitionId && agent.revision === applied.appliedRevision)
+        || applied.appliedRevision > actor.desiredRevision!)
+        throw new RuntimeError(409, "Worker applied revision is not authorized.");
+      if ((actor.membership === "active" && applied.membership !== "active")
+        || (actor.membership === "removed" && applied.membership !== "removed"))
+        throw new RuntimeError(409, "Worker membership conflicts with backend intent.");
+      actor.worker = binding;
+      actor.appliedRevision = applied.appliedRevision;
+      // An older active report can never undo a backend removal fence.
+      if (actor.membership === "removing" && applied.membership === "removed") {
+        actor.membership = "removed";
+        // Projection carries the durable removal intent, not its observation. Completion
+        // must not invalidate a concurrent reconcile/definition request for that intent.
+      }
+    }
+    journal.report = { storeId, roomId: report.roomId, revision: report.revision, fingerprint: hash };
+  }
+
+  private async workerMembership(tx: Tx, id: string): Promise<WorkerMembershipSnapshot> {
+    const room = await tx.doc(SharedDoc, nativeId(id));
+    const actors = (await tx.doc(WorkerActorsDoc)).actors[id];
+    const invitations = (await tx.doc(WorkerInvitationsDoc)).rooms[id];
+    if (!actors || !invitations) throw new RuntimeError(409, "Conversation has no backend membership journal.");
+    const catalog = await tx.doc(CatalogDoc);
+    let changed = false;
+    // Additive journal upgrade: retain every backend/native identity and old request receipt.
+    if (!invitations.instances) {
+      for (const actor of actors) { actor.legacy ??= true; actor.membership ??= "active"; }
+      invitations.instances = true;
+      changed = true;
+    }
+    if (!invitations.mcpSelections) { invitations.mcpSelections = true; changed = true; }
+    for (const actor of actors) {
+      const latest = latestAgent(catalog, actor.companyId, actor.definitionId);
+      const desired = latest && !latest.archived && actor.membership !== "removed" && actor.membership !== "removing"
+        ? latest.revision : actor.desiredRevision ?? Math.max(actor.appliedRevision ?? actor.revision, latest?.revision ?? actor.revision);
+      if (actor.desiredRevision !== desired) { actor.desiredRevision = desired; changed = true; }
+      actor.membership ??= "active";
+      actor.legacy ??= false;
+    }
+    if (changed) invitations.revision++;
+    return detached({ conversationKey: id, revision: invitations.revision,
+      humans: room.members.filter(member => member.kind === "human").map(member => ({ id: member.userId!, name: member.name })),
+      agents: actors.map(actor => ({ actorId: actor.participantId, definitionId: actor.definitionId,
+        revision: actor.revision, desiredRevision: actor.desiredRevision!, membership: actor.membership === "active" ? "active" : "removing", legacy: actor.legacy!,
+        ...(actor.creation ? { creation: actor.creation } : {}), ...(actor.removedByUserId ? { removedByUserId: actor.removedByUserId } : {}),
+        mcp: workerMcpSelection(actor.configuration) })), events: invitations.events });
+  }
+
+  private async admitWorkerInvitation(tx: Tx, id: string, companyId: string, author: { userId?: string; definitionId?: string; actorId?: string }, input: AddParticipantsInput, people: Person[]) {
+    requireText(input.requestId, "Invitation request ID", 200);
+    const agentIds = [...new Set(input.agentDefinitionIds ?? [])].sort();
+    const userIds = [...new Set(input.userIds ?? [])].sort();
+    for (const id of [...agentIds, ...userIds]) requireText(id, "Participant ID", 200);
+    const room = await tx.doc(SharedDoc, nativeId(id));
+    if (room.companyId !== companyId) throw new RuntimeError(404, "Conversation not found.");
+    if (room.sharedProjectId !== undefined && userIds.length) throw new RuntimeError(403, "Manage project membership to grant access to this conversation.");
+    await this.workerMembership(tx, id);
+    const actors = (await tx.doc(WorkerActorsDoc)).actors[id];
+    const invitations = (await tx.doc(WorkerInvitationsDoc)).rooms[id];
+    const key = JSON.stringify([author, input.requestId]);
+    const hash = fingerprint([agentIds, userIds]);
+    if (invitations.requests[key]) {
+      if (invitations.requests[key] !== hash) throw requestConflict();
+      return this.workerMembership(tx, id);
+    }
+    const catalog = await tx.doc(CatalogDoc);
+    const names: string[] = [];
+    let authorAdded = false;
+    if (author.userId && !room.members.some(member => member.userId === author.userId)) {
+      const person = people.find(person => person.id === author.userId);
+      if (!person) throw new RuntimeError(404, "Invitation author is unavailable.");
+      room.members.push({ id: `human:${person.id}`, kind: "human", userId: person.id, name: person.name, joinedAt: Date.now(), status: "idle" });
+      room.preferences[person.id] ??= { pinned: false, archived: false };
+      authorAdded = true;
+    }
+    for (const definitionId of agentIds) {
+      const existing = actors.filter(actor => actor.definitionId === definitionId);
+      if (existing.some(actor => actor.membership === "active")) continue;
+      if (!author.userId && existing.length) throw new RuntimeError(403, "Only a human can re-add a removed agent.");
+      if (existing.some(actor => actor.membership === "removing")) throw new RuntimeError(409, "Agent removal is still pending. Retry after cleanup finishes.");
+      const definition = this.findAgent(catalog, { companyId }, definitionId);
+      this.validateAgent(definition);
+      const identity = await tx.createConversation({ ownership: { kind: "ownerless" } });
+      actors.push({ companyId, definitionId, revision: definition.revision, instanceId: identity.id,
+        participantId: randomUUID(), roomId: nativeId(id), configuration: detached(publicAgent(definition)), legacy: false, membership: "active" });
+      names.push(definition.name);
+    }
+    for (const userId of userIds) {
+      if (room.members.some(member => member.kind === "human" && member.userId === userId)) continue;
+      const person = people.find(person => person.id === userId);
+      if (!person) throw new RuntimeError(404, "Company member not found.");
+      room.members.push({ id: `human:${userId}`, kind: "human", userId, name: person.name, joinedAt: Date.now(), status: "idle" });
+      room.preferences[userId] = { pinned: false, archived: false };
+      names.push(person.name);
+    }
+    invitations.requests[key] = hash;
+    if (names.length || authorAdded) invitations.revision++;
+    if (names.length) {
+      invitations.events.push({ revision: invitations.revision, ...(author.userId ? { authorUserId: author.userId } : { authorDefinitionId: author.definitionId!, authorActorId: author.actorId! }), names, at: Date.now() });
+    }
+    return this.workerMembership(tx, id);
+  }
+
+  /** Backend-only projection, applied on Pi's commit line. Versions reject stale/conflicting
+   * content; participant creation and membership notices commit with the receipt.
+   */
+  async applyWorkerMembership(input: WorkerMembershipSnapshot) {
+    // Agent invitation callbacks and HTTP reconciliation can arrive independently.
+    // Order registry preparation with the durable selection commit, without holding a Pi transaction over I/O.
+    const operation = this.membershipTail.then(() => this.applyWorkerMembershipNow(input));
+    this.membershipTail = operation.catch(() => {});
+    return operation;
+  }
+
+  private async applyWorkerMembershipNow(input: WorkerMembershipSnapshot) {
+    if (!this.worker || !this.boundRoomId) throw new RuntimeError(409, "Worker room is not open.");
+    const snapshot = detached(input);
+    if (snapshot.conversationKey !== this.worker.conversationKey || !Number.isSafeInteger(snapshot.revision) || snapshot.revision < 1)
+      throw new RuntimeError(409, "Worker membership identity/revision mismatch.");
+    if (new Set(snapshot.humans.map(person => person.id)).size !== snapshot.humans.length
+      || new Set(snapshot.agents.map(agent => agent.actorId)).size !== snapshot.agents.length)
+      throw new RuntimeError(409, "Duplicate worker membership identity.");
+    for (const agent of snapshot.agents) {
+      requireText(agent.actorId, "Worker actor ID", 200);
+      if (!Number.isSafeInteger(agent.revision) || agent.revision < 1 || !Number.isSafeInteger(agent.desiredRevision)
+        || agent.desiredRevision < agent.revision || !["active", "removing"].includes(agent.membership))
+        throw new RuntimeError(409, "Invalid worker instance projection.");
+    }
+    const hash = fingerprint(snapshot);
+    const prior = await this.harness.snapshot(WorkerMembershipReceiptDoc, context);
+    if (prior && (snapshot.revision < prior.revision || (snapshot.revision === prior.revision && hash !== prior.fingerprint)))
+      throw new RuntimeError(409, "Stale or conflicting worker membership.");
+    if (prior?.revision === snapshot.revision) return { revision: snapshot.revision };
+    await this.prepareWorkerMcp(snapshot);
+    await this.harness.commit(async tx => {
+      const receipt = await tx.doc(WorkerMembershipReceiptDoc);
+      if (snapshot.revision < receipt.revision || (snapshot.revision === receipt.revision && hash !== receipt.fingerprint))
+        throw new RuntimeError(409, "Stale or conflicting worker membership.");
+      if (snapshot.revision === receipt.revision) return;
+      const roomId = nativeId(this.boundRoomId!);
+      const room = await tx.doc(SharedDoc, roomId);
+      for (const person of snapshot.humans) {
+        if (room.members.some(member => member.kind === "human" && member.userId === person.id)) continue;
+        room.members.push({ id: `human:${person.id}`, kind: "human", userId: person.id, name: person.name, joinedAt: Date.now(), status: "idle" });
+        room.preferences[person.id] ??= { pinned: false, archived: false };
+      }
+      const identities = await tx.doc(WorkerIdentityDoc);
+      for (const agent of snapshot.agents) {
+        let mapping = identities.mappings[agent.actorId];
+        if (!mapping) {
+          let member: Member | undefined;
+          if (agent.legacy) {
+            // The old protocol admitted at most one instance per definition. Bind it once,
+            // without changing native IDs, public author IDs, task inputs or history.
+            const retained = room.members.filter(member => member.kind === "agent" && member.agentDefinitionId === agent.definitionId
+              && !Object.values(identities.mappings).some(mapping => mapping.participantId === member.id));
+            if (retained.length > 1) throw new RuntimeError(409, "Legacy participant mapping is ambiguous.");
+            member = retained[0];
+          }
+          if (!member) member = await this.shared.addAgent(tx, roomId, agent.definitionId, agent.creation ?? {}, agent.revision, agent.actorId);
+          if (!member.conversationId) throw new RuntimeError(409, "Worker participant has no native instance.");
+          mapping = identities.mappings[agent.actorId] = { participantId: member.id, instanceId: String(member.conversationId), desiredRevision: agent.desiredRevision };
+        }
+        if (agent.desiredRevision < mapping.desiredRevision) throw new RuntimeError(409, "Worker desired revision regressed.");
+        mapping.desiredRevision = agent.desiredRevision;
+        const member = room.members.find(member => member.id === mapping.participantId);
+        if (!member || member.agentDefinitionId !== agent.definitionId || String(member.conversationId) !== mapping.instanceId
+          || !member.agentRevision || member.agentRevision < agent.revision || member.agentRevision > agent.desiredRevision)
+          throw new RuntimeError(409, "Worker participant conflicts with its backend instance authority.");
+        if (agent.membership !== "active") {
+          if (!agent.removedByUserId) throw new RuntimeError(409, "Removal attribution is unavailable.");
+          await this.shared.beginRemoval(tx, roomId, member.id, `human:${agent.removedByUserId}`);
+        } else {
+          if (member.membership && member.membership !== "active") throw new RuntimeError(409, "Backend projection cannot revive a removed participant.");
+          if (fingerprint(workerMcpSelection(member.agent!)) !== fingerprint(agent.mcp)) member.pendingWorkerMcp = detached(agent.mcp);
+          else delete member.pendingWorkerMcp;
+        }
+      }
+      if (room.members.some(member => member.kind === "agent" && !Object.values(identities.mappings).some(mapping => mapping.participantId === member.id))
+        || Object.keys(identities.mappings).some(actorId => !snapshot.agents.some(agent => agent.actorId === actorId)))
+        throw new RuntimeError(409, "Worker has a participant without backend authority.");
+      for (const event of snapshot.events.filter(event => event.revision > receipt.revision)) {
+        const authorId = event.authorUserId ? `human:${event.authorUserId}`
+          : event.authorActorId ? identities.mappings[event.authorActorId]?.participantId
+          : room.members.find(member => member.agentDefinitionId === event.authorDefinitionId)?.id;
+        if (!authorId) throw new RuntimeError(409, "Invitation author is unavailable.");
+        await this.shared.appendPublic(tx, roomId, { data: { id: `membership:${this.worker!.conversationKey}:${event.revision}`,
+          kind: "membership", authorId, text: `Invited ${event.names.join(", ")}`, createdAt: event.at, threadId: null, mentions: [] } });
+      }
+      receipt.revision = snapshot.revision; receipt.fingerprint = hash;
+      await this.updateWorkerParticipantReport(tx);
+    }, context);
+    // Registry preparation precedes this safe-idle application; pending work remains native-owned.
+    await this.reconcileUpgrades(new Set([nativeId(this.boundRoomId)]));
+    return { revision: snapshot.revision };
+  }
+
+  async workerInitialAgentRevisions(scope: RuntimeScope, id: string): Promise<Record<string, number>> {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    return this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
+      const actors = (await tx.doc(WorkerActorsDoc)).actors[id];
+      if (!actors) throw new RuntimeError(409, "Conversation has no backend actor pins.");
+      return Object.fromEntries([...actors].reverse().map(actor => [actor.definitionId, actor.revision]));
+    }, context);
+  }
+
+  private async prepareWorkerMcp(membership: WorkerMembershipSnapshot) {
+    if (!this.worker) throw new RuntimeError(409, "Not a conversation worker.");
+    if (membership.conversationKey !== this.worker.conversationKey) throw new RuntimeError(409, "Worker membership identity mismatch.");
+    for (const { mcp } of membership.agents.filter(agent => agent.membership === "active")) {
+      if (!mcp || mcp.extensions.some(name => !isMcpExtension(name)) || mcp.tools.some(name => !isMcpTool(name)))
+        throw new RuntimeError(409, "Invalid worker MCP selection.");
+    }
+    if (this.workerMcp) await this.workerMcp.prepare(this.registry, membership, id => this.harness.commit(async tx => this.remoteActor(tx, await this.shared.managementActor(tx, id)), context));
+    else if (membership.agents.some(agent => agent.membership === "active" && (agent.mcp.extensions.length || agent.mcp.tools.length)))
+      throw new RuntimeError(503, "Worker MCP registrations are unavailable.");
+  }
+
+  private async applyWorkerMcpSelection(tx: Tx, member: Member, selection: WorkerMcpSelection) {
+    if (!member.conversationId || !member.agent) throw new RuntimeError(409, "Worker agent binding is unavailable.");
+    const registry = this.registry.snapshot();
+    const extensions = selection.extensions.map(name => {
+      const extension = registry.extension(name);
+      if (!extension) throw new RuntimeError(503, `Agent extension ${name} is unavailable.`);
+      return extension;
+    });
+    if (selection.tools.some(name => !extensions.some(extension => extension.tools?.some(tool => tool.name === name))))
+      throw new RuntimeError(503, "Worker MCP tool registration is unavailable.");
+    const agent = await tx.doc(AgentDoc, member.conversationId);
+    // These instances originate from configure() with explicit lists. Preserve native
+    // collaboration/skill/coding selections and reject unsupported selection shapes.
+    if (!Array.isArray(agent.extensions) || !Array.isArray(agent.tools)) throw new RuntimeError(409, "Worker agent selections must be explicit.");
+    agent.extensions = [...agent.extensions.filter(name => !isMcpExtension(name)), ...selection.extensions];
+    agent.tools = [...agent.tools.filter(name => !isMcpTool(name)), ...selection.tools];
+    member.agent.extensions = [...member.agent.extensions.filter(name => !isMcpExtension(name)), ...selection.extensions];
+    member.agent.tools = [...member.agent.tools.filter(name => !isMcpTool(name)), ...selection.tools];
+    member.agent.connections = detached(selection.connections ?? []);
+  }
+
+  /** Attempt authentication belongs to the backend route. Never execute the returned
+   * authorization after a concurrent revocation barrier; the invocation owns that ordering.
+   */
+  async authorizeWorkerSearch(claim: WorkerManagementActor) {
+    this.requireDirectoryActor(claim);
+    return this.harness.commit(async tx => {
+      const actor = await this.authoritativeWorkerActor(tx, claim);
+      const definition = latestAgent(await tx.doc(CatalogDoc), actor.companyId, actor.definitionId);
+      if (!definition || definition.archived || !agentCapabilities(definition).includes("web-search"))
+        throw new RuntimeError(403, "Search is not authorized for this participant.");
+      return { companyId: actor.companyId, definitionId: actor.definitionId };
+    }, context);
+  }
+
+  async authorizeWorkerMcp(claim: WorkerManagementActor, connectionId: string, toolName: string) {
+    this.requireDirectoryActor(claim);
+    return this.harness.commit(async tx => {
+      const actor = await this.authoritativeWorkerActor(tx, claim);
+      const mcp = workerMcpSelection(actor.configuration);
+      const connection = mcp.connections?.find(item => item.id === connectionId);
+      const installed = connection && this.registry.snapshot().extension(connection.extension);
+      if (!connection || !mcp.extensions.includes(connection.extension) || !mcp.tools.includes(toolName)
+        || !installed?.tools?.some(tool => tool.name === toolName)) throw new RuntimeError(403, "MCP tool is not authorized for this participant.");
+      const current = this.connections.forAgent(actor.definitionId, managedIds(actor.configuration)).find(item => item.id === connectionId && item.extension === connection.extension);
+      if (!current) throw new RuntimeError(403, "MCP connection is unavailable.");
+      if (isManagedConnection(connection)) {
+        const record = this.managed?.record(connectionId);
+        if (!record || record.companyId !== actor.companyId || record.authorization !== "authorized") throw new RuntimeError(403, "MCP connection is disabled.");
+      }
+      return detached({ actor, connection });
+    }, context);
+  }
+
+  private async authoritativeWorkerActor(tx: Tx, claim: WorkerManagementActor): Promise<WorkerManagementActor> {
+    const actors = (await tx.doc(WorkerActorsDoc)).actors[claim.conversationKey] ?? [];
+    const actor = actors.find(item => item.participantId === claim.actorId);
+    if (!actor || actor.companyId !== claim.companyId || actor.definitionId !== claim.definitionId)
+      throw new RuntimeError(403, "Instance is not authorized in this conversation.");
+    const report = workerParticipantReportSchema.parse(claim.participantReport);
+    // Tool calls carry the last committed report too: a lost background acknowledgement
+    // must not race a newly adopted instance. This never calls back into the worker.
+    await this.acknowledgeWorkerParticipantsIn(tx, claim.companyId, claim.conversationKey, claim.storeId, report);
+    if (actor.membership !== "active"
+      || actor.worker?.storeId !== claim.storeId || actor.worker.roomId !== String(claim.roomId)
+      || actor.worker.participantId !== claim.participantId || actor.worker.instanceId !== String(claim.instanceId)
+      || actor.appliedRevision !== claim.revision)
+      throw new RuntimeError(403, "Instance is not authorized in this conversation.");
+    const applied = (await tx.doc(CatalogDoc)).agents.find(agent => agent.companyId === actor.companyId
+      && agent.id === actor.definitionId && agent.revision === actor.appliedRevision);
+    if (!applied) throw new RuntimeError(409, "Applied agent revision is unavailable.");
+    const configuration = detached(publicAgent(applied));
+    setWorkerMcpSelection({ configuration }, workerMcpSelection(actor.configuration));
+    // Retain stable backend receipt identities, but only after checking the exact persisted
+    // worker/native mapping. Definition equality is never an identity substitute.
+    return { ...detached(actor), revision: actor.appliedRevision, configuration,
+      conversationKey: claim.conversationKey, storeId: claim.storeId, actorId: actor.participantId, participantReport: detached(report) };
+  }
+
+  private requireDirectoryActor(actor: WorkerManagementActor) {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Remote management requires a directory runtime.");
+    requireText(actor.conversationKey, "Conversation key", 200);
+    requireText(actor.storeId, "Worker store ID", 200);
+    requireText(actor.companyId, "Company ID", 200);
+    requireText(actor.actorId, "Worker actor ID", 200);
+  }
+
+  private async remoteActor(tx: Tx, actor: ManagementActor): Promise<WorkerManagementActor> {
+    this.requireWorkerRoom({ companyId: actor.companyId, userId: "" }, String(actor.roomId));
+    const identities = await tx.doc(WorkerIdentityDoc);
+    const identity = Object.entries(identities.mappings).find(([, mapping]) => mapping.participantId === actor.participantId
+      && mapping.instanceId === String(actor.instanceId));
+    if (!identity || !identities.report) throw new RuntimeError(409, "Worker instance authority is unavailable.");
+    return detached({ ...actor, conversationKey: this.worker!.conversationKey, storeId: this.worker!.storeId,
+      actorId: identity[0], participantReport: identities.report });
+  }
+
+  private requireCatalogOwner() {
+    if (this.worker) throw new RuntimeError(409, "Catalog administration belongs to the backend, not a conversation worker.");
+  }
+
+  private requireConversationExecutor() {
+    if (this.directoryOnly) throw new RuntimeError(409, "Conversation execution must be routed to its worker.");
+  }
+
+  private requireWorkerRoom(scope: RuntimeScope, id: string) {
+    if (this.worker && (scope.companyId !== this.worker.scope.companyId || id !== this.boundRoomId))
+      throw new RuntimeError(404, "Conversation not found in this worker.");
+  }
+
+  private async verifyWorkerWorkspace() {
+    await this.harness.commit(async tx => {
+      const catalog = await tx.doc(CatalogDoc);
+      if (catalog.chats.length !== 1 || catalog.chats[0].id !== this.boundRoomId)
+        throw new RuntimeError(409, "A conversation worker must own exactly one room.");
+      const room = await tx.doc(SharedDoc, nativeId(this.boundRoomId!));
+      if (room.companyId !== this.worker!.scope.companyId) throw new RuntimeError(409, "Worker room company mismatch.");
+      for (const member of room.members) {
+        if (!member.conversationId) continue;
+        const agent = await tx.doc(AgentDoc, member.conversationId);
+        if (agent.cwd && agent.cwd !== this.workspaceDir)
+          throw new RuntimeError(409, "Worker workspace path changed; implicit workspace migration is not supported.");
+      }
+    }, context);
   }
 
   async listChats(scope: RuntimeScope): Promise<ChatSummary[]> {
@@ -296,6 +1134,41 @@ export class DispatchRuntime {
       catch (error) { if (!(error instanceof Error && "status" in error && error.status === 404)) throw error; }
     }
     return summaries.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
+  }
+
+  workerMcpBridge() {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    return {
+      definition: this.connections.workerDefinition.bind(this.connections),
+      call: this.connections.callWorkerTool.bind(this.connections),
+    };
+  }
+
+  /** Directory authority and title policy are read together; no worker is started. */
+  async directoryChatSummaries(scope: RuntimeScope): Promise<{ conversation: ChatSummary; automaticTitle: boolean }[]> {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    return this.harness.commit(async tx => {
+      const catalog = await tx.doc(CatalogDoc);
+      const projects = await tx.doc(ProjectsDoc);
+      const entries: { conversation: ChatSummary; automaticTitle: boolean }[] = [];
+      for (const chat of catalog.chats.filter(chat => chat.companyId === scope.companyId)) {
+        try {
+          const room = await this.shared.authorize(tx, scope, nativeId(chat.id), "read", this.readAll(scope));
+          const preference = room.preferences[scope.userId] ?? { pinned: false, archived: false };
+          const access = room.sharedProjectId ? projectAccess(projects.projects[room.sharedProjectId], scope, this.readAll(scope)) : { participate: true };
+          entries.push({ automaticTitle: chat.displayTitle === undefined && chat.title === "New conversation", conversation: {
+            id: chat.id, title: chat.displayTitle ?? chat.title,
+            sharedProjectId: room.sharedProjectId ?? null, canParticipate: access.participate,
+            projectId: room.sharedProjectId ?? null, pinned: preference.pinned, archived: preference.archived,
+            createdAt: chat.createdAt, updatedAt: chat.createdAt, revision: this.commitRevision,
+            agentDefinitionId: chat.agentDefinitionId, agentRevision: chat.agentRevision, agentName: chat.agentName ?? "Saved agent", status: "idle",
+          } });
+        } catch (error) {
+          if (!(error instanceof Error && "status" in error && error.status === 404)) throw error;
+        }
+      }
+      return entries;
+    }, context);
   }
 
   async listProjects(scope: RuntimeScope): Promise<Project[]> {
@@ -315,6 +1188,7 @@ export class DispatchRuntime {
   }
 
   async createProject(scope: RuntimeScope, input: CreateProjectInput): Promise<Project> {
+    this.requireCatalogOwner();
     requireText(input.requestId, "Request ID", 200);
     const name = input.name.trim();
     requireText(name, "Project name", 100);
@@ -336,7 +1210,22 @@ export class DispatchRuntime {
     }, context);
   }
 
-  private get projectArchiveStore() { return new ProjectArchiveStore(join(this.owner.directory, "project-archives")); }
+  private get projectArchiveStore() {
+    if (this.archiveStorage) return this.archiveStorage;
+    if (this.directoryOnly) throw new RuntimeError(503, "Durable archive storage is unavailable.");
+    return new ProjectArchiveStore(join(this.owner.directory, "project-archives"));
+  }
+
+  async authorizeProjectExport(scope: RuntimeScope, id: string, chatIds: string[]) {
+    if (chatIds.length > 100 || new Set(chatIds).size !== chatIds.length) throw new RuntimeError(400, "Choose up to 100 unique chats.");
+    await this.harness.commit(async tx => {
+      await requireProjectAccess(tx, scope, id, "manage");
+      for (const chatId of chatIds) {
+        const room = await this.shared.authorize(tx, scope, nativeId(chatId), "read", false);
+        if (room.sharedProjectId !== id) throw new RuntimeError(409, "Selected chat no longer belongs to this project.");
+      }
+    }, context);
+  }
 
   async exportProjectArchive(scope: RuntimeScope, id: string, chatIds: string[]): Promise<ProjectArchive> {
     if (chatIds.length > 100 || new Set(chatIds).size !== chatIds.length) throw new RuntimeError(400, "Choose up to 100 unique chats.");
@@ -447,6 +1336,7 @@ export class DispatchRuntime {
   }
 
   async saveProject(scope: RuntimeScope, id: string, input: SaveProjectInput): Promise<Project> {
+    this.requireCatalogOwner();
     const cwd = input.cwd === undefined ? undefined : input.cwd?.trim() || null;
     if (cwd && (cwd.length > 4096 || cwd.includes("\0") || !isAbsolute(cwd))) {
       throw new RuntimeError(400, "Working directory must be an absolute path on the service host.");
@@ -490,6 +1380,16 @@ export class DispatchRuntime {
   }
 
   async createChat(scope: RuntimeScope, input: CreateChatInput): Promise<ChatSnapshot> {
+    return this.getChat(scope, await this.createChatRecord(scope, input));
+  }
+
+  private async createChatRecord(scope: RuntimeScope, input: CreateChatInput): Promise<string> {
+    if (this.worker) {
+      if (fingerprint([scope, input]) !== fingerprint([this.worker.scope, this.worker.input]))
+        throw new RuntimeError(409, "A conversation worker cannot create another room.");
+      const binding = (await this.harness.snapshot(RuntimeModeDoc, context))?.worker;
+      if (binding?.roomId) return binding.roomId;
+    }
     requireText(input.requestId, "Request ID", 200);
     const explicitTitle = Boolean(input.title?.trim());
     const title = input.title?.trim() || "New conversation";
@@ -498,7 +1398,11 @@ export class DispatchRuntime {
     const creationFingerprint = input.sharedProjectId ? JSON.stringify([title, input.sharedProjectId, requestedAgents ?? null]) : undefined;
     for (const agentId of agentIds) requireText(agentId, "Agent ID", 200);
     requireText(title, "Title", 200);
-    const human = await this.person(scope.companyId, scope.userId);
+    const admittedCreator = this.worker?.creator;
+    if (admittedCreator && (admittedCreator.id !== scope.userId || !this.worker?.membership
+      || this.worker.membership.conversationKey !== this.worker.conversationKey || requestedAgents === undefined))
+      throw new RuntimeError(409, "Worker creation attribution/admission mismatch.");
+    const human = admittedCreator ?? await this.person(scope.companyId, scope.userId);
     const id = await this.harness.commit(async tx => {
       const catalog = await tx.doc(CatalogDoc);
       const existing = catalog.chats.find(chat => owns(scope, chat) && chat.requestId === input.requestId);
@@ -516,21 +1420,52 @@ export class DispatchRuntime {
         return existing.id;
       }
       if (input.sharedProjectId) {
-        const project = await requireProjectAccess(tx, scope, input.sharedProjectId, "participate", this.readAll(scope));
-        agentIds = [...new Set(requestedAgents ?? project.defaultAgentDefinitionIds)];
+        if (admittedCreator) {
+          const project = (await tx.doc(ProjectsDoc)).projects[input.sharedProjectId];
+          if (!project || project.companyId !== scope.companyId) throw new RuntimeError(409, "Admitted worker project is unavailable.");
+        } else {
+          const project = await requireProjectAccess(tx, scope, input.sharedProjectId, "participate", this.readAll(scope));
+          agentIds = [...new Set(requestedAgents ?? project.defaultAgentDefinitionIds)];
+        }
       }
-      for (const agentId of agentIds) this.validateAgent(this.findAgent(catalog, scope, agentId));
+      const initialAgent = (agentId: string) => {
+        const revision = this.worker?.initialAgentRevisions?.[agentId];
+        const agent = revision === undefined ? this.findAgent(catalog, scope, agentId)
+          : catalog.agents.find(item => item.companyId === scope.companyId && item.id === agentId && item.revision === revision);
+        if (!agent) throw new RuntimeError(409, "Pinned worker agent revision is unavailable.");
+        return agent;
+      };
+      for (const agentId of agentIds) this.validateAgent(initialAgent(agentId));
       const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
-      await this.shared.initialize(tx, record.id, scope.companyId, human, agentIds, { pinned: false, archived: false }, input.sharedProjectId ?? undefined);
-      const first = agentIds.length ? this.findAgent(catalog, scope, agentIds[0]) : undefined;
+      const initialize = admittedCreator ? this.shared.initializeAdmitted.bind(this.shared) : this.shared.initialize.bind(this.shared);
+      await initialize(tx, record.id, scope.companyId, human, this.directoryOnly || this.worker ? [] : agentIds, { pinned: false, archived: false }, input.sharedProjectId ?? undefined);
+      const first = agentIds.length ? initialAgent(agentIds[0]) : undefined;
       const id = String(record.id);
+      if (this.directoryOnly) {
+        const actors: BackendWorkerActor[] = [];
+        for (const definitionId of agentIds) {
+          const definition = this.findAgent(catalog, scope, definitionId);
+          const identity = await tx.createConversation({ ownership: { kind: "ownerless" } });
+          actors.push({ companyId: scope.companyId, definitionId, revision: definition.revision,
+            instanceId: identity.id, participantId: randomUUID(), roomId: record.id,
+            configuration: detached(publicAgent(definition)), legacy: false, membership: "active" });
+        }
+        (await tx.doc(WorkerActorsDoc)).actors[id] = actors;
+        (await tx.doc(WorkerInvitationsDoc)).rooms[id] = { revision: 1, mcpSelections: true, instances: true, requests: {}, events: [] };
+      }
       catalog.chats.push({ ...(creationFingerprint ? { creationFingerprint } : {}), id, title, creationTitleExplicit: explicitTitle, ...(explicitTitle ? { displayTitle: title } : {}), creationAgentIds: agentIds, creationAgentsOmitted: requestedAgents === undefined, createdAt: Date.now(), agentDefinitionId: first?.id ?? "", agentRevision: first?.revision ?? 0, agentName: first?.name ?? "People", companyId: scope.companyId, userId: scope.userId, requestId: input.requestId });
+      if (this.worker) {
+        const binding = (await tx.doc(RuntimeModeDoc)).worker!;
+        if (binding.roomId) throw new RuntimeError(409, "Worker room already exists.");
+        binding.roomId = id;
+      }
       return id;
     }, context);
-    return this.getChat(scope, id);
+    return id;
   }
 
   async updateChat(scope: RuntimeScope, id: string, input: UpdateChatInput): Promise<ChatSnapshot> {
+    this.requireWorkerRoom(scope, id);
     await this.harness.commit(async tx => {
       const room = await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
       const preference = room.preferences[scope.userId] ??= { pinned: false, archived: false };
@@ -542,6 +1477,7 @@ export class DispatchRuntime {
 
   async saveDefinitionOfDone(scope: RuntimeScope, id: string, input: { markdown: string; expectedRevision: number }): Promise<ChatSnapshot> {
     if (typeof input.markdown !== "string" || input.markdown.length > 20000 || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0) throw new RuntimeError(400, "Invalid completion criteria.");
+    this.requireWorkerRoom(scope, id);
     await this.harness.commit(async tx => {
       const room = await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
       const revision = room.definitionOfDone?.revision ?? 0;
@@ -554,6 +1490,7 @@ export class DispatchRuntime {
   async renameChat(scope: RuntimeScope, id: string, title: string): Promise<ChatSnapshot> {
     title = title.trim();
     requireText(title, "Title", 200);
+    this.requireWorkerRoom(scope, id);
     await this.harness.commit(async tx => {
       const catalog = await tx.doc(CatalogDoc);
       const chat = catalog.chats.find(item => item.id === id && item.companyId === scope.companyId);
@@ -582,6 +1519,7 @@ export class DispatchRuntime {
   }
 
   async getChat(scope: RuntimeScope, id: string): Promise<ChatSnapshot> {
+    this.requireWorkerRoom(scope, id);
     // Authorize and read all participating streams on the same native commit line.
     return this.harness.commit(async tx => {
       const catalog = await tx.doc(CatalogDoc);
@@ -602,6 +1540,7 @@ export class DispatchRuntime {
   }
 
   async transcriptPage(scope: RuntimeScope, id: string, query: TranscriptQuery) {
+    this.requireWorkerRoom(scope, id);
     return this.harness.commit(async tx => {
       await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
       return { ...await this.shared.page(tx, nativeId(id), query), revision: this.commitRevision };
@@ -609,11 +1548,30 @@ export class DispatchRuntime {
   }
 
   async publicDetail(scope: RuntimeScope, id: string, kind: "message" | "activity", itemId: string) {
+    this.requireWorkerRoom(scope, id);
     return this.harness.commit(async tx => {
       await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
       const value = await this.shared.detail(tx, nativeId(id), kind, itemId);
       if (!value) throw new RuntimeError(404, "History item unavailable.");
       return value;
+    }, context);
+  }
+
+  /** Internal public-summary projection. This never borrows the creator's current access.
+   * Its durable content revision survives replacement and also orders transient status changes.
+   */
+  async workerSummary(): Promise<WorkerSummary> {
+    if (!this.worker || !this.boundRoomId) throw new RuntimeError(409, "Worker room is not open.");
+    return this.harness.commit(async tx => {
+      const chat = (await tx.doc(CatalogDoc)).chats.find(chat => chat.id === this.boundRoomId);
+      if (!chat) throw new RuntimeError(409, "Worker room is unavailable.");
+      const { firstText, updatedAt, status, error } = await this.shared.summary(tx, nativeId(this.boundRoomId!));
+      const summary = { updatedAt: Math.max(updatedAt, chat.createdAt), status,
+        ...(error ? { error } : {}), ...(firstText ? { suggestedTitle: firstText.slice(0, 80) } : {}) };
+      const receipt = await tx.doc(WorkerSummaryReceiptDoc);
+      const hash = fingerprint(summary);
+      if (receipt.fingerprint !== hash) { receipt.revision++; receipt.fingerprint = hash; }
+      return { ...summary, revision: receipt.revision };
     }, context);
   }
 
@@ -674,9 +1632,9 @@ export class DispatchRuntime {
     });
     return {
       get value() { return value; },
-      deliver: (emit: () => void) => this.harness.commit(async tx => {
+      deliver: (emit: () => void | Promise<void>) => this.harness.commit(async tx => {
         await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
-        emit();
+        await emit();
       }, context),
       start: (next: (snapshot: ChatSnapshot) => Promise<void>) => {
         listener = next;
@@ -695,6 +1653,7 @@ export class DispatchRuntime {
   }
 
   async authorizeAttachmentUpload(scope: RuntimeScope, id: string) {
+    this.requireWorkerRoom(scope, id);
     await this.harness.commit(async tx => { await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope)); }, context);
   }
 
@@ -710,6 +1669,7 @@ export class DispatchRuntime {
   }
 
   async downloadAttachment(scope: RuntimeScope, id: string, attachmentId: string) {
+    this.requireWorkerRoom(scope, id);
     const attachment = await this.harness.commit(async tx => {
       await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
       const record = (await tx.doc(AttachmentsDoc, nativeId(id))).records[attachmentId];
@@ -720,6 +1680,7 @@ export class DispatchRuntime {
   }
 
   async submit(scope: RuntimeScope, id: string, input: SendMessageInput) {
+    this.requireConversationExecutor();
     requireText(input.requestId, "Request ID", 200);
     requireText(input.text, "Message", 100_000, Boolean(input.attachmentIds?.length));
     await this.authorize(scope, id);
@@ -731,7 +1692,13 @@ export class DispatchRuntime {
     }, context);
   }
 
+  async submitAndGetChat(scope: RuntimeScope, id: string, input: SendMessageInput): Promise<ChatSnapshot> {
+    await this.submit(scope, id, input);
+    return this.getChat(scope, id);
+  }
+
   async composing(scope: RuntimeScope, id: string, input: { clientId: string; sequence: number; active: boolean }) {
+    this.requireConversationExecutor();
     await this.authorize(scope, id);
     const person = await this.person(scope.companyId, scope.userId);
     await this.harness.commit(async tx => {
@@ -742,6 +1709,8 @@ export class DispatchRuntime {
   }
 
   async addParticipants(scope: RuntimeScope, id: string, input: AddParticipantsInput) {
+    this.requireConversationExecutor();
+    if (this.worker) throw new RuntimeError(409, "Worker invitations must first be admitted by the backend.");
     requireText(input.requestId, "Request ID", 200);
     await this.authorize(scope, id);
     const people = await Promise.all((input.userIds ?? []).map(userId => this.person(scope.companyId, userId)));
@@ -755,6 +1724,8 @@ export class DispatchRuntime {
   }
 
   async createAgentInstance(scope: RuntimeScope, id: string, input: CreateAgentInstanceInput): Promise<CreateAgentInstanceResult> {
+    this.requireConversationExecutor();
+    if (this.worker) throw new RuntimeError(409, "Worker instance creation must first be admitted by the backend.");
     requireText(input.requestId, "Request ID", 200);
     requireText(input.agentDefinitionId, "Agent ID", 200);
     if (input.name !== undefined) requireText(input.name, "Instance name", 100, true);
@@ -770,17 +1741,26 @@ export class DispatchRuntime {
   }
 
   async removeParticipant(scope: RuntimeScope, id: string, participantId: string) {
+    this.requireConversationExecutor();
     requireText(participantId, "Participant ID", 200);
     await this.authorize(scope, id);
     const person = await this.person(scope.companyId, scope.userId);
     await this.shared.remove(nativeId(id), participantId, `human:${scope.userId}`, async tx => {
+      if (this.worker) {
+        const member = (await tx.doc(SharedDoc, nativeId(id))).members.find(member => member.id === participantId);
+        const mapped = Object.values((await tx.doc(WorkerIdentityDoc)).mappings).some(mapping => mapping.participantId === participantId);
+        if (!mapped || !member?.membership || member.membership === "active") throw new RuntimeError(409, "Worker removal must first be admitted by the backend.");
+      }
       await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
       await this.shared.ensureHuman(tx, nativeId(id), person);
     });
+    if (this.workerParticipants) await this.workerParticipants.report(await this.workerParticipantReport());
     return this.getChat(scope, id);
   }
 
   async stop(scope: RuntimeScope, id: string) {
+    this.requireConversationExecutor();
+    this.requireWorkerRoom(scope, id);
     await this.shared.stop(nativeId(id), async tx => { await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope)); });
     return this.getChat(scope, id);
   }
@@ -1093,6 +2073,7 @@ export class DispatchRuntime {
   }
 
   async saveSkill(scope: RuntimeScope, input: SaveSkillInput): Promise<SkillDefinition> {
+    this.requireCatalogOwner();
     const fingerprint = JSON.stringify([input.id, input.expectedRevision, input.name, input.description, input.instructions]);
     return this.harness.commit(async tx => {
       const catalog = await tx.doc(CatalogDoc);
@@ -1144,9 +2125,12 @@ export class DispatchRuntime {
       });
   }
 
+  async startMcpConnections() { await this.connections.start(); }
+
   async refreshMcpConnections(id?: string) { await this.connections.reloadManaged(id); }
 
   async saveAgent(scope: RuntimeScope, input: SaveAgentInput): Promise<AgentDefinition> {
+    this.requireCatalogOwner();
     this.validateAgent(input);
     const fingerprint = JSON.stringify([input.id, input.expectedRevision, input.name.trim(), input.description.trim(), input.instructions,
       input.provider, input.modelId, input.thinkingLevel, input.capabilities?.slice().sort(), input.connectionIds?.slice().sort(), !!input.applyConnectionsToExisting, ...(input.skills === undefined ? [] : [input.skills])]);
@@ -1201,6 +2185,14 @@ export class DispatchRuntime {
       catalog.agents.push(agent);
       if (input.applyConnectionsToExisting && prior) {
         for (const chat of catalog.chats.filter(chat => chat.companyId === scope.companyId)) {
+          if (this.directoryOnly) {
+            const actors = (await tx.doc(WorkerActorsDoc)).actors[chat.id] ?? [];
+            for (const actor of actors.filter(actor => actor.definitionId === id && (!actor.membership || actor.membership === "active"))) {
+              const desired = workerMcpSelection(publicAgent(agent));
+              if (setWorkerMcpSelection(actor, desired)) (await tx.doc(WorkerInvitationsDoc)).rooms[chat.id].revision++;
+            }
+            continue;
+          }
           const room = await tx.doc(SharedDoc, nativeId(chat.id));
           for (const member of room.members) {
             if (member.kind !== "agent" || member.agentDefinitionId !== id || !member.conversationId || !member.agent) continue;
@@ -1219,6 +2211,7 @@ export class DispatchRuntime {
   }
 
   async saveManagementGrant(principal: AuthPrincipal, input: unknown) {
+    this.requireCatalogOwner();
     return this.harness.commit(tx => writeGrant(tx, principal, input, async input => {
       const catalog = await tx.doc(CatalogDoc);
       const editor = latestAgent(catalog, principal.companyId, input.editorId);
@@ -1253,6 +2246,14 @@ export class DispatchRuntime {
   private async readManagedAgent(tx: Tx, instance: ConversationId, raw: unknown) {
     const input = managementReadSchema.parse(raw);
     const actor = await this.shared.managementActor(tx, instance);
+    if (this.worker) {
+      if (!this.workerManagement) throw new ManagementError(503, "Backend management service is unavailable.");
+      return this.workerManagement.read(await this.remoteActor(tx, actor), detached(input));
+    }
+    return this.readManagedActor(tx, actor, input);
+  }
+
+  private async readManagedActor(tx: Tx, actor: ManagementActor, input: ReturnType<typeof managementReadSchema.parse>) {
     const catalog = await tx.doc(CatalogDoc);
     const grants = await readGrants(tx, actor.companyId);
     if (!input.targetId) {
@@ -1275,12 +2276,21 @@ export class DispatchRuntime {
   private async saveManagedAgent(tx: Tx, instance: ConversationId, callId: string, raw: unknown) {
     const input = managementSaveSchema.parse(raw);
     const actor = await this.shared.managementActor(tx, instance);
+    if (this.worker) {
+      if (!this.workerManagement) throw new ManagementError(503, "Backend management service is unavailable.");
+      return this.workerManagement.save(await this.remoteActor(tx, actor), callId, detached(input));
+    }
+    return this.saveManagedActor(tx, actor, callId, input);
+  }
+
+  private async saveManagedActor(tx: Tx, actor: ManagementActor | WorkerManagementActor, callId: string, input: ReturnType<typeof managementSaveSchema.parse>) {
     const catalog = await tx.doc(CatalogDoc);
     const receipts = await tx.doc(ManagementReceiptsDoc);
+    const workerStoreId = "storeId" in actor ? actor.storeId : undefined;
     const fingerprint = JSON.stringify([input.targetId, input.expectedRevision, input.reason, input.evidence ?? [], input.restoreRevision ?? null,
       input.patch ? managementFields.filter(field => input.patch![field] !== undefined).map(field => [field, input.patch![field]]) : null]);
     // Durable call identity catches transport replay; operation identity also catches a new call retry.
-    const receipt = receipts.receipts.find(item => item.companyId === actor.companyId && item.instanceId === String(actor.instanceId) &&
+    const receipt = receipts.receipts.find(item => item.companyId === actor.companyId && item.workerStoreId === workerStoreId && item.instanceId === String(actor.instanceId) &&
       (item.callId === callId || item.operationId === input.operationId));
     if (receipt) {
       if (receipt.fingerprint !== fingerprint || receipt.operationId !== input.operationId || receipt.definitionId !== actor.definitionId)
@@ -1311,6 +2321,7 @@ export class DispatchRuntime {
     catalog.agents.push(next);
     const outcome: ManagementReceipt = { companyId: actor.companyId, definitionId: actor.definitionId, revision: actor.revision,
       instanceId: String(actor.instanceId), roomId: String(actor.roomId), participantId: actor.participantId,
+      ...("storeId" in actor ? { workerStoreId: actor.storeId, conversationKey: actor.conversationKey } : {}),
       operationId: input.operationId, callId, fingerprint, targetId: target.id, beforeRevision: target.revision, afterRevision: next.revision,
       at: now, reason: input.reason, evidence: input.evidence ?? [], fields, grantVersion: grant.version,
       ...(input.restoreRevision ? { restoreRevision: input.restoreRevision } : {}) };
@@ -1319,6 +2330,7 @@ export class DispatchRuntime {
   }
 
   async archiveAgent(scope: RuntimeScope, id: string, expectedRevision: number): Promise<AgentDefinition> {
+    this.requireCatalogOwner();
     if (id === DEFAULT_AGENT_ID) throw new RuntimeError(400, "The default agent cannot be archived.");
     return this.harness.commit(async (tx) => {
       const catalog = await tx.doc(CatalogDoc);
@@ -1336,12 +2348,14 @@ export class DispatchRuntime {
     this.closed = true;
     this.unsubscribeUpgrades?.();
     await this.upgradeDrain;
+    await this.participantReportDrain;
     try { await this.harness.close(context); } finally {
       try { await this.connections.close(); } finally { this.owner.release(); }
     }
   }
 
   private async authorize(scope: RuntimeScope, id: string) {
+    this.requireWorkerRoom(scope, id);
     await this.harness.commit(async tx => { await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope)); }, context);
   }
 
@@ -1394,7 +2408,7 @@ export class DispatchRuntime {
         if (member.conversationId) this.pendingUpgradeRooms.delete(member.conversationId);
         if (member.kind !== "agent" || !member.agentDefinitionId || (member.membership && member.membership !== "active")) continue;
         const latest = latestAgent(catalog, chat.companyId, member.agentDefinitionId);
-        if ((!latest || latest.archived || latest.revision === member.agentRevision) && !member.pendingConnectionIds && !member.connectionsRefreshPending) continue;
+        if ((!latest || latest.archived || latest.revision === member.agentRevision) && !member.pendingConnectionIds && !member.pendingWorkerMcp && !member.connectionsRefreshPending) continue;
         // Index before awaiting the idle check, so a settling task cannot lose its wakeup.
         if (member.conversationId) this.pendingUpgradeRooms.set(member.conversationId, roomId);
         try {
@@ -1418,11 +2432,19 @@ export class DispatchRuntime {
     if (!member.conversationId || !member.agent || !member.agentDefinitionId || (member.membership && member.membership !== "active")) return;
     const catalog = await tx.doc(CatalogDoc);
     const latest = latestAgent(catalog, companyId, member.agentDefinitionId);
-    const agent = latest && !latest.archived ? latest : undefined;
+    const mapping = this.worker ? Object.values((await tx.doc(WorkerIdentityDoc)).mappings).find(mapping => mapping.participantId === member.id) : undefined;
+    const desired = mapping ? catalog.agents.find(agent => agent.companyId === companyId && agent.id === member.agentDefinitionId && agent.revision === mapping.desiredRevision) : latest;
+    const agent = latest && !latest.archived && (!this.worker || mapping) ? desired : undefined;
     const updateBase = agent && agent.revision !== member.agentRevision;
-    if (!updateBase && !member.pendingConnectionIds && !member.connectionsRefreshPending) return;
+    if (!updateBase && !member.pendingConnectionIds && !member.pendingWorkerMcp && !member.connectionsRefreshPending) return;
+    if ((await tx.doc(SharedDoc, roomId)).stopping) return;
     const id = member.conversationId;
     if ((await tx.doc(LiveDoc, id)).run || (await tx.doc(InboxDoc, id)).items.length || await this.hasUnfinishedAgentWork(tx, id, roomId)) return;
+    if (member.pendingWorkerMcp) {
+      if (!this.worker) throw new RuntimeError(409, "Worker MCP selection appeared in a native runtime.");
+      await this.applyWorkerMcpSelection(tx, member, member.pendingWorkerMcp);
+      delete member.pendingWorkerMcp;
+    }
     if (member.pendingConnectionIds || member.connectionsRefreshPending) {
       const connected = await this.connections.bind(tx, id, member.agentDefinitionId, true, member.pendingConnectionIds, member.pendingConnectionIds !== undefined);
       member.agent.extensions = [...member.agent.extensions.filter(name => !isMcpExtension(name)), ...connected.extensions];
@@ -1452,6 +2474,7 @@ export class DispatchRuntime {
       member.agentRevision = agent.revision;
     }
     if (member.upgradeError) delete member.upgradeError;
+    if (this.worker) await this.updateWorkerParticipantReport(tx);
   }
 
   private async hasUnfinishedAgentWork(tx: Tx, id: ConversationId, roomId: ConversationId) {
@@ -1494,20 +2517,29 @@ export class DispatchRuntime {
     return { extensions, tools, snapshots };
   }
 
-  private async createParticipant(tx: Tx, roomId: ConversationId, companyId: string, definitionId: string): Promise<Member> {
+  private async createParticipant(tx: Tx, roomId: ConversationId, companyId: string, definitionId: string, revision?: number): Promise<Member> {
+    this.requireConversationExecutor();
+    if (this.worker && (companyId !== this.worker.scope.companyId || (this.boundRoomId && String(roomId) !== this.boundRoomId)))
+      throw new RuntimeError(403, "Participant is outside this worker room.");
     const catalog = await tx.doc(CatalogDoc);
-    const agent = this.findAgent(catalog, { companyId }, definitionId);
+    const pinnedRevision = revision ?? (!this.boundRoomId ? this.worker?.initialAgentRevisions?.[definitionId] : undefined);
+    const saved = pinnedRevision === undefined ? this.findAgent(catalog, { companyId }, definitionId)
+      : catalog.agents.find(item => item.companyId === companyId && item.id === definitionId && item.revision === pinnedRevision);
+    if (!saved) throw new RuntimeError(409, "Pinned worker agent revision is unavailable.");
+    // Worker MCP selection is applied from the authoritative membership, not historical
+    // definition names which may no longer have installed implementations after a rollout.
+    const agent = this.worker ? { ...saved, extensions: (saved.extensions ?? []).filter(name => !isMcpExtension(name)), tools: (saved.tools ?? []).filter(name => !isMcpTool(name)) } : saved;
     this.validateAgent(agent);
     const { extensions, tools, snapshots } = this.resolveConfiguration(catalog, companyId, agent);
     const room = await tx.doc(SharedDoc, roomId);
     const project = room.sharedProjectId ? (await tx.doc(ProjectsDoc)).projects[room.sharedProjectId] : undefined;
     if (room.sharedProjectId && (!project || project.companyId !== companyId)) throw new RuntimeError(404, "Project not found.");
-    const workspaceDefault = project?.cwd ?? this.workspaceDir;
+    const workspaceDefault = this.worker ? this.workspaceDir : project?.cwd ?? this.workspaceDir;
     const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
     if (snapshots.length) (await tx.doc(SkillBindingsDoc, record.id)).skills = snapshots;
     const cwd = agent.extensions?.some(name => name === CodingTools.name || name === "dispatch-image-gen") ? workspaceDefault : undefined;
     await configure(tx, record.id, { model: { provider: agent.provider, modelId: agent.modelId }, instructions: agent.instructions, thinkingLevel: agent.thinkingLevel, extensions, tools, ...(cwd ? { cwd } : {}) });
-    await this.connections.bind(tx, record.id, definitionId, false, managedIds(agent));
+    if (!this.worker) await this.connections.bind(tx, record.id, definitionId, false, managedIds(agent));
     return { id: randomUUID(), kind: "agent", workspaceDefault, name: agent.name, joinedAt: Date.now(), agentDefinitionId: agent.id, agentRevision: agent.revision, conversationId: record.id, status: "idle", agent: { ...publicAgent(agent), extensions: extensions.map(extension => extension.name), tools: tools.map(tool => tool.name), ...(cwd ? { cwd } : {}) } };
   }
 
@@ -1527,6 +2559,21 @@ export class DispatchRuntime {
         }
       }
       for (const chat of catalog.chats.filter(chat => chat.companyId === companyId)) {
+        if (this.directoryOnly) {
+          // Discovery refreshes tools for previously selected connections; it never grants
+          // a latest definition's newly attached connection to older pinned participants.
+          let changed = false;
+          for (const actor of (await tx.doc(WorkerActorsDoc)).actors[chat.id] ?? []) {
+            if (actor.membership && actor.membership !== "active") continue;
+            const connections = this.connections.forAgent(actor.definitionId, managedIds(actor.configuration))
+              .filter(current => actor.configuration.connections?.some(selected => selected.id === current.id && selected.extension === current.extension));
+            const extensions = connections.map(connection => connection.extension);
+            const tools = extensions.flatMap(name => this.registry.snapshot().extension(name)?.tools?.map(tool => tool.name) ?? []);
+            changed = setWorkerMcpSelection(actor, { connections, extensions, tools }) || changed;
+          }
+          if (changed) (await tx.doc(WorkerInvitationsDoc)).rooms[chat.id].revision++;
+          continue;
+        }
         const room = await tx.doc(SharedDoc, nativeId(chat.id));
         for (const member of room.members) {
           if (member.kind !== "agent" || !member.conversationId || !member.agentDefinitionId || !member.agent) continue;
@@ -1657,6 +2704,16 @@ function agentCapabilities(agent: Pick<StoredAgent, "extensions">) {
   return capabilityDefinitions.filter(item => agent.extensions?.includes(item.marker)
     || (agent.extensions?.includes("dispatch-web") && (item.id === "web-reading" || item.id === "web-search"))).map(item => item.id);
 }
+function workerMcpSelection(agent: Pick<AgentDefinition, "connections" | "extensions" | "tools">): WorkerMcpSelection {
+  return detached({ connections: agent.connections ?? [], extensions: agent.extensions.filter(isMcpExtension), tools: agent.tools.filter(isMcpTool) });
+}
+function setWorkerMcpSelection(actor: Pick<ManagementActor, "configuration">, selection: WorkerMcpSelection): boolean {
+  if (fingerprint(workerMcpSelection(actor.configuration)) === fingerprint(selection)) return false;
+  actor.configuration.connections = detached(selection.connections);
+  actor.configuration.extensions = [...actor.configuration.extensions.filter(name => !isMcpExtension(name)), ...selection.extensions];
+  actor.configuration.tools = [...actor.configuration.tools.filter(name => !isMcpTool(name)), ...selection.tools];
+  return true;
+}
 function managedIds(agent: Pick<AgentDefinition, "connections">) { return (agent.connections ?? []).filter(isManagedConnection).map(connection => connection.id); }
 function requireText(value: unknown, field: string, max: number, allowEmpty = false): asserts value is string {
   if (typeof value !== "string" || (!allowEmpty && !value.trim()) || value.length > max) throw new RuntimeError(400, `${field} must be ${allowEmpty ? "at most" : "between 1 and"} ${max} characters.`);
@@ -1710,4 +2767,11 @@ function portableTrackedAgent(key: string, agent: StoredAgent, skills: TrackedBu
       const entry = skills.find(item => item.id === selection.id);
       return entry ? `${entry.key} (local revision ${selection.revision})` : `local skill (revision ${selection.revision})`;
     }), omittedConnections: agent.connections?.length ?? 0 };
+}
+
+/** Stable JSON identity across object-key order; arrays preserve semantically meaningful order. */
+function fingerprint(value: unknown): string {
+  const ordered = (input: unknown): unknown => Array.isArray(input) ? input.map(ordered)
+    : input !== null && typeof input === "object" ? Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, value]) => [key, ordered(value)])) : input;
+  return createHash("sha256").update(JSON.stringify(ordered(value))).digest("hex");
 }

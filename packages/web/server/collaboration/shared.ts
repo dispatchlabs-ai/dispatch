@@ -10,7 +10,7 @@ import {
   type EntryId, type HookApi, type SubmissionRecord, type TaskId, type Tx,
 } from "@earendil-works/pi-durable";
 import type {
-  Attachment, AgentParticipant, CreateAgentInstanceInput, ConversationMessage, ConversationParticipant, ParticipantActivity, SendMessageInput, RuntimeScope,
+  Attachment, AgentConnection, AgentParticipant, CreateAgentInstanceInput, ConversationMessage, ConversationParticipant, ParticipantActivity, SendMessageInput, RuntimeScope,
 } from "../../src/shared/contracts.js";
 import { requireProjectAccess, type ProjectAction } from "../project-access.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata, messageAttachments } from "../attachments.js";
@@ -30,12 +30,13 @@ export type PeopleDirectory = {
 export type Member = {
   id: string; kind: "human" | "agent"; name: string; joinedAt: number;
   userId?: string; agentDefinitionId?: string; agentRevision?: number; conversationId?: ConversationId;
-  agent?: { [K in keyof AgentParticipant["agent"]]: AgentParticipant["agent"][K] };
+  agent?: { [K in keyof AgentParticipant["agent"]]: AgentParticipant["agent"][K] } & { connections?: AgentConnection[] };
   status: "idle" | "working" | "listening" | "silent" | "stopped" | "failed"; error?: string;
   instanceInstructions?: string;
   /** Workspace chosen at creation, including for agents that gain local tools later. */
   workspaceDefault?: string;
   pendingConnectionIds?: string[];
+  pendingWorkerMcp?: { connections: AgentConnection[]; extensions: string[]; tools: string[] };
   connectionsRefreshPending?: boolean;
   upgradeError?: string;
   membership?: AgentParticipant["membership"]; removalTask?: TaskId;
@@ -91,6 +92,7 @@ export class SharedConversations {
   private readonly entryCache = new Map<ConversationId, EntryRecord[]>();
   private readonly messageCache = new Map<ConversationId, { entries: EntryRecord[]; aliases: string; messages: MessageData[] }>();
   private readonly activityCache = new Map<ConversationId, { entries: EntryRecord[]; messages: ConversationMessage[]; memberId: string; joinedAt: number; groups: ParticipantActivity[] }>();
+  onParticipantStateChanged?: (tx: Tx) => Promise<void>;
   beforeDelivery?: (tx: Tx, roomId: ConversationId, companyId: string, member: Member) => Promise<void>;
   readonly extension;
   readonly definitionOfDoneExtension;
@@ -101,7 +103,7 @@ export class SharedConversations {
   readonly turns = new ConversationTurns();
   readonly contributions = new Contributions(this.turns);
 
-  constructor(private readonly createAgent: (tx: Tx, roomId: ConversationId, companyId: string, definitionId: string) => Promise<Member>, private readonly attachments: AttachmentStore, management: Parameters<typeof managementTools>[0]) {
+  constructor(private readonly createAgent: (tx: Tx, roomId: ConversationId, companyId: string, definitionId: string, revision?: number) => Promise<Member>, private readonly attachments: AttachmentStore, management: Parameters<typeof managementTools>[0]) {
     this.definitionOfDoneExtension = createDefinitionOfDone(async (tx, instanceId) => {
       const binding = await tx.doc(BindingDoc, instanceId);
       if (!binding.roomId || !binding.participantId) throw new CollaborationError(403, "Agent binding is unavailable.");
@@ -240,6 +242,7 @@ export class SharedConversations {
           const member = room.members.find(item => item.id === task.input.participantId)!;
           if (member.removalTask !== task.id || member.membership === "removed") return terminal();
           member.membership = "removed";
+          await this.onParticipantStateChanged?.(tx);
           member.status = "stopped";
           delete member.error;
           delete member.activeDelivery;
@@ -373,6 +376,11 @@ export class SharedConversations {
       execute: async (args, api, ctx) => {
         const binding = await this.binding(api.conversationId, ctx);
         if (!args.agentDefinitionId) return reply(await this.availableAgents((await api.snapshot(SharedDoc, binding.roomId!, ctx))!.companyId));
+        const requestId = `tool:${api.taskId}:${api.callId}`;
+        if (this.inviteRemote) {
+          await this.inviteRemote(api.conversationId, requestId, [args.agentDefinitionId]);
+          return reply({ invited: args.agentDefinitionId });
+        }
         await api.commit(async tx => {
           await this.invite(tx, binding.roomId!, binding.participantId!, { requestId: `tool:${api.taskId}:${api.callId}`, agentDefinitionIds: [args.agentDefinitionId!] }, []);
         }, ctx);
@@ -487,6 +495,7 @@ export class SharedConversations {
     });
   }
 
+  inviteRemote?: (instanceId: ConversationId, requestId: string, definitionIds: string[]) => Promise<void>;
   availableAgents: (companyId: string) => Promise<unknown> = async () => [];
   bind(harness: Harness, storage: Storage) {
     this.harness = harness; this.storage = storage; this.turns.bind(harness); this.contributions.bind(harness);
@@ -623,6 +632,13 @@ export class SharedConversations {
 
   async initialize(tx: Tx, roomId: ConversationId, companyId: string, human: Person, agentIds: string[], preferences: { pinned: boolean; archived: boolean }, sharedProjectId?: string) {
     if (sharedProjectId !== undefined) await requireProjectAccess(tx, { companyId, userId: human.id }, sharedProjectId, "participate");
+    return this.initializeAdmitted(tx, roomId, companyId, human, agentIds, preferences, sharedProjectId);
+  }
+
+  /** Materialize backend-admitted creation. Historical attribution does not modify project ACLs;
+   * subsequent reads, invitations and submissions still authorize against the current project.
+   */
+  async initializeAdmitted(tx: Tx, roomId: ConversationId, companyId: string, human: Person, agentIds: string[], preferences: { pinned: boolean; archived: boolean }, sharedProjectId?: string) {
     const room = await tx.doc(SharedDoc, roomId);
     await tx.doc(TurnsDoc, roomId);
     room.companyId = companyId;
@@ -633,9 +649,10 @@ export class SharedConversations {
     for (const definitionId of agentIds) await this.addAgent(tx, roomId, definitionId);
   }
 
-  async addAgent(tx: Tx, roomId: ConversationId, definitionId: string, options: Pick<CreateAgentInstanceInput, "name" | "instructions"> = {}) {
+  async addAgent(tx: Tx, roomId: ConversationId, definitionId: string, options: Pick<CreateAgentInstanceInput, "name" | "instructions"> = {}, revision?: number, participantId?: string) {
     const room = await tx.doc(SharedDoc, roomId);
-    const member = await this.createAgent(tx, roomId, room.companyId, definitionId);
+    const member = await this.createAgent(tx, roomId, room.companyId, definitionId, revision);
+    if (participantId) member.id = participantId;
     if (options.name) member.name = options.name;
     if (options.instructions) {
       member.instanceInstructions = options.instructions;
@@ -694,7 +711,7 @@ export class SharedConversations {
     const member = room.members.find(item => item.id === binding.participantId && item.conversationId === conversationId && item.kind === "agent");
     if (!activeMember(member) || !member?.agentDefinitionId || !member.agentRevision || !member.agent) throw new CollaborationError(403, "Agent membership is unavailable.");
     return { companyId: room.companyId, definitionId: member.agentDefinitionId, revision: member.agentRevision,
-      instanceId: conversationId, participantId: member.id, roomId: binding.roomId };
+      instanceId: conversationId, participantId: member.id, roomId: binding.roomId, configuration: JSON.parse(JSON.stringify(member.agent)) as NonNullable<Member["agent"]> };
   }
 
   async binding(conversationId: ConversationId, ctx: Context) {
@@ -818,7 +835,7 @@ export class SharedConversations {
   }
 
   /** Public metadata and its entry are one native commit, including membership and legacy writes. */
-  private async appendPublic(tx: Tx, roomId: ConversationId, value: { data: MessageData }) {
+  async appendPublic(tx: Tx, roomId: ConversationId, value: { data: MessageData }) {
     const entry = await tx.appendEntry(PublicEntry, roomId, value);
     includePublicMessage(await tx.doc(PublicSummaryDoc, roomId), entry.id, value.data);
     return entry;
@@ -935,36 +952,42 @@ export class SharedConversations {
   async remove(roomId: ConversationId, participantId: string, authorId: string, authorize: (tx: Tx) => Promise<unknown>) {
     const id = await this.harness.commit(async tx => {
       await authorize(tx);
-      const room = await tx.doc(SharedDoc, roomId);
-      const author = requireActiveMember(room, authorId);
-      if (author.kind !== "human") throw new CollaborationError(403, "Only humans can remove agents.");
-      const member = room.members.find(item => item.id === participantId);
-      if (!member) throw new CollaborationError(404, "Participant not found.");
-      if (member.kind !== "agent" || !member.conversationId) throw new CollaborationError(400, "Only agent participants can be removed.");
-      if (member.membership === "removed") return undefined;
-      if (member.removalTask) {
-        const previous = await tx.task(member.removalTask);
-        if (previous && previous.state.status !== "terminal") return previous.id;
-      }
-      member.membership = "removing";
-      const contributions = await this.contributions.closeAll(tx, roomId, member.id);
-      await this.turns.release(tx, roomId, member.id);
-      const deliveries: TaskId[] = [];
-      for (const id of room.deliveries) {
-        const task = await tx.task(id);
-        if (task && (task.kind === this.delivery.definition.name || task.kind === this.legacyReporter.definition.name)
-          && (task.input as { participantId?: string }).participantId === member.id) deliveries.push(id);
-      }
-      const id = await tx.createTask(this.removeTask, {
-        roomId, participantId: member.id, authorId, conversationId: member.conversationId, deliveries, contributions,
-      }, { conversationId: roomId, ownership: { kind: "conversation" }, background: true });
-      member.removalTask = id;
-      return id;
+      return this.beginRemoval(tx, roomId, participantId, authorId);
     }, context);
     if (id) {
       const result = await this.harness.waitForTask(id, context);
       if (result.state.outcome.status !== "completed") throw new CollaborationError(503, "Agent removal did not complete. Retry removal to finish cleanup.");
     }
+  }
+
+  /** Trusted removal intent and native cleanup admission share the caller's transaction. */
+  async beginRemoval(tx: Tx, roomId: ConversationId, participantId: string, authorId: string) {
+    const room = await tx.doc(SharedDoc, roomId);
+    const author = requireActiveMember(room, authorId);
+    if (author.kind !== "human") throw new CollaborationError(403, "Only humans can remove agents.");
+    const member = room.members.find(item => item.id === participantId);
+    if (!member) throw new CollaborationError(404, "Participant not found.");
+    if (member.kind !== "agent" || !member.conversationId) throw new CollaborationError(400, "Only agent participants can be removed.");
+    if (member.membership === "removed") return undefined;
+    if (member.removalTask) {
+      const previous = await tx.task(member.removalTask);
+      if (previous && previous.state.status !== "terminal") return previous.id;
+    }
+    member.membership = "removing";
+    const contributions = await this.contributions.closeAll(tx, roomId, member.id);
+    await this.turns.release(tx, roomId, member.id);
+    const deliveries: TaskId[] = [];
+    for (const id of room.deliveries) {
+      const task = await tx.task(id);
+      if (task && (task.kind === this.delivery.definition.name || task.kind === this.legacyReporter.definition.name)
+        && (task.input as { participantId?: string }).participantId === member.id) deliveries.push(id);
+    }
+    const id = await tx.createTask(this.removeTask, {
+      roomId, participantId: member.id, authorId, conversationId: member.conversationId, deliveries, contributions,
+    }, { conversationId: roomId, ownership: { kind: "conversation" }, background: true });
+    member.removalTask = id;
+    await this.onParticipantStateChanged?.(tx);
+    return id;
   }
 
   async stop(roomId: ConversationId, authorize?: (tx: Tx) => Promise<unknown>) {
@@ -1042,7 +1065,7 @@ export class SharedConversations {
     const participants: ConversationParticipant[] = [];
     const activeTickets = await activeTurnTickets(tx, turns);
     for (const member of room.members) {
-      const { pendingConnectionIds, connectionsRefreshPending, conversationId, removalTask, lastDelivery: _last, threadId, activeDelivery: _delivery, consideredThrough: _through, superseded: _superseded, publicationPriority: _priority, ...participant } = member;
+      const { pendingConnectionIds, pendingWorkerMcp, connectionsRefreshPending, conversationId, removalTask, lastDelivery: _last, threadId, activeDelivery: _delivery, consideredThrough: _through, superseded: _superseded, publicationPriority: _priority, ...participant } = member;
       if (conversationId) {
         const live = await tx.doc(LiveDoc, conversationId);
         const observed = await participantStatus(tx, member, live, turns, activeTickets);
@@ -1050,7 +1073,7 @@ export class SharedConversations {
         const removal = removalTask ? await tx.task(removalTask) : undefined;
         const removalError = member.membership === "removing" && (!removal || removal.state.status === "terminal")
           ? "Removal incomplete. Retry removal." : undefined;
-        participants.push({ ...participant, ...(pendingConnectionIds || connectionsRefreshPending ? { connectionsPending: true } : {}), membership: member.membership ?? "active", ...(removalError ? { removalError } : {}),
+        participants.push({ ...participant, ...(pendingConnectionIds || pendingWorkerMcp || connectionsRefreshPending ? { connectionsPending: true } : {}), membership: member.membership ?? "active", ...(removalError ? { removalError } : {}),
           ...observed, usage } as ConversationParticipant);
       }
       else participants.push({ ...participant, status: Object.values(turns.presence).some(presence => presence.participantId === member.id && presence.until > Date.now()) ? "typing" : "idle" } as ConversationParticipant);

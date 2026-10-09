@@ -4,7 +4,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { JsonRepresentation, JsonValue } from "@earendil-works/chord";
 import { Type } from "@earendil-works/pi-ai";
 import { AgentDoc, defineDoc, defineExtension, defineTool, section, type ConversationId, type Harness, type Registry, type Tx } from "@earendil-works/pi-durable";
-import { McpClient, StdioTransport, StreamableHttpTransport, toLlmContent, type Tool } from "@earendil-works/pi-mcp";
+import { McpClient, StdioTransport, StreamableHttpTransport, toLlmContent, type Tool, type CallToolResult, type McpRequestOptions } from "@earendil-works/pi-mcp";
 import { z } from "zod";
 import type { AgentConnection, AgentConnectionStatus } from "../src/shared/contracts.js";
 import type { McpConnections, ManagedConnectionRecord } from "./mcp-connections.js";
@@ -31,12 +31,20 @@ const BindingDoc = defineDoc<{ connections: string[] }>({
 export const isMcpExtension = (name: string) => name.startsWith("dispatch-mcp-");
 export const isMcpTool = (name: string) => name.startsWith("mcp_");
 
+/** Nonsecret registry projection; no transport command, credentials or client object. */
+export type WorkerConnectionDefinition = {
+  id: string; extension: string; instructions: string;
+  tools: { name: string; description: string; inputSchema: Tool["inputSchema"] }[];
+};
+export type WorkerMcpCallOptions = Pick<McpRequestOptions, "signal" | "onProgress"> & { beforeCall: () => Promise<void>; assertCurrent: () => void };
+
 /** Explicit per-definition bindings; credentials never enter native documents. */
 export class AgentConnections {
   private readonly connections: McpConnection[];
   private harness!: Harness;
   private closed = false;
   onChanged: () => Promise<void> = async () => {};
+  runBackground: <T>(operation: () => Promise<T>) => Promise<T> = operation => operation();
 
   private constructor(configs: ConnectionConfig[], private readonly registry: Registry, private readonly managed?: McpConnections, private readonly companyId?: string) {
     this.connections = configs.map(config => this.create(config));
@@ -51,7 +59,7 @@ export class AgentConnections {
         catalog.connections[connection.key] = connection.catalog;
       }, context);
       await this.onChanged();
-    }, "source" in config ? this.managed : undefined);
+    }, "source" in config ? this.managed : undefined, operation => this.runBackground(operation));
   }
 
   private syncManaged() {
@@ -83,11 +91,16 @@ export class AgentConnections {
     return new AgentConnections(configs, registry, managed, companyId);
   }
 
-  async open(harness: Harness) {
+  async open(harness: Harness, connect = true) {
     this.harness = harness;
     const saved = await harness.snapshot(CatalogDoc, context);
     for (const connection of this.connections) connection.restore(saved?.connections[connection.key]);
     // Discovery installs executable definitions before Pi resumes any saved work.
+    if (connect) await this.start();
+  }
+
+  async start() {
+    this.syncManaged();
     await Promise.all(this.connections.map(connection => connection.connect().catch(() => {})));
   }
 
@@ -134,6 +147,23 @@ export class AgentConnections {
     return { extensions, tools };
   }
 
+  private workerConnection(connection: Pick<AgentConnection, "id" | "extension">) {
+    const found = this.connections.find(item => item.config.id === connection.id && item.extensionName === connection.extension);
+    if (!found) throw new Error("MCP connection is unavailable.");
+    return found;
+  }
+
+  workerDefinition(connection: Pick<AgentConnection, "id" | "extension">): WorkerConnectionDefinition {
+    return this.workerConnection(connection).workerDefinition();
+  }
+
+  /** Only the backend's attempt/actor-authorized invocation path may use this bridge.
+   * Keep the call admitted across reconnect, credential callbacks and the external request.
+   */
+  callWorkerTool(connection: Pick<AgentConnection, "id" | "extension">, toolName: string, args: Record<string, unknown>, options: WorkerMcpCallOptions): Promise<CallToolResult> {
+    return this.runBackground(() => this.workerConnection(connection).callRegisteredTool(toolName, args, options));
+  }
+
   async close() { this.closed = true; await Promise.all(this.connections.map(connection => connection.close())); }
 }
 
@@ -146,7 +176,7 @@ class McpConnection {
   private error?: string;
   catalog: Catalog["connections"][string] = { tools: [], instructions: "", checkedAt: 0 };
 
-  constructor(readonly config: ConnectionConfig, private readonly registry: Registry, private readonly changed: (connection: McpConnection) => Promise<void>, private readonly managed?: McpConnections) {
+  constructor(readonly config: ConnectionConfig, private readonly registry: Registry, private readonly changed: (connection: McpConnection) => Promise<void>, private readonly managed?: McpConnections, private readonly runBackground: <T>(operation: () => Promise<T>) => Promise<T> = operation => operation()) {
     this.key = `${config.agentId}/${config.id}`;
     this.extensionName = `dispatch-mcp-${config.agentId}-${config.id}`;
   }
@@ -205,11 +235,17 @@ class McpConnection {
     const client = new McpClient({ name: "dispatch-web", version: "0.1.0" });
     this.client = client;
     client.onClose(() => { if (!this.closed) this.error = `${this.config.name} disconnected. The next tool call will reconnect.`; });
-    client.onNotification("notifications/tools/list_changed", () => { void this.discover(client).catch(() => { this.error = "The tool list could not be refreshed."; }); });
+    client.onNotification("notifications/tools/list_changed", () => { void this.runBackground(() => this.discover(client)).catch(() => { this.error = "The tool list could not be refreshed."; }); });
     try {
       if (this.managed) {
-        await this.managed.beforeConnect(this.config.id);
-        await client.connect(new StreamableHttpTransport({ url: this.config.endpoint, authProvider: this.managed.authProvider(this.config.id), fetch: (input, init) => this.managed!.fetch(this.config.id, input, init) }));
+        await this.runBackground(() => this.managed!.beforeConnect(this.config.id));
+        const auth = this.managed.authProvider(this.config.id);
+        await client.connect(new StreamableHttpTransport({ url: this.config.endpoint, authProvider: {
+          // SSE reconnect and transport close can renew credentials independently
+          // of discovery or an HTTP request. Track the entire renewal as a writer.
+          token: () => this.runBackground(() => auth.token()),
+          onUnauthorized: input => this.runBackground(async () => { await auth.onUnauthorized?.(input); }),
+        }, fetch: (input, init) => this.managed!.fetch(this.config.id, input, init) }));
       } else if ("command" in this.config) {
         await client.connect(new StdioTransport({ command: this.config.command, args: this.config.args, inheritEnv: false, stderr: "pipe" }));
       }
@@ -228,11 +264,34 @@ class McpConnection {
     const instructions = client.instructions ?? "";
     if (!this.managed) verifyLegacyOperatorIdentity(this.config.identity, instructions, tools.map(tool => tool.name));
     const serverName = client.serverInfo?.title || client.serverInfo?.name || "";
-    this.managed?.recordServer(this.config.id, serverName, instructions);
+    await this.managed?.recordServer(this.config.id, serverName, instructions);
     this.catalog = { tools: JSON.parse(JSON.stringify(tools)) as JsonRepresentation<Tool>[], instructions, checkedAt: Date.now(), ...(serverName ? { serverName } : {}) };
     this.error = undefined;
     this.install();
     await this.changed(this);
+  }
+
+  workerDefinition(): WorkerConnectionDefinition {
+    return JSON.parse(JSON.stringify({ id: this.config.id, extension: this.extensionName,
+      instructions: [`Connection: ${this.config.name}. MCP server: ${this.config.endpoint}. Use its tools within the connection's granted access.`, this.config.instructions, this.catalog.instructions].filter(Boolean).join("\n\n"),
+      tools: this.catalog.tools.map(tool => ({ name: this.toolName(tool.name), description: `${tool.description ?? tool.name}\nConnection: ${this.config.name} (${this.config.endpoint}).`, inputSchema: tool.inputSchema })),
+    })) as WorkerConnectionDefinition;
+  }
+
+  async callRegisteredTool(name: string, args: Record<string, unknown>, options: Pick<McpRequestOptions, "signal" | "onProgress"> & { beforeCall?: () => Promise<void>; assertCurrent?: () => void }): Promise<CallToolResult> {
+    options.signal?.throwIfAborted();
+    options.assertCurrent?.();
+    await this.connect();
+    // Reconnect/discovery/credential renewal can yield across a policy change.
+    await options.beforeCall?.();
+    options.signal?.throwIfAborted();
+    if (this.closed || (this.managed && this.managedRecord?.authorization !== "authorized")) throw new Error("MCP connection is disabled.");
+    const tool = this.catalog.tools.find(tool => this.toolName(tool.name) === name);
+    if (!tool) throw new Error("This MCP tool is no longer available.");
+    // No await between the attempt fence and handing the call to the transport.
+    // Retirement still joins admitted calls; this check cannot undo remote effects.
+    options.assertCurrent?.();
+    return this.client!.callTool(tool.name, args, { signal: options.signal, onProgress: options.onProgress });
   }
 
   private install() {
@@ -250,10 +309,7 @@ class McpConnection {
         execute: async (args, api, ctx) => {
           const binding = await api.snapshot(BindingDoc, api.conversationId, ctx);
           if (!binding?.connections.includes(this.key)) throw new Error("This agent has no access to this MCP connection.");
-          await this.connect();
-          ctx.abortSignal?.throwIfAborted();
-          if (!this.catalog.tools.some(current => current.name === tool.name)) throw new Error("This MCP tool is no longer available.");
-          const result = await this.client!.callTool(tool.name, args, { signal: ctx.abortSignal, onProgress: progress => { if (progress.message) api.output(progress.message + "\n"); } });
+          const result = await this.callRegisteredTool(this.toolName(tool.name), args, { signal: ctx.abortSignal, onProgress: progress => { if (progress.message) api.output(progress.message + "\n"); } });
           return { content: toLlmContent(result), isError: result.isError === true, details: JSON.parse(JSON.stringify(result)) as JsonValue };
         },
       })),

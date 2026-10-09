@@ -10,7 +10,8 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { z } from "zod";
 import type { createAuth, AuthPrincipal } from "./auth.js";
 import { ProjectAccessError } from "./project-access.js";
-import { RuntimeError, type DispatchRuntime } from "./runtime.js";
+import { RuntimeError } from "./runtime.js";
+import type { RuntimeService } from "./runtime-service.js";
 import { CollaborationError } from "./collaboration/shared.js";
 import type { ApplicationConfig, ChatSnapshot } from "../src/shared/contracts.js";
 import { ConnectionError, type McpConnections } from "./mcp-connections.js";
@@ -20,10 +21,10 @@ import { EvaluationError, parseEvaluationRevision } from "./evaluations.js";
 import { ManagementError } from "./agent-grants.js";
 import { randomToken } from "./auth/crypto.js";
 
-type Auth = ReturnType<typeof createAuth>;
+type Auth = Awaited<ReturnType<typeof createAuth>>;
 type AppOptions = {
   auth: Auth;
-  runtime: DispatchRuntime;
+  runtime: RuntimeService;
   mcpConnections: McpConnections;
   origin: string;
   configuration: () => Promise<ApplicationConfig>;
@@ -115,23 +116,23 @@ export function createApp(options: AppOptions) {
     }
     const response = await auth.handle(c.req.raw);
     if (response) return response;
-    const principal = auth.authenticate(c.req.raw);
+    const principal = await auth.authenticate(c.req.raw);
     if (!principal) return c.json({ error: { code: "unauthenticated", message: "Sign in to continue." } }, 401);
     c.set("principal", principal);
     await next();
   });
   app.get("/api/config", async (c) => c.json(await options.configuration()));
-  app.get("/api/secrets/exa", c => c.json(options.mcpConnections.searchSecret(c.get("principal"))));
+  app.get("/api/secrets/exa", async c => c.json(await options.mcpConnections.searchSecret(c.get("principal"))));
   app.post("/api/secrets/exa", async c => {
     const input = z.object({ revision: z.number().int().nonnegative(), source: z.enum(["stored", "environment"]), value: z.string().trim().min(1).optional(), agentIds: z.array(z.string().min(1)) }).strict().parse(await c.req.json());
     const scope = c.get("principal");
     const agents = await runtime.listAgents(scope);
     if (input.agentIds.some(id => !agents.some(agent => agent.id === id && !agent.archived))) throw new ConnectionError(400, "Choose current agents from this workspace.");
-    return c.json(options.mcpConnections.saveSearchSecret(scope, input));
+    return c.json(await options.mcpConnections.saveSearchSecret(scope, input));
   });
   app.post("/api/secrets/exa/disconnect", async c => {
     const input = z.object({ revision: z.number().int().nonnegative() }).strict().parse(await c.req.json());
-    return c.json(options.mcpConnections.disconnectSearchSecret(c.get("principal"), input.revision));
+    return c.json(await options.mcpConnections.disconnectSearchSecret(c.get("principal"), input.revision));
   });
   app.get("/api/connections", async c => c.json({ connections: await runtime.listMcpConnections(c.get("principal")) }));
   app.post("/api/connections/authorize", async c => {
@@ -163,7 +164,7 @@ export function createApp(options: AppOptions) {
     await runtime.refreshMcpConnections(c.req.param("id"));
     return c.json({ connections: await runtime.listMcpConnections(c.get("principal")) });
   });
-  app.get("/api/people", (c) => c.json({ people: auth.listCompanyPeople(c.get("principal").companyId) }));
+  app.get("/api/people", async (c) => c.json({ people: await auth.listCompanyPeople(c.get("principal").companyId) }));
   app.post("/api/project-archives/preview", async c => {
     const input = z.object({ archive: z.string().max(32 * 1024 * 1024) }).strict().parse(await c.req.json());
     return c.json({ preview: projectArchivePreview(decodeProjectArchive(input.archive)) });
@@ -250,7 +251,7 @@ export function createApp(options: AppOptions) {
     const principal = c.get("principal");
     await runtime.authorizeAttachmentUpload(principal, c.req.param("id"));
     const file = await readAttachmentUpload(c.req.raw);
-    if (!auth.isSessionValid(principal.sessionId)) return c.json({ error: { code: "unauthenticated", message: "Sign in to continue." } }, 401);
+    if (!await auth.isSessionValid(principal.sessionId)) return c.json({ error: { code: "unauthenticated", message: "Sign in to continue." } }, 401);
     return c.json({ attachment: await runtime.uploadAttachment(principal, c.req.param("id"), file) }, 201);
   });
   app.get("/api/chats/:id/attachments/:attachmentId", async c => {
@@ -270,8 +271,7 @@ export function createApp(options: AppOptions) {
       threadId: identity.nullable().optional(), mentions: identities.optional(), agentMentions: identities.max(50).optional(),
       attachmentIds: z.array(z.string().uuid()).max(ATTACHMENT_MAX_COUNT).refine(ids => new Set(ids).size === ids.length).optional(),
     }).strict().refine(input => input.text.length > 0 || Boolean(input.attachmentIds?.length), "Add a message or attachment.").parse(await c.req.json());
-    await runtime.submit(c.get("principal"), c.req.param("id"), input);
-    return c.json(await runtime.getChat(c.get("principal"), c.req.param("id")), 202);
+    return c.json(await runtime.submitAndGetChat(c.get("principal"), c.req.param("id"), input), 202);
   });
   app.post("/api/chats/:id/stop", async (c) => {
     z.object({}).strict().parse(await c.req.json());
@@ -350,10 +350,10 @@ export function createApp(options: AppOptions) {
   return app;
 }
 
-type ChatWatch = Awaited<ReturnType<DispatchRuntime["watchChat"]>>;
+type ChatWatch = Awaited<ReturnType<RuntimeService["watchChat"]>>;
 
 /** Each subscriber retains at most the latest complete snapshot under backpressure. */
-function snapshotStream(watch: ChatWatch, isValid: () => boolean, signal: AbortSignal, onRevocation: (listener: () => void) => () => void) {
+function snapshotStream(watch: ChatWatch, isValid: () => Promise<boolean>, signal: AbortSignal, onRevocation: (listener: () => void | Promise<void>) => () => void) {
   const encoder = new TextEncoder();
   let controller: ReadableStreamDefaultController<Uint8Array>;
   let pending: ChatSnapshot | undefined = watch.value;
@@ -361,31 +361,35 @@ function snapshotStream(watch: ChatWatch, isValid: () => boolean, signal: AbortS
   let stopped = false;
   let unsubscribe = () => {};
   let heartbeat: ReturnType<typeof setInterval>;
+  let cleanup: Promise<void> | undefined;
   function close() {
     if (stopped) return;
     stopped = true;
     clearInterval(heartbeat);
     unsubscribe();
     signal.removeEventListener("abort", close);
-    void watch.stop();
+    cleanup = Promise.resolve().then(async () => { await watch.stop(); });
+    void cleanup.catch(() => {});
     controller.close();
   }
-  function valid() {
+  async function valid() {
     if (stopped) return false;
-    if (isValid()) return true;
+    try { if (await isValid()) return !stopped; } catch { /* Fail closed on authorization storage failure. */ }
+    if (stopped) return false;
     controller.enqueue(encoder.encode('event: session-ended\ndata: {"message":"Sign in to continue."}\n\n'));
     close();
     return false;
   }
   let flushing = false;
   async function flush() {
-    if (flushing || !valid() || !pending || (controller.desiredSize ?? 0) <= 0) return;
+    if (flushing || stopped || !pending || (controller.desiredSize ?? 0) <= 0) return;
     flushing = true;
     const snapshot = pending;
     pending = undefined;
     try {
-      await watch.deliver(() => {
-        if (valid()) {
+      if (!await valid()) return;
+      await watch.deliver(async () => {
+        if (await valid()) {
           const event = delivered ? "delta" : "snapshot";
           const payload = delivered ? chatDelta(delivered, snapshot) : snapshot;
           controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`));
@@ -399,12 +403,12 @@ function snapshotStream(watch: ChatWatch, isValid: () => boolean, signal: AbortS
   return new ReadableStream<Uint8Array>({
     start(streamController) {
       controller = streamController;
-      heartbeat = setInterval(() => {
-        if (!valid()) return;
+      heartbeat = setInterval(async () => {
+        if (!await valid()) return;
         if (pending) void flush();
         else if ((controller.desiredSize ?? 0) > 0) controller.enqueue(encoder.encode(": heartbeat\n\n"));
       }, 15_000);
-      unsubscribe = onRevocation(() => { valid(); });
+      unsubscribe = onRevocation(async () => { await valid(); if (stopped) await cleanup; });
       signal.addEventListener("abort", close, { once: true });
       if (signal.aborted) { close(); return; }
       void watch.closed.then(close, close);

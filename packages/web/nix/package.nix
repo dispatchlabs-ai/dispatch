@@ -26,7 +26,7 @@ buildNpmPackage {
     ];
   };
 
-  npmDepsHash = "sha256-a47GCl7OjtsNSNQSYZVYkESs8PdPDS4Z1E10Qn2BICc=";
+  npmDepsHash = "sha256-ZBJuAhP8Yq+bWGBAH88PByzE0aw80fKWN2nmPUrIqVk=";
   npmBuildScript = "build";
 
   doCheck = true;
@@ -49,6 +49,21 @@ buildNpmPackage {
       --add-flags "$app/packages/web/build/service/server/index.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-auth" \
       --add-flags "$app/packages/web/build/service/server/auth-cli.js"
+    test -f "$app/packages/web/build/service/server/workers/bootstrap-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-bootstrap" \
+      --add-flags "$app/packages/web/build/service/server/workers/bootstrap-main.js"
+    test -f "$app/packages/web/build/service/server/workers/database-init-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-database-init" \
+      --add-flags "$app/packages/web/build/service/server/workers/database-init-main.js"
+    test -f "$app/packages/web/build/service/server/workers/backend-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-backend" \
+      --add-flags "$app/packages/web/build/service/server/workers/backend-main.js"
+    test -f "$app/packages/web/build/service/server/workers/control-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-launcher" \
+      --add-flags "$app/packages/web/build/service/server/workers/control-main.js"
+    test -f "$app/packages/web/build/service/server/workers/worker-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-worker" \
+      --add-flags "$app/packages/web/build/service/server/workers/worker-main.js"
     mkdir -p "$out/share/dispatch-web"
     cp -R packages/web/capabilities "$out/share/dispatch-web/capabilities"
     cp packages/web/server/storage/postgres/NOTICE "$out/share/dispatch-web/postgres-storage-NOTICE"
