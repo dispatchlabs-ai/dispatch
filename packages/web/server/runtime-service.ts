@@ -47,6 +47,7 @@ export type RuntimeService = Pick<DispatchRuntime,
   | "saveSkill"
   | "stop"
   | "submit"
+  | "submitAndGetChat"
   | "updateChat"
   | "uploadAttachment"
   | "watchChat"

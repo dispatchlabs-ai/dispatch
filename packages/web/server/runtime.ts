@@ -1673,6 +1673,11 @@ export class DispatchRuntime {
     }, context);
   }
 
+  async submitAndGetChat(scope: RuntimeScope, id: string, input: SendMessageInput): Promise<ChatSnapshot> {
+    await this.submit(scope, id, input);
+    return this.getChat(scope, id);
+  }
+
   async composing(scope: RuntimeScope, id: string, input: { clientId: string; sequence: number; active: boolean }) {
     this.requireConversationExecutor();
     await this.authorize(scope, id);

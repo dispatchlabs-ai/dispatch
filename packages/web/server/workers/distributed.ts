@@ -27,6 +27,9 @@ export type DistributedRuntime = RuntimeService & {
 export function distributedRuntime(options: DistributedOptions): DistributedRuntime {
   const { directory, routes } = options;
   const launching = new Map<string, Promise<WorkerRoute>>();
+  // A warm address is a transport hint, never authorization or a retirement fence.
+  // Restart and failed RPCs require the existing launcher reconciliation path again.
+  const activated = new Map<string, string>();
   // Read leases cover authorization, activation and RPC completion. A policy writer
   // seals later leases synchronously, then joins the earlier ones before changing
   // policy or taking launcher inventory. Ordinary conversations remain concurrent.
@@ -47,6 +50,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
   const launcher = <T>(path: string, body?: unknown, timeoutMs = options.launcherTimeoutMs ?? 300_000) => workerRequest<T>(options.launcherUrl, options.launcherToken, `/v1/${path}`, body, undefined, timeoutMs);
   const token = (route: WorkerRoute) => workerToken(options.workerKey, options.installationId, route);
   async function activate(route: WorkerRoute): Promise<WorkerRoute> {
+    if (route.phase === "ready" && route.containerName && activated.get(route.conversationId) === route.attemptId) return route;
     const existing = launching.get(route.conversationId); if (existing) return existing;
     const work = (async () => {
       const status = await launcher<LauncherStatus>("status");
@@ -69,7 +73,9 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
         try {
           const ready = await workerRequest<{ roomId: string; conversationId: string; attemptId: string }>(origin, token(route), "/ready");
           if (ready.conversationId !== route.conversationId || ready.attemptId !== route.attemptId) throw new Error("Worker readiness identity mismatch.");
-          return await routes.ready(route.conversationId, route.attemptId, ready.roomId, address);
+          const active = await routes.ready(route.conversationId, route.attemptId, ready.roomId, address);
+          activated.set(active.conversationId, active.attemptId);
+          return active;
         } catch (error) { if (i === 39) throw error; await delay(250); }
       }
       throw new RuntimeError(503, "Worker did not become ready.");
@@ -81,16 +87,26 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     return policyRead(() => callNow<T>(scope, id, method, input));
   }
   async function callNow<T>(scope: RuntimeScope, id: string, method: string, input?: unknown): Promise<T> {
-    // Recheck backend-authoritative project/membership policy on every request.
-    await directory.getChat(scope, id);
-    const bootstrap = await directory.directoryChatBootstrap(scope, id);
-    const route = routes.get(id) ?? await routes.ensure(id, bootstrap.scope, bootstrap.input, options.configurationRevision);
+    // This projection checks current project/membership access without constructing
+    // and discarding a directory transcript. The policy lease covers RPC completion.
+    const membership = await directory.directoryWorkerMembership(scope, id);
+    let route = routes.get(id);
+    if (!route) {
+      const bootstrap = await directory.directoryChatBootstrap(scope, id);
+      route = await routes.ensure(id, bootstrap.scope, bootstrap.input, options.configurationRevision);
+    }
     if (route.companyId !== scope.companyId) throw new RuntimeError(503, "Conversation worker unavailable.");
     const active = await activate(route);
-    const membership = await directory.directoryWorkerMembership(scope, id);
     const catalog = await directory.exportWorkerCatalog(scope.companyId);
-    const response = await workerRequest<{ result: T }>(`http://${active.containerName}:8831`, token(active), "/rpc", { scope: { companyId: scope.companyId, userId: scope.userId }, method, input, catalog, membership });
-    return response.result;
+    try {
+      const response = await workerRequest<{ result: T }>(`http://${active.containerName}:8831`, token(active), "/rpc", { scope: { companyId: scope.companyId, userId: scope.userId }, method, input, catalog, membership });
+      return response.result;
+    } catch (error) {
+      if (activated.get(id) === active.attemptId) activated.delete(id);
+      // Never replay an uncertain mutation. A later request reconciles this same
+      // attempt; replacement still requires confirmed irreversible retirement.
+      throw error;
+    }
   }
   async function acknowledgePolicy(companyId?: string, requireRevocationFence = true) {
     const status = await launcher<LauncherStatus>("status");
@@ -227,6 +243,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     async saveDefinitionOfDone(scope, id, input) { return snapshot(await call<ChatSnapshot>(scope, id, "saveDefinitionOfDone", input), id); },
     async getChat(scope, id) { return snapshot(await call<ChatSnapshot>(scope, id, "getChat"), id); },
     async submit(scope, id, input) { return call(scope, id, "submit", input); },
+    async submitAndGetChat(scope, id, input) { return snapshot(await call<ChatSnapshot>(scope, id, "submitAndGetChat", input), id); },
     async composing(scope, id, input) { return call(scope, id, "composing", input); },
     async createAgentInstance(scope, id, input) {
       return policyRead(async () => {
@@ -260,7 +277,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
       let finish!: (value: { reason: "stopped" | "listener_error" | "session_closed" }) => void;
       const closed = new Promise<{ reason: "stopped" | "listener_error" | "session_closed" }>(resolve => { finish = resolve; });
       return { value, closed,
-        async deliver(deliver: () => void | Promise<void>) { await options.runBackground(() => policyRead(async () => { await directory.getChat(scope, id); if (!stopped) await deliver(); })); },
+        async deliver(deliver: () => void | Promise<void>) { await options.runBackground(() => policyRead(async () => { await directory.directoryWorkerMembership(scope, id); if (!stopped) await deliver(); })); },
         start(listener: (value: ChatSnapshot) => Promise<void>) {
           if (started) throw new Error("Watch already started"); started = true;
           void (async () => {
@@ -272,7 +289,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
                 const encoded = JSON.stringify(next);
                 if (encoded !== previous && !stopped) {
                   await options.runBackground(() => policyRead(async () => {
-                    await directory.getChat(scope, id);
+                    await directory.directoryWorkerMembership(scope, id);
                     if (!stopped) await listener(next);
                   }));
                   previous = encoded;

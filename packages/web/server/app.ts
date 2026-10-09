@@ -271,8 +271,7 @@ export function createApp(options: AppOptions) {
       threadId: identity.nullable().optional(), mentions: identities.optional(), agentMentions: identities.max(50).optional(),
       attachmentIds: z.array(z.string().uuid()).max(ATTACHMENT_MAX_COUNT).refine(ids => new Set(ids).size === ids.length).optional(),
     }).strict().refine(input => input.text.length > 0 || Boolean(input.attachmentIds?.length), "Add a message or attachment.").parse(await c.req.json());
-    await runtime.submit(c.get("principal"), c.req.param("id"), input);
-    return c.json(await runtime.getChat(c.get("principal"), c.req.param("id")), 202);
+    return c.json(await runtime.submitAndGetChat(c.get("principal"), c.req.param("id"), input), 202);
   });
   app.post("/api/chats/:id/stop", async (c) => {
     z.object({}).strict().parse(await c.req.json());
