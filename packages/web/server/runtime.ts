@@ -42,10 +42,11 @@ const capabilityDefinitions: { id: NonNullable<AgentDefinition["capabilities"]>[
   { id: "files-and-commands", marker: CodingTools.name, extensions: [Coding.name, CodingTools.name], tools: ["read", "write", "edit", "bash"] },
   { id: "image-generation", marker: "dispatch-image-gen", extensions: ["dispatch-image-gen"], tools: ["generate_image"] },
   { id: "edit-definition-of-done", marker: "dispatch-definition-of-done", extensions: ["dispatch-definition-of-done"], tools: ["conversation_definition_of_done"] },
-  { id: "web-research", marker: "dispatch-web", extensions: ["dispatch-web"], tools: ["web_run"] },
+  { id: "web-reading", marker: "dispatch-web-read", extensions: ["dispatch-web-read"], tools: ["web_read"] },
+  { id: "web-search", marker: "dispatch-web-search", extensions: ["dispatch-web-search"], tools: ["web_search"] },
 ];
-const capabilityExtensions = new Set(capabilityDefinitions.flatMap(item => item.extensions));
-const capabilityTools = new Set(capabilityDefinitions.flatMap(item => item.tools));
+const capabilityExtensions = new Set([...capabilityDefinitions.flatMap(item => item.extensions), "dispatch-web"]);
+const capabilityTools = new Set([...capabilityDefinitions.flatMap(item => item.tools), "web_run"]);
 type StoredChat = Omit<ChatSummary, "sharedProjectId" | "canParticipate" | "status" | "error" | "updatedAt" | "revision" | "agentName" | "pinned" | "archived" | "projectId"> & { creationFingerprint?: string; creationTitleExplicit?: boolean; displayTitle?: string; pinned?: boolean; archived?: boolean; agentName?: string; creationProjectId?: string | null; companyId: string; userId: string; requestId: string; creationAgentIds?: string[]; creationAgentsOmitted?: boolean };
 type StoredAgent = Omit<AgentDefinition, "extensions" | "tools"> & { companyId: string; extensions?: string[]; tools?: string[]; savedBy?: string; saveRequestId?: string; saveFingerprint?: string };
 type StoredSkill = SkillDefinition & { companyId: string; savedBy: string; requestId: string; fingerprint: string };
@@ -157,18 +158,29 @@ export class DispatchRuntime {
       registry.install(CodingTools);
       registry.install(Coding);
       registry.install(Skills);
-      registry.install(createWebResearch(createWebBackend(), async (instanceId, query, signal) => {
+      const authorizeWeb = async (instanceId: ConversationId, capability: "web-reading" | "web-search", signal?: AbortSignal) => {
+        signal?.throwIfAborted();
         const authorized = await runtime.harness.commit(async tx => {
           const actor = await shared.managementActor(tx, instanceId);
           const catalog = await tx.doc(CatalogDoc);
           const definition = latestAgent(catalog, actor.companyId, actor.definitionId);
-          if (!definition || definition.archived || !publicAgent(definition).capabilities?.includes("web-research")) return undefined;
+          if (!definition || definition.archived || !publicAgent(definition).capabilities?.includes(capability)) return undefined;
           return { companyId: actor.companyId, definitionId: actor.definitionId };
         }, context);
         signal?.throwIfAborted();
-        const key = authorized ? options.mcpConnections?.resolveSearchSecret(authorized.companyId, authorized.definitionId) : undefined;
-        return createWebBackend({ searchApiKey: key }).search(query, signal);
-      }));
+        return authorized;
+      };
+      const web = createWebResearch(createWebBackend(), {
+        authorize: async (instanceId, capability, signal) => Boolean(await authorizeWeb(instanceId, capability, signal)),
+        search: async (instanceId, query, signal) => {
+          const authorized = await authorizeWeb(instanceId, "web-search", signal);
+          const key = authorized ? options.mcpConnections?.resolveSearchSecret(authorized.companyId, authorized.definitionId) : undefined;
+          return createWebBackend({ searchApiKey: key }).search(query, signal);
+        },
+      });
+      registry.install(web.reading);
+      registry.install(web.search);
+      registry.install(web.legacy);
       registry.install(createImageGen(models));
       connections = await AgentConnections.load(options.connectionsFile ?? join(owner.directory, "agent-connections.json"), registry, options.mcpConnections, options.companyId);
       const harness = await Harness.open(storage, {
@@ -238,6 +250,21 @@ export class DispatchRuntime {
           });
         }
         catalog.runtimeInstance = randomUUID();
+      }, context);
+      // Append revisions rather than rewriting historical definitions or native snapshots.
+      await runtime.harness.commit(async tx => {
+        const catalog = await tx.doc(CatalogDoc);
+        const ids = new Set(catalog.agents.filter(agent => agent.companyId === options.companyId).map(agent => agent.id));
+        for (const id of ids) {
+          const agent = latestAgent(catalog, options.companyId, id)!;
+          if (!agent.extensions?.includes("dispatch-web")) continue;
+          const selection = capabilitySelection(publicAgent(agent).capabilities ?? []);
+          catalog.agents.push({ ...agent,
+            extensions: [...agent.extensions.filter(name => !capabilityExtensions.has(name)), ...selection.extensions],
+            tools: [...(agent.tools ?? []).filter(name => !capabilityTools.has(name)), ...selection.tools],
+            revision: agent.revision + 1, updatedAt: Date.now(),
+          });
+        }
       }, context);
       await runtime.migrateChats();
       await runtime.initializePublicSummaries();
@@ -1635,7 +1662,7 @@ function owns(scope: RuntimeScope, chat: RuntimeScope) { return scope.companyId 
 function publicAgent({ companyId: _companyId, savedBy: _savedBy, saveRequestId: _request, saveFingerprint: _fingerprint, ...agent }: StoredAgent): AgentDefinition {
   // Nested catalog values may be transaction proxies; detach before the transaction settles.
   return detached({ ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [],
-    capabilities: capabilityDefinitions.filter(item => agent.extensions?.includes(item.marker)).map(item => item.id) });
+    capabilities: capabilityDefinitions.filter(item => (agent.extensions?.includes(item.marker) || (agent.extensions?.includes("dispatch-web") && (item.id === "web-reading" || item.id === "web-search")))).map(item => item.id) });
 }
 function managedIds(agent: Pick<AgentDefinition, "connections">) { return (agent.connections ?? []).filter(isManagedConnection).map(connection => connection.id); }
 function requireText(value: unknown, field: string, max: number, allowEmpty = false): asserts value is string {

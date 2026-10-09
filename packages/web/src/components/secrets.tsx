@@ -46,7 +46,7 @@ export function SecretsPage() {
         {source === "stored" ? <Field label={saved.source === "stored" ? "Replace API key" : "API key"} hint={saved.source === "stored" ? "Leave blank to keep the saved key." : undefined}>{props => <Input {...props} type="password" autoComplete="new-password" value={value} disabled={busy} onChange={event => setValue(event.target.value)} />}</Field> : null}
         <fieldset disabled={busy}><legend>Allow agents to use this key</legend>
           <p className="field-hint">Applies to existing and future instances. Results are shared with conversation participants.</p>
-          {agents.map(agent => <label className="checkbox-field" key={agent.id}><input type="checkbox" checked={agentIds.includes(agent.id)} onChange={event => setAgentIds(ids => event.target.checked ? [...ids, agent.id] : ids.filter(id => id !== agent.id))} />{agent.name}{!agent.capabilities?.includes("web-research") ? " (Web research disabled)" : ""}</label>)}
+          {agents.map(agent => <label className="checkbox-field" key={agent.id}><input type="checkbox" checked={agentIds.includes(agent.id)} onChange={event => setAgentIds(ids => event.target.checked ? [...ids, agent.id] : ids.filter(id => id !== agent.id))} />{agent.name}{!agent.capabilities?.includes("web-search") ? " (Web search disabled)" : ""}</label>)}
         </fieldset>
         {message ? <p role="status">{message}</p> : null}
         <div className="button-row"><Button type="submit" disabled={busy}>{busy ? <Spinner /> : null}Save changes</Button><Button type="button" variant="ghost" disabled={busy || saved.source === "disconnected"} onClick={() => { if (window.confirm("Disconnect Exa for all assigned agents?")) void save(true); }}>Disconnect</Button></div>
