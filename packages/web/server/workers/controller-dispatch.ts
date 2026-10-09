@@ -12,7 +12,8 @@ export class ControllerDispatch {
 
   constructor(private readonly waitMs = 30_000, private readonly maxWaiting = 256) {}
   get holding() { return this.retiring && !this.failed; }
-  get available() { return !this.failed && this.waiting < this.maxWaiting; }
+  get available() { return !this.failed; }
+  get waitingAvailable() { return !this.failed && this.waiting < this.maxWaiting; }
   fail() { this.failed = true; }
 
   /** Wait for a natural request-idle boundary BEFORE sealing local dispatch.

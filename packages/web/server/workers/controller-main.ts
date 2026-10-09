@@ -107,6 +107,7 @@ export async function serveRollingController(role: "backend" | "launcher", openO
   async function ready() {
     if (stopping || !gate.available) return false;
     if (owner && activated && !retired && !gate.holding) return owner.ready();
+    if (!gate.waitingAvailable) return false;
     // The old task retains a bounded waiting path while a verified successor opens.
     if (activated && transfer && performance.now() - transferStarted < 30_000) return true;
     return activated && retired && !!await remoteOwner();
