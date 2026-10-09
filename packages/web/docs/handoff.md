@@ -1939,3 +1939,18 @@ Implementation sequence and acceptance:
 3. Show pending/failure states and reconcile the same archive request after interruption. Opening, refresh or restore alone must not restart cancelled work or a retired worker; later explicit new work must respect confirmed prior retirement.
 
 Documentation acceptance: inspect the changed contracts and local links, review the diff and run whitespace checks. No runtime changes, tests, builds, service stops or deployment are included. Future implementation must record source/type/build checks and any separately authorized local/cloud functional evidence under the existing testing policy.
+
+## Composer typing responsiveness — October 9, 2026
+
+Chris reported recurring prompt lag and authorized the team to fix it. Source review identified workspace-wide invalidation on draft edits and full-draft Markdown serialization in the editor; their relative contribution to the reported lag is not measured. This correction does not reopen the completed [October 8 performance package](#chat-presentation-performance--october-8-2026), whose measured workload was presence updates rather than arbitrary streaming/tool output.
+
+Scope: isolate draft notifications to the relevant chat/thread composer while retaining workspace-lifetime state; remove avoidable editor work without debouncing user input or changing Markdown behavior. Developer owns draft isolation, Deslop owns editor changes, Pi Durable Expert reviews draft/send/retry and presence boundaries, and Documenter reconciles contracts and evidence. No backend redesign, new draft persistence or unrelated cleanup is included.
+
+Acceptance:
+
+- Draft edits must not rerender the workspace or unrelated mounted chat panels. Send/close read current state synchronously; switching/remounting main/thread composers retains independent drafts and uploads.
+- Preserve selection/undo, Markdown transforms/paste, mentions, IME handling, pending-send feedback, uncertain retry identity and late-response/newer-draft protection. Typing presence remains asynchronous and contains no draft text.
+- Review the integrated source and run permitted TypeScript/application/Nix builds, diff/whitespace and changed-document link checks. Source/build success alone does not prove responsive typing or editor correctness.
+- Performance evidence should compare the same history/draft and multiple-open-tab workload before/after, including received public message/activity updates rather than presence alone, against the existing <100 ms p95 target. Record revision, build mode, device/browser, input timing method, samples and delivered updates. Desktop/390 px rendered and focused draft/send observations remain necessary to qualify runtime behavior; use only an applicable explicit testing-policy exception and coordinate the target before touching live state. Do not create billable model requests merely to generate load.
+
+Status: implementation and integrated checks are in progress. No new browser measurement, deployment or running-version qualification is claimed.
