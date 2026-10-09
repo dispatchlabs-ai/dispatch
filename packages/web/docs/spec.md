@@ -218,6 +218,8 @@ Keep desktop columns in their own layout space, with scrolling contained to thei
 
 Each mounted chat owns its editor and undo history; workspace drafts and submitted messages remain Markdown strings. External draft changes, including an acknowledged send, update the editor without reinitializing it on every keystroke. The existing request/retry and draft-version rules remain unchanged. Draft persistence across reloads is still out of scope. Copy/cut exports the selected content as Markdown.
 
+**October 9 hosted hotfix:** on submission, clear the submitted text immediately into a bounded **Sending…** preview in the main or thread composer; this is pending feedback, not durable acceptance. Keep one send in flight per composer. Restore failed submitted text only when no newer draft has replaced it; preserve retry identity for uncertain outcomes and clear acknowledged attachments/mentions only for the submitted draft version. Browser-memory state is not reload persistence. Delivery evidence belongs in [the hotfix package](handoff.md#hosted-request-path-hotfix--october-9-2026); broader profiling is deferred.
+
 The composer has one outer focus indicator, grows with its contents up to a scrolling bound, and has no privacy/status sentence in the toolbar. Send and Stop retain their existing state and accessible labels. Desktop Enter sends, Shift+Enter adds a line, and touch-primary Enter adds a line; IME composition must not submit. The existing 100,000-character limit applies to serialized Markdown: longer drafts remain editable, show an error, and cannot send until shortened.
 
 ### Message attachments
