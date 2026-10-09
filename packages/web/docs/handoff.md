@@ -1725,6 +1725,8 @@ Post-rebase integration checkpoint: `6f78872` shares the unchanged Settings memb
 
 Read-path follow-up: independently reviewed `4c20ae9` removes three preliminary authorization-only commits; chat, transcript-page and detail reads retain authorization inside their read transaction. Combined TypeScript/application/capability, Apple Silicon Nix build and flake evaluation passed again (zero runnable checks; Linux omitted). Runtime and latency effects remain unmeasured. No tests or deployment.
 
+Detail/Stop follow-up: independently reviewed `8914142` selects and detaches only the requested public detail through existing projection helpers, avoiding unrelated participant status/usage work. Stop retains mutation-time participation authorization and its authorized response read while removing a preliminary commit. Integrated TypeScript/application/capability, Apple Silicon Nix build and flake checks passed; flake has zero runnable checks and omits Linux. No tests or deployment; runtime, cold-history cost and latency remain unmeasured.
+
 Acceptance:
 
 - Preserve supported behavior, public/persisted contracts, authorization, meaningful failures and native Pi execution/recovery ownership. Investigate compatibility consumers before removal; unresolved behavior changes require a decision, not speculative deletion.
