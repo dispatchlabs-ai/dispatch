@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — live agent indicator
+
+- Replace Activity/Working disclosure labels with agent names and arrows; show current working/responding indicators separately without visible status text. Preserve accessible status and reduced-motion support.
+- Remove the teal pending-prompt surface while retaining Sending and Retry.
+
 ## Unreleased — ECS deployment mode selection
 
 - Add explicit per-controller `stop-first` (0/100) or `rolling` (100/200) deployment selection to the reusable AWS module; preserve stop-first defaults. Rolling requires application-level overlap and readiness support, which current exclusive-owner controllers do not provide. No live deployment mode changed.

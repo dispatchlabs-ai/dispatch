@@ -33,17 +33,17 @@ export function ConversationPresence({ participants }: { participants: Conversat
   const userId = state?.state === "authenticated" ? state.user.id : undefined;
   return <div className="conversation-presence" role="status" aria-live="polite">{participants.filter(member => member.kind === "human" ? member.status === "typing" && member.userId !== userId : member.membership === "active" && ["working", "listening", "responding"].includes(member.status)).map(member => <div className="agent-working" key={member.id}>
     {member.status === "listening" ? <Ear size={15} aria-hidden="true" /> : member.status === "typing" ? <Pencil size={15} aria-hidden="true" /> : <Spinner label={`${member.name} is ${participantStatus[member.status].toLowerCase()}`} />}
-    <span>{member.name} · {participantStatus[member.status]}</span>
+    <span>{member.name}<span className="sr-only"> · {participantStatus[member.status]}</span></span>
   </div>)}</div>;
 }
 
-function ParticipantContent({ author, participants, createdAt, showAuthor = true, status, children }: {
-  author?: ConversationParticipant; participants: ConversationParticipant[]; createdAt: number; showAuthor?: boolean; status?: string; children: ReactNode;
+function ParticipantContent({ author, participants, createdAt, showAuthor = true, children }: {
+  author?: ConversationParticipant; participants: ConversationParticipant[]; createdAt: number; showAuthor?: boolean; children: ReactNode;
 }) {
   return <>
     {showAuthor ? <ParticipantAvatar kind={author?.kind || "human"} name={author?.name || "?"} /> : null}
     <div className="participant-body">
-      {showAuthor ? <header className="message-heading"><strong>{author ? mentionLabel(author, participants) : "Former participant"}</strong>{author?.kind === "agent" ? <span className="agent-kind-badge">{author.membership === "removed" ? "Removed agent" : author.membership === "removing" ? "Removing agent" : "Agent"}</span> : null}<time dateTime={new Date(createdAt).toISOString()}>{formatTime(createdAt)}</time>{status ? <span className="activity-status">{status}</span> : null}</header> : null}
+      {showAuthor ? <header className="message-heading"><strong>{author ? mentionLabel(author, participants) : "Former participant"}</strong>{author?.kind === "agent" ? <span className="agent-kind-badge">{author.membership === "removed" ? "Removed agent" : author.membership === "removing" ? "Removing agent" : "Agent"}</span> : null}<time dateTime={new Date(createdAt).toISOString()}>{formatTime(createdAt)}</time></header> : null}
       {children}
     </div>
   </>;
@@ -132,7 +132,7 @@ export function PublicActivity({ activity, participants }: { activity: Participa
   if (generation?.retry) content.push(<p className="run-outcome" role="status" key="retry">Retrying the response…</p>);
   if (!content.length) return null;
   return <section className="conversation-entry participant-activity" aria-label={`${author?.name || "Agent"} activity`}>
-    <ParticipantContent author={author} participants={participants} createdAt={activity.createdAt} status={generation && author?.kind === "agent" ? `${agentStatus(author)}…` : "Activity"}>
+    <ParticipantContent author={author} participants={participants} createdAt={activity.createdAt}>
       {content}
     </ParticipantContent>
   </section>;
