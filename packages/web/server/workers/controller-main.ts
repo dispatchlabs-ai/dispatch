@@ -165,7 +165,7 @@ export async function serveRollingController(role: "backend" | "launcher", openO
     if (owner && !retired && !dispatchGate.holding && !workerSupport) return c.text("Controller unavailable", 503);
     // Admission is synchronous. Once accepted, its promise is never replayed.
     const route = await gate.wait(request.signal, async signal => {
-      if (await localAvailable(workerSupport)) {
+      if (owner && !retired && (maintenance || await localAvailable(workerSupport))) {
         if (signal.aborted) return undefined;
         const response = dispatchGate.tryRun(request, async value => owner!.app.fetch(value));
         if (response) return { local: true as const, response };

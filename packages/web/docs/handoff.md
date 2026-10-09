@@ -2132,3 +2132,14 @@ the focused source diff with no additional ownership blocker. Application checks
 Apple Silicon Nix build and flake evaluation pass (zero runnable flake checks;
 Linux omitted). No tests or live changes were executed by Developer; corrected
 image build, migration restoration and rolling continuity remain pending.
+
+Maintenance-waiter follow-up: a status/drain/undrain request arriving before the
+local owner finishes opening now becomes dispatchable once that owner exists,
+even while installation admission is drained. The same retirement/failure gate,
+owner authorization and pre-dispatch cancellation checks remain enforced. Pi
+reviewed the one-line eligibility change with no additional source blocker.
+Application checks, Apple Silicon Nix build and flake evaluation pass (zero flake
+checks; Linux omitted); no tests or live changes from Developer. The existing
+`8106d5b` image can serve maintenance after owner opening; this follow-up prevents
+an earlier request from unnecessarily waiting until its deadline. Mutation
+transport outcomes remain non-replayable. Deployment pins do not follow docs HEAD.
