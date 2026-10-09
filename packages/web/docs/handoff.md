@@ -2046,3 +2046,23 @@ continuity and ownership safety separately from application acceptance; publicat
 plan success and a healthy post-rollout target alone do not establish zero downtime.
 The handover design and any further runtime verification must respect the repository
 testing policy and Chris's testing boundary.
+
+Planned design under implementation/review: identity-bound controller rendezvous
+serializes transfer to a named successor. The replacement initially opens no
+exclusive stores; transfer release is published only after old-owner operations
+and stores close cleanly, and the replacement loads fresh state rather than cached
+objects. Peer loss, timeout or an available advisory lock is not handover evidence
+and must not authorize automatic retired-owner recovery. Authenticated transport
+must not replay dispatched mutations. Only undispatched requests may wait, with
+bounded capacity/time and cancellation.
+
+Complete planned transfer before the replacement reports ECS readiness, so long
+admitted operations do not begin draining inside ECS's 120-second stop countdown.
+The old listener remains available, then forwards to the activated successor until
+ECS retires it. The remaining store-close/open gap must fit request deadlines;
+this sequencing is not itself zero-downtime evidence. Current module budgets are
+120-second task stop, 30-second ALB deregistration and 300-second ALB idle timeout;
+backend launcher calls default to 300 seconds and worker calls to 60 seconds.
+Readiness must be bounded/lightweight and not queued behind full launcher mutations
+or ECS executor inventory. Final readiness routes/configuration, integrated source
+and measured transfer/rollout evidence remain pending.
