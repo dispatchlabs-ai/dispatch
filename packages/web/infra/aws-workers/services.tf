@@ -113,6 +113,7 @@ resource "aws_ecs_service" "stable" {
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100
   enable_execute_command             = false
+  health_check_grace_period_seconds  = each.key == "backend" && var.certificate_arn != null ? 600 : 0
   deployment_circuit_breaker {
     enable   = true
     rollback = false
@@ -154,7 +155,7 @@ resource "aws_lb_target_group" "backend" {
   vpc_id               = aws_vpc.this.id
   deregistration_delay = 30
   health_check {
-    path     = "/"
+    path     = var.backend_health_check_path
     protocol = "HTTPS"
     matcher  = "200"
   }
