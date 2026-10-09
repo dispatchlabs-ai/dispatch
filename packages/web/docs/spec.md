@@ -1060,7 +1060,7 @@ Create, replace and delete named, write-only secrets in Settings → Secrets usi
 
 Check current authorization at each tool use. Replacement affects subsequent uses; revocation/deletion denies subsequent access. Keep values out of prompts, logs, exports and persisted agent configuration. Grants control delivery, not isolation between agents sharing a worker; already-disclosed credentials may require upstream rotation.
 
-Tool consumption remains unresolved: do not assume environment-variable injection. The first slice must support private GitHub cloning without tokens in clone URLs or saved Git configuration. No new principal system, persistent workspace or repository-management UI. Implementation and verification are pending; the existing Exa behavior above remains unchanged until explicitly integrated.
+Agreed tool consumption: `secrets_list` returns granted IDs/names only; `git_clone` takes a granted secret ID, GitHub HTTPS repository URL and workspace-relative destination. Resolve credentials internally through trusted native participant/current-worker identity; no model-visible plaintext retrieval or environment injection. Use an operation-local Git credential helper, no saved credential/config; suppress credential-bearing Git output and failures. No new principal system, persistent workspace or repository-management UI. Implementation and verification are pending; the existing Exa behavior above remains unchanged until explicitly integrated.
 
 ## ECS deployment mode contract — October 9, 2026
 
