@@ -216,3 +216,26 @@ Unknown outcomes must be investigated, never blindly recreated/reset.
 Both engines' synthetic optional-initializer module plans agree on eight extra
 AWS resources and no scheduled operator service. Runtime helper/RDS compatibility
 is separate application work; no live invocation is established by these plans.
+
+## Optional private credential-maintenance terminal
+
+`credential_maintenance` defaults to `null`. With an image and explicit
+`{ environment = map(string), secrets = map(string) }`, module `7a183ae` registers
+an unscheduled task, separate Exec cluster (`logging = NONE`), security group and
+IAM roles. It does not launch a task or service. Output `credential_maintenance`
+provides `cluster_arn`, `task_definition_arn` and `security_group_id`.
+
+The effective backend desired count must be zero and `database_initializer` null.
+Independently confirm the backend and previous maintenance executors STOPPED;
+configuration is not retirement proof. Review each plan/cost and secret-reference
+allowlist. Surton's caller supplies provider URL/key references only, never master
+credentials or an application bundle. Ordinary application/worker Exec stays off.
+
+Only this operator container has writable ephemeral root/default capabilities for
+Exec. No container log driver is configured. Follow the [bootstrap UID and
+command-audit boundaries](../../server/workers/bootstrap.md#deployment-inputs-and-boundaries):
+CloudTrail still records commands. Keep the terminal private and unrecorded.
+After graceful CLI exit, confirm the operator task STOPPED before normal backend
+startup. Set the input back to null and review temporary-resource cleanup without
+removing retained databases, artifacts or secret versions. Registration/source
+review is not live Exec, bootstrap, OAuth or model/workload acceptance.
