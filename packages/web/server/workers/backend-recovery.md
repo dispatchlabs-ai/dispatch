@@ -23,6 +23,27 @@ If startup fails after only some owners recover, inspect the remaining retained 
 
 This is backend-owner recovery only. Launcher ownership, Pi endpoint markers, worker stores, encrypted backup/key pairing and retired executor denial retain their separate runbook requirements. No existing-installation migration or activation is authorized by these instructions. At introduction, only source/build checks were established.
 
+## Controller rendezvous recovery (implementation pending)
+
+The planned rolling controller introduces a separate retained installation/role
+owner record. Its recovery does **not** clear provider, MCP, routing, launcher or
+Pi ownership latches; recover those through their existing supported procedures.
+Before any rendezvous recovery, hold the affected service stopped, prevent
+supervisor restart and independently confirm termination of both the retained
+owner and any named successor. Inspect the complete owner/phase/successor snapshot
+with scoped credentials. Recovery must match that exact snapshot and refuse live
+connected identities; changed or uncertain state requires fresh reconciliation,
+not forced takeover. Use the reviewed restricted-config operator CLI rather than
+SQL edits; its exact invocation will be documented after source integration.
+Never retain recovery assertions in normal deployment configuration.
+
+Clean planned shutdown without a successor uses the same joined-operation and
+closed-store proof as handover before deleting its own rendezvous record. Mere
+connection closure or a startup failure cannot publish vacancy. These are selected
+implementation requirements, not observed recovery acceptance. The [rolling work
+package](../../docs/handoff.md#safe-controller-overlap-for-ecs-rolling-deployment--october-9-2026)
+tracks source and runtime evidence separately.
+
 ## Observed scope
 
 An independent October 8, 2026 Surton ECS/CloudWatch review of
