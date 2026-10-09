@@ -225,6 +225,22 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
     assertCurrent();
     return c.json(result ?? { accepted: true });
   }
+  if (operation === "secrets") return c.json(await mcpPolicy.call(async () => {
+    const request = z.object({
+      actor: z.custom<import("../runtime.js").WorkerManagementActor>(value => typeof value === "object" && value !== null),
+      secretId: z.string().uuid().optional(),
+    }).strict().parse(input);
+    const { actor } = request;
+    if (actor.companyId !== route.companyId || actor.conversationKey !== route.conversationId || actor.storeId !== route.storeId)
+      throw new RuntimeError(403, "Secret actor is outside the authenticated worker route.");
+    const authorized = await directory.authorizeWorkerSecrets(actor);
+    assertCurrent();
+    const result = request.secretId ? { value: await connections.resolveNamedSecret(authorized.companyId, authorized.definitionId, request.secretId) }
+      : { secrets: await connections.grantedNamedSecrets(authorized.companyId, authorized.definitionId) };
+    assertCurrent();
+    c.req.raw.signal.throwIfAborted();
+    return result;
+  }));
   if (operation === "search") return c.json(await mcpPolicy.call(async () => {
     const request = z.object({
       actor: z.custom<import("../runtime.js").WorkerManagementActor>(value => typeof value === "object" && value !== null),

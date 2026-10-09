@@ -1,3 +1,4 @@
+import { createAgentSecrets } from "./extensions/agent-secrets.js";
 import type { TranscriptQuery } from "../src/shared/contracts.js";
 import { ProjectArchiveStore, ProjectArchivesDoc, archiveDigest, decodeProjectArchive } from "./project-archives.js";
 import { PROJECT_ARCHIVE_MAX_BYTES, type ProjectArchive, type ArchivedChat } from "../src/shared/project-archives.js";
@@ -44,7 +45,7 @@ export const DEFAULT_AGENT_ID = "developer";
 const IMAGE_GENERATION_SKILL_ID = "d6f5a67d-5c7b-4813-910f-b29d97d29cd1";
 // Fixed application selections, not a plugin registry. Markers preserve historical capability recognition.
 const capabilityDefinitions: { id: NonNullable<AgentDefinition["capabilities"]>[number]; marker: string; extensions: string[]; tools: string[] }[] = [
-  { id: "files-and-commands", marker: CodingTools.name, extensions: [Coding.name, CodingTools.name], tools: ["read", "write", "edit", "bash"] },
+  { id: "files-and-commands", marker: CodingTools.name, extensions: [Coding.name, CodingTools.name, "dispatch-agent-secrets"], tools: ["read", "write", "edit", "bash", "secrets_list", "git_clone"] },
   { id: "image-generation", marker: "dispatch-image-gen", extensions: ["dispatch-image-gen"], tools: ["generate_image"] },
   { id: "edit-definition-of-done", marker: "dispatch-definition-of-done", extensions: ["dispatch-definition-of-done"], tools: ["conversation_definition_of_done"] },
   { id: "web-reading", marker: "dispatch-web-read", extensions: ["dispatch-web-read"], tools: ["web_read"] },
@@ -171,6 +172,7 @@ export type RuntimeOptions = {
   connectMcpOnOpen?: boolean;
   runMcpBackground?: <T>(operation: () => Promise<T>) => Promise<T>;
   workerManagement?: WorkerManagement;
+  workerSecrets?: (actor: WorkerManagementActor, secretId?: string, signal?: AbortSignal) => Promise<{ secrets: { id: string; name: string }[] } | { value: string }>;
   workerSearch?: (actor: WorkerManagementActor, query: Parameters<import("./web/types.js").WebBackend["search"]>[0], signal?: AbortSignal) => ReturnType<import("./web/types.js").WebBackend["search"]>;
   workerMcp?: WorkerMcp;
   workerInvitations?: WorkerInvitations;
@@ -273,6 +275,35 @@ export class DispatchRuntime {
         signal?.throwIfAborted();
         return authorized;
       };
+      const secretAccess = async (instanceId: ConversationId, secretId?: string, signal?: AbortSignal) => {
+        signal?.throwIfAborted();
+        const actor = await runtime.harness.commit(async tx => {
+          const actor = await shared.managementActor(tx, instanceId);
+          const definition = latestAgent(await tx.doc(CatalogDoc), actor.companyId, actor.definitionId);
+          if (!definition || definition.archived || !agentCapabilities(definition).includes("files-and-commands")) throw new RuntimeError(403, "Secret tools are not authorized.");
+          return { companyId: actor.companyId, definitionId: actor.definitionId, remote: worker ? await runtime.remoteActor(tx, actor) : undefined };
+        }, context);
+        signal?.throwIfAborted();
+        if (worker) {
+          if (!options.workerSecrets || !actor.remote) throw new RuntimeError(503, "Secret mediation unavailable.");
+          return options.workerSecrets(actor.remote, secretId, signal);
+        }
+        if (!options.mcpConnections) throw new RuntimeError(503, "Secret storage unavailable.");
+        return secretId ? { value: await options.mcpConnections.resolveNamedSecret(actor.companyId, actor.definitionId, secretId) }
+          : { secrets: await options.mcpConnections.grantedNamedSecrets(actor.companyId, actor.definitionId) };
+      };
+      registry.install(createAgentSecrets({
+        list: async (instanceId, signal) => {
+          const result = await secretAccess(instanceId, undefined, signal);
+          if (!("secrets" in result)) throw new RuntimeError(503, "Secret list unavailable.");
+          return result.secrets;
+        },
+        resolve: async (instanceId, id, signal) => {
+          const result = await secretAccess(instanceId, id, signal);
+          if (!("value" in result)) throw new RuntimeError(503, "Secret unavailable.");
+          return result.value;
+        },
+      }));
       const web = createWebResearch(createWebBackend(), {
         authorize: async (instanceId, capability, signal) => Boolean(await authorizeWeb(instanceId, capability, signal)),
         search: async (instanceId, query, signal) => {
@@ -410,6 +441,15 @@ export class DispatchRuntime {
             tools: [...new Set([...(agent.tools ?? []).filter(name => name !== "web_run"), ...selection.tools])],
             revision: agent.revision + 1, updatedAt: Date.now(),
           });
+        }
+      }, context);
+      await runtime.harness.commit(async tx => {
+        const catalog = await tx.doc(CatalogDoc);
+        for (const agent of latestAgents(catalog, options.companyId).values()) {
+          if (!agent.extensions?.includes(CodingTools.name) || agent.extensions.includes("dispatch-agent-secrets")) continue;
+          catalog.agents.push({ ...agent, extensions: [...agent.extensions, "dispatch-agent-secrets"],
+            tools: [...new Set([...(agent.tools ?? []), "secrets_list", "git_clone"])],
+            revision: agent.revision + 1, updatedAt: Date.now() });
         }
       }, context);
       if (!runtime.directoryOnly) {
@@ -1019,6 +1059,17 @@ export class DispatchRuntime {
   /** Attempt authentication belongs to the backend route. Never execute the returned
    * authorization after a concurrent revocation barrier; the invocation owns that ordering.
    */
+  async authorizeWorkerSecrets(claim: WorkerManagementActor) {
+    this.requireDirectoryActor(claim);
+    return this.harness.commit(async tx => {
+      const actor = await this.authoritativeWorkerActor(tx, claim);
+      const definition = latestAgent(await tx.doc(CatalogDoc), actor.companyId, actor.definitionId);
+      if (!definition || definition.archived || !agentCapabilities(definition).includes("files-and-commands"))
+        throw new RuntimeError(403, "Secret tools are not authorized for this participant.");
+      return { companyId: actor.companyId, definitionId: actor.definitionId };
+    }, context);
+  }
+
   async authorizeWorkerSearch(claim: WorkerManagementActor) {
     this.requireDirectoryActor(claim);
     return this.harness.commit(async tx => {

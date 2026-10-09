@@ -1,4 +1,4 @@
-import type { SearchSecret, SaveSearchSecret } from "../src/shared/secrets.js";
+import type { SearchSecret, SaveSearchSecret, NamedSecret, SaveNamedSecret } from "../src/shared/secrets.js";
 import { createHmac, randomUUID } from "node:crypto";
 import { chmodSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -113,7 +113,7 @@ export class McpConnections {
           ALTER TABLE mcp_connections ADD COLUMN disconnect_notice TEXT;`);
       }
       db.exec(MCP_SCHEMA);
-      this.key = loadSecretKey(this.keyPath, Boolean(db.prepare("SELECT 1 FROM mcp_connections WHERE secret IS NOT NULL UNION SELECT 1 FROM mcp_oauth_pending UNION SELECT 1 FROM integration_secrets WHERE secret IS NOT NULL LIMIT 1").get()));
+      this.key = loadSecretKey(this.keyPath, Boolean(db.prepare("SELECT 1 FROM mcp_connections WHERE secret IS NOT NULL UNION SELECT 1 FROM mcp_oauth_pending UNION SELECT 1 FROM integration_secrets WHERE secret IS NOT NULL UNION SELECT 1 FROM named_secrets LIMIT 1").get()));
       if (legacy) {
         for (const row of db.prepare("SELECT * FROM mcp_connections").all() as ConnectionRow[]) {
           const old = JSON.parse(row.config) as { issuer: string; clientId: string; authorize: string; token: string; revoke: string };
@@ -134,6 +134,91 @@ export class McpConnections {
       db.exec("COMMIT");
       this.db = McpDatabase.sqlite(db);
     } catch (error) { try { db.exec("ROLLBACK"); } finally { db.close(); this.key?.fill(0); } throw error; }
+  }
+
+  private async namedRecords(query: McpQuery, scope: RuntimeScope): Promise<NamedSecret[]> {
+    const rows = await query<{ id: string; name: string; revision: number; definition_id: string | null }>(
+      `SELECT s.id,s.name,s.revision,g.definition_id FROM named_secrets s
+       LEFT JOIN named_secret_grants g ON g.secret_id=s.id WHERE s.company_id=$1 AND s.owner_id=$2 ORDER BY s.name,s.id`, [scope.companyId, scope.userId]);
+    const records = new Map<string, NamedSecret>();
+    for (const row of rows) {
+      const record = records.get(row.id) ?? { id: row.id, name: row.name, revision: row.revision, agentIds: [] };
+      if (row.definition_id) record.agentIds.push(row.definition_id);
+      records.set(row.id, record);
+    }
+    return [...records.values()];
+  }
+
+  namedSecrets(scope: RuntimeScope) {
+    return this.admit(() => this.namedRecords(this.db!.read.bind(this.db!), scope));
+  }
+
+  saveNamedSecret(scope: RuntimeScope, id: string | undefined, input: SaveNamedSecret) {
+    return this.admit(async () => {
+      const result = await this.db!.write<NamedSecret | ConnectionError>([], async query => {
+        const [row] = id ? await query<{ revision: number; secret: string }>(
+          "SELECT revision,secret FROM named_secrets WHERE id=$1 AND company_id=$2 AND owner_id=$3", [id, scope.companyId, scope.userId]) : [];
+        if (id && !row) return new ConnectionError(404, "Secret not found.");
+        if ((row?.revision ?? 0) !== input.revision) return new ConnectionError(409, "Secret changed. Reload before saving.");
+        if (!row && !input.value) return new ConnectionError(400, "Enter a secret value.");
+        const key = id ?? randomUUID();
+        const secret = input.value ? this.seal(input.value, ["named-secret", scope.companyId, scope.userId, key]) : row!.secret;
+        await query(`INSERT INTO named_secrets (id,company_id,owner_id,name,secret,revision) VALUES ($1,$2,$3,$4,$5,$6)
+          ON CONFLICT(id) DO UPDATE SET name=excluded.name,secret=excluded.secret,revision=excluded.revision`,
+          [key, scope.companyId, scope.userId, input.name, secret, input.revision + 1]);
+        return (await this.namedRecords(query, scope)).find(record => record.id === key)!;
+      });
+      if (result instanceof ConnectionError) throw result;
+      return result;
+    });
+  }
+
+  deleteNamedSecret(scope: RuntimeScope, id: string, revision: number) {
+    return this.admit(async () => {
+      const result = await this.db!.write<ConnectionError | null>([], async query => {
+        const row = (await this.namedRecords(query, scope)).find(record => record.id === id);
+        if (!row) return new ConnectionError(404, "Secret not found.");
+        if (row.revision !== revision) return new ConnectionError(409, "Secret changed. Reload before deleting.");
+        await query("DELETE FROM named_secret_grants WHERE secret_id=$1", [id]);
+        await query("DELETE FROM named_secrets WHERE id=$1", [id]);
+        return null;
+      });
+      if (result) throw result;
+    });
+  }
+
+  grantNamedSecret(scope: RuntimeScope, id: string, definitionId: string, revision: number, granted: boolean) {
+    return this.admit(async () => {
+      const result = await this.db!.write<NamedSecret | ConnectionError>([], async query => {
+        const row = (await this.namedRecords(query, scope)).find(record => record.id === id);
+        if (!row) return new ConnectionError(404, "Secret not found.");
+        if (row.revision !== revision) return new ConnectionError(409, "Secret changed. Reload before saving.");
+        if (granted) await query("INSERT INTO named_secret_grants (secret_id,definition_id) VALUES ($1,$2) ON CONFLICT(secret_id,definition_id) DO NOTHING", [id, definitionId]);
+        else await query("DELETE FROM named_secret_grants WHERE secret_id=$1 AND definition_id=$2", [id, definitionId]);
+        await query("UPDATE named_secrets SET revision=revision+1 WHERE id=$1", [id]);
+        return (await this.namedRecords(query, scope)).find(record => record.id === id)!;
+      });
+      if (result instanceof ConnectionError) throw result;
+      return result;
+    });
+  }
+
+  /** Caller authorizes trusted live instance identity before invoking these methods. */
+  grantedNamedSecrets(companyId: string, definitionId: string) {
+    return this.admit(() => this.db!.read<{ id: string; name: string }>(
+      `SELECT s.id,s.name FROM named_secrets s JOIN named_secret_grants g ON g.secret_id=s.id
+       WHERE s.company_id=$1 AND g.definition_id=$2 ORDER BY s.name,s.id`, [companyId, definitionId]));
+  }
+
+  resolveNamedSecret(companyId: string, definitionId: string, id: string) {
+    return this.admit(async () => {
+      const [row] = await this.db!.read<{ secret: string; owner_id: string }>(
+        `SELECT s.secret,s.owner_id FROM named_secrets s JOIN named_secret_grants g ON g.secret_id=s.id
+         WHERE s.company_id=$1 AND g.definition_id=$2 AND s.id=$3`, [companyId, definitionId, id]);
+      if (!row) throw new ConnectionError(403, "Secret access denied.");
+      try { return this.unseal(row.secret, ["named-secret", companyId, row.owner_id, id]); }
+      catch { throw new ConnectionError(503, "Secret is unavailable."); }
+    });
   }
 
   private searchBinding(companyId: string, ownerId: string) {

@@ -1,3 +1,4 @@
+import { NamedSecrets } from "./named-secrets";
 import { ArrowRight, Archive, Bot, Pencil } from "lucide-react";
 import { useRef, useState } from "react";
 import type {
@@ -172,6 +173,7 @@ export function AgentsPage({
               {agent.instructions || "No additional instructions."}
             </Markdown>
           </section>
+          <NamedSecrets key={`secrets-${agent.id}`} agentId={agent.id} disabled={agent.archived} />
           <AgentSkillsPanel selections={agent.skills ?? []} />
           <AgentConnectionsPanel key={agent.id} agentId={agent.id} />
           {agent.archived ? (
@@ -604,6 +606,7 @@ function AgentEditor({
               <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("web-reading") ?? false} onChange={event => update("capabilities", event.target.checked ? [...(draft.capabilities ?? []), "web-reading"] : (draft.capabilities ?? []).filter(capability => capability !== "web-reading"))} /><span>Web reading<small>Open public pages, find text and follow links; no key required</small></span></label>
               <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("web-search") ?? false} onChange={event => update("capabilities", event.target.checked ? [...(draft.capabilities ?? []), "web-search"] : (draft.capabilities ?? []).filter(capability => capability !== "web-search"))} /><span>Web search<small>Search for sources; requires an Exa grant in Settings → Secrets</small></span></label>
             </details>
+            <div data-agent-section="Secrets" tabIndex={-1}>{agent ? <NamedSecrets agentId={agent.id} disabled={busy || agent.archived} /> : <p>Save this agent before granting secrets.</p>}</div>
             <div data-agent-section="Skills" tabIndex={-1}><AgentSkillsEditor selections={draft.skills ?? []} onChange={skills => update("skills", skills)} busy={busy}
               editing={editing.skillEditing} onEditingChange={skillEditing => onChange({ ...editing, skillEditing, busy: skillEditing?.busy ?? false })} /></div>
             <div data-agent-section="Connections" tabIndex={-1}><AgentConnectionsEditor agent={agent} selectedIds={editing.connectionIds} busy={busy}

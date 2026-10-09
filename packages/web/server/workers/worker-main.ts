@@ -42,6 +42,10 @@ const runtime = await DispatchRuntime.openConversation({
   stateDir: "/workspace/state", workspaceDir: "/workspace", companyId: bootstrap.scope.companyId,
   piStorage: bootstrap.storage, models,
   workerParticipants: { report: report => backend("/participants/report", report) },
+  workerSecrets: (actor, secretId, signal) => {
+    if (new URL(env.DISPATCH_BACKEND_INTERNAL_URL).protocol !== "https:") throw new RuntimeError(503, "Secrets require encrypted backend transport.");
+    return backend("/secrets", { actor, secretId }, signal);
+  },
   workerSearch: (actor, query, signal) => backend("/search", { actor, query }, signal),
   workerMcp: workerMcp((operation, input, signal) => backend(`/mcp/${operation}`, input, signal)),
   peopleDirectory: { list: companyId => backend("/people", { companyId }), get: (companyId, userId) => backend("/person", { companyId, userId }) },

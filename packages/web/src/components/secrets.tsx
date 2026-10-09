@@ -1,3 +1,4 @@
+import { NamedSecrets } from "./named-secrets";
 import { useEffect, useState } from "react";
 import type { AgentDefinition } from "../shared/contracts";
 import type { SearchSecret } from "../shared/secrets";
@@ -38,6 +39,7 @@ export function SecretsPage() {
   return <section className="agent-view connections-page">
     <header className="view-heading"><h1>Secrets</h1></header>
     <div className="agent-content"><div className="connections-page-inner">
+      <NamedSecrets />
       {error ? <Notice>{error}<Button variant="ghost" disabled={busy} onClick={() => { if (!saved || window.confirm("Reload saved settings and discard this draft?")) setAttempt(n => n + 1); }}>Reload settings</Button></Notice> : null}
       {!saved && !error ? <p><Spinner /> Loading secrets…</p> : null}
       {saved ? <form className="connection-card" onSubmit={event => { event.preventDefault(); void save(); }}>

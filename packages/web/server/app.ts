@@ -134,6 +134,21 @@ export function createApp(options: AppOptions) {
     const input = z.object({ revision: z.number().int().nonnegative() }).strict().parse(await c.req.json());
     return c.json(await options.mcpConnections.disconnectSearchSecret(c.get("principal"), input.revision));
   });
+  app.get("/api/secrets", async c => c.json({ secrets: await options.mcpConnections.namedSecrets(c.get("principal")) }));
+  const namedSecretSchema = z.object({ name: z.string().trim().min(1).max(100), value: z.string().min(1).max(16384).optional(), revision: z.number().int().nonnegative() }).strict();
+  app.post("/api/secrets", async c => c.json(await options.mcpConnections.saveNamedSecret(c.get("principal"), undefined, namedSecretSchema.parse(await c.req.json()))));
+  app.post("/api/secrets/:id", async c => c.json(await options.mcpConnections.saveNamedSecret(c.get("principal"), c.req.param("id"), namedSecretSchema.parse(await c.req.json()))));
+  app.post("/api/secrets/:id/delete", async c => {
+    const input = z.object({ revision: z.number().int().nonnegative() }).strict().parse(await c.req.json());
+    await options.mcpConnections.deleteNamedSecret(c.get("principal"), c.req.param("id"), input.revision);
+    return c.json({ deleted: true });
+  });
+  app.post("/api/agents/:id/secrets/:secretId", async c => {
+    const input = z.object({ revision: z.number().int().nonnegative(), granted: z.boolean() }).strict().parse(await c.req.json());
+    const scope = c.get("principal"), id = c.req.param("id");
+    if (!(await runtime.listAgents(scope)).some(agent => agent.id === id && !agent.archived)) throw new ConnectionError(404, "Agent not found.");
+    return c.json(await options.mcpConnections.grantNamedSecret(scope, c.req.param("secretId"), id, input.revision, input.granted));
+  });
   app.get("/api/connections", async c => c.json({ connections: await runtime.listMcpConnections(c.get("principal")) }));
   app.post("/api/connections/authorize", async c => {
     const input = connectionSchema.parse(await c.req.json());
