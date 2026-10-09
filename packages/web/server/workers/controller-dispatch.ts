@@ -102,8 +102,7 @@ export class ControllerDispatch {
       }
       throw new Error("Controller activation wait expired.");
     } catch {
-      // An unavailable wait path is not rollout readiness.
-      if (timeout.aborted) this.failed = true;
+      // Expiry/cancellation belongs to this undispatched request, not ownership.
       throw new Error("Controller activation wait unavailable.");
     } finally { this.waiting--; }
   }

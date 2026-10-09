@@ -160,6 +160,9 @@ export async function serveRollingController(role: "backend" | "launcher", openO
       const accepted = dispatchGate.tryRun(request, async value => owner!.app.fetch(value));
       if (accepted) return accepted;
     }
+    // A claimed local owner may intentionally keep admission closed at startup.
+    // Reject public work without consuming handover waiters or blocking maintenance.
+    if (owner && !retired && !dispatchGate.holding && !workerSupport) return c.text("Controller unavailable", 503);
     // Admission is synchronous. Once accepted, its promise is never replayed.
     const route = await gate.wait(request.signal, async signal => {
       if (await localAvailable(workerSupport)) {

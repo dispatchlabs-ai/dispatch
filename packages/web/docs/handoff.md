@@ -2120,3 +2120,15 @@ later callbacks; worker URLs must retain a route to ready replacement ingress.
 Managed drain budgets must cover the complete request/response lifetime, not merely the
 300-second client timeout. No migration, measured transfer or deployed continuity
 is established by this source checkpoint.
+
+Startup correction: the initial migration exposed a request-timeout latch in the
+controller listener. An undispatched wait expiring incorrectly failed the shared
+gate, preventing authenticated maintenance on an intentionally drained owner.
+The correction keeps expiry/cancellation request-local and immediately rejects
+public work when a claimed local owner is unready; maintenance remains counted
+and subject to the existing explicit lifecycle failure barrier. Ownership claims,
+release, recovery latches and mutation no-replay rules are unchanged. Pi reviewed
+the focused source diff with no additional ownership blocker. Application checks,
+Apple Silicon Nix build and flake evaluation pass (zero runnable flake checks;
+Linux omitted). No tests or live changes were executed by Developer; corrected
+image build, migration restoration and rolling continuity remain pending.
