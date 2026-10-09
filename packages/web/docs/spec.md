@@ -1054,6 +1054,14 @@ Settings → Secrets manages owner-bound Exa credentials in the existing encrypt
 
 Search resolves the current credential and grant using trusted execution identity, checking active membership and the current definition at use time. Rotation affects subsequent requests; disconnect removes grants and does not fall back to the environment. Environment-source credentials require explicit grants too; there is no implicit operator-key fallback. Existing environment-only installations must select that source and grant their agents once. Revoked bindings remain tombstoned. Saves and disconnects compare the current owner settings revision transactionally; stale tabs must reload rather than restore removed grants. In-flight requests and previously disclosed evidence cannot be recalled. Status describes configuration, not provider verification.
 
+### Named agent secrets — authorized October 9, 2026
+
+Create, replace and delete named, write-only secrets in Settings → Secrets using the existing encrypted store. Manage separate grants in the Agent screen alongside capabilities; one stored secret may serve multiple named definitions and their current/future instances. Permission to edit an agent is not permission to share a secret. Copy/import/export must not carry grants or values.
+
+Check current authorization at each tool use. Replacement affects subsequent uses; revocation/deletion denies subsequent access. Keep values out of prompts, logs, exports and persisted agent configuration. Grants control delivery, not isolation between agents sharing a worker; already-disclosed credentials may require upstream rotation.
+
+Tool consumption remains unresolved: do not assume environment-variable injection. The first slice must support private GitHub cloning without tokens in clone URLs or saved Git configuration. No new principal system, persistent workspace or repository-management UI. Implementation and verification are pending; the existing Exa behavior above remains unchanged until explicitly integrated.
+
 ## ECS deployment mode contract — October 9, 2026
 
 The reusable conversation-worker AWS module supports explicit per-controller
