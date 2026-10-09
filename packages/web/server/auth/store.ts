@@ -19,6 +19,8 @@ export abstract class AsyncAuthStore {
   protected abstract rollback(): Promise<void>;
   protected abstract disconnect(): Promise<void>;
 
+  get healthy(): boolean { return !this.failure && !this.closing; }
+
   protected assertHealthy(): void { if (this.failure) throw this.failure; }
 
   transaction<T>(operation: () => Promise<T>): Promise<T> {

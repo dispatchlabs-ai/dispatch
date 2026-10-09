@@ -286,6 +286,7 @@ export class AuthService {
   }
 
   get admitting(): boolean { return this.accepting && !this.closing; }
+  get healthy(): boolean { return !this.closing && this.store.healthy; }
 
   private admit<T>(operation: () => Promise<T>): Promise<T> {
     if (this.operationContext.getStore()?.active) return operation();

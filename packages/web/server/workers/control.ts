@@ -11,6 +11,7 @@ export function createLauncherControl(launcher: WorkerLauncher, token: string) {
   if (!/^[A-Za-z0-9_-]{43,256}$/.test(token)) throw new Error("Use a dedicated random launcher control token (at least 32 bytes, base64url).");
   const expected = digest(`Bearer ${token}`);
   const app = new Hono();
+  app.get("/internal/ready", c => { const ready = launcher.ready(); return c.text(ready ? "ok" : "unavailable", ready ? 200 : 503); });
   app.use("*", async (c, next) => {
     c.header("Cache-Control", "no-store");
     if (c.req.header("Origin") || !timingSafeEqual(expected, digest(c.req.header("Authorization") ?? ""))) {

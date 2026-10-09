@@ -30,6 +30,16 @@ export class WriteAdmission {
     }
   }
 
+  /** Instance retirement seals local admission without changing the installation's
+   * persisted drain state. Callers must never resume this retiring owner. */
+  suspend(): Promise<void> {
+    this.generation++;
+    this.blocked = true;
+    return this.change(async () => {
+      if (this.active !== 0) await new Promise<void>(resolve => this.settled.push(resolve));
+    });
+  }
+
   quiesce(): Promise<void> {
     // Disable synchronously, before queuing persistence behind another transition.
     this.generation++;

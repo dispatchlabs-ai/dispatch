@@ -56,6 +56,8 @@ export class PostgresDatabase implements PostgresExecutor {
     client.on("end", () => { this.failure ??= new Error("PostgreSQL storage connection ended"); });
   }
 
+  get healthy(): boolean { return !this.failure && !this.closing; }
+
   static async open(options: PostgresStorageOptions): Promise<PostgresDatabase> {
     if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(options.storeId)) {
       throw new Error("PostgreSQL store ID must be 1–200 ASCII letters, digits, dots, underscores, colons or hyphens, starting with a letter or digit");

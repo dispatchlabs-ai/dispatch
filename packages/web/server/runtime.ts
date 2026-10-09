@@ -13,6 +13,7 @@ import { WorkerActorsDoc, WorkerInstancesDoc, WorkerIdentityDoc, workerParticipa
 export type { WorkerParticipantReport } from "./workers/participant-identity.js";
 import type { WorkerSummary } from "./workers/summaries.js";
 import { prepareWorkerWorkspace, workerWorkspaceSection, WorkerWorkspaceDoc } from "./workers/workspace.js";
+import { PostgresStorage } from "./storage/postgres/storage.js";
 import { openPiStorage, type PiStorageConfig } from "./storage/open.js";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
@@ -208,7 +209,7 @@ export class DispatchRuntime {
   private archiveStorage?: Pick<ProjectArchiveStore, "save" | "read">;
   private membershipTail: Promise<unknown> = Promise.resolve();
 
-  private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: Registry, shared: SharedConversations, connections: AgentConnections, private readonly workspaceDir: string, private readonly attachments: AttachmentStore, peopleDirectory?: PeopleDirectory) {
+  private constructor(harness: Harness, private readonly storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: Registry, shared: SharedConversations, connections: AgentConnections, private readonly workspaceDir: string, private readonly attachments: AttachmentStore, peopleDirectory?: PeopleDirectory) {
     this.connections = connections;
     this.shared = shared;
     this.peopleDirectory = peopleDirectory;
@@ -2359,6 +2360,8 @@ export class DispatchRuntime {
       return publicAgent(agent);
     }, context);
   }
+
+  get healthy(): boolean { return !this.closed && (!(this.storage instanceof PostgresStorage) || this.storage.healthy); }
 
   async close() {
     if (this.closed) return;

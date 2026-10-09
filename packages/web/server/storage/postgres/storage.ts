@@ -135,6 +135,7 @@ export class PostgresStorage implements Storage {
   private closing: Promise<void> | undefined;
 
   private constructor(private readonly db: PostgresDatabase) {}
+  get healthy(): boolean { return this.db.healthy; }
 
   /** Open one logically isolated store over its own non-reconnecting connection. */
   static async open(options: PostgresStorageOptions): Promise<PostgresStorage> {

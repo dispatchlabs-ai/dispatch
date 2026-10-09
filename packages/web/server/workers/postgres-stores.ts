@@ -141,6 +141,8 @@ export class WorkerStoreProvisioner {
     }
   }
 
+  get healthy(): boolean { return !this.failure && !this.closing; }
+
   close(): Promise<void> { return this.closing ??= this.tail.then(() => this.client.end()); }
   private assertHealthy() { if (this.failure) throw this.failure; }
 }

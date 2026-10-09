@@ -209,6 +209,12 @@ export class WorkerLauncher {
     });
   }
 
+  /** Readiness must not queue behind lifecycle mutations or inventory ECS. */
+  ready(): boolean {
+    if (this.closing || this.poisoned) return false;
+    try { this.storage.assertHealthy(); return true; } catch { return false; }
+  }
+
   status(): Promise<LauncherStatus> { return this.serial(() => this.readStatus()); }
 
   /** Close the controller only. Workers survive; callers must explicitly drain for a stack shutdown. */
