@@ -2057,10 +2057,13 @@ must not replay dispatched mutations. Only undispatched requests may wait, with
 bounded capacity/time and cancellation.
 
 Complete planned transfer before the replacement reports ECS readiness, so long
-admitted operations do not begin draining inside ECS's 120-second stop countdown.
+old-owner operations do not begin draining inside ECS's 120-second stop countdown.
 The old listener remains available, then forwards to the activated successor until
-ECS retires it. The remaining store-close/open gap must fit request deadlines;
-this sequencing is not itself zero-downtime evidence. Current module budgets are
+ECS retires it. This does not solve post-handover proxy draining: forwarded calls
+and ordinary response bodies must also finish within task/ALB retirement limits,
+with explicit SSE reconnection handling. A shorter client timeout does not prove
+that a dispatched mutation stopped. The remaining store-close/open gap must fit
+request deadlines; this sequencing is not itself zero-downtime evidence. Current module budgets are
 120-second task stop, 30-second ALB deregistration and 300-second ALB idle timeout;
 backend launcher calls default to 300 seconds and worker calls to 60 seconds.
 Readiness must be bounded/lightweight and not queued behind full launcher mutations
