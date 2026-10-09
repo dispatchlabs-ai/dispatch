@@ -3,8 +3,10 @@
 **Retained POC candidate, October 8, 2026; not deployed or AWS-qualified.**
 This is the worker/PostgreSQL topology, not the older sibling `../aws` module's
 SQLite/S3 Files deployment. Installation account, domain, backend state and secret
-values belong in a separate consumer repository. The Surton consumer is
-`dispatchlabs-ai/dispatch-infra/environments/surton/dispatch-workers`.
+values belong in a separate company-owned consumer repository. That caller owns
+its exact deploy/rollback commands, build-host setup, release digest selections
+and rollout receipts; this module documents only reusable application/infrastructure
+contracts, without a company-specific deployment entry point.
 
 ## Resources and runtime
 
@@ -84,6 +86,19 @@ Reference the application's [bootstrap contract](../../server/workers/bootstrap.
 for exclusive 0700/0600 materialization and environment removal. Raw encryption
 keys are base64 inputs decoded to 32-byte files; retained secret versions must
 match encrypted records. Configuration is not a backup.
+
+## Controller deployment compatibility
+
+The current application requires exclusive backend routing and launcher ownership.
+A replacement backend cannot become ready while its predecessor holds the routing
+owner lock (`server/workers/routing-database.ts`); the launcher has its own exclusive
+owner. ECS deployment percentages alone cannot make these controllers safely overlap.
+Keep application ownership and confirmed executor retirement intact; never remove
+locks or infer termination from a failed replacement merely to complete a rollout.
+Use ECS-native rolling replacement only for an application/service configuration
+that supports overlapping ready tasks. Module settings, a successful plan and ECS
+service stability do not independently establish zero downtime. Current controller
+upgrades follow the ordered stop/start procedure below and incur an availability gap.
 
 ## Reuse from a caller root
 
