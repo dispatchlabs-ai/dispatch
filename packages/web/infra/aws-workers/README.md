@@ -192,7 +192,10 @@ requires SCRAM password encryption and rejects enabled audit/utility capture whe
 those settings exist. See [the provisioner](../../server/workers/postgres-stores.ts).
 Source/build checks and a parameter-only apply do not qualify deployed guard
 behavior or a full external logging audit. Rebuild and deploy the supporting image
-before resuming worker provisioning.
+before resuming worker provisioning. Inspected consumer receipts at `0b8ef0a`
+cover [native ARM64/AMD64 packaging](https://github.com/dispatchlabs-ai/dispatch-infra/blob/0b8ef0a/environments/surton/dispatch-workers/evidence/e87dbab-native-images.json)
+and a [fresh, read-only provisioner-role TLS session](https://github.com/dispatchlabs-ai/dispatch-infra/blob/0b8ef0a/environments/surton/dispatch-workers/evidence/worker-effective-logging.json),
+not the running backend connection or the deployed guard's password-DDL behavior.
 
 The task definition precondition requires `desired_count=0` and every
 `service_desired_counts` override at zero; this is not proof of
