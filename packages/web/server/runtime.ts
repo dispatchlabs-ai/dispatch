@@ -170,6 +170,7 @@ export type RuntimeOptions = {
   workerInvitations?: WorkerInvitations;
   /** Workers must inject durable remote blob storage; native installations keep their local default. */
   attachmentStore?: AttachmentStore;
+  projectArchiveStore?: Pick<ProjectArchiveStore, "save" | "read">;
 };
 
 /** Authentication supplies the scope; Pi remains the only owner of transcripts and work. */
@@ -195,6 +196,7 @@ export class DispatchRuntime {
   private workerManagement?: WorkerManagement;
   private workerMcp?: WorkerMcp;
   private boundRoomId?: string;
+  private archiveStorage?: Pick<ProjectArchiveStore, "save" | "read">;
   private membershipTail: Promise<unknown> = Promise.resolve();
 
   private constructor(harness: Harness, storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: Registry, shared: SharedConversations, connections: AgentConnections, private readonly workspaceDir: string, private readonly attachments: AttachmentStore, peopleDirectory?: PeopleDirectory) {
@@ -289,6 +291,7 @@ export class DispatchRuntime {
         await runtime.applyWorkerCatalog(result.catalog);
         await runtime.applyWorkerMembership(result.membership);
       };
+      runtime.archiveStorage = options.projectArchiveStore;
       runtime.readAllProjectUserIds = new Set(options.readAllProjectUserIds ?? []);
       await runtime.bindRuntimeMode();
       if (worker) {
@@ -910,7 +913,11 @@ export class DispatchRuntime {
     }, context);
   }
 
-  private get projectArchiveStore() { return new ProjectArchiveStore(join(this.owner.directory, "project-archives")); }
+  private get projectArchiveStore() {
+    if (this.archiveStorage) return this.archiveStorage;
+    if (this.directoryOnly) throw new RuntimeError(503, "Durable archive storage is unavailable.");
+    return new ProjectArchiveStore(join(this.owner.directory, "project-archives"));
+  }
 
   async authorizeProjectExport(scope: RuntimeScope, id: string, chatIds: string[]) {
     if (chatIds.length > 100 || new Set(chatIds).size !== chatIds.length) throw new RuntimeError(400, "Choose up to 100 unique chats.");
