@@ -1056,11 +1056,11 @@ Search resolves the current credential and grant using trusted execution identit
 
 ### Named agent secrets — authorized October 9, 2026
 
-Create, replace and delete named, write-only secrets in Settings → Secrets using the existing encrypted store. Manage separate grants in the Agent screen alongside capabilities; one stored secret may serve multiple named definitions and their current/future instances. Permission to edit an agent is not permission to share a secret. Copy/import/export must not carry grants or values.
+Create, replace and delete named, write-only secrets in Settings → Secrets using the existing encrypted store. Manage separate grants in the Agent screen alongside capabilities; one stored secret may serve multiple named definitions and their current/future instances. Permission to edit an agent is not permission to share a secret. Grant changes save independently of the agent configuration draft. Copy/import/export must not carry grants or values.
 
 Check current authorization at each tool use. Replacement affects subsequent uses; revocation/deletion denies subsequent access. Keep values out of prompts, logs, exports and persisted agent configuration. Grants control delivery, not isolation between agents sharing a worker; already-disclosed credentials may require upstream rotation.
 
-Agreed tool consumption: `secrets_list` returns granted IDs/names only; `git_clone` takes a granted secret ID, GitHub HTTPS repository URL and workspace-relative destination. Resolve credentials internally through trusted native participant/current-worker identity; no model-visible plaintext retrieval or environment injection. Use an operation-local Git credential helper, no saved credential/config; suppress credential-bearing Git output and failures. No new principal system, persistent workspace or repository-management UI. Implementation and verification are pending; the existing Exa behavior above remains unchanged until explicitly integrated.
+Agreed tool consumption: `secrets_list` returns granted IDs/names only; `git_clone` takes a granted secret ID, GitHub HTTPS repository URL and workspace-relative destination. Resolve credentials internally through trusted native participant/current-worker identity; no model-visible plaintext retrieval or environment injection. Hosted worker mediation requires HTTPS backend transport. Use an operation-local Git credential helper, no saved credential/config; suppress credential-bearing Git output and failures. No new principal system, persistent workspace or repository-management UI. Implementation and verification are pending; the existing Exa behavior above remains unchanged until explicitly integrated.
 
 ## ECS deployment mode contract — October 9, 2026
 

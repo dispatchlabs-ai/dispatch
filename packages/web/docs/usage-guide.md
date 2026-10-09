@@ -696,10 +696,10 @@ Direct extraction is not a browser: JavaScript-only pages, authenticated content
 **Source candidate, October 9:** integration, functional verification and deployment remain pending; see [acceptance status](handoff.md#named-agent-secrets--october-9-2026).
 
 1. In **Settings → Secrets → Named secrets**, enter **Name** and **Value**, then **Create secret**. Saved values are write-only. **Edit → Replace value → Save secret** rotates the value; leave blank to preserve it. **Delete** removes the secret and all grants. On a revision conflict, **Reload** before retrying.
-2. In **Agent screen → Secrets**, check/uncheck your owned secrets to grant/revoke access. One secret can serve multiple named agents and their current/future instances. Copies/imports do not inherit grants. Enable **Files and commands** separately for the Git tools.
+2. In **Agent screen → Secrets**, check/uncheck your owned secrets to grant/revoke access immediately, independently of the agent editor’s Save/Cancel. One secret can serve multiple named agents and their current/future instances. Copies/imports do not inherit grants. Enable **Files and commands** separately for the Git tools.
 3. For private GitHub cloning, use a fine-grained token restricted to the intended repositories with Contents read access. Ask the agent to use `secrets_list` for granted IDs/names, then `git_clone` with `secretId`, `repository` (GitHub HTTPS URL) and `destination` (a new workspace-relative directory whose parent exists). Never paste the token into chat, clone URLs or shell arguments. Git errors are suppressed; check permissions/URL/grant and inspect partial destinations before retrying.
 
-Replacement/revocation affects later uses, not credentials already disclosed; rotate those at GitHub if necessary. No environment injection or plaintext retrieval tool is provided. Grants are not isolation between agents sharing a worker. This tool clones only—not authenticated fetch/push, submodules or persistent storage. Worker replacement may lose the checkout. Exa settings remain separate.
+Replacement/revocation affects later uses, not credentials already disclosed; rotate those at GitHub if necessary. No environment injection or plaintext retrieval tool is provided. Grants are not isolation between agents sharing a worker. This tool clones only—not authenticated fetch/push, submodules or persistent storage. Worker replacement may lose the checkout. Hosted workers require HTTPS backend transport for secret use. Exa settings remain separate.
 
 ### Exa search credentials
 
