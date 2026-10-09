@@ -41,6 +41,10 @@ October 7 development update: frontend-only edits continue to avoid Pi restarts.
 
 **Local deployment boundary, October 7:** preserve native Web Next and its state. Palm owns host prerequisites and DNS/TLS routing; the local module keeps native deployment as its default and offers opt-in OCI deployment with a separate service identity and state. The pilot-only OCI cutover and upgrade are recorded in [WP-041](handoff.md#wp-041--generic-aws-container-deployment); they do not qualify AWS or full application recovery. Future cutovers require a stopped-owner backup and explicit scope; never merge installation state implicitly. The AWS module is not a local Docker deployer. Loopback HTTP remains the development endpoint, not an internal hosted site.
 
+### Deployment-independent responsiveness
+
+**Accepted October 9, 2026:** local and hosted deployments must preserve comparable responsiveness for ordinary interactions; deployment machinery is an underlying detail, not a reason for large avoidable delays. Additional compute should improve capacity/performance rather than add repeated management work to warm requests. Preserve authorization, worker fencing and recovery; distinguish unavoidable network/startup costs from redundant orchestration. This is an acceptance requirement, not measured parity or authorization for deployment or expanded qualification.
+
 ### AWS container deployment target
 
 **Accepted target, October 7, 2026; not implemented or AWS-qualified.** Separate the Dispatch backend (authentication, authorization, company catalog, project/conversation directory, request routing and streamed results) from conversation workers. Each active conversation gets an ECS Fargate worker embedding Pi Durable and Dispatch's room/agent behavior. All collaborating agents in that conversation run within its owning Pi runtime, not separate role-specific containers. Historical conversations need durable state, not permanently running tasks.
