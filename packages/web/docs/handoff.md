@@ -1717,6 +1717,8 @@ Chris authorized further focused passes after the five-finding delivery. Deslop 
 
 Post-rebase integration checkpoint: `6f78872` shares the unchanged Settings membership predicate; `487031c` removes full-agent projection from web permission checks, an unread actor configuration copy and repeated legacy-migration catalog scans, and corrects reference guidance. Deslop independently found no source blocker. Documentation corrections preserve dated portability evidence and the revised web factory contract. Combined TypeScript/application/capability checks, Apple Silicon Nix build and flake evaluation passed (zero runnable flake checks; Linux omitted). No tests, runtime/browser checks or deployment occurred. Hosted worker work remains separate: its actor configuration has a real consumer and must not receive the main-only removal blindly. Hosted latency, pending-message UI ownership and overall cleanup acceptance remain open.
 
+Read-path follow-up: independently reviewed `4c20ae9` removes three preliminary authorization-only commits; chat, transcript-page and detail reads retain authorization inside their read transaction. Combined TypeScript/application/capability, Apple Silicon Nix build and flake evaluation passed again (zero runnable checks; Linux omitted). Runtime and latency effects remain unmeasured. No tests or deployment.
+
 Acceptance:
 
 - Preserve supported behavior, public/persisted contracts, authorization, meaningful failures and native Pi execution/recovery ownership. Investigate compatibility consumers before removal; unresolved behavior changes require a decision, not speculative deletion.
