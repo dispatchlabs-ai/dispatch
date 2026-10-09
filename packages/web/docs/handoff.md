@@ -1,5 +1,11 @@
 # Dispatch Web implementation handoff
 
+## Activity disclosure recovery — October 9, 2026
+
+Chris requested removing all activity record counts and fixing stale empty activity disclosures and failed loads. Scope: omit empty live-only activity from browser timeline inputs/reconciliation while retaining loaded nonempty historical pages; resolve settled group identities from sanitized committed projections for detail requests; separate actual request loading from page availability, offer Retry and retain previously loaded output during same-page refresh. No native Pi lifecycle/storage or authorization changes.
+
+Acceptance: no count labels; empty transient groups do not persist as clickable history; older nonempty pages remain reachable; settling between preview/detail does not invalidate the committed group identity; failed loading stops with Retry; background refresh retains loaded output. Source/deslop review confirms these branches and preservation of public sanitization. TypeScript/application builds and Apple Silicon Nix build/flake evaluation passed; Nix reported zero declared flake checks on this revision. An initial dependency-based typecheck failure was resolved with an isolated worktree npm install. Browser verification is blocked by installed agent-browser 0.15.1 versus the assigned 0.38.2 guidance; no installation or repair was authorized. Desktop/390 px rendering, keyboard/touch, failure/retry and lifecycle runtime behavior remain unverified. Publication is recorded in the delivery reply; remote deployment is not part of this request.
+
 ## Project participants and authentication diagnostics — October 9, 2026
 
 Chris reported that a new Surton project manager was absent from chat Participants and could not be mentioned, then reported a passkey rejection and requested application-owned diagnostic data. The deployed participant projection used only historical chat records; project membership granted access without adding a mention choice. A read-only account inspection confirmed completed enrollment and a failed attempt against a registered credential, but the verifier reason was not retained. Surton's ALB access logging was disabled at inspection; that deployment setting is separate from this application change.

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — activity disclosure recovery
+
+- Remove activity count labels and empty live-only timeline disclosures while preserving loaded historical activity.
+- Resolve settled activity detail identities; stop loading on failure with Retry and retain output during background refresh.
+
 ## Unreleased — composer typing isolation
 
 - Notify only the affected main/thread composer on draft edits rather than rerendering the workspace and unrelated chats; retain workspace-lifetime drafts, uploads and send/retry guards.

@@ -1044,7 +1044,10 @@ export class SharedConversations {
       if (!member.conversationId || !itemId.startsWith(`${member.id}:`)) continue;
       const entries = await this.committedEntries(member.conversationId);
       const live = await tx.doc(LiveDoc, member.conversationId);
-      value = this.projectedActivities(member, entries, live, messages).find(activity => activity.id === itemId);
+      // A live-only group can settle between the preview and detail requests.
+      // Resolve its committed identity even when it no longer belongs on the timeline.
+      value = this.projectedActivities(member, entries, live, messages).find(activity => activity.id === itemId)
+        ?? projectActivityGroups(member, entries, messages).find(activity => activity.id === itemId);
       if (value) break;
     }
     return value ? copyJson(value, { omitUndefinedProperties: true }) as unknown as typeof value : undefined;
