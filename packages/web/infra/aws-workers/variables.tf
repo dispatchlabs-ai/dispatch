@@ -147,3 +147,13 @@ variable "service_desired_counts" {
     error_message = "Only backend/launcher zero-or-one overrides are supported."
   }
 }
+
+variable "service_deployment_mode" {
+  description = "Per-controller ECS deployment mode. Omitted services use stop-first (0/100). Rolling (100/200) requires an application that safely supports overlapping owners and readiness-gated admission; current Dispatch controllers do not."
+  type        = map(string)
+  default     = {}
+  validation {
+    condition     = alltrue([for role, mode in var.service_deployment_mode : contains(["backend", "launcher"], role) && contains(["stop-first", "rolling"], mode)])
+    error_message = "Select stop-first or rolling for backend and/or launcher only."
+  }
+}

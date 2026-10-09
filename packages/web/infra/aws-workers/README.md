@@ -14,7 +14,7 @@ contracts, without a company-specific deployment entry point.
   endpoint. Single-NAT egress is not multi-AZ availability. Review the CIDR against
   live routing before applying. Tasks never receive public addresses.
 - Separate stable-service and **worker-only** ECS clusters. Backend and launcher
-  are count-zero by default, maximum one each; 0/100 ECS replacement, no automatic
+  are count-zero by default, maximum one each; stop-first ECS replacement by default, no automatic
   rollback or ECS Exec. Workers are standalone launcher-owned `RunTask` attempts,
   never Terraform-managed conversation services. Database locks do not prove old
   task termination. Crash owners require the application's explicit recovery path.
@@ -99,6 +99,28 @@ Use ECS-native rolling replacement only for an application/service configuration
 that supports overlapping ready tasks. Module settings, a successful plan and ECS
 service stability do not independently establish zero downtime. Current controller
 upgrades follow the ordered stop/start procedure below and incur an availability gap.
+
+## ECS service deployment selection
+
+`service_deployment_mode` accepts optional `backend` and `launcher` entries:
+`"stop-first"` selects ECS minimum/maximum healthy percentages **0/100**;
+`"rolling"` selects **100/200**. Omitted entries use `"stop-first"`. The map is
+empty by default, preserving existing callers. Desired counts remain zero or one;
+rolling allows ECS to run one temporary replacement alongside that service's owner.
+Standalone conversation workers are not controlled by this option.
+
+**Do not select rolling for the current Dispatch backend or launcher.** Both
+require exclusive retained ownership, so a replacement cannot become ready while
+the old owner runs. Enabling 100/200 alone can stall or fail deployment; disabling
+owner locks is not a workaround. Retain ordered drain, confirmed retirement,
+launcher-first startup and private readiness/undrain for these images.
+
+A caller may opt a service into rolling only after its application supports safe
+overlap and readiness-gated traffic/admission. The current `/internal/health`
+endpoint is liveness, not such a readiness gate. This option does not change
+health checks, owner fencing, circuit-breaker rollback, secrets, database state or
+admission behavior, and it does not establish zero-downtime operation. No live
+consumer is switched to rolling by this module update.
 
 ## Reuse from a caller root
 

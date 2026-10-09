@@ -1049,3 +1049,13 @@ The approved concepts supersede the earlier evaluation layout and its designer-a
 Settings → Secrets manages owner-bound Exa credentials in the existing encrypted connection database, outside conversation history. Owners can save/replace a key, select the fixed `EXA_API_KEY` environment source, grant named agent definitions use, and disconnect. No arbitrary environment names, file paths, shell commands or automatic Codex imports are accepted. Other users cannot manage or grant these credentials. Granting use explicitly shares search authority with the selected definition's current and future instances and audiences.
 
 Search resolves the current credential and grant using trusted execution identity, checking active membership and the current definition at use time. Rotation affects subsequent requests; disconnect removes grants and does not fall back to the environment. Environment-source credentials require explicit grants too; there is no implicit operator-key fallback. Existing environment-only installations must select that source and grant their agents once. Revoked bindings remain tombstoned. Saves and disconnects compare the current owner settings revision transactionally; stale tabs must reload rather than restore removed grants. In-flight requests and previously disclosed evidence cannot be recalled. Status describes configuration, not provider verification.
+
+## ECS deployment mode contract — October 9, 2026
+
+The reusable conversation-worker AWS module supports explicit per-controller
+`service_deployment_mode`: `stop-first` (0/100) or `rolling` (100/200), defaulting
+to stop-first for omitted services. Rolling is available only to callers whose
+application safely supports overlapping owners and readiness-gated traffic.
+The current exclusive-owner backend/launcher remain stop-first; infrastructure
+percentages do not replace ownership fencing or make liveness a readiness check.
+Standalone worker retirement and live consumer configuration remain unchanged.

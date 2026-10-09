@@ -122,8 +122,8 @@ resource "aws_ecs_service" "stable" {
   desired_count                      = lookup(var.service_desired_counts, each.key, var.desired_count)
   launch_type                        = "FARGATE"
   platform_version                   = "1.4.0"
-  deployment_minimum_healthy_percent = 0
-  deployment_maximum_percent         = 100
+  deployment_minimum_healthy_percent = lookup(var.service_deployment_mode, each.key, "stop-first") == "rolling" ? 100 : 0
+  deployment_maximum_percent         = lookup(var.service_deployment_mode, each.key, "stop-first") == "rolling" ? 200 : 100
   enable_execute_command             = false
   health_check_grace_period_seconds  = each.key == "backend" && var.certificate_arn != null ? 600 : 0
   deployment_circuit_breaker {

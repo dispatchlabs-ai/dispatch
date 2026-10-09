@@ -1990,3 +1990,22 @@ Delivery: the focused fix was published at `c4b2cd6` and Developer reported it s
 Evidence at integrated `5dd915a`: Documenter inspected the private `.local/typing-isolation-proof/` harness, build setup, three JSON receipts and check logs. Production Workspace components with private render-count instrumentation, mocked session/API and three mounted chat composers replayed 20 messages/eight activities per chat. M1 Air/system Chrome `154.0.8037.98` ran headless at 1440×1000 and 390×844; synthetic 5 Hz public message/tool deltas accompanied 120 sequential inputs per run. At idle, 30 inputs caused 30 Workspace, 90 ChatPanel and 90 composer renders on baseline `e4d44b9`; the candidate caused only 30 renders of the edited composer. Baseline desktop input-event-to-second-animation-frame p95 was 31.0 ms, candidate desktop/390 px 30.5/31.2 ms (31/30/29 received delta events). Documenter independently recomputed these percentiles. No recorded long tasks, page errors or horizontal overflow occurred; tab-switch draft retention, latest-text mocked Send and clearing passed. This establishes removed rendering work, not a material latency improvement, reproduction of Chris's lag, physical presentation timing or authenticated live-app acceptance.
 
 Integrated `npm run check` in Nix, Apple Silicon Nix build and flake check passed; logs confirm zero runnable flake checks and omitted Linux systems. Source review includes the corrected paired state/IDs cache. The replay used existing Playwright tooling because installed agent-browser was 0.15.1, not the assigned 0.38.2. Authenticated-service performance, actual model/tool streaming, thread/context remounts, attachment uploads, uncertain retries/late-response races, IME and broader editor interactions remain unverified by this replay. Private harness, receipts and captures stay ignored under `.local/`; no live state/service or billable model call was used. Consumer rollout evidence is separate from fixture results; application/typing acceptance remains with Chris.
+
+## ECS deployment mode selection — October 9, 2026
+
+Chris requested a focused Terraform module update after the typing-fix rollout.
+`service_deployment_mode` is an optional map for backend/launcher: `stop-first`
+selects 0/100 and `rolling` selects 100/200 ECS deployment percentages. Empty/default
+input preserves all existing consumers; desired counts remain zero or one and
+standalone conversation workers are unchanged. The [module contract](../infra/aws-workers/README.md#ecs-service-deployment-selection)
+records caller responsibility for overlap-capable application ownership and
+readiness-gated admission. Current routing/launcher ownership rejects overlapping
+controllers; this does not enable zero downtime for the current application or
+change a live consumer's module pin.
+
+Acceptance: Deslop source-reviewed the focused option without a blocker; OpenTofu
+1.12.6/provider 6.67.0 initialization, formatting and validation passed, with the
+existing Cloud Map `failure_threshold` deprecation warning. Diff checks pass.
+Local Terraform 1.5.7 is below the module's existing >=1.12.6 requirement and was
+not used for validation. No application/backend redesign, deployed rolling-mode
+activation, functional/browser test or new qualification suite was performed.
