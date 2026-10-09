@@ -104,6 +104,8 @@ This slice does not implement per-conversation workers, distributed executor own
 
 ## Testing policy
 
+**October 9 named-agent secrets exception:** Chris directed the team to continue after the explicit request for focused functional/browser verification. Disposable local create/shared-grant/denial/rotation/revocation/restart and Git-tool checks, plus desktop/390px UI review, are authorized for [named-agent secrets](handoff.md#named-agent-secrets--october-9-2026). No automated regression suite, live-state copying, live-service stops or deployment is authorized by this exception. Real private GitHub cloning additionally requires an explicitly approved repository and privately granted credential.
+
 **October 8 clarification for portability qualification:** Chris clarified that the restriction is on automated tests, and explicitly requires `agent-browser` proof of working flows. Manual browser/runtime qualification of the agreed first version with disposable data is authorized; do not add or run an automated test suite. Earlier portability references treating manual/browser checks as blocked are superseded. Preserve live installations; no live-state copying or live-service stops. [The portability qualification entry](handoff.md#portability-manual-qualification--october-8-2026) owns evidence and remaining criteria.
 
 **Accepted October 3, 2026.** Do not add or run tests at the current stage. Make enough implementation progress to establish useful, stable behavior before investing in regression coverage. During this exploratory stage, use source review, TypeScript checks, and builds; record functional outcomes that remain unverified.
