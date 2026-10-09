@@ -18,7 +18,10 @@ export type DistributedOptions = {
   runPolicyChange?: <T>(operation: () => Promise<T>) => Promise<T>;
   configurationRevision: string; directory: DispatchRuntime; routes: WorkerRoutes;
 };
-export function distributedRuntime(options: DistributedOptions): RuntimeService {
+export type DistributedRuntime = RuntimeService & {
+  runWorkerTransition<T>(operation: () => Promise<T>): Promise<T>;
+};
+export function distributedRuntime(options: DistributedOptions): DistributedRuntime {
   const { directory, routes } = options;
   const launching = new Map<string, Promise<WorkerRoute>>();
   // Read leases cover authorization, activation and RPC completion. A policy writer
@@ -226,12 +229,12 @@ export function distributedRuntime(options: DistributedOptions): RuntimeService 
     },
   };
   // Bound delegation preserves the native catalog API without duplicating its policy.
-  return new Proxy(directory, { get(target, property) {
+  return Object.assign(new Proxy(directory, { get(target, property) {
     const replacement = overrides[property as keyof RuntimeService];
     if (replacement) return replacement;
     const value = Reflect.get(target, property);
     return typeof value === "function" ? value.bind(target) : value;
-  } });
+  } }), { runWorkerTransition: policyChange });
 }
 
 /** Only the authenticated launcher selects the host; never accept arbitrary RPC URLs. */
