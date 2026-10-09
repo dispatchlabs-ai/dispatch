@@ -615,8 +615,7 @@ export class DispatchRuntime {
   async publicDetail(scope: RuntimeScope, id: string, kind: "message" | "activity", itemId: string) {
     return this.harness.commit(async tx => {
       await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
-      const presentation = await this.shared.presentation(tx, nativeId(id));
-      const value = kind === "message" ? presentation.messages.find(item => item.id === itemId || item.aliases?.includes(itemId)) : presentation.activities.find(item => item.id === itemId);
+      const value = await this.shared.detail(tx, nativeId(id), kind, itemId);
       if (!value) throw new RuntimeError(404, "History item unavailable.");
       return value;
     }, context);
@@ -786,7 +785,6 @@ export class DispatchRuntime {
   }
 
   async stop(scope: RuntimeScope, id: string) {
-    await this.authorize(scope, id);
     await this.shared.stop(nativeId(id), async tx => { await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope)); });
     return this.getChat(scope, id);
   }

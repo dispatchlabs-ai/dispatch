@@ -998,6 +998,23 @@ export class SharedConversations {
     return { status: "failed", error: typeof latest.detail === "string" ? latest.detail : `Response ended: ${latest.reason}.` };
   }
 
+  /** Called inside the authorized read transaction; detach only the requested public item. */
+  async detail(tx: Tx, roomId: ConversationId, kind: "message" | "activity", itemId: string) {
+    const room = await tx.doc(SharedDoc, roomId);
+    const messages = this.projectedMessages(roomId, await this.committedEntries(roomId), room.messageAliases);
+    let value: ConversationMessage | ParticipantActivity | undefined;
+    if (kind === "message") value = messages.find(message => message.id === itemId || message.aliases?.includes(itemId));
+    else for (const member of room.members) {
+      // Both ordinary and context-boundary activity IDs start with their participant ID.
+      if (!member.conversationId || !itemId.startsWith(`${member.id}:`)) continue;
+      const entries = await this.committedEntries(member.conversationId);
+      const live = await tx.doc(LiveDoc, member.conversationId);
+      value = this.projectedActivities(member, entries, live, messages).find(activity => activity.id === itemId);
+      if (value) break;
+    }
+    return value ? copyJson(value, { omitUndefinedProperties: true }) as unknown as typeof value : undefined;
+  }
+
   async presentation(tx: Tx, roomId: ConversationId, query?: TranscriptQuery): Promise<Presentation & { history?: { before: string | null; generation: string }; page?: TranscriptPage }> {
     const room = await tx.doc(SharedDoc, roomId);
     const turns = await tx.doc(TurnsDoc, roomId);
