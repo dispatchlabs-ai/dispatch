@@ -146,6 +146,23 @@ resource "aws_db_parameter_group" "this" {
     value        = "0"
     apply_method = "immediate"
   }
+  # Worker provisioning also sends role DDL; bound-value limits do not redact SQL literals.
+  # Fail-closed application checks must verify these effective settings before password DDL.
+  dynamic "parameter" {
+    for_each = {
+      log_statement                      = "none"
+      log_min_duration_statement         = "-1"
+      log_min_duration_sample            = "-1"
+      log_min_error_statement            = "panic"
+      log_error_verbosity                = "terse"
+      "pg_stat_statements.track_utility" = "0"
+    }
+    content {
+      name         = parameter.key
+      value        = parameter.value
+      apply_method = "immediate"
+    }
+  }
   tags = local.tags
 }
 resource "aws_db_instance" "this" {
