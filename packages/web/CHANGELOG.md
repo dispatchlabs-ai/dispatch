@@ -60,11 +60,11 @@ Integrated source review and TypeScript/application/Apple Silicon Nix checks pas
 ## Unreleased — starter and GitHub bundles
 
 - Add an explicit-model Developer starter through the existing archive preview/import path.
-- Add public GitHub commit-pinned imports and tracked updates with durable reviewed previews, conservative local-edit conflicts, retained removed entries and atomic retry receipts. Updated definitions follow the existing safe-idle adoption policy. Source/build checked; runtime and rendered UI remain unverified. See [portability evidence](docs/handoff.md#portable-definitions-and-project-data--october-8-2026).
+- Add public GitHub commit-pinned imports and tracked updates with durable reviewed previews, conservative local-edit conflicts, retained removed entries and atomic retry receipts. Updated definitions follow the existing safe-idle adoption policy. Source/build checked; later bounded runtime/browser observations and remaining limits are recorded in [portability evidence](docs/handoff.md#portability-manual-qualification--october-8-2026).
 
 ## Unreleased — portable agent and skill bundles
 
-- Add Agents import/export with bounded ZIP parsing, requirement preview, exact assigned skill revisions and independent local copies. Native atomic receipts preserve same-operation retries; connections, credentials and existing instances remain untouched. Source/build checked; runtime and rendered UI qualification remain outstanding in the [handoff](docs/handoff.md#portable-definitions-and-project-data--october-8-2026). GitHub updates, starter distribution, project exports and backups remain later work.
+- Add Agents import/export with bounded ZIP parsing, requirement preview, exact assigned skill revisions and independent local copies. Native atomic receipts preserve same-operation retries; connections, credentials and existing instances remain untouched. The initial slice excluded GitHub updates, starter distribution, project exports and backups; subsequent deliveries and bounded manual qualification are recorded in the [handoff](docs/handoff.md#portability-manual-qualification--october-8-2026).
 
 ## Unreleased — separate web capabilities
 
@@ -308,4 +308,4 @@ Integrated source review and TypeScript/application/Apple Silicon Nix checks pas
 - Add bounded project-history JSON export/import with attachment checksums, manager export authorization, independent projects, inert history and atomic retry-safe admission.
 - Add restricted offline SQLite recovery tooling requiring stopped writers and fenced original ownership; restore never starts a service.
 - Package existing native capabilities for reviewed host installation on Pi Durable 1.0.4; bundle import never installs code.
-- Type/build checks passed; functional, recovery and portability UI qualification remain outstanding.
+- Type/build checks passed; later bounded functional, disposable recovery and desktop/390 px evidence, plus remaining acceptance limits, are recorded in the [portability handoff](docs/handoff.md#portability-manual-qualification--october-8-2026).
