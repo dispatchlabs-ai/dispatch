@@ -1838,7 +1838,7 @@ Scope: avoid repeated worker inventory, activation/reconciliation and readiness 
 Acceptance for this hotfix:
 
 - Source/native review of warm routing and cold/recovery fallback; no new overlapping executor or weakened authorization. Pending is not durable acceptance; failed or uncertain sends retain retryable content/identity without clearing newer drafts or duplicating accepted posts.
-- Applicable TypeScript/build checks and focused desktop/390 px review of changed composer states; record exact evidence and unverified outcomes, without a broad automated test suite.
+- Applicable TypeScript/build checks. **October 9 handoff correction:** Chris took ownership of the post-deployment send/UI check; agent browser checks are no longer a deployment gate. Leave desktop/390 px interaction evidence unverified until his observations are supplied; no broad automated test suite.
 - Deployer records the immutable deployed source/image pins, retained-state rollout/recovery safeguards and bounded readiness observations. No deployment or measured latency improvement is established by this scope entry.
 - Full before/after profiling and the broader end-to-end performance run are explicitly deferred, not rollout gates for this quick fix and not satisfied by source/build checks.
 
