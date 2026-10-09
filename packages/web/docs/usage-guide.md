@@ -669,7 +669,7 @@ Do not paste base64 into messages or treat workspace paths as browser links. A s
 
 ## Web research
 
-The capability split is pending integrated publication and qualification. In the updated application, open **Agents → Edit → Capabilities**, select **Web reading**, **Web search**, or both, and save. Web reading exposes `web_read` for `open`, `find` and `click`; Web search exposes `web_search` for `search_query`. Active instances adopt the saved selections at the next safe idle base upgrade. Files and commands, MCP connections and skills are not required.
+In the updated application, open **Agents → Edit → Capabilities**, select **Web reading**, **Web search**, or both, and save. Web reading exposes `web_read` for `open`, `find` and `click`; Web search exposes `web_search` for `search_query`. Active instances adopt the saved selections at the next safe idle base upgrade. Files and commands, MCP connections and skills are not required.
 
 Direct public HTML/text URL reads need no API key or paid retrieval API; normal model/network costs remain. Search additionally requires an Exa credential grant in **Settings → Secrets** and may incur Exa charges. Search-only agents receive snippets and source URLs, not full-page evidence; enable Web reading too if they must open results. This is independent of the Exa MCP skill/connection and does not inherit its credentials.
 
