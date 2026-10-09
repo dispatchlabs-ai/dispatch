@@ -142,6 +142,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
       });
     },
     async saveProject(scope, id, input) {
+      if (input.cwd) throw new RuntimeError(400, "Hosted conversations use their dedicated worker workspace.");
       return policyChange(async () => {
         const result = await directory.saveProject(scope, id, input);
         await acknowledgePolicy(scope.companyId);

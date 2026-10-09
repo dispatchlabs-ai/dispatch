@@ -2203,7 +2203,7 @@ export class DispatchRuntime {
     const room = await tx.doc(SharedDoc, roomId);
     const project = room.sharedProjectId ? (await tx.doc(ProjectsDoc)).projects[room.sharedProjectId] : undefined;
     if (room.sharedProjectId && (!project || project.companyId !== companyId)) throw new RuntimeError(404, "Project not found.");
-    const workspaceDefault = project?.cwd ?? this.workspaceDir;
+    const workspaceDefault = this.worker ? this.workspaceDir : project?.cwd ?? this.workspaceDir;
     const record = await tx.createConversation({ ownership: { kind: "ownerless" } });
     if (snapshots.length) (await tx.doc(SkillBindingsDoc, record.id)).skills = snapshots;
     const cwd = agent.extensions?.some(name => name === CodingTools.name || name === "dispatch-image-gen") ? workspaceDefault : undefined;
