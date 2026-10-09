@@ -13,7 +13,7 @@ import { ApiError, errorMessage } from "../lib/api";
 import type { PendingMessage } from "../lib/chat";
 import { useSession } from "../lib/session";
 import { useComposingPresence } from "../lib/composing";
-import { agentMentionPrefix, mentionUrl } from "../lib/mentions";
+import { agentMentionPrefix, mentionLabel, mentionUrl } from "../lib/mentions";
 import { toolActivities, type ToolActivity } from "../lib/tool-activity";
 import { AgentChoices, ParticipantAvatar } from "./conversation-people";
 import { Markdown } from "./markdown";
@@ -37,18 +37,13 @@ export function ConversationPresence({ participants }: { participants: Conversat
   </div>)}</div>;
 }
 
-function participantName(participant: ConversationParticipant, participants: ConversationParticipant[]) {
-  return participants.some(other => other.id !== participant.id && other.name === participant.name)
-    ? `${participant.name} · ${participant.id.slice(-6)}` : participant.name;
-}
-
 function ParticipantContent({ author, participants, createdAt, showAuthor = true, status, children }: {
   author?: ConversationParticipant; participants: ConversationParticipant[]; createdAt: number; showAuthor?: boolean; status?: string; children: ReactNode;
 }) {
   return <>
     {showAuthor ? <ParticipantAvatar kind={author?.kind || "human"} name={author?.name || "?"} /> : null}
     <div className="participant-body">
-      {showAuthor ? <header className="message-heading"><strong>{author ? participantName(author, participants) : "Former participant"}</strong>{author?.kind === "agent" ? <span className="agent-kind-badge">{author.membership === "removed" ? "Removed agent" : author.membership === "removing" ? "Removing agent" : "Agent"}</span> : null}<time dateTime={new Date(createdAt).toISOString()}>{formatTime(createdAt)}</time>{status ? <span className="activity-status">{status}</span> : null}</header> : null}
+      {showAuthor ? <header className="message-heading"><strong>{author ? mentionLabel(author, participants) : "Former participant"}</strong>{author?.kind === "agent" ? <span className="agent-kind-badge">{author.membership === "removed" ? "Removed agent" : author.membership === "removing" ? "Removing agent" : "Agent"}</span> : null}<time dateTime={new Date(createdAt).toISOString()}>{formatTime(createdAt)}</time>{status ? <span className="activity-status">{status}</span> : null}</header> : null}
       {children}
     </div>
   </>;
@@ -217,11 +212,11 @@ export function SharedContextPanel({ criteriaDraft, onCriteriaDraft, snapshot, a
       <Button className="invite-participants" variant="secondary" disabled={snapshot.conversation.canParticipate === false} onClick={onInvite}><UserPlus size={18} /> Add participants</Button>
       <Button variant="secondary" disabled={snapshot.conversation.canParticipate === false || !agents.some(agent => !agent.archived)} onClick={() => onAddInstance()}><UserPlus size={18} /> Add agent instance</Button>
       <div className="participant-list">{snapshot.participants.map(member => <button type="button" className={`participant-row ${participant?.id === member.id ? "selected" : ""}`} key={member.id} onClick={() => setSelectedId(member.id)} aria-pressed={participant?.id === member.id}>
-        <ParticipantAvatar kind={member.kind} name={member.name} /><span className="participant-choice-copy"><strong>{participantName(member, snapshot.participants)}</strong><span>{member.kind === "agent" ? `Agent · ${agentStatus(member)}` : `${state?.state === "authenticated" && state.user.id === member.userId ? "You" : "Person"}${member.status === "typing" ? " · Typing" : ""}`}</span></span>
+        <ParticipantAvatar kind={member.kind} name={member.name} /><span className="participant-choice-copy"><strong>{mentionLabel(member, snapshot.participants)}</strong><span>{member.kind === "agent" ? `Agent · ${agentStatus(member)}` : `${state?.state === "authenticated" && state.user.id === member.userId ? "You" : "Person"}${member.status === "typing" ? " · Typing" : ""}`}</span></span>
       </button>)}</div>
       <p className="history-access"><LockKeyhole size={14} /> {snapshot.conversation.sharedProjectId ? "Current project members can read the full history. Listed authors may include former members." : "Active participants can read the full public history."}</p>
       {participant ? <section className="participant-details">
-        <h3>{participantName(participant, snapshot.participants)}</h3>
+        <h3>{mentionLabel(participant, snapshot.participants)}</h3>
         {participant.kind === "agent" ? <>
           <AgentRemoval key={`${snapshot.conversation.id}:${participant.id}`} participant={participant} chatId={snapshot.conversation.id} canParticipate={snapshot.conversation.canParticipate !== false} onSnapshot={onSnapshot} />
           <dl className="context-facts"><div><dt>Base revision applied</dt><dd>{participant.agent.name} · {participant.agentRevision}</dd></div><div><dt>Model</dt><dd>{models.find(model => model.id === participant.agent.modelId && model.provider === participant.agent.provider)?.name || participant.agent.modelId}</dd></div><div><dt>Provider</dt><dd>{participant.agent.provider}</dd></div><div><dt>Thinking</dt><dd>{participant.agent.thinkingLevel}</dd></div><div><dt>Tools</dt><dd>{describeAgentTools(participant.agent.tools)}</dd></div>{participant.agent.cwd ? <div><dt>Local workspace</dt><dd>{participant.agent.cwd}</dd></div> : null}</dl>

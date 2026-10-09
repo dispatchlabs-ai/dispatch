@@ -89,7 +89,7 @@ export function AgentSkillsEditor({ selections, onChange, busy, editing, onEditi
   const invalid = editing && (!editing.input.name.trim() || !editing.input.description.trim() || !editing.input.instructions.trim() || editing.input.instructions.length > 50000);
   return <section className="agent-connections">
     <h2>Skills</h2>
-    <p className="field-hint">Only explicitly assigned skills are available. Changes apply to new instances after saving this agent.</p>
+    <p className="field-hint">Assigned skills only. Save the agent to apply changes; active instances update when idle.</p>
     {notice ? <Notice tone="success">{notice}</Notice> : null}
     {error ? <Notice>{error} <Button variant="ghost" disabled={disabled} onClick={() => setAttempt(value => value + 1)}>Retry library</Button></Notice> : null}
     {!skills && !error ? <Spinner label="Loading skills" /> : null}
