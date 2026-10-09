@@ -290,6 +290,9 @@ This example is configuration guidance, not a tested fresh-install receipt.
    `/internal/undrain` through the private operator path before waiting for ALB/ECS
    health; waiting for callback-target readiness first deadlocks drained startup.
    The worker-only callback listener is not an operator/undrain route.
+   Require a controller image that rejects drained public work without disabling
+   authenticated maintenance. Undispatched waiter expiry/cancellation is
+   request-local; actual ownership/store failures must still fail closed.
    Verify actual runtime UID/permissions, private bootstrap files, secret-source environment removal,
    database verified TLS, signed-out HTTPS, enrollment, real model/tool execution,
    artifacts and replacement with independently confirmed old-task STOPPED.

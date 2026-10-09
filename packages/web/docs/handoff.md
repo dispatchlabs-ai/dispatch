@@ -2049,6 +2049,9 @@ limitations separately from subsequent rolling behavior, with exact source/modul
 revisions and overlapping-ready/availability evidence. Record observed service
 continuity and ownership safety separately from application acceptance; publication,
 plan success and a healthy post-rollout target alone do not establish zero downtime.
+Distinguish header-only HTTP samples from completed-response samples; consume
+bodies without retaining content and record completion/byte counts. Sampling
+does not establish availability between samples.
 The handover design and any further runtime verification must respect the repository
 testing policy and Chris's testing boundary.
 
@@ -2106,7 +2109,8 @@ evidence, not runtime acceptance. No application/typing tests ran for this packa
 deployment and measured rolling-continuity acceptance remain pending.
 Module-only successor `3e1b26a36a5c7f02fd5b5e2f1c51785f3c264941` corrects
 callback DNS to supported Cloud Map ALB alias registration; direct Route 53 writes
-into its managed zone are not supported. The controller image stays at `8fb001f`.
+into its managed zone are not supported. That DNS-only change preserved the initial
+`8fb001f` controller image; the startup correction below requires a new image.
 Source validation did not exercise that AWS restriction; a passing validation or
 preview is not live activation evidence.
 The selected deployment integration uses an internal launcher ALB rather than a
@@ -2121,25 +2125,33 @@ Managed drain budgets must cover the complete request/response lifetime, not mer
 300-second client timeout. No migration, measured transfer or deployed continuity
 is established by this source checkpoint.
 
-Startup correction: the initial migration exposed a request-timeout latch in the
-controller listener. An undispatched wait expiring incorrectly failed the shared
-gate, preventing authenticated maintenance on an intentionally drained owner.
+Startup correction, source `8106d5b2f50636c74d74b89f13b84c072c0ae190`: the initial
+migration exposed a request-timeout latch in the controller listener. An
+undispatched wait expiring incorrectly failed the shared gate, preventing
+authenticated maintenance on an intentionally drained owner.
 The correction keeps expiry/cancellation request-local and immediately rejects
 public work when a claimed local owner is unready; maintenance remains counted
 and subject to the existing explicit lifecycle failure barrier. Ownership claims,
 release, recovery latches and mutation no-replay rules are unchanged. Pi reviewed
 the focused source diff with no additional ownership blocker. Application checks,
 Apple Silicon Nix build and flake evaluation pass (zero runnable flake checks;
-Linux omitted). No tests or live changes were executed by Developer; corrected
-image build, migration restoration and rolling continuity remain pending.
+Linux omitted). No tests or live changes were executed by Developer. Deployer
+subsequently reports the corrected Linux ARM64 image built/published, with source
+revision and architecture verified. This artifact checkpoint alone does not
+establish runtime acceptance.
 
-Maintenance-waiter follow-up: a status/drain/undrain request arriving before the
-local owner finishes opening now becomes dispatchable once that owner exists,
-even while installation admission is drained. The same retirement/failure gate,
+Maintenance-waiter follow-up, source `39f20d5`: a status/drain/undrain request
+arriving before the local owner finishes opening now becomes dispatchable once
+that owner exists, even while installation admission is drained. The same retirement/failure gate,
 owner authorization and pre-dispatch cancellation checks remain enforced. Pi
 reviewed the one-line eligibility change with no additional source blocker.
 Application checks, Apple Silicon Nix build and flake evaluation pass (zero flake
-checks; Linux omitted); no tests or live changes from Developer. The existing
+checks; Linux omitted); no tests or live changes from Developer. Deslop reports
+the follow-up Linux ARM64 image built/published, with revision and architecture
+verified. Deployer reports the one-time migration restored on this follow-up;
+that interruption and a healthy final state are not rolling-continuity evidence.
+Native rolling observations remain in progress; installation receipts belong in
+the consumer infrastructure repository. The existing
 `8106d5b` image can serve maintenance after owner opening; this follow-up prevents
 an earlier request from unnecessarily waiting until its deadline. Mutation
 transport outcomes remain non-replayable. Deployment pins do not follow docs HEAD.
