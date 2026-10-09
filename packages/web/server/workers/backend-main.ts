@@ -1,3 +1,4 @@
+import { S3ProjectArchiveStore } from "./s3-project-archives.js";
 import { createWebBackend } from "../web/backend.js";
 import { McpPolicyGate } from "./mcp-policy.js";
 import { backendWorkerMcp } from "./mcp.js";
@@ -110,6 +111,8 @@ if (recovering) await routes.setAdmissionBlocked(true);
 const admission = new WriteAdmission(routes.admissionBlocked(), async blocked => { await routes.setAdmissionBlocked(blocked); });
 const artifacts = await S3Artifacts.open(workerConfig.artifacts);
 startupCleanup.push(() => artifacts.close());
+const archives = await S3ProjectArchiveStore.open(workerConfig.artifacts, workerConfig.installationId);
+startupCleanup.push(() => archives.close());
 const workerKey = (await readFile(workerConfig.workerKeyFile, "utf8")).trim();
 const stores = await WorkerStoreProvisioner.open({ connectionString: storeUrl, ca: storeCa, installationId: workerConfig.installationId, credentialKey: workerKey });
 startupCleanup.push(() => stores.close());
@@ -133,6 +136,7 @@ await connections.quiesce();
 const support = new WriteAdmission(true, async () => {});
 const directory = await DispatchRuntime.open({
   connectMcpOnOpen: false, runMcpBackground: operation => support.run(operation), stateDir: join(config.stateDir, "runtime"), companyId: config.companyId, models: provider.models, directoryOnly: true,
+  projectArchiveStore: archives,
   piStorage: directoryStorage, workspaceDir: config.workspaceDir, connectionsFile: config.connectionsFile, mcpConnections: connections,
   provider: provider.provider, modelId: provider.modelId, thinkingLevel: provider.thinkingLevel, readAllProjectUserIds: config.readAllProjectUserIds,
   peopleDirectory: { list: async companyId => auth.listCompanyPeople(companyId), get: async (companyId, userId) => auth.getCompanyPerson(companyId, userId) },
@@ -361,6 +365,7 @@ function close(): Promise<void> {
       () => runtime.close(),
       () => { cleanupSessionResources(); },
       () => connections.close(),
+      () => archives.close(),
       () => artifacts.close(),
       () => stores.close(),
       () => auth.close(),
