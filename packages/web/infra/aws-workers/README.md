@@ -181,6 +181,18 @@ failure. The helper's owning contract is
 Bound-parameter limits do not redact SQL password literals. Initializer-session
 checks do not qualify the separate worker provisioner connection; that connection
 must independently enforce safe statement/error logging before password DDL.
+Module `6d0718a` also prepares `log_statement=none`, both duration logging
+thresholds (`log_min_duration_statement`, `log_min_duration_sample`) at `-1`,
+`log_min_error_statement=panic`, `log_error_verbosity=terse` and
+`pg_stat_statements.track_utility=0`. Application `e87dbab` verifies effective
+settings at provisioner connection open and again inside serialized `ensure()`
+before password DDL, since dynamic RDS changes can affect an already-open session.
+It fails closed with sanitized errors, without privileged SET; its full guard also
+requires SCRAM password encryption and rejects enabled audit/utility capture where
+those settings exist. See [the provisioner](../../server/workers/postgres-stores.ts).
+Source/build checks and a parameter-only apply do not qualify deployed guard
+behavior or a full external logging audit. Rebuild and deploy the supporting image
+before resuming worker provisioning.
 
 The task definition precondition requires `desired_count=0` and every
 `service_desired_counts` override at zero; this is not proof of
