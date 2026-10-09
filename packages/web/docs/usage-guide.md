@@ -445,7 +445,7 @@ In default SQLite mode, the state directory contains `auth.sqlite`, `auth.key`, 
 
 ### GitHub bundles
 
-**Source-published; real GitHub import/update checks in progress.** See [manual qualification evidence and limits](handoff.md#portability-manual-qualification--october-8-2026). In Agent bundles, choose **GitHub**. Destination **New independent copy** imports new local records; selecting an existing tracked installation previews its update. Enter public GitHub owner/repository, package directory (empty for root) and a full 40-character commit SHA, not a branch/tag, then **Preview commit**.
+**Source-published; bounded real GitHub import/update/conflict/retry checks recorded.** See [manual qualification evidence and limits](handoff.md#portability-manual-qualification--october-8-2026). In Agent bundles, choose **GitHub**. Destination **New independent copy** imports new local records; selecting an existing tracked installation previews its update. Enter public GitHub owner/repository, package directory (empty for root) and a full 40-character commit SHA, not a branch/tag, then **Preview commit**.
 
 Inspect Last imported, Local now and Incoming definitions, blockers, warnings, capability changes and retained local authority. Approve definitions/capability changes explicitly, then **Import copy** or **Apply update**. Updates preserve local connections and active instances adopt changed base definitions when idle. Divergent local/upstream edits to the same definition block the whole update, even when different fields changed; **Preview independent copy** offers a separate import instead. Removed-upstream definitions remain local, not archived/deleted.
 
