@@ -1,3 +1,7 @@
+import { CollaborationError } from "../collaboration/shared.js";
+import { ProjectAccessError } from "../project-access.js";
+import { ProjectArchiveError } from "../project-archives.js";
+import { AttachmentError } from "../attachments.js";
 import { HistoryCursorError } from "../chat-pages.js";
 import { cleanupSessionResources } from "@earendil-works/pi-ai";
 import { mkdir } from "node:fs/promises";
@@ -130,7 +134,8 @@ app.post("/rpc", async c => {
 });
 app.onError((error, c) => {
   if (error instanceof HistoryCursorError) return c.json({ error: { code: "HISTORY_CHANGED" } }, 409);
-  const status = error instanceof RuntimeError && [400, 403, 404, 409].includes(error.status) ? error.status as 400 | 403 | 404 | 409 : error instanceof z.ZodError ? 400 : 503;
+  const known = error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ProjectAccessError || error instanceof ProjectArchiveError || error instanceof AttachmentError;
+  const status = known && [400, 403, 404, 409, 410, 413].includes(error.status) ? error.status as 400 | 403 | 404 | 409 | 410 | 413 : error instanceof z.ZodError ? 400 : 503;
   return c.json({ error: "Worker operation failed" }, status);
 });
 const server = serve({ fetch: app.fetch, hostname: "0.0.0.0", port: 8831 });
