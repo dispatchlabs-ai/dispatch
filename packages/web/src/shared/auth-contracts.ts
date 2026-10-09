@@ -34,7 +34,7 @@ export type AuthState =
   | { state: "signed_out" };
 
 export interface AuthErrorBody {
-  error: { code: string; message: string };
+  error: { code: string; message: string; reference?: string };
 }
 
 export interface SecurityState {

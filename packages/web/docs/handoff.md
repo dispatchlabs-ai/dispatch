@@ -1,5 +1,25 @@
 # Dispatch Web implementation handoff
 
+## Project participants and authentication diagnostics — October 9, 2026
+
+Chris reported that a new Surton project manager was absent from chat Participants and could not be mentioned, then reported a passkey rejection and requested application-owned diagnostic data. The deployed participant projection used only historical chat records; project membership granted access without adding a mention choice. A read-only account inspection confirmed completed enrollment and a failed attempt against a registered credential, but the verifier reason was not retained. Surton's ALB access logging was disabled at inspection; that deployment setting is separate from this application change.
+
+Scope: materialize current project members on executing-runtime chat reads, preserve historical attribution, exclude former members from new mention choices, validate human mention submissions against current policy, and add structured authentication diagnostics with public correlation references. Authentication requirements, project ACLs, worker ownership and already admitted contribution publication remain unchanged.
+
+The same workflow exposed another defect: a member in account recovery disappears from the active company directory, causing an unrelated member addition to fail. Chris rejected creating a replacement test project. Project saves now validate additions and role changes while preserving existing unchanged members; no recovery/account state is modified.
+
+Acceptance:
+
+- A project member appears before composing or posting, in both the main and thread mention pickers. Removed members retain attributed history, are labeled Former member and are not offered for new mentions; stale new mentions are rejected by current policy. An observer gains no participation.
+- Known and unknown passkey failures retain generic public errors and distinct safe operator reasons. Browser context and response/log references agree; no credential/assertion material is logged.
+- A recovering member retains the same project identity/role while another member is added. Unknown additions and role changes for unavailable accounts remain rejected.
+- Run source/deslop review, TypeScript/application and Apple Silicon Nix checks; inspect the complete diff and documentation links. Focused harmless-data runtime/browser checks use the Surton POC exception; no automated test suite is added or run.
+- Record desktop/390 px review, exercised runtime flows, exact publication and deployment status here before completion. Ben's real sign-in remains unresolved until a diagnostic retry establishes its cause; adding logs does not fix or qualify his passkey.
+
+Source qualification: TypeScript/application checks, Apple Silicon `nix build` and `nix flake check` passed (one declared build check; Linux checked during deployment packaging). Source/deslop and complete diff review kept the change within existing project policy and authentication boundaries. Disposable native-runtime checks passed member visibility before participation, bidirectional main/thread mentions, observer read-only access, former-author retention/restart, stale-mention rejection, additions while preserving a recovering member, and rejection of unknown additions/unavailable role changes. A disposable authentication request verified the generic error/reference, safe unknown-credential category, browser/ALB context and exclusion of fixture assertion material. No real model call or automated suite was run.
+
+Actual composer/Participants components were reviewed with disposable snapshots at desktop and 390 px width; keyboard mention selection and former-member exclusion passed. Captures are in the task worktree's ignored `.local/`. This component fixture does not establish full deployed/mobile workflow qualification. Surton deployment and live project/member acceptance are pending; the existing Test Project rejected the attempted test-account addition before this fix. A separate account was enrolled and fresh password/TOTP sign-in verified, with credentials stored in Chris's Personal Vault; no replacement project was created.
+
 The local implementation covers the current features listed in [spec.md](spec.md#reading-this-specification), including company authentication, shared conversations, named agents, tools/connections/skills, shared projects, attachments and opt-in PostgreSQL storage. [spec.md](spec.md) defines the current contracts; [usage-guide.md](usage-guide.md) explains operation. The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains product intent and decision history. Shared conversations are implemented locally in [WP-024](#wp-024--shared-conversations); [WP-026](#wp-026--listen-before-responding) adds listening and speaking turns. Qualification is scoped to dated evidence below; implementation alone does not establish it.
 
 ## Current testing policy

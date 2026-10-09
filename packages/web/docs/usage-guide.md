@@ -101,6 +101,8 @@ The local duplicate-owner guard is a per-store PostgreSQL session advisory lock 
 
 ## First account and sign-in
 
+Authentication errors include a support reference. Operators can find the matching `authentication_failed` JSON record in the service's stderr/CloudWatch logs. It includes the endpoint, HTTP status, error code, safe rejection category, bounded browser user-agent and an ALB trace root when available. Passkey categories distinguish an unrecognized credential, user-handle failure, signature rejection, challenge/origin/RP mismatch, user verification, counters and credential changes. Public errors remain generic; never ask someone to send their passkey, password, verification code or recovery code for diagnosis. ALB access logs, when separately enabled, add request-level evidence but do not contain application verification reasons. The browser user-agent does not identify the passkey provider.
+
 Accounts require an operator-issued invitation; the login page has no self-service signup. Only the unused enrollment link expires—not the enrolled account. After setup, sign in normally with your saved credentials.
 
 With the same root checkout and Nix shell, create a single-use enrollment link:

@@ -5,6 +5,12 @@
 - Notify only the affected main/thread composer on draft edits rather than rerendering the workspace and unrelated chats; retain workspace-lifetime drafts, uploads and send/retry guards.
 - Avoid duplicate mention scans for the same editor state while retaining synchronous Markdown updates, initial imports and external replacements. See the [correction package](docs/handoff.md#composer-typing-responsiveness--october-9-2026) for evidence and limits.
 
+## Unreleased — project participants and sign-in diagnostics
+
+- Include current project members in chat Participants and inline mention choices before their first message; preserve former authors and reject new mentions after project removal.
+- Allow project changes while an existing member recovers their account, preserving that member's unchanged identity and role.
+- Record structured authentication failures with browser context, safe passkey rejection categories and a user-visible support reference.
+
 ## Unreleased — borderless activity labels
 
 - Remove the visible box around agent activity labels while retaining click-to-expand, hover feedback and keyboard focus styling. Tighten activity-only row spacing and label padding, retaining 44 px touch targets.
