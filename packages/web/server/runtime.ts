@@ -165,6 +165,7 @@ export type RuntimeOptions = {
   connectMcpOnOpen?: boolean;
   runMcpBackground?: <T>(operation: () => Promise<T>) => Promise<T>;
   workerManagement?: WorkerManagement;
+  workerSearch?: (actor: WorkerManagementActor, query: Parameters<import("./web/types.js").WebBackend["search"]>[0], signal?: AbortSignal) => ReturnType<import("./web/types.js").WebBackend["search"]>;
   workerMcp?: WorkerMcp;
   workerInvitations?: WorkerInvitations;
   /** Workers must inject durable remote blob storage; native installations keep their local default. */
@@ -252,9 +253,13 @@ export class DispatchRuntime {
           const catalog = await tx.doc(CatalogDoc);
           const definition = latestAgent(catalog, actor.companyId, actor.definitionId);
           if (!definition || definition.archived || !publicAgent(definition).capabilities?.includes("web-research")) return undefined;
-          return { companyId: actor.companyId, definitionId: actor.definitionId };
+          return actor;
         }, context);
         signal?.throwIfAborted();
+        if (worker && authorized) {
+          if (!options.workerSearch) throw new RuntimeError(503, "Search mediation unavailable.");
+          return options.workerSearch(runtime.remoteActor(authorized), query, signal);
+        }
         const key = authorized ? await options.mcpConnections?.resolveSearchSecret(authorized.companyId, authorized.definitionId) : undefined;
         return createWebBackend({ searchApiKey: key }).search(query, signal);
       }));
@@ -736,6 +741,17 @@ export class DispatchRuntime {
   /** Attempt authentication belongs to the backend route. Never execute the returned
    * authorization after a concurrent revocation barrier; the invocation owns that ordering.
    */
+  async authorizeWorkerSearch(claim: WorkerManagementActor) {
+    this.requireDirectoryActor(claim);
+    return this.harness.commit(async tx => {
+      const actor = await this.authoritativeWorkerActor(tx, claim);
+      const definition = latestAgent(await tx.doc(CatalogDoc), actor.companyId, actor.definitionId);
+      if (!definition || definition.archived || !publicAgent(definition).capabilities?.includes("web-research"))
+        throw new RuntimeError(403, "Search is not authorized for this participant.");
+      return { companyId: actor.companyId, definitionId: actor.definitionId };
+    }, context);
+  }
+
   async authorizeWorkerMcp(claim: WorkerManagementActor, connectionId: string, toolName: string) {
     this.requireDirectoryActor(claim);
     return this.harness.commit(async tx => {

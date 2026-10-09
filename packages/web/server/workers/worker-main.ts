@@ -36,6 +36,7 @@ const models = workerModels(providers.models.getProviders(), (provider, signal) 
 const runtime = await DispatchRuntime.openConversation({
   stateDir: "/workspace/state", workspaceDir: "/workspace", companyId: bootstrap.scope.companyId,
   piStorage: bootstrap.storage, models,
+  workerSearch: (actor, query, signal) => backend("/search", { actor, query }, signal),
   workerMcp: workerMcp((operation, input, signal) => backend(`/mcp/${operation}`, input, signal)),
   peopleDirectory: { list: companyId => backend("/people", { companyId }), get: (companyId, userId) => backend("/person", { companyId, userId }) },
   attachmentStore: new RemoteAttachmentStore((operation, input) => backend(`/attachment/${operation}`, input)),
