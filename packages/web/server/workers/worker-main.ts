@@ -67,7 +67,7 @@ app.use("*", bodyLimit({ maxSize: ATTACHMENT_RPC_MAX_BYTES, onError: c => c.json
 app.get("/ready", c => c.json({ roomId, conversationId: env.DISPATCH_CONVERSATION_ID, attemptId: env.DISPATCH_WORKER_ATTEMPT_ID }));
 const rpcSchema = z.object({
   scope: z.object({ companyId: z.string(), userId: z.string() }).strict(),
-  method: z.enum(["workerInstanceResult", "exportProjectArchive", "transcriptPage", "publicDetail", "saveDefinitionOfDone", "getChat", "submit", "composing", "addParticipants", "stop", "updateChat", "renameChat", "authorizeAttachmentUpload", "uploadAttachment", "downloadAttachment"]),
+  method: z.enum(["removeParticipant", "workerInstanceResult", "exportProjectArchive", "transcriptPage", "publicDetail", "saveDefinitionOfDone", "getChat", "submit", "composing", "addParticipants", "stop", "updateChat", "renameChat", "authorizeAttachmentUpload", "uploadAttachment", "downloadAttachment"]),
   input: z.unknown().optional(), catalog: z.custom<WorkerCatalogSnapshot>(),
   membership: z.custom<import("../runtime.js").WorkerMembershipSnapshot>(),
 }).strict();
@@ -93,6 +93,10 @@ app.post("/rpc", async c => {
   await runtime.applyWorkerMembership(membership);
   let result: unknown;
   switch (method) {
+    case "removeParticipant": {
+      const { participantId } = z.object({ participantId: z.string().min(1).max(200) }).strict().parse(input);
+      result = await runtime.removeParticipant(scope, roomId, participantId); break;
+    }
     case "workerInstanceResult": {
       const { actorId } = z.object({ actorId: z.string().min(1).max(200) }).strict().parse(input);
       result = await runtime.workerInstanceResult(scope, roomId, actorId); break;

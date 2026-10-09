@@ -225,7 +225,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     async removeParticipant(scope, id, participantId) {
       return policyChange(async () => {
         await directory.removeWorkerParticipant(scope, id, participantId);
-        return snapshot(await callNow<ChatSnapshot>(scope, id, "getChat"), id);
+        return snapshot(await callNow<ChatSnapshot>(scope, id, "removeParticipant", { participantId }), id);
       });
     },
     async addParticipants(scope, id, input) {
