@@ -1,0 +1,48 @@
+# Ubuntu agent worker image
+
+The [Containerfile](Containerfile) assembles an Ubuntu development environment around a **Nix-built Dispatch worker**. Nix still pins Dispatch's Node/runtime closure; Ubuntu's package manager and project-selected runtimes are separate. This image is for conversation workers, not the backend or launcher. See the [work package](../docs/handoff.md#ubuntu-agent-image--october-9-2026) for acceptance and evidence; source/build success is not deployed qualification.
+
+## Build inputs
+
+Build Dispatch's `packages.aarch64-linux.workers-oci` or `packages.x86_64-linux.workers-oci` output for the matching Linux platform first. Preserve `/nix/store` and the worker wrapper's absolute paths; do not copy only application JavaScript or substitute Ubuntu's Node. Supply digest-pinned `DISPATCH_IMAGE`, `UBUNTU_IMAGE` and `MISE_IMAGE` references plus the matching application `SOURCE_REVISION` when assembling the image:
+
+```sh
+# Caller supplies the four variables; this example builds one native platform.
+docker build --platform linux/arm64 \
+  -f packages/web/container/Containerfile \
+  --build-arg DISPATCH_IMAGE="$DISPATCH_IMAGE" \
+  --build-arg UBUNTU_IMAGE="$UBUNTU_IMAGE" \
+  --build-arg MISE_IMAGE="$MISE_IMAGE" \
+  --build-arg SOURCE_REVISION="$SOURCE_REVISION" \
+  -t dispatch-agent:local packages/web/container
+```
+
+Build/inspect `linux/amd64` separately before publishing a multi-platform index. Record both child manifests, the index digest and source revision. Tags/default Containerfile arguments alone are not release identities. Fargate pulls images for new tasks: keep the registry in the task's region and measure startup before adding large SDK inventories. The [AWS module](../infra/aws-workers/README.md) and installation consumer own task definitions, image pins, resources and rollout; a local build does not update ECS.
+
+## Tools and project runtimes
+
+The recipe includes Bash/GNU tools, Git/SSH client, ripgrep, curl/wget, jq, archives, certificates, Python/venv/pip, C/C++ compilers, make, CMake/Ninja/pkg-config/autotools and common native-development libraries. Mise and a separate project Node are pinned in the recipe. Dispatch's own launcher does not use mise shims.
+
+`PATH` includes mise shims and conventional Ubuntu executable directories for Pi's noninteractive `/bin/bash -c` commands. No interactive shell activation is required. Preserve repository package managers, runtime files and lockfiles. For a reviewed project using mise:
+
+```sh
+mise install
+mise exec -- node --version
+npm ci
+```
+
+Mise configuration and hooks can execute project code: review/trust the selected configuration explicitly rather than automatically trusting arbitrary repositories. Other runtime versions can be installed during work; the shipped image does not preinstall every Node, Python, Go, Java, Rust, Ruby or .NET version. Exact architecture/version/native-library combinations require qualification. Keep runtime requirements in `mise.toml` (and `mise.lock` where used), alongside existing package-manager lockfiles. Ubuntu's externally managed Python should use a project venv rather than forcing global pip installation.
+
+## Installation and security boundary
+
+The development worker runs as container root with a writable Ubuntu filesystem, **not privileged mode**. Ordinary work can use `apt-get update && apt-get install -y <package>` without sudo. Ubuntu mirrors are configured for HTTPS to fit existing HTTPS package egress; no HTTP egress expansion is required. Package service-start hooks are suppressed in the recipe; this is not a full init/systemd host.
+
+The worker's home is `/root`; workspace/state are under `/workspace`. Baked mise tools/config/shims must remain visible with the actual ECS mounts: mounting an empty volume over their paths hides them. Controllers retain their separate non-root/read-only/drop-capabilities settings. Worker capabilities must permit apt's UID switching and Pi process-group cancellation; root with controller drop-ALL is not equivalent. Confirm the rendered task definition and runtime behavior, not only `USER` in the Containerfile.
+
+Coding tools can access the worker's conversation-scoped database/callback authority. Root and pinned runtime paths do not isolate collaborating agents from one another or protect worker-local credentials from their shells. Do not inject backend/launcher owner credentials, host mounts, Docker sockets or ECS-control authority. Nested privileged Docker workloads need a separately reviewed remote builder or another execution environment; they are not supported merely by installing a Docker CLI on Fargate.
+
+## Replacement and base-image evolution
+
+Runtime package installs modify this task's writable filesystem, **not the published image**. They disappear on fresh-task replacement unless reproduced. Home/Git capture alone cannot preserve apt changes under `/usr`, `/etc` and `/var/lib/dpkg`; the current worker policy does not promise full-filesystem snapshots.
+
+Record useful installations in versioned project setup scripts; promote recurring tools into this Containerfile. Commit/push useful source progress and publish durable artifacts through the supported artifact tools. Local commits, dependencies and unpushed files remain disposable; retained Pi history is not a complete filesystem journal and completed tools must not be blindly replayed. Keep preparation out of warm message/read paths. Pi still owns execution/recovery, and replacement still requires confirmed old-task termination.
