@@ -179,3 +179,43 @@ Unknown outcomes must be investigated, never blindly recreated/reset.
 Both engines' synthetic optional-initializer module plans agree on eight extra
 AWS resources and no scheduled operator service. Runtime helper/RDS compatibility
 is separate application work; no live invocation is established by these plans.
+
+## Optional private credential-maintenance terminal
+
+`credential_maintenance = {environment, secrets}` (default null) registers an
+**unscheduled** operator task and an isolated temporary ECS cluster. It adds ten
+resources: cluster, task definition, two IAM roles/policies, SG and three network
+rules. It never starts a task or changes application/worker Exec settings. Its
+execution role can fetch only declared secret ARNs and the installation image;
+the task role has only the four resource-unscopable `ssmmessages` channel actions.
+Declare only the authority required by the credential CLI, never the RDS master.
+
+Its private SG permits SQL to this RDS instance and HTTPS egress; no inbound or
+controller access is opened. The task uses 0.5 vCPU/2 GiB, the same native image
+and secret-free volume initializer. It waits without starting an application
+server. Review caller-specific task/usage costs and stop it explicitly; no idle
+retirement or spending cap is implied.
+
+ECS Exec always starts as root. Only this operator container has a writable
+**ephemeral** root and default capabilities so the fixed command can clear
+supplementary groups and drop GID/UID to 65532 before bootstrap. Bootstrap must
+create fresh private files under that UID. Never chown existing inputs or delete
+collision evidence to retry. Ordinary application containers retain their
+read-only roots and dropped capabilities.
+
+Verify the dedicated cluster's Exec logging is `NONE` and neither container has
+a log driver before invoking it. Keep the terminal private and unrecorded.
+CloudTrail still records the Exec command: use fixed CLI/config/provider arguments
+only, never OAuth URLs/codes, passwords or tokens. Native Pi owns hidden prompts,
+callback/exchange and persistence; do not implement an alternative exchange or
+copy another installation's auth files.
+
+Terraform requires backend desired zero and no database initializer; it cannot
+prove owner termination. Independently confirm exact backend and prior maintenance
+executors **STOPPED** before RunTask, preserve a single-dispatch intent, and never
+retry an ambiguous command. A separate CLI process can finish while its container
+still waits: verify its joined completion/owner cleanup independently of a later
+container stop. Then confirm exact task STOPPED before normal flag-free backend
+startup. Missing inventory, desired zero and closed terminal transport are not
+retirement proof. Remove the optional input through a reviewed plan to delete the
+temporary cluster/task/IAM/SG resources without touching retained credential data.
