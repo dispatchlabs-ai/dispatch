@@ -153,9 +153,22 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
         .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
     },
     async saveAgent(scope, input) {
-      if (!input.applyConnectionsToExisting) return directory.saveAgent(scope, input);
       return policyChange(async () => {
         const result = await directory.saveAgent(scope, input);
+        await acknowledgePolicy(scope.companyId);
+        return result;
+      });
+    },
+    async applyGitHubBundle(scope, input) {
+      return policyChange(async () => {
+        const result = await directory.applyGitHubBundle(scope, input);
+        await acknowledgePolicy(scope.companyId);
+        return result;
+      });
+    },
+    async archiveAgent(scope, id, revision) {
+      return policyChange(async () => {
+        const result = await directory.archiveAgent(scope, id, revision);
         await acknowledgePolicy(scope.companyId);
         return result;
       });
@@ -260,7 +273,6 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     removeParticipant: directory.removeParticipant.bind(directory),
     listGitHubBundles: directory.listGitHubBundles.bind(directory),
     previewGitHubBundle: directory.previewGitHubBundle.bind(directory),
-    applyGitHubBundle: directory.applyGitHubBundle.bind(directory),
     exportBundle: directory.exportBundle.bind(directory),
     previewBundle: directory.previewBundle.bind(directory),
     importBundle: directory.importBundle.bind(directory),
@@ -268,7 +280,6 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     evaluationProfileRevision: directory.evaluationProfileRevision.bind(directory),
     saveEvaluationProfile: directory.saveEvaluationProfile.bind(directory),
     agentConnections: directory.agentConnections.bind(directory),
-    archiveAgent: directory.archiveAgent.bind(directory),
     createProject: directory.createProject.bind(directory),
     getSkill: directory.getSkill.bind(directory),
     listAgents: directory.listAgents.bind(directory),
