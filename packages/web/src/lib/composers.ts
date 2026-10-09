@@ -75,7 +75,7 @@ export function useComposers(onSnapshot: (snapshot: ChatSnapshot) => void) {
         agentMentions: previous?.agentMentions ?? mentions.filter(id => id.startsWith(agentMentionPrefix)).map(id => id.slice(agentMentionPrefix.length)),
       };
       const request = state.request?.requestId === command.requestId ? state.request : { requestId: command.requestId, version: state.version };
-      update(key, { ...state, request, pending: { ...command, sending: true }, error: undefined });
+      update(key, { ...state, text: "", request, pending: { ...command, sending: true }, error: undefined });
       try {
         onSnapshot(await api<ChatSnapshot>(`/api/chats/${encodeURIComponent(conversationId)}/messages`, command));
         const latest = get(key);
@@ -88,10 +88,12 @@ export function useComposers(onSnapshot: (snapshot: ChatSnapshot) => void) {
         const latest = get(key);
         if (latest.request?.requestId !== command.requestId) return;
         const message = errorMessage(error);
+        // Restore only the submitted edit; never replace a newer draft.
+        const restored = latest.version === request.version ? { ...latest, text: state.text } : latest;
         if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429) {
-          update(key, { ...latest, request: undefined, pending: undefined, error: message });
+          update(key, { ...restored, request: undefined, pending: undefined, error: message });
         } else {
-          update(key, { ...latest, pending: { ...command, sending: false, error: message } });
+          update(key, { ...restored, pending: { ...command, sending: false, error: message } });
         }
       }
     },

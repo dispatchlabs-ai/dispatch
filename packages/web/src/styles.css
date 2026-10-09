@@ -1163,3 +1163,6 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .archived-message header { display: flex; flex-wrap: wrap; gap: .5rem; }
 .archived-message time { color: var(--color-muted); font-size: var(--text-sm); }
 .archived-message pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; max-width: 80ch; margin-block: .75rem; }
+
+.pending-message { align-self: flex-end; margin-left: auto; width: min(100%, 42rem); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-aqua-soft); }
+.pending-message-text { max-height: 10rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-sm); }
