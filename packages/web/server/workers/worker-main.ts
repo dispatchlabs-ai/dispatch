@@ -37,6 +37,7 @@ const models = workerModels(providers.models.getProviders(), (provider, signal) 
 const runtime = await DispatchRuntime.openConversation({
   stateDir: "/workspace/state", workspaceDir: "/workspace", companyId: bootstrap.scope.companyId,
   piStorage: bootstrap.storage, models,
+  workerParticipants: { report: report => backend("/participants/report", report) },
   workerSearch: (actor, query, signal) => backend("/search", { actor, query }, signal),
   workerMcp: workerMcp((operation, input, signal) => backend(`/mcp/${operation}`, input, signal)),
   peopleDirectory: { list: companyId => backend("/people", { companyId }), get: (companyId, userId) => backend("/person", { companyId, userId }) },
@@ -62,7 +63,7 @@ app.use("*", bodyLimit({ maxSize: ATTACHMENT_RPC_MAX_BYTES, onError: c => c.json
 app.get("/ready", c => c.json({ roomId, conversationId: env.DISPATCH_CONVERSATION_ID, attemptId: env.DISPATCH_WORKER_ATTEMPT_ID }));
 const rpcSchema = z.object({
   scope: z.object({ companyId: z.string(), userId: z.string() }).strict(),
-  method: z.enum(["exportProjectArchive", "transcriptPage", "publicDetail", "saveDefinitionOfDone", "getChat", "submit", "composing", "addParticipants", "stop", "updateChat", "renameChat", "authorizeAttachmentUpload", "uploadAttachment", "downloadAttachment"]),
+  method: z.enum(["workerInstanceResult", "exportProjectArchive", "transcriptPage", "publicDetail", "saveDefinitionOfDone", "getChat", "submit", "composing", "addParticipants", "stop", "updateChat", "renameChat", "authorizeAttachmentUpload", "uploadAttachment", "downloadAttachment"]),
   input: z.unknown().optional(), catalog: z.custom<WorkerCatalogSnapshot>(),
   membership: z.custom<import("../runtime.js").WorkerMembershipSnapshot>(),
 }).strict();
@@ -88,6 +89,10 @@ app.post("/rpc", async c => {
   await runtime.applyWorkerMembership(membership);
   let result: unknown;
   switch (method) {
+    case "workerInstanceResult": {
+      const { actorId } = z.object({ actorId: z.string().min(1).max(200) }).strict().parse(input);
+      result = await runtime.workerInstanceResult(scope, roomId, actorId); break;
+    }
     case "exportProjectArchive": {
       const { projectId } = z.object({ projectId: z.string().uuid() }).strict().parse(input);
       result = await runtime.exportProjectArchive(scope, projectId, [roomId]); break;

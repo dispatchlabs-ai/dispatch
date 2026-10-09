@@ -5,7 +5,7 @@ import { isIPv4 } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { DispatchRuntime, RuntimeError } from "../runtime.js";
 import type { RuntimeService } from "../runtime-service.js";
-import type { ChatSnapshot, RuntimeScope } from "../../src/shared/contracts.js";
+import type { ChatSnapshot, RuntimeScope, CreateAgentInstanceResult } from "../../src/shared/contracts.js";
 import { WorkerRoutes, type WorkerRoute } from "./routes.js";
 import { workerToken } from "./identity.js";
 import { decodeAttachmentBytes } from "./attachments.js";
@@ -215,6 +215,19 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     async getChat(scope, id) { return snapshot(await call<ChatSnapshot>(scope, id, "getChat"), id); },
     async submit(scope, id, input) { return call(scope, id, "submit", input); },
     async composing(scope, id, input) { return call(scope, id, "composing", input); },
+    async createAgentInstance(scope, id, input) {
+      return policyRead(async () => {
+        const admitted = await directory.admitWorkerInstance(scope, id, input);
+        const result = await callNow<CreateAgentInstanceResult>(scope, id, "workerInstanceResult", { actorId: admitted.actorId });
+        return { ...snapshot(result, id), createdParticipantId: result.createdParticipantId };
+      });
+    },
+    async removeParticipant(scope, id, participantId) {
+      return policyChange(async () => {
+        await directory.removeWorkerParticipant(scope, id, participantId);
+        return snapshot(await callNow<ChatSnapshot>(scope, id, "getChat"), id);
+      });
+    },
     async addParticipants(scope, id, input) {
       await directory.inviteWorkerParticipants(scope, id, input);
       return snapshot(await call<ChatSnapshot>(scope, id, "getChat"), id);
@@ -269,8 +282,6 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
   return {
     importProjectArchive: directory.importProjectArchive.bind(directory),
     getProjectArchive: directory.getProjectArchive.bind(directory),
-    createAgentInstance: directory.createAgentInstance.bind(directory),
-    removeParticipant: directory.removeParticipant.bind(directory),
     listGitHubBundles: directory.listGitHubBundles.bind(directory),
     previewGitHubBundle: directory.previewGitHubBundle.bind(directory),
     exportBundle: directory.exportBundle.bind(directory),
