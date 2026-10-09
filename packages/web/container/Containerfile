@@ -34,11 +34,11 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
 
 # Project commands use mise shims even in /bin/bash -c (no login/rc hooks).
 # Dispatch's wrapper uses its own absolute Nix Node path, never these shims.
-ENV HOME=/data/home \
-    MISE_DATA_DIR=/data/home/.local/share/mise \
-    MISE_CONFIG_DIR=/data/home/.config/mise \
-    MISE_CACHE_DIR=/data/home/.cache/mise \
-    PATH=/data/home/.local/share/mise/shims:/data/home/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+ENV HOME=/root \
+    MISE_DATA_DIR=/root/.local/share/mise \
+    MISE_CONFIG_DIR=/root/.config/mise \
+    MISE_CACHE_DIR=/root/.cache/mise \
+    PATH=/root/.local/share/mise/shims:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     LANG=C.UTF-8 \
     DISPATCH_WORKSPACE_DIR=/workspace \
     DISPATCH_DATA_DIR=/workspace/state \
