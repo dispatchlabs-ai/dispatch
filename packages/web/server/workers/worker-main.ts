@@ -62,7 +62,7 @@ app.use("*", bodyLimit({ maxSize: ATTACHMENT_RPC_MAX_BYTES, onError: c => c.json
 app.get("/ready", c => c.json({ roomId, conversationId: env.DISPATCH_CONVERSATION_ID, attemptId: env.DISPATCH_WORKER_ATTEMPT_ID }));
 const rpcSchema = z.object({
   scope: z.object({ companyId: z.string(), userId: z.string() }).strict(),
-  method: z.enum(["transcriptPage", "publicDetail", "saveDefinitionOfDone", "getChat", "submit", "composing", "addParticipants", "stop", "updateChat", "renameChat", "authorizeAttachmentUpload", "uploadAttachment", "downloadAttachment"]),
+  method: z.enum(["exportProjectArchive", "transcriptPage", "publicDetail", "saveDefinitionOfDone", "getChat", "submit", "composing", "addParticipants", "stop", "updateChat", "renameChat", "authorizeAttachmentUpload", "uploadAttachment", "downloadAttachment"]),
   input: z.unknown().optional(), catalog: z.custom<WorkerCatalogSnapshot>(),
   membership: z.custom<import("../runtime.js").WorkerMembershipSnapshot>(),
 }).strict();
@@ -88,6 +88,10 @@ app.post("/rpc", async c => {
   await runtime.applyWorkerMembership(membership);
   let result: unknown;
   switch (method) {
+    case "exportProjectArchive": {
+      const { projectId } = z.object({ projectId: z.string().uuid() }).strict().parse(input);
+      result = await runtime.exportProjectArchive(scope, projectId, [roomId]); break;
+    }
     case "uploadAttachment": {
       const file = z.object({ name: z.string().max(4096), mimeType: z.string().max(256), dataBase64: z.string() }).strict().parse(input);
       result = await runtime.uploadAttachment(scope, roomId, new File([new Uint8Array(decodeAttachmentBytes(file.dataBase64))], file.name, { type: file.mimeType })); break;
