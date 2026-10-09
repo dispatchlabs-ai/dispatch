@@ -156,8 +156,8 @@ function ActivityDetail({ activity, participants, chatId }: { activity: Particip
   }, [open, activity.detail?.version, before, url, api]);
   if (!activity.detail) return <PublicActivity activity={activity} participants={participants} />;
   const name = participants.find(person => person.id === activity.participantId)?.name ?? "Agent";
-  return <section className="conversation-entry participant-activity"><div className="participant-body">
-    <Button variant="ghost" aria-expanded={open} onClick={() => setOpen(value => !value)}>{name} · {activity.detail.active ? "Working" : "Activity"} · {activity.detail.count} records</Button>
+  return <section className="conversation-entry participant-activity activity-detail"><div className="participant-body">
+    <Button variant="ghost" className="button-compact" aria-expanded={open} onClick={() => setOpen(value => !value)}>{name} · {activity.detail.active ? "Working" : "Activity"} · {activity.detail.count} records</Button>
     {open ? <>
       {error ? <Notice>{error}</Notice> : null}
       {!page ? <Spinner label="Loading activity" /> : <>

@@ -2,7 +2,7 @@
 
 ## Unreleased — borderless activity labels
 
-- Remove the visible box around agent activity labels while retaining click-to-expand, hover feedback and keyboard focus styling.
+- Remove the visible box around agent activity labels while retaining click-to-expand, hover feedback and keyboard focus styling. Tighten activity-only row spacing and label padding, retaining 44 px touch targets.
 
 ## Unreleased — chat completion guidance
 
