@@ -1359,12 +1359,15 @@ export class DispatchRuntime {
       const info = await stat(normalize(cwd)).catch(() => undefined);
       if (!info?.isDirectory()) throw new RuntimeError(400, "Working directory must be an existing directory on the service host.");
     }
-    await Promise.all(input.members.map(member => this.person(scope.companyId, member.userId)));
     return this.harness.commit(async tx => {
       const prior = await replay(tx);
       if (prior) return prior;
       const current = await requireProjectAccess(tx, scope, id, "manage", this.readAll(scope));
       if (current.revision !== input.expectedRevision) throw new RuntimeError(409, "Project changed. Reload before saving.");
+      // Recovery can temporarily hide an existing account from the people directory.
+      // Only additions and role changes require a currently available company member.
+      await Promise.all(input.members.filter(member => !current.members.some(existing => existing.userId === member.userId && existing.role === member.role))
+        .map(member => this.person(scope.companyId, member.userId)));
       const catalog = await tx.doc(CatalogDoc);
       for (const agentId of input.defaultAgentDefinitionIds) this.findAgent(catalog, scope, agentId);
       const project: SharedProjectRecord = { ...current, name: input.name, members: input.members, defaultAgentDefinitionIds: input.defaultAgentDefinitionIds,
@@ -1525,8 +1528,22 @@ export class DispatchRuntime {
       const catalog = await tx.doc(CatalogDoc);
       const chat = catalog.chats.find(item => item.id === id && item.companyId === scope.companyId)!;
       const room = await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
+      const project = room.sharedProjectId ? (await tx.doc(ProjectsDoc)).projects[room.sharedProjectId] : undefined;
+      if (project && !this.directoryOnly) {
+        // Record project participants before they speak. This preserves their identity for
+        // later message attribution; current project policy still owns all access decisions.
+        const known = new Set(room.members.filter(member => member.kind === "human").map(member => member.userId));
+        const people = await Promise.all(project.members.filter(member => !known.has(member.userId))
+          .map(member => this.peopleDirectory?.get(scope.companyId, member.userId)));
+        for (const person of people) if (person) {
+          room.members.push({ id: `human:${person.id}`, kind: "human", userId: person.id, name: person.name, joinedAt: Date.now(), status: "idle" });
+        }
+      }
       const presentation = await this.shared.presentation(tx, nativeId(id));
       for (const participant of presentation.participants) {
+        if (participant.kind === "human" && project) {
+          participant.membership = project.members.some(member => member.userId === participant.userId) ? "active" : "removed";
+        }
         if (participant.kind !== "agent" || participant.membership !== "active") continue;
         const latest = latestAgent(catalog, scope.companyId, participant.agentDefinitionId);
         participant.savedAgentRevision = latest && !latest.archived ? latest.revision : participant.agentRevision;

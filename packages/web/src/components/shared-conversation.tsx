@@ -149,7 +149,7 @@ export function ConversationComposer({ id, chatId, active = true, draft, pending
   thread?: boolean; conversationTitle?: string; disabled?: boolean; children?: ReactNode;
 }) {
   const mentionPeople = useMemo(() => [
-    ...participants.filter(person => person.kind === "human" || person.membership === "active"),
+    ...participants.filter(person => person.kind === "human" ? person.membership !== "removed" : person.membership === "active"),
     ...agents.filter(agent => !agent.archived && !participants.some(person => person.kind === "agent" && person.membership !== "removed" && person.agentDefinitionId === agent.id))
       .map(agent => ({ id: `${agentMentionPrefix}${agent.id}`, name: agent.name, kind: "agent" as const, inviteOnSend: true })),
   ], [participants, agents]);
@@ -217,7 +217,7 @@ export function SharedContextPanel({ criteriaDraft, onCriteriaDraft, snapshot, a
       <Button className="invite-participants" variant="secondary" disabled={snapshot.conversation.canParticipate === false} onClick={onInvite}><UserPlus size={18} /> Add participants</Button>
       <Button variant="secondary" disabled={snapshot.conversation.canParticipate === false || !agents.some(agent => !agent.archived)} onClick={() => onAddInstance()}><UserPlus size={18} /> Add agent instance</Button>
       <div className="participant-list">{snapshot.participants.map(member => <button type="button" className={`participant-row ${participant?.id === member.id ? "selected" : ""}`} key={member.id} onClick={() => setSelectedId(member.id)} aria-pressed={participant?.id === member.id}>
-        <ParticipantAvatar kind={member.kind} name={member.name} /><span className="participant-choice-copy"><strong>{mentionLabel(member, snapshot.participants)}</strong><span>{member.kind === "agent" ? `Agent · ${agentStatus(member)}` : `${state?.state === "authenticated" && state.user.id === member.userId ? "You" : "Person"}${member.status === "typing" ? " · Typing" : ""}`}</span></span>
+        <ParticipantAvatar kind={member.kind} name={member.name} /><span className="participant-choice-copy"><strong>{mentionLabel(member, snapshot.participants)}</strong><span>{member.kind === "agent" ? `Agent · ${agentStatus(member)}` : member.membership === "removed" ? "Former member" : `${state?.state === "authenticated" && state.user.id === member.userId ? "You" : "Person"}${member.status === "typing" ? " · Typing" : ""}`}</span></span>
       </button>)}</div>
       <p className="history-access"><LockKeyhole size={14} /> {snapshot.conversation.sharedProjectId ? "Current project members can read the full history. Listed authors may include former members." : "Active participants can read the full public history."}</p>
       {participant ? <section className="participant-details">

@@ -59,6 +59,8 @@ export interface HumanParticipant extends ParticipantIdentity {
   kind: "human";
   userId: string;
   status: "idle" | "typing";
+  /** Current project membership; omitted for standalone chats and older snapshots. */
+  membership?: "active" | "removed";
 }
 
 export interface AgentParticipant extends ParticipantIdentity {

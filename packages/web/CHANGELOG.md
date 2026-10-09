@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — project participants and sign-in diagnostics
+
+- Include current project members in chat Participants and inline mention choices before their first message; preserve former authors and reject new mentions after project removal.
+- Allow project changes while an existing member recovers their account, preserving that member's unchanged identity and role.
+- Record structured authentication failures with browser context, safe passkey rejection categories and a user-visible support reference.
+
 ## Unreleased — borderless activity labels
 
 - Remove the visible box around agent activity labels while retaining click-to-expand, hover feedback and keyboard focus styling. Tighten activity-only row spacing and label padding, retaining 44 px touch targets.

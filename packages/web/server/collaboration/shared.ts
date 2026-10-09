@@ -12,7 +12,7 @@ import {
 import type {
   Attachment, AgentConnection, AgentParticipant, CreateAgentInstanceInput, ConversationMessage, ConversationParticipant, ParticipantActivity, SendMessageInput, RuntimeScope,
 } from "../../src/shared/contracts.js";
-import { requireProjectAccess, type ProjectAction } from "../project-access.js";
+import { ProjectsDoc, requireProjectAccess, type ProjectAction } from "../project-access.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata, messageAttachments } from "../attachments.js";
 import { managementTools } from "../agent-management.js";
 import { createDefinitionOfDone, CRITERIA_EXTENSION } from "./definition-of-done.js";
@@ -350,7 +350,7 @@ export class SharedConversations {
           const proposedThread = args.threadId === undefined ? member.threadId ?? null : args.threadId;
           const threadId = proposedThread ? room.messageAliases?.[proposedThread] ?? proposedThread : null;
           if (threadId && !messages.some(message => message.id === threadId && message.threadId === null && message.kind === "message")) throw new CollaborationError(400, "Reply thread not found.");
-          if (args.mentions?.some(id => !room.members.some(member => member.id === id && activeMember(member)))) throw new CollaborationError(400, "Mentioned participant is no longer active in this conversation.");
+          await this.validateMentions(tx, room, args.mentions ?? []);
           // Even a post-only round settles before admission. Mixed siblings never hold the turn.
           if (revising) {
             reviewing.draft = { text: args.text, threadId: args.threadId === undefined ? reviewing.draft.threadId : args.threadId, mentions: args.mentions ?? reviewing.draft.mentions, attachmentIds, createdAt: Date.now() };
@@ -747,6 +747,16 @@ export class SharedConversations {
     return member;
   }
 
+  private async validateMentions(tx: Tx, room: SharedState, mentions: string[]) {
+    if (!mentions.length) return;
+    const project = room.sharedProjectId ? (await tx.doc(ProjectsDoc)).projects[room.sharedProjectId] : undefined;
+    if (mentions.some(id => {
+      const member = room.members.find(member => member.id === id);
+      return !activeMember(member) || (member?.kind === "human" && room.sharedProjectId !== undefined
+        && !project?.members.some(person => person.userId === member.userId));
+    })) throw new CollaborationError(400, "Mentioned participant is no longer active in this conversation.");
+  }
+
   async messages(roomId: ConversationId, ctx = context): Promise<MessageData[]> {
     const entries: EntryRecord[] = []; let cursor: Cursor | undefined;
     do { const page = await this.storage.scanEntries({ conversationId: roomId }, 200, cursor, ctx); entries.push(...page.items); cursor = page.next; } while (cursor);
@@ -814,7 +824,7 @@ export class SharedConversations {
     // Keep the original request fingerprint, but accept a saved draft targeting a reconciled duplicate.
     if (normalized.threadId) normalized.threadId = room.messageAliases?.[normalized.threadId] ?? normalized.threadId;
     if (normalized.threadId && !messages.some(message => message.id === normalized.threadId && message.threadId === null && message.kind === "message")) throw new CollaborationError(400, "Reply thread not found.");
-    if (normalized.mentions.some(id => !room.members.some(member => member.id === id && activeMember(member)))) throw new CollaborationError(400, "Mentioned participant is no longer active in this conversation.");
+    await this.validateMentions(tx, room, normalized.mentions);
     if (ids.length && author.kind !== "human") throw new CollaborationError(400, "Only uploaders may attach files.");
     const attachments = await messageAttachments(tx, roomId, author.userId!, ids);
     if (agentMentions.length) {

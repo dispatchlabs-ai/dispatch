@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
@@ -33,6 +33,7 @@ import {
 } from "./auth/crypto.js";
 import { AuthStore, type AsyncAuthStore } from "./auth/store.js";
 import { PostgresAuthStore } from "./auth/postgres.js";
+import { authenticationFailureContext, passkeyVerificationFailure } from "./auth/diagnostics.js";
 import type { ClientConfig } from "pg";
 
 const MINUTE = 60_000;
@@ -139,12 +140,12 @@ interface Pending extends Omit<PendingRow, "data"> {
 }
 
 class AuthError extends Error {
-  constructor(readonly status: number, readonly code: string, message: string) {
+  constructor(readonly status: number, readonly code: string, message: string, readonly diagnostic?: string) {
     super(message);
   }
 }
 
-const invalidAuthentication = () => new AuthError(401, "AUTHENTICATION_FAILED", "The credentials or verification code were not accepted.");
+const invalidAuthentication = (diagnostic?: string) => new AuthError(401, "AUTHENTICATION_FAILED", "The credentials or verification code were not accepted.", diagnostic);
 const expiredFlow = () => new AuthError(401, "FLOW_EXPIRED", "This authentication step has expired. Start again.");
 
 function stringField(body: Record<string, unknown>, key: string, maximum = 1024): string {
@@ -754,10 +755,12 @@ export class AuthService {
         requireUserPresence: true,
         requireUserVerification: true,
       });
-      if (!result.verified || !result.registrationInfo.userVerified) throw invalidAuthentication();
+      if (!result.verified) throw invalidAuthentication("registration_not_verified");
+      if (!result.registrationInfo.userVerified) throw invalidAuthentication("user_verification_missing");
       return result;
-    } catch {
-      throw invalidAuthentication();
+    } catch (error) {
+      if (error instanceof AuthError) throw error;
+      throw invalidAuthentication(passkeyVerificationFailure(error));
     }
   }
 
@@ -805,11 +808,13 @@ export class AuthService {
     const response = body.response as AuthenticationResponseJSON | undefined;
     const credential = typeof response?.id === "string" ? await this.store.one<PasskeyRow>("SELECT * FROM auth_passkeys WHERE id = ?", response.id) : undefined;
     const user = credential ? await this.user(credential.user_id) : undefined;
-    if (!credential || !user || user.status !== "active") throw invalidAuthentication();
+    if (!credential) throw invalidAuthentication("unknown_passkey");
+    if (!user || user.status !== "active") throw invalidAuthentication("inactive_account");
     const rate = await this.rateLimit("passkey", user.id);
     let verification;
     try {
-      if (response?.response.userHandle !== Buffer.from(user.id).toString("base64url")) throw invalidAuthentication();
+      if (!response?.response?.userHandle) throw invalidAuthentication("user_handle_missing");
+      if (response.response.userHandle !== Buffer.from(user.id).toString("base64url")) throw invalidAuthentication("user_handle_mismatch");
       verification = await verifyAuthenticationResponse({
         response: response!,
         expectedChallenge: challenge,
@@ -818,14 +823,16 @@ export class AuthService {
         requireUserVerification: true,
         credential: { id: credential.id, publicKey: new Uint8Array(Buffer.from(credential.public_key, "base64url")), counter: credential.counter, transports: JSON.parse(credential.transports) as AuthenticatorTransport[] },
       });
-      if (!verification.verified || !verification.authenticationInfo.userVerified) throw invalidAuthentication();
-    } catch {
-      throw invalidAuthentication();
+      if (!verification.verified) throw invalidAuthentication("signature_invalid");
+      if (!verification.authenticationInfo.userVerified) throw invalidAuthentication("user_verification_missing");
+    } catch (error) {
+      if (error instanceof AuthError) throw error;
+      throw invalidAuthentication(passkeyVerificationFailure(error));
     }
     const result = await this.store.transaction(async () => {
       await this.requireCurrentPending(pending);
       await this.currentUser(user, "active");
-      if (!(await this.store.run("UPDATE auth_passkeys SET counter = ?, device_type = ?, backed_up = ? WHERE id = ? AND counter = ?", verification.authenticationInfo.newCounter, verification.authenticationInfo.credentialDeviceType, verification.authenticationInfo.credentialBackedUp ? 1 : 0, credential.id, credential.counter))) throw invalidAuthentication();
+      if (!(await this.store.run("UPDATE auth_passkeys SET counter = ?, device_type = ?, backed_up = ? WHERE id = ? AND counter = ?", verification.authenticationInfo.newCounter, verification.authenticationInfo.credentialDeviceType, verification.authenticationInfo.credentialBackedUp ? 1 : 0, credential.id, credential.counter))) throw invalidAuthentication("credential_changed");
       return await this.createSession(user, request, headers);
     });
     await this.clearRateLimit(rate);
@@ -944,10 +951,13 @@ export class AuthService {
       } catch (error) {
         headers.delete("set-cookie");
         const known = error instanceof AuthError;
-        if (!known) console.error("Authentication request failed:", error instanceof Error ? error.message : "Unknown error");
         const status = known ? error.status : 500;
         const message = known ? error.message : "Authentication could not be completed. Try again or contact your operator.";
-        return new Response(JSON.stringify({ error: { code: known ? error.code : "INTERNAL_ERROR", message } }), { status, headers });
+        const code = known ? error.code : "INTERNAL_ERROR";
+        const reference = randomUUID();
+        console.warn(JSON.stringify({ event: "authentication_failed", reference, method: request.method, path, status, code,
+          reason: known ? error.diagnostic ?? error.code.toLowerCase() : "internal_error", ...authenticationFailureContext(request) }));
+        return new Response(JSON.stringify({ error: { code, message: `${message} Reference: ${reference}`, reference } }), { status, headers });
       }
     });
   }
