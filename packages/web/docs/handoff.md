@@ -1,5 +1,11 @@
 # Dispatch Web implementation handoff
 
+## Live agent indicator and neutral pending prompt — October 9, 2026
+
+Chris requested replacing Activity/Working disclosure labels with a small current-work animation that stops on completion, and removing the teal pending-prompt treatment. Reuse ConversationPresence's current participant-status projection and existing spinner, with agent names only visually and status retained for assistive technology. Listening remains a static icon. Recorded tool disclosures retain their name, arrow, accessible label, expansion and Retry; no historical activity drives animation. The pending prompt becomes transparent while preserving its border, content and Sending/Retry controls.
+
+Acceptance: live working/responding indicators disappear on idle/silent/stopped/failed or inactive membership; listening is distinct and static; historical disclosure labels and record counts are absent; existing reduced-motion CSS disables continuous animation; pending send has no teal surface without losing draft/retry behavior. Source/deslop review confirms these branches with no timers, new working-state cache or Pi lifecycle changes; removed the unused historical activity-status CSS rule. TypeScript/application checks and Apple Silicon Nix build/flake evaluation passed (zero declared flake checks on this revision). Desktop/390 px rendering, keyboard/touch, runtime state transitions and motion remain unverified because installed agent-browser is 0.15.1 versus assigned 0.38.2 guidance. No browser tooling upgrade or deployment is included.
+
 ## Activity disclosure recovery — October 9, 2026
 
 Chris requested removing all activity record counts and fixing stale empty activity disclosures and failed loads. Scope: omit empty live-only activity from browser timeline inputs/reconciliation while retaining loaded nonempty historical pages; resolve settled group identities from sanitized committed projections for detail requests; separate actual request loading from page availability, offer Retry and retain previously loaded output during same-page refresh. No native Pi lifecycle/storage or authorization changes.

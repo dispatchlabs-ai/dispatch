@@ -1,5 +1,6 @@
 import type { ActivityPage } from "../shared/activity-page";
 import { ToolActivityView } from "./tool-activity";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { Markdown } from "./markdown";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -162,7 +163,7 @@ function ActivityDetail({ activity, participants, chatId }: { activity: Particip
   if (!activity.detail) return <PublicActivity activity={activity} participants={participants} />;
   const name = participants.find(person => person.id === activity.participantId)?.name ?? "Agent";
   return <section className="conversation-entry participant-activity activity-detail"><div className="participant-body">
-    <Button variant="ghost" className="button-compact" aria-expanded={open} onClick={() => setOpen(value => !value)}>{name} · {activity.detail.active ? "Working" : "Activity"}</Button>
+    <Button variant="ghost" className="button-compact" aria-label={`Tool details for ${name}`} aria-expanded={open} onClick={() => setOpen(value => !value)}>{open ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronRight size={15} aria-hidden="true" />}{name}</Button>
     {open ? <>
       {error ? <Notice>{error}<Button variant="secondary" onClick={() => setAttempt(value => value + 1)}>Retry</Button></Notice> : null}
       {loading && !page ? <Spinner label="Loading activity" /> : null}
