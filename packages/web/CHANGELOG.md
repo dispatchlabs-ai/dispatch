@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — hosted request-path hotfix
+
+- Reuse verified warm worker routes instead of repeating AWS activation checks; preserve per-request membership authorization and fenced recovery.
+- Return message submission and its snapshot in one worker RPC, and avoid discarded directory transcript projections.
+- Clear submitted text immediately into a Sending preview; restore rejected/uncertain messages with their mention metadata and existing retry identity. The composer remains read-only during submission.
+- Source/build checked; deployment and bounded browser evidence belong to the [hotfix handoff](docs/handoff.md#hosted-request-path-hotfix--october-9-2026). Broader performance profiling is deferred.
+
 ## Unreleased — agent criteria editing
 
 - Add opt-in Edit Definition of Done capability with current-chat read/write tool, revision protection and durable retry receipts. Disabled by default; existing instances adopt capability changes at safe idle boundaries.
