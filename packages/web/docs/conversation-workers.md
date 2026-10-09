@@ -8,7 +8,7 @@ The backend owns authenticated HTTP/SSE, company/project directories, definition
 
 The existing runtime combines catalog and conversation mutations in Pi transactions. Splitting those transactions requires explicit durable command receipts and revisioned catalog propagation; copying a whole catalog into workers without update/revocation semantics is not sufficient. Preserve membership checks, connection revocation, management grants and apply-to-existing behavior. Native single-runtime mode stays supported.
 
-**Rolling-deployment scope change, October 9, 2026; implementation pending:**
+**Rolling-deployment scope change, October 9, 2026; candidate under review:**
 Chris authorized safe controller overlap. The original single-owner rehearsal and
 ordered installation-drain procedure below remain historical/current fallback
 contracts, not a rule that all HTTP processes must stop for every future update.
@@ -258,6 +258,37 @@ These entrypoints exist in source; their presence does not establish a running s
 | `dispatch-backend` | `build/service/server/workers/backend-main.js` | Normal Dispatch configuration plus `DISPATCH_BACKEND_WORKERS_CONFIG_FILE` |
 | `dispatch-launcher` | `build/service/server/workers/control-main.js` | `DISPATCH_LAUNCHER_CONFIG_FILE` |
 | `dispatch-worker` | `build/service/server/workers/worker-main.js` | Trusted driver-generated environment; internal port 8831 |
+
+**Candidate rolling-controller configuration (`31b357e`; not rollout acceptance).**
+Backend and launcher entrypoints opt into planned handover when
+`DISPATCH_CONTROLLER_CONFIG_FILE` names a restricted JSON file. Their existing
+owner configuration remains required; omitting this variable retains the legacy
+entrypoint path. The additional file has these fields:
+
+- Required `databaseConfigFile`, `tokenFile` and integer `port` (1–65535).
+  The database file uses `{installationId, databaseUrlFile, databaseCaFile}` and
+  selects the role's scoped PostgreSQL database with verified TLS. Provision a
+  separate controller peer token; the trimmed secret must contain 43–256
+  URL-safe alphanumeric, underscore or hyphen characters. Do not reuse worker
+  derivation keys or publish token values.
+- Optional `host` defaults to `0.0.0.0`. Optional `endpoint` identifies this exact
+  listener, not an ALB or shared discovery name, and must match its port. When
+  omitted, startup reads `ECS_CONTAINER_METADATA_URI_V4`, requires exactly one
+  `awsvpc` IPv4 address, and derives the direct URL using `port` and listener TLS.
+- Optional listener `tls: {keyFile, certFile}` requires
+  `peerTls: {caFile, serverName}`. Peer HTTPS verifies the supplied CA and expected
+  certificate DNS identity while connecting to the selected task address;
+  listener and peer transport must agree. File fields above use absolute paths.
+  Deliver private files through the existing [bootstrap contract](../server/workers/bootstrap.md),
+  with separate backend/launcher secret maps; workers receive neither bundle.
+
+The private `/internal/ready` returns only 200/503. A successor stays unready until
+fresh ownership activation; liveness is not readiness. Managed backend/launcher
+withdrawal and drain budgets, caller URL migration, and separate accounting for
+ALB-bypassing peer/worker connections remain deployment prerequisites. Existing
+workers keep their pinned backend URL; do not retire them merely to replace a
+controller. See the [handover work package](handoff.md#safe-controller-overlap-for-ecs-rolling-deployment--october-9-2026)
+and [explicit recovery procedure](../server/workers/backend-recovery.md) before activation.
 
 Backend JSON contains `{installationId, workerKeyFile, launcherTokenFile, operatorTokenFile, launcherUrl, configurationRevision, artifacts, postgresStores: {adminUrlFile}}`. Optional backend `launcherTimeoutMs` defaults to `300000` (integer range `1000`–`3600000`). Set it above the full launcher lifecycle window, including multi-worker drain; ordinary worker RPCs retain a 60-second deadline. Timeout is ambiguous, not permission to retry a mutation or start a competing owner: reconcile the same attempt with fresh retirement evidence. Launcher JSON contains `{installationId, stateDir, tokenFile, workerKeyFile, host, port, driver}`. Keep configuration and secrets in restricted files; do not publish real values or pass tokens in argv. Backend/launcher share the private installation HMAC key; each worker receives only a derived token bound to its immutable launch identity. Backend validates the current route/attempt before returning company-scoped bootstrap state. Provider OAuth resolution belongs to the backend, not copied worker auth files; refresh/revocation behavior remains an integration requirement.
 

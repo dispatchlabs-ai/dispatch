@@ -2063,9 +2063,30 @@ ECS retires it. This does not solve post-handover proxy draining: forwarded call
 and ordinary response bodies must also finish within task/ALB retirement limits,
 with explicit SSE reconnection handling. A shorter client timeout does not prove
 that a dispatched mutation stopped. The remaining store-close/open gap must fit
-request deadlines; this sequencing is not itself zero-downtime evidence. Current module budgets are
-120-second task stop, 30-second ALB deregistration and 300-second ALB idle timeout;
-backend launcher calls default to 300 seconds and worker calls to 60 seconds.
+request deadlines; this sequencing is not itself zero-downtime evidence. ECS task
+stop remains 120 seconds. Stop-first backend ALB budgets are 30-second
+deregistration and 300-second idle timeout; rolling module candidate `a7ecbe2`
+uses 360/400 seconds for managed backend/launcher ingress. See the
+[module runbook](../infra/aws-workers/README.md#ecs-service-deployment-selection)
+for activation prerequisites. Backend launcher calls default to 300 seconds and
+worker calls to 60 seconds.
 Readiness must be bounded/lightweight and not queued behind full launcher mutations
-or ECS executor inventory. Final readiness routes/configuration, integrated source
-and measured transfer/rollout evidence remain pending.
+or ECS executor inventory.
+
+Source candidate `31b357e` implements controller handover, authenticated peer
+transport, separate worker-support admission, cancellable undispatched waiting
+and ordinary/proxy response-body joining. The [generic controller configuration](conversation-workers.md#entrypoints-and-private-configuration)
+records the metadata-derived direct endpoint and peer TLS inputs; explicit
+rendezvous recovery is in [backend recovery](../server/workers/backend-recovery.md).
+Developer reports TypeScript and diff checks passing; Deslop reports the scoped
+transport, discovery, origin-confinement, body-lifetime and atomic-admission
+findings addressed. Full lifecycle review and deployment acceptance remain pending.
+The selected deployment integration uses an internal launcher ALB rather than a
+new caller-routing protocol. Before rolling acceptance, migrate launcher callers,
+verify deregistration completes before SIGTERM, and account separately for direct
+peer/worker connections, including existing workers' pinned backend URLs.
+Draining admitted calls does not keep a cached old-task address reachable for
+later callbacks; worker URLs must retain a route to ready replacement ingress.
+Managed drain budgets must cover the complete request/response lifetime, not merely the
+300-second client timeout. No migration, measured transfer or deployed continuity
+is established by this source checkpoint.
