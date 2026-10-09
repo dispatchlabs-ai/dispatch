@@ -178,6 +178,9 @@ still enforce its logging protections before password-bearing provisioning. Do
 not grant application roles parameter authority to work around an initializer
 failure. The helper's owning contract is
 [`database-init.md`](../../server/workers/database-init.md).
+Bound-parameter limits do not redact SQL password literals. Initializer-session
+checks do not qualify the separate worker provisioner connection; that connection
+must independently enforce safe statement/error logging before password DDL.
 
 The task definition precondition requires `desired_count=0` and every
 `service_desired_counts` override at zero; this is not proof of
