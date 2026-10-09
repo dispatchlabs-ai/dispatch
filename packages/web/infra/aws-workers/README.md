@@ -170,8 +170,13 @@ This example is configuration guidance, not a tested fresh-install receipt.
    the launcher. Do not scale both controllers down simultaneously. Complete
    termination before maintenance against their stores.
    Preserve PostgreSQL, S3 artifacts and matched encryption/signing/token secret
-   versions. Record exact prior/new image digests and schema compatibility. ECS
-   stop-before-start does not automatically establish complete application drain.
+   versions. Record exact prior/new image digests and schema compatibility.
+   For development image/container-only changes with unchanged application/schema,
+   such as the Ubuntu worker repackaging, do not automatically create a fresh RDS
+   snapshot or make one a rollout gate. Preserve existing state/recovery material
+   without adding production-style backup ceremony to development deployments. Database-changing or destructive maintenance
+   needs its own reviewed backup/restore plan. ECS stop-before-start does not automatically establish
+   complete application drain.
    Restart the launcher first with backend desired count held at zero. Read back
    the resolved launcher configuration and RunTask policy against the intended
    worker task-definition revision before starting the normal flag-free backend.

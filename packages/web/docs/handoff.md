@@ -1905,6 +1905,8 @@ Follow-up: Chris approved tighter activity spacing. Scope margin/padding changes
 
 **Implementation and native qualification published; deployed acceptance pending.** Chris selected Ubuntu for the agent environment, retained Nix for Dispatch/pinned dependencies, and requested a `Containerfile` supporting Linux ARM64 and AMD64. Agents must be able to install tools during ordinary work; commonly needed tools can enter the base recipe later. The earlier design-only handoff was withdrawn; the subsequent explicit team deployment request authorizes this package.
 
+Surton is a **development environment**, not production. Chris explicitly rejected production-style snapshot ceremony: do not create routine RDS snapshots or gate image-only rollouts on them. This Ubuntu repackaging retains the application/schema and requires no database migration; preserve existing state and executor fencing without adding that gate.
+
 Definition of Done: Chris can log in to `https://dispatch.surton.com`, start a new chat and have that conversation execute using the newly defined image. Deployment remains represented by the existing Terraform modules and Surton consumer configuration. Chris subsequently added that others can use the AWS Terraform module to deploy similarly; the [generic caller guide](../infra/aws-workers/README.md#reuse-from-a-caller-root) owns the reusable inputs and prerequisites. Developer owns application packaging/browser acceptance, Deployer native image publication/Terraform/rollout, Pi Durable Expert execution/recovery review, Deslop independent complexity/security-boundary review, and Documenter the contract/evidence record.
 
 Acceptance:
