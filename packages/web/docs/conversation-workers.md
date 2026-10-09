@@ -8,6 +8,17 @@ The backend owns authenticated HTTP/SSE, company/project directories, definition
 
 The existing runtime combines catalog and conversation mutations in Pi transactions. Splitting those transactions requires explicit durable command receipts and revisioned catalog propagation; copying a whole catalog into workers without update/revocation semantics is not sufficient. Preserve membership checks, connection revocation, management grants and apply-to-existing behavior. Native single-runtime mode stays supported.
 
+**Rolling-deployment scope change, October 9, 2026; implementation pending:**
+Chris authorized safe controller overlap. The original single-owner rehearsal and
+ordered installation-drain procedure below remain historical/current fallback
+contracts, not a rule that all HTTP processes must stop for every future update.
+Instance retirement must be separate from explicit installation-wide drain and
+must not retire conversation workers. Readiness must represent the ability to serve
+through functioning ownership; merely listening or passing liveness is insufficient.
+See the [current work package](handoff.md#safe-controller-overlap-for-ecs-rolling-deployment--october-9-2026)
+for handover and rollout acceptance. Preserve one executor per conversation;
+broader failover/HA qualification below is not added to this package.
+
 ## Launcher lifecycle contract
 
 Private authenticated control API; no public ingress. Only launcher has Docker access. Neither backend requests nor workers can choose arbitrary images, mounts, capabilities or commands. Operator configuration pins the worker image and allowed network/resources. Worker credentials are scoped separately from launcher control credentials.

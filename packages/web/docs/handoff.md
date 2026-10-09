@@ -2036,7 +2036,13 @@ application/typing acceptance remains Chris-owned.
 Acceptance remains pending: reviewed safe overlap/handover implementation and
 permitted source/build checks, then ECS-native replacement evidence that the new
 service becomes ready before the old service stops without an availability gap.
-Record observed service continuity and ownership safety separately from application
-acceptance; publication, plan success and a healthy post-rollout target alone do
-not establish zero downtime. The handover design and any further runtime
-verification must respect the repository testing policy and Chris's testing boundary.
+Readiness must mean requests can reach functioning ownership, not just liveness.
+Separate instance retirement from explicit installation-wide drain; preserve running
+workers and handle admitted requests/long-lived streams through bounded draining
+and reconnection without replaying uncertain mutations. Report one-time migration
+limitations separately from subsequent rolling behavior, with exact source/module
+revisions and overlapping-ready/availability evidence. Record observed service
+continuity and ownership safety separately from application acceptance; publication,
+plan success and a healthy post-rollout target alone do not establish zero downtime.
+The handover design and any further runtime verification must respect the repository
+testing policy and Chris's testing boundary.
