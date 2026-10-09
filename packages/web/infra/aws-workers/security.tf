@@ -1,5 +1,5 @@
 resource "aws_security_group" "tasks" {
-  for_each    = toset(["backend", "launcher", "worker", "alb"])
+  for_each    = toset(concat(["backend", "launcher", "worker", "alb"], var.launcher_internal_alb ? ["launcher_alb"] : []))
   name_prefix = "${var.name}-${each.key}-"
   description = "${var.name} ${each.key} only"
   vpc_id      = aws_vpc.this.id
@@ -24,7 +24,10 @@ locals {
     for role, mode in var.service_deployment_mode : "${role}_peer" => {
       from = role, to = role, port = role == "backend" ? 3001 : 8830
     } if mode == "rolling"
-  })
+    }, var.launcher_internal_alb ? {
+    backend_launcher_alb  = { from = "backend", to = "launcher_alb", port = 8830 }
+    launcher_alb_launcher = { from = "launcher_alb", to = "launcher", port = 8830 }
+  } : {})
 }
 resource "aws_vpc_security_group_ingress_rule" "private" {
   for_each                     = local.private_flows

@@ -130,7 +130,27 @@ remains denied. A rolling launcher gets a loopback HTTP `/internal/ready` ECS
 container check: 5-second interval/timeout, three failures, 300-second startup
 period, with an internal 4-second request timeout. The controller image must
 provide this endpoint on port 8830; no token or state payload is part of the probe.
-Stop-first controllers retain their existing checks and networking.
+With the default `launcher_internal_alb = false`, stop-first controllers retain
+their existing checks and networking.
+
+Rolling launchers require `launcher_internal_alb = true`. This adds a private ALB
+and a dedicated security group: only backend tasks can reach its HTTP listener on
+8830; the ALB can reach only launcher tasks on that port. Authentication remains
+application-owned, and this does not add transport encryption. `launcher_private_url`
+then returns the managed ingress rather than Cloud Map. Enable it during the
+stop-first migration and move **every launcher caller** to that output before
+rolling. The additional ALB/LCU charges belong to the caller's infrastructure.
+
+Managed draining uses 360-second target deregistration and 400-second idle timeout
+for the launcher ALB and for the backend ALB in rolling mode. Stop-first backend
+budgets remain 30/300 seconds. ALB-attached controllers have 600-second ECS startup
+health-check grace; grace does not make an unready replacement count healthy.
+The intended budget is the existing 300-second call bound plus up to 30 seconds of
+handoff waiting and margin. Confirm full request/response-body bounds and observe
+target withdrawal before SIGTERM in the actual rollout; these settings are not a
+continuity guarantee. Peer requests and existing workers' pinned direct backend
+callbacks bypass ALB draining and must remain tracked by the application. SSE
+reconnection stays explicit. ECS's post-deregistration stop allowance remains 120s.
 
 These gates require the application handover contract: a new controller stays
 unready until planned transfer and fresh-store activation finish, while the old

@@ -157,3 +157,9 @@ variable "service_deployment_mode" {
     error_message = "Select stop-first or rolling for backend and/or launcher only."
   }
 }
+
+variable "launcher_internal_alb" {
+  description = "Use a private launcher ALB for managed request withdrawal/draining. Requires a readiness-capable image; migrate callers before enabling rolling."
+  type        = bool
+  default     = false
+}

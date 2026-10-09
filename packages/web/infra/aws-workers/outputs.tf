@@ -10,7 +10,7 @@ output "database_master_secret_arn" {
 }
 output "artifact_bucket" { value = aws_s3_bucket.artifacts.id }
 output "backend_private_url" { value = "https://backend.${aws_service_discovery_private_dns_namespace.this.name}:3001" }
-output "launcher_private_url" { value = "http://launcher.${aws_service_discovery_private_dns_namespace.this.name}:8830" }
+output "launcher_private_url" { value = var.launcher_internal_alb ? "http://${aws_lb.launcher[0].dns_name}:8830" : "http://launcher.${aws_service_discovery_private_dns_namespace.this.name}:8830" }
 output "alb_dns_name" { value = try(aws_lb.this[0].dns_name, null) }
 output "alb_zone_id" { value = try(aws_lb.this[0].zone_id, null) }
 output "task_role_arns" { value = { for key, role in aws_iam_role.task : key => role.arn } }

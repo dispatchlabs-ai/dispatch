@@ -59,6 +59,10 @@ resource "aws_ecs_task_definition" "stable" {
       condition     = each.key != "backend" || lookup(var.service_deployment_mode, each.key, "stop-first") != "rolling" || var.certificate_arn != null
       error_message = "Rolling backend deployment requires the module ALB readiness check and a certificate."
     }
+    precondition {
+      condition     = each.key != "launcher" || lookup(var.service_deployment_mode, each.key, "stop-first") != "rolling" || var.launcher_internal_alb
+      error_message = "Rolling launcher deployment requires the internal ALB and callers migrated to its URL."
+    }
   }
   tags = local.tags
 }
@@ -138,7 +142,7 @@ resource "aws_ecs_service" "stable" {
   deployment_minimum_healthy_percent = lookup(var.service_deployment_mode, each.key, "stop-first") == "rolling" ? 100 : 0
   deployment_maximum_percent         = lookup(var.service_deployment_mode, each.key, "stop-first") == "rolling" ? 200 : 100
   enable_execute_command             = false
-  health_check_grace_period_seconds  = each.key == "backend" && var.certificate_arn != null ? 600 : 0
+  health_check_grace_period_seconds  = (each.key == "backend" && var.certificate_arn != null) || (each.key == "launcher" && var.launcher_internal_alb) ? 600 : 0
   deployment_circuit_breaker {
     enable   = true
     rollback = false
@@ -157,7 +161,15 @@ resource "aws_ecs_service" "stable" {
       container_port   = 3001
     }
   }
-  depends_on = [aws_lb_listener.https, aws_iam_role_policy.execution, aws_iam_role_policy.launcher, aws_iam_role_policy.backend, aws_nat_gateway.this]
+  dynamic "load_balancer" {
+    for_each = each.key == "launcher" && var.launcher_internal_alb ? [1] : []
+    content {
+      target_group_arn = aws_lb_target_group.launcher[0].arn
+      container_name   = "launcher"
+      container_port   = 8830
+    }
+  }
+  depends_on = [aws_lb_listener.https, aws_lb_listener.launcher, aws_iam_role_policy.execution, aws_iam_role_policy.launcher, aws_iam_role_policy.backend, aws_nat_gateway.this]
   tags       = local.tags
 }
 resource "aws_lb" "this" {
@@ -167,7 +179,7 @@ resource "aws_lb" "this" {
   load_balancer_type         = "application"
   security_groups            = [aws_security_group.tasks["alb"].id]
   subnets                    = var.internal_alb ? aws_subnet.private[*].id : aws_subnet.public[*].id
-  idle_timeout               = 300
+  idle_timeout               = lookup(var.service_deployment_mode, "backend", "stop-first") == "rolling" ? 400 : 300
   drop_invalid_header_fields = true
   tags                       = local.tags
 }
@@ -178,7 +190,7 @@ resource "aws_lb_target_group" "backend" {
   protocol             = "HTTPS"
   target_type          = "ip"
   vpc_id               = aws_vpc.this.id
-  deregistration_delay = 30
+  deregistration_delay = lookup(var.service_deployment_mode, "backend", "stop-first") == "rolling" ? 360 : 30
   health_check {
     path     = lookup(var.service_deployment_mode, "backend", "stop-first") == "rolling" ? "/internal/ready" : var.backend_health_check_path
     protocol = "HTTPS"
