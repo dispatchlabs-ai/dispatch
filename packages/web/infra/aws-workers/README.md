@@ -102,6 +102,11 @@ match encrypted records. Configuration is not a backup.
    Preserve PostgreSQL, S3 artifacts and matched encryption/signing/token secret
    versions. Record exact prior/new image digests and schema compatibility. ECS
    stop-before-start does not automatically establish complete application drain.
+   Restart the launcher first with backend desired count held at zero. Read back
+   the resolved launcher configuration and RunTask policy against the intended
+   worker task-definition revision before starting the normal flag-free backend.
+   Reopen admission only through the authenticated quiesced preflight/undrain path,
+   not a successful liveness probe.
 6. On failure keep admission closed and preserve state/evidence. Reconcile the
    same immutable attempt; absence, expired leases and successful StopTask requests
    are not retirement proof. Recover stale backend ownership only after confirmed
