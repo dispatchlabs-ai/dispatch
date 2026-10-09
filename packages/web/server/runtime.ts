@@ -531,7 +531,6 @@ export class DispatchRuntime {
   }
 
   async updateChat(scope: RuntimeScope, id: string, input: UpdateChatInput): Promise<ChatSnapshot> {
-    await this.authorize(scope, id);
     await this.harness.commit(async tx => {
       const room = await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
       const preference = room.preferences[scope.userId] ??= { pinned: false, archived: false };
@@ -543,7 +542,6 @@ export class DispatchRuntime {
 
   async saveDefinitionOfDone(scope: RuntimeScope, id: string, input: { markdown: string; expectedRevision: number }): Promise<ChatSnapshot> {
     if (typeof input.markdown !== "string" || input.markdown.length > 20000 || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0) throw new RuntimeError(400, "Invalid completion criteria.");
-    await this.authorize(scope, id);
     await this.harness.commit(async tx => {
       const room = await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
       const revision = room.definitionOfDone?.revision ?? 0;
@@ -556,7 +554,6 @@ export class DispatchRuntime {
   async renameChat(scope: RuntimeScope, id: string, title: string): Promise<ChatSnapshot> {
     title = title.trim();
     requireText(title, "Title", 200);
-    await this.authorize(scope, id);
     await this.harness.commit(async tx => {
       const catalog = await tx.doc(CatalogDoc);
       const chat = catalog.chats.find(item => item.id === id && item.companyId === scope.companyId);
