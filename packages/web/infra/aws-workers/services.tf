@@ -181,7 +181,7 @@ resource "aws_ecs_service" "stable" {
       container_port   = 3001
     }
   }
-  depends_on = [aws_lb_listener.https, aws_lb_listener.launcher, aws_lb_listener_rule.backend_callback, aws_iam_role_policy.execution, aws_iam_role_policy.launcher, aws_iam_role_policy.backend, aws_nat_gateway.this]
+  depends_on = [aws_lb_listener.https, aws_lb_listener.launcher, aws_lb_listener_rule.backend_callback, aws_service_discovery_instance.backend_callback, aws_iam_role_policy.execution, aws_iam_role_policy.launcher, aws_iam_role_policy.backend, aws_nat_gateway.this]
   tags       = local.tags
 }
 resource "aws_lb" "this" {

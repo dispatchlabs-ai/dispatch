@@ -143,10 +143,13 @@ rolling. The additional ALB/LCU charges belong to the caller's infrastructure.
 
 Rolling backends also require `backend_callback_certificate_arn`. This adds an
 HTTPS listener on port 443 to the same private ALB and a separate backend target
-group on HTTPS 3001, checked at `/internal/ready`. The private Route 53 alias is
+group on HTTPS 3001, checked at `/internal/ready`. The private ALB alias, registered through Cloud Map, is
 `callbacks.<name>.internal`; `backend_callback_hostname` exposes that certificate
 identity before provisioning and `backend_callback_url` returns its HTTPS origin
-when enabled. The existing `backend_private_url` remains a direct Cloud Map URL for
+when enabled. Cloud Map owns the namespace's hosted zone, so the module registers
+an `A`/`WEIGHTED` service instance with `AWS_ALIAS_DNS_NAME`; it must not write
+Route 53 records directly into that managed zone. The existing
+`backend_private_url` remains a direct Cloud Map URL for
 operator/direct use; it is **not** replacement-safe callback ingress.
 
 Only worker task security groups can reach the callback listener. Only

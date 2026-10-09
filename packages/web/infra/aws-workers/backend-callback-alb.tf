@@ -47,14 +47,26 @@ resource "aws_lb_listener_rule" "backend_callback" {
     target_group_arn = aws_lb_target_group.backend_callback[0].arn
   }
 }
-resource "aws_route53_record" "backend_callback" {
-  count   = local.backend_callback_enabled ? 1 : 0
-  zone_id = aws_service_discovery_private_dns_namespace.this.hosted_zone
-  name    = local.backend_callback_hostname
-  type    = "A"
-  alias {
-    name                   = aws_lb.launcher[0].dns_name
-    zone_id                = aws_lb.launcher[0].zone_id
-    evaluate_target_health = true
+# Cloud Map owns its namespace's hosted zone; Route 53 writes are rejected.
+# Register the ALB alias through Cloud Map, not individual controller addresses.
+resource "aws_service_discovery_service" "backend_callback" {
+  count = local.backend_callback_enabled ? 1 : 0
+  name  = "callbacks"
+  dns_config {
+    namespace_id   = aws_service_discovery_private_dns_namespace.this.id
+    routing_policy = "WEIGHTED"
+    dns_records {
+      ttl  = 60
+      type = "A"
+    }
+  }
+  tags = local.tags
+}
+resource "aws_service_discovery_instance" "backend_callback" {
+  count       = local.backend_callback_enabled ? 1 : 0
+  instance_id = "callback-alb"
+  service_id  = aws_service_discovery_service.backend_callback[0].id
+  attributes = {
+    AWS_ALIAS_DNS_NAME = aws_lb.launcher[0].dns_name
   }
 }
