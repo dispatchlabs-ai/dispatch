@@ -2099,8 +2099,16 @@ evaluation passing; flake ran zero checks and omitted Linux systems. Pi and Desl
 report their scoped application-source findings addressed, including waiter-capacity
 deadlock correction. Callback-ingress source `05339ca` is integrated; Pi reports
 isolated OpenTofu initialization/format/validation checks passing, and Deslop reports
-no additional source blocker. No application/typing tests ran for this package;
-Linux controller-image build and deployment acceptance remain pending.
+no additional source blocker. Deslop subsequently reports the native Linux ARM64
+controller image built/published, with architecture and source-revision label
+verified; the worker image/task definition is retained. This is build/artifact
+evidence, not runtime acceptance. No application/typing tests ran for this package;
+deployment and measured rolling-continuity acceptance remain pending.
+Module-only successor `3e1b26a36a5c7f02fd5b5e2f1c51785f3c264941` corrects
+callback DNS to supported Cloud Map ALB alias registration; direct Route 53 writes
+into its managed zone are not supported. The controller image stays at `8fb001f`.
+Source validation did not exercise that AWS restriction; a passing validation or
+preview is not live activation evidence.
 The selected deployment integration uses an internal launcher ALB rather than a
 new caller-routing protocol, plus private readiness-gated HTTPS worker callback
 ingress. The [module runbook](../infra/aws-workers/README.md#ecs-service-deployment-selection)
