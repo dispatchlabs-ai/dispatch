@@ -50,6 +50,8 @@ RUN mkdir -p "$HOME" /workspace /tmp \
     && mise install --system node@24.9.0 \
     && mise use --global node@24.9.0 \
     && mise reshim \
+    && node --version \
+    && npm --version \
     && chmod 1777 /tmp
 
 COPY entrypoint.sh /usr/local/bin/dispatch-agent-entrypoint
