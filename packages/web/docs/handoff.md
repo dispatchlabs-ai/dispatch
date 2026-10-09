@@ -1540,6 +1540,12 @@ Evidence: source/deslop review confirms only prompt strings change in runtime co
 
 Follow-up observation (October 8, 2026): Pi Durable Expert reported read-only inspection of existing AWS Prep execution records after Chris explicitly resumed the conversation. Incoming notifications contained the new guidance, and the Developer continued tool work after routine updates and completed-subtask reports without a definition/thinking-level change. This is bounded observational evidence of adoption and improved continuity, not a controlled causal test or proof against future stalls; sustained reliability remains unqualified.
 
+### Definition of Done takes precedence over broader checklists — October 9, 2026
+
+Chris requested pointing shared agents clearly at the chat's saved Definition of Done after reviewing repeated deployment checks. Scope: shared system guidance, incoming/refreshed notices and criteria context wording. The existing per-request criteria refresh already supplies the current value; no storage, delivery, scheduling, capability or UI changes are required.
+
+Acceptance: use saved criteria with latest human direction; fall back to the authorized conversation goal when blank; keep repository checklists within that goal; continue relevant unmet work and finish after evidenced completion is reported. Preserve role/access/Stop/approval boundaries, changed-criteria refresh and native contribution recovery. Source/deslop review, TypeScript/application and Apple Silicon Nix build/flake checks, whitespace and changed local links are required. No tests or model/browser probes under the standing policy; behavioral effectiveness remains unverified. Source/deslop review, integrated TypeScript/application checks, Apple Silicon Nix build/flake checks, whitespace and the changed local Markdown anchor passed. No model requests or browser probes were run; the prompt change does not establish reduced coordination time or automatic completion.
+
 ## Project working directory — October 8, 2026
 
 Chris authorized an optional `cwd` in Project settings. Developer owns settings UI; Pi Durable Expert owns backend persistence/session-path integration and lifecycle review; Documenter owns contract/usage updates. See the [shared-project contract](spec.md#shared-project-access-and-default-agents).

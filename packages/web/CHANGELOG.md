@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — chat completion guidance
+
+- Point shared agents to the saved chat Definition of Done and latest human direction, use the conversation goal when blank, and finish after evidenced completion instead of expanding work from broader checklists.
+
 ## Unreleased — project import placement
 
 - Move project import from the chat sidebar into Settings → Import & export, with paired project export, a file drop area and Continue to archive review. Retain existing approval and retry behavior.
