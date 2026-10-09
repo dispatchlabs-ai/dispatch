@@ -1731,6 +1731,8 @@ Transcript-page follow-up: independently reviewed `47daa5c` reuses the shared hi
 
 Snapshot/archive follow-up: independently reviewed `98cce11` removes the discarded duplicate page copy, projects only public messages for archive export and removes unconsumed unbounded presentation. Full nested archive detachment, aliases, authorization and attachment privacy checks remain. Integrated TypeScript/application/capability, Apple Silicon Nix build and flake evaluation passed (zero runnable checks; Linux omitted). No tests or deployment; runtime and latency remain unmeasured.
 
+Reply-summary follow-up: independently reviewed `0d9f5ab` bounds author tracking to the first four distinct authors and removes the redundant slice/copy, preserving ordering, total count and last-reply time. Integrated TypeScript/application/capability, Apple Silicon Nix build and flake evaluation passed (zero runnable checks; Linux omitted). No tests or deployment; runtime and latency remain unmeasured.
+
 Acceptance:
 
 - Preserve supported behavior, public/persisted contracts, authorization, meaningful failures and native Pi execution/recovery ownership. Investigate compatibility consumers before removal; unresolved behavior changes require a decision, not speculative deletion.
