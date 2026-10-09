@@ -164,7 +164,7 @@ export class DispatchRuntime {
           const actor = await shared.managementActor(tx, instanceId);
           const catalog = await tx.doc(CatalogDoc);
           const definition = latestAgent(catalog, actor.companyId, actor.definitionId);
-          if (!definition || definition.archived || !publicAgent(definition).capabilities?.includes(capability)) return undefined;
+          if (!definition || definition.archived || !agentCapabilities(definition).includes(capability)) return undefined;
           return { companyId: actor.companyId, definitionId: actor.definitionId };
         }, context);
         signal?.throwIfAborted();
@@ -254,11 +254,9 @@ export class DispatchRuntime {
       // Append revisions rather than rewriting historical definitions or native snapshots.
       await runtime.harness.commit(async tx => {
         const catalog = await tx.doc(CatalogDoc);
-        const ids = new Set(catalog.agents.filter(agent => agent.companyId === options.companyId).map(agent => agent.id));
-        for (const id of ids) {
-          const agent = latestAgent(catalog, options.companyId, id)!;
+        const selection = capabilitySelection(["web-reading", "web-search"]);
+        for (const agent of latestAgents(catalog, options.companyId).values()) {
           if (!agent.extensions?.includes("dispatch-web")) continue;
-          const selection = capabilitySelection(["web-reading", "web-search"]);
           catalog.agents.push({ ...agent,
             extensions: [...new Set([...agent.extensions.filter(name => name !== "dispatch-web"), ...selection.extensions])],
             tools: [...new Set([...(agent.tools ?? []).filter(name => name !== "web_run"), ...selection.tools])],
@@ -1662,7 +1660,11 @@ function owns(scope: RuntimeScope, chat: RuntimeScope) { return scope.companyId 
 function publicAgent({ companyId: _companyId, savedBy: _savedBy, saveRequestId: _request, saveFingerprint: _fingerprint, ...agent }: StoredAgent): AgentDefinition {
   // Nested catalog values may be transaction proxies; detach before the transaction settles.
   return detached({ ...agent, extensions: agent.extensions ?? [], tools: agent.tools ?? [],
-    capabilities: capabilityDefinitions.filter(item => (agent.extensions?.includes(item.marker) || (agent.extensions?.includes("dispatch-web") && (item.id === "web-reading" || item.id === "web-search")))).map(item => item.id) });
+    capabilities: agentCapabilities(agent) });
+}
+function agentCapabilities(agent: Pick<StoredAgent, "extensions">) {
+  return capabilityDefinitions.filter(item => agent.extensions?.includes(item.marker)
+    || (agent.extensions?.includes("dispatch-web") && (item.id === "web-reading" || item.id === "web-search"))).map(item => item.id);
 }
 function managedIds(agent: Pick<AgentDefinition, "connections">) { return (agent.connections ?? []).filter(isManagedConnection).map(connection => connection.id); }
 function requireText(value: unknown, field: string, max: number, allowEmpty = false): asserts value is string {

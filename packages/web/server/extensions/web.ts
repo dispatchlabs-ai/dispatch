@@ -32,7 +32,7 @@ const RecentReferences = defineDoc<{ references: ReferenceSummary[] }>({
 
 class WebInputError extends Error {}
 
-const refId = Type.String({ minLength: 1, description: "An HTTP(S) URL or a reference returned to this agent by web_run." });
+const refId = Type.String({ minLength: 1, description: "An HTTP(S) URL or a saved web reference returned to this agent." });
 const lineNumber = Type.Integer({ minimum: 1, description: "1-based line number in the saved snapshot." });
 const parameters = Type.Object({
   search_query: Type.Optional(Type.Array(Type.Object({

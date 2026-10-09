@@ -692,7 +692,7 @@ export class SharedConversations {
     const member = room.members.find(item => item.id === binding.participantId && item.conversationId === conversationId && item.kind === "agent");
     if (!activeMember(member) || !member?.agentDefinitionId || !member.agentRevision || !member.agent) throw new CollaborationError(403, "Agent membership is unavailable.");
     return { companyId: room.companyId, definitionId: member.agentDefinitionId, revision: member.agentRevision,
-      instanceId: conversationId, participantId: member.id, roomId: binding.roomId, configuration: JSON.parse(JSON.stringify(member.agent)) as NonNullable<Member["agent"]> };
+      instanceId: conversationId, participantId: member.id, roomId: binding.roomId };
   }
 
   async binding(conversationId: ConversationId, ctx: Context) {
