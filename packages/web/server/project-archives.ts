@@ -49,10 +49,15 @@ export function projectArchivePreview(archive: ProjectArchive): ProjectArchivePr
   return { name: archive.name, bytes: Buffer.byteLength(JSON.stringify(archive)), chats: archive.chats.map(chat => ({ title: chat.title, messages: chat.messages.length, files: chat.files.length, authors: chat.authors.map(author => author.name) })) };
 }
 export type ArchiveBlob = { id: string; digest: string };
+/** Storage owns immutable bytes; callers own authorization and atomic catalog admission. */
+export interface ProjectArchiveStorage {
+  save(archive: ProjectArchive): Promise<ArchiveBlob>;
+  read(blob: ArchiveBlob): Promise<ProjectArchive>;
+}
 export const ProjectArchivesDoc = defineDoc<{ records: Record<string, ArchiveBlob> }>({ kind: "dispatch.project-archives", version: 1, scope: "session", initial: () => ({ records: {} }) });
 
 /** Immutable content (including file bytes) precedes atomic native admission. Orphans are never visible. */
-export class ProjectArchiveStore {
+export class ProjectArchiveStore implements ProjectArchiveStorage {
   constructor(private readonly directory: string) {}
   async save(archive: ProjectArchive): Promise<ArchiveBlob> {
     const text = JSON.stringify(archive);
