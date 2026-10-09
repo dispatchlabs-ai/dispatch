@@ -409,6 +409,7 @@ export function Workspace() {
     requestAnimationFrame(() => document.getElementById("main-workspace")?.focus());
   }
 
+  const settingsSection = section === "security" || section === "connections" || section === "secrets" || section === "import-export";
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId) ?? agents.find(agent => agent.id === config?.defaultAgentId);
   const active: WorkspaceTab | { id: string; kind: "agents" | "security" | "connections" | "secrets" | "import-export" } = section === "chats" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
   const detailsVisible = active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : active.kind === "connections" || active.kind === "secrets" || active.kind === "import-export" ? false : otherDetailsVisible;
@@ -469,7 +470,7 @@ export function Workspace() {
         onEdit={editAgent}
         onArchive={agent => requestAgentAction(() => { setEditingAgent(null); setArchivingAgent(agent); })} />
     </div>
-    {section === "security" || section === "connections" || section === "secrets" || section === "import-export" ? <div className="section-sidebar">
+    {settingsSection ? <div className="section-sidebar">
       <h2>Settings</h2>
       <nav aria-label="Settings">
         <Button variant="ghost" aria-current={section === "connections" ? "page" : undefined} onClick={() => selectSection("connections")}>Connections</Button>
@@ -521,7 +522,7 @@ export function Workspace() {
         </IconButton> : null}
       </div>
       <div className="rail-account">
-        <IconButton label="Settings" className={section === "security" || section === "connections" || section === "secrets" || section === "import-export" ? "active" : ""} aria-current={section === "security" || section === "connections" || section === "secrets" || section === "import-export" ? "page" : undefined} onClick={() => selectSection("connections")}>
+        <IconButton label="Settings" className={settingsSection ? "active" : ""} aria-current={settingsSection ? "page" : undefined} onClick={() => selectSection("connections")}>
           <Settings2 size={20} />
         </IconButton>
         <IconButton label="Sign out" disabled={signingOut} onClick={() => void signOut()}>{signingOut ? <Spinner /> : <LogOut size={19} />}</IconButton>
@@ -658,7 +659,7 @@ export function Workspace() {
                 <MessageSquare /> Chats</Button>
               <Button variant="ghost" aria-current={active.kind === "agents" ? "page" : undefined} onClick={() => selectSection("agents")}>
                 <Bot /> Agents</Button>
-              <Button variant="ghost" aria-current={section === "security" || section === "connections" || section === "secrets" || section === "import-export" ? "page" : undefined} onClick={() => selectSection("connections")}>
+              <Button variant="ghost" aria-current={settingsSection ? "page" : undefined} onClick={() => selectSection("connections")}>
                 <Settings2 /> Settings</Button>
             </nav>{sidebar}<Button className="mobile-signout" variant="ghost" onClick={() => void signOut()} disabled={signingOut}>
               <LogOut /> Sign out</Button>
