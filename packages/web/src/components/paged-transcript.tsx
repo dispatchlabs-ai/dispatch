@@ -11,10 +11,11 @@ import { Button, Notice, Spinner } from "./ui";
 
 type Item = { id: string; at: number; message?: ConversationMessage; activity?: ParticipantActivity };
 function items(page: Pick<TranscriptPage, "messages" | "activities">): Item[] {
-  return [...page.messages.map(message => ({ id: `m:${message.id}`, at: message.createdAt, message })), ...page.activities.map(activity => ({ id: `a:${activity.id}`, at: activity.createdAt, activity }))];
+  return [...page.messages.map(message => ({ id: `m:${message.id}`, at: message.createdAt, message })), ...page.activities.filter(activity => activity.detail?.count !== 0).map(activity => ({ id: `a:${activity.id}`, at: activity.createdAt, activity }))];
 }
 function merge(before: Item[], incoming: Item[]) {
-  const map = new Map(before.map(item => [item.id, item]));
+  // Empty live-only groups are status, not retained history. Keep loaded nonempty pages.
+  const map = new Map(before.filter(item => item.activity?.detail?.count !== 0).map(item => [item.id, item]));
   for (const item of incoming) {
     const old = map.get(item.id);
     map.set(item.id, old && JSON.stringify(old) === JSON.stringify(item) ? old : item);
@@ -147,25 +148,30 @@ function ActivityDetail({ activity, participants, chatId }: { activity: Particip
   const [page, setPage] = useState<ActivityPage>();
   const [before, setBefore] = useState<number>();
   const [error, setError] = useState<string>();
+  const [loading, setLoading] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const url = `/api/chats/${encodeURIComponent(chatId)}/detail/activity/${encodeURIComponent(activity.id)}`;
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
-    void api<ActivityPage>(`${url}${before === undefined ? "" : `?before=${before}`}`, undefined, controller.signal).then(setPage).catch(error => { if (!controller.signal.aborted) setError(errorMessage(error)); });
+    setLoading(true);
+    setError(undefined);
+    void api<ActivityPage>(`${url}${before === undefined ? "" : `?before=${before}`}`, undefined, controller.signal).then(value => { if (!controller.signal.aborted) setPage(value); }).catch(error => { if (!controller.signal.aborted) setError(errorMessage(error)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [open, activity.detail?.version, before, url, api]);
+  }, [open, activity.detail?.version, before, url, api, attempt]);
   if (!activity.detail) return <PublicActivity activity={activity} participants={participants} />;
   const name = participants.find(person => person.id === activity.participantId)?.name ?? "Agent";
   return <section className="conversation-entry participant-activity activity-detail"><div className="participant-body">
-    <Button variant="ghost" className="button-compact" aria-expanded={open} onClick={() => setOpen(value => !value)}>{name} · {activity.detail.active ? "Working" : "Activity"} · {activity.detail.count} records</Button>
+    <Button variant="ghost" className="button-compact" aria-expanded={open} onClick={() => setOpen(value => !value)}>{name} · {activity.detail.active ? "Working" : "Activity"}</Button>
     {open ? <>
-      {error ? <Notice>{error}</Notice> : null}
-      {!page ? <Spinner label="Loading activity" /> : <>
-        {page.before !== null ? <Button variant="secondary" onClick={() => setBefore(page.before!)}>Older activity</Button> : null}
-        {before !== undefined ? <Button variant="secondary" onClick={() => setBefore(undefined)}>Latest activity</Button> : null}
+      {error ? <Notice>{error}<Button variant="secondary" onClick={() => setAttempt(value => value + 1)}>Retry</Button></Notice> : null}
+      {loading && !page ? <Spinner label="Loading activity" /> : null}
+      {page ? <>
+        {page.before !== null ? <Button variant="secondary" onClick={() => { setPage(undefined); setBefore(page.before!); }}>Older activity</Button> : null}
+        {before !== undefined ? <Button variant="secondary" onClick={() => { setPage(undefined); setBefore(undefined); }}>Latest activity</Button> : null}
         {page.items.map(item => item.kind === "tool" ? <ToolActivityView key={item.id} activity={item.tool} authorName={name} /> : item.kind === "text" ? <Markdown key={item.id}>{item.text}</Markdown> : item.kind === "large" ? <p key={item.id}>{item.label} <a href={`${url}?download=1`}>Download</a></p> : <details key={item.id}><summary>{item.label}</summary><pre>{JSON.stringify(item.data, null, 2)}</pre></details>)}
         <a href={`${url}?download=1`}>Download complete activity</a>
-      </>}
+      </> : null}
     </> : null}
   </div></section>;
 }

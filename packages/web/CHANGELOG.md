@@ -4,6 +4,11 @@
 
 - Add explicit per-controller `stop-first` (0/100) or `rolling` (100/200) deployment selection to the reusable AWS module; preserve stop-first defaults. Rolling requires application-level overlap and readiness support, which current exclusive-owner controllers do not provide. No live deployment mode changed.
 
+## Unreleased — activity disclosure recovery
+
+- Remove activity count labels and empty live-only timeline disclosures while preserving loaded historical activity.
+- Resolve settled activity detail identities; stop loading on failure with Retry and retain output during background refresh.
+
 ## Unreleased — composer typing isolation
 
 - Notify only the affected main/thread composer on draft edits rather than rerendering the workspace and unrelated chats; retain workspace-lifetime drafts, uploads and send/retry guards.
