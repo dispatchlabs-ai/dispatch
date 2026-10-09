@@ -238,7 +238,10 @@ Only this operator container has writable ephemeral root/default capabilities fo
 Exec. No container log driver is configured. Follow the [bootstrap UID and
 command-audit boundaries](../../server/workers/bootstrap.md#deployment-inputs-and-boundaries):
 CloudTrail still records commands. Keep the terminal private and unrecorded.
-After graceful CLI exit, confirm the operator task STOPPED before normal backend
-startup. Set the input back to null and review temporary-resource cleanup without
+Verify the separately executed CLI's own clean exit and credential-owner release;
+the holder container's exit code (including 143) does not establish either.
+Then confirm the operator task STOPPED before normal flag-free backend startup.
+If the owner latch remains, use the owning CLI/backend's explicit retired-owner
+recovery procedure rather than clearing SQL latches or forcing normal startup. Set the input back to null and review temporary-resource cleanup without
 removing retained databases, artifacts or secret versions. Registration/source
 review is not live Exec, bootstrap, OAuth or model/workload acceptance.
