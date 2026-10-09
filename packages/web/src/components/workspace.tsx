@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { useSearchParams } from "react-router";
 import type { AgentDefinition, ApplicationConfig, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, UpdateChatInput } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
-import { composerKey, useComposers } from "../lib/composers";
+import { ComposerContext, composerKey, useComposers } from "../lib/composers";
 import { mergeChat, type ConnectionState } from "../lib/chat";
 import { useSession } from "../lib/session";
 import { AgentArchiveDialog, AgentDetails, AgentsPage, agentEditIsDirty, beginAgentEdit, type AgentEditing } from "./agents";
@@ -433,11 +433,7 @@ export function Workspace() {
     onAddFiles={files => attachmentDrafts.add(supportingKey, active.chatId, files)}
     onRemoveAttachment={id => attachmentDrafts.remove(supportingKey, id)}
     onRetryAttachment={id => attachmentDrafts.retry(supportingKey, active.chatId, id)}
-    mentions={composers.get(supportingKey).mentions} onMentionsChange={ids => composers.changeMentions(supportingKey, ids)}
-    draft={composers.get(supportingKey).text}
-    pending={composers.get(supportingKey).pending} error={composers.get(supportingKey).error}
-    onDraftChange={text => composers.changeText(supportingKey, text)}
-    onSnapshot={onSnapshot} onSend={mentions => void composers.send(active.chatId, threads[active.chatId] ?? null, mentions)} onInvite={() => setInvitingChatId(active.chatId)} onAddInstance={(definitionId, onCreated) => setAddingInstance({ chatId: active.chatId, definitionId, onCreated })}
+    onSnapshot={onSnapshot} onInvite={() => setInvitingChatId(active.chatId)} onAddInstance={(definitionId, onCreated) => setAddingInstance({ chatId: active.chatId, definitionId, onCreated })}
     onClose={() => {
       setThreads(current => ({ ...current, [active.chatId]: null }));
       setDetailsVisible(false);
@@ -498,7 +494,7 @@ export function Workspace() {
     <Button variant="ghost" onClick={() => void signOut()}>Sign out</Button>
   </main>;
 
-  return <div className={`workspace ${section === "agents" && editingAgent ? "agent-editing" : ""} ${sidebarVisible ? "" : "sidebar-hidden"} ${detailsVisible ? "" : "details-hidden"}`}
+  return <ComposerContext.Provider value={composers}><div className={`workspace ${section === "agents" && editingAgent ? "agent-editing" : ""} ${sidebarVisible ? "" : "sidebar-hidden"} ${detailsVisible ? "" : "details-hidden"}`}
     style={{ "--sidebar-width": `${sidebarVisible ? sidebarWidth : 0}px`, "--details-width": `${detailsVisible ? detailsWidth : 0}px` } as CSSProperties}>
     <a className="skip-link" href="#main-workspace">Skip to main content</a>
     <nav className="workspace-rail" aria-label="Workspace navigation">
@@ -587,13 +583,6 @@ export function Workspace() {
               onAddFiles={files => attachmentDrafts.add(tab.chatId, tab.chatId, files)}
               onRemoveAttachment={id => attachmentDrafts.remove(tab.chatId, id)}
               onRetryAttachment={id => attachmentDrafts.retry(tab.chatId, tab.chatId, id)}
-              draft={composers.get(tab.chatId).text}
-              pending={composers.get(tab.chatId).pending}
-              sendError={composers.get(tab.chatId).error}
-              mentions={composers.get(tab.chatId).mentions}
-              onMentionsChange={ids => composers.changeMentions(tab.chatId, ids)}
-              onDraftChange={text => composers.changeText(tab.chatId, text)}
-              onSend={mentions => void composers.send(tab.chatId, null, mentions)}
               activeThreadId={(viewportWidth <= 800 ? contextOpen : chatDetailsVisible[tab.chatId]) ? threads[tab.chatId] : null}
               onParticipants={() => openSupporting(tab.chatId, null)}
               onAddInstance={(definitionId, onCreated) => setAddingInstance({ chatId: tab.chatId, definitionId, onCreated })}
@@ -678,7 +667,7 @@ export function Workspace() {
       <span className="status-company">{config.company.name}</span>
       <span className="status-user">{state.user.name}</span>
     </footer>
-  </div>;
+  </div></ComposerContext.Provider>;
 }
 
 function mergeProjects(current: Project[], incoming: Project[]) {

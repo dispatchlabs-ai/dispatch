@@ -5,7 +5,7 @@ import { ArrowDown, RotateCcw, Square, Users } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { AgentDefinition, ChatSnapshot } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
-import { chatStatusLabel, type ConnectionState, type PendingMessage } from "../lib/chat";
+import { chatStatusLabel, type ConnectionState } from "../lib/chat";
 import { useSession } from "../lib/session";
 import { Brand } from "./brand";
 import { ConversationComposer, ConversationPresence, SharedTranscript } from "./shared-conversation";
@@ -19,13 +19,6 @@ interface ChatPanelProps extends AttachmentComposerProps {
   active: boolean;
   connection: ConnectionState;
   snapshot?: ChatSnapshot;
-  draft: string;
-  pending?: PendingMessage;
-  sendError?: string;
-  onDraftChange: (text: string) => void;
-  mentions: string[];
-  onMentionsChange: (ids: string[]) => void;
-  onSend: (mentions: string[]) => void;
   activeThreadId?: string | null;
   onParticipants: () => void;
   onAddInstance: OpenInstanceForm;
@@ -35,7 +28,7 @@ interface ChatPanelProps extends AttachmentComposerProps {
   onConnection: (chatId: string, state: ConnectionState) => void;
 }
 
-export function ChatPanel({ focusComposer, onComposerFocused, agents, active: visible, connection, chatId, snapshot, draft, pending, sendError, mentions, onMentionsChange, onDraftChange, onSend, activeThreadId, onParticipants, onAddInstance, onThread, onSnapshot, onConnection, onAccessLost, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment }: ChatPanelProps) {
+export function ChatPanel({ focusComposer, onComposerFocused, agents, active: visible, connection, chatId, snapshot, activeThreadId, onParticipants, onAddInstance, onThread, onSnapshot, onConnection, onAccessLost, attachments, onAddFiles, onRemoveAttachment, onRetryAttachment }: ChatPanelProps) {
   const { api, refreshSession } = useSession();
   const openThread = useCallback((id: string) => onThread(chatId, id), [chatId, onThread]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -129,11 +122,6 @@ export function ChatPanel({ focusComposer, onComposerFocused, agents, active: vi
     setShowLatest(false);
   }
 
-  function sendDraft(mentions: string[]) {
-    scrollToLatest();
-    onSend(mentions);
-  }
-
   return <div className="chat-panel shared-chat-panel">
     <header className="view-heading">
       <div>
@@ -181,7 +169,7 @@ export function ChatPanel({ focusComposer, onComposerFocused, agents, active: vi
         <ArrowDown /> Latest messages</Button>
     </div> : null}
     {stopError ? <Notice>{stopError}</Notice> : null}
-    <ConversationComposer attachments={attachments} onAddFiles={onAddFiles} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} id={`composer-${chatId}`} conversationTitle={snapshot?.conversation.title} chatId={chatId} active={visible} draft={draft} pending={pending} error={sendError} agents={agents} participants={snapshot?.participants ?? []} mentions={mentions} onMentionsChange={onMentionsChange} disabled={!snapshot || snapshot.conversation.canParticipate === false} onDraftChange={onDraftChange} onSend={sendDraft} onAddInstance={onAddInstance}>
+    <ConversationComposer attachments={attachments} onAddFiles={onAddFiles} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} id={`composer-${chatId}`} conversationTitle={snapshot?.conversation.title} chatId={chatId} active={visible} agents={agents} participants={snapshot?.participants ?? []} disabled={!snapshot || snapshot.conversation.canParticipate === false} onBeforeSend={scrollToLatest} onAddInstance={onAddInstance}>
       {running && snapshot?.conversation.canParticipate !== false ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
         setStopping(true); setStopError(null);
         void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/stop`, {}).then(onSnapshot).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));

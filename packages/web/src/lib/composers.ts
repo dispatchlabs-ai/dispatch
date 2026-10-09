@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { createContext, useCallback, useContext, useRef, useSyncExternalStore } from "react";
 import type { ChatSnapshot, SendMessageInput } from "../shared/contracts";
 import { ApiError, errorMessage } from "./api";
 import { useAttachmentDrafts } from "./attachments";
@@ -19,12 +19,12 @@ export const composerKey = (chatId: string, threadId?: string | null) => threadI
 
 export function useComposers(onSnapshot: (snapshot: ChatSnapshot) => void) {
   const { api } = useSession();
-  const [composers, setComposers] = useState<Record<string, Composer>>({});
-  const current = useRef(composers);
+  const current = useRef<Record<string, Composer>>({});
+  const listeners = useRef(new Map<string, Set<() => void>>());
   const get = (key: string) => current.current[key] ?? emptyComposer;
   function update(key: string, next: Composer) {
     current.current = { ...current.current, [key]: next };
-    setComposers(current.current);
+    listeners.current.get(key)?.forEach(listener => listener());
   }
   const attachments = useAttachmentDrafts(key => {
     const state = get(key);
@@ -36,6 +36,15 @@ export function useComposers(onSnapshot: (snapshot: ChatSnapshot) => void) {
   }
   return {
     get,
+    subscribe(key: string, listener: () => void) {
+      let subscribers = listeners.current.get(key);
+      if (!subscribers) { subscribers = new Set(); listeners.current.set(key, subscribers); }
+      subscribers.add(listener);
+      return () => {
+        subscribers.delete(listener);
+        if (!subscribers.size) listeners.current.delete(key);
+      };
+    },
     attachments,
     isDirty(chatId: string) {
       return keys(chatId).some(key => {
@@ -98,5 +107,21 @@ export function useComposers(onSnapshot: (snapshot: ChatSnapshot) => void) {
         }
       }
     },
+  };
+}
+
+export const ComposerContext = createContext<ReturnType<typeof useComposers> | null>(null);
+
+export function useComposer(chatId: string, threadId?: string | null) {
+  const owner = useContext(ComposerContext)!;
+  const key = composerKey(chatId, threadId);
+  const subscribe = useCallback((listener: () => void) => owner.subscribe(key, listener), [owner, key]);
+  const read = useCallback(() => owner.get(key), [owner, key]);
+  const state = useSyncExternalStore(subscribe, read, read);
+  return {
+    ...state,
+    changeText: (text: string) => owner.changeText(key, text),
+    changeMentions: (ids: string[]) => owner.changeMentions(key, ids),
+    send: (mentions: string[]) => { void owner.send(chatId, threadId ?? null, mentions); },
   };
 }
