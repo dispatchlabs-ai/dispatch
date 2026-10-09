@@ -4,7 +4,7 @@
 
 - Keep undispatched request expiry separate from controller failure; reject public traffic while a claimed local owner is unready without blocking authenticated startup maintenance.
 - Add opt-in backend/launcher listener overlap with identity-bound planned ownership transfer, fresh-state activation, private readiness, bounded undispatched waiting and response-body draining. Preserve worker executors and store recovery latches; do not replay dispatched mutations or take over on timeout.
-- Add explicit snapshot-checked controller recovery and generic managed-launcher ingress with rolling drain budgets. Source review is not deployed continuity; see the [handover package](docs/handoff.md#safe-controller-overlap-for-ecs-rolling-deployment--october-9-2026) for activation prerequisites and outstanding acceptance.
+- Add explicit snapshot-checked controller recovery and generic managed-launcher ingress with rolling drain budgets. Source review is not deployed continuity; see the [handover package](docs/handoff.md#safe-controller-overlap-for-ecs-rolling-deployment--october-9-2026) for activation prerequisites, observed native replacements and coverage limits.
 
 ## Unreleased — live agent indicator
 

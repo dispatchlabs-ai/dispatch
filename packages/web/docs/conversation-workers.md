@@ -8,7 +8,7 @@ The backend owns authenticated HTTP/SSE, company/project directories, definition
 
 The existing runtime combines catalog and conversation mutations in Pi transactions. Splitting those transactions requires explicit durable command receipts and revisioned catalog propagation; copying a whole catalog into workers without update/revocation semantics is not sufficient. Preserve membership checks, connection revocation, management grants and apply-to-existing behavior. Native single-runtime mode stays supported.
 
-**Rolling-deployment scope change, October 9, 2026; source-published, deployment pending:**
+**Rolling-deployment scope change, October 9, 2026; deployed, native replacements observed:**
 Chris authorized safe controller overlap. The original single-owner rehearsal and
 ordered installation-drain procedure below remain historical/current fallback
 contracts, not a rule that all HTTP processes must stop for every future update.

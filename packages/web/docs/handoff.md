@@ -2024,7 +2024,7 @@ activation, functional/browser test or new qualification suite was performed.
 
 ## Safe controller overlap for ECS rolling deployment — October 9, 2026
 
-**Source-published; deployment acceptance pending:** after the module-only change,
+**Deployed; native ECS replacements observed, with limited availability evidence:** after the module-only change,
 Chris directed the team to solve the application blocker to actual ECS-native
 zero-downtime rolling deployment. The published selection option alone did not
 meet that outcome. The legacy routing cache/exclusive owner and launcher ownership
@@ -2039,8 +2039,9 @@ application/module contracts here and company configuration/rollout receipts in
 the owning infrastructure repository. No RDS snapshot creation or waiting;
 application/typing acceptance remains Chris-owned.
 
-Source review and permitted checks are recorded below. Runtime acceptance remains
-pending: ECS-native replacement evidence that the new service becomes ready before the old service stops without an availability gap.
+Source review, permitted checks and scoped runtime observations are recorded below.
+The deployment target is ECS-native replacement with the new service ready before
+the old service stops, supported by ownership and availability evidence.
 Readiness must mean requests can reach functioning ownership, not just liveness.
 Separate instance retirement from explicit installation-wide drain; preserve running
 workers and handle admitted requests/long-lived streams through bounded draining
@@ -2106,7 +2107,8 @@ no additional source blocker. Deslop subsequently reports the native Linux ARM64
 controller image built/published, with architecture and source-revision label
 verified; the worker image/task definition is retained. This is build/artifact
 evidence, not runtime acceptance. No application/typing tests ran for this package;
-deployment and measured rolling-continuity acceptance remain pending.
+deployment and measured rolling-continuity acceptance were still pending at this
+initial checkpoint; subsequent observations are recorded below.
 Module-only successor `3e1b26a36a5c7f02fd5b5e2f1c51785f3c264941` corrects
 callback DNS to supported Cloud Map ALB alias registration; direct Route 53 writes
 into its managed zone are not supported. That DNS-only change preserved the initial
@@ -2150,8 +2152,26 @@ checks; Linux omitted); no tests or live changes from Developer. Deslop reports
 the follow-up Linux ARM64 image built/published, with revision and architecture
 verified. Deployer reports the one-time migration restored on this follow-up;
 that interruption and a healthy final state are not rolling-continuity evidence.
-Native rolling observations remain in progress; installation receipts belong in
-the consumer infrastructure repository. The existing
+Native rolling observations are now recorded below; installation receipts belong
+in the consumer infrastructure repository. The existing
 `8106d5b` image can serve maintenance after owner opening; this follow-up prevents
 an earlier request from unnecessarily waiting until its deadline. Mutation
 transport outcomes remain non-replayable. Deployment pins do not follow docs HEAD.
+
+Observed deployment outcome, source `39f20d53ccda608c88d10348e207f9aed94d91d1`:
+Deployer published the consumer receipt; Documenter inspected it. Both backend and
+launcher native ECS replacements record ownership release before successor
+activation, sampled overlapping old/new readiness, target withdrawal before
+shutdown signal, and clean old-task termination. Worker revision retention was
+persisted without replacing the worker definition. The interrupted legacy
+migration is recorded separately, not counted as rolling continuity.
+
+All complete-body availability samples succeeded, but coverage began after the
+launcher handover and covers the backend replacement end to end. The separate
+header-only observer recorded an unclassified transport error despite concurrent
+successful body samples; this is not a failure-free observation window or an
+unconditional zero-downtime guarantee. No live workers were present; live-worker
+callbacks, long-running requests and SSE reconnection were not exercised. Drain
+budgets remain configuration, not measured worst-case bounds. Application and
+typing acceptance remain Chris-owned. Installation-specific counts, timings,
+commands, pins and receipts stay in consumer infrastructure, not this repository.
