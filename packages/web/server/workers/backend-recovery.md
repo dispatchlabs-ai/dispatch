@@ -32,4 +32,5 @@ workers/unresolved attempts, and graceful shutdown while the launcher was
 reachable. Helper review found no manual SQL latch clearing or master authority.
 This is a zero-worker controller-recovery observation, not interrupted workload
 recovery, encrypted restore/retired-authority qualification, normal service startup
-or deployed browser acceptance. The Surton consumer owns exact task/plan receipts.
+or deployed browser acceptance. The Surton consumer owns the
+[exact task/plan receipt](https://github.com/dispatchlabs-ai/dispatch-infra/blob/8c2192e/environments/surton/dispatch-workers/evidence/3a90b6d-live-deployment.json).
