@@ -912,6 +912,17 @@ export class DispatchRuntime {
 
   private get projectArchiveStore() { return new ProjectArchiveStore(join(this.owner.directory, "project-archives")); }
 
+  async authorizeProjectExport(scope: RuntimeScope, id: string, chatIds: string[]) {
+    if (chatIds.length > 100 || new Set(chatIds).size !== chatIds.length) throw new RuntimeError(400, "Choose up to 100 unique chats.");
+    await this.harness.commit(async tx => {
+      await requireProjectAccess(tx, scope, id, "manage");
+      for (const chatId of chatIds) {
+        const room = await this.shared.authorize(tx, scope, nativeId(chatId), "read", false);
+        if (room.sharedProjectId !== id) throw new RuntimeError(409, "Selected chat no longer belongs to this project.");
+      }
+    }, context);
+  }
+
   async exportProjectArchive(scope: RuntimeScope, id: string, chatIds: string[]): Promise<ProjectArchive> {
     if (chatIds.length > 100 || new Set(chatIds).size !== chatIds.length) throw new RuntimeError(400, "Choose up to 100 unique chats.");
     const snapshot = await this.harness.commit(async tx => {

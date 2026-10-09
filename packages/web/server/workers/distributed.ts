@@ -1,3 +1,5 @@
+import { decodeProjectArchive } from "../project-archives.js";
+import { PROJECT_ARCHIVE_MAX_BYTES, type ProjectArchive } from "../../src/shared/project-archives.js";
 import { awaitWorkerLaunch } from "./startup.js";
 import { isIPv4 } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
@@ -128,6 +130,23 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
   }
   const snapshot = (value: ChatSnapshot, id: string): ChatSnapshot => ({ ...value, conversation: { ...value.conversation, id } });
   const overrides: Partial<RuntimeService> = {
+    async exportProjectArchive(scope, id, chatIds) {
+      return policyRead(async () => {
+        await directory.authorizeProjectExport(scope, id, chatIds);
+        const archive = await directory.exportProjectArchive(scope, id, []);
+        let bytes = Buffer.byteLength(JSON.stringify(archive));
+        for (const chatId of chatIds) {
+          const exported = decodeProjectArchive(JSON.stringify(await callNow<ProjectArchive>(scope, chatId, "exportProjectArchive", { projectId: id })));
+          bytes += Buffer.byteLength(JSON.stringify(exported.chats));
+          if (bytes > PROJECT_ARCHIVE_MAX_BYTES) throw new RuntimeError(413, "Selected content exceeds 32 MiB.");
+          archive.chats.push(...exported.chats);
+        }
+        archive.chats.forEach((chat, index) => { chat.key = `c${index}`; });
+        const result = decodeProjectArchive(JSON.stringify(archive));
+        await directory.authorizeProjectExport(scope, id, chatIds);
+        return result;
+      });
+    },
     async listChats(scope) {
       const entries = await directory.directoryChatSummaries(scope);
       return entries.map(({ conversation, automaticTitle }) => mergeWorkerSummary(conversation, automaticTitle, routes.readSummary(conversation.id)))
