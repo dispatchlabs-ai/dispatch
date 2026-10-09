@@ -349,12 +349,12 @@ export class DispatchRuntime {
         if (!stored) throw new RuntimeError(404, "Chat not found.");
         const room = await this.shared.authorize(tx, scope, nativeId(chatId), "read", false);
         if (room.sharedProjectId !== id) throw new RuntimeError(409, "Selected chat no longer belongs to this project.");
-        const presentation = await this.shared.presentation(tx, nativeId(chatId));
+        const messages = await this.shared.publicMessages(nativeId(chatId), room.messageAliases);
         const attachments = await tx.doc(AttachmentsDoc, nativeId(chatId));
-        for (const message of presentation.messages) for (const file of message.attachments ?? []) {
+        for (const message of messages) for (const file of message.attachments ?? []) {
           if (!attachments.records[file.id] || attachments.records[file.id].private) throw new RuntimeError(409, "Public attachment metadata is unavailable.");
         }
-        chats.push({ id: chatId, title: stored.displayTitle ?? stored.title, messages: presentation.messages,
+        chats.push({ id: chatId, title: stored.displayTitle ?? stored.title, messages,
           authors: room.members.map(member => ({ id: member.id, name: member.name, kind: member.kind })) });
       }
       return JSON.parse(JSON.stringify({ name: project.name, chats, prior: (await tx.doc(ProjectArchivesDoc)).records[id] })) as { name: string; chats: typeof chats; prior?: { id: string; digest: string } };
@@ -590,8 +590,7 @@ export class DispatchRuntime {
       const catalog = await tx.doc(CatalogDoc);
       const chat = catalog.chats.find(item => item.id === id && item.companyId === scope.companyId)!;
       const room = await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
-      const presentation = await this.shared.presentation(tx, nativeId(id), {});
-      delete presentation.page;
+      const presentation = await this.shared.presentation(tx, nativeId(id));
       for (const participant of presentation.participants) {
         if (participant.kind !== "agent" || participant.membership !== "active") continue;
         const latest = latestAgent(catalog, scope.companyId, participant.agentDefinitionId);

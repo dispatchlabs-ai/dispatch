@@ -508,7 +508,9 @@ export class SharedConversations {
     return entries;
   }
 
-  private projectedMessages(roomId: ConversationId, entries: EntryRecord[], aliases: Record<string, string> = {}) {
+  /** Borrowed public projection; callers must not mutate it and must detach returned snapshots. */
+  async publicMessages(roomId: ConversationId, aliases: Record<string, string> = {}) {
+    const entries = await this.committedEntries(roomId);
     const key = JSON.stringify(aliases);
     const cached = this.messageCache.get(roomId);
     if (cached?.entries === entries && cached.aliases === key) return cached.messages;
@@ -1001,7 +1003,7 @@ export class SharedConversations {
   /** Called inside the authorized read transaction; detach only the requested public item. */
   async detail(tx: Tx, roomId: ConversationId, kind: "message" | "activity", itemId: string) {
     const room = await tx.doc(SharedDoc, roomId);
-    const messages = this.projectedMessages(roomId, await this.committedEntries(roomId), room.messageAliases);
+    const messages = await this.publicMessages(roomId, room.messageAliases);
     let value: ConversationMessage | ParticipantActivity | undefined;
     if (kind === "message") value = messages.find(message => message.id === itemId || message.aliases?.includes(itemId));
     else for (const member of room.members) {
@@ -1015,9 +1017,9 @@ export class SharedConversations {
     return value ? copyJson(value, { omitUndefinedProperties: true }) as unknown as typeof value : undefined;
   }
 
-  private async projectedHistory(tx: Tx, roomId: ConversationId, query?: TranscriptQuery) {
+  private async projectedPage(tx: Tx, roomId: ConversationId, query: TranscriptQuery) {
     const room = await tx.doc(SharedDoc, roomId);
-    const messages = this.projectedMessages(roomId, await this.committedEntries(roomId), room.messageAliases);
+    const messages = await this.publicMessages(roomId, room.messageAliases);
     const activities: ParticipantActivity[] = [];
     for (const member of room.members) {
       if (!member.conversationId) continue;
@@ -1025,17 +1027,17 @@ export class SharedConversations {
       const entries = await this.committedEntries(member.conversationId);
       activities.push(...this.projectedActivities(member, entries, live, messages));
     }
-    const page = query ? transcriptPage(messages, activities, query, createHash("sha256").update(JSON.stringify(room.messageAliases ?? {})).digest("hex")) : undefined;
-    return { room, messages, activities, page };
+    const page = transcriptPage(messages, activities, query, createHash("sha256").update(JSON.stringify(room.messageAliases ?? {})).digest("hex"));
+    return { room, page };
   }
 
   async page(tx: Tx, roomId: ConversationId, query: TranscriptQuery): Promise<TranscriptPage> {
-    const { page } = await this.projectedHistory(tx, roomId, query);
-    return copyJson(page!, { omitUndefinedProperties: true }) as unknown as TranscriptPage;
+    const { page } = await this.projectedPage(tx, roomId, query);
+    return copyJson(page, { omitUndefinedProperties: true }) as unknown as TranscriptPage;
   }
 
-  async presentation(tx: Tx, roomId: ConversationId, query?: TranscriptQuery): Promise<Presentation & { history?: { before: string | null; generation: string }; page?: TranscriptPage }> {
-    const { room, messages, activities, page } = await this.projectedHistory(tx, roomId, query);
+  async presentation(tx: Tx, roomId: ConversationId): Promise<Presentation & { history: { before: string | null; generation: string } }> {
+    const { room, page } = await this.projectedPage(tx, roomId, {});
     const turns = await tx.doc(TurnsDoc, roomId);
     const participants: ConversationParticipant[] = [];
     const activeTickets = await activeTurnTickets(tx, turns);
@@ -1054,7 +1056,7 @@ export class SharedConversations {
       else participants.push({ ...participant, status: Object.values(turns.presence).some(presence => presence.participantId === member.id && presence.until > Date.now()) ? "typing" : "idle" } as ConversationParticipant);
     }
     // Native document drafts are revoked at the end of the enclosing commit.
-    return copyJson(page ? { participants, messages: page.messages, activities: page.activities, history: { before: page.before, generation: page.generation }, page } : { participants, messages, activities }, { omitUndefinedProperties: true }) as unknown as Presentation & { history?: { before: string | null; generation: string }; page?: TranscriptPage };
+    return copyJson({ participants, messages: page.messages, activities: page.activities, history: { before: page.before, generation: page.generation } }, { omitUndefinedProperties: true }) as unknown as Presentation & { history: { before: string | null; generation: string } };
   }
 }
 
