@@ -22,9 +22,11 @@ Record the source commit and tarball SHA-256 with any distribution; version `0.1
 | --- | --- | --- |
 | `@dispatch/pi-capabilities/coding` | `Coding` | `coding` prompt sections; install stock `CodingTools` from `@earendil-works/pi-durable/tools` separately. `files-and-commands` requires both, with tools `read`, `write`, `edit`, `bash`. |
 | `@dispatch/pi-capabilities/skills` | `Skills`, `SkillBindingsDoc`, `SkillSnapshot` type | `dispatch-skills`, tool `load_skill`; host admits authorized immutable skill snapshots into the conversation document alongside agent configuration. No catalog, package reader or automatic skill assignment. |
-| `@dispatch/pi-capabilities/web` | `createWebResearch` | `dispatch-web`, tool `web_run`; inject a host `WebBackend`. Native web-reference document kinds/versions stay unchanged. |
+| `@dispatch/pi-capabilities/web` | `createWebResearch`, `WebCapability` and `WebResearchAccess` types | Call `createWebResearch(backend, access)` to obtain `reading` (`dispatch-web-read` / `web_read`), `search` (`dispatch-web-search` / `web_search`) and `legacy` (`dispatch-web` / `web_run`). Native web-reference document kinds/versions stay unchanged. |
 | `@dispatch/pi-capabilities/web-backend` | `WebBackend` type, `WebBackendError` | Backend must enforce URL/DNS/redirect and network safety, bound reads and honor cancellation. Search/provider credentials remain host-owned. The Dispatch HTTP/search backend is **not** included. |
 | `@dispatch/pi-capabilities/image-gen` | `createImageGen` | `dispatch-image-gen`, tool `generate_image`; inject host `Models` with OpenAI authentication and supply a writable local execution environment. Uses the existing fixed OpenAI Images endpoint/model defaults and local output/evidence files. |
+
+For web tools, inject a safe `WebBackend` plus trusted `WebResearchAccess` callbacks: `authorize(instanceId, capability, signal)` checks current permission for each operation, including saved-reference reads; `search(instanceId, query, signal)` resolves current credentials/grants and performs search. Do not derive authority from caller arguments or historical agent configuration, and never put secrets in native documents. Install all three returned extensions before recovery; select only reading/search for newly configured agents. Legacy registration preserves persisted calls, not permission to bypass disabled operations.
 
 These modules are trusted host code, not a sandbox. Coding tools can access files and execute commands with the environment's authority; a working directory is not an isolation boundary. Image generation makes paid external requests and writes local files. Web retrieval sends queries/URLs externally. Skills provide instructions, not permission grants. Shared-conversation, agent-management and authenticated connection extensions remain Dispatch-owned and are not portable exports.
 
@@ -52,6 +54,6 @@ Native replay declarations are unchanged: skills are read-only/replay-safe; web 
 
 ## Qualification
 
-Build/type checks and archive-content inspection are packaging evidence only. Installation in a separate host, tool execution, restart/recovery, provider/network behavior and credential/environment integration require separately authorized functional qualification. No runtime tests are included or authorized by this package.
+Build/type checks and archive-content inspection are packaging evidence only. [Dated portability observations](../docs/handoff.md#portability-manual-qualification--october-8-2026) cover bounded independent-host installation/execution/reopen of the earlier artifact; they do not qualify the revised web factory or every provider/credential integration. [Native web split observations](../docs/handoff.md#wp-054--native-web-research) record separate extension gating/recovery evidence and its limits. No runtime tests are included or authorized by this package.
 
 Native contract: [Pi Durable v1.0.4 extensions](https://github.com/earendil-works/pi/blob/v1.0.4/packages/durable/README.md#extensions).
