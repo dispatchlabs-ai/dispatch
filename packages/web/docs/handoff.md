@@ -1727,6 +1727,8 @@ Read-path follow-up: independently reviewed `4c20ae9` removes three preliminary 
 
 Detail/Stop follow-up: independently reviewed `8914142` selects and detaches only the requested public detail through existing projection helpers, avoiding unrelated participant status/usage work. Stop retains mutation-time participation authorization and its authorized response read while removing a preliminary commit. Integrated TypeScript/application/capability, Apple Silicon Nix build and flake checks passed; flake has zero runnable checks and omits Linux. No tests or deployment; runtime, cold-history cost and latency remain unmeasured.
 
+Transcript-page follow-up: independently reviewed `47daa5c` reuses the shared history projection without participant status/usage, turn-ticket or removal-task reads. Existing authorization, sanitizers, aliases and cursor generation remain. Integrated TypeScript/application/capability, Apple Silicon Nix build and flake evaluation passed (zero runnable checks; Linux omitted). No tests or deployment; runtime and latency remain unmeasured.
+
 Acceptance:
 
 - Preserve supported behavior, public/persisted contracts, authorization, meaningful failures and native Pi execution/recovery ownership. Investigate compatibility consumers before removal; unresolved behavior changes require a decision, not speculative deletion.
