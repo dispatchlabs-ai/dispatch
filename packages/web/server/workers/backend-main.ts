@@ -1,3 +1,4 @@
+import { createWebBackend } from "../web/backend.js";
 import { McpPolicyGate } from "./mcp-policy.js";
 import { backendWorkerMcp } from "./mcp.js";
 import { mkdir, readFile } from "node:fs/promises";
@@ -213,6 +214,21 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
   if (c.req.method !== "POST") return c.json({ error: "Not found" }, 404);
   const input = await c.req.json();
   assertCurrent();
+  if (operation === "search") return c.json(await mcpPolicy.call(async () => {
+    const request = z.object({
+      actor: z.custom<import("../runtime.js").WorkerManagementActor>(value => typeof value === "object" && value !== null),
+      query: z.object({ q: z.string().trim().min(1).max(10000), recency: z.number().int().nonnegative().optional(), domains: z.array(z.string().min(1).max(253)).max(100).optional() }).strict(),
+    }).strict().parse(input);
+    const { actor } = request;
+    if (actor.companyId !== route.companyId || actor.conversationKey !== route.conversationId || actor.storeId !== route.storeId)
+      throw new RuntimeError(403, "Search actor is outside the authenticated worker route.");
+    assertCurrent();
+    const authorized = await directory.authorizeWorkerSearch(actor);
+    const searchApiKey = await connections.resolveSearchSecret(authorized.companyId, authorized.definitionId);
+    assertCurrent();
+    c.req.raw.signal.throwIfAborted();
+    return createWebBackend({ searchApiKey }).search(request.query, c.req.raw.signal);
+  }));
   if (operation === "mcp/definitions") return c.json(await mcp.definitions(route, input));
   if (operation === "mcp/call") return c.json(await mcpPolicy.call(() => {
     assertCurrent();
