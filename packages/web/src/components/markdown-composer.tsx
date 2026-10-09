@@ -16,7 +16,7 @@ import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPl
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
-import { $findMatchingParent, $getSelection, $isRangeSelection, $isTextNode, FORMAT_TEXT_COMMAND, CLEAR_HISTORY_COMMAND, COMMAND_PRIORITY_HIGH, COMMAND_PRIORITY_NORMAL, COPY_COMMAND, CUT_COMMAND, INSERT_PARAGRAPH_COMMAND, KEY_ENTER_COMMAND, PASTE_COMMAND, SKIP_DOM_SELECTION_TAG } from "lexical";
+import { $findMatchingParent, $getSelection, $isRangeSelection, $isTextNode, FORMAT_TEXT_COMMAND, CLEAR_HISTORY_COMMAND, COMMAND_PRIORITY_HIGH, COMMAND_PRIORITY_NORMAL, COPY_COMMAND, CUT_COMMAND, INSERT_PARAGRAPH_COMMAND, KEY_ENTER_COMMAND, PASTE_COMMAND, SKIP_DOM_SELECTION_TAG, type EditorState } from "lexical";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { MentionParticipant } from "../lib/mentions";
 import { $getMentionIds, MentionNode, mentionTransformers } from "./mention-node";
@@ -118,6 +118,7 @@ function ComposerSync(props: MarkdownComposerProps & { transformers: Transformer
   const lastValue = useRef(value);
   const lastParentValue = useRef(value);
   const lastMentions = useRef(mentions);
+  const scannedMentionState = useRef<EditorState | null>(null);
 
   useEffect(() => { editor.setEditable(!disabled && !readOnly); }, [editor, disabled, readOnly]);
 
@@ -137,7 +138,13 @@ function ComposerSync(props: MarkdownComposerProps & { transformers: Transformer
 
   useEffect(() => {
     if (!onMentionsChange) return;
-    const ids = editor.read("latest", $getMentionIds);
+    const ids = editor.read("latest", () => {
+      const state = editor.getEditorState();
+      // Local edits already collected IDs in OnChange; still scan imports/replacements.
+      if (state === scannedMentionState.current) return lastMentions.current;
+      scannedMentionState.current = state;
+      return $getMentionIds();
+    });
     if (ids.join("\n") !== lastMentions.current.join("\n")) {
       lastMentions.current = ids;
       onMentionsChange(ids);
@@ -193,7 +200,8 @@ function ComposerSync(props: MarkdownComposerProps & { transformers: Transformer
 
   return <OnChangePlugin ignoreSelectionChange ignoreHistoryMergeTagChange={false} onChange={(state, _editor, tags) => {
     if (tags.has("external-draft")) return;
-    const { markdown, ids } = state.read(() => ({ markdown: $convertToMarkdownString(transformers, undefined, true), ids: $getMentionIds() }));
+    const { markdown, ids } = state.read(() => ({ markdown: $convertToMarkdownString(transformers, undefined, true), ids: onMentionsChange ? $getMentionIds() : noMentions }));
+    if (onMentionsChange) scannedMentionState.current = state;
     if (markdown !== lastValue.current) {
       lastValue.current = markdown;
       onChange(markdown);
