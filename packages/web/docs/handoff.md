@@ -1289,6 +1289,18 @@ Acceptance evidence: Developer integrated Documenter's contract updates and Desl
 
 ## WP-054 — Native web research
 
+### Capability split — October 9, 2026
+
+Chris requested separate Web reading and Web search assignments; see the [revised contract](spec.md#native-web-research). Developer owns runtime/capability/UI integration and publication; Pi Durable Expert owns the native extension split and operation gating/recovery; Documenter records the contract. This supersedes the single-capability assignment design below, not the existing evidence/recovery boundaries.
+
+Acceptance additions:
+- Agents can receive reading only, search only, both or neither. Enforce each operation server-side; a current Exa grant is additionally required for search and never implicitly enables reading.
+- Agent controls, Secrets grant labels and trusted runtime credential resolution use the corresponding capability. Preserve saved evidence and encrypted credentials/grants.
+- Expose `web_read` and `web_search` over shared snapshot documents. Map legacy `web-research` assignments to both, preserving credential grants; explicit new selections remove the legacy marker. Register legacy `dispatch-web`/`web_run` only for persisted-call compatibility, checking trusted current capabilities before each operation. Preserve unsafe replay without restoring disabled authority.
+- Source/native/deslop review, TypeScript/application and applicable Nix checks, whitespace/local links and desktop/390 px review. Record operation denial, migration, idle adoption and recovery observations separately from builds. Existing activation and authenticated end-to-end acceptance gaps remain open.
+
+Status: contract recorded; implementation, publication and runtime/rendered qualification pending. No capabilities or credentials changed by this documentation update.
+
 Authorized October 8, 2026 for all four operations together. Pi Durable Expert owns the native extension and durable references; Reverse owns retrieval/security; Developer owns capability/runtime/UI integration, documentation and publication.
 
 Acceptance criteria:
