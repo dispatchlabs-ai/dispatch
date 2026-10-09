@@ -16,6 +16,10 @@ values belong in a separate consumer repository. The Surton consumer is
   rollback or ECS Exec. Workers are standalone launcher-owned `RunTask` attempts,
   never Terraform-managed conversation services. Database locks do not prove old
   task termination. Crash owners require the application's explicit recovery path.
+  Optional `service_desired_counts` overrides accept only `backend`/`launcher`
+  entries at `0` or `1`; omitted entries inherit `desired_count`. The default `{}`
+  preserves shared counts. Use overrides for staged controller maintenance,
+  reviewing each state-backed plan and confirming actual termination between stages.
 - Private encrypted PostgreSQL 17, single-AZ `db.t4g.small`, 20 GiB gp3 (autoscaling
   up to 100 GiB), enforced TLS, seven-day backups and deletion protection. The
   generated RDS master secret is **operator-only**. Provision separate application
@@ -175,7 +179,8 @@ not grant application roles parameter authority to work around an initializer
 failure. The helper's owning contract is
 [`database-init.md`](../../server/workers/database-init.md).
 
-The task definition precondition requires `desired_count=0`; this is not proof of
+The task definition precondition requires `desired_count=0` and every
+`service_desired_counts` override at zero; this is not proof of
 actual old-task termination. Before the operator invokes it, independently confirm
 all backend/launcher/worker and maintenance owners STOPPED, reject uncertain state,
 and pin exact task definition/secret versions. Run it in `service_cluster_arn`,
