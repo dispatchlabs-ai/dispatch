@@ -182,7 +182,7 @@ function operatorTransition<T>(operation: () => Promise<T>): Promise<T> {
 const mcp = backendWorkerMcp(directory);
 const app = new Hono();
 app.use("*", async (c, next) => {
-  if (c.req.path === "/internal/replace" || c.req.path === "/internal/status" || c.req.path === "/internal/drain" || c.req.path === "/internal/undrain") return next();
+  if (c.req.path === "/internal/health" || c.req.path === "/internal/replace" || c.req.path === "/internal/status" || c.req.path === "/internal/drain" || c.req.path === "/internal/undrain") return next();
   const gate = c.req.path.startsWith("/internal/workers/") ? support : admission;
   if (!gate.admitting) return c.json({ error: "Application is drained" }, 503);
   return gate.run(next);
@@ -192,6 +192,8 @@ app.use("/internal/*", async (c, next) => {
   if (c.req.header("Origin")) return c.json({ error: "Forbidden" }, 403);
   await next();
 });
+// Private load-balancer liveness is independent of admission and readiness.
+app.get("/internal/health", c => c.text("ok"));
 app.use("/internal/workers/*", bodyLimit({ maxSize: ATTACHMENT_RPC_MAX_BYTES, onError: c => c.json({ error: "Request too large" }, 413) }));
 app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
   const currentRoute = () => {
