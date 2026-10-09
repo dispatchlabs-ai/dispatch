@@ -75,6 +75,16 @@ node build/service/server/workers/controller-recovery.js recover \
   --confirm-controllers-stopped
 ```
 
+For a one-off ECS/operator container using the existing restricted-file bootstrap,
+replace `node build/service/server/workers/controller-recovery.js` above with
+`dispatch-bootstrap controller-recovery`. Supply the role's existing
+`DISPATCH_BOOTSTRAP_FILES` manifest and scoped secret references, with `--config`
+pointing to the materialized controller database config. The bootstrap only writes
+restricted files and executes this CLI; it does not start a controller or open its
+application stores. Run inspection and recovery as separate operator invocations,
+never as a retained service command. Transfer the inspected snapshot through an
+operator-owned restricted file/bootstrap entry, not an unverified chat copy.
+
 The confirmation is an operator assertion, not proof supplied by the CLI. Recovery
 refuses still-connected instance locks and deletes only an exact matching
 installation/role/owner/phase/successor record. Those locks add a guard; their

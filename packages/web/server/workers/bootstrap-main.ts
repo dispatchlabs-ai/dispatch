@@ -12,6 +12,7 @@ const services = {
   auth: "../auth-cli.js",
   "provider-auth": "../provider-auth-cli.js",
   "database-init": "./database-init-main.js",
+  "controller-recovery": "./controller-recovery.js",
 } as const;
 const manifestSchema = z.record(
   z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/),
