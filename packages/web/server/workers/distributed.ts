@@ -21,6 +21,7 @@ export type DistributedOptions = {
   configurationRevision: string; directory: DispatchRuntime; routes: WorkerRoutes;
 };
 export type DistributedRuntime = RuntimeService & {
+  deferCatalogReconciliation(companyId: string): void;
   runWorkerTransition<T>(operation: () => Promise<T>): Promise<T>;
 };
 export function distributedRuntime(options: DistributedOptions): DistributedRuntime {
@@ -127,6 +128,16 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
         await routes.retiring(route.conversationId, route.attemptId);
       }
     }
+  }
+  function deferCatalogReconciliation(companyId: string): void {
+    // Admit now so shutdown joins the deferred work, but never await a worker
+    // callback from the management RPC that its native transaction is awaiting.
+    void options.runBackground(async () => {
+      await delay(0);
+      await policyChange(() => acknowledgePolicy(companyId));
+    }).catch(() => {
+      console.error("Deferred worker catalog reconciliation failed; reconciliation is required.");
+    });
   }
   const snapshot = (value: ChatSnapshot, id: string): ChatSnapshot => ({ ...value, conversation: { ...value.conversation, id } });
   const operations = {
@@ -302,6 +313,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     saveSkill: directory.saveSkill.bind(directory),
     getDefaultAgent: directory.getDefaultAgent.bind(directory),
     ...operations,
+    deferCatalogReconciliation,
     runWorkerTransition: policyChange,
   } satisfies DistributedRuntime;
 }
