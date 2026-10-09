@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — composer typing isolation
+
+- Notify only the affected main/thread composer on draft edits rather than rerendering the workspace and unrelated chats; retain workspace-lifetime drafts, uploads and send/retry guards.
+- Avoid duplicate mention scans for the same editor state while retaining synchronous Markdown updates, initial imports and external replacements. See the [correction package](docs/handoff.md#composer-typing-responsiveness--october-9-2026) for evidence and limits.
+
 ## Unreleased — borderless activity labels
 
 - Remove the visible box around agent activity labels while retaining click-to-expand, hover feedback and keyboard focus styling. Tighten activity-only row spacing and label padding, retaining 44 px touch targets.

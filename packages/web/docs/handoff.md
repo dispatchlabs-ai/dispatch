@@ -1946,6 +1946,8 @@ Chris reported recurring prompt lag and authorized the team to fix it. Source re
 
 Scope: isolate draft notifications to the relevant chat/thread composer while retaining workspace-lifetime state; remove avoidable editor work without debouncing user input or changing Markdown behavior. Developer owns draft isolation, Deslop owns editor changes, Pi Durable Expert reviews draft/send/retry and presence boundaries, and Documenter reconciles contracts and evidence. No backend redesign, new draft persistence or unrelated cleanup is included.
 
+Implementation decision: keep synchronous Markdown serialization so immediate Send and length validation read the current draft without new flush/race machinery. The narrow editor optimization caches mention IDs with their editor-state identity to avoid duplicate scans after local edits; initial imports and external replacements still scan. Editors without mention callbacks skip that collection. Source review includes the corrected paired state/IDs cache, not the superseded identity-only guard.
+
 Acceptance:
 
 - Draft edits must not rerender the workspace or unrelated mounted chat panels. Send/close read current state synchronously; switching/remounting main/thread composers retains independent drafts and uploads.
