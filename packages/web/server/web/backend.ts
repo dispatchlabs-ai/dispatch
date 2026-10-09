@@ -1,6 +1,6 @@
 /*
- * Web research backend: public-web retrieval for the web-research
- * capability. Direct HTTP page reads with public-destination validation and
+ * Web research backend: public-web retrieval for the reading and search
+ * capabilities. Direct HTTP page reads with public-destination validation and
  * connection-time address pinning (original Host header and TLS SNI kept),
  * maintained-parser HTML-to-text extraction (node-html-parser), and optional
  * Exa search.
@@ -298,7 +298,7 @@ export function createWebBackend(config: WebBackendConfig = {}): WebBackend {
     },
 
     async search(query: { q: string; recency?: number; domains?: string[] }, signal?: AbortSignal) {
-      if (!searchApiKey) throw new WebBackendError("Web search has no authorized credential. In Settings → Secrets, configure Exa and allow this agent to use it. Direct URL reads remain available.");
+      if (!searchApiKey) throw new WebBackendError("Web search has no authorized credential. In Settings → Secrets, configure Exa and allow this agent to use it. Direct URL reads require the separate Web reading capability.");
       const q = query.q.trim();
       if (!q) throw new WebBackendError("The search query is blank.");
       // Fixed public endpoint, so there is no URL surface to validate; the key is sent only to this host.

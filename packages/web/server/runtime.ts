@@ -258,10 +258,10 @@ export class DispatchRuntime {
         for (const id of ids) {
           const agent = latestAgent(catalog, options.companyId, id)!;
           if (!agent.extensions?.includes("dispatch-web")) continue;
-          const selection = capabilitySelection(publicAgent(agent).capabilities ?? []);
+          const selection = capabilitySelection(["web-reading", "web-search"]);
           catalog.agents.push({ ...agent,
-            extensions: [...agent.extensions.filter(name => !capabilityExtensions.has(name)), ...selection.extensions],
-            tools: [...(agent.tools ?? []).filter(name => !capabilityTools.has(name)), ...selection.tools],
+            extensions: [...new Set([...agent.extensions.filter(name => name !== "dispatch-web"), ...selection.extensions])],
+            tools: [...new Set([...(agent.tools ?? []).filter(name => name !== "web_run"), ...selection.tools])],
             revision: agent.revision + 1, updatedAt: Date.now(),
           });
         }
