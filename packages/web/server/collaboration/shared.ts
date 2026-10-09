@@ -36,6 +36,7 @@ export type Member = {
   /** Workspace chosen at creation, including for agents that gain local tools later. */
   workspaceDefault?: string;
   pendingConnectionIds?: string[];
+  pendingWorkerMcp?: { connections: AgentConnection[]; extensions: string[]; tools: string[] };
   connectionsRefreshPending?: boolean;
   upgradeError?: string;
   membership?: AgentParticipant["membership"]; removalTask?: TaskId;
@@ -91,6 +92,7 @@ export class SharedConversations {
   private readonly entryCache = new Map<ConversationId, EntryRecord[]>();
   private readonly messageCache = new Map<ConversationId, { entries: EntryRecord[]; aliases: string; messages: MessageData[] }>();
   private readonly activityCache = new Map<ConversationId, { entries: EntryRecord[]; messages: ConversationMessage[]; memberId: string; joinedAt: number; groups: ParticipantActivity[] }>();
+  onParticipantStateChanged?: (tx: Tx) => Promise<void>;
   beforeDelivery?: (tx: Tx, roomId: ConversationId, companyId: string, member: Member) => Promise<void>;
   readonly extension;
   readonly definitionOfDoneExtension;
@@ -240,6 +242,7 @@ export class SharedConversations {
           const member = room.members.find(item => item.id === task.input.participantId)!;
           if (member.removalTask !== task.id || member.membership === "removed") return terminal();
           member.membership = "removed";
+          await this.onParticipantStateChanged?.(tx);
           member.status = "stopped";
           delete member.error;
           delete member.activeDelivery;
@@ -644,9 +647,10 @@ export class SharedConversations {
     for (const definitionId of agentIds) await this.addAgent(tx, roomId, definitionId);
   }
 
-  async addAgent(tx: Tx, roomId: ConversationId, definitionId: string, options: Pick<CreateAgentInstanceInput, "name" | "instructions"> = {}, revision?: number) {
+  async addAgent(tx: Tx, roomId: ConversationId, definitionId: string, options: Pick<CreateAgentInstanceInput, "name" | "instructions"> = {}, revision?: number, participantId?: string) {
     const room = await tx.doc(SharedDoc, roomId);
     const member = await this.createAgent(tx, roomId, room.companyId, definitionId, revision);
+    if (participantId) member.id = participantId;
     if (options.name) member.name = options.name;
     if (options.instructions) {
       member.instanceInstructions = options.instructions;
@@ -829,7 +833,7 @@ export class SharedConversations {
   }
 
   /** Public metadata and its entry are one native commit, including membership and legacy writes. */
-  private async appendPublic(tx: Tx, roomId: ConversationId, value: { data: MessageData }) {
+  async appendPublic(tx: Tx, roomId: ConversationId, value: { data: MessageData }) {
     const entry = await tx.appendEntry(PublicEntry, roomId, value);
     includePublicMessage(await tx.doc(PublicSummaryDoc, roomId), entry.id, value.data);
     return entry;
@@ -946,36 +950,42 @@ export class SharedConversations {
   async remove(roomId: ConversationId, participantId: string, authorId: string, authorize: (tx: Tx) => Promise<unknown>) {
     const id = await this.harness.commit(async tx => {
       await authorize(tx);
-      const room = await tx.doc(SharedDoc, roomId);
-      const author = requireActiveMember(room, authorId);
-      if (author.kind !== "human") throw new CollaborationError(403, "Only humans can remove agents.");
-      const member = room.members.find(item => item.id === participantId);
-      if (!member) throw new CollaborationError(404, "Participant not found.");
-      if (member.kind !== "agent" || !member.conversationId) throw new CollaborationError(400, "Only agent participants can be removed.");
-      if (member.membership === "removed") return undefined;
-      if (member.removalTask) {
-        const previous = await tx.task(member.removalTask);
-        if (previous && previous.state.status !== "terminal") return previous.id;
-      }
-      member.membership = "removing";
-      const contributions = await this.contributions.closeAll(tx, roomId, member.id);
-      await this.turns.release(tx, roomId, member.id);
-      const deliveries: TaskId[] = [];
-      for (const id of room.deliveries) {
-        const task = await tx.task(id);
-        if (task && (task.kind === this.delivery.definition.name || task.kind === this.legacyReporter.definition.name)
-          && (task.input as { participantId?: string }).participantId === member.id) deliveries.push(id);
-      }
-      const id = await tx.createTask(this.removeTask, {
-        roomId, participantId: member.id, authorId, conversationId: member.conversationId, deliveries, contributions,
-      }, { conversationId: roomId, ownership: { kind: "conversation" }, background: true });
-      member.removalTask = id;
-      return id;
+      return this.beginRemoval(tx, roomId, participantId, authorId);
     }, context);
     if (id) {
       const result = await this.harness.waitForTask(id, context);
       if (result.state.outcome.status !== "completed") throw new CollaborationError(503, "Agent removal did not complete. Retry removal to finish cleanup.");
     }
+  }
+
+  /** Trusted removal intent and native cleanup admission share the caller's transaction. */
+  async beginRemoval(tx: Tx, roomId: ConversationId, participantId: string, authorId: string) {
+    const room = await tx.doc(SharedDoc, roomId);
+    const author = requireActiveMember(room, authorId);
+    if (author.kind !== "human") throw new CollaborationError(403, "Only humans can remove agents.");
+    const member = room.members.find(item => item.id === participantId);
+    if (!member) throw new CollaborationError(404, "Participant not found.");
+    if (member.kind !== "agent" || !member.conversationId) throw new CollaborationError(400, "Only agent participants can be removed.");
+    if (member.membership === "removed") return undefined;
+    if (member.removalTask) {
+      const previous = await tx.task(member.removalTask);
+      if (previous && previous.state.status !== "terminal") return previous.id;
+    }
+    member.membership = "removing";
+    const contributions = await this.contributions.closeAll(tx, roomId, member.id);
+    await this.turns.release(tx, roomId, member.id);
+    const deliveries: TaskId[] = [];
+    for (const id of room.deliveries) {
+      const task = await tx.task(id);
+      if (task && (task.kind === this.delivery.definition.name || task.kind === this.legacyReporter.definition.name)
+        && (task.input as { participantId?: string }).participantId === member.id) deliveries.push(id);
+    }
+    const id = await tx.createTask(this.removeTask, {
+      roomId, participantId: member.id, authorId, conversationId: member.conversationId, deliveries, contributions,
+    }, { conversationId: roomId, ownership: { kind: "conversation" }, background: true });
+    member.removalTask = id;
+    await this.onParticipantStateChanged?.(tx);
+    return id;
   }
 
   async stop(roomId: ConversationId, authorize?: (tx: Tx) => Promise<unknown>) {
@@ -1019,7 +1029,7 @@ export class SharedConversations {
     const messages = this.projectedMessages(roomId, await this.committedEntries(roomId), room.messageAliases);
     const activeTickets = await activeTurnTickets(tx, turns);
     for (const member of room.members) {
-      const { pendingConnectionIds, connectionsRefreshPending, conversationId, removalTask, lastDelivery: _last, threadId, activeDelivery: _delivery, consideredThrough: _through, superseded: _superseded, publicationPriority: _priority, ...participant } = member;
+      const { pendingConnectionIds, pendingWorkerMcp, connectionsRefreshPending, conversationId, removalTask, lastDelivery: _last, threadId, activeDelivery: _delivery, consideredThrough: _through, superseded: _superseded, publicationPriority: _priority, ...participant } = member;
       if (conversationId) {
         const live = await tx.doc(LiveDoc, conversationId);
         const observed = await participantStatus(tx, member, live, turns, activeTickets);
@@ -1029,7 +1039,7 @@ export class SharedConversations {
         const removal = removalTask ? await tx.task(removalTask) : undefined;
         const removalError = member.membership === "removing" && (!removal || removal.state.status === "terminal")
           ? "Removal incomplete. Retry removal." : undefined;
-        participants.push({ ...participant, ...(pendingConnectionIds || connectionsRefreshPending ? { connectionsPending: true } : {}), membership: member.membership ?? "active", ...(removalError ? { removalError } : {}),
+        participants.push({ ...participant, ...(pendingConnectionIds || pendingWorkerMcp || connectionsRefreshPending ? { connectionsPending: true } : {}), membership: member.membership ?? "active", ...(removalError ? { removalError } : {}),
           ...observed, usage } as ConversationParticipant);
       }
       else participants.push({ ...participant, status: Object.values(turns.presence).some(presence => presence.participantId === member.id && presence.until > Date.now()) ? "typing" : "idle" } as ConversationParticipant);
