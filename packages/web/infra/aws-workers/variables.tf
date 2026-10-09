@@ -163,3 +163,13 @@ variable "launcher_internal_alb" {
   type        = bool
   default     = false
 }
+
+variable "backend_callback_certificate_arn" {
+  description = "Optional ACM certificate for callbacks.<name>.internal on the private ALB. Requires launcher_internal_alb and a readiness-capable backend. The certificate must match backend_callback_hostname and chain to the workers' configured CA bundle."
+  type        = string
+  default     = null
+  validation {
+    condition     = var.backend_callback_certificate_arn == null || var.launcher_internal_alb
+    error_message = "Backend callback ingress reuses the private ALB; enable launcher_internal_alb."
+  }
+}

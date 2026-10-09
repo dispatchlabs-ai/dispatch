@@ -60,6 +60,10 @@ resource "aws_ecs_task_definition" "stable" {
       error_message = "Rolling backend deployment requires the module ALB readiness check and a certificate."
     }
     precondition {
+      condition     = each.key != "backend" || lookup(var.service_deployment_mode, each.key, "stop-first") != "rolling" || local.backend_callback_enabled
+      error_message = "Rolling backend deployment requires managed callback ingress and workers migrated to backend_callback_url with matching CA trust."
+    }
+    precondition {
       condition     = each.key != "launcher" || lookup(var.service_deployment_mode, each.key, "stop-first") != "rolling" || var.launcher_internal_alb
       error_message = "Rolling launcher deployment requires the internal ALB and callers migrated to its URL."
     }
@@ -142,7 +146,7 @@ resource "aws_ecs_service" "stable" {
   deployment_minimum_healthy_percent = lookup(var.service_deployment_mode, each.key, "stop-first") == "rolling" ? 100 : 0
   deployment_maximum_percent         = lookup(var.service_deployment_mode, each.key, "stop-first") == "rolling" ? 200 : 100
   enable_execute_command             = false
-  health_check_grace_period_seconds  = (each.key == "backend" && var.certificate_arn != null) || (each.key == "launcher" && var.launcher_internal_alb) ? 600 : 0
+  health_check_grace_period_seconds  = (each.key == "backend" && (var.certificate_arn != null || local.backend_callback_enabled)) || (each.key == "launcher" && var.launcher_internal_alb) ? 600 : 0
   deployment_circuit_breaker {
     enable   = true
     rollback = false
@@ -169,7 +173,15 @@ resource "aws_ecs_service" "stable" {
       container_port   = 8830
     }
   }
-  depends_on = [aws_lb_listener.https, aws_lb_listener.launcher, aws_iam_role_policy.execution, aws_iam_role_policy.launcher, aws_iam_role_policy.backend, aws_nat_gateway.this]
+  dynamic "load_balancer" {
+    for_each = each.key == "backend" && local.backend_callback_enabled ? [1] : []
+    content {
+      target_group_arn = aws_lb_target_group.backend_callback[0].arn
+      container_name   = "backend"
+      container_port   = 3001
+    }
+  }
+  depends_on = [aws_lb_listener.https, aws_lb_listener.launcher, aws_lb_listener_rule.backend_callback, aws_iam_role_policy.execution, aws_iam_role_policy.launcher, aws_iam_role_policy.backend, aws_nat_gateway.this]
   tags       = local.tags
 }
 resource "aws_lb" "this" {

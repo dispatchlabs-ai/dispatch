@@ -141,6 +141,33 @@ then returns the managed ingress rather than Cloud Map. Enable it during the
 stop-first migration and move **every launcher caller** to that output before
 rolling. The additional ALB/LCU charges belong to the caller's infrastructure.
 
+Rolling backends also require `backend_callback_certificate_arn`. This adds an
+HTTPS listener on port 443 to the same private ALB and a separate backend target
+group on HTTPS 3001, checked at `/internal/ready`. The private Route 53 alias is
+`callbacks.<name>.internal`; `backend_callback_hostname` exposes that certificate
+identity before provisioning and `backend_callback_url` returns its HTTPS origin
+when enabled. The existing `backend_private_url` remains a direct Cloud Map URL for
+operator/direct use; it is **not** replacement-safe callback ingress.
+
+Only worker task security groups can reach the callback listener. Only
+`/internal/workers/*` forwards; other paths return 404, including operator and
+controller-handover APIs. Worker authorization remains enforced by the backend.
+The listener requires a caller-supplied ACM server certificate matching
+`backend_callback_hostname`, chaining to the CA bundle the launcher supplies to
+workers. The module does not create/import private keys or CA material. ALB-to-task
+HTTPS encrypts the target hop, but ALB does not validate target certificates;
+security-group restrictions and worker authentication remain necessary.
+
+Enable the callback ingress while still stop-first, then explicitly configure the
+launcher's worker environment `DISPATCH_BACKEND_INTERNAL_URL` to
+`backend_callback_url`, preserving the matching `DISPATCH_BACKEND_CA_PEM` trust
+supplied by `backendCaFile`. Merely changing module outputs does not update that
+configuration or running workers. Inspect/reconcile existing pinned worker URLs
+before enabling rolling; do not silently stop workers or assume stale Cloud Map
+addresses are safe after listener withdrawal. Direct cross-role security rules
+remain for staged migration/operations, not as a continuity guarantee. No callback
+mutation retry or ownership bypass is added.
+
 Managed draining uses 360-second target deregistration and 400-second idle timeout
 for the launcher ALB and for the backend ALB in rolling mode. Stop-first backend
 budgets remain 30/300 seconds. ALB-attached controllers have 600-second ECS startup

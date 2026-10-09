@@ -25,3 +25,12 @@ output "database_initializer" {
   } : null
   description = "Operator-only RunTask inputs, using service_cluster_arn/private_subnet_ids and no public IP. Not scheduled by Terraform."
 }
+
+output "backend_callback_hostname" {
+  value       = local.backend_callback_hostname
+  description = "Private callback certificate DNS identity, available before certificate provisioning."
+}
+output "backend_callback_url" {
+  value       = local.backend_callback_enabled ? "https://${local.backend_callback_hostname}" : null
+  description = "Readiness-gated worker callback origin. Set DISPATCH_BACKEND_INTERNAL_URL explicitly and supply matching worker CA trust; existing worker environments are not changed."
+}

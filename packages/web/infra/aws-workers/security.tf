@@ -27,6 +27,9 @@ locals {
     }, var.launcher_internal_alb ? {
     backend_launcher_alb  = { from = "backend", to = "launcher_alb", port = 8830 }
     launcher_alb_launcher = { from = "launcher_alb", to = "launcher", port = 8830 }
+    } : {}, local.backend_callback_enabled ? {
+    worker_callback_alb  = { from = "worker", to = "launcher_alb", port = 443 }
+    callback_alb_backend = { from = "launcher_alb", to = "backend", port = 3001 }
   } : {})
 }
 resource "aws_vpc_security_group_ingress_rule" "private" {
