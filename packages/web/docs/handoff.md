@@ -2015,3 +2015,28 @@ existing Cloud Map `failure_threshold` deprecation warning. Diff checks pass.
 Local Terraform 1.5.7 is below the module's existing >=1.12.6 requirement and was
 not used for validation. No application/backend redesign, deployed rolling-mode
 activation, functional/browser test or new qualification suite was performed.
+
+## Safe controller overlap for ECS rolling deployment — October 9, 2026
+
+**Authorized target, not implemented acceptance:** after the module-only change,
+Chris directed the team to solve the application blocker to actual ECS-native
+zero-downtime rolling deployment. The published selection option alone did not
+meet that outcome. The current routing cache/exclusive owner and launcher ownership
+are implementation constraints to address, not permanent requirements that only
+one controller process may exist.
+
+Developer owns implementation, Pi Durable Expert ownership/handover safety,
+Deployer ECS integration and rollout evidence, and Deslop simplification/review.
+Preserve existing data, authorization and one active executor per conversation;
+do not bypass locks while keeping conflicting process-local state. Keep generic
+application/module contracts here and company configuration/rollout receipts in
+the owning infrastructure repository. No RDS snapshot creation or waiting;
+application/typing acceptance remains Chris-owned.
+
+Acceptance remains pending: reviewed safe overlap/handover implementation and
+permitted source/build checks, then ECS-native replacement evidence that the new
+service becomes ready before the old service stops without an availability gap.
+Record observed service continuity and ownership safety separately from application
+acceptance; publication, plan success and a healthy post-rollout target alone do
+not establish zero downtime. The handover design and any further runtime
+verification must respect the repository testing policy and Chris's testing boundary.
