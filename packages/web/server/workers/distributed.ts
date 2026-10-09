@@ -129,7 +129,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     }
   }
   const snapshot = (value: ChatSnapshot, id: string): ChatSnapshot => ({ ...value, conversation: { ...value.conversation, id } });
-  const overrides: Partial<RuntimeService> = {
+  const operations = {
     async exportProjectArchive(scope, id, chatIds) {
       return policyRead(async () => {
         await directory.authorizeProjectExport(scope, id, chatIds);
@@ -250,14 +250,38 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
       const failures = results.filter(result => result.status === "rejected").map(result => result.reason);
       if (failures.length) throw new AggregateError(failures, "Distributed runtime teardown failed.");
     },
-  };
-  // Bound delegation preserves the native catalog API without duplicating its policy.
-  return Object.assign(new Proxy(directory, { get(target, property) {
-    const replacement = overrides[property as keyof RuntimeService];
-    if (replacement) return replacement;
-    const value = Reflect.get(target, property);
-    return typeof value === "function" ? value.bind(target) : value;
-  } }), { runWorkerTransition: policyChange });
+  } satisfies Partial<RuntimeService>;
+  // Every application method is classified explicitly. New runtime APIs must select
+  // catalog authority or conversation execution here rather than silently falling through.
+  return {
+    importProjectArchive: directory.importProjectArchive.bind(directory),
+    getProjectArchive: directory.getProjectArchive.bind(directory),
+    createAgentInstance: directory.createAgentInstance.bind(directory),
+    removeParticipant: directory.removeParticipant.bind(directory),
+    listGitHubBundles: directory.listGitHubBundles.bind(directory),
+    previewGitHubBundle: directory.previewGitHubBundle.bind(directory),
+    applyGitHubBundle: directory.applyGitHubBundle.bind(directory),
+    exportBundle: directory.exportBundle.bind(directory),
+    previewBundle: directory.previewBundle.bind(directory),
+    importBundle: directory.importBundle.bind(directory),
+    evaluationProfile: directory.evaluationProfile.bind(directory),
+    evaluationProfileRevision: directory.evaluationProfileRevision.bind(directory),
+    saveEvaluationProfile: directory.saveEvaluationProfile.bind(directory),
+    agentConnections: directory.agentConnections.bind(directory),
+    archiveAgent: directory.archiveAgent.bind(directory),
+    createProject: directory.createProject.bind(directory),
+    getSkill: directory.getSkill.bind(directory),
+    listAgents: directory.listAgents.bind(directory),
+    listMcpConnections: directory.listMcpConnections.bind(directory),
+    listProjects: directory.listProjects.bind(directory),
+    listSkills: directory.listSkills.bind(directory),
+    managementGrants: directory.managementGrants.bind(directory),
+    saveManagementGrant: directory.saveManagementGrant.bind(directory),
+    saveSkill: directory.saveSkill.bind(directory),
+    getDefaultAgent: directory.getDefaultAgent.bind(directory),
+    ...operations,
+    runWorkerTransition: policyChange,
+  } satisfies DistributedRuntime;
 }
 
 /** Only the authenticated launcher selects the host; never accept arbitrary RPC URLs. */
