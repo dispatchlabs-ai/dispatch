@@ -21,4 +21,15 @@ Recovery persists public admission closed before opening provider/MCP stores. It
 
 If startup fails after only some owners recover, inspect the remaining retained IDs again: successful cleanup clears only owners acquired by that invocation. Never blindly replay obsolete recovery IDs. After a successful graceful stop, restart using the normal command without recovery arguments.
 
-This is backend-owner recovery only. Launcher ownership, Pi endpoint markers, worker stores, encrypted backup/key pairing and retired executor denial retain their separate runbook requirements. No existing-installation migration or activation is authorized by these instructions. At introduction, source/build checks pass; crash/recovery invocation and integrated Linux recovery remain unqualified.
+This is backend-owner recovery only. Launcher ownership, Pi endpoint markers, worker stores, encrypted backup/key pairing and retired executor denial retain their separate runbook requirements. No existing-installation migration or activation is authorized by these instructions. At introduction, only source/build checks were established.
+
+## Observed scope
+
+An independent October 8, 2026 Surton ECS/CloudWatch review of
+`backend-recovery-review.json` confirmed the one-off recovery backend STOPPED with
+exit 0: all three retained owners recovered, admission remained closed, zero
+workers/unresolved attempts, and graceful shutdown while the launcher was
+reachable. Helper review found no manual SQL latch clearing or master authority.
+This is a zero-worker controller-recovery observation, not interrupted workload
+recovery, encrypted restore/retired-authority qualification, normal service startup
+or deployed browser acceptance. The Surton consumer owns exact task/plan receipts.
