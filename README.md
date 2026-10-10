@@ -11,16 +11,21 @@ Dispatch is built on [Pi Durable](https://github.com/earendil-works/pi): Pi owns
 | Where you want to run Dispatch | Start here |
 | --- | --- |
 | **Apple Silicon Mac** — one machine for development | Use the [portable Mac package](#apple-silicon-mac). It includes its runtime; no Nix or Homebrew is needed to run it. |
-| **Windows with WSL2** — containers on your desktop | Use the [WSL2 container candidate](#windows-with-wsl2), with Docker Engine and Compose inside Ubuntu. |
-| **AWS** — your own infrastructure and ECR | Follow the [terraform-aws-dispatch module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) for Terraform/OpenTofu setup. The application release artifacts and complete installation are still being qualified. |
+| **Windows with WSL2** — containers on your desktop | Use the [WSL2 container installation](#windows-with-wsl2), with Docker Engine and Compose inside Ubuntu. |
+| **AWS** — your own infrastructure and ECR | Follow the [terraform-aws-dispatch module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) for Terraform/OpenTofu setup. Application archives are [available in 0.2.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.2.0); complete AWS installation remains unqualified. |
 
-We are preparing the first public packaged release. Mac and Windows/WSL2 candidates have been installed and their login pages checked; account enrollment and model conversations are still being qualified. Complete AWS installation remains pending. No separate Pi installation is needed.
+**[Dispatch 0.2.0 is available](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.2.0)**, our first public packaged release. The released Mac package and Windows/WSL2 controller bytes have installation and login-page evidence; account enrollment and model conversations are still being qualified. Complete AWS installation remains pending. No separate Pi installation is needed.
 
 ## Apple Silicon Mac
 
-The portable package includes Node and Dispatch. **A public release download is not available yet.** The steps below apply to the candidate archive supplied by the maintainer; do not download similarly named files from an untrusted source.
+The portable package includes Node and Dispatch. Download it from the official [0.2.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.2.0), or run these commands in Terminal from a dedicated download directory:
 
-In Terminal, change to the directory containing `dispatch-0.2.0-darwin-arm64.tar.gz` and its `SHA256SUMS`, then:
+```sh
+curl -fL -O https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.2.0/dispatch-0.2.0-darwin-arm64.tar.gz
+curl -fL -O https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.2.0/SHA256SUMS
+```
+
+Verify the archive before extracting it:
 
 ```sh
 awk '$2 == "dispatch-0.2.0-darwin-arm64.tar.gz"' SHA256SUMS | shasum -a 256 -c -
@@ -50,17 +55,24 @@ The archive and checksum file are in `result/`. Building requires Nix; running t
 
 ## Windows with WSL2
 
-The candidate has been checked with **Ubuntu on WSL2, Docker Engine 29.1.3 and Compose 2.40.3**, opening the app in Windows Edge. Docker Desktop is a different service lifecycle and has not been separately qualified.
+The released controller bytes have been checked with **Ubuntu on WSL2, Docker Engine 29.1.3 and Compose 2.40.3**, opening the app in Windows Edge. Docker Desktop is a different service lifecycle and has not been separately qualified.
 
-**Public release images are not available yet.** For the candidate, obtain the verified Linux/AMD64 controller image and matching [Compose file](compose.yaml) and [environment example](.env.example) from the maintainer. Use a dedicated directory inside Ubuntu for this installation, not an existing deployment directory.
+The [0.2.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.2.0) contains the Linux/AMD64 controller archive. **GHCR images and registry digests are still pending**; use the downloadable archive without rebuilding. Use a dedicated directory inside Ubuntu, not an existing deployment directory.
 
-In that directory, from an Ubuntu WSL terminal:
+Download `dispatch-controller-b8dda02-amd64.tar.gz` and `SHA256SUMS` from that release. Also download the matching [Compose file](https://raw.githubusercontent.com/dispatchlabs-ai/dispatch/v0.2.0/compose.yaml) and [environment example](https://raw.githubusercontent.com/dispatchlabs-ai/dispatch/v0.2.0/.env.example), saving them as `compose.yaml` and `.env.example`. From an Ubuntu WSL terminal in that directory:
 
 ```sh
+awk '$2 == "dispatch-controller-b8dda02-amd64.tar.gz"' SHA256SUMS | sha256sum -c -
+```
+
+Require `dispatch-controller-b8dda02-amd64.tar.gz: OK` before loading it. Obtain the archive and checksum through the official release channel; checksums verify integrity, not independent publisher identity.
+
+```sh
+docker load -i dispatch-controller-b8dda02-amd64.tar.gz
 cp .env.example .env
 ```
 
-Edit `.env` to set `DISPATCH_IMAGE` to the supplied controller image identity; published images should be pinned by digest. Keep `DISPATCH_PORT=3001` unless it is already in use. Then start the service:
+The archive records the local tag `dispatch-web:b8dda02325cf`. Set `DISPATCH_IMAGE=dispatch-web:b8dda02325cf` in `.env`. This is a locally loaded tag, not a registry digest; don't replace it with an unverified registry image. Keep `DISPATCH_PORT=3001` unless it is already in use. Then start the service:
 
 ```sh
 docker compose up
@@ -70,7 +82,7 @@ Open **http://localhost:3001** in your Windows browser (use your chosen port if 
 
 Compose publishes only on host loopback and preserves state/workspace in the `dispatch-data` named volume. Keep the same Compose directory/project identity when restarting or replacing the image. Do not use `docker compose down -v` for an upgrade: it deletes the data volume. Do not mount your Windows or Linux home directory into the agent workspace.
 
-The login page is verified; container account enrollment and model use are not yet qualified. Provisioning uses the image's `dispatch-auth` CLI with the same data volume while the controller is stopped; complete verified enrollment steps will accompany publication. There is no default account or public signup.
+The login page is verified; container account enrollment and model use are not yet qualified. Provisioning uses the image's `dispatch-auth` CLI with the same data volume while the controller is stopped; complete target-qualified enrollment steps remain pending. There is no default account or public signup.
 
 ## Run from source
 
