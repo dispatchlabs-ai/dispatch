@@ -10,9 +10,30 @@ const repositoryUrl = z.string().trim().min(1).max(4096).refine(value => {
   } catch { return false; }
 }, "Use a credential-free HTTPS repository URL without a query or fragment.");
 
+function repositoryIdentity(value: string) {
+  const url = new URL(value);
+  // GitHub owner/repo names are case-insensitive; other hosts retain path case.
+  if (url.hostname === "github.com") {
+    url.pathname = url.pathname.toLowerCase().replace(/\/$/, "").replace(/\.git$/, "");
+  }
+  return url.href;
+}
+
 export const projectRepositoriesSchema = z.array(z.object({
   id: repositoryId, name: z.string().trim().min(1).max(100), url: repositoryUrl,
-}).strict()).refine(values => new Set(values.map(value => value.id)).size === values.length, "Repository IDs must be unique.");
+}).strict()).superRefine((values, ctx) => {
+  const ids = new Set<string>();
+  const urls = new Set<string>();
+  values.forEach((value, index) => {
+    if (ids.has(value.id)) ctx.addIssue({ code: "custom", path: [index, "id"], message: "Repository IDs must be unique." });
+    ids.add(value.id);
+    // Field parsing can report a malformed URL before this list refinement runs.
+    if (!repositoryUrl.safeParse(value.url).success) return;
+    const identity = repositoryIdentity(value.url);
+    if (urls.has(identity)) ctx.addIssue({ code: "custom", path: [index, "url"], message: "This repository is already listed." });
+    urls.add(identity);
+  });
+});
 
 export const projectSpecSchema = z.object({
   repositoryId,
