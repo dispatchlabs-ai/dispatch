@@ -1,5 +1,5 @@
 import { ArrowLeft } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Project, ProjectSpecDocument } from "../shared/contracts";
 import { errorMessage } from "../lib/api";
 import { useSession } from "../lib/session";
@@ -28,12 +28,15 @@ function repositoryLabel(url: string) {
  * Reads the project's spec at a pinned commit. Editing is an in-memory draft
  * only: there is no save destination in this slice, so nothing claims Saved.
  */
-export function ProjectSpecView({ project, onBack, onDirtyChange }: {
+export function ProjectSpecView({ project, active, onBack, onDirtyChange }: {
   project: Project;
+  active: boolean;
   onBack: () => void;
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const { api } = useSession();
+  const heading = useRef<HTMLHeadingElement>(null);
+  useLayoutEffect(() => { if (active) heading.current?.focus({ preventScroll: true }); }, [active]);
   const current = projectSpecSource(project);
   const currentKey = sourceKey(current);
   const [requested, setRequested] = useState(currentKey);
@@ -107,7 +110,7 @@ export function ProjectSpecView({ project, onBack, onDirtyChange }: {
     }}><ArrowLeft size={18} aria-hidden="true" />{project.name}</a>
     <header className="project-spec-header">
       <div>
-        <h1 id={`project-spec-title-${project.id}`} tabIndex={-1}>Spec</h1>
+        <h1 ref={heading} id={`project-spec-title-${project.id}`} tabIndex={-1}>Spec</h1>
         <p className="project-spec-path">{shown?.path ?? project.spec?.path ?? "No spec file configured"}</p>
         {shown ? <p className="project-spec-provenance"><span>{repository}</span> · <span><span aria-hidden="true">{shown.commit.slice(0, 7)}</span><span className="sr-only">loaded at commit {shown.commit}</span></span></p> : null}
       </div>

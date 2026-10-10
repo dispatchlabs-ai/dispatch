@@ -452,7 +452,7 @@ export function Workspace() {
   function openSpec(projectId: string, open: boolean) {
     setSpecOpen(current => ({ ...current, [projectId]: open }));
     setSearchParams(open ? { project: projectId, view: "spec" } : { project: projectId });
-    requestAnimationFrame(() => document.getElementById(open ? `project-spec-title-${projectId}` : "main-workspace")?.focus());
+    if (!open) requestAnimationFrame(() => document.getElementById("main-workspace")?.focus());
   }
   const detailsVisible = projectEditorOpen ? false : active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : active.kind === "connections" || active.kind === "secrets" || active.kind === "import-export" || active.kind === "model-providers" ? false : otherDetailsVisible;
   const detailsWidth = Math.min(preferredDetailsWidth ?? (active.kind === "chat" ? 440 : 360), detailsMax);
@@ -666,7 +666,7 @@ export function Workspace() {
               const retainSpec = project && (specOpen[tab.projectId] || showSpec);
               return <>
                 {retainSpec ? <div hidden={!showSpec} inert={!showSpec}>
-                  <ProjectSpecView project={project} onBack={() => openSpec(tab.projectId, false)}
+                  <ProjectSpecView project={project} active={showSpec && tab.id === activeId && section === "chats"} onBack={() => openSpec(tab.projectId, false)}
                     onDirtyChange={dirty => setSpecDirty(current => current[tab.projectId] === dirty ? current : { ...current, [tab.projectId]: dirty })} />
                 </div> : null}
                 {!showSpec ? project && projectEditing[tab.projectId] && (tab.id !== activeId || projectEditorOpen) ? <ProjectSettings project={project} agents={agents}
