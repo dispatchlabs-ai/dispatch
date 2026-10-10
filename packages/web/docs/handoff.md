@@ -2377,10 +2377,10 @@ AWS access or storage migration is authorized; real outcomes remain unverified.
 At module `192c6ce` / application `a502fc8`, Pi/Deslop close source-review findings,
 including current-task drift protection before mutations. The runtime guide owns
 non-cancelling refusal, planned health and retained recovery boundaries. Deployer
-reports independent archives/external callers at `8b8ee00`: Terraform 1.13.5,
-OpenTofu 1.12.6, provider 6.67.0, 28 mock plans/engine, 33 Python checks, nine
-operator-request cases and edge checks. The follow-up adds one lifecycle refusal
-case; Pi verifies all 11 lifecycle checks. Documenter independently passed all
+reports independent archives/external callers at `192c6ce`: Terraform 1.13.5,
+OpenTofu 1.12.6, provider 6.67.0, 28 mock plans/engine, 34 Python checks, nine
+operator-request cases and edge checks. Controller-drift refusal is covered; Pi
+verifies all 11 lifecycle checks. Documenter independently passed all
 34 Python checks, nine operator-request cases and complete caller init/validate
 on Terraform 1.13.5/OpenTofu 1.13.1 after `192c6ce`; no AWS calls.
 

@@ -112,8 +112,8 @@ when not in use, rather than merely discounting continuously running resources.
 Evaluate Aurora Serverless v2 scaling/auto-pause together with application
 connections and retained workers/controllers; a zero-ACU input alone is not an
 idle-cost result. Preserve authentication, exclusive execution, durable history,
-uncertain-call recovery and the disposable-workspace policy. The design is not
-yet settled; the [idle-cost work package](handoff.md#idle-cost-optimization--october-10-2026)
+uncertain-call recovery and the disposable-workspace policy. The initial profile is operator-driven, not an automatic idle policy; the
+[idle-cost work package](handoff.md#idle-cost-optimization--october-10-2026)
 tracks residual costs, wake tradeoffs and bounded evidence. No customer access,
 live deployment or state migration is authorized by this optimization work.
 
