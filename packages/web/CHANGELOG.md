@@ -11,6 +11,10 @@
 
 - Replace the separate Stop all control with a single fixed-position Send/Stop button for main and thread composers, with draft presence separate from send eligibility and explicit whole-chat cancellation scope. Source/type/build and synthetic component visual reviews pass; authenticated integration remains unverified. See the [handoff](docs/handoff.md#single-composer-sendstop-action--october-10-2026).
 
+### inline image attachments
+
+- Show large, uncropped, responsive image attachments in main chat and threads, with stacked previews and filenames underneath. Keep originals optional, small images at native size and non-image files compact. Retain original links and a short status when previews fail.
+
 ### Lockstep versioning
 
 - Add SemVer release preparation, package-derived Nix and browser build versions. Keep release publication and deployment explicit.

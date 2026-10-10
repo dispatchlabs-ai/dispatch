@@ -49,8 +49,34 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
   const revision = useRef(snapshot.conversation.revision);
   revision.current = snapshot.conversation.revision;
   const getScrollElement = useCallback(() => host.current?.closest<HTMLElement>(".transcript, .thread-transcript") ?? null, []);
+  const anchor = useRef<{ id: string; offset: number; top: number } | undefined>(undefined);
+  const resizeCorrection = useRef({ frame: 0, delta: 0 });
+  const clearResizeCorrection = useCallback(() => {
+    cancelAnimationFrame(resizeCorrection.current.frame);
+    resizeCorrection.current = { frame: 0, delta: 0 };
+  }, []);
+  useEffect(() => clearResizeCorrection, [clearResizeCorrection]);
+  const queueResizeCorrection = useCallback((delta: number) => {
+    if (anchor.current) return;
+    const correction = resizeCorrection.current;
+    correction.delta += delta;
+    if (!correction.frame) {
+      // Wait for the virtual list to commit, so the old scroll range cannot clamp correction.
+      correction.frame = requestAnimationFrame(() => {
+        const scroll = getScrollElement();
+        if (scroll) {
+          if (following.current) scroll.scrollTop = scroll.scrollHeight;
+          else scroll.scrollTop += correction.delta;
+        }
+        resizeCorrection.current = { frame: 0, delta: 0 };
+      });
+    }
+  }, [getScrollElement]);
   const virtualizer = useVirtualizer({ count: rows.length, getScrollElement, scrollMargin, estimateSize: () => 160, overscan: 4, getItemKey: index => rows[index]!.id });
-  const anchor = useRef<{ id: string; offset: number } | undefined>(undefined);
+  virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, delta, instance) => {
+    if (following.current || item.start < (instance.scrollOffset ?? 0)) queueResizeCorrection(delta);
+    return false;
+  };
   const base = `/api/chats/${encodeURIComponent(snapshot.conversation.id)}`;
   const query = threadId ? `threadId=${encodeURIComponent(threadId)}&` : "";
   const load = useCallback(async (before?: string) => {
@@ -60,7 +86,11 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
     setLoading(true); setError(undefined);
     const scroll = getScrollElement();
     const first = virtualizer.getVirtualItems().find(item => item.end > (scroll?.scrollTop ?? 0));
-    if (before && first && scroll) anchor.current = { id: String(first.key), offset: scroll.scrollTop - first.start };
+    if (before && first && scroll) {
+      const row = list.current?.querySelector<HTMLElement>(`[data-index="${first.index}"]`);
+      const content = row?.querySelector<HTMLElement>(".conversation-entry") ?? row;
+      if (content) anchor.current = { id: String(first.key), offset: scroll.scrollTop - first.start, top: content.getBoundingClientRect().top };
+    }
     try {
       const page = await api<TranscriptPage>(`${base}/history?${query}${before ? `before=${encodeURIComponent(before)}` : ""}`);
       if (!alive.current) return;
@@ -71,7 +101,10 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
       if (before) historyLoaded.current = true;
       if (page.root) { setRoot(page.root); setReplyCount(page.replyCount ?? 0); }
     } catch (error) { if (alive.current) { setError(errorMessage(error)); setExpired(error instanceof ApiError && error.code === "HISTORY_CHANGED"); } }
-    finally { inFlight.current = false; if (alive.current) setLoading(false); }
+    finally {
+      inFlight.current = false;
+      if (alive.current) setLoading(false);
+    }
   }, [api, base, query, getScrollElement, virtualizer, snapshot.history?.generation]);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => {
@@ -99,25 +132,48 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
   useLayoutEffect(() => {
     const scroll = getScrollElement();
     if (!scroll || !list.current) return;
-    const measure = () => setScrollMargin(list.current!.getBoundingClientRect().top - scroll.getBoundingClientRect().top + scroll.scrollTop);
+    let previousMargin: number | undefined;
+    const measure = () => {
+      const margin = list.current!.getBoundingClientRect().top - scroll.getBoundingClientRect().top + scroll.scrollTop;
+      if (previousMargin !== undefined && margin !== previousMargin && (following.current || previousMargin < scroll.scrollTop)) queueResizeCorrection(margin - previousMargin);
+      previousMargin = margin;
+      setScrollMargin(margin);
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(host.current!);
-    const onScroll = () => { following.current = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 100; };
+    const onScroll = () => {
+      if (resizeCorrection.current.frame && !anchor.current) clearResizeCorrection();
+      following.current = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 100;
+    };
     scroll.addEventListener("scroll", onScroll);
     return () => { observer.disconnect(); scroll.removeEventListener("scroll", onScroll); };
-  }, [getScrollElement]);
+  }, [getScrollElement, queueResizeCorrection, clearResizeCorrection]);
   useLayoutEffect(() => {
     const pending = anchor.current;
     if (!pending) {
       const scroll = getScrollElement();
-      if (following.current && scroll) scroll.scrollTop = scroll.scrollHeight;
+      if (following.current && scroll) { clearResizeCorrection(); scroll.scrollTop = scroll.scrollHeight; }
       return;
     }
+    if (loading) return;
+    clearResizeCorrection();
     const index = rows.findIndex(item => item.id === pending.id);
-    if (index >= 0) { virtualizer.scrollToIndex(index, { align: "start" }); const scroll = getScrollElement(); if (scroll) scroll.scrollTop += pending.offset; }
-    anchor.current = undefined;
-  }, [rows, virtualizer, getScrollElement]);
+    const offset = index >= 0 ? virtualizer.getOffsetForIndex(index, "start") : undefined;
+    const scroll = getScrollElement();
+    if (!offset || !scroll) { anchor.current = undefined; return; }
+    scroll.scrollTop = offset[0] + pending.offset;
+    resizeCorrection.current.frame = requestAnimationFrame(() => {
+      // Let ResizeObserver measurements and the new history controls settle before restoring the anchor.
+      resizeCorrection.current.frame = requestAnimationFrame(() => {
+        const row = list.current?.querySelector<HTMLElement>(`[data-index="${index}"]`);
+        const content = row?.querySelector<HTMLElement>(".conversation-entry") ?? row;
+        if (content) scroll.scrollTop += content.getBoundingClientRect().top - pending.top;
+        anchor.current = undefined;
+        resizeCorrection.current = { frame: 0, delta: 0 };
+      });
+    });
+  }, [rows, loading, virtualizer, getScrollElement, clearResizeCorrection]);
   const participants = snapshot.participants;
   return <div ref={host} className="paged-transcript">
     {root ? <><PublicMessage message={root} participants={participants} chatId={snapshot.conversation.id} /><p className="thread-reply-count">{replyCount} {replyCount === 1 ? "reply" : "replies"}</p></> : null}

@@ -1,7 +1,7 @@
 import { PagedTranscript } from "./paged-transcript";
 import { DefinitionOfDone, type CriteriaDraft } from "./definition-of-done";
 import type { OpenInstanceForm } from "./add-instance";
-import { ATTACHMENT_IMAGE_MAX_BYTES } from "../shared/contracts";
+import { MessageAttachment } from "./message-attachment";
 import { AttachmentPicker, DraftAttachments, type AttachmentComposerProps } from "./composer-attachments";
 import { describeAgentTools } from "../lib/agent-tools";
 import type { Message } from "@earendil-works/pi-ai";
@@ -67,10 +67,7 @@ export function PublicMessage({ message, participants, replies = [], onThread, o
     <ParticipantContent author={author} participants={participants} createdAt={message.createdAt} showAuthor={!outputInActivity}>
       {outputInActivity ? <header className="message-heading activity-output-reference">Command output shown above</header> : null}
       {!outputInActivity ? <div className="message-content"><Markdown mentions={participants.filter(person => message.mentions.includes(person.id))}>{message.text}</Markdown></div> : null}
-      {message.attachments?.length ? <div className="message-attachments">{message.attachments.map(attachment => <a className="message-attachment" href={attachment.url} key={attachment.id} target="_blank" rel="noopener noreferrer">
-        {attachment.kind === "image" ? <img src={attachment.url} alt={attachment.name} loading="lazy" /> : null}
-        <span>{attachment.name}{attachment.kind === "file" ? " · Download only" : attachment.kind === "image" && attachment.size > ATTACHMENT_IMAGE_MAX_BYTES ? " · Preview/download only; too large for agents" : ""}</span>
-      </a>)}</div> : null}
+      {message.attachments?.length ? <div className="message-attachments">{message.attachments.map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}</div> : null}
       {message.truncated && chatId ? <a href={`/api/chats/${encodeURIComponent(chatId)}/detail/message/${encodeURIComponent(message.id)}?download=1`}>Download complete message</a> : null}
       {message.images?.map((image, index) => <img className="message-image" key={index} src={`data:${image.mimeType};base64,${image.data}`} alt="Image attached to the message" />)}
       {detachedMentions.length ? <div className="message-mentions" aria-label="Mentioned participants">{detachedMentions.map(id => <span key={id}>@{participants.find(participant => participant.id === id)?.name || "Former participant"}</span>)}</div> : null}
