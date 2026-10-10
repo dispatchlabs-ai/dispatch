@@ -33,11 +33,16 @@ export async function openModels(
     models, provider, modelId, thinkingLevel,
     async configuration(defaultAgent: Pick<AgentDraft, "provider" | "modelId">) {
       const model = models.getModel(defaultAgent.provider, defaultAgent.modelId);
-      const available = await models.getAvailable();
+      // A pending/invalid credential must not prevent opening Settings to repair
+      // it. Pi's global enumeration rejects if any provider's auth check fails.
+      const available = (await Promise.all(models.getProviders().map(async provider => {
+        try { return await models.getAvailable(provider.id); }
+        catch { return []; } // Provider setup reports the unavailable credential without exposing its error.
+      }))).flat();
       const choices = !model || available.some((item) => item.provider === model.provider && item.id === model.id) ? available : [model, ...available];
       return {
         models: choices.map((item): ModelOption => ({ provider: item.provider, id: item.id, name: item.name, reasoning: item.reasoning, thinkingLevels: [...getSupportedThinkingLevels(item)] })),
-        providerReady: models.hasConfiguredAuth(defaultAgent.provider),
+        providerReady: available.some(item => item.provider === defaultAgent.provider),
       };
     },
   };
