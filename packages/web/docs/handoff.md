@@ -2430,3 +2430,18 @@ passes. No application runtime tests or live AWS sleep/wake were exercised.
 Estimated residual idle cost remains conditional, not an invoice or demonstrated
 minimum. Automatic between-turn retirement, browser wake and actual pause/latency/
 billing verification remain absent; operator tooling does not silently add them.
+
+## Project repositories and spec reference — October 10, 2026
+
+**Authorized screen/persistence slice; design review and implementation pending.** Chris requested discoverable Project spec-file configuration, expanded it to multiple repositories, then clarified that project setup must not depend on service-host filesystem paths. [The specification](spec.md#project-repositories-and-spec-reference) owns the scope. Web Application Designer owns responsive designs/UI; Developer owns persistence/shared types; Documenter owns documentation reconciliation. Earlier single-folder proposals are superseded. Watchers, automatic work and cloud cloning are not this slice.
+
+### Acceptance criteria
+
+- Users can add/remove multiple repository URL references and select a repository plus relative spec path without supplying a host directory.
+- Spec repository identity survives repository renaming/reordering; removing it requires explicit clearing/reassignment in the same save, never fallback.
+- Manager authority, expected revisions, retry identity and draft preservation remain intact; older-client saves do not erase omitted new metadata.
+- Saved-reference copy does not imply cloning, file existence, private-repository access or agent workspace changes. Existing local-directory behavior stays separate.
+- Review responsive image designs before frontend changes; record rendered desktop/390px evidence and any other required sizes separately from design concepts, and identify unavailable interaction evidence. Verification must stay within the canonical testing policy.
+- Record source review, permitted type/build checks and publication evidence here; implementation alone is not functional qualification. Exact field/URL/path validation contracts await owner agreement.
+
+No implementation, rendered validation, runtime check or deployment is evidenced by this documentation draft.
