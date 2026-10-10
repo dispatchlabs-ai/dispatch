@@ -1,3 +1,4 @@
+import { httpTelemetry } from "../telemetry.js";
 import { S3ProjectArchiveStore } from "./s3-project-archives.js";
 import { createWebBackend } from "../web/backend.js";
 import { McpPolicyGate } from "./mcp-policy.js";
@@ -184,6 +185,7 @@ function operatorTransition<T>(operation: () => Promise<T>): Promise<T> {
 }
 const mcp = backendWorkerMcp(directory);
 const app = new Hono();
+app.use("*", httpTelemetry());
 app.use("*", async (c, next) => {
   if (c.req.path === "/internal/health" || c.req.path === "/internal/ready" || c.req.path === "/internal/replace" || c.req.path === "/internal/status" || c.req.path === "/internal/drain" || c.req.path === "/internal/undrain") return next();
   const gate = c.req.path.startsWith("/internal/workers/") ? support : admission;
@@ -351,7 +353,8 @@ app.get("/internal/status", async c => {
   return c.json({ schemaVersion: 1, installation: workerConfig.installationId, drained: status.drained, drainComplete: status.drainComplete, backendQuiesced: admission.quiesced && support.quiesced && credentialsQuiesced, activeWorkers: status.activeWorkers.length, unresolvedAttempts: status.unresolvedAttempts.length });
 });
 const clientDir = process.env.DISPATCH_CLIENT_DIR ?? resolve(dirname(fileURLToPath(import.meta.url)), "../../../client");
-app.route("/", createApp({ auth, runtime, mcpConnections: connections, origin: config.origin, clientDir,
+app.route("/", createApp({ auth, runtime, mcpConnections: connections, origin: config.origin,
+  clientDir: process.env.DISPATCH_SERVE_CLIENT === "false" ? undefined : clientDir,
   configuration: async () => ({ company: { id: config.companyId, name: config.companyName }, defaultAgentId: DEFAULT_AGENT_ID, ...await provider.configuration(await runtime.getDefaultAgent(config.companyId)) }),
 }));
 app.onError((error, c) => error instanceof RuntimeError && error.status === 403

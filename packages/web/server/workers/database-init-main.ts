@@ -88,7 +88,7 @@ async function main() {
     stage = "operator connection and preflight";
     await admin.connect();
     const { rows: [version] } = await admin.query("SELECT current_setting('server_version_num')::int / 10000 AS major");
-    if (version.major !== 17) throw new Error("PostgreSQL 17 required.");
+    if (![17, 18].includes(version.major)) throw new Error("PostgreSQL 17 or 18 required.");
     const { rows: [lock] } = await admin.query("SELECT pg_try_advisory_lock(1684632432, 7) AS acquired");
     if (!lock.acquired) throw new Error("Another initializer is active.");
     if (values.create) {
@@ -121,7 +121,7 @@ async function main() {
         for (const store of stores) {
           await admin.query(`CREATE ROLE ${ident(store.role)} NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`);
           await admin.query(`COMMENT ON ROLE ${ident(store.role)} IS ${literal(store.marker)}`);
-          // PostgreSQL 17 requires SET permission to create a database owned by another role.
+          // PostgreSQL requires SET permission to create a database owned by another role.
           // Membership is operator -> application, never application -> operator or another store.
           await admin.query(`GRANT ${ident(store.role)} TO ${ident(adminRole)} WITH INHERIT FALSE, SET TRUE`);
         }

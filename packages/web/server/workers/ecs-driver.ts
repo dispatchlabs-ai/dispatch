@@ -14,6 +14,7 @@ const configSchema = z.object({
   containerName: text, subnets: z.array(z.string().regex(/^subnet-[a-f0-9]+$/)).min(1),
   securityGroups: z.array(z.string().regex(/^sg-[a-f0-9]+$/)).min(1),
   environment: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/), z.string()).default({}),
+  capacityProvider: z.enum(["FARGATE", "FARGATE_SPOT"]).default("FARGATE"),
   configurationRevision: text, platformVersion: z.string().regex(/^\d+\.\d+\.\d+$/).default("1.4.0"),
   requestTimeoutMs: z.number().int().min(1000).max(120_000).default(30_000),
   retirementTimeoutMs: z.number().int().min(1000).max(900_000).default(180_000),
@@ -48,7 +49,8 @@ export class EcsContainerDriver implements ContainerDriver {
       .map(([key, value]) => ({ key: prefix + key, value }));
     return {
       cluster: this.config.cluster, taskDefinition: this.config.taskDefinition,
-      launchType: "FARGATE", count: 1, platformVersion: this.config.platformVersion,
+      capacityProviderStrategy: [{ capacityProvider: this.config.capacityProvider, weight: 1 }],
+      count: 1, platformVersion: this.config.platformVersion,
       clientToken: createHash("sha256").update(JSON.stringify([spec.installationId, spec.attemptId])).digest("hex"),
       startedBy: createHash("sha256").update(spec.installationId).digest("hex").slice(0, 36),
       enableExecuteCommand: false, tags,

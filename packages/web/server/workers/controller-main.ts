@@ -1,3 +1,4 @@
+import { httpTelemetry, closeTelemetry } from "../telemetry.js";
 import { serve } from "@hono/node-server";
 import { createServer as createHttpsServer } from "node:https";
 import { once } from "node:events";
@@ -71,6 +72,7 @@ export async function serveRollingController(role: "backend" | "launcher", openO
   let transferTarget: ControllerIdentity | undefined;
   let transferStarted = 0;
   const app = new Hono();
+  app.use("*", httpTelemetry());
   const equal = (a: ControllerIdentity, b: ControllerIdentity) => a.instanceId === b.instanceId && a.endpoint === b.endpoint
     && a.installationId === b.installationId && a.role === b.role;
   async function peer(identity: ControllerIdentity, path: string, body?: unknown) {
@@ -249,6 +251,7 @@ export async function serveRollingController(role: "backend" | "launcher", openO
       await listenerClosed;
       lifecycle("request-drain-complete");
       await rendezvous.close();
+      await closeTelemetry();
     })()).catch(() => { gate.fail(); process.exitCode = 1; console.error("Controller shutdown incomplete; explicit recovery required."); });
   }
   process.once("SIGTERM", stop); process.once("SIGINT", stop);

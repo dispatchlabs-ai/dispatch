@@ -1,7 +1,9 @@
 # Operator-only PostgreSQL initialization
 
-`dispatch-database-init` prepares a **fresh, dedicated PostgreSQL 17 installation**
-for the retained worker POC. It is not a service, migration, password-rotation or
+`dispatch-database-init` prepares a **fresh, dedicated PostgreSQL 17 or 18 installation**
+for the conversation-worker topology. PostgreSQL 18/Aurora acceptance is source-only:
+its GRANT/SET ROLE and CREATE DATABASE contract is supported, but AWS role grants,
+effective logging settings and initialization still need runtime qualification. It is not a service, migration, password-rotation or
 recovery command. The application’s normal loaders own schema migrations. No
 existing installation is converted, reset or deleted by this helper.
 

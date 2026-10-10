@@ -1,3 +1,4 @@
+import { closeTelemetry } from "../telemetry.js";
 import { serve } from "@hono/node-server";
 import { createServer as createHttpsServer } from "node:https";
 import { once } from "node:events";
@@ -24,7 +25,7 @@ function requestShutdown() {
   void (shutdown ??= owner.close().then(() => new Promise<void>((resolve, reject) => {
     server.close(error => error && (error as NodeJS.ErrnoException).code !== "ERR_SERVER_NOT_RUNNING" ? reject(error) : resolve());
     if ("closeAllConnections" in server) server.closeAllConnections();
-  })).catch(error => { shutdown = undefined; throw error; })).catch(() => {
+  })).then(closeTelemetry).catch(error => { shutdown = undefined; throw error; })).catch(() => {
     process.exitCode = 1;
     console.error("Backend shutdown incomplete; operator intervention required.");
   });

@@ -1,3 +1,4 @@
+import { httpTelemetry, closeTelemetry } from "../telemetry.js";
 import { CollaborationError } from "../collaboration/shared.js";
 import { ProjectAccessError } from "../project-access.js";
 import { ProjectArchiveError } from "../project-archives.js";
@@ -61,6 +62,7 @@ if (!binding?.roomId) throw new Error("Worker room binding missing.");
 const roomId = String(binding.roomId);
 const admission = new WriteAdmission(false, async () => {});
 const app = new Hono();
+app.use("*", httpTelemetry());
 app.use("*", async (c, next) => {
   c.header("Cache-Control", "no-store");
   if (c.req.header("Origin") || !tokenMatches(env.DISPATCH_WORKER_TOKEN, c.req.header("Authorization"))) return c.json({ error: "Unauthorized" }, 401);
@@ -173,6 +175,7 @@ async function close() {
   // This process owns only this conversation. Release provider session sockets
   // after Pi has joined execution and closed durable storage.
   cleanupSessionResources();
+  await closeTelemetry();
   if ("closeAllConnections" in server) server.closeAllConnections();
   console.info("Worker shutdown: remaining resources", process.getActiveResourcesInfo());
 }

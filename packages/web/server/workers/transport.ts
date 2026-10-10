@@ -1,3 +1,4 @@
+import { tracedRequest } from "../telemetry.js";
 import { HistoryCursorError } from "../chat-pages.js";
 import { X509Certificate } from "node:crypto";
 import { request } from "node:https";
@@ -5,13 +6,18 @@ import { RuntimeError } from "../runtime.js";
 
 /** Internal JSON transport: no automatic retry of potentially committed mutations. */
 export async function workerRequest<T>(origin: string, token: string, path: string, body?: unknown, signal?: AbortSignal, timeoutMs = 60_000, ca?: string): Promise<T> {
+  return tracedRequest("worker.request", body === undefined ? "GET" : "POST", headers =>
+    sendWorkerRequest<T>(origin, token, path, body, signal, timeoutMs, ca, headers));
+}
+
+async function sendWorkerRequest<T>(origin: string, token: string, path: string, body: unknown, signal: AbortSignal | undefined, timeoutMs: number, ca: string | undefined, traceHeaders: Record<string, string>): Promise<T> {
   const timeout = AbortSignal.timeout(timeoutMs);
-  if (ca !== undefined) return verifiedBackendRequest<T>(origin, token, path, body, signal ? AbortSignal.any([signal, timeout]) : timeout, ca);
+  if (ca !== undefined) return verifiedBackendRequest<T>(origin, token, path, body, signal ? AbortSignal.any([signal, timeout]) : timeout, ca, traceHeaders);
   let response: Response;
   try {
     response = await fetch(new URL(path, origin), {
     method: body === undefined ? "GET" : "POST", redirect: "error",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    headers: { ...traceHeaders, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
   });
@@ -39,7 +45,7 @@ export function validateBackendCa(ca: string): void {
     throw new Error("Backend trust requires a PEM CA bundle.");
 }
 
-function verifiedBackendRequest<T>(origin: string, token: string, path: string, body: unknown, signal: AbortSignal, ca: string): Promise<T> {
+function verifiedBackendRequest<T>(origin: string, token: string, path: string, body: unknown, signal: AbortSignal, ca: string, traceHeaders: Record<string, string>): Promise<T> {
   const base = new URL(origin);
   const url = new URL(path, base);
   if (url.protocol !== "https:" || url.origin !== base.origin || url.username || url.password)
@@ -51,7 +57,7 @@ function verifiedBackendRequest<T>(origin: string, token: string, path: string, 
     const req = request(url, {
       method: payload === undefined ? "GET" : "POST", agent: false,
       ca, rejectUnauthorized: true, minVersion: "TLSv1.2", signal,
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json",
+      headers: { ...traceHeaders, Authorization: `Bearer ${token}`, "Content-Type": "application/json",
         ...(payload ? { "Content-Length": payload.length } : {}) },
     }, response => {
       response.on("error", () => reject(new RuntimeError(503, "Worker response interrupted.")));

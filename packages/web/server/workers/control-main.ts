@@ -1,3 +1,4 @@
+import { closeTelemetry } from "../telemetry.js";
 import { serve } from "@hono/node-server";
 import { openLauncherOwner } from "./launcher-owner.js";
 if (process.env.DISPATCH_CONTROLLER_CONFIG_FILE) {
@@ -12,6 +13,7 @@ async function close() {
   closing = true;
   server.close();
   await owner.close();
+  await closeTelemetry();
   if ("closeAllConnections" in server) server.closeAllConnections();
 }
 process.once("SIGTERM", () => { void close(); });

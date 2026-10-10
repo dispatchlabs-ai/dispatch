@@ -359,7 +359,8 @@ export function createApp(options: AppOptions) {
   app.onError((error, c) => {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return c.json({ error: { code: "invalid_request", message: "The request is invalid. Check the fields and try again." } }, 400);
     if (error instanceof ProjectArchiveError || error instanceof BundleError || error instanceof EvaluationError || error instanceof ManagementError || error instanceof AttachmentError || error instanceof ProjectAccessError || error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
-    console.error("Dispatch request failed:", error);
+    // Raw exceptions can contain database statements, URLs or credentials.
+    console.error("Dispatch request failed");
     return c.json({ error: { code: "internal", message: "The request could not be completed. Try again." } }, 500);
   });
   return app;
