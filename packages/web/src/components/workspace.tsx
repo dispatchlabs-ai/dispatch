@@ -8,7 +8,7 @@ import { BundlesDialog } from "./bundles";
 import { emptyAttachments } from "../lib/attachments";
 import { Tabs } from "@base-ui/react/tabs";
 import { Bot, ChevronLeft, ChevronRight, CircleHelp, Folder, LogOut, Menu, MessageSquare, PanelLeft, PanelRight, Plus, Settings2, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import { useSearchParams } from "react-router";
 import type { AgentDefinition, ApplicationConfig, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, UpdateChatInput } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
@@ -52,8 +52,8 @@ export function Workspace() {
   const { state, api, auth, setState } = useSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const [criteriaDrafts, setCriteriaDrafts] = useState<Record<string, CriteriaDraft | undefined>>({});
-  const [section, setSection] = useState<WorkspaceSection>(searchParams.get("section") === "model-providers" ? "model-providers" : searchParams.get("section") === "import-export" ? "import-export" : searchParams.get("section") === "secrets" ? "secrets" : searchParams.get("section") === "connections" ? "connections" : "chats");
-  const [visited, setVisited] = useState({ "model-providers": searchParams.get("section") === "model-providers", "import-export": searchParams.get("section") === "import-export", agents: false, security: false, secrets: searchParams.get("section") === "secrets", connections: searchParams.get("section") === "connections" });
+  const [section, setSection] = useState<WorkspaceSection>(searchParams.get("section") === "security" ? "security" : searchParams.get("section") === "model-providers" ? "model-providers" : searchParams.get("section") === "import-export" ? "import-export" : searchParams.get("section") === "secrets" ? "secrets" : searchParams.get("section") === "connections" ? "connections" : "chats");
+  const [visited, setVisited] = useState({ "model-providers": searchParams.get("section") === "model-providers", "import-export": searchParams.get("section") === "import-export", agents: false, security: searchParams.get("section") === "security", secrets: searchParams.get("section") === "secrets", connections: searchParams.get("section") === "connections" });
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [evaluationAgent, setEvaluationAgent] = useState<string | null>(null);
   const [evaluationContext, setEvaluationContext] = useState<React.ReactNode>(null);
@@ -252,9 +252,15 @@ export function Workspace() {
   const composers = useComposers(onSnapshot);
   const attachmentDrafts = composers.attachments;
 
+  function navigateSettings(event: MouseEvent<HTMLAnchorElement>, next: WorkspaceSection) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    selectSection(next);
+  }
+
   function selectSection(next: WorkspaceSection) {
     setSection(next);
-    if (next === "connections" || next === "secrets" || next === "import-export" || next === "model-providers") { setOtherDetailsVisible(false); setSearchParams({ section: next }, { replace: true }); }
+    if (next === "connections" || next === "secrets" || next === "import-export" || next === "model-providers" || next === "security") { setOtherDetailsVisible(false); setSearchParams({ section: next }, { replace: true }); }
     else if (searchParams.has("section")) setSearchParams({}, { replace: true });
     if (next !== "chats") setVisited(current => ({ ...current, [next]: true }));
     setNavigationOpen(false);
@@ -532,11 +538,11 @@ export function Workspace() {
     {settingsSection ? <div className="section-sidebar">
       <h2>Settings</h2>
       <nav aria-label="Settings">
-        <Button variant="ghost" aria-current={section === "model-providers" ? "page" : undefined} onClick={() => selectSection("model-providers")}>Model providers</Button>
-        <Button variant="ghost" aria-current={section === "connections" ? "page" : undefined} onClick={() => selectSection("connections")}>Connections</Button>
-        <Button variant="ghost" aria-current={section === "secrets" ? "page" : undefined} onClick={() => selectSection("secrets")}>Secrets</Button>
-        <Button variant="ghost" aria-current={section === "import-export" ? "page" : undefined} onClick={() => selectSection("import-export")}>Import &amp; export</Button>
-        <Button variant="ghost" aria-current={section === "security" ? "page" : undefined} onClick={() => selectSection("security")}>Account and security</Button>
+        <a className="button button-ghost" href="/?section=model-providers" aria-current={section === "model-providers" ? "page" : undefined} onClick={event => navigateSettings(event, "model-providers")}>Model providers</a>
+        <a className="button button-ghost" href="/?section=connections" aria-current={section === "connections" ? "page" : undefined} onClick={event => navigateSettings(event, "connections")}>Connections</a>
+        <a className="button button-ghost" href="/?section=secrets" aria-current={section === "secrets" ? "page" : undefined} onClick={event => navigateSettings(event, "secrets")}>Secrets</a>
+        <a className="button button-ghost" href="/?section=import-export" aria-current={section === "import-export" ? "page" : undefined} onClick={event => navigateSettings(event, "import-export")}>Import &amp; export</a>
+        <a className="button button-ghost" href="/?section=security" aria-current={section === "security" ? "page" : undefined} onClick={event => navigateSettings(event, "security")}>Account and security</a>
         {section === "security" ? [['passkeys', 'Passkeys'], ['password', 'Password & authenticator'], ['sessions', 'Active sessions']].map(([id, label]) => <Button key={id} variant="ghost" onClick={() => {
           setNavigationOpen(false);
           requestAnimationFrame(() => document.getElementById(`account-${id}`)?.scrollIntoView({ block: "start" }));
@@ -582,9 +588,9 @@ export function Workspace() {
         </IconButton> : null}
       </div>
       <div className="rail-account">
-        <IconButton label="Settings" className={settingsSection ? "active" : ""} aria-current={settingsSection ? "page" : undefined} onClick={() => selectSection("model-providers")}>
+        <a href="/?section=model-providers" aria-label="Settings" title="Settings" className={`icon-button ${settingsSection ? "active" : ""}`} aria-current={settingsSection ? "page" : undefined} onClick={event => navigateSettings(event, "model-providers")}>
           <Settings2 size={20} />
-        </IconButton>
+        </a>
         <IconButton label="Sign out" disabled={signingOut} onClick={() => void signOut()}>{signingOut ? <Spinner /> : <LogOut size={19} />}</IconButton>
         <span className="rail-avatar" title={state.user.name}>{state.user.name.slice(0, 1).toUpperCase()}
         </span>
@@ -734,8 +740,8 @@ export function Workspace() {
                 <MessageSquare /> Chats</Button>
               <Button variant="ghost" aria-current={active.kind === "agents" ? "page" : undefined} onClick={() => selectSection("agents")}>
                 <Bot /> Agents</Button>
-              <Button variant="ghost" aria-current={settingsSection ? "page" : undefined} onClick={() => selectSection("model-providers")}>
-                <Settings2 /> Settings</Button>
+              <a className="button button-ghost" href="/?section=model-providers" aria-current={settingsSection ? "page" : undefined} onClick={event => navigateSettings(event, "model-providers")}>
+                <Settings2 /> Settings</a>
             </nav>{sidebar}
             <div className="mobile-menu-footer">
               <Button variant="ghost" onClick={() => void signOut()} disabled={signingOut}>
