@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Licensing
+
+- License Dispatch under the MIT License.
+
 ## [0.2.0] - 2026-10-10
 
 ### Pi runtime and prompt caching

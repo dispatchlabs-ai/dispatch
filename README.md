@@ -33,3 +33,7 @@ Follow [CONTRIBUTING.md](CONTRIBUTING.md) for work packages, source review, perm
 - [Existing Dispatch Web repository and Omarchy pilot](https://github.com/dispatchlabs-ai/dispatch-web)
 
 The [lockstep SemVer workflow](CONTRIBUTING.md#versioning-and-releases) prepares versions and changelogs. CI and automatic release publication are unconfigured. Reserved directories do not imply a test framework or configured automation.
+
+## License
+
+MIT
