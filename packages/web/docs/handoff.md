@@ -51,7 +51,9 @@ Developer also rebuilt exact source `e3dc418` on Apple Silicon: `nix build` pass
 
 Production application builds from `e3dc418` plus the exact correction were served locally with read-only synthetic API data. Final captures cover 1440×900 desktop, 1280×720 laptop, 768×1024 tablet and 390×844 phone: baseline `v0.1.0` at 100%, and `v0.2.0-rc.1` at 100% and native Chrome 200% page zoom. Zoom captures show the Menu scrolled to its footer, not a permanently visible footer. Designer reported keyboard opening/tab order and Escape/focus return passing, no version tab stop, and accessibility-tree version text present. Post-correction npm check/build and diff checks passed. Local receipts and reproduction details: `.local/version-ui-verification/README.md`, with final images under `captures/fixed-*.png`; selected actual recaptures are attached in this chat. Synthetic design proposals are not browser evidence.
 
-Presentation acceptance does not qualify authentication, backend operations, real conversation streaming, physical-device touch or real screen-reader operation. Those remain unverified and outside this saved checklist. Final delivery awaits integration and final build/publication evidence.
+Presentation acceptance does not qualify authentication, backend operations, real conversation streaming, physical-device touch or real screen-reader operation. Those remain unverified and outside this saved checklist.
+
+**Final delivery:** Developer reviewed the final captures and CSS, integrated the correction as `8d01015` on top of the reconciled documentation, and published it to `main`. Apple Silicon `nix build` passed for that exact integrated source (application build and recipe TypeScript checking); `nix flake check` evaluation passed with zero runnable native checks and Linux systems omitted. Diff checks passed. Release preparation and version wiring are unchanged from the rehearsed source. All four saved chat acceptance criteria are satisfied; no release was cut, tagged, published or deployed.
 
 ## Live agent indicator and neutral pending prompt — October 9, 2026
 
