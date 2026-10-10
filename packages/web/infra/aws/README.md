@@ -1,64 +1,8 @@
-# Dispatch Web — AWS service module
+# Retired SQLite AWS deployment
 
-Generic Terraform/OpenTofu child module for one ECS Fargate owner behind an HTTPS ALB, with durable S3 Files storage. This is a deployment candidate, **not yet AWS-qualified**. See [deployment operations](../../docs/aws-deployment.md) and [SQLite qualification](../../docs/aws-sqlite-qualification.md).
+The SQLite/S3 Files AWS topology is no longer a supported Dispatch deployment
+path. Use the standalone PostgreSQL/conversation-worker module at
+[terraform-aws-dispatch](https://github.com/dispatchlabs-ai/terraform-aws-dispatch).
 
-## Ownership
-
-The caller supplies its AWS provider, backend, VPC, task and ALB subnets, ECS cluster, S3 Files filesystem and authoritative bucket/prefix, issued ACM certificate, DNS, image digest, and any secret references. No provider credentials, backend, private module dependencies or installation-specific accounts/domains are embedded here.
-
-The module creates an ALB with a TLS 1.2/1.3 HTTPS listener, IP target group, restricted ingress groups, task/execution roles, logs, S3 Files access point and ECS service. DNS must alias the chosen origin hostname to `alb_dns_name`/`alb_zone_id`. The certificate must cover that hostname. Only HTTPS port 443 is exposed; there is no HTTP listener. The ALB is internal by default; public reachability requires explicit `alb_internal=false`, suitable ALB subnets and client CIDRs. Tasks default to private addressing and require working egress for model/MCP APIs, registry/logs/secrets and storage.
-
-## Example
-
-```hcl
-module "dispatch_web" {
-  source = "./path/to/dispatch-web-next/packages/web/infra/aws"
-
-  name                 = "example-dispatch"
-  vpc_id               = var.vpc_id
-  subnet_ids           = var.private_subnet_ids
-  alb_subnet_ids       = var.alb_subnet_ids
-  cluster_arn          = var.cluster_arn
-  certificate_arn      = var.certificate_arn
-  origin               = "https://dispatch.example.com"
-  allowed_client_cidrs = ["10.0.0.0/8"]
-  image_uri            = var.image_uri # registry/repository@sha256:<64 hex>
-  ecr_repository_arns  = var.ecr_repository_arns
-
-  s3_files_file_system_id  = var.file_system_id
-  s3_files_file_system_arn = var.file_system_arn
-  s3_files_bucket_arn      = var.bucket_arn
-  s3_files_prefix          = var.filesystem_bucket_prefix
-  desired_count           = 0
-}
-```
-
-See `variables.tf` for all inputs, validation and defaults; `outputs.tf` defines integration outputs. Pin source to a reviewed release/commit, image to a matching Linux platform or multi-platform index digest and provider versions in the caller lockfile. The child module intentionally does not ship a provider lockfile.
-
-## Runtime and IAM
-
-The container runs as 65532:65532 with a read-only root and dropped capabilities. `/data` is the access point root `/dispatch/NAME/data`; `/data/state`, `/data/workspace` and `/data/home` hold state, coding workspace and provider home respectively. `/tmp` is ephemeral. Back up the entire access-point tree, including encryption keys and provider credentials; a database-only backup is insufficient.
-
-Non-secret `environment` values enter infrastructure state. `secret_environment` accepts exact Secrets Manager/SSM ARNs, not secret values; ECS injects resolved values at runtime. Never put secrets into `environment` or image layers. Runtime-critical environment names cannot be overridden. Injected environment secrets are readable by every coding agent shell; do not inject a credential that should be withheld from a conversation. Coding agents share service-account access to files and runtime credentials; this is not tenant or project execution isolation.
-
-Task permissions allow S3 Files mount/write only through the declared access point, plus read/version-read/list under its exact backing S3 prefix following the Wiki pattern. The execution role separately owns image pull, log writes and declared secret reads/decryption. ECR authentication requires a wildcard resource; repository pulls are scoped. ECS Exec is disabled. The caller owns filesystem/bucket resource policies, storage encryption/KMS policy, mount-target connectivity and backups; these must agree with the task role and security group outputs.
-
-Direct S3 reads bypass POSIX permissions: `0700`/`0600` protect the mounted filesystem path, not IAM-authorized object reads. The entire backing prefix is secrets-bearing, including `/data/home/.pi/agent/auth.json`; object readers and backup operators can read credentials. `GetObjectVersion` can retrieve noncurrent versions, including deleted attachments or old credentials. Callers must explicitly accept that retention or configure appropriate bucket version lifecycle rules; revoking a credential at its issuer remains necessary.
-
-Default task egress permits all IPv4 traffic to support caller-selected model/MCP endpoints. Narrow `egress_rules` for the installation after accounting for DNS, HTTPS and TCP 2049 to the storage mount-target security group (plus reciprocal mount-target ingress from the task group); the default is not an egress isolation boundary.
-
-## Operations and qualification
-
-`desired_count` is restricted to 0 or 1 and defaults to zero. Bootstrap using the **same image and volume settings**, with the service at zero and every old task confirmed STOPPED. Keep invitation output private. After qualification, explicitly set count to one. Stop-before-start deployment (0% minimum, 100% maximum) allows downtime; it is not distributed fencing or high availability. Do not launch overlapping maintenance tasks. Automatic rollback is disabled because an older image may not understand migrated state.
-
-Scale to zero and confirm STOPPED before enrollment/recovery CLI, file-copy backups, integrity checks, restore or downgrade. Root `/` health checks prove HTTP/static serving, not database integrity or model readiness. Verify authenticated SSE through the actual ALB, including idle periods and reconnect after replacement.
-
-Destroy removes the service/ALB/access point and roles but not caller-owned storage or retained task-definition revisions. Data remains under the documented backing prefix; deleting it is a separate explicit operator action. Preserve image digests and a consistent backup for recovery. Rename/root-path changes require deliberate data migration.
-
-[WP-041](../../docs/handoff.md#wp-041--generic-aws-container-deployment) owns dated validation, synthetic consumer-plan and isolated amd64 artifact-execution evidence. Live AWS plan/deployment, ARM execution and AWS SQLite/storage qualification remain pending. These checks do not establish live compatibility.
-
-## CPU architecture
-
-`cpu_architecture` defaults to `ARM64`; set `X86_64` explicitly for amd64-only images. Earlier module revisions fixed X86_64: upgrading the module without an explicit architecture now selects ARM64 and replaces the task definition. Review that change and qualify the matching image before applying. An image index must contain the selected platform; Terraform cannot verify registry contents.
-
-Build `packages.aarch64-linux.oci` and `packages.x86_64-linux.oci` from the same source revision on matching Linux builders (or explicitly configured emulation). Inspect and execute both independently before publishing a multi-platform OCI index. Pin the index digest and record both child manifest digests; tags alone are not release identities. A macOS ARM host build or an amd64 execution does not qualify Linux ARM64.
+No state migration or compatibility adapter is provided. Native local deployment
+remains application-owned and is not affected by this infrastructure extraction.
