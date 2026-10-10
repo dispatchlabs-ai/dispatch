@@ -1,39 +1,84 @@
 # Dispatch
 
-Dispatch Web is a browser workspace for company users, built on stock Pi Durable. The local implementation provides secure sign-in, invite-only shared conversations, company-shared agent definitions, and Dispatch's branded desktop/mobile workspace.
+**A self-hosted workspace where people and AI agents work together.**
 
-The private repository is [dispatchlabs-ai/dispatch](https://github.com/dispatchlabs-ai/dispatch), renamed from `dispatch-web-next` on October 10, 2026. The retired runtime and infrastructure repository is preserved privately as [dispatch-retired](https://github.com/dispatchlabs-ai/dispatch-retired). Existing local checkout and worktree paths are retained; update their Git remote URLs when adopting the new names.
+Dispatch brings shared conversations, named agents, project tools and background work into a browser workspace. Invite your teammates, connect a model provider, and work with multiple agents in the same conversation. Your installation owns its accounts, credentials and conversation state.
 
-The wider product includes tools, handoffs, background work, and event- or schedule-triggered agents. Broader integrations, RBAC and additional agent workflows remain later work. Deployment versions and qualification are recorded in the [package handoff](packages/web/docs/handoff.md); source publication does not establish deployment.
+Dispatch is built on [Pi Durable](https://github.com/earendil-works/pi): Pi owns agent execution and recovery; Dispatch adds sign-in, collaboration and the browser experience.
 
-## Quick start
+## Choose your installation
+
+| Where you want to run Dispatch | Start here |
+| --- | --- |
+| **Apple Silicon Mac** — one machine for development | The portable Mac release package is being prepared. For now, use the source-development steps below with Nix. |
+| **Windows with WSL2** — containers on your desktop | The container quick start is being prepared and is not yet installation-qualified. |
+| **AWS** — your own infrastructure and ECR | Follow the [terraform-aws-dispatch module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) for Terraform/OpenTofu setup. The application release artifacts and complete installation are still being qualified. |
+
+We are preparing the first packaged release. A successful build is not yet a verified installation on each platform; this README will gain the exact download and startup steps as those packages are checked. No separate Pi installation is needed.
+
+## Run from source
+
+You need Git and [Nix](https://nixos.org/download/) with `nix-command` and `flakes` enabled. Nix supplies the Node toolchain.
 
 ```sh
+git clone https://github.com/dispatchlabs-ai/dispatch.git
+cd dispatch
 nix develop
 npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173`. Provision the first account with `npm run auth -- invite --email person@example.com --name "Person"`, then complete passkey or password/TOTP enrollment in the browser. Pi provider credentials stay on the service. See the [usage guide](packages/web/docs/usage-guide.md) for account recovery, model configuration, state, and built-app launchers.
+Open **http://localhost:5173**. Keep that terminal running; Ctrl-C stops the application.
 
-`npm run check` runs TypeScript and builds only. **No tests at this stage:** future coverage will focus on end-to-end and API tests once behavior is stable enough to lock in. See the [testing policy](packages/web/docs/spec.md#testing-policy). Current source/build checks do not establish functional or device qualification.
+### Create your first account
 
-## Package and workflow
+There is no default password or public signup. In a second terminal, enter the same checkout and create a private enrollment link:
 
-The [Web package](packages/web/README.md) owns browser code in `src/`, service integration in `server/`, and its specification, handoff, usage guide, and changelog. Root files own shared workspace tooling, dependency locks, and contribution guidance. Nix pins the development toolchain and builds the static client plus service launchers.
+```sh
+# Run in the cloned dispatch directory.
+nix develop
+npm run auth -- invite --email person@example.com --name "Person"
+```
 
-Follow [CONTRIBUTING.md](CONTRIBUTING.md) for work packages, source review, permitted checks, and publication. Use stock Pi Durable's public interfaces: Pi owns durable execution, history, and recovery; Dispatch owns identity, authorization, transport, and presentation. The wiki owns maintained product intent and decision history; package documents define concrete implementation contracts.
+Replace the example email and name with your own. Open the generated link and enroll with a passkey or a password plus an authenticator app. The invitation expires after one hour by default; Dispatch does not send an email. Save any recovery codes in your password manager.
 
-## References
+### Connect a model and start working
 
-- [Specification](packages/web/docs/spec.md), [implementation handoff](packages/web/docs/handoff.md), and [changelog](packages/web/CHANGELOG.md)
-- [Repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/)
-- [Dispatch Web product history](https://wiki.chrisreynolds.me/wiki/dispatch-web/) and [Pi Durable capabilities](https://wiki.chrisreynolds.me/wiki/pi-durable-capabilities/)
-- [Pi Durable documentation](https://github.com/earendil-works/pi/tree/v1.0.4/packages/durable)
-- [Existing Dispatch Web repository and Omarchy pilot](https://github.com/dispatchlabs-ai/dispatch-web)
+1. Sign in and open **Settings → Model providers**.
+2. Connect an available provider: OpenAI supports ChatGPT OAuth or an API key; Claude and Fireworks use API keys.
+3. In **Agents**, configure Developer or create a named agent with a model your provider account can use.
+4. Select **New chat**, choose your agent, and send your first message.
 
-The [lockstep SemVer workflow](CONTRIBUTING.md#versioning-and-releases) prepares versions and changelogs. CI and automatic release publication are unconfigured. Reserved directories do not imply a test framework or configured automation.
+Provider credentials stay on the service and are shared by agents in this installation. See the [usage guide](packages/web/docs/usage-guide.md) for agent configuration, supported tools and account recovery.
+
+## Keep your work safe
+
+- Local development listens on your own machine. To serve other machines, use HTTPS and a matching `DISPATCH_ORIGIN`; do not expose a plaintext development server to the network.
+- Source-development state lives in `.local/state/dispatch` by default. Back up the complete state directory, including the authentication database and encryption keys, together.
+- Run only one application owner against a state directory. Stop it before activating a replacement. An older executable alone does not guarantee a safe rollback after state changes.
+
+The [usage guide](packages/web/docs/usage-guide.md) covers state locations, backups, launchers and troubleshooting. Keep private enrollment links, provider credentials and recovery codes out of issue reports.
+
+## Develop and contribute
+
+Builds run **locally with Nix**, not GitHub Actions:
+
+```sh
+npm run check
+nix build
+nix flake check
+```
+
+Run these from the repository's Nix shell. They check types and builds, not end-to-end behavior. Follow [CONTRIBUTING.md](CONTRIBUTING.md) for the current no-automated-tests policy, interactive verification and source publication.
+
+## Learn more
+
+- [Web package](packages/web/README.md) — implementation and documentation index
+- [Usage guide](packages/web/docs/usage-guide.md) — detailed setup and operation
+- [Changelog](packages/web/CHANGELOG.md) — changes and release history
+- [Specification](packages/web/docs/spec.md) and [handoff](packages/web/docs/handoff.md) — contracts and scoped verification evidence
+- [AWS deployment module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) — infrastructure and AWS installation instructions
 
 ## License
 
-MIT
+[MIT](LICENSE).
