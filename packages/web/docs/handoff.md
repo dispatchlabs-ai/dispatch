@@ -2333,7 +2333,7 @@ These are source/type/build checks, not image publication or live qualification.
 
 ## Idle-cost optimization — October 10, 2026
 
-**Optimization work authorized; design and acceptance pending.** Minimize effective
+**Optimization implemented in a candidate; final source acceptance pending.** Minimize effective
 cost while the installation is not in use; active-use infrastructure spending is
 acceptable. This extends the accepted baseline source, not its live qualification.
 Deployer owns Aurora auto-pause constraints and revised idle/active cost estimates;
@@ -2347,9 +2347,10 @@ no permanent NAT, and isolated listeners on one managed-domain private ALB. The
 is provisional, not a demonstrated minimum or measured bill. Historical pooled
 per-workspace prices do not establish this isolated installation's floor, and old
 filesystem persistence assumptions do not supersede disposable workspaces.
-The [sleep API contract](conversation-workers.md#idle-sleep-contract--october-10-2026)
-requires non-cancelling refusal, retained support callbacks and full admission
-reopening after partial refusal; implementation/review remains pending.
+The [canonical sleep/wake contract](idle-sleep.md) owns non-cancelling refusal,
+retained support callbacks, partial reopening, planned-quiescence health and clean
+owner shutdown. Implementation/review is available; final integrated checks and
+independent consumer acceptance remain pending.
 
 Acceptance for the selected design:
 
@@ -2366,6 +2367,7 @@ Acceptance for the selected design:
   Record source/build/mock checks separately from real wake, pause, interruption
   and billing observations. Existing offline passes do not qualify these changes.
 
-The current baseline has no automatic worker idle retirement and retains database
-owner connections. It is not the completed idle-optimized design. No customer/live
+Automatic worker retirement between turns remains absent; operator sleep must
+retire workers/controllers to close every database owner. No achieved idle-price
+or universal minimum-cost claim follows from source implementation. No customer/live
 AWS access or storage migration is authorized; real outcomes remain unverified.

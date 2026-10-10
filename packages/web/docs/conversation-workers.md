@@ -48,37 +48,13 @@ A single launcher serializes installation lifecycle mutations. Its own exclusive
 
 ## Idle sleep contract — October 10, 2026
 
-**Implementation contract, not completed/runtime-qualified behavior.** Private,
-operator-authenticated `POST /internal/sleep` with empty JSON is non-cancelling;
-existing `/internal/drain` is not an idle gate because it cancels work.
-
-- **200 `{quiesced:true}`:** each running worker sealed new-work RPC admission,
-  found no native live/background tasks or unsettled submissions, cleanly closed
-  its runtime, and existing launcher retirement confirmed actual termination.
-- **409 `{quiesced:false,reason:"busy"}`:** refuse without cancelling busy work.
-  Keep authenticated worker support callbacks available so admitted work can finish.
-- **503:** unresolved/failure, never permission to stop controllers. Reuse persisted
-  stop intent, orphan reconciliation and confirmed termination; no second reaper.
-
-Admission remains closed after an attempt. A partial refusal may have retired
-already-idle workers; explicit `/internal/undrain` must reopen surviving worker RPC
-admission as well as backend/launcher admission. Retired workers resume through
-normal fresh attempts and the existing disposable-workspace recovery policy.
-`waitForIdle()` alone excludes background tasks and cannot authorize shutdown.
-
-Planned-quiescence health is distinct from request admission, on both owner and
-rolling wrapper. Only an initialized, currently ready operator-sleep transition
-may keep ECS/ALB health green while rejecting new public work and retaining support
-callbacks. Cold persisted drain, ownership/store failure and shutdown do not grant
-this state. Health is neither proof of idle nor permission to stop a controller.
-
-Only after successful quiescence may operator orchestration stop/confirm backend,
-then launcher, closing their database owners cleanly. Wake starts launcher, then
-backend and explicit activation; clean-reopen markers and crash-recovery latches
-retain their distinct meanings. No automatic idle timer, anonymous browser wake,
-unsafe transaction replay or forced latch clearing is included. The module owns
-selected-network operator commands and the provisional idle/active cost model;
-see the [idle-cost work package](handoff.md#idle-cost-optimization--october-10-2026).
+Source `1114256` implements explicit operator sleep, not an automatic idle timer.
+The [canonical sleep/wake contract](idle-sleep.md) owns eligibility, busy/unknown
+refusal, retained support callbacks, partial retirement/reopening, planned-quiescence
+health and clean-close/wake boundaries. Existing `/internal/drain` cancels work and
+is not this idle gate; health or `waitForIdle()` alone does not prove idleness.
+The module owns selected-network orchestration/receipts and cost estimates. Source,
+build and mock acceptance do not establish live pause, wake latency or savings.
 
 ## ECS follow-up plan (proposed, not deployed)
 
