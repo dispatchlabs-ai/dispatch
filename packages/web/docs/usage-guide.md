@@ -125,7 +125,34 @@ A reset immediately suspends the old sign-in methods and revokes sessions; the n
 
 ## Model credentials and agent configuration
 
-The service uses Pi's public `ModelRuntime` from the pinned coding-agent package. It reads the operator's Pi credential/model files from `~/.pi/agent` and uses Pi's locked credential refresh, including OAuth. Secrets stay on the service and do not enter browser snapshots, Git, build artifacts, or the Nix store.
+### Application provider setup
+
+**Candidate implementation; integration and runtime/UI qualification pending.** Settings → Model providers manages installation-wide credentials shared by workspace agents. OpenAI offers ChatGPT OAuth or an API key; Claude and Fireworks initially offer API keys. Existing legacy Codex uses a separate OAuth-only provider ID. Available models come from Pi; saving a credential is not proof that an account can use every catalog model.
+
+Connect or replace credentials through the provider's setup flow. For OpenAI OAuth, follow the provider sign-in link and, when prompted, paste the **full loopback callback URL** into Dispatch. With a remote backend the callback may not load in your browser; copy its address rather than sharing it in chat, screenshots or support logs. API keys are entered in protected fields and are never redisplayed. Account information appears only when returned by the provider.
+
+“Key saved” and “Authorized” describe stored credentials, not a live connection test. “Reconnect required” identifies an interrupted credential update that cannot safely be reused. Storage outages or decryption failures require operator diagnosis, not automatic deletion/reconnection. Replacement keeps the old account until a successful save, except reconnecting an interrupted credential first removes its unusable local record. Cancellation stops waiting for input; an exchange already admitted to the provider may still complete and save. Reload status before retrying an uncertain result.
+
+Disconnect removes Dispatch's stored credential; it does **not** revoke the upstream key or grant. Revoke provider access separately when needed. Changing installation-wide credentials affects agents using that provider, not their saved provider/model selections or past messages.
+
+**Local compatibility change:** app-managed providers move to encrypted application storage. Existing Pi `auth.json` is preserved on disk, but its OAuth grants are not copied; reconnect once through Settings. This does not revoke the old upstream grant. The candidate local adapter stores `providers.sqlite` and `providers.key` under the application state directory; keep the database and matching encryption key together in restricted backups. Use a coordinated all-writer shutdown/backup procedure, not a live file copy. Losing the key prevents decryption. PostgreSQL installations retain their existing externally keyed encrypted store. Existing Pi model/settings files continue to supply configuration as described below.
+
+Candidate API (authenticated same-origin requests):
+
+| Endpoint under `/api/model-providers` | Request / result |
+| --- | --- |
+| `GET /` | `{ providers }`: stored status, supported methods, model catalog and opaque revision |
+| `POST /:providerId/connect` | `{ type, revision }` → login attempt |
+| `GET /attempts/:id` | Current session-bound attempt |
+| `POST /attempts/:id/answer` | `{ promptId, value }` → updated attempt |
+| `POST /attempts/:id/cancel` | `{}` → attempt after admitted work settles |
+| `POST /:providerId/disconnect` | `{ revision }` → refreshed `{ providers }` |
+
+Use the latest opaque revision; a stale revision returns 409 and requires reloading status. Attempts belong to their initiating session, and only an active attempt needs polling. Completion refreshes the application's model configuration. Provider setup unavailable on an installation returns 503. See [acceptance evidence](handoff.md#model-provider-setup--october-10-2026).
+
+### Pi configuration and agent defaults
+
+The service uses Pi's public `ModelRuntime` from the pinned coding-agent package. Before the provider-setup cutover it reads the operator's Pi credential/model files from `~/.pi/agent`; the candidate above replaces credential ownership for app-managed providers. Pi owns credential resolution and serialized refresh, including OAuth. Secrets stay on the service and do not enter browser snapshots, Git, build artifacts, or the Nix store.
 
 When seeding the company's default agent for the first time, explicit `DISPATCH_PROVIDER`, `DISPATCH_MODEL`, and `DISPATCH_THINKING` override Pi's `defaultProvider`, `defaultModel`, and `defaultThinkingLevel`. Without either configuration, the fallback is `openai` / `gpt-6-sol` / `off`; the provider still needs credentials. `DISPATCH_PI_AGENT_DIR` selects a different existing Pi configuration directory. Provider environment credentials supported by Pi can also be supplied to the service. Use Personal Vault's process injection for secrets rather than putting them on the command line or in committed files.
 
