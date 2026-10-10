@@ -3,7 +3,8 @@
 set -eu
 self=$(realpath "$0" 2>/dev/null || printf '%s\n' "$0")
 root=$(cd "$(dirname "$self")/.." && pwd -P)
-node="$root/libexec/node/bin/node"
+# Bundled official Node by default; DISPATCH_NODE overrides it with a compatible Node 24.
+node="${DISPATCH_NODE:-$root/libexec/node/bin/node}"
 server="$root/lib/dispatch-web/packages/web/build/service/server"
 home="${DISPATCH_HOME:-$HOME/Library/Application Support/Dispatch}"
 export DISPATCH_DATA_DIR="${DISPATCH_DATA_DIR:-$home/state}"
