@@ -30,4 +30,4 @@ Follow [CONTRIBUTING.md](CONTRIBUTING.md) for work packages, source review, perm
 - [Pi Durable documentation](https://github.com/earendil-works/pi/tree/v1.0.4/packages/durable)
 - [Existing Dispatch Web repository and Omarchy pilot](https://github.com/dispatchlabs-ai/dispatch-web)
 
-CI and release automation are unconfigured. Reserved directories do not imply a test framework or configured automation.
+The [lockstep SemVer workflow](CONTRIBUTING.md#versioning-and-releases) prepares versions and changelogs. CI and automatic release publication are unconfigured. Reserved directories do not imply a test framework or configured automation.
