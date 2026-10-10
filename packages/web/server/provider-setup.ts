@@ -49,7 +49,11 @@ export class ProviderSetup {
       interrupted = (await this.credentials.inspect?.(id))?.pending ?? false;
       if (!interrupted) credential = await this.credentials.read(id);
     } catch { unavailable = true; }
-    const external = !credential && this.models.getProviderAuthStatus(id).configured;
+    let external = false;
+    if (!credential && !interrupted && !unavailable) {
+      try { external = !!await this.models.checkAuth(id); }
+      catch { unavailable = true; }
+    }
     const state = unavailable ? "unavailable" : interrupted ? "reconnect_required" : credential?.type === "api_key" ? "key_saved" : credential ? "authorized" : external ? "externally_managed" : "not_connected";
     // Only allowlisted, provider-returned metadata; never decode tokens for an identity.
     const account = credential?.type === "oauth" && typeof credential.accountId === "string" ? credential.accountId.slice(0, 200) : undefined;
@@ -57,14 +61,14 @@ export class ProviderSetup {
       revision: this.revision([id, interrupted, unavailable, external, credential ?? null]),
       models: this.models.getModels(id).map(model => ({ id: model.id, name: model.name })) };
   }
-  async list() {
+  async list(principal?: AuthPrincipal) {
     const values: ProviderStatus[] = [];
     for (const definition of definitions) {
       if (!this.models.getProvider(definition.id)) continue;
       const status = await this.status(definition.id);
       values.push(status);
     }
-    return { providers: values };
+    return { providers: values, attempt: principal && this.active?.sessionId === principal.sessionId ? this.snapshot(this.active) : null };
   }
   private async assertRevision(id: SetupProviderId, revision: string) {
     if (!this.accepting) throw new ProviderSetupError(503, "Provider setup is shutting down.");
@@ -96,7 +100,9 @@ export class ProviderSetup {
     clearTimeout(attempt.timer);
     this.active = attempt;
     this.attempts.set(attempt.view.id, attempt);
-    attempt.timer = setTimeout(() => this.stop(attempt), 10 * 60_000);
+    attempt.timer = setInterval(() => {
+      void this.revalidate(attempt);
+    }, 5_000);
     attempt.timer.unref();
     attempt.done = this.runBackground(() => this.login(attempt, type)).catch(() => {
       clearTimeout(attempt.timer);
@@ -170,6 +176,11 @@ export class ProviderSetup {
     if (pending.options && !pending.options.some(option => option.id === value)) throw new ProviderSetupError(400, "Choose an available option.");
     pending.resolve(value);
     return this.snapshot(attempt);
+  }
+  private async revalidate(attempt: Attempt) {
+    try {
+      if (Date.now() >= attempt.expiresAt || !await this.isSessionValid(attempt.sessionId)) this.stop(attempt);
+    } catch { this.stop(attempt); }
   }
   private stop(attempt: Attempt) { attempt.stopped = true; attempt.pending?.reject(); }
   async cancel(principal: AuthPrincipal, id: string) {

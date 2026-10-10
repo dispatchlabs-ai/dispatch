@@ -130,7 +130,7 @@ export function createApp(options: AppOptions) {
     if (!options.providerSetup) throw new ProviderSetupError(503, "Provider setup is not configured on this installation.");
     return options.providerSetup;
   };
-  app.get("/api/model-providers", c => providerSetup().list().then(value => c.json(value)));
+  app.get("/api/model-providers", c => providerSetup().list(c.get("principal")).then(value => c.json(value)));
   app.post("/api/model-providers/:providerId/connect", async c => {
     const input = z.object({ type: z.enum(["oauth", "api_key"]), revision: z.string().min(1).max(200) }).strict().parse(await c.req.json());
     return c.json(await providerSetup().start(c.get("principal"), providerId.parse(c.req.param("providerId")), input.type, input.revision));
