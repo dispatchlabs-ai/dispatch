@@ -7,6 +7,10 @@
 - Add a non-cancelling operator sleep gate using sealed admission, native live/background work inspection and confirmed worker retirement. Busy workers keep support callbacks and reopen RPC admission; uncertain outcomes remain fail-closed. See [idle sleep](docs/idle-sleep.md) for partial refusal, recovery and live-qualification limits.
 - Allow typed ECS public-IP assignment for outbound task networking and extend initial PostgreSQL connection deadlines to 60 seconds for cold resume, without transaction retries or relaxed ownership fencing.
 
+### Single composer Send/Stop action
+
+- Replace the separate Stop all control with a single fixed-position Send/Stop button for main and thread composers, with draft presence separate from send eligibility and explicit whole-chat cancellation scope. Source/type/build and synthetic component visual reviews pass; authenticated integration remains unverified. See the [handoff](docs/handoff.md#single-composer-sendstop-action--october-10-2026).
+
 ### Lockstep versioning
 
 - Add SemVer release preparation, package-derived Nix and browser build versions. Keep release publication and deployment explicit.

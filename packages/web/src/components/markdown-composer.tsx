@@ -16,7 +16,7 @@ import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPl
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
-import { $findMatchingParent, $getSelection, $isRangeSelection, $isTextNode, FORMAT_TEXT_COMMAND, CLEAR_HISTORY_COMMAND, COMMAND_PRIORITY_HIGH, COMMAND_PRIORITY_NORMAL, COPY_COMMAND, CUT_COMMAND, INSERT_PARAGRAPH_COMMAND, KEY_ENTER_COMMAND, PASTE_COMMAND, SKIP_DOM_SELECTION_TAG, type EditorState } from "lexical";
+import { $findMatchingParent, $getRoot, $getSelection, $isRangeSelection, $isTextNode, FORMAT_TEXT_COMMAND, CLEAR_HISTORY_COMMAND, COMMAND_PRIORITY_HIGH, COMMAND_PRIORITY_NORMAL, COPY_COMMAND, CUT_COMMAND, INSERT_PARAGRAPH_COMMAND, KEY_ENTER_COMMAND, PASTE_COMMAND, SKIP_DOM_SELECTION_TAG, type EditorState } from "lexical";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { MentionParticipant } from "../lib/mentions";
 import { $getMentionIds, MentionNode, mentionTransformers } from "./mention-node";
@@ -35,6 +35,7 @@ type MarkdownComposerProps = {
 } & ({ mode: "document" } | {
   mode?: "message";
   onSend: () => void;
+  onContentPresenceChange?: (hasContent: boolean) => void;
   participants: MentionParticipant[];
   instanceChoices?: MentionParticipant[];
   onAddInstance?: OpenInstanceForm;
@@ -200,6 +201,8 @@ function ComposerSync(props: MarkdownComposerProps & { transformers: Transformer
   }, [editor, transformers]);
 
   return <OnChangePlugin ignoreSelectionChange ignoreHistoryMergeTagChange={false} onChange={(state, _editor, tags) => {
+    // Markdown export can discard whitespace; it must not turn a draft into Stop.
+    conversation?.onContentPresenceChange?.(state.read(() => $getRoot().getTextContent().length > 0));
     if (tags.has("external-draft")) return;
     const { markdown, ids } = state.read(() => ({ markdown: $convertToMarkdownString(transformers, undefined, true), ids: onMentionsChange ? $getMentionIds() : noMentions }));
     if (onMentionsChange) scannedMentions.current = { state, ids };

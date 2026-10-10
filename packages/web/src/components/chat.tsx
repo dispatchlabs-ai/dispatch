@@ -33,8 +33,6 @@ export function ChatPanel({ focusComposer, onComposerFocused, agents, active: vi
   const openThread = useCallback((id: string) => onThread(chatId, id), [chatId, onThread]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [stopping, setStopping] = useState(false);
-  const [stopError, setStopError] = useState<string | null>(null);
   const [showLatest, setShowLatest] = useState(false);
   const transcript = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
@@ -168,12 +166,6 @@ export function ChatPanel({ focusComposer, onComposerFocused, agents, active: vi
       <Button className="latest-button" variant="secondary" onClick={scrollToLatest}>
         <ArrowDown /> Latest messages</Button>
     </div> : null}
-    {stopError ? <Notice>{stopError}</Notice> : null}
-    <ConversationComposer attachments={attachments} onAddFiles={onAddFiles} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} id={`composer-${chatId}`} conversationTitle={snapshot?.conversation.title} chatId={chatId} active={visible} agents={agents} participants={snapshot?.participants ?? []} disabled={!snapshot || snapshot.conversation.canParticipate === false} onBeforeSend={scrollToLatest} onAddInstance={onAddInstance}>
-      {running && snapshot?.conversation.canParticipate !== false ? <Button variant="secondary" className="stop-button" disabled={stopping} onClick={() => {
-        setStopping(true); setStopError(null);
-        void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}/stop`, {}).then(onSnapshot).catch(error => setStopError(errorMessage(error))).finally(() => setStopping(false));
-      }}>{stopping ? <Spinner /> : <Square />} Stop all</Button> : null}
-    </ConversationComposer>
+    <ConversationComposer key={chatId} attachments={attachments} onAddFiles={onAddFiles} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} id={`composer-${chatId}`} conversationTitle={snapshot?.conversation.title} chatId={chatId} active={visible} agents={agents} participants={snapshot?.participants ?? []} disabled={!snapshot || snapshot.conversation.canParticipate === false} onBeforeSend={scrollToLatest} onAddInstance={onAddInstance} running={running} onSnapshot={onSnapshot} />
   </div>;
 }
