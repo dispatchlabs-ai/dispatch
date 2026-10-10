@@ -6,7 +6,7 @@
 
 Acceptance:
 
-- Use the verified Pi 1.0.4 matrix: OpenAI OAuth/API key, legacy Codex OAuth only, Claude and Fireworks API key initially. Preserve legacy IDs. Claude OAuth exclusion is application policy. Verify credential-management authority, installation-wide sharing disclosure and encrypted-store availability in each supported runtime mode.
+- Use the verified Pi 1.0.4 matrix: OpenAI OAuth/API key, legacy Codex OAuth only, Claude and Fireworks API key initially. Preserve legacy IDs and a reachable legacy-Codex reconnect path after local cutover, including when no encrypted grant exists. Modern OpenAI setup does not rewrite old agent configurations. Claude OAuth exclusion is application policy. Verify credential-management authority, installation-wide sharing disclosure and encrypted-store availability in each supported runtime mode.
 - Connect, inspect account/status, change accounts/replace credentials, reconnect and disconnect through Settings. Preserve useful recovery after cancellation, rejected credentials and interrupted exchanges; do not label stored metadata as live verification.
 - Backend-only token refresh/persistence preserves the existing store's serialized updates and uncertain-rotation recovery. Settings reads do not refresh tokens. Secrets never enter public payloads, logs or persistent browser storage.
 - Derive available models and supported thinking levels from Pi; reflect credential changes without inventing a second provider/model catalog. Report effects on existing configured agents honestly.
@@ -15,7 +15,9 @@ Acceptance:
 
 Selected local cutover: preserve `auth.json` without importing its OAuth grants; app-managed providers use encrypted application storage and require a one-time Settings reconnect. Usage instructions must explain this compatibility change and the manual callback-paste flow for remote OpenAI authorization. Cancellation must join admitted exchanges through persistence. These are implementation choices, not verified runtime outcomes.
 
-Documentation preparation: reviewed existing credential-store and model-runtime integration. The repository wiki home could not be retrieved through the available web reader (private-address block); no wiki update or wiki review is claimed. No implementation, builds, account flows or browser outcomes have yet been verified for this package.
+Documentation preparation: reviewed existing credential-store and model-runtime integration. The repository wiki home could not be retrieved through the available web reader (private-address block); no wiki update or wiki review is claimed. Full application/Nix builds, account flows and browser outcomes remain unverified for this package.
+
+**October 10 adapter source evidence:** Pi Durable Expert supplied `8b76de2` (local encrypted store and side-effect-free pending inspection on both stores) and `56a0275` (local wiring). The local adapter reuses application encryption/key handling, holds an exclusive SQLite owner lock, and persists uncertain-update intent before provider callbacks; `inspect()` exposes only `{ pending }`. Expert reported focused strict TypeScript checking inside Nix plus source/deslop and whitespace review passing. This is adapter/source evidence, not integrated application, persistence/restart or account-flow qualification. Candidate usage/API documentation describes storage/key pairing, manual callback handling and compatibility cutover; provider fallback suppression and final runtime behavior remain under integration review.
 
 ## Repository rename — October 10, 2026
 
