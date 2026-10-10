@@ -83,7 +83,7 @@ Also run `git diff --check` (and `git diff --cached --check` after staging), ins
 
 Use a task branch and worktree for concurrent work; edit canonical `main` only with exclusive checkout ownership. Before publication, fetch the latest remote target, reconcile any changes, and rerun the applicable checks. Commit only task changes, push normally to `main` unless the task requires a PR, and verify the published commit. Fast-forward a clean canonical checkout after publication; preserve existing edits and unpublished work.
 
-CI and automatic release publication are not configured. Existing shared CI policy continues to apply; an empty workflow directory does not enable GitHub Actions.
+**Accepted October 10, 2026:** release builds run locally with Nix, not GitHub Actions. Keep the exact source revision, reproducible commands and artifact checksums/digests in build receipts; local builds do not replace installation acceptance. CI and automatic release publication are not configured; an empty workflow directory does not enable GitHub Actions.
 
 ## Versioning and releases
 
