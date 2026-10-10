@@ -34,6 +34,7 @@ import { Button, IconButton, Modal, Notice, Spinner } from "./ui";
 type WorkspaceTab = { id: string; kind: "chat"; chatId: string } | { id: string; kind: "project"; projectId: string } | { id: string; kind: "welcome" };
 type WorkspaceSection = "chats" | "agents" | "security" | "connections" | "secrets" | "import-export";
 const welcomeTab: WorkspaceTab = { id: "welcome", kind: "welcome" };
+const appVersion = import.meta.env.VITE_APP_VERSION;
 
 function tabLocation(tab: WorkspaceTab): Record<string, string> {
   return tab.kind === "chat" ? { chat: tab.chatId } : tab.kind === "project" ? { project: tab.projectId } : {};
@@ -653,8 +654,12 @@ export function Workspace() {
                 <Bot /> Agents</Button>
               <Button variant="ghost" aria-current={settingsSection ? "page" : undefined} onClick={() => selectSection("connections")}>
                 <Settings2 /> Settings</Button>
-            </nav>{sidebar}<Button className="mobile-signout" variant="ghost" onClick={() => void signOut()} disabled={signingOut}>
-              <LogOut /> Sign out</Button>
+            </nav>{sidebar}
+            <div className="mobile-menu-footer">
+              <Button variant="ghost" onClick={() => void signOut()} disabled={signingOut}>
+                <LogOut /> Sign out</Button>
+              <span className="app-version"><span className="sr-only">Dispatch version </span>v{appVersion}</span>
+            </div>
           </Modal>
         </div>
         {active.kind !== "welcome" && active.kind !== "connections" && active.kind !== "import-export" ? <div className="mobile-context">
@@ -666,6 +671,7 @@ export function Workspace() {
         <span aria-hidden="true" />{connection === "reconnecting" ? "Reconnecting · agent work continues" : connection === "connecting" ? "Connecting to conversation" : connection === "error" ? "Connection needs attention" : connection === "connected" ? "Conversation connected" : "No live conversation selected"}</span>
       <span className="status-company">{config.company.name}</span>
       <span className="status-user">{state.user.name}</span>
+      <span className="app-version status-version"><span className="sr-only">Dispatch version </span>v{appVersion}</span>
     </footer>
   </div></ComposerContext.Provider>;
 }
