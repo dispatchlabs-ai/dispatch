@@ -2275,34 +2275,35 @@ Do not imply Aurora is cheapest or omit idle foundation/owner-connection costs.
   outcomes require separate runtime evidence; no live apply is authorized here.
 
 
-Baseline source checkpoint: application `3dff8d6` integrates Pi slice `f5c9674`
-(Spot, sanitized telemetry, backend SPA opt-out and explicit initializer majors
-17/18). Pi reports Nix-shell application/type/build, Apple Silicon Nix build,
-flake evaluation and source/whitespace review passed; no runtime tests or cloud
-calls. Module `ae4ef52` passes Developer's 18 mock plans per engine (OpenTofu
-1.13.1/Terraform 1.13.5, AWS provider 6.67.0), 17 Python helper checks, activation
-syntax and offline edge-function checks. Documenter inspected the integrated
-module check output; these remain source/offline results.
+### Baseline source acceptance
 
-The managed CDN removes query parameters only from GET
-`/api/connections/oauth/callback` before the ALB, retaining the browser URL for
-callback HTML to read and POST completion JSON. Ordinary API queries stay intact.
-This bounds ALB authorization-code exposure, not browser history or future CDN
-viewer logging; actual provider authorization remains unqualified. Cost estimates,
-released-frontend tooling and final external-caller rechecking are still required
-for completion. Live CDN/API/SSE, trace/log delivery, Aurora, Spot and zero-downtime
-claims remain separate from this source checkpoint.
+**Source implementation and cost estimates accepted; live/distribution acceptance
+remains separate.** Independent module archives/external callers at `fc216e9`
+passed init/validate and 20 mock plans each on Terraform 1.13.5/OpenTofu 1.12.6,
+AWS provider 6.67.0, plus 23 offline helpers and edge-function checks. Documenter
+inspected the retained logs; no application checkout, AWS apply or customer access.
+Developer's integrated OpenTofu 1.13.1/Terraform 1.13.5 checks also pass. Changes
+through `f040bd7` add docs and the publisher-check Makefile entry, not different
+infrastructure. These are mock/source checks, not real AWS plans/applies.
 
+Pi source-reviewed module `f6ff8d5`/application `4f48d7b` with no blocking finding
+remaining in scope; normalized rolling peer paths, retained shared chunk URLs and
+outer-only request-summary logging resolve review findings. Deslop found no
+additional complexity blocker and accepted collector-within-task cost accounting.
+Application/type/build, Apple Silicon Nix build, flake evaluation and whitespace
+passes are owner-reported for Pi slices `f5c9674`/`8d91d98`; no runtime tests.
 
-Cost/frontend dependency update: the module's
-[dated regional estimate](https://github.com/dispatchlabs-ai/terraform-aws-dispatch/blob/main/releases/cost-estimate.md)
-now documents fixed baseline, modest traffic, Aurora/RDS and worker/Spot scenarios,
-three DNS zones, collector headroom and exclusions. It is an estimate, not billing
-or deployed capacity evidence. Application `b888a1c` adds deterministic frontend
-archive/checksum packaging; Deployer reports build/flake checks passed. Module
-`8797705` adds explicit receipt-backed conditional publication with retained shared
-assets and release-prefixed HTML; 23 offline helper checks are reported. Public
-bundle/image publication, live S3/CDN operation and final independent candidate
-rechecking remain separate. Deployer reports collector startup in a
-network-disabled container, not AWS trace delivery. Use the module's guide rather
-than copying installation-specific commands here.
+The managed CDN strips only OAuth callback GET queries before the ALB, retaining
+browser URLs for callback HTML's completion POST and preserving ordinary API
+queries. ALB logs still require restricted access; this is not browser-history or
+future CDN viewer-log protection. Public provider authorization is unqualified.
+
+The module's [regional estimate](https://github.com/dispatchlabs-ai/terraform-aws-dispatch/blob/main/releases/cost-estimate.md)
+closes the cost-estimate dependency with explicit dated prices, three DNS zones,
+workload/collector assumptions, database/worker/Spot scenarios and exclusions.
+Application `b888a1c` adds deterministic frontend packaging, with owner-reported
+build/flake passes. Deployer reports offline verification of its actual 342-file
+bundle and network-disabled collector startup. Publisher/module guide owns
+receipt-backed immutable uploads, not this application handoff. Public bundles,
+images/registry and live CDN/log/trace/Aurora/Spot/provider/rolling/SSE outcomes
+remain unverified; none is implied by source acceptance.
