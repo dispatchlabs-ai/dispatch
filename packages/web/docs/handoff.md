@@ -2249,7 +2249,12 @@ and collector/IAM; Pi owns application tracing and opt-in worker Spot lifecycle;
 Documenter owns contracts, caller example, guide and evidence review. Use isolated
 branches, send commits for integration and do not access customer infrastructure.
 
-Acceptance remains open:
+Acceptance remains open. Chris additionally requires cost estimates before
+completion; Deployer owns the comparison and the standalone module is its
+canonical home. State date/region, public price sources, fixed foundation costs,
+workload/architecture/task-size assumptions, Aurora versus small RDS, On-Demand
+versus Spot, ACU/worker-hours, network/CDN/storage/observability and exclusions.
+Do not imply Aurora is cheapest or omit idle foundation/owner-connection costs.
 
 - Standalone caller interfaces initialize/validate under both engines; offline
   plans assert ALB logging, DNS/certificates, CloudFront routing/cache boundaries,
