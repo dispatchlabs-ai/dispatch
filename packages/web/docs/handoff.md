@@ -2437,10 +2437,11 @@ billing verification remain absent; operator tooling does not silently add them.
 
 ### Acceptance criteria
 
-- Users can add/remove multiple repository URL references and select a repository plus relative spec path without supplying a host directory.
+- Users can add/remove multiple repository URL references and select a repository plus relative spec path without supplying a host directory. They can also select a project-directory-relative spec with an explicit saved `cwd` and zero repositories.
+- The source is explicit (`directory` or `repository`); no migration or legacy-shape fallback. Clearing the directory of a directory-backed spec requires clearing/reassigning its spec in the same save, never workspace fallback.
 - Spec repository identity survives repository renaming/reordering; removing it requires explicit clearing/reassignment in the same save, never fallback.
 - Manager authority, expected revisions, retry identity and draft preservation remain intact; older-client saves do not erase omitted new metadata.
-- Saved-reference copy does not imply cloning, file existence, private-repository access or agent workspace changes. Existing local-directory behavior stays separate.
+- Saved-reference copy does not imply cloning, file existence or private-repository access. Directory edits visibly change the spec base and identify use by new local agents; existing agent working folders stay unchanged.
 - Review responsive image designs before frontend changes; record rendered desktop/390px evidence and any other required sizes separately from design concepts, and identify unavailable interaction evidence. Verification must stay within the canonical testing policy.
 - Record source review, permitted type/build checks and publication evidence here; implementation alone is not functional qualification. Settled field/URL/path validation is recorded below.
 
@@ -2479,3 +2480,5 @@ One directory input moves beside the spec for directory-backed references and in
 The Designer shared revised ImageGen concepts for 1440×900, 1280×720, 768×1024 and 390×844 before frontend edits. The team reviewed them; tablet stacking, long-directory readability, single-field ownership and local-agent copy were incorporated. Review exports are in ignored `.local/directory-spec-design/`, with original generated outputs/metadata under `imagegen/`. Concepts are synthetic, not application captures; generated abbreviated membership controls, cyan accents, and generic File path labels are not implementation requirements.
 
 TypeScript/application/capability builds passed on the integrated candidate inside `nix develop`. Behavior-preserving review keeps the two source branches explicit, reuses a single directory control, and avoids duplicate directory state or filesystem checks for ordinary metadata saves. Final external source review, Nix checks, documentation reconciliation and publication remain pending. No automated tests, browser/API/runtime probes, data migration/reset or deployment ran. Rendered four-size layouts, actual contrast, keyboard/touch, save/reopen, permissions, conflicts/retries and recovery remain unverified pending explicit browser-check authorization; the source rules and generated images do not close those criteria.
+
+Final directory-source review/checkpoint: Deslop source-reviewed backend `1be8771` and integrated UI `17c8929` with no blocking findings. Documenter's reconciliation `edb75c9` is integrated as `bce1710`. TypeScript/application/capability builds and Apple Silicon `nix build --no-link` passed; `nix flake check` ran one declared native type/build check and passed, omitting incompatible Linux systems. Full task diff, whitespace and changed local-document links were reviewed. Repository navigation/draft safeguards are unchanged. Final publication checks follow documentation reconciliation; source completion still does not claim deployment or close the browser/runtime acceptance gaps above.
