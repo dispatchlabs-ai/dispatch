@@ -66,6 +66,12 @@ admission as well as backend/launcher admission. Retired workers resume through
 normal fresh attempts and the existing disposable-workspace recovery policy.
 `waitForIdle()` alone excludes background tasks and cannot authorize shutdown.
 
+Planned-quiescence health is distinct from request admission, on both owner and
+rolling wrapper. Only an initialized, currently ready operator-sleep transition
+may keep ECS/ALB health green while rejecting new public work and retaining support
+callbacks. Cold persisted drain, ownership/store failure and shutdown do not grant
+this state. Health is neither proof of idle nor permission to stop a controller.
+
 Only after successful quiescence may operator orchestration stop/confirm backend,
 then launcher, closing their database owners cleanly. Wake starts launcher, then
 backend and explicit activation; clean-reopen markers and crash-recovery latches
