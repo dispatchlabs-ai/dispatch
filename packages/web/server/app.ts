@@ -1,3 +1,4 @@
+import { ProviderSetupError, type ProviderSetup } from "./provider-setup.js";
 import { activityPage, HistoryCursorError } from "./chat-pages.js";
 import { chatDelta } from "../src/shared/chat-updates.js";
 import { decodeProjectArchive, projectArchivePreview, ProjectArchiveError } from "./project-archives.js";
@@ -29,6 +30,7 @@ type AppOptions = {
   runtime: RuntimeService;
   mcpConnections: McpConnections;
   origin: string;
+  providerSetup?: ProviderSetup;
   configuration: () => Promise<ApplicationConfig>;
   clientDir?: string;
 };
@@ -122,6 +124,29 @@ export function createApp(options: AppOptions) {
     if (!principal) return c.json({ error: { code: "unauthenticated", message: "Sign in to continue." } }, 401);
     c.set("principal", principal);
     await next();
+  });
+  const providerId = z.enum(["openai", "anthropic", "fireworks", "openai-codex"]);
+  const providerSetup = () => {
+    if (!options.providerSetup) throw new ProviderSetupError(503, "Provider setup is not configured on this installation.");
+    return options.providerSetup;
+  };
+  app.get("/api/model-providers", c => providerSetup().list().then(value => c.json(value)));
+  app.post("/api/model-providers/:providerId/connect", async c => {
+    const input = z.object({ type: z.enum(["oauth", "api_key"]), revision: z.string().min(1).max(200) }).strict().parse(await c.req.json());
+    return c.json(await providerSetup().start(c.get("principal"), providerId.parse(c.req.param("providerId")), input.type, input.revision));
+  });
+  app.post("/api/model-providers/:providerId/disconnect", async c => {
+    const input = z.object({ revision: z.string().min(1).max(200) }).strict().parse(await c.req.json());
+    return c.json(await providerSetup().disconnect(providerId.parse(c.req.param("providerId")), input.revision));
+  });
+  app.get("/api/model-providers/attempts/:id", async c => c.json(await providerSetup().get(c.get("principal"), c.req.param("id"))));
+  app.post("/api/model-providers/attempts/:id/answer", async c => {
+    const input = z.object({ promptId: z.string().uuid(), value: z.string().min(1).max(16384) }).strict().parse(await c.req.json());
+    return c.json(providerSetup().answer(c.get("principal"), c.req.param("id"), input.promptId, input.value));
+  });
+  app.post("/api/model-providers/attempts/:id/cancel", async c => {
+    z.object({}).strict().parse(await c.req.json());
+    return c.json(await providerSetup().cancel(c.get("principal"), c.req.param("id")));
   });
   app.get("/api/config", async (c) => c.json(await options.configuration()));
   app.get("/api/secrets/exa", async c => c.json(await options.mcpConnections.searchSecret(c.get("principal"))));
@@ -365,7 +390,7 @@ export function createApp(options: AppOptions) {
   }
   app.onError((error, c) => {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return c.json({ error: { code: "invalid_request", message: "The request is invalid. Check the fields and try again." } }, 400);
-    if (error instanceof ProjectArchiveError || error instanceof BundleError || error instanceof EvaluationError || error instanceof ManagementError || error instanceof AttachmentError || error instanceof ProjectAccessError || error instanceof ProjectSpecError || error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
+    if (error instanceof ProviderSetupError || error instanceof ProjectArchiveError || error instanceof BundleError || error instanceof EvaluationError || error instanceof ManagementError || error instanceof AttachmentError || error instanceof ProjectAccessError || error instanceof ProjectSpecError || error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
     // Raw exceptions can contain database statements, URLs or credentials.
     console.error("Dispatch request failed");
     return c.json({ error: { code: "internal", message: "The request could not be completed. Try again." } }, 500);

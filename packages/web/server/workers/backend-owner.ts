@@ -15,6 +15,7 @@ import { S3Artifacts, s3ArtifactsConfigSchema } from "./s3-artifacts.js";
 import { ATTACHMENT_RPC_MAX_BYTES, attachmentSaveRequestSchema, attachmentReadRequestSchema, decodeAttachmentBytes } from "./attachments.js";
 import { z } from "zod";
 import { createAuth } from "../auth.js";
+import { ProviderSetup } from "../provider-setup.js";
 import { createApp } from "../app.js";
 import { readConfig } from "../config.js";
 import { readDirectoryStoreConfig } from "../storage/directory-config.js";
@@ -133,6 +134,8 @@ const connections = mcpConfig ? await openConfiguredMcpConnections(mcpConfig, co
 startupCleanup.push(() => connections.close());
 await connections.quiesce();
 const support = new WriteAdmission(true, async () => {});
+const providerSetup = credentials ? new ProviderSetup(provider.models, credentials, workerConfig.installationId, id => auth.isSessionValid(id), operation => support.run(operation)) : undefined;
+startupCleanup.push(async () => { await providerSetup?.close(); });
 const directory = await DispatchRuntime.open({
   connectMcpOnOpen: false, runMcpBackground: operation => support.run(operation), stateDir: join(config.stateDir, "runtime"), companyId: config.companyId, models: provider.models, directoryOnly: true,
   projectArchiveStore: archives,
@@ -177,6 +180,7 @@ if (!routes.admissionBlocked()) {
   if (!retired) {
     await resumeCredentials(false);
     await support.resume();
+    providerSetup?.resume();
   }
 }
 let transition: Promise<unknown> = Promise.resolve();
@@ -325,6 +329,7 @@ async function drainBackend() {
   await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/drain", {}, undefined, workerConfig.launcherTimeoutMs);
   const status = await launcherStatus();
   if (!status.drainComplete) throw new Error("Worker retirement remains unresolved.");
+  await providerSetup?.quiesce();
   await support.quiesce();
   credentialsQuiesced = false;
   const results = await Promise.allSettled([connections.quiesce(), auth.quiesce(), credentials?.quiesce()]);
@@ -357,6 +362,7 @@ app.post("/internal/undrain", async c => {
     if (closing) throw new Error("Backend shutdown is in progress.");
     await resumeCredentials();
     await support.resume();
+    providerSetup?.resume();
     await support.run(() => directory.startMcpConnections());
     await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/undrain", {}, undefined, workerConfig.launcherTimeoutMs);
     await admission.resume();
@@ -370,7 +376,7 @@ app.get("/internal/status", async c => {
   return c.json({ schemaVersion: 1, installation: workerConfig.installationId, drained: status.drained, drainComplete: status.drainComplete, backendQuiesced: admission.quiesced && support.quiesced && credentialsQuiesced, activeWorkers: status.activeWorkers.length, unresolvedAttempts: status.unresolvedAttempts.length });
 });
 const clientDir = process.env.DISPATCH_CLIENT_DIR ?? resolve(dirname(fileURLToPath(import.meta.url)), "../../../client");
-app.route("/", createApp({ auth, runtime, mcpConnections: connections, origin: config.origin,
+app.route("/", createApp({ auth, runtime, mcpConnections: connections, providerSetup, origin: config.origin,
   clientDir: process.env.DISPATCH_SERVE_CLIENT === "false" ? undefined : clientDir,
   configuration: async () => ({ company: { id: config.companyId, name: config.companyName }, defaultAgentId: DEFAULT_AGENT_ID, ...await provider.configuration(await runtime.getDefaultAgent(config.companyId)) }),
 }));
@@ -391,6 +397,7 @@ function close(retireOnly = false, beforeSupportClose?: () => Promise<void>): Pr
       // Handover preserves workers and the persisted installation drain state.
       await admission.suspend();
       await beforeSupportClose?.();
+      await providerSetup?.close();
       await support.quiesce();
       await Promise.all([connections.quiesce(), auth.quiesce(), credentials?.quiesce()]);
     } else await drainBackend();
@@ -399,6 +406,7 @@ function close(retireOnly = false, beforeSupportClose?: () => Promise<void>): Pr
     // Attempt every independent cleanup even if an earlier close fails. Retain
     // the terminal result: closing owners is not a replayable drain operation.
     for (const cleanup of [
+      async () => { await providerSetup?.close(); },
       () => runtime.close(),
       () => { cleanupSessionResources(); },
       () => connections.close(),
