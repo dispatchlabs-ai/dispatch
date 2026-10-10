@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/pi-capabilities",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Host-installed native Dispatch extensions for Pi Durable 1.0.4",
   "type": "module",

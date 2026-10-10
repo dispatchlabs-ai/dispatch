@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-10
+
 ### Pi runtime and prompt caching
 
 - Align Pi packages at 1.1.0, including upstream context derivation and Anthropic system/tool cache fixes.
