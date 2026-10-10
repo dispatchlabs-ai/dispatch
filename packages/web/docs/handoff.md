@@ -12,6 +12,23 @@ Acceptance:
 
 This package changes repository and build metadata. It does not change application behavior or qualify runtime, browser, device or deployment outcomes.
 
+## Pierre fork and project spec editor — October 10, 2026
+
+**Implementation authorized; pending.** Chris requested implementing the maintained Pierre fork, using it in the existing chat diff viewer and adding the new project spec integration. Developer owns library/application implementation, Designer UI and accessibility review, Security rendering/hardening review, Pi Durable Expert identity/state/recovery review, and Documenter documentation reconciliation. The [source-editor contract](spec.md#reusable-source-viewereditor-and-project-spec) owns boundaries. This is not evidence of a created fork, released artifact, integrated editor or deployment.
+
+Proposed baseline is upstream `diffs-v1.5.1`, commit `8f360ae1b39fcbbdaccacbcd8dbbf94fb10a3c38`, in [pierrecomputer/pierre](https://github.com/pierrecomputer/pierre). Library changes belong in its owning repository; preserve upstream history/license obligations and pin reproducible artifacts in Dispatch. Fork destination, release delivery, spec loading/write contract and any focused testing exception must be established with the implementation owners. The standing Dispatch testing policy is unchanged; discussions of fork checks do not authorize an automated suite here.
+
+Acceptance criteria:
+
+- Existing chat file/diff rendering consumes the maintained fork without altering recorded tool output, native execution or recovery. Partial/historical excerpts remain excerpts, with safe fallback presentation.
+- The project spec surface uses the same reusable library for source display/editing and the existing safe Markdown preview; keep repository fetching, identity, draft and persistence outside the library.
+- Implement configurable spellcheck and undoable correction input, accessible labels, keyboard exit/normal Tab navigation, and marker HTML hardening. Preserve literal source, newline/trailing-newline fidelity, selection/undo across preview/layout changes, and local typing responsiveness.
+- Define and enforce authorized spec loading, loaded revision and supported save destination. Reject stale writes rather than silently overwriting; do not claim a browser draft is saved or that workspace writes are repository commits. Loading/credential/checkout limits remain explicit.
+- Review designs before UI changes; record rendered desktop/390 px and other required-size evidence separately from keyboard, touch, IME, VoiceOver and persistence/conflict qualification. Run only checks authorized by the applicable policy; record unavailable evidence rather than waive it.
+- Record source/deslop review, type/build and applicable Nix checks, packed dependency/worker export integration, full diff/whitespace/local-link checks, publication identities and outstanding acceptance evidence here. No deployment is implied.
+
+Baseline evidence is limited: Security reported a scoped static rendering-path review of installed `@pierre/diffs` 1.5.1 and byte-matching embedded TypeScript for `File.ts`, `marker.ts` and `FileRenderer.ts` against the proposed upstream base. This establishes correspondence for those sources, not emitted-JavaScript integrity or a whole-package audit. The optional marker `{html}` API remains upstream and is not used by Dispatch today; no current-viewer vulnerability was demonstrated. Main-app CSP work and rendered adversarial-fixture evidence remain pending, not supplied by the fork decision.
+
 ## Single composer Send/Stop action — October 10, 2026
 
 **Implemented and published as `47d8b27`; component visual review passed, authenticated integration remains blocked.** Chris approved the four composer-only design sheets and interaction notes, then requested implementation. Developer owns the shared main/thread UI, Pi Durable Expert cancellation/state review, Designer rendered integration review, and Documenter package documentation. The [composer contract](spec.md#message-composer) supersedes the separate Stop all toolbar control; no Pi lifecycle or backend admission change is included.
