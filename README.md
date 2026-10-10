@@ -23,10 +23,10 @@ The portable package includes Node and Dispatch. **A public release download is 
 In Terminal, change to the directory containing `dispatch-0.2.0-darwin-arm64.tar.gz` and its `SHA256SUMS`, then:
 
 ```sh
-shasum -a 256 -c SHA256SUMS
+awk '$2 == "dispatch-0.2.0-darwin-arm64.tar.gz"' SHA256SUMS | shasum -a 256 -c -
 ```
 
-Proceed only if the checksum check passes. Obtain both files through the trusted maintainer/release channel: the checksum checks integrity, not publisher identity by itself.
+This checks only the Mac archive; you do not need the Windows or AWS artifacts listed in the same checksum file. Proceed only if it prints `dispatch-0.2.0-darwin-arm64.tar.gz: OK`. Obtain both files through the trusted maintainer/release channel: the checksum checks integrity, not publisher identity by itself.
 
 ```sh
 tar -xzf dispatch-0.2.0-darwin-arm64.tar.gz
