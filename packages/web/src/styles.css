@@ -1208,7 +1208,7 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .project-references dd { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .project-references ul { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); list-style: none; margin: 0; padding: 0; }
 .project-references a { display: inline-block; padding-block: var(--space-1); text-decoration: underline; text-underline-offset: 3px; }
-.project-spec-reference { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
+.project-spec-reference { display: flex; flex-direction: column; gap: var(--space-2); }
 .project-spec-reference strong { font-weight: 600; }
 .project-editor { height: 100%; min-height: 0; }
 .project-editor-form { height: 100%; display: flex; flex-direction: column; min-height: 0; }
@@ -1223,14 +1223,20 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .project-repository-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--space-4); }
 .project-repository-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
 .project-repository-actions .field-hint { margin: 0; }
-.project-spec-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--space-4); }
+.project-spec-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--space-4); align-items: start; }
+.project-directory-spec { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.5fr); }
+.project-directory-preview { display: none; }
 .project-advanced { border-top: 1px solid var(--color-border); padding-top: var(--space-4); }
 .project-advanced summary { cursor: pointer; font-size: var(--text-sm); color: var(--color-navy); padding-block: var(--space-3); }
 .project-advanced .field { margin-top: var(--space-3); }
 .project-editor-actions { flex-shrink: 0; background: var(--color-surface); border-top: 1px solid var(--color-border); padding: var(--space-4) var(--space-8); }
 .project-editor-actions .button-row { justify-content: flex-end; }
 .project-editor-actions > .field-hint { margin-bottom: var(--space-3); }
+@media (max-width: 1000px) {
+  .project-directory-spec { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 800px) {
+  .project-directory-preview { display: block; overflow-wrap: anywhere; }
   .project-editor-scroll { padding: var(--space-6) var(--space-5); }
   .project-editor-actions { padding: var(--space-3) var(--space-5); }
   .project-editor-actions .button-row { display: grid; grid-template-columns: 1fr 1fr; }

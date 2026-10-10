@@ -62,6 +62,8 @@ export function ProjectPage({ project, saved, chats, creating, updating, onCreat
   const projectChats = chats.filter(chat => chat.projectId === project.id && !chat.archived);
   const visible = projectChats.filter(chat => (!activeOnly || chat.status === "running") && chat.title.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const settingsUrl = `?${new URLSearchParams({ project: project.id, view: "settings" })}`;
+  const spec = project.spec;
+  const specRepository = spec?.source === "repository" ? project.repositories?.find(repository => repository.id === spec.repositoryId) : undefined;
   function editLink(event: MouseEvent<HTMLAnchorElement>, specOnly = false) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
@@ -75,7 +77,11 @@ export function ProjectPage({ project, saved, chats, creating, updating, onCreat
     </header>
     <dl className="project-references">
       <div><dt>Repositories</dt><dd>{project.repositories?.length ? <ul>{project.repositories.map(repository => <li key={repository.id}><a href={repository.url} target="_blank" rel="noreferrer">{repository.name}<span className="sr-only"> (opens in new tab)</span></a></li>)}</ul> : <span className="text-muted">None added</span>}</dd></div>
-      <div><dt>Spec file</dt><dd>{project.spec ? <span className="project-spec-reference"><strong>{project.repositories?.find(repository => repository.id === project.spec?.repositoryId)?.name}</strong><span>{project.spec.path}</span></span> : <span className="text-muted">Not set</span>}</dd>
+      <div><dt>Spec file</dt><dd>{spec ? <span className="project-spec-reference">
+        <strong>{spec.source === "directory" ? "Project directory" : specRepository?.name}</strong>
+        {spec.source === "directory" ? <span>{project.cwd}</span> : null}
+        <span className="text-muted">{spec.source === "directory" ? "Path in project directory" : "Path in repository"}</span><span>{spec.path}</span>
+      </span> : <span className="text-muted">Not set</span>}</dd>
         {project.canManage ? <Link className="button button-ghost" to={`${settingsUrl}&focus=spec`} onClick={event => editLink(event, true)} aria-label={project.spec ? "Edit spec file" : "Set spec file"}>{project.spec ? "Edit" : "Set spec file"}</Link> : null}
       </div>
     </dl>
