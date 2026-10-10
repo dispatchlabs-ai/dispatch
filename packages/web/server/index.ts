@@ -13,6 +13,10 @@ import { LocalCredentialStore } from "./storage/local-provider-credentials.js";
 import { ProviderSetup } from "./provider-setup.js";
 
 const config = readConfig();
+if (config.containerLoopbackHttp) {
+  console.warn(`DISPATCH_CONTAINER_LOOPBACK_HTTP=1: serving plain HTTP for ${config.origin} on ${config.host}:${config.port}. ` +
+    "Publish this port only on the host loopback (for example 127.0.0.1:3001:3001). Session cookies are not Secure; use HTTPS with a matching DISPATCH_ORIGIN before exposing Dispatch to other machines.");
+}
 await mkdir(config.stateDir, { recursive: true, mode: 0o700 });
 const credentials = LocalCredentialStore.open({
   databasePath: join(config.stateDir, "providers.sqlite"), keyPath: join(config.stateDir, "providers.key"),

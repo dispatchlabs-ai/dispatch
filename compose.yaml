@@ -1,0 +1,21 @@
+# Dispatch on one desktop (for example Docker Desktop or Docker Engine in WSL2).
+# Plain HTTP on localhost only: the port is published on the host loopback, never
+# on other interfaces. To serve other machines, put HTTPS in front and set a
+# matching https:// DISPATCH_ORIGIN instead of using this container mode.
+services:
+  dispatch:
+    image: ${DISPATCH_IMAGE:?Set DISPATCH_IMAGE to the Dispatch controller image for your platform}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${DISPATCH_PORT:-3001}:3001"
+    environment:
+      DISPATCH_ORIGIN: http://localhost:${DISPATCH_PORT:-3001}
+      DISPATCH_CONTAINER_LOOPBACK_HTTP: "1"
+      DISPATCH_COMPANY_NAME: ${DISPATCH_COMPANY_NAME:-Dispatch}
+    volumes:
+      - dispatch-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+volumes:
+  dispatch-data:

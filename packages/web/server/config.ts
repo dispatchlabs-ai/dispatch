@@ -15,6 +15,9 @@ const environmentSchema = z.object({
   DISPATCH_AGENT_CONNECTIONS_FILE: z.string().min(1).optional(),
   DISPATCH_COMPANY_ID: z.string().min(1).max(100).default("dispatch"),
   DISPATCH_COMPANY_NAME: z.string().min(1).max(100).default("Dispatch"),
+  // Opt-in for a desktop container: HTTP localhost origin with an all-interfaces bind inside
+  // the container. Reachability is then decided by the host port publish, not this process.
+  DISPATCH_CONTAINER_LOOPBACK_HTTP: z.enum(["0", "1"]).default("0"),
 });
 
 export function readConfig(environment: NodeJS.ProcessEnv = process.env) {
@@ -44,11 +47,13 @@ export function readConfig(environment: NodeJS.ProcessEnv = process.env) {
   if (url.protocol !== "https:" && !(url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) {
     throw new Error("DISPATCH_ORIGIN must use HTTPS, except for loopback development.");
   }
-  if (url.protocol === "http:" && !["localhost", "127.0.0.1", "::1"].includes(parsed.DISPATCH_HOST)) {
-    throw new Error("Loopback HTTP development must bind to localhost, 127.0.0.1, or ::1.");
+  const containerLoopbackHttp = url.protocol === "http:" && parsed.DISPATCH_CONTAINER_LOOPBACK_HTTP === "1";
+  if (url.protocol === "http:" && !containerLoopbackHttp && !["localhost", "127.0.0.1", "::1"].includes(parsed.DISPATCH_HOST)) {
+    throw new Error("Loopback HTTP development must bind to localhost, 127.0.0.1, or ::1, or set DISPATCH_CONTAINER_LOOPBACK_HTTP=1 inside a container published only on the host loopback.");
   }
   return {
     origin: url.origin,
+    containerLoopbackHttp,
     rpId: url.hostname.replace(/^\[|\]$/g, ""),
     host: parsed.DISPATCH_HOST,
     port: parsed.DISPATCH_PORT,
