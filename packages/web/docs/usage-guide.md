@@ -693,7 +693,7 @@ Direct extraction is not a browser: JavaScript-only pages, authenticated content
 
 ### Named agent secrets
 
-**Source-published through `611adf6`, October 9:** type/build and focused local storage/UI/Git fixture checks passed. Real private cloning remains credential-blocked; not deployed. See [acceptance status](handoff.md#named-agent-secrets--october-9-2026).
+**Source-published through `611adf6`, October 9:** type/build and focused local storage/UI/Git fixture checks passed. Deployed at [Surton](https://dispatch.surton.com) October 10 with bounded HTTPS/readiness evidence; hard-refresh before use. Hosted secret workflows and real private cloning remain unverified (the latter credential-blocked). See [acceptance status](handoff.md#named-agent-secrets--october-9-2026).
 
 1. In **Settings → Secrets → Named secrets**, enter **Name** and **Value**, then **Create secret**. Saved values are write-only. **Edit → Replace value → Save secret** rotates the value; leave blank to preserve it. **Delete** removes the secret and all grants. On a revision conflict, **Reload** before retrying.
 2. In **Agent screen → Secrets**, check/uncheck your owned secrets to grant/revoke access immediately, independently of the agent editor’s Save/Cancel. One secret can serve multiple named agents and their current/future instances. Copies/imports do not inherit grants. Enable **Files and commands** separately for the Git tools.
