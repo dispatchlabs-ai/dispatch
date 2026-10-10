@@ -20,7 +20,7 @@ export class PostgresLauncherJournal {
   }
 
   static async open(options: { connectionString: string; ca?: string; installationId: string; initial: string; recoverOwnerId?: string }) {
-    const client = new Client({ ...(options.ca === undefined ? { connectionString: options.connectionString } : verifiedPostgresConfig(options.connectionString, options.ca)), connectionTimeoutMillis: 10_000, application_name: "dispatch-launcher-journal" });
+    const client = new Client({ ...(options.ca === undefined ? { connectionString: options.connectionString } : verifiedPostgresConfig(options.connectionString, options.ca)), connectionTimeoutMillis: 60_000, application_name: "dispatch-launcher-journal" });
     const store = new PostgresLauncherJournal(client, options.installationId);
     try {
       await client.connect();

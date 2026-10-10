@@ -50,7 +50,7 @@ export class ControllerRendezvous {
       instanceId: randomUUID(), endpoint: options.endpoint,
     });
     identity.endpoint = new URL(identity.endpoint).origin;
-    const client = new Client({ ...options.database, connectionTimeoutMillis: 10_000, application_name: "dispatch-controller-rendezvous" });
+    const client = new Client({ ...options.database, connectionTimeoutMillis: 60_000, application_name: "dispatch-controller-rendezvous" });
     const rendezvous = new ControllerRendezvous(client, identity);
     try {
       await client.connect();
@@ -184,6 +184,8 @@ export class ControllerRendezvous {
     })();
   }
 
+  get healthy() { return !this.failure && !this.closing; }
+
   private key() { return [this.identity.installationId, this.identity.role]; }
   private requireScope(identity: ControllerIdentity) {
     if (identity.installationId !== this.identity.installationId || identity.role !== this.identity.role)
@@ -238,7 +240,7 @@ export async function recoverControllerRendezvous(options: {
   const expected = controllerDiscoverySchema.parse(options.expected);
   if (expected.successor && (expected.successor.installationId !== expected.owner.installationId || expected.successor.role !== expected.owner.role))
     throw new Error("Recovery identities must belong to the same installation and role.");
-  const client = new Client({ ...options.database, connectionTimeoutMillis: 10_000, application_name: "dispatch-controller-recovery" });
+  const client = new Client({ ...options.database, connectionTimeoutMillis: 60_000, application_name: "dispatch-controller-recovery" });
   let failed = false;
   client.on("error", () => { failed = true; });
   try {

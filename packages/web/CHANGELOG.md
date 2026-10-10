@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### operator idle sleep
+
+- Add a non-cancelling operator sleep gate using sealed admission, native live/background work inspection and confirmed worker retirement. Busy workers keep support callbacks and reopen RPC admission; uncertain outcomes remain fail-closed. See [idle sleep](docs/idle-sleep.md) for partial refusal, recovery and live-qualification limits.
+- Allow typed ECS public-IP assignment for outbound task networking and extend initial PostgreSQL connection deadlines to 60 seconds for cold resume, without transaction retries or relaxed ownership fencing.
+
 ### Lockstep versioning
 
 - Add SemVer release preparation, package-derived Nix and browser build versions. Keep release publication and deployment explicit.

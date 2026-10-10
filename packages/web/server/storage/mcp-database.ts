@@ -71,7 +71,7 @@ export class McpDatabase {
   static async openPostgres(options: McpPostgresOptions) {
     if (!options.installationId || options.installationId.length > 200 || options.encryptionKey.length !== 32)
       throw new Error("MCP storage requires an installation and an external 32-byte key.");
-    const client = new Client({ connectionTimeoutMillis: 10_000, ...options.database, application_name: "dispatch-mcp-connections",
+    const client = new Client({ connectionTimeoutMillis: 60_000, ...options.database, application_name: "dispatch-mcp-connections",
       types: { getTypeParser: (oid, format) => oid === 20 ? (value: string) => {
         const number = Number(value);
         if (!Number.isSafeInteger(number)) throw new Error("Unsafe MCP integer.");

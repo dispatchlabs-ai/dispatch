@@ -66,6 +66,14 @@ app.use("*", httpTelemetry());
 app.use("*", async (c, next) => {
   c.header("Cache-Control", "no-store");
   if (c.req.header("Origin") || !tokenMatches(env.DISPATCH_WORKER_TOKEN, c.req.header("Authorization"))) return c.json({ error: "Unauthorized" }, 401);
+  await next();
+});
+// Outside ordinary RPC admission: this command must join, not wait on itself.
+app.post("/idle-retire", bodyLimit({ maxSize: 1024 }), async c => {
+  z.object({}).strict().parse(await c.req.json());
+  return c.json({ idle: await retireIfIdle(), attemptId: env.DISPATCH_WORKER_ATTEMPT_ID });
+});
+app.use("*", async (c, next) => {
   if (!admission.admitting) return c.json({ error: "Worker is closing" }, 503);
   await admission.run(next);
 });
@@ -151,6 +159,9 @@ app.onError((error, c) => {
 });
 const server = serve({ fetch: app.fetch, hostname: "0.0.0.0", port: 8831 });
 let closing = false;
+let runtimeClosed = false;
+let idleRetirement: Promise<boolean> | undefined;
+let shutdown: Promise<void> | undefined;
 let summaryPending: Promise<void> | undefined;
 function publishSummary() {
   if (closing || summaryPending) return;
@@ -165,19 +176,47 @@ function publishSummary() {
 const summaryTimer = setInterval(publishSummary, 1_000);
 summaryTimer.unref();
 publishSummary();
-async function close() {
-  if (closing) return; closing = true; server.close();
-  clearInterval(summaryTimer);
-  await admission.quiesce();
-  console.info("Worker shutdown: runtime close started");
-  await runtime.close();
-  console.info("Worker shutdown: runtime close completed");
-  // This process owns only this conversation. Release provider session sockets
-  // after Pi has joined execution and closed durable storage.
-  cleanupSessionResources();
-  await closeTelemetry();
-  if ("closeAllConnections" in server) server.closeAllConnections();
-  console.info("Worker shutdown: remaining resources", process.getActiveResourcesInfo());
+function retireIfIdle(): Promise<boolean> {
+  if (runtimeClosed) return Promise.resolve(true);
+  if (closing) return Promise.reject(new Error("Worker shutdown is already in progress."));
+  return idleRetirement ??= (async () => {
+    await admission.quiesce();
+    if (!await runtime.closeWorkerIfIdle()) {
+      // A busy refusal restores worker RPCs; backend admission stays operator-sealed.
+      if (!closing) await admission.resume();
+      return false;
+    }
+    closing = true;
+    clearInterval(summaryTimer);
+    cleanupSessionResources();
+    runtimeClosed = true;
+    // Retain the authenticated listener until the launcher confirms ECS retirement.
+    return true;
+  })().catch(error => {
+    closing = true;
+    clearInterval(summaryTimer);
+    throw error; // Never reopen an owner after an uncertain close.
+  }).finally(() => { if (!closing) idleRetirement = undefined; });
 }
-process.once("SIGTERM", () => { void close(); });
-process.once("SIGINT", () => { void close(); });
+function close(): Promise<void> {
+  return shutdown ??= (async () => {
+    closing = true; server.close();
+    clearInterval(summaryTimer);
+    await idleRetirement;
+    await admission.quiesce();
+    console.info("Worker shutdown: runtime close started");
+    if (!runtimeClosed) await runtime.close();
+    console.info("Worker shutdown: runtime close completed");
+    // This process owns only this conversation. Release provider session sockets
+    // after Pi has joined execution and closed durable storage.
+    cleanupSessionResources();
+    await closeTelemetry();
+    if ("closeAllConnections" in server) server.closeAllConnections();
+    console.info("Worker shutdown: remaining resources", process.getActiveResourcesInfo());
+  })();
+}
+function requestShutdown() {
+  void close().catch(() => { process.exitCode = 1; console.error("Worker shutdown incomplete; recovery may be required."); });
+}
+process.once("SIGTERM", requestShutdown);
+process.once("SIGINT", requestShutdown);

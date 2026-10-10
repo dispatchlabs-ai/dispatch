@@ -26,7 +26,7 @@ export class WorkerStoreProvisioner {
     const url = new URL(options.connectionString);
     if (!["postgres:", "postgresql:"].includes(url.protocol) || !url.username || !url.password || !url.pathname.slice(1)) throw new Error("Explicit worker database credentials and database are required.");
     if ([...url.searchParams.keys()].some(key => !["sslmode", "sslrootcert", "uselibpqcompat"].includes(key))) throw new Error("Unsupported worker database URL parameters; credentials must be in URL authority only.");
-    const client = new Client({ ...(options.ca === undefined ? { connectionString: options.connectionString } : verifiedPostgresConfig(options.connectionString, options.ca)), connectionTimeoutMillis: 10_000, application_name: "dispatch-worker-provisioner" });
+    const client = new Client({ ...(options.ca === undefined ? { connectionString: options.connectionString } : verifiedPostgresConfig(options.connectionString, options.ca)), connectionTimeoutMillis: 60_000, application_name: "dispatch-worker-provisioner" });
     const provisioner = new WorkerStoreProvisioner(client, options);
     try {
       await client.connect();

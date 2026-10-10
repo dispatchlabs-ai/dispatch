@@ -43,7 +43,7 @@ export class RoutingDatabase {
 
   static async openPostgres(options: RoutingPostgresOptions) {
     if (!options.installationId || options.installationId.length > 200) throw new Error("Routing storage requires an installation identity.");
-    const client = new Client({ connectionTimeoutMillis: 10_000, ...options.database, application_name: "dispatch-worker-routes" });
+    const client = new Client({ connectionTimeoutMillis: 60_000, ...options.database, application_name: "dispatch-worker-routes" });
     const store = new RoutingDatabase(options.installationId, undefined, undefined, client, randomUUID());
     try {
       await client.connect();

@@ -45,7 +45,7 @@ export class PostgresCredentialStore implements CredentialStore {
   static async open(options: PostgresCredentialStoreOptions): Promise<PostgresCredentialStore> {
     if (!options.installationId || options.installationId.length > 200 || options.encryptionKey.length !== 32)
       throw new Error("Provider credentials require an installation identity and a 32-byte external key.");
-    const client = new Client({ connectionTimeoutMillis: 10_000, ...options.database, application_name: "dispatch-provider-credentials" });
+    const client = new Client({ connectionTimeoutMillis: 60_000, ...options.database, application_name: "dispatch-provider-credentials" });
     const store = new PostgresCredentialStore(client, options.installationId, options.encryptionKey);
     try {
       await client.connect();
@@ -88,15 +88,16 @@ export class PostgresCredentialStore implements CredentialStore {
     }
   }
 
-  get admitting() { return this.accepting && !this.closing && !this.failure; }
+  get healthy() { return !this.closing && !this.failure; }
+  get admitting() { return this.accepting && this.healthy; }
 
-  private healthy() { if (this.failure) throw this.failure; }
+  private assertHealthy() { if (this.failure) throw this.failure; }
 
   private async query<T extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
-    this.healthy();
+    this.assertHealthy();
     try {
       const result = await this.client.query<T>(text, values);
-      this.healthy();
+      this.assertHealthy();
       return result;
     } catch {
       this.failure ??= new Error("Provider credential database operation failed; outcome may be uncertain. Retire owner before reopening.");
@@ -107,7 +108,7 @@ export class PostgresCredentialStore implements CredentialStore {
   private enqueue<T>(operation: () => Promise<T>, options?: AuthOperationOptions): Promise<T> {
     if (!this.accepting) return Promise.reject(new Error("Provider credential store is quiesced."));
     const result = this.tail.then(async () => {
-      this.healthy();
+      this.assertHealthy();
       // Cancellation affects waiting, not persistence after the callback starts.
       options?.signal?.throwIfAborted();
       return operation();
@@ -160,7 +161,7 @@ export class PostgresCredentialStore implements CredentialStore {
       }
       // Do not retry fn or clear intent on rejection: external effects may exist.
       const next = await fn(current);
-      this.healthy();
+      this.assertHealthy();
       const credential = next === undefined ? current : credentialSchema.parse(next) as Credential;
       const encrypted = credential === undefined ? null : this.encrypt(JSON.stringify(credential), `provider:${providerId}`);
       await this.query("UPDATE dispatch_provider_auth.credentials SET credential=$3, pending=FALSE WHERE installation=$1 AND provider=$2", [this.installation, providerId, encrypted]);
@@ -180,7 +181,7 @@ export class PostgresCredentialStore implements CredentialStore {
   quiesce(): Promise<void> {
     this.admissionGeneration++;
     this.accepting = false;
-    this.draining ??= this.tail.then(() => { this.healthy(); });
+    this.draining ??= this.tail.then(() => { this.assertHealthy(); });
     return this.draining;
   }
 
@@ -189,7 +190,7 @@ export class PostgresCredentialStore implements CredentialStore {
     if (this.closing) throw new Error("Provider credential store is closing.");
     const generation = ++this.admissionGeneration;
     await this.draining;
-    this.healthy();
+    this.assertHealthy();
     if (this.closing) throw new Error("Provider credential store is closing.");
     if (generation === this.admissionGeneration) {
       this.draining = undefined;

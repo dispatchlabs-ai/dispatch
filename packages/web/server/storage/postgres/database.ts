@@ -65,7 +65,7 @@ export class PostgresDatabase implements PostgresExecutor {
     const client = new Client({
       ...(options.ca === undefined ? { connectionString: options.connectionString } : verifiedPostgresConfig(options.connectionString, options.ca)),
       application_name: "dispatch-pi-storage",
-      connectionTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 60_000,
       keepAlive: true,
       // Scope decoding to this client; never mutate pg's process-global parsers.
       types: {

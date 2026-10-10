@@ -23,7 +23,7 @@ async function text(filename: string, secret = true): Promise<string> {
   try { return bytes.toString("utf8"); } finally { bytes.fill(0); }
 }
 function client(url: URL, ca: string): Client {
-  const result = new Client({ ...verifiedPostgresConfig(url.toString(), ca), connectionTimeoutMillis: 10_000,
+  const result = new Client({ ...verifiedPostgresConfig(url.toString(), ca), connectionTimeoutMillis: 60_000,
     statement_timeout: 30_000, query_timeout: 35_000, application_name: "dispatch-database-init" });
   // Never allow pg's asynchronous error event to dump connection or statement details.
   result.on("error", () => { process.exitCode = 1; });

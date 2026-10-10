@@ -37,7 +37,7 @@ async function main() {
       console.log("Controller rendezvous cleared. Existing store latches are unchanged; reconcile them before normal startup.");
       return;
     }
-    const client = new Client({ ...database, connectionTimeoutMillis: 10_000, application_name: "dispatch-controller-inspect" });
+    const client = new Client({ ...database, connectionTimeoutMillis: 60_000, application_name: "dispatch-controller-inspect" });
     let failed = false;
     client.on("error", () => { failed = true; });
     try {

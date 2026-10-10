@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { HistoryCursorError } from "../chat-pages.js";
 import { decodeProjectArchive } from "../project-archives.js";
 import { PROJECT_ARCHIVE_MAX_BYTES, type ProjectArchive } from "../../src/shared/project-archives.js";
@@ -24,6 +25,7 @@ export type DistributedOptions = {
 export type DistributedRuntime = RuntimeService & {
   deferCatalogReconciliation(companyId: string): void;
   runWorkerTransition<T>(operation: () => Promise<T>): Promise<T>;
+  retireIdleWorkers(): Promise<boolean>;
 };
 export function distributedRuntime(options: DistributedOptions): DistributedRuntime {
   const { directory, routes } = options;
@@ -337,6 +339,35 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     ...operations,
     deferCatalogReconciliation,
     runWorkerTransition: policyChange,
+    async retireIdleWorkers() {
+      // Backend admission must already be sealed and joined. Support callbacks stay open.
+      const before = await launcher<LauncherStatus>("status");
+      if (before.installationId !== options.installationId || !before.driverReachable
+        || before.unresolvedAttempts.length || before.orphanContainerIds.length) throw new Error("Worker inventory is unresolved.");
+      for (const attempt of before.attempts.filter(item => item.phase !== "stopped")) {
+        const route = routes.get(attempt.conversationId);
+        if (!route || route.phase !== "ready" || route.attemptId !== attempt.attemptId || route.storeId !== attempt.storeId)
+          throw new Error("Worker route is unresolved.");
+        const result = z.object({ idle: z.boolean(), attemptId: z.string() }).strict().parse(await workerRequest(
+          `http://${workerAddress(attempt)}:8831`, token(route), "/idle-retire", {}, undefined, options.launcherTimeoutMs,
+        ));
+        if (result.attemptId !== attempt.attemptId) throw new Error("Worker retirement identity mismatch.");
+        if (!result.idle) return false;
+        await launcher("stop", { attemptId: attempt.attemptId });
+        const status = await launcher<LauncherStatus>("status");
+        const retired = status.attempts.find(item => item.attemptId === attempt.attemptId);
+        if (status.installationId !== options.installationId || !status.driverReachable
+          || retired?.phase !== "stopped" || retired.observed !== "absent") throw new Error("Retirement is not confirmed.");
+        await routes.retiring(route.conversationId, route.attemptId);
+        activated.delete(route.conversationId);
+      }
+      const after = await launcher<LauncherStatus>("status");
+      if (after.installationId !== options.installationId || !after.driverReachable || after.containers.length
+        || after.unresolvedAttempts.length || after.orphanContainerIds.length
+        || after.attempts.some(attempt => attempt.phase !== "stopped" || attempt.observed !== "absent"))
+        throw new Error("Worker retirement remains unresolved.");
+      return true;
+    },
   } satisfies DistributedRuntime;
 }
 

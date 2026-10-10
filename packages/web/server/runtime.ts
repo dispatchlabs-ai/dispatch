@@ -2414,6 +2414,19 @@ export class DispatchRuntime {
 
   get healthy(): boolean { return !this.closed && (!(this.storage instanceof PostgresStorage) || this.storage.healthy); }
 
+  /** Caller has sealed and joined every worker RPC before asking to retire.
+   * A UI summary or waitForIdle() omits background work and cannot authorize this.
+   */
+  async closeWorkerIfIdle(): Promise<boolean> {
+    if (!this.worker || !this.healthy) throw new Error("Worker is not available for idle retirement.");
+    const inspection = await this.harness.inspect(context);
+    if (inspection.tasks.length || inspection.submissions.length || this.upgradeDrain || this.participantReportDrain
+      || this.upgradeCatalogDirty || this.upgradeRooms.size || this.participantReportDirty) return false;
+    // close() seals local reconciliation synchronously, before its first await.
+    await this.close();
+    return true;
+  }
+
   async close() {
     if (this.closed) return;
     this.closed = true;

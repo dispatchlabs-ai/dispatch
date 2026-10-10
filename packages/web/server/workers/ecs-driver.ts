@@ -15,6 +15,7 @@ const configSchema = z.object({
   securityGroups: z.array(z.string().regex(/^sg-[a-f0-9]+$/)).min(1),
   environment: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/), z.string()).default({}),
   capacityProvider: z.enum(["FARGATE", "FARGATE_SPOT"]).default("FARGATE"),
+  assignPublicIp: z.boolean().default(false),
   configurationRevision: text, platformVersion: z.string().regex(/^\d+\.\d+\.\d+$/).default("1.4.0"),
   requestTimeoutMs: z.number().int().min(1000).max(120_000).default(30_000),
   retirementTimeoutMs: z.number().int().min(1000).max(900_000).default(180_000),
@@ -54,7 +55,7 @@ export class EcsContainerDriver implements ContainerDriver {
       clientToken: createHash("sha256").update(JSON.stringify([spec.installationId, spec.attemptId])).digest("hex"),
       startedBy: createHash("sha256").update(spec.installationId).digest("hex").slice(0, 36),
       enableExecuteCommand: false, tags,
-      networkConfiguration: { awsvpcConfiguration: { subnets: this.config.subnets, securityGroups: this.config.securityGroups, assignPublicIp: "DISABLED" } },
+      networkConfiguration: { awsvpcConfiguration: { subnets: this.config.subnets, securityGroups: this.config.securityGroups, assignPublicIp: this.config.assignPublicIp ? "ENABLED" : "DISABLED" } },
       overrides: { containerOverrides: [{ name: this.config.containerName,
         environment: Object.entries(environment).map(([name, value]) => ({ name, value })) }] },
     };

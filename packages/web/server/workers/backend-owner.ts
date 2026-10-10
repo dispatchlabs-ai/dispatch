@@ -150,6 +150,8 @@ async function launcherStatus(): Promise<LauncherStatus> {
   return status;
 }
 let credentialsQuiesced = true;
+// Process-local, explicit operator intent; never inferred from a persisted drain.
+let plannedQuiescence = false;
 async function resumeCredentials(refresh = true) {
   credentialsQuiesced = false;
   await credentials?.resume();
@@ -187,7 +189,7 @@ const mcp = backendWorkerMcp(directory);
 const app = new Hono();
 app.use("*", httpTelemetry());
 app.use("*", async (c, next) => {
-  if (c.req.path === "/internal/health" || c.req.path === "/internal/ready" || c.req.path === "/internal/replace" || c.req.path === "/internal/status" || c.req.path === "/internal/drain" || c.req.path === "/internal/undrain") return next();
+  if (c.req.path === "/internal/health" || c.req.path === "/internal/ready" || c.req.path === "/internal/replace" || c.req.path === "/internal/status" || c.req.path === "/internal/drain" || c.req.path === "/internal/sleep" || c.req.path === "/internal/undrain") return next();
   const gate = c.req.path.startsWith("/internal/workers/") ? support : admission;
   if (!gate.admitting) return c.json({ error: "Application is drained" }, 503);
   return gate.run(next);
@@ -200,7 +202,7 @@ app.use("/internal/*", async (c, next) => {
 // Private load-balancer liveness is independent of admission and readiness.
 app.get("/internal/health", c => c.text("ok"));
 app.get("/internal/ready", async c => {
-  try { const available = await ready(); return c.text(available ? "ok" : "unavailable", available ? 200 : 503); }
+  try { const available = healthReady(); return c.text(available ? "ok" : "unavailable", available ? 200 : 503); }
   catch { return c.text("unavailable", 503); }
 });
 app.use("/internal/workers/*", bodyLimit({ maxSize: ATTACHMENT_RPC_MAX_BYTES, onError: c => c.json({ error: "Request too large" }, 413) }));
@@ -335,6 +337,20 @@ app.post("/internal/drain", async c => {
   await operatorTransition(drainBackend);
   return c.json({ quiesced: admission.quiesced && support.quiesced && credentialsQuiesced });
 });
+app.post("/internal/sleep", bodyLimit({ maxSize: 1024 }), async c => {
+  if (!tokenMatches(operatorToken, c.req.header("Authorization"))) return c.json({ error: "Forbidden" }, 403);
+  z.object({}).strict().parse(await c.req.json());
+  const idle = await operatorTransition(async () => {
+    if (closing || (!plannedQuiescence && !ready())) throw new Error("Backend is not ready for planned sleep.");
+    plannedQuiescence = true;
+    await admission.quiesce();
+    if (!await runtime.retireIdleWorkers()) return false;
+    // No workers remain; this existing final drain cannot cancel native work.
+    await drainBackend();
+    return true;
+  });
+  return idle ? c.json({ quiesced: true }) : c.json({ quiesced: false, reason: "busy" }, 409);
+});
 app.post("/internal/undrain", async c => {
   if (!tokenMatches(operatorToken, c.req.header("Authorization"))) return c.json({ error: "Forbidden" }, 403);
   await operatorTransition(async () => {
@@ -344,6 +360,7 @@ app.post("/internal/undrain", async c => {
     await support.run(() => directory.startMcpConnections());
     await workerRequest(workerConfig.launcherUrl, launcherToken, "/v1/undrain", {}, undefined, workerConfig.launcherTimeoutMs);
     await admission.resume();
+    plannedQuiescence = false;
   });
   return c.json({ admitting: admission.admitting });
 });
@@ -365,6 +382,7 @@ let shutdown: Promise<void> | undefined;
 let teardownStarted = false;
 function close(retireOnly = false, beforeSupportClose?: () => Promise<void>): Promise<void> {
   closing = true;
+  plannedQuiescence = false;
   return shutdown ??= operatorTransition(async () => {
     // Persist admission closure and join worker effects before releasing owners.
     // An unresolved retirement leaves the server available for status/recovery,
@@ -398,16 +416,19 @@ function close(retireOnly = false, beforeSupportClose?: () => Promise<void>): Pr
     throw error;
   });
 }
+function resourcesHealthy() {
+  if (closing) return false;
+  // Local dependency health only: no ECS inventory or launcher mutation queue.
+  routes.admissionBlocked();
+  return stores.healthy && directory.healthy && auth.healthy && connections.healthy && (!credentials || credentials.healthy);
+}
 function resourcesReady() {
-    if (!support.admitting) return false;
-    // Local dependency health only: no ECS inventory or launcher mutation queue.
-    routes.admissionBlocked();
-    return stores.healthy && directory.healthy && auth.healthy
-      && (!credentials || credentials.admitting) && auth.admitting && connections.admitting;
+  return support.admitting && resourcesHealthy() && (!credentials || credentials.admitting) && auth.admitting && connections.admitting;
 }
 function ready() { return admission.admitting && resourcesReady(); }
+function healthReady() { return ready() || (plannedQuiescence && resourcesHealthy()); }
 return { app, tls, host: config.host, port: config.port,
-  close: () => close(), retire: (beforeSupportClose?: () => Promise<void>) => close(true, beforeSupportClose), ready, supportReady: resourcesReady,
+  close: () => close(), retire: (beforeSupportClose?: () => Promise<void>) => close(true, beforeSupportClose), ready, healthReady, supportReady: resourcesReady,
 };
 } catch (error) {
   const failures: unknown[] = [error];

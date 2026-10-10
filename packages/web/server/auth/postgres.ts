@@ -22,7 +22,7 @@ export class PostgresAuthStore extends AsyncAuthStore {
     const client = new Client({
       ...options.database,
       application_name: "dispatch-auth",
-      connectionTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 60_000,
       keepAlive: true,
       types: { getTypeParser(oid, format) {
         if (oid === 20 && format !== "binary") return (value: string) => {

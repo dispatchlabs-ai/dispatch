@@ -59,7 +59,8 @@ export class McpConnections {
   }
 
   get ownerId() { return this.db?.ownerId; }
-  get admitting() { return this.accepting && !this.closing && !!this.db?.healthy; }
+  get healthy() { return !this.closing && !!this.db?.healthy; }
+  get admitting() { return this.accepting && this.healthy; }
   get quiesced() { return !this.accepting && this.active.size === 0 && !!this.db?.healthy; }
 
   private admit<T>(action: () => Promise<T>): Promise<T> {
