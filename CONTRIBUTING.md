@@ -4,7 +4,7 @@ Dispatch Web has a local browser/service implementation with authentication, nat
 
 ## Current check policy
 
-Follow the package's [testing policy](packages/web/docs/spec.md#testing-policy), the canonical source for the October 3 zero-tests rule and explicitly scoped exceptions. Outside those exceptions, do not add or run tests, smoke checks or browser acceptance procedures; use source review, TypeScript checks and builds. An exception applies only to its authorized work package. Future coverage should prioritize stable end-to-end and API behavior, not implementation details or coverage counts. Builds do not establish runtime correctness; record dated observations and unverified outcomes in the package handoff.
+Follow the package's [testing policy](packages/web/docs/spec.md#testing-policy): do not add or run automated tests. This does not apply to AI agents using `agent-browser` for interactive verification of authorized work; no separate testing-policy exception is needed. Source review, TypeScript checks and builds remain permitted. Future coverage should prioritize stable end-to-end and API behavior, not implementation details or coverage counts. Builds do not establish runtime correctness; record dated observations and unverified outcomes in the package handoff.
 
 ## Local development and Nix builds
 
@@ -77,7 +77,7 @@ Use `/deslop` after implementing a work package, then rerun affected checks befo
 
 ## Checks and publication
 
-Run `npm run check` inside `nix develop` for code changes. Run `nix flake check` for the declared type/build check and `nix build` to produce artifacts. There is no functional test suite under the current zero-tests rule. Run browser verification only within an explicit exception in the [package testing policy](packages/web/docs/spec.md#testing-policy).
+Run `npm run check` inside `nix develop` for code changes. Run `nix flake check` for the declared type/build check and `nix build` to produce artifacts. There is no functional test suite under the current zero-tests rule. AI-agent interactive verification using `agent-browser` is permitted under the [package testing policy](packages/web/docs/spec.md#testing-policy).
 
 Also run `git diff --check` (and `git diff --cached --check` after staging), inspect the full diff, and verify changed local documentation links. Documentation checks do not verify application behavior.
 

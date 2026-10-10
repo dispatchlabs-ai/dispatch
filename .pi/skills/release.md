@@ -9,7 +9,7 @@ Use when a release is requested. Read `AGENTS.md`, `CONTRIBUTING.md`, the releva
 
 **Current tooling:** application/Nix builds and deployment procedures exist; see [CONTRIBUTING.md](../../CONTRIBUTING.md) and the [package usage guide](../../packages/web/docs/usage-guide.md). The [lockstep SemVer policy](../../CONTRIBUTING.md#versioning-and-releases) governs release preparation. CI and automatic publication remain unconfigured; do not assume a registry release or deployment.
 
-Follow the [testing policy](../../packages/web/docs/spec.md#testing-policy): artifact, smoke and browser checks below require an applicable explicit exception. A release request alone does not authorize tests.
+Follow the [testing policy](../../packages/web/docs/spec.md#testing-policy): do not add or run automated tests. AI-agent interactive verification using `agent-browser` is permitted without a separate exception; release requests do not authorize unrelated runtime probes, deployment or live-state disruption.
 
 1. Establish the requested artifact or deployment target, release revision, audience, and existing authorization. Inspect current manifests, scripts, workflows, and maintained procedures. If essential release choices are still absent, prepare the concrete proposal and identify the unresolved decision before publication.
 2. Audit the relevant changelog with [cl.md](../prompts/cl.md). Select the SemVer bump for accumulated changes, run `npm run release -- <patch|minor|major|version> --dry-run`, then prepare the approved version without `--dry-run`. Review manifest/lockfile versions and dated changelog sections. This command does not commit, tag, push, publish, or deploy.

@@ -153,11 +153,15 @@ This slice does not implement per-conversation workers, distributed executor own
 
 ## Testing policy
 
+**Current policy — clarified October 10, 2026:** Do not add or run automated tests. This restriction does **not** apply to AI agents using `agent-browser` for interactive browser verification of the authorized work. No separate testing-policy exception is needed for that browser use. Source review, TypeScript checks and builds remain permitted. Keep browser evidence scoped to the exercised revision, environment and workflows; permission to verify does not establish that verification passed or authorize deployment, live-state disruption, credential use or billable model calls.
+
+Earlier statements below requiring a scoped exception for agent-browser use are historical and superseded by this clarification. Retain their work-package boundaries and dated evidence; they do not prohibit current interactive browser verification.
+
 **October 9 named-agent secrets exception:** Chris directed the team to continue after the explicit request for focused functional/browser verification. Disposable local create/shared-grant/denial/rotation/revocation/restart and Git-tool checks, plus desktop/390px UI review, are authorized for [named-agent secrets](handoff.md#named-agent-secrets--october-9-2026). No automated regression suite, live-state copying, live-service stops or deployment is authorized by this exception. Real private GitHub cloning additionally requires an explicitly approved repository and privately granted credential.
 
 **October 8 clarification for portability qualification:** Chris clarified that the restriction is on automated tests, and explicitly requires `agent-browser` proof of working flows. Manual browser/runtime qualification of the agreed first version with disposable data is authorized; do not add or run an automated test suite. Earlier portability references treating manual/browser checks as blocked are superseded. Preserve live installations; no live-state copying or live-service stops. [The portability qualification entry](handoff.md#portability-manual-qualification--october-8-2026) owns evidence and remaining criteria.
 
-**Accepted October 3, 2026.** Do not add or run tests at the current stage. Make enough implementation progress to establish useful, stable behavior before investing in regression coverage. During this exploratory stage, use source review, TypeScript checks, and builds; record functional outcomes that remain unverified.
+**Accepted October 3, 2026.** Do not add or run automated tests at the current stage. Make enough implementation progress to establish useful, stable behavior before investing in regression coverage. During this exploratory stage, use source review, TypeScript checks, and builds; record functional outcomes that remain unverified.
 
 **October 7 scoped exception:** Chris requested first-deployment SQLite qualification for the AWS container target above. Focused deployment/storage checks with disposable data are authorized for that work; this does not authorize a broad application test suite or qualify the deployment by itself.
 
@@ -175,7 +179,7 @@ This slice does not implement per-conversation workers, distributed executor own
 
 When the workflows are ready to lock in, prioritize end-to-end tests and API tests that protect observable behavior and service contracts. These are the kinds of tests Chris wants in this codebase. Unit tests and tests that mirror implementation details are not the default; do not add them merely for coverage. Any exception needs a concrete benefit that the preferred test types cannot provide. Do not preemptively build a test framework or add test maintenance work while the product is still changing quickly.
 
-Resume test work only after there is enough useful, stable behavior worth preserving; application regression tests remain deferred outside the scoped exceptions above. This policy supersedes earlier instructions in the handoff and contribution workflow to add tests with every implementation slice or run browser acceptance tests now. A successful type check or build does not establish that runtime behavior has been verified.
+Resume test work only after there is enough useful, stable behavior worth preserving; application regression tests remain deferred outside the scoped exceptions above. This policy supersedes earlier instructions to add automated tests with every implementation slice; the October 10 clarification permits AI-agent interactive verification using agent-browser. A successful type check or build does not establish that runtime behavior has been verified.
 
 **October 6 focused exception:** Chris explicitly requested coordinator-led use of the local development site to validate the conversation layout refinement. Manual browser interaction and rendered desktop/phone comparison are authorized for [WP-028](handoff.md#wp-028--conversation-layout-refinement). This does not authorize adding or running automated tests or qualify unrelated runtime workflows. Record the specific observed outcomes and remaining limitations.
 
