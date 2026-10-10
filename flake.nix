@@ -12,7 +12,9 @@
           pkgs = import nixpkgs { inherit system; };
           web = pkgs.callPackage ./packages/web/nix/package.nix { };
         in {
-          packages = { default = web; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+          packages = { default = web; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
+            macos-release = pkgs.callPackage ./packages/web/nix/macos-release.nix { inherit web; };
+          } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             oci = pkgs.callPackage ./packages/web/nix/oci.nix {
               inherit web;
               sourceRevision = self.rev or self.dirtyRev or "uncommitted";
