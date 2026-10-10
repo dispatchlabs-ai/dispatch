@@ -2193,3 +2193,43 @@ A caller-owned AWS rollout was authorized. Its development policy prioritized fa
 **Bounded consumer deployment evidence, October 10:** application `4b7474a` deployed with native ARM64 controller and Ubuntu worker artifacts selected by immutable digests. Old controllers and workers were confirmed STOPPED/exit 0; a replacement worker used the new image and effective HTTPS callback/CA trust. Ownership-release/activation observations, complete-body HTTPS sampling and a final no-op infrastructure plan establish bounded rollout/readiness evidence, not independently repeated AWS checks or hosted secret CRUD/grant/tool/browser acceptance. State/keys were retained with additive secret/grant tables; no reset, restore or destructive conversion occurred. Old-image downgrade is not qualified. Real private cloning remains credential-blocked. Exact images, task identities, resource counts and deployment receipts remain in the restricted caller repository, not this application contract.
 
 Rendered review: Documenter inspected all four private Settings/Agent PNGs at 1440×1000 and 390×844. Named-secret fields/actions and agent checkboxes are readable and unclipped; the immediate-save/current-future-instance/isolation notice is visible. No visual blocker found in these captures. This does not verify keyboard/touch, measured contrast, accessibility, error/conflict layouts, private GitHub authentication or hosted workers. Captures and raw evidence remain private under ignored `.local/agent-secrets-verify/`; no screenshot publication.
+
+
+## Standalone AWS module — October 10, 2026
+
+**Authorized source extraction, not an existing-installation migration.**
+The standalone [terraform-aws-dispatch](https://github.com/dispatchlabs-ai/terraform-aws-dispatch)
+repository owns the PostgreSQL/conversation-worker AWS module, typed generated
+configuration, caller example, operator helpers and installation/release guide.
+Dispatch retains runtime/bootstrap commands and container builds. The older
+SQLite AWS candidate is historical, not a second supported new-install path.
+Customer-specific deployment records and private evidence links were removed
+from shipped application guidance while retaining useful generic findings.
+No customer repository or environment was accessed for this extraction.
+
+Acceptance evidence:
+
+- Source integration at application `fd80c72` removes embedded AWS Terraform
+  implementations and routes owning documentation to the standalone module.
+  No application runtime behavior, database/state move or compatibility shim is
+  introduced. Documentation diff/whitespace and 240 local file/anchor links were
+  checked before integration; final publication/link review is Developer-owned.
+- Module `0edd7f1` passed Developer's format/init/validate and eight mock plan
+  scenarios under OpenTofu 1.13.1 and Terraform 1.13.5/provider 6.67.0, plus 17
+  offline artifact/operator helper tests and activation-template syntax.
+  Documenter inspected the check output; Pi completed final configuration/lifecycle
+  source review of `0edd7f1` with no blocking finding. No mock applies or cloud calls occurred;
+  these are source/configuration checks, not deployment acceptance.
+- Pi reviewed enrollment/provider ordering: backend stopped, initializer removed,
+  explicit PostgreSQL auth path, private unrecorded terminal and a fresh task for
+  each exclusive bootstrap invocation. Actual ECS Exec/authorization remains
+  unverified. The activation-only task preserves the stopped-backend maintenance
+  boundary and runs before fresh-install readiness; no automatic mutation replay.
+- Earlier external module-only caller init/validate passed on `af8655b` under
+  Terraform 1.13.5 and OpenTofu 1.12.6, reported by Deployer. The exact final-source
+  rerun and publication remain pending at this checkpoint; see the module's
+  [acceptance record](https://github.com/dispatchlabs-ai/terraform-aws-dispatch/blob/main/docs/releases.md).
+- Public image/registry publication, live fresh-account initialization/activation,
+  login/model/tool/browser acceptance, replacement and measured rollout speed are
+  **not established** by this extraction. They remain explicit release acceptance,
+  not a reason to claim current source is deployed or publicly consumable.
