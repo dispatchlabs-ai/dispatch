@@ -9,6 +9,7 @@ buildNpmPackage {
   src = lib.fileset.toSource {
     root = ../../..;
     fileset = lib.fileset.unions [
+      ../../../LICENSE
       ../../../package.json
       ../../../package-lock.json
       ../../../scripts
@@ -26,7 +27,7 @@ buildNpmPackage {
     ];
   };
 
-  npmDepsHash = "sha256-4uIsx4wWYC66ZKzxfExDD3Bu+T9xLLbNPSRGYJEcr9Q=";
+  npmDepsHash = "sha256-BzLSWvQu7RfjucO0CRTB5qPnTu+1//O8CTYBnNRrNPg=";
   npmBuildScript = "build";
 
   doCheck = true;
@@ -65,6 +66,8 @@ buildNpmPackage {
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-worker" \
       --add-flags "$app/packages/web/build/service/server/workers/worker-main.js"
     mkdir -p "$out/share/dispatch-web"
+    cp LICENSE "$app/LICENSE"
+    cp LICENSE "$out/share/dispatch-web/LICENSE"
     cp -R packages/web/capabilities "$out/share/dispatch-web/capabilities"
     cp packages/web/server/storage/postgres/NOTICE "$out/share/dispatch-web/postgres-storage-NOTICE"
     mkdir -p "$out/share/dispatch-web/agent-browser"
