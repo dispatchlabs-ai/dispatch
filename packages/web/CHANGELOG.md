@@ -11,7 +11,7 @@
 
 - Add Settings → Model providers for OpenAI ChatGPT OAuth/API keys, Claude API keys, Fireworks API keys and legacy Codex OAuth. Keep Pi responsible for authentication, refresh and model catalogs; show stored authorization separately from live verification and externally managed credentials.
 - Use encrypted application credential storage locally, preserving Pi `auth.json` without importing grants. Existing local credentials need a one-time application reconnect. Keep interrupted updates recoverable by explicit disconnect/reconnect and distinguish storage failure from an uncertain grant. Disconnect removes local credentials, not upstream authorization or operator-configured fallback credentials.
-- Integration and account/browser qualification remain pending; see [acceptance evidence](docs/handoff.md#model-provider-setup--october-10-2026).
+- Integrated source/type/build checks pass; account/browser qualification remains pending. See [acceptance evidence](docs/handoff.md#model-provider-setup--october-10-2026).
 
 ### Repository identity
 
