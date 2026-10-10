@@ -238,7 +238,9 @@ export interface UpdateChatInput {
 }
 
 export type ProjectRepository = { id: string; name: string; url: string };
-export type ProjectSpec = { repositoryId: string; path: string };
+export type ProjectSpec =
+  | { source: "directory"; path: string }
+  | { source: "repository"; repositoryId: string; path: string };
 
 export type ProjectMember = { userId: string; role: "manager" | "member" };
 export interface SaveProjectInput {

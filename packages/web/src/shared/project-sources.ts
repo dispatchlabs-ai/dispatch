@@ -35,12 +35,14 @@ export const projectRepositoriesSchema = z.array(z.object({
   });
 });
 
-export const projectSpecSchema = z.object({
-  repositoryId,
-  path: z.string().trim().min(1).max(4096).refine(value =>
-    !/[\\:\u0000-\u001f\u007f]/.test(value) && value.split("/").every(segment => !!segment && segment !== "." && segment !== ".."),
-  "Use a repo-relative file path without traversal or empty segments."),
-}).strict();
+const specPath = z.string().trim().min(1).max(4096).refine(value =>
+  !/[\\:\u0000-\u001f\u007f]/.test(value) && value.split("/").every(segment => !!segment && segment !== "." && segment !== ".."),
+"Use a relative file path without traversal or empty segments.");
+
+export const projectSpecSchema = z.discriminatedUnion("source", [
+  z.object({ source: z.literal("directory"), path: specPath }).strict(),
+  z.object({ source: z.literal("repository"), repositoryId, path: specPath }).strict(),
+]);
 
 export const projectSourcesSchema = z.object({
   repositories: projectRepositoriesSchema.optional(), spec: projectSpecSchema.nullable().optional(),

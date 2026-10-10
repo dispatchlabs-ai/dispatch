@@ -1439,8 +1439,11 @@ export class DispatchRuntime {
         else project.spec = sources.spec;
       }
       const spec = project.spec;
-      if (spec && !project.repositories?.some(repository => repository.id === spec.repositoryId)) {
+      if (spec?.source === "repository" && !project.repositories?.some(repository => repository.id === spec.repositoryId)) {
         throw new RuntimeError(400, "Clear or reassign the spec file before removing its repository.");
+      }
+      if (spec?.source === "directory" && !project.cwd) {
+        throw new RuntimeError(400, "Set a project directory or clear or reassign the spec file.");
       }
       const doc = await tx.doc(ProjectsDoc);
       doc.projects[id] = project; doc.requests[key] = { fingerprint, projectId: project.id };
