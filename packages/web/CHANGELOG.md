@@ -4,7 +4,7 @@
 
 ### Project repositories and spec reference
 
-- Store manager-editable repository URL references and a repository-relative spec reference without requiring a host directory. Preserve omitted metadata on older-client saves and reject dangling spec references. Saving does not clone repositories or verify access/file existence. Backend source/type/build checks pass; UI and runtime qualification remain pending.
+- Store manager-editable repository URL references and a repository-relative spec reference without requiring a host directory. Preserve omitted metadata on older-client saves and reject dangling spec references. Saving does not clone repositories or verify access/file existence. Add a responsive main-area Project settings form with URL/name entry, repo-relative spec selection, inline errors and retained drafts. Keep saved references discoverable on the overview and local-directory overrides separate under Advanced. Source/type/build checks pass; browser/runtime qualification remains pending.
 
 ### operator idle sleep
 
