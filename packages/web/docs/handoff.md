@@ -2225,9 +2225,13 @@ Acceptance evidence:
   each exclusive bootstrap invocation. Actual ECS Exec/authorization remains
   unverified. The activation-only task preserves the stopped-backend maintenance
   boundary and runs before fresh-install readiness; no automatic mutation replay.
-- Earlier external module-only caller init/validate passed on `af8655b` under
-  Terraform 1.13.5 and OpenTofu 1.12.6, reported by Deployer. The exact final-source
-  rerun and publication remain pending at this checkpoint; see the module's
+- Final independent external-caller verification passed at `0edd7f1`: module-only
+  Git archives and separately copied caller init/validate, eight mock plans per
+  engine and 17 offline helper checks under Terraform 1.13.5/OpenTofu 1.12.6,
+  AWS provider 6.67.0. Deployer used temporary HOME/credential-empty engine
+  environments; Documenter inspected the retained logs. No application checkout,
+  AWS API/apply, image pull or customer access. This closes source-only caller
+  acceptance; see the module's
   [acceptance record](https://github.com/dispatchlabs-ai/terraform-aws-dispatch/blob/main/docs/releases.md).
 - Public image/registry publication, live fresh-account initialization/activation,
   login/model/tool/browser acceptance, replacement and measured rollout speed are
