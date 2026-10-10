@@ -1282,3 +1282,7 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 @media (max-width: 799px) {
   .project-spec-page { padding: var(--space-5) var(--space-4); }
 }
+
+@media (max-width: 1099px), (pointer: coarse) {
+  .project-spec-page .button { min-height: 44px; }
+}

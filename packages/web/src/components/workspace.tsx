@@ -113,7 +113,16 @@ export function Workspace() {
   const [threads, setThreads] = useState<Record<string, string | null>>({});
   const [closingTab, setClosingTab] = useState<string | null>(null);
   // Open spec views and their unsaved in-memory drafts, by project.
-  const [specOpen, setSpecOpen] = useState<Record<string, boolean>>({});
+  const [specOpen, setSpecOpen] = useState<Record<string, boolean>>(() => {
+    const projectId = searchParams.get("project");
+    return projectId && searchParams.get("view") === "spec" ? { [projectId]: true } : {};
+  });
+  useEffect(() => {
+    const projectId = searchParams.get("project");
+    if (projectId && searchParams.get("view") === "spec") {
+      setSpecOpen(current => current[projectId] ? current : { ...current, [projectId]: true });
+    }
+  }, [searchParams]);
   const [specDirty, setSpecDirty] = useState<Record<string, boolean>>({});
   const tabList = useRef<HTMLDivElement>(null);
   const [tabOverflow, setTabOverflow] = useState({ before: false, after: false });
@@ -393,6 +402,7 @@ export function Workspace() {
   }, [viewportWidth]);
 
   async function signOut() {
+    if (Object.values(specDirty).some(Boolean) && !window.confirm("Discard unsaved spec drafts and sign out?")) return;
     setSigningOut(true); setError(null);
     try { setState(await auth("/api/auth/logout", {})); } catch (error) { setError(errorMessage(error)); } finally { setSigningOut(false); }
   }
@@ -640,21 +650,27 @@ export function Workspace() {
               onAccessLost={onAccessLost}
             /> : tab.kind === "project" ? (() => {
               const project = projects.find(project => project.id === tab.projectId);
-              return project && projectEditing[tab.projectId] && (tab.id !== activeId || projectEditorOpen) ? <ProjectSettings project={project} agents={agents}
+              const showSpec = tab.id === activeId && section === "chats" ? projectSpecOpen : Boolean(specOpen[tab.projectId]);
+              const retainSpec = project && (specOpen[tab.projectId] || showSpec);
+              return <>
+                {retainSpec ? <div hidden={!showSpec} inert={!showSpec}>
+                  <ProjectSpecView project={project} onBack={() => openSpec(tab.projectId, false)}
+                    onDirtyChange={dirty => setSpecDirty(current => current[tab.projectId] === dirty ? current : { ...current, [tab.projectId]: dirty })} />
+                </div> : null}
+                {!showSpec ? project && projectEditing[tab.projectId] && (tab.id !== activeId || projectEditorOpen) ? <ProjectSettings project={project} agents={agents}
                 editing={projectEditing[tab.projectId]}
                 onEditingChange={editing => {
                   if (!editing) changeProjectEditing(tab.projectId, null);
                   else setProjectEditing(current => ({ ...current, [tab.projectId]: editing }));
-                }} onSaved={savedProject} /> : project && (tab.id === activeId ? projectSpecOpen : specOpen[tab.projectId]) ? <ProjectSpecView project={project}
-                onBack={() => openSpec(tab.projectId, false)}
-                onDirtyChange={dirty => setSpecDirty(current => current[tab.projectId] === dirty ? current : { ...current, [tab.projectId]: dirty })} /> : <ProjectPage
+                }} onSaved={savedProject} /> : <ProjectPage
                 onOpenSpec={() => openSpec(tab.projectId, true)}
                 search={projectSearch[tab.projectId] ?? ""} onSearchChange={search => setProjectSearch(current => ({ ...current, [tab.projectId]: search }))}
                 project={project} saved={savedProjectId === tab.projectId} chats={chats} creating={creating || createFailed} updating={updatingChats}
                 onCreate={() => chooseAgents(config.defaultAgentId, tab.projectId)} onSelect={selectChat}
                 onEdit={specOnly => { if (project) editProject(project, specOnly); }}
                 onRename={renameChat} onUpdate={updateChatAction}
-              />;
+              /> : null}
+              </>;
             })() : <Welcome
               name={state.user.name} config={config}
               onCreate={() => chooseAgents()} creating={creating || createFailed}

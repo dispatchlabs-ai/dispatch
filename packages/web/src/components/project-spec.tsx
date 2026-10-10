@@ -46,9 +46,7 @@ export function ProjectSpecView({ project, onBack, onDirtyChange }: {
   const [dirty, setDirty] = useState(false);
   // Load the editor only once Source is first shown, then keep it mounted.
   const [sourceShown, setSourceShown] = useState(false);
-  useEffect(() => { if (view === "source") setSourceShown(true); }, [view]);
   const draft = useRef<string | null>(null);
-  const editorRegion = useRef<HTMLDivElement>(null);
 
   // Follow reference changes automatically unless that would discard edits.
   useEffect(() => { if (!dirty) setRequested(currentKey); }, [currentKey, dirty]);
@@ -73,7 +71,9 @@ export function ProjectSpecView({ project, onBack, onDirtyChange }: {
       // Never present one source's content under another reference.
       if (sourceKey(spec) !== requested) { setError("The project's spec reference changed while loading. Reload to open the current spec."); return; }
       setDoc(spec);
-      setView(isMarkdown(spec.path) ? "preview" : "source");
+      const sourceDefault = !isMarkdown(spec.path);
+      setView(sourceDefault ? "source" : "preview");
+      setSourceShown(sourceDefault);
     }).catch(error => { if (!controller.signal.aborted) setError(errorMessage(error)); });
     return () => controller.abort();
   }, [api, requested, attempt]);
@@ -90,16 +90,8 @@ export function ProjectSpecView({ project, onBack, onDirtyChange }: {
     if (!confirmDiscard()) return;
     draft.current = null; setDirty(false); setEditing(false); setSession(value => value + 1);
   }
-  function edit() {
-    setEditing(true); setView("source");
-    // The lazily loaded editor may not exist yet; focus it once it mounts.
-    let tries = 0;
-    const focus = () => {
-      const target = editorRegion.current?.querySelector<HTMLElement>("[contenteditable='true']");
-      if (target) target.focus(); else if (++tries < 60) requestAnimationFrame(focus);
-    };
-    requestAnimationFrame(focus);
-  }
+  function showSource() { setSourceShown(true); setView("source"); }
+  function edit() { setEditing(true); showSource(); }
   function back() { if (confirmDiscard()) onBack(); }
   function openCurrent() {
     if (!confirmDiscard()) return;
@@ -115,13 +107,13 @@ export function ProjectSpecView({ project, onBack, onDirtyChange }: {
     }}><ArrowLeft size={18} aria-hidden="true" />{project.name}</a>
     <header className="project-spec-header">
       <div>
-        <h1 id={`project-spec-title-${project.id}`}>Spec</h1>
+        <h1 id={`project-spec-title-${project.id}`} tabIndex={-1}>Spec</h1>
         <p className="project-spec-path">{shown?.path ?? project.spec?.path ?? "No spec file configured"}</p>
-        {shown ? <p className="project-spec-provenance"><span>{repository}</span> · <span title={shown.commit}><span className="sr-only">loaded at commit </span>{shown.commit.slice(0, 7)}</span></p> : null}
+        {shown ? <p className="project-spec-provenance"><span>{repository}</span> · <span><span aria-hidden="true">{shown.commit.slice(0, 7)}</span><span className="sr-only">loaded at commit {shown.commit}</span></span></p> : null}
       </div>
       {shown && !editing ? <Button variant="secondary" onClick={edit}>Edit</Button> : null}
     </header>
-    {requested !== currentKey && currentKey ? <Notice tone="info">The project's spec reference changed. This draft belongs to the previous file. <Button variant="ghost" onClick={openCurrent}>Open current spec</Button></Notice> : null}
+    {requested !== currentKey ? <Notice tone="info">{currentKey ? "Spec reference changed · previous-file draft" : "Spec reference removed · previous-file draft"} <Button variant="ghost" onClick={openCurrent}>{currentKey ? "Open current spec" : "Discard draft"}</Button></Notice> : null}
     {!current && !shown ? <p className="text-muted">{project.spec?.source === "directory" ? "Directory-backed specs aren't available in this view." : "This project has no spec file configured."}</p> : null}
     {error ? <Notice>{error} <Button variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></Notice> : null}
     {requested && !shown && !error ? <Spinner label="Loading spec" /> : null}
@@ -129,7 +121,7 @@ export function ProjectSpecView({ project, onBack, onDirtyChange }: {
       <div className="project-spec-toolbar">
         <div className="segmented-control" role="group" aria-label="Spec view">
           <Button variant="ghost" aria-pressed={view === "preview"} onClick={() => setView("preview")}>Preview</Button>
-          <Button variant="ghost" aria-pressed={view === "source"} onClick={() => setView("source")}>Source</Button>
+          <Button variant="ghost" aria-pressed={view === "source"} onClick={showSource}>Source</Button>
         </div>
         {editing ? <div className="project-spec-draft">
           <span role="status">{dirty ? "Draft · not saved" : "Editing · no changes"}</span>
@@ -138,10 +130,10 @@ export function ProjectSpecView({ project, onBack, onDirtyChange }: {
       </div>
       {view === "preview" ? <div className="project-spec-preview"><Markdown>{draft.current ?? shown.content}</Markdown></div> : null}
       {/* One editor instance survives view switches so selection and undo persist. */}
-      {sourceShown ? <div className="project-spec-source" ref={editorRegion} hidden={view !== "source"} inert={view !== "source"}>
+      {sourceShown ? <div className="project-spec-source" hidden={view !== "source"} inert={view !== "source"}>
         <Suspense fallback={<Spinner label="Loading editor" />}>
           <CodeEditor documentId={`${requested}:${shown.commit}:${session}`} path={shown.path} initialValue={shown.content}
-            readOnly={!editing} label={`Spec source, ${shown.path}${editing ? ", editing" : ", read-only"}`} onChange={onChange} />
+            readOnly={!editing} autoFocus={editing} label={`Spec source, ${shown.path}${editing ? ", editing" : ", read-only"}`} onChange={onChange} />
         </Suspense>
       </div> : null}
     </> : null}
