@@ -25,7 +25,7 @@ import { RenameConversationDialog } from "./rename-conversation-dialog";
 import { ConversationSidebar } from "./conversation-sidebar";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ContextPanel } from "./context-panel";
-import { ProjectSettings, type ProjectEditing } from "./project-settings";
+import { ProjectSettings, beginProjectEdit, type ProjectEditing } from "./project-settings";
 import { ProjectPage } from "./projects";
 import { SecurityPage } from "./security";
 import { McpConnectionsPage } from "./mcp-connections";
@@ -66,6 +66,8 @@ export function Workspace() {
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [projectSearch, setProjectSearch] = useState<Record<string, string>>({});
   const [projectEditing, setProjectEditing] = useState<Record<string, ProjectEditing | null>>({});
+  const [savedProjectId, setSavedProjectId] = useState<string | null>(null);
+  const activeProjectRef = useRef<string | null>(null);
   const createInFlight = useRef(false);
   const [focusChatId, setFocusChatId] = useState<string | null>(null);
   const [importingProject, setImportingProject] = useState(false);
@@ -247,7 +249,7 @@ export function Workspace() {
     if (tab.kind === "chat" && tab.id !== activeId) setConnections(current => ({ ...current, [tab.chatId]: "connecting" }));
     setActiveId(tab.id);
     setNavigationOpen(false);
-    setSearchParams(tabLocation(tab), { replace: true });
+    setSearchParams(tab.kind === "project" && projectEditing[tab.projectId] ? { ...tabLocation(tab), view: "settings" } : tabLocation(tab), { replace: true });
   }
 
   function requestCloseTab(tabId: string) {
@@ -413,7 +415,8 @@ export function Workspace() {
   const settingsSection = section === "security" || section === "connections" || section === "secrets" || section === "import-export";
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId) ?? agents.find(agent => agent.id === config?.defaultAgentId);
   const active: WorkspaceTab | { id: string; kind: "agents" | "security" | "connections" | "secrets" | "import-export" } = section === "chats" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
-  const detailsVisible = active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : active.kind === "connections" || active.kind === "secrets" || active.kind === "import-export" ? false : otherDetailsVisible;
+  const projectEditorOpen = active.kind === "project" && searchParams.get("view") === "settings";
+  const detailsVisible = projectEditorOpen ? false : active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : active.kind === "connections" || active.kind === "secrets" || active.kind === "import-export" ? false : otherDetailsVisible;
   const detailsWidth = Math.min(preferredDetailsWidth ?? (active.kind === "chat" ? 440 : 360), detailsMax);
   function setDetailsVisible(visible: boolean) {
     if (active.kind === "chat") setChatDetailsVisible(current => ({ ...current, [active.chatId]: visible }));
@@ -423,12 +426,39 @@ export function Workspace() {
   const connection = active.kind === "chat" ? connections[active.chatId] || "connecting" : null;
   const activeProjectId = active.kind === "project" ? active.projectId : active.kind === "chat" ? chats.find(chat => chat.id === active.chatId)?.projectId ?? null : null;
   const selectedProject = active.kind === "project" ? projects.find(project => project.id === active.projectId) : undefined;
+  activeProjectRef.current = selectedProject?.id ?? null;
   const supportingKey = active.kind === "chat" ? composerKey(active.chatId, threads[active.chatId]) : "";
-  const supporting = (inDrawer = false) => selectedProject ? <ProjectSettings key={selectedProject.id}
+  function changeProjectEditing(projectId: string, editing: ProjectEditing | null) {
+    setProjectEditing(current => ({ ...current, [projectId]: editing }));
+    if (activeProjectRef.current !== projectId) return;
+    setContextOpen(false);
+    if (!editing) setSearchParams({ project: projectId }, { replace: true });
+    requestAnimationFrame(() => (editing ? document.getElementById(`project-editor-${projectId}`) : document.getElementById("main-workspace"))?.focus());
+  }
+  function editProject(project: Project, specOnly = false) {
+    if (!project.canManage || project.revision === undefined) return;
+    setSavedProjectId(null);
+    setSearchParams({ project: project.id, view: "settings", ...(specOnly ? { focus: "spec" } : {}) });
+    changeProjectEditing(project.id, projectEditing[project.id] ?? beginProjectEdit(project));
+    if (specOnly) requestAnimationFrame(() => document.getElementById(`project-spec-${project.id}`)?.focus());
+  }
+  useEffect(() => {
+    if (!projectEditorOpen || !selectedProject || projectEditing[selectedProject.id]) return;
+    const editing = beginProjectEdit(selectedProject);
+    if (!editing) return;
+    setProjectEditing(current => ({ ...current, [selectedProject.id]: editing }));
+    requestAnimationFrame(() => document.getElementById(`${searchParams.get("focus") === "spec" ? "project-spec" : "project-editor"}-${selectedProject.id}`)?.focus());
+  }, [projectEditorOpen, selectedProject, projectEditing, searchParams]);
+  function savedProject(project: Project) {
+    setSavedProjectId(project.id);
+    setProjects(current => mergeProjects(current, [project]));
+    void load();
+  }
+  const supporting = (inDrawer = false) => projectEditorOpen ? null : selectedProject ? <ProjectSettings key={selectedProject.id}
     project={selectedProject} agents={agents} showHeader={!inDrawer}
     editing={projectEditing[selectedProject.id] ?? null}
-    onEditingChange={editing => setProjectEditing(current => ({ ...current, [selectedProject.id]: editing }))}
-    onSaved={project => { setProjects(current => mergeProjects(current, [project])); void load(); }} /> : section === "agents" && !editingAgent && evaluationAgent === selectedAgent?.id ? <div className="agent-details">{!inDrawer ? <header className="context-header"><h2>Evaluation profile</h2></header> : null}<div className="context-body">{evaluationContext}</div></div> : section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : active.kind === "chat" && snapshot ? <SharedContextPanel agents={agents} key={snapshot.conversation.id} snapshot={snapshot} models={config?.models ?? []} threadId={threads[active.chatId] ?? null}
+    onEditingChange={editing => changeProjectEditing(selectedProject.id, editing)}
+    onSaved={savedProject} /> : section === "agents" && !editingAgent && evaluationAgent === selectedAgent?.id ? <div className="agent-details">{!inDrawer ? <header className="context-header"><h2>Evaluation profile</h2></header> : null}<div className="context-body">{evaluationContext}</div></div> : section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : active.kind === "chat" && snapshot ? <SharedContextPanel agents={agents} key={snapshot.conversation.id} snapshot={snapshot} models={config?.models ?? []} threadId={threads[active.chatId] ?? null}
     criteriaDraft={criteriaDrafts[active.chatId]} onCriteriaDraft={draft => setCriteriaDrafts(current => ({ ...current, [active.chatId]: draft }))}
     attachments={attachmentDrafts.drafts[supportingKey] ?? emptyAttachments}
     onAddFiles={files => attachmentDrafts.add(supportingKey, active.chatId, files)}
@@ -514,7 +544,7 @@ export function Workspace() {
         <IconButton className="sidebar-toggle" label={sidebarVisible ? "Hide sidebar" : "Show sidebar"} aria-expanded={sidebarVisible} aria-controls="workspace-sidebar" onClick={() => setSidebarVisible(value => !value)}>
           <PanelLeft size={19} />
         </IconButton>
-        {section !== "connections" && section !== "secrets" && section !== "import-export" ? <IconButton className="details-toggle" label={detailsVisible ? "Hide details" : "Show details"} aria-expanded={detailsVisible} aria-controls="details-column" onClick={() => setDetailsVisible(!detailsVisible)}>
+        {!projectEditorOpen && section !== "connections" && section !== "secrets" && section !== "import-export" ? <IconButton className="details-toggle" label={detailsVisible ? "Hide details" : "Show details"} aria-expanded={detailsVisible} aria-controls="details-column" onClick={() => setDetailsVisible(!detailsVisible)}>
           <PanelRight size={19} />
         </IconButton> : null}
       </div>
@@ -591,12 +621,21 @@ export function Workspace() {
               onSnapshot={onSnapshot}
               onConnection={onConnection}
               onAccessLost={onAccessLost}
-            /> : tab.kind === "project" ? <ProjectPage
-              search={projectSearch[tab.projectId] ?? ""} onSearchChange={search => setProjectSearch(current => ({ ...current, [tab.projectId]: search }))}
-              project={projects.find(project => project.id === tab.projectId)} chats={chats} creating={creating || createFailed} updating={updatingChats}
-              onCreate={() => chooseAgents(config.defaultAgentId, tab.projectId)} onSelect={selectChat}
-              onRename={renameChat} onUpdate={updateChatAction}
-            /> : <Welcome
+            /> : tab.kind === "project" ? (() => {
+              const project = projects.find(project => project.id === tab.projectId);
+              return project && projectEditing[tab.projectId] && (tab.id !== activeId || projectEditorOpen) ? <ProjectSettings project={project} agents={agents}
+                editing={projectEditing[tab.projectId]}
+                onEditingChange={editing => {
+                  if (!editing) changeProjectEditing(tab.projectId, null);
+                  else setProjectEditing(current => ({ ...current, [tab.projectId]: editing }));
+                }} onSaved={savedProject} /> : <ProjectPage
+                search={projectSearch[tab.projectId] ?? ""} onSearchChange={search => setProjectSearch(current => ({ ...current, [tab.projectId]: search }))}
+                project={project} saved={savedProjectId === tab.projectId} chats={chats} creating={creating || createFailed} updating={updatingChats}
+                onCreate={() => chooseAgents(config.defaultAgentId, tab.projectId)} onSelect={selectChat}
+                onEdit={specOnly => { if (project) editProject(project, specOnly); }}
+                onRename={renameChat} onUpdate={updateChatAction}
+              />;
+            })() : <Welcome
               name={state.user.name} config={config}
               onCreate={() => chooseAgents()} creating={creating || createFailed}
             />}
@@ -662,7 +701,7 @@ export function Workspace() {
             </div>
           </Modal>
         </div>
-        {active.kind !== "welcome" && active.kind !== "connections" && active.kind !== "import-export" ? <div className="mobile-context">
+        {!projectEditorOpen && active.kind !== "welcome" && active.kind !== "connections" && active.kind !== "import-export" ? <div className="mobile-context">
           <Modal title={active.kind === "chat" ? threads[active.chatId] ? "Thread" : "Participants" : section === "agents" ? editingAgent ? "Draft preview" : "Agent details" : "Details"} description={active.kind === "chat" ? snapshot?.conversation.title || "Active conversation" : section === "agents" ? undefined : "For your current view"} side="right" open={contextOpen} onOpenChange={setContextOpen} trigger={<Button variant="ghost" className="workspace-action">
             <PanelRight size={19} /> Details</Button>}>{supporting(true)}</Modal>
         </div> : null}

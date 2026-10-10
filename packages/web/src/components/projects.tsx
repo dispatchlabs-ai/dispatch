@@ -1,7 +1,8 @@
 import { ProjectArchiveActions } from "./project-archives";
 import { Popover } from "@base-ui/react/popover";
-import { FolderPlus, MessageSquare, Pin, Plus, Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { FolderPlus, MessageSquare, Pin, Plus, Search, Settings } from "lucide-react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { Link } from "react-router";
 import type { ChatSummary, Project, UpdateChatInput } from "../shared/contracts";
 import { statusLabels } from "../lib/chat";
 import { ConversationActions } from "./conversation-actions";
@@ -42,10 +43,12 @@ export function NewProjectButton({ name, busy, error, compact, onNameChange, onC
   </Popover.Root>;
 }
 
-export function ProjectPage({ project, chats, creating, updating, onCreate, onSelect, onRename, onUpdate, search, onSearchChange }: {
+export function ProjectPage({ project, saved, chats, creating, updating, onCreate, onSelect, onRename, onUpdate, onEdit, search, onSearchChange }: {
   search: string;
   onSearchChange: (search: string) => void;
+  onEdit: (specOnly?: boolean) => void;
   project?: Project;
+  saved: boolean;
   chats: ChatSummary[];
   creating: boolean;
   updating: ReadonlySet<string>;
@@ -58,11 +61,24 @@ export function ProjectPage({ project, chats, creating, updating, onCreate, onSe
   if (!project) return <div className="project-page"><h1>Project unavailable</h1><p className="text-muted">Choose a project from Chats.</p></div>;
   const projectChats = chats.filter(chat => chat.projectId === project.id && !chat.archived);
   const visible = projectChats.filter(chat => (!activeOnly || chat.status === "running") && chat.title.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const settingsUrl = `?${new URLSearchParams({ project: project.id, view: "settings" })}`;
+  function editLink(event: MouseEvent<HTMLAnchorElement>, specOnly = false) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    onEdit(specOnly);
+  }
   return <section className="project-page">
     <header className="project-page-header">
-      <div><p className="eyebrow">Shared project</p><h1>{project.name}</h1></div>
-      <Button disabled={creating || project.canParticipate === false} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New chat</Button>
+      <div><p className="eyebrow">Shared project</p><h1>{project.name}</h1>{saved ? <p className="project-save-notice" role="status">Project saved</p> : null}</div>
+      <div className="project-page-actions"><Button disabled={creating || project.canParticipate === false} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New chat</Button>
+      {project.canManage ? <Link className="button button-secondary" to={settingsUrl} onClick={event => editLink(event)}><Settings size={18} />Project settings</Link> : null}</div>
     </header>
+    <dl className="project-references">
+      <div><dt>Repositories</dt><dd>{project.repositories?.length ? <ul>{project.repositories.map(repository => <li key={repository.id}><a href={repository.url} target="_blank" rel="noreferrer">{repository.name}<span className="sr-only"> (opens in new tab)</span></a></li>)}</ul> : <span className="text-muted">None added</span>}</dd></div>
+      <div><dt>Spec file</dt><dd>{project.spec ? <span className="project-spec-reference"><strong>{project.repositories?.find(repository => repository.id === project.spec?.repositoryId)?.name}</strong><span>{project.spec.path}</span></span> : <span className="text-muted">Not set</span>}</dd>
+        {project.canManage ? <Link className="button button-ghost" to={`${settingsUrl}&focus=spec`} onClick={event => editLink(event, true)} aria-label={project.spec ? "Edit spec file" : "Set spec file"}>{project.spec ? "Edit" : "Set spec file"}</Link> : null}
+      </div>
+    </dl>
     <ProjectArchiveActions key={project.id} project={project} chats={chats} />
     <div className="project-toolbar">
       <div className="search-input"><Search size={18} aria-hidden="true" /><Input type="search" aria-label="Search chats in this project" placeholder="Search chats in this project…" value={search} onChange={event => onSearchChange(event.target.value)} /></div>

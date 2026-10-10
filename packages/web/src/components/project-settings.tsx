@@ -1,6 +1,7 @@
-import { Bot, ChevronRight, Settings, Users } from "lucide-react";
+import { Bot, Plus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { AgentDefinition, CompanyPerson, Project, SaveProjectInput } from "../shared/contracts";
+import { projectSourcesSchema } from "../shared/project-sources";
 import { ApiError, errorMessage } from "../lib/api";
 import { useSession } from "../lib/session";
 import { Button, Field, Input, Notice, Select, Spinner } from "./ui";
@@ -10,7 +11,17 @@ export type ProjectEditing = {
   busy: boolean;
   error?: string;
   conflict?: boolean;
+  showValidation?: boolean;
 };
+
+export function beginProjectEdit(project: Project): ProjectEditing | null {
+  if (!project.canManage || project.revision === undefined) return null;
+  return { busy: false, input: {
+    requestId: crypto.randomUUID(), expectedRevision: project.revision, name: project.name,
+    members: project.members ?? [], defaultAgentDefinitionIds: project.defaultAgentDefinitionIds ?? [],
+    repositories: project.repositories ?? [], spec: project.spec ?? null,
+  } };
+}
 
 export function ProjectSettings({ project, agents, editing, onEditingChange, onSaved, showHeader = true }: {
   showHeader?: boolean;
@@ -40,22 +51,27 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
   const personName = (id: string) => people?.find(person => person.id === id)?.name ?? id;
   const agentName = (id: string) => agents.find(agent => agent.id === id)?.name ?? id;
 
-  function begin() {
-    if (!project.canManage || project.revision === undefined) return;
-    onEditingChange({ busy: false, input: {
-      requestId: crypto.randomUUID(), expectedRevision: project.revision, name: project.name, cwd: project.cwd ?? "",
-      members: project.members ?? [], defaultAgentDefinitionIds: project.defaultAgentDefinitionIds ?? [],
-    } });
-  }
-  function update(patch: Partial<Pick<SaveProjectInput, "name" | "cwd" | "members" | "defaultAgentDefinitionIds">>) {
+  function update(patch: Partial<Pick<SaveProjectInput, "name" | "cwd" | "members" | "defaultAgentDefinitionIds" | "repositories" | "spec">>) {
     if (!editing || disabled) return;
-    onEditingChange({ ...editing, input: { ...editing.input, ...patch, requestId: crypto.randomUUID() } });
+    onEditingChange({ ...editing, error: undefined, input: { ...editing.input, ...patch, requestId: crypto.randomUUID() } });
   }
+  const repositories = editing?.input.repositories ?? project.repositories ?? [];
+  const spec = editing ? editing.input.spec : project.spec;
+  const sources = { repositories, spec };
+  const validation = editing?.showValidation ? projectSourcesSchema.safeParse(sources) : undefined;
+  const fieldError = (path: string) => validation?.error?.issues.find(issue => issue.path.join(".") === path)?.message;
+  const invalidSpec = Boolean(spec && !repositories.some(repository => repository.id === spec.repositoryId));
+
   function discard() {
     if (!editing?.busy && window.confirm("Discard unsaved project settings?")) onEditingChange(null);
   }
-  async function save() {
+  async function save(form: HTMLFormElement) {
     if (!editing || disabled || editing.conflict || !editing.input.name.trim() || !managerCount || unavailableDefaults.length) return;
+    if (!projectSourcesSchema.safeParse(sources).success || invalidSpec) {
+      onEditingChange({ ...editing, showValidation: true });
+      requestAnimationFrame(() => form.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
+      return;
+    }
     onEditingChange({ ...editing, busy: true, error: undefined });
     try {
       const result = await api<{ project: Project }>(`/api/projects/${encodeURIComponent(project.id)}`, editing.input);
@@ -66,25 +82,57 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
     }
   }
 
-  return <section className="project-details">
-    {showHeader ? <header className="context-header"><h2>{editing ? "Project settings" : "Project details"}</h2></header> : null}
-    <div className="project-details-body">
-    {!editing ? <div className="project-sharing"><Users size={24} aria-hidden="true" /><div><strong>Shared project</strong><p>Full history · Shared chats</p></div></div> : null}
-    {error ? <Notice>People could not be loaded. {error} <Button variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></Notice> : null}
-    {!people && !error ? <Spinner label="Loading people" /> : null}
-    {editing ? <div className="stack">
+  return <section className={editing ? "project-editor" : "project-details"}>
+    {editing ? <form className="project-editor-form" onSubmit={event => { event.preventDefault(); void save(event.currentTarget); }}>
+      <div className="project-editor-scroll">
+      <div className="project-editor-content stack">
+      <header className="project-editor-heading"><p className="text-muted">{project.name}</p><h1 tabIndex={-1} id={`project-editor-${project.id}`}>Project settings</h1></header>
       {!project.canManage ? <Notice>Management permission removed. Draft retained.</Notice> : null}
-      {editing.error ? <Notice>{editing.error}{editing.conflict ? " Draft retained. Discard to load current settings." : " Retry to save."}</Notice> : null}
-      <Field label="Project name">{props => <Input {...props} value={editing.input.name} maxLength={100} disabled={disabled} onChange={event => update({ name: event.target.value })} />}</Field>
-      <Field label="Working directory (optional)" hint="Service-host path · Blank uses default · New instances only · Not a sandbox">{props => <Input {...props} value={editing.input.cwd ?? ""} disabled={disabled} autoComplete="off" spellCheck={false} onChange={event => update({ cwd: event.target.value })} />}</Field>
+      {editing.error ? <Notice>{editing.error}{editing.conflict ? " Draft retained. Discard to load current settings." : " Draft retained. Retry to save."}</Notice> : null}
+      <Field label="Project name">{props => <Input {...props} value={editing.input.name} maxLength={100} required disabled={disabled} onChange={event => update({ name: event.target.value })} />}</Field>
+      <fieldset className="agent-form-section project-repositories" disabled={disabled}>
+        <legend>Repositories</legend>
+        {repositories.map((repository, index) => <div className="project-repository" key={repository.id}>
+          <div className="project-repository-fields">
+            <Field label="Repository URL" error={fieldError(`repositories.${index}.url`)}>{props => <Input {...props} aria-label={`Repository ${index + 1} URL`} value={repository.url} required maxLength={4096} autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="https://github.com/owner/repo" onBlur={() => {
+              if (!repository.name.trim()) {
+                try {
+                  const name = new URL(repository.url).pathname.split("/").filter(Boolean).at(-1)?.replace(/\.git$/i, "").slice(0, 100) ?? "";
+                  if (name) update({ repositories: repositories.map(item => item.id === repository.id ? { ...item, name } : item) });
+                } catch { /* The shared schema reports invalid URLs on save. */ }
+              }
+            }} onChange={event => update({ repositories: repositories.map(item => item.id === repository.id ? { ...item, url: event.target.value } : item) })} />}</Field>
+            <Field label="Name" error={fieldError(`repositories.${index}.name`)}>{props => <Input {...props} aria-label={`Repository ${index + 1} name`} value={repository.name} required maxLength={100} onChange={event => update({ repositories: repositories.map(item => item.id === repository.id ? { ...item, name: event.target.value } : item) })} />}</Field>
+          </div>
+          <div className="project-repository-actions"><Button variant="ghost" disabled={spec?.repositoryId === repository.id} aria-label={`Remove repository ${repository.name || index + 1}`} onClick={() => update({ repositories: repositories.filter(item => item.id !== repository.id) })}>Remove</Button>
+            {spec?.repositoryId === repository.id ? <span className="field-hint">Clear or reassign the spec first.</span> : null}
+          </div>
+        </div>)}
+        <Button variant="secondary" onClick={() => update({ repositories: [...repositories, { id: crypto.randomUUID(), name: "", url: "" }] })}><Plus size={18} />Add repository</Button>
+      </fieldset>
+      <fieldset className="agent-form-section" disabled={disabled}>
+        <legend tabIndex={-1} id={`project-spec-${project.id}`}>Spec file <span className="text-muted">(optional)</span></legend>
+        {repositories.length ? <>
+          <div className="project-spec-fields">
+            <Field label="Repository" error={invalidSpec ? "Choose a repository or clear the spec." : fieldError("spec.repositoryId")}>{props => <Select {...props} value={spec?.repositoryId ?? ""} onChange={event => update({ spec: event.target.value ? { repositoryId: event.target.value, path: spec?.path ?? "" } : null })}>
+              <option value="">No spec file</option>
+              {repositories.map((repository, index) => <option key={repository.id} value={repository.id}>{repository.name.trim() || `Repository ${index + 1}`} — {repository.url.replace(/^https:\/\//i, "")}</option>)}
+            </Select>}</Field>
+            <Field label="Path in repository" hint="From repository root" error={fieldError("spec.path")}>{props => <Input {...props} value={spec?.path ?? ""} disabled={!spec} required={Boolean(spec)} maxLength={4096} autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="docs/spec.md" onChange={event => { if (spec) update({ spec: { ...spec, path: event.target.value } }); }} />}</Field>
+          </div>
+          {spec ? <Button variant="ghost" onClick={() => update({ spec: null })}>Clear spec</Button> : null}
+        </> : <p className="field-hint">Add a repository to choose a spec file.</p>}
+      </fieldset>
+      {error ? <Notice>People could not be loaded. {error} <Button variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></Notice> : null}
+      {!people && !error ? <Spinner label="Loading people" /> : null}
       <fieldset className="agent-form-section" disabled={disabled}>
         <legend>Members</legend>
-        <p className="field-hint">Members access all project history. Keep at least one manager.</p>
+        <p className="field-hint">Full history access · Keep one manager</p>
         {members.map(member => <div className="connection-card" key={member.userId}>
           <Field label={`Role for ${personName(member.userId)}`}>{props => <Select {...props} value={member.role} disabled={member.role === "manager" && managerCount === 1} onChange={event => update({ members: members.map(item => item.userId === member.userId ? { ...item, role: event.target.value as "manager" | "member" } : item) })}>
             <option value="member">Member</option><option value="manager">Manager</option>
           </Select>}</Field>
-          {member.role === "manager" && managerCount === 1 ? <p className="field-hint">Add another manager before demoting or removing this one.</p> : null}
+          {member.role === "manager" && managerCount === 1 ? <p className="field-hint">Add another manager to change this role.</p> : null}
           <Button variant="secondary" disabled={member.role === "manager" && managerCount === 1} onClick={() => update({ members: members.filter(item => item.userId !== member.userId) })}>Remove {personName(member.userId)}</Button>
         </div>)}
         <Field label="Add member">{props => <Select {...props} value="" disabled={!people || Boolean(error)} onChange={event => { if (event.target.value) update({ members: [...members, { userId: event.target.value, role: "member" }] }); }}>
@@ -101,14 +149,23 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
         </label>)}
         {unavailableDefaults.map(id => <div className="connection-card" key={id}><p>{agentName(id)} is unavailable. Remove it before saving.</p><Button variant="secondary" onClick={() => update({ defaultAgentDefinitionIds: defaults.filter(item => item !== id) })}>Remove unavailable default</Button></div>)}
       </fieldset>
-      <div className="button-row"><Button variant="secondary" disabled={editing.busy} onClick={discard}>Discard settings</Button><Button disabled={disabled || editing.conflict || !editing.input.name.trim() || !managerCount || Boolean(unavailableDefaults.length)} onClick={() => void save()}>{editing.busy ? <Spinner label="Saving project" /> : null}Save project settings</Button></div>
-    </div> : <>
+      <details className="project-advanced"><summary>Advanced</summary>
+        <Field label="Working directory" hint="Local service override · New instances only">{props => <Input {...props} value={editing.input.cwd === undefined ? project.cwd ?? "" : editing.input.cwd ?? ""} disabled={disabled} autoComplete="off" spellCheck={false} placeholder="Default workspace" onChange={event => update({ cwd: event.target.value })} />}</Field>
+      </details>
+      </div></div>
+      <footer className="project-editor-actions"><p className="project-editor-content field-hint">References only · No cloning or agent runs</p><div className="project-editor-content button-row"><Button variant="secondary" disabled={editing.busy} onClick={discard}>Discard</Button><Button type="submit" disabled={disabled || editing.conflict || !editing.input.name.trim() || !managerCount || Boolean(unavailableDefaults.length)}>{editing.busy ? <Spinner label="Saving project" /> : null}Save project</Button></div></footer>
+    </form> : <>
+      {showHeader ? <header className="context-header"><h2>Project details</h2></header> : null}
+      <div className="project-details-body">
+      <div className="project-sharing"><Users size={24} aria-hidden="true" /><div><strong>Shared project</strong><p>Full history · Shared chats</p></div></div>
+      {error ? <Notice>People could not be loaded. {error} <Button variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></Notice> : null}
+      {!people && !error ? <Spinner label="Loading people" /> : null}
       <section className="project-detail-group"><h3>Members</h3>
       <ul>{members.map(member => <li key={member.userId}><span className="participant-avatar" aria-hidden="true">{personName(member.userId).split(/\s+/).slice(0, 2).map(part => part[0]).join("")}</span><span>{personName(member.userId)}<small>{member.role === "manager" ? "Manager" : "Member"}</small></span></li>)}</ul></section>
       <section className="project-detail-group"><h3>Default agents</h3>
       {defaults.length ? <ul>{defaults.map(id => <li key={id}><span className="project-chat-icon"><Bot size={22} aria-hidden="true" /></span><span>{agentName(id)}{unavailableDefaults.includes(id) ? <small>Unavailable</small> : null}</span></li>)}</ul> : <p className="text-muted">No default agents</p>}</section>
-      {project.canManage ? <Button variant="ghost" className="project-settings-link" onClick={begin}><Settings size={20} aria-hidden="true" /><span>Project settings</span><ChevronRight size={18} aria-hidden="true" /></Button> : <p className="field-hint">Managed by project managers</p>}
+      {!project.canManage ? <p className="field-hint">Managed by project managers</p> : null}
+      </div>
     </>}
-    </div>
   </section>;
 }
