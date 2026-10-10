@@ -14,6 +14,8 @@ Acceptance:
 
 Implementation and integrated check evidence are pending. The wiki home could not be read from this environment (private-address access restriction); this entry records the explicit current-chat decision, not a wiki publication.
 
+Source/build evidence: release preparation prevalidates SemVer precedence, clean-tree/tag guards, all participating manifest/lockfile versions and normalized changelogs before writes; no publication commands are invoked. Nested shipped capabilities participate outside npm workspaces. Source/deslop review, TypeScript/client/service/tooling builds, Apple Silicon Nix build and flake evaluation passed after refreshing the dependency hash for the baseline lockfile. Flake evaluation reported zero runnable checks; Linux was not built. No release command or automated tests were executed; release mutation/dry-run behavior remains unverified by execution. UI integration and rendered evidence remain pending.
+
 ## Live agent indicator and neutral pending prompt — October 9, 2026
 
 Chris requested replacing Activity/Working disclosure labels with a small current-work animation that stops on completion, and removing the teal pending-prompt treatment. Reuse ConversationPresence's current participant-status projection and existing spinner, with agent names only visually and status retained for assistive technology. Listening remains a static icon. Recorded tool disclosures retain their name, arrow, accessible label, expansion and Retry; no historical activity drives animation. The pending prompt becomes transparent while preserving its border, content and Sending/Retry controls.

@@ -10,7 +10,7 @@ const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encodi
 // SemVer precedence excludes build metadata; numeric prerelease identifiers cannot have leading zeros.
 function parseVersion(version: string) {
   const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([\da-zA-Z-]+(?:\.[\da-zA-Z-]+)*))?(?:\+([\da-zA-Z-]+(?:\.[\da-zA-Z-]+)*))?$/.exec(version);
-  if (!match) throw new Error(`Invalid SemVer: ${version}`);
+  if (!match || match[0] !== version) throw new Error(`Invalid SemVer: ${version}`);
   const core = match.slice(1, 4).map(Number);
   const pre = match[4]?.split(".") ?? [];
   if (core.some(n => !Number.isSafeInteger(n)) || pre.some(id => /^\d+$/.test(id) && id.length > 1 && id.startsWith("0"))) {
@@ -61,6 +61,7 @@ function main() {
   if (!packages.length) throw new Error("No workspace packages found.");
   const updates = new Map<string, string>();
   const lock = readJson("package-lock.json");
+  if (lock.version !== current) throw new Error("Root lockfile version is not in lockstep.");
   for (const path of ["package.json", ...packages, "packages/web/capabilities/package.json"]) {
     const pkg = readJson(path);
     if (pkg.version !== current) throw new Error(`${path} is not in lockstep with ${current}.`);
