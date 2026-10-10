@@ -113,7 +113,7 @@ export function ProjectSpecView({ project, onBack, onDirtyChange }: {
       </div>
       {shown && !editing ? <Button variant="secondary" onClick={edit}>Edit</Button> : null}
     </header>
-    {requested !== currentKey ? <Notice tone="info">{currentKey ? "Spec reference changed · previous-file draft" : "Spec reference removed · previous-file draft"} <Button variant="ghost" onClick={openCurrent}>{currentKey ? "Open current spec" : "Discard draft"}</Button></Notice> : null}
+    {requested !== currentKey ? <Notice tone="info">{currentKey ? "Spec reference changed · previous-file draft" : project.spec?.source === "directory" ? "Spec changed to a directory reference · previous-file draft" : "Spec reference removed · previous-file draft"} <Button variant="ghost" onClick={openCurrent}>{currentKey ? "Open current spec" : "Discard previous draft"}</Button></Notice> : null}
     {!current && !shown ? <p className="text-muted">{project.spec?.source === "directory" ? "Directory-backed specs aren't available in this view." : "This project has no spec file configured."}</p> : null}
     {error ? <Notice>{error} <Button variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></Notice> : null}
     {requested && !shown && !error ? <Spinner label="Loading spec" /> : null}
