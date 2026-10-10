@@ -614,7 +614,7 @@ The runtime pins Pi Durable, Pi AI, Chord, Pi Coding Agent, and Pi MCP to 1.0.4.
 
 Use exact versions in the owning manifest and commit the root dependency lock. To update `npmDepsHash` in `packages/web/nix/package.nix`, temporarily set `lib.fakeHash`, run `nix build`, replace the placeholder with the reported actual hash, then rebuild. Never commit a placeholder. Toolchain changes through `nix flake update` also require a build.
 
-Installation-specific hosting, artifact pins and deployment evidence belong in the owning infrastructure repository; the [handoff](handoff.md#wp-043--isolated-palm-postgresql-trial) links the isolated Palm trial and its qualification limits. This does not establish deployment of the latest source. Loopback development cannot be opened directly from a phone; real-device access requires an authorized reachable environment. CI and release automation are unconfigured. Follow the [testing policy](spec.md#testing-policy) for permitted verification.
+Installation-specific hosting, artifact pins and deployment evidence belong in the owning infrastructure repository; the [handoff](handoff.md#wp-043--isolated-palm-postgresql-trial) links the isolated Palm trial and its qualification limits. This does not establish deployment of the latest source. Loopback development cannot be opened directly from a phone; real-device access requires an authorized reachable environment. CI and automatic release publication are unconfigured; use the [lockstep SemVer workflow](../../../CONTRIBUTING.md#versioning-and-releases) for version/changelog preparation. Follow the [testing policy](spec.md#testing-policy) for permitted verification.
 
 ### Agent skills
 
