@@ -179,6 +179,8 @@ Resume test work only after there is enough useful, stable behavior worth preser
 
 **October 6 focused exception:** Chris explicitly requested coordinator-led use of the local development site to validate the conversation layout refinement. Manual browser interaction and rendered desktop/phone comparison are authorized for [WP-028](handoff.md#wp-028--conversation-layout-refinement). This does not authorize adding or running automated tests or qualify unrelated runtime workflows. Record the specific observed outcomes and remaining limitations.
 
+**October 10 versioning verification scope:** following the explicit request to finish this chat’s saved Definition of Done, run an isolated release-preparation rehearsal (including non-mutating dry-run) and focused actual-browser review at desktop, laptop, tablet and phone sizes, including longer prerelease and enlarged text. Resolve browser tooling locally for this scope. Preserve live state; no real release, tag, registry publication or deployment is authorized. Record outcomes in [the versioning work package](handoff.md#lockstep-semver-and-visible-application-version--october-9-2026); this is not a blanket test-suite exception.
+
 ## Application release version
 
 **Accepted October 9, 2026:** adopt Pi's lockstep release workflow with SemVer and per-package unreleased changelogs. The [repository policy](../../../CONTRIBUTING.md#versioning-and-releases) owns bump semantics and release commands. The initial `0.1.0` baseline is metadata, not evidence of a tagged release.
