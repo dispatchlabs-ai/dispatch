@@ -1,5 +1,5 @@
 {
-  "name": "dispatch-web-next",
+  "name": "dispatch",
   "version": "0.1.0",
   "private": true,
   "workspaces": [

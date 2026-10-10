@@ -9,7 +9,7 @@ FROM ${UBUNTU_IMAGE}
 
 ARG SOURCE_REVISION
 LABEL org.opencontainers.image.title="Dispatch agent worker" \
-      org.opencontainers.image.source="https://github.com/dispatchlabs-ai/dispatch-web-next" \
+      org.opencontainers.image.source="https://github.com/dispatchlabs-ai/dispatch" \
       org.opencontainers.image.revision="${SOURCE_REVISION}"
 
 # Never flatten the Nix closure or replace its absolute executable paths.

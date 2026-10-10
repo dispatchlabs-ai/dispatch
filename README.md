@@ -1,6 +1,8 @@
-# Dispatch Web — rebuild
+# Dispatch
 
 Dispatch Web is a browser workspace for company users, built on stock Pi Durable. The local implementation provides secure sign-in, invite-only shared conversations, company-shared agent definitions, and Dispatch's branded desktop/mobile workspace.
+
+The private repository is [dispatchlabs-ai/dispatch](https://github.com/dispatchlabs-ai/dispatch), renamed from `dispatch-web-next` on October 10, 2026. The retired runtime and infrastructure repository is preserved privately as [dispatch-retired](https://github.com/dispatchlabs-ai/dispatch-retired). Existing local checkout and worktree paths are retained; update their Git remote URLs when adopting the new names.
 
 The wider product includes tools, handoffs, background work, and event- or schedule-triggered agents. Broader integrations, RBAC and additional agent workflows remain later work. Deployment versions and qualification are recorded in the [package handoff](packages/web/docs/handoff.md); source publication does not establish deployment.
 

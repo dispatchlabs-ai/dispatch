@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Repository identity
+
+- Rename the private application repository to `dispatch` and update container source labels and documentation links. The retired repository is preserved privately as `dispatch-retired`; existing application, state and checkout paths stay compatible.
+
 ### Project repositories and spec reference
 
 - Store manager-editable repository URLs and explicit directory-relative or repository-relative spec references. Directory specs need a saved project directory, not a repository URL; clearing their base or removing a selected repository requires clearing/reassigning the spec. No migration or legacy-source fallback. Preserve omitted metadata, manager/revision/retry checks and existing agent directories. Saving references does not clone repositories or verify access/spec-file existence.

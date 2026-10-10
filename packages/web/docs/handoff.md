@@ -1,5 +1,17 @@
 # Dispatch Web implementation handoff
 
+## Repository rename — October 10, 2026
+
+Chris requested the application repository name `dispatch`, with the previous occupant renamed and kept private. GitHub repository `1403128960` moved from `dispatchlabs-ai/dispatch-web-next` to `dispatchlabs-ai/dispatch`. The retired repository `1349656036` moved from `dispatchlabs-ai/dispatch` to `dispatchlabs-ai/dispatch-retired`; it remains private and archived, retaining its history, tags and release artifacts. `dispatch-legacy` was already occupied and was not changed.
+
+Acceptance:
+
+- [x] Verify GitHub identities and private visibility after both renames; restore the retired repository's archived state after updating its README and historical source link.
+- [x] Update the local Git remotes, private root package name and lockfile, container source labels, and current source links. Preserve existing checkout/worktree paths, runtime paths and application state.
+- [x] Source/deslop review, TypeScript/application/capability builds (`npm run check`), Apple Silicon `nix build`, 125 local documentation links and whitespace checks passed. Refresh `npmDepsHash` for the renamed root lockfile. `nix flake check` passed evaluation with zero runnable checks and omitted incompatible Linux systems.
+
+This package changes repository and build metadata. It does not change application behavior or qualify runtime, browser, device or deployment outcomes.
+
 ## Single composer Send/Stop action — October 10, 2026
 
 **Implemented and published as `47d8b27`; component visual review passed, authenticated integration remains blocked.** Chris approved the four composer-only design sheets and interaction notes, then requested implementation. Developer owns the shared main/thread UI, Pi Durable Expert cancellation/state review, Designer rendered integration review, and Documenter package documentation. The [composer contract](spec.md#message-composer) supersedes the separate Stop all toolbar control; no Pi lifecycle or backend admission change is included.
@@ -382,7 +394,7 @@ The local service registered Developer with the saved GPT-6 Astra / Low defaults
 
 ## Integration evidence
 
-On October 3, 2026, the integrated application source at [13875d1](https://github.com/dispatchlabs-ai/dispatch-web-next/commit/13875d1310af0118c52dedd7575d5b5ad095e89a) passed:
+On October 3, 2026, the integrated application source at [13875d1](https://github.com/dispatchlabs-ai/dispatch/commit/13875d1310af0118c52dedd7575d5b5ad095e89a) passed:
 
 - `nix develop --command npm run check`: route-type generation, frontend/service/tooling TypeScript, production SPA output, and compiled service output.
 - `nix build` and `nix flake check` on M1 Air: the Apple Silicon client/service artifact and declared type/build check. The x86-64 Linux output remains unbuilt.
@@ -618,7 +630,7 @@ Qualification evidence (October 5, 2026):
 - Desktop and 390×844 phone stills reviewed actual components with clearly labelled inactive samples for Listening, Responding, Working and human Typing, including participant details. Captures remain in the task worktree's ignored `.local/listen-layout/`; no sample messages were inserted into user state. Shared styling and labelled controls were reviewed. Keyboard/touch, IME, virtual keyboard, assistive technology, measured contrast, real-device behavior and all error/loading states remain unverified.
 - No tests, smoke checks, model requests or browser/API acceptance procedures were run. Functional turn ordering, multi-user access, streaming, presence expiry, provider failure and restart recovery remain unqualified. These limits remain after the normal local startup.
 
-- [Implementation `ba71416`](https://github.com/dispatchlabs-ai/dispatch-web-next/commit/ba7141673354f17f40225244814a924296f37cbf) was pushed normally to private remote `main`; remote equality was verified and the clean canonical M1 Air checkout fast-forwarded under the repository integration locks. The existing local launcher shut down gracefully, and state was backed up under canonical `.local/backups/listen-first-20261005-202329/` before restarting against the same state and workspaces. Startup reports the service on `127.0.0.1:3001` and Vite on localhost:5173. This is startup evidence, not functional qualification. Omarchy and the pilot were not updated.
+- [Implementation `ba71416`](https://github.com/dispatchlabs-ai/dispatch/commit/ba7141673354f17f40225244814a924296f37cbf) was pushed normally to private remote `main`; remote equality was verified and the clean canonical M1 Air checkout fast-forwarded under the repository integration locks. The existing local launcher shut down gracefully, and state was backed up under canonical `.local/backups/listen-first-20261005-202329/` before restarting against the same state and workspaces. Startup reports the service on `127.0.0.1:3001` and Vite on localhost:5173. This is startup evidence, not functional qualification. Omarchy and the pilot were not updated.
 
 ### Duplicate reply correction — October 5, 2026
 
@@ -628,7 +640,7 @@ Chris reported two identical public replies per agent. Read-only inspection of t
 - Use one public-message projection for snapshots and agent history/context. Keep original request fingerprints and existing membership boundaries. Review these changes with the source/deslop procedure and inspect the final diff and local documentation links.
 - Run TypeScript/production builds, Apple Silicon `nix build` and `nix flake check`; inspect the existing repaired conversation on desktop and 390 px. No synthetic messages, model requests, tests or API/browser acceptance procedures. Record observed repair and layout evidence separately from unverified future-turn, restart, concurrency and interaction behavior.
 
-[Implementation `d90ab5c`](https://github.com/dispatchlabs-ai/dispatch-web-next/commit/d90ab5c5346cd0b9ba33fc203398843d645a5819) passed frontend/service/tooling TypeScript and production builds (`npm run check`), Apple Silicon `nix build` and `nix flake check`, source/deslop review, documentation-link and whitespace checks. It was pushed normally to private remote `main`; remote equality was verified and the clean canonical M1 Air checkout fast-forwarded under the repository integration locks.
+[Implementation `d90ab5c`](https://github.com/dispatchlabs-ai/dispatch/commit/d90ab5c5346cd0b9ba33fc203398843d645a5819) passed frontend/service/tooling TypeScript and production builds (`npm run check`), Apple Silicon `nix build` and `nix flake check`, source/deslop review, documentation-link and whitespace checks. It was pushed normally to private remote `main`; remote equality was verified and the clean canonical M1 Air checkout fast-forwarded under the repository integration locks.
 
 The local launcher shut down gracefully, and existing state was backed up under canonical `.local/backups/duplicate-replies-20261005-205033/` before restarting against the same state and workspaces. Read-only inspection of existing native records confirmed both duplicate pairs received canonical aliases and the missing final markers were restored. The existing conversation then displayed one reply per agent on desktop and at 390 px; ignored captures are in canonical `.local/duplicate-replies/`. Static component captures in task-worktree `.local/duplicate-layout/` also cover a reply thread opened through an older alias. Raw entries were preserved. No new messages or model requests were sent.
 
@@ -644,7 +656,7 @@ Chris asked for a deslop pass after reviewing the duplicate-reply cause. The sha
 - Run historical duplicate repair once per existing room before native resume; retain raw entries and old aliases, remove obsolete publication lists, and mark new rooms current. Normal publication must not use content-based deduplication.
 - Review source and all affected callers, run TypeScript/production builds, Apple Silicon `nix build` and `nix flake check`, and inspect the diff and local links. Review the existing conversation on desktop and 390 px after the local update. No tests, synthetic messages, model requests or browser/API acceptance procedures under the standing policy.
 
-[Implementation f5de4b2](https://github.com/dispatchlabs-ai/dispatch-web-next/commit/f5de4b2e028ef76bae01426683771f46d76af2fe) was pushed normally to private `main`, verified remotely and fast-forwarded into the clean canonical checkout. Source/deslop review, TypeScript/production builds, Apple Silicon `nix build` and `nix flake check`, whitespace and 32 local documentation links passed.
+[Implementation f5de4b2](https://github.com/dispatchlabs-ai/dispatch/commit/f5de4b2e028ef76bae01426683771f46d76af2fe) was pushed normally to private `main`, verified remotely and fast-forwarded into the clean canonical checkout. Source/deslop review, TypeScript/production builds, Apple Silicon `nix build` and `nix flake check`, whitespace and 32 local documentation links passed.
 
 The canonical M1 Air service was restarted after a private state backup at `.local/backups/publication-cleanup-20261006-062053/dispatch`. Read-only metadata from the existing Pi database showed all five rooms at history version 1 with the obsolete member fields removed. All 89 raw entries retained the same SHA-256 digest, and existing message aliases were unchanged. The existing conversation rendered on desktop and at 390 px; captures remain private in `.local/publication-cleanup/desktop.jpg` and `phone.jpg` in the canonical checkout. This is evidence of the observed local migration and saved-history rendering only.
 
@@ -698,7 +710,7 @@ Qualification evidence (October 5, 2026):
   real devices and the full loading/error matrix remain functionally unverified.
   This revision was not built on x86-64 Linux or deployed to Omarchy/the pilot.
 
-[Implementation `1e72b47`](https://github.com/dispatchlabs-ai/dispatch-web-next/commit/1e72b47fdb06a4e3b4139d1d463ac450fe12501d)
+[Implementation `1e72b47`](https://github.com/dispatchlabs-ai/dispatch/commit/1e72b47fdb06a4e3b4139d1d463ac450fe12501d)
 was reconciled with the duplicate-reply correction and passed the required
 TypeScript/build/Nix checks again before publication. It was pushed normally to
 private remote `main`, verified there, and fast-forwarded into the clean canonical
@@ -726,7 +738,7 @@ Review the source/diff and actual rendered desktop/390 px layouts, and run the
 repository TypeScript/build/Nix checks. The standing zero-tests policy remains;
 interaction, assistive technology, measured contrast and real devices are unverified.
 
-[Implementation `2c6fd7c`](https://github.com/dispatchlabs-ai/dispatch-web-next/commit/2c6fd7c81833553fcb2a407a857cd508bb0144d0)
+[Implementation `2c6fd7c`](https://github.com/dispatchlabs-ai/dispatch/commit/2c6fd7c81833553fcb2a407a857cd508bb0144d0)
 passed source/deslop review, 44 local documentation links, whitespace checks,
 TypeScript/production builds, Apple Silicon `nix build` and `nix flake check`.
 It was pushed normally to private main, verified there, and synchronized to the

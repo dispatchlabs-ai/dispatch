@@ -53,7 +53,7 @@ in dockerTools.buildLayeredImage {
     Volumes = lib.optionalAttrs (!disposableWorkspace) { "/tmp" = { }; };
     Labels = {
       "org.opencontainers.image.title" = "Dispatch Web";
-      "org.opencontainers.image.source" = "https://github.com/dispatchlabs-ai/dispatch-web-next";
+      "org.opencontainers.image.source" = "https://github.com/dispatchlabs-ai/dispatch";
       "org.opencontainers.image.revision" = sourceRevision;
       "org.opencontainers.image.version" = web.version;
     };
