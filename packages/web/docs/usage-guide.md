@@ -455,12 +455,17 @@ Do not run that service beside the development owner of the same state. Passkeys
 | `DISPATCH_PORT` | API service port during development or standalone Nix operation; default 3001; root built launcher uses `DISPATCH_WEB_PORT` |
 | `DISPATCH_ORIGIN` | Exact browser origin, without a trailing slash; root launchers default to localhost plus the web port |
 | `DISPATCH_HOST` | Standalone/built service bind address; default 127.0.0.1; development pins 127.0.0.1 |
+| `DISPATCH_CONTAINER_LOOPBACK_HTTP` | `0` (default) or `1`; opt-in HTTP loopback-origin mode for a container published only on the desktop host's loopback address. Allows a non-loopback container-internal bind; does not allow non-loopback HTTP origins. |
 | `DISPATCH_COMPANY_ID`, `DISPATCH_COMPANY_NAME` | Installation company identity/display name; defaults `dispatch` / `Dispatch` |
 | `DISPATCH_PI_AGENT_DIR` | Pi credential/model/settings directory; defaults to `~/.pi/agent` |
 | `DISPATCH_PROVIDER`, `DISPATCH_MODEL`, `DISPATCH_THINKING` | Explicit default-agent model settings |
 | `DISPATCH_CLIENT_DIR` | Optional static-client location for a custom service launcher |
 
-Use HTTPS for any non-loopback origin. HTTP configurations must bind to loopback. Keep company identity and state together; changing the company ID does not migrate accounts or conversations. Custom origin/port settings must be shared by the service, frontend, and account CLI.
+Use HTTPS for any non-loopback origin. Native HTTP configurations must bind to loopback. For a single desktop container, `DISPATCH_CONTAINER_LOOPBACK_HTTP=1` permits a non-loopback internal bind while retaining an HTTP loopback browser origin. The app cannot inspect the host's port publication; it emits a startup warning, and the operator must publish only on host loopback (for example `127.0.0.1:3001:3001`). This is not a network-serving mode. To serve other machines, use HTTPS with a matching `DISPATCH_ORIGIN`.
+
+The root [Compose file](../../../compose.yaml) uses this opt-in and loopback-only publication, a named data volume, a read-only container filesystem and temporary `/tmp`. It requires `DISPATCH_IMAGE` for the chosen platform; use a verified release digest. Container installation and browser sign-in qualification remain pending. Do not bind-mount your host home directory into an agent workspace. Keep persistent data when replacing the image; `docker compose down -v` deletes named volumes and is not an upgrade step.
+
+Keep company identity and state together; changing the company ID does not migrate accounts or conversations. Custom origin/port settings must be shared by the service, frontend, and account CLI. Passkeys enrolled for localhost do not transfer to a different domain; arrange recovery/re-enrollment before changing the browser origin.
 
 In default SQLite mode, the state directory contains `auth.sqlite`, `auth.key`, and `runtime/` with Pi storage and its ownership lock. Back up the authentication database and encryption key together, along with the complete runtime directory, including `runtime/attachments/` blobs and their native Pi metadata. Attachment references without their blobs cannot be restored by rebuilding; missing bytes return 410. Stop the service before a simple file-copy backup so SQLite journals are settled. A missing encryption key must be restored; generating another key cannot decrypt existing TOTP factors. Do not copy these files into build inputs or source control.
 
