@@ -39,7 +39,7 @@
     "@opentelemetry/resources": "2.12.0",
     "@opentelemetry/sdk-trace-base": "2.12.0",
     "@opentelemetry/sdk-trace-node": "2.12.0",
-    "@pierre/diffs": "https://github.com/dispatchlabs-ai/pierre/releases/download/dispatch-diffs-v1.5.1-dispatch.1/pierre-diffs-1.5.1-dispatch.1.tgz",
+    "@pierre/diffs": "https://github.com/dispatchlabs-ai/pierre/releases/download/dispatch-diffs-v1.5.1-dispatch.2/pierre-diffs-1.5.1-dispatch.2.tgz",
     "@simplewebauthn/browser": "14.0.0",
     "@simplewebauthn/server": "14.0.3",
     "@tanstack/react-virtual": "3.13.12",
