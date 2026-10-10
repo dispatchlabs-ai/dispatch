@@ -19,6 +19,18 @@ docker build --platform linux/arm64 \
 
 Build/inspect `linux/amd64` separately before publishing a multi-platform index. Record both child manifests, the index digest, the Nix application revision and the Containerfile revision separately. They can differ when repackaging an unchanged deployed application; the `SOURCE_REVISION` label identifies the application, not necessarily the packaging recipe. Record all three base-image digests/build arguments in the caller receipt. Tags/default Containerfile arguments alone are not release identities. Fargate pulls images for new tasks: keep the registry in the task's region and measure startup before adding large SDK inventories. The [AWS module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) and installation consumer own task definitions, image pins, resources and rollout; a local build does not update ECS.
 
+## Release frontend bundle
+
+Application publishers also run `nix build .#frontend` from the selected release
+commit. It reuses the locked application build and emits `dispatch-frontend.tar.gz`
+and `SHA256SUMS` with deterministic archive metadata. Publish that archive with
+the controller/worker artifacts and record its HTTPS URL/checksum and compatible
+module version in the [artifact manifest](https://github.com/dispatchlabs-ai/terraform-aws-dispatch/blob/main/releases/README.md#spa-bundle-and-publication).
+Independent callers obtain verified release artifacts, not this source checkout
+or a Nix build requirement. The module's explicit publisher retains shared hashed
+assets and immutable index prefixes; building locally neither uploads S3 objects
+nor switches CloudFront. Public artifacts remain gated on the open-source release.
+
 ## Tools and project runtimes
 
 The recipe includes Bash/GNU tools, Git/SSH client, ripgrep, curl/wget, jq, archives, certificates, Python/venv/pip, C/C++ compilers, make, CMake/Ninja/pkg-config/autotools and common native-development libraries. Mise and a separate project Node are pinned in the recipe. Dispatch's own launcher does not use mise shims.

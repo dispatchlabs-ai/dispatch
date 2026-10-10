@@ -2292,3 +2292,17 @@ viewer logging; actual provider authorization remains unqualified. Cost estimate
 released-frontend tooling and final external-caller rechecking are still required
 for completion. Live CDN/API/SSE, trace/log delivery, Aurora, Spot and zero-downtime
 claims remain separate from this source checkpoint.
+
+
+Cost/frontend dependency update: the module's
+[dated regional estimate](https://github.com/dispatchlabs-ai/terraform-aws-dispatch/blob/main/releases/cost-estimate.md)
+now documents fixed baseline, modest traffic, Aurora/RDS and worker/Spot scenarios,
+three DNS zones, collector headroom and exclusions. It is an estimate, not billing
+or deployed capacity evidence. Application `b888a1c` adds deterministic frontend
+archive/checksum packaging; Deployer reports build/flake checks passed. Module
+`8797705` adds explicit receipt-backed conditional publication with retained shared
+assets and release-prefixed HTML; 23 offline helper checks are reported. Public
+bundle/image publication, live S3/CDN operation and final independent candidate
+rechecking remain separate. Deployer reports collector startup in a
+network-disabled container, not AWS trace delivery. Use the module's guide rather
+than copying installation-specific commands here.
