@@ -27,6 +27,7 @@ import { ColumnResizeHandle } from "./column-resize-handle";
 import { ContextPanel } from "./context-panel";
 import { ProjectSettings, beginProjectEdit, type ProjectEditing } from "./project-settings";
 import { ProjectPage } from "./projects";
+import { ProjectSpecView } from "./project-spec";
 import { SecurityPage } from "./security";
 import { McpConnectionsPage } from "./mcp-connections";
 import { Button, IconButton, Modal, Notice, Spinner } from "./ui";
@@ -111,6 +112,9 @@ export function Workspace() {
   const [invitingChatId, setInvitingChatId] = useState<string | null>(null);
   const [threads, setThreads] = useState<Record<string, string | null>>({});
   const [closingTab, setClosingTab] = useState<string | null>(null);
+  // Open spec views and their unsaved in-memory drafts, by project.
+  const [specOpen, setSpecOpen] = useState<Record<string, boolean>>({});
+  const [specDirty, setSpecDirty] = useState<Record<string, boolean>>({});
   const tabList = useRef<HTMLDivElement>(null);
   const [tabOverflow, setTabOverflow] = useState({ before: false, after: false });
 
@@ -249,7 +253,12 @@ export function Workspace() {
     if (tab.kind === "chat" && tab.id !== activeId) setConnections(current => ({ ...current, [tab.chatId]: "connecting" }));
     setActiveId(tab.id);
     setNavigationOpen(false);
-    setSearchParams(tab.kind === "project" && projectEditing[tab.projectId] ? { ...tabLocation(tab), view: "settings" } : tabLocation(tab), { replace: true });
+    setSearchParams(projectTabLocation(tab), { replace: true });
+  }
+  function projectTabLocation(tab: WorkspaceTab) {
+    if (tab.kind === "project" && projectEditing[tab.projectId]) return { ...tabLocation(tab), view: "settings" };
+    if (tab.kind === "project" && specOpen[tab.projectId]) return { ...tabLocation(tab), view: "spec" };
+    return tabLocation(tab);
   }
 
   function requestCloseTab(tabId: string) {
@@ -257,7 +266,7 @@ export function Workspace() {
     const dirty = tab?.kind === "chat" && composers.isDirty(tab.chatId);
     if (tab?.kind === "project" && projectEditing[tab.projectId]?.busy) return;
     if (tab?.kind === "chat" && criteriaDrafts[tab.chatId]?.busy) return;
-    if (dirty || (tab?.kind === "chat" && criteriaDrafts[tab.chatId]) || (tab?.kind === "project" && (projectEditing[tab.projectId] || projectSearch[tab.projectId]))) setClosingTab(tabId);
+    if (dirty || (tab?.kind === "chat" && criteriaDrafts[tab.chatId]) || (tab?.kind === "project" && (projectEditing[tab.projectId] || projectSearch[tab.projectId] || specDirty[tab.projectId]))) setClosingTab(tabId);
     else closeTab(tabId);
   }
 
@@ -266,6 +275,8 @@ export function Workspace() {
     if (closing?.kind === "project") {
       setProjectEditing(current => ({ ...current, [closing.projectId]: null }));
       setProjectSearch(current => { const next = { ...current }; delete next[closing.projectId]; return next; });
+      setSpecOpen(current => ({ ...current, [closing.projectId]: false }));
+      setSpecDirty(current => ({ ...current, [closing.projectId]: false }));
     }
     if (closing?.kind === "chat") {
       setCriteriaDrafts(current => ({ ...current, [closing.chatId]: undefined }));
@@ -280,7 +291,7 @@ export function Workspace() {
       const selected = next[Math.max(0, Math.min(tabs.findIndex(tab => tab.id === tabId) - 1, next.length - 1))];
       focusId = selected.id;
       setActiveId(selected.id);
-      setSearchParams(selected.kind === "project" && projectEditing[selected.projectId] ? { ...tabLocation(selected), view: "settings" } : tabLocation(selected), { replace: true });
+      setSearchParams(projectTabLocation(selected), { replace: true });
     }
     requestAnimationFrame(() => {
       (tabList.current?.querySelector<HTMLElement>(`[data-work-tab="${CSS.escape(focusId)}"]`) ?? document.getElementById("main-workspace"))?.focus();
@@ -416,6 +427,12 @@ export function Workspace() {
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId) ?? agents.find(agent => agent.id === config?.defaultAgentId);
   const active: WorkspaceTab | { id: string; kind: "agents" | "security" | "connections" | "secrets" | "import-export" } = section === "chats" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
   const projectEditorOpen = active.kind === "project" && searchParams.get("view") === "settings";
+  const projectSpecOpen = active.kind === "project" && searchParams.get("view") === "spec";
+  function openSpec(projectId: string, open: boolean) {
+    setSpecOpen(current => ({ ...current, [projectId]: open }));
+    setSearchParams(open ? { project: projectId, view: "spec" } : { project: projectId });
+    requestAnimationFrame(() => document.getElementById(open ? `project-spec-title-${projectId}` : "main-workspace")?.focus());
+  }
   const detailsVisible = projectEditorOpen ? false : active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : active.kind === "connections" || active.kind === "secrets" || active.kind === "import-export" ? false : otherDetailsVisible;
   const detailsWidth = Math.min(preferredDetailsWidth ?? (active.kind === "chat" ? 440 : 360), detailsMax);
   function setDetailsVisible(visible: boolean) {
@@ -628,7 +645,10 @@ export function Workspace() {
                 onEditingChange={editing => {
                   if (!editing) changeProjectEditing(tab.projectId, null);
                   else setProjectEditing(current => ({ ...current, [tab.projectId]: editing }));
-                }} onSaved={savedProject} /> : <ProjectPage
+                }} onSaved={savedProject} /> : project && (tab.id === activeId ? projectSpecOpen : specOpen[tab.projectId]) ? <ProjectSpecView project={project}
+                onBack={() => openSpec(tab.projectId, false)}
+                onDirtyChange={dirty => setSpecDirty(current => current[tab.projectId] === dirty ? current : { ...current, [tab.projectId]: dirty })} /> : <ProjectPage
+                onOpenSpec={() => openSpec(tab.projectId, true)}
                 search={projectSearch[tab.projectId] ?? ""} onSearchChange={search => setProjectSearch(current => ({ ...current, [tab.projectId]: search }))}
                 project={project} saved={savedProjectId === tab.projectId} chats={chats} creating={creating || createFailed} updating={updatingChats}
                 onCreate={() => chooseAgents(config.defaultAgentId, tab.projectId)} onSelect={selectChat}

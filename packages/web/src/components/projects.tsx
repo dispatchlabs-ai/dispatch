@@ -43,8 +43,9 @@ export function NewProjectButton({ name, busy, error, compact, onNameChange, onC
   </Popover.Root>;
 }
 
-export function ProjectPage({ project, saved, chats, creating, updating, onCreate, onSelect, onRename, onUpdate, onEdit, search, onSearchChange }: {
+export function ProjectPage({ project, saved, chats, creating, updating, onCreate, onSelect, onRename, onUpdate, onEdit, onOpenSpec, search, onSearchChange }: {
   search: string;
+  onOpenSpec: () => void;
   onSearchChange: (search: string) => void;
   onEdit: (specOnly?: boolean) => void;
   project?: Project;
@@ -82,7 +83,11 @@ export function ProjectPage({ project, saved, chats, creating, updating, onCreat
         {spec.source === "directory" ? <span>{project.cwd}</span> : null}
         <span className="text-muted">{spec.source === "directory" ? "Path in project directory" : "Path in repository"}</span><span>{spec.path}</span>
       </span> : <span className="text-muted">Not set</span>}</dd>
-        {project.canManage ? <Link className="button button-ghost" to={`${settingsUrl}&focus=spec`} onClick={event => editLink(event, true)} aria-label={project.spec ? "Edit spec file" : "Set spec file"}>{project.spec ? "Edit" : "Set spec file"}</Link> : null}
+        {project.spec ? <Link className="button button-secondary" to={`?${new URLSearchParams({ project: project.id, view: "spec" })}`} onClick={event => {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault(); onOpenSpec();
+        }}>View spec</Link> : null}
+        {project.canManage ? <Link className="button button-ghost" to={`${settingsUrl}&focus=spec`} onClick={event => editLink(event, true)} aria-label={project.spec ? "Change spec file" : "Set spec file"}>{project.spec ? "Change" : "Set spec file"}</Link> : null}
       </div>
     </dl>
     <ProjectArchiveActions key={project.id} project={project} chats={chats} />

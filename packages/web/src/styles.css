@@ -1258,3 +1258,27 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 @media (max-width: 799px) {
   .code-editor-viewport diffs-container { --diffs-font-size: var(--text-base); }
 }
+
+.project-spec-page { container-type: inline-size; width: 100%; max-width: 1100px; margin: 0 auto; padding: var(--space-8); display: flex; flex-direction: column; gap: var(--space-5); }
+.project-spec-back { display: inline-flex; align-items: center; gap: var(--space-2); align-self: flex-start; min-height: 44px; font-weight: 600; color: var(--color-navy); text-decoration: none; overflow-wrap: anywhere; }
+.project-spec-back:hover { text-decoration: underline; text-underline-offset: 3px; }
+.project-spec-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--space-4); }
+.project-spec-header > div { flex: 1; min-width: min(240px, 100%); }
+.project-spec-header h1 { font-size: clamp(var(--text-2xl), 2.5vw, var(--text-3xl)); line-height: 1.2; font-weight: 600; letter-spacing: -.035em; }
+.project-spec-path { margin-top: var(--space-2); font-family: var(--font-mono, ui-monospace, monospace); overflow-wrap: anywhere; }
+.project-spec-provenance { margin-top: var(--space-1); font-size: var(--text-sm); color: var(--color-muted); overflow-wrap: anywhere; }
+.project-spec-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); }
+.project-spec-draft { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); color: var(--color-muted); font-size: var(--text-sm); }
+.project-spec-preview { min-width: 0; }
+.project-spec-preview .markdown { max-width: 72ch; font-size: var(--text-base); }
+.project-spec-source { min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
+.project-spec-source[hidden] { display: none; }
+@container (max-width: 560px) {
+  .project-spec-toolbar .segmented-control { flex: 1 1 100%; }
+  .project-spec-toolbar .segmented-control .button { flex: 1; min-height: 44px; }
+  .project-spec-draft { flex: 1 1 100%; justify-content: space-between; }
+  .project-spec-draft .button, .project-spec-header .button { min-height: 44px; }
+}
+@media (max-width: 799px) {
+  .project-spec-page { padding: var(--space-5) var(--space-4); }
+}
