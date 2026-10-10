@@ -1,6 +1,6 @@
 import { Editor, type EditorFactory } from "@pierre/diffs/edit";
 import { EditProvider, File, type FileOptions } from "@pierre/diffs/react";
-import { memo, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { PierreProvider } from "./pierre";
 
 interface CodeEditorProps {
@@ -9,6 +9,8 @@ interface CodeEditorProps {
   path: string;
   initialValue: string;
   readOnly?: boolean;
+  /** Focus only after an explicitly requested edit attachment becomes usable. */
+  autoFocus?: boolean;
   label: string;
   onChange?: (text: string) => void;
 }
@@ -26,12 +28,17 @@ export default memo(function CodeEditor({ documentId, ...props }: CodeEditorProp
 
 // This is initialized source, not a controlled input. Never feed keystrokes back
 // into Pierre's file prop. The caller owns draft persistence and preview state.
-function EditorSession({ path, initialValue, readOnly = false, label, onChange }: Omit<CodeEditorProps, "documentId">) {
+function EditorSession({ path, initialValue, readOnly = false, autoFocus = false, label, onChange }: Omit<CodeEditorProps, "documentId">) {
   const [file] = useState(() => ({ name: path, contents: initialValue }));
+  const shouldFocus = useRef(false);
+  shouldFocus.current = autoFocus && !readOnly;
+  const onAttach = useCallback((editor: Editor<"file", undefined, undefined>) => {
+    if (shouldFocus.current) editor.focus({ preventScroll: true });
+  }, []);
   const editorOptions = useMemo(() => ({
-    ariaLabel: label, spellcheck: /\.(?:md|markdown|mdx|txt|rst)$/i.test(path),
+    onAttach, ariaLabel: label, spellcheck: /\.(?:md|markdown|mdx|txt|rst)$/i.test(path),
     tabBehavior: "focus" as const, autoSurround: "never" as const,
-  }), [label, path]);
+  }), [label, path, onAttach]);
   return <PierreProvider><EditProvider createEditor={createEditor}>
     <div className="code-editor-viewport" role="region" aria-label={label} tabIndex={readOnly ? 0 : undefined}>
       <File file={file} options={options} editorOptions={editorOptions} edit={!readOnly}
