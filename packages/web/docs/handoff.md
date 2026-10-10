@@ -37,6 +37,8 @@ Observed: OpenAI/Claude/Fireworks key setup/replacement/cancellation and disconn
 
 Remaining unverified: real key validity, OAuth/account replacement/reconnect/refresh/revocation, actual interrupted external exchanges and shutdown races, authentication/authorization/cross-session boundaries, Postgres/cloud workers, runtime external fallbacks, Linux, screen readers/full keyboard trapping/physical-device touch/200% zoom/measured contrast, and deployment. The seeded pending-marker recovery is not proof of real OAuth-rotation recovery. Publication to main remains pending.
 
+**Final publication candidate:** `1274c81` reconciles current main `17428de`, preserving its Pierre focus fixes and completed evidence. Provider manager, storage, routes and UI are unchanged from browser-reviewed `390e97a`; the workspace merge retains both provider navigation and the current spec-focus behavior. Full Nix-shell `npm run check`, Apple Silicon `nix build --no-link`, flake evaluation (zero runnable checks; Linux omitted), source/diff and local documentation link checks passed after reconciliation. Publication is source-only; no deployment or real-provider qualification is claimed. Claude was removed before final review; no Claude approval is claimed.
+
 ## Repository rename — October 10, 2026
 
 Chris requested the application repository name `dispatch`, with the previous occupant renamed and kept private. GitHub repository `1403128960` moved from `dispatchlabs-ai/dispatch-web-next` to `dispatchlabs-ai/dispatch`. The retired repository `1349656036` moved from `dispatchlabs-ai/dispatch` to `dispatchlabs-ai/dispatch-retired`; it remains private and archived, retaining its history, tags and release artifacts. `dispatch-legacy` was already occupied and was not changed.
