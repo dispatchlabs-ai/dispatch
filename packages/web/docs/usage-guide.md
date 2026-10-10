@@ -127,7 +127,7 @@ A reset immediately suspends the old sign-in methods and revokes sessions; the n
 
 ### Application provider setup
 
-**Candidate implementation; integration and runtime/UI qualification pending.** Settings → Model providers manages installation-wide credentials shared by workspace agents. OpenAI offers ChatGPT OAuth or an API key; Claude and Fireworks initially offer API keys. Existing legacy Codex uses a separate OAuth-only provider ID. Available models come from Pi; saving a credential is not proof that an account can use every catalog model.
+**Candidate implementation; integration and runtime/UI qualification pending.** Settings → Model providers manages installation-wide credentials shared by workspace agents. Any fully authenticated installation user can manage them; setup prompts and attempts belong to the initiating session. OpenAI offers ChatGPT OAuth or an API key; Claude and Fireworks initially offer API keys. Existing legacy Codex uses a separate OAuth-only provider ID. Available models come from Pi; saving a credential is not proof that an account can use every catalog model.
 
 Connect or replace credentials through the provider's setup flow. For OpenAI OAuth, follow the provider sign-in link and, when prompted, paste the **full loopback callback URL** into Dispatch. With a remote backend the callback may not load in your browser; copy its address rather than sharing it in chat, screenshots or support logs. API keys are entered in protected fields and are never redisplayed. Account information appears only when returned by the provider. Modern OpenAI OAuth does not supply a verified account identity through the current Pi interface; its client ID is not an account name.
 
