@@ -4,7 +4,8 @@
 
 ### Project repositories and spec reference
 
-- Store manager-editable repository URL references and a repository-relative spec reference without requiring a host directory. Preserve omitted metadata on older-client saves and reject dangling spec references. Saving does not clone repositories or verify access/file existence. Add a responsive main-area Project settings form with URL/name entry, repo-relative spec selection, inline errors and retained drafts. Keep saved references discoverable on the overview and local-directory overrides separate under Advanced. Source/type/build checks pass; browser/runtime qualification remains pending.
+- Store manager-editable repository URLs and explicit directory-relative or repository-relative spec references. Directory specs need a saved project directory, not a repository URL; clearing their base or removing a selected repository requires clearing/reassigning the spec. No migration or legacy-source fallback. Preserve omitted metadata, manager/revision/retry checks and existing agent directories. Saving references does not clone repositories or verify access/spec-file existence.
+- Add responsive main-area Project settings with source-specific path labels, shared inline errors and retained drafts. Show the single directory input beside directory specs, under Advanced otherwise; switching source or clearing the spec retains it. Show saved bases/paths separately on the overview and warn when changing the directory base used by new local agents. Directory/repository changes are source candidates; publication and browser/runtime qualification remain pending. See the [work package](docs/handoff.md#project-repositories-and-spec-reference--october-10-2026) for evidence.
 
 ### operator idle sleep
 
