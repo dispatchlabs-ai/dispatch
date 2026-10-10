@@ -1,5 +1,20 @@
 # Dispatch Web implementation handoff
 
+## Pi 1.1.0 and shared-context caching — October 10, 2026
+
+Chris authorized upgrading Pi, correcting the Anthropic caching issue, adapting PostgreSQL compatibility, running the updated local version and verifying real cache reuse. This package preserves current shared-context freshness and native Pi execution/recovery. It does not change browser UI or deploy a hosted installation.
+
+Acceptance criteria:
+
+- Align Chord, Pi AI, Coding Agent, Durable and MCP at 1.1.0 with a locked dependency graph and updated Nix hash.
+- Use Pi's public request transform to move the Anthropic history breakpoint before Dispatch's identified transient shared-context suffix. Preserve payload content, tool/system markers, short/long/disabled retention, native credentials and other APIs; fail before dispatch if the suffix cannot be found. Review pending system updates, assistant/thinking blocks and recovery.
+- Adapt PostgreSQL ordered scans, direction-carrying cursor continuation, legacy cursor defaults, conflicting-order rejection, inclusive entry bounds and inherited fork segments. Preserve store isolation and transaction consistency. Record focused disposable PostgreSQL observations; no broad regression suite.
+- Apply source/deslop, full diff/whitespace and changed-document link review; complete Nix-shell TypeScript/application checks, Apple Silicon Nix build and flake evaluation.
+- Publish normally to `main`, verify remote inclusion and synchronize the clean canonical checkout. Gracefully restart the local launcher with the same state/workspaces after preserving a private recovery copy.
+- Use the requested small live Claude verification conversation, record exact model/revision and per-response cache reads/writes/cost, and establish reuse of saved conversation history beyond the static tool/system prefix. Keep private captures and diagnostics in ignored `.local/`. Target under $1 for qualification calls; this is a verification budget, not a new runtime concurrency or spending restriction.
+
+Status: implementation and qualification in progress. Evidence is recorded below as each criterion is completed.
+
 ## Model provider setup — October 10, 2026
 
 **Backend/frontend candidate implemented; integrated source/type/build and scoped disposable browser checks pass; publication and real-provider qualification pending.** Chris requested Settings → Model providers for OpenAI Codex, Claude and Fireworks, using Pi's public authentication/model interfaces and the existing encrypted credential store. Developer owns backend/integration, Designer owns responsive design review, Pi Durable Expert verifies provider/method mappings, Deslop reviews behavior-preserving simplification, and Documenter maintains package documentation. [The spec](spec.md#model-provider-setup) records the user outcomes and ownership boundaries.

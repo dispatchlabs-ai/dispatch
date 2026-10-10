@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Pi runtime and prompt caching
+
+- Align Pi packages at 1.1.0, including upstream context derivation and Anthropic system/tool cache fixes.
+- Cache saved conversation history before the fresh shared-context suffix, preserving listening behavior and native provider credentials.
+- Support ordered PostgreSQL scans and cursor continuation, including inherited fork history.
+
 ### Pierre source editor and project spec reading
 
 - Use the maintained Dispatch Pierre fork for chat file/diff presentation and the shared literal source editor, preserving historical excerpt semantics and React/worker import paths. Pin the immutable fork release with npm integrity and the Nix dependency hash; retain Apache notices.

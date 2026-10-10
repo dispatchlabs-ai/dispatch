@@ -1,6 +1,6 @@
-Storage semantics and initial relational layout adapted from Pi Durable 1.0.4
-packages/durable/src/storage/sqlite/{storage,migrations}.ts.
-https://github.com/earendil-works/pi/tree/v1.0.4/packages/durable/src/storage/sqlite
+Storage semantics and relational layout adapted from Pi Durable 1.0.4 and 1.1.0
+packages/durable/src/storage/sqlite/{storage,migrations}.ts and storage/scan.ts.
+https://github.com/earendil-works/pi/tree/v1.1.0/packages/durable/src/storage
 
 MIT License
 

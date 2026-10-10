@@ -1,4 +1,5 @@
 import { transcriptPage } from "../chat-pages.js";
+import { sharedContextMessage } from "./prompt-cache.js";
 import type { TranscriptQuery, TranscriptPage } from "../../src/shared/contracts.js";
 import { createHash, randomUUID } from "node:crypto";
 import { awaitWithContext, BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -427,7 +428,7 @@ export class SharedConversations {
               recentMessages: recentMessages(messages),
             });
           }, ctx);
-          return { messages: [...request.messages, { role: "user" as const, content: update, timestamp: Date.now() }] };
+          return { messages: [...request.messages, sharedContextMessage(update)] };
         }),
         afterResponse: (message, api, ctx) => this.coordinated(api, ctx, async () => {
           const binding = await api.snapshot(BindingDoc, api.conversationId, ctx);

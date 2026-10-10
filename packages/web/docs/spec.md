@@ -13,6 +13,16 @@
 
 Dispatch Web is a browser workspace for companies doing general-purpose client problem-solving with agents. It uses stock Pi Durable for durable execution and recovery. The maintained product account and previous decisions are linked from the [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/).
 
+## Pi runtime and shared-context caching
+
+**Accepted October 10, 2026:** keep the directly used Pi packages aligned at 1.1.0. Preserve Pi's ownership of execution, credentials, transcripts and recovery, including existing SQLite state and isolated PostgreSQL stores.
+
+Fresh shared context remains a request-only suffix, supplied before every generation attempt. For Anthropic Messages, place the conversation cache breakpoint at the last cacheable saved-history block before that suffix. Preserve Pi's system/tool breakpoints, cache retention and disabled-caching behavior, and the original attributed context. A request-local identity must distinguish this suffix from participant-authored text. Apply the correction through Pi's public model request transform in both local and worker runtimes; do not patch upstream internals or persist repeated shared snapshots into private history. Unexpected payload changes that lose the identified suffix must fail before provider dispatch. Other provider APIs retain their existing request behavior.
+
+The PostgreSQL adapter must honor ascending and descending conversation, entry, task and submission scans, retaining Pi's default directions. Continuation cursors carry their direction; omission inherits it, conflicting directions are rejected, and legacy cursors retain the scan's original default. Entry scans preserve inherited fork cutoffs and inclusive bounds in both directions within one consistent transaction. Keep logical-store predicates on every query and preserve storage/recovery ownership.
+
+Qualification for the [upgrade work package](handoff.md#pi-110-and-shared-context-caching--october-10-2026) includes the requested local restart, a small live Claude conversation and its actual per-response cache reads/writes. Build success or a Console cache label alone does not establish reuse. The [incident record](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/#section-claude-prompt-cache-cost-incident-october-10-2026) preserves the diagnosis.
+
 ## Product terminology
 
 **Accepted October 8, 2026:** use **chat** for the user-facing shared space, including navigation, actions, search, tooltips and accessibility labels (for example, **New chat** and **Search chats**). Use **Pi conversation** for the underlying durable transcript scope in technical documentation; one Dispatch chat coordinates shared history and individual agent-instance conversations. This is a presentation change, not an API, stored-identifier or historical-title migration. Older sections use conversation for the Dispatch chat unless explicitly discussing Pi.

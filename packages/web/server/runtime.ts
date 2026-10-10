@@ -1,4 +1,5 @@
 import { createAgentSecrets } from "./extensions/agent-secrets.js";
+import { withSharedContextCache } from "./collaboration/prompt-cache.js";
 import type { TranscriptQuery } from "../src/shared/contracts.js";
 import { ProjectArchiveStore, ProjectArchivesDoc, archiveDigest, decodeProjectArchive } from "./project-archives.js";
 import { PROJECT_ARCHIVE_MAX_BYTES, type ProjectArchive, type ArchivedChat } from "../src/shared/project-archives.js";
@@ -250,7 +251,7 @@ export class DispatchRuntime {
     let openedHarness: Harness | undefined;
     try {
       options.mcpConnections?.initialize();
-      const models = options.models ?? productionModels();
+      const models = withSharedContextCache(options.models ?? productionModels());
       storage = await openPiStorage(owner.directory, options.piStorage ?? { kind: "sqlite" });
       const registry = createRegistry();
       let runtime: DispatchRuntime;
