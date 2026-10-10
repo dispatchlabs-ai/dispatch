@@ -2776,6 +2776,7 @@ export class DispatchRuntime {
     requireText(agent.description, "Description", 500, true);
     requireText(agent.instructions, "Instructions", 50_000, true);
     requireText(agent.provider, "Provider", 100);
+    if (agent.provider === "openai-codex") throw new RuntimeError(400, "Select an OpenAI model.");
     requireText(agent.modelId, "Model", 200);
     const model = this.models.getModel(agent.provider, agent.modelId);
     if (!model) throw new RuntimeError(400, "This model is not available from the configured providers.");

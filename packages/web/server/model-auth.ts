@@ -27,7 +27,8 @@ export async function openModels(
   let defaults: z.infer<typeof defaultsSchema> = {};
   try { defaults = defaultsSchema.parse(JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8"))); }
   catch (error) { if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error; }
-  const provider = environment.DISPATCH_PROVIDER ?? defaults.defaultProvider ?? "openai";
+  const inheritedProvider = defaults.defaultProvider === "openai-codex" ? undefined : defaults.defaultProvider;
+  const provider = environment.DISPATCH_PROVIDER ?? inheritedProvider ?? "openai";
   const modelId = environment.DISPATCH_MODEL ?? defaults.defaultModel ?? "gpt-6-sol";
   const models = await ModelRuntime.create({
     ...(credentials ? { credentials, refreshOnCreate: false } : { authPath: join(agentDir, "auth.json") }),
@@ -37,10 +38,10 @@ export async function openModels(
   return {
     models, provider, modelId, thinkingLevel,
     async configuration(defaultAgent: Pick<AgentDraft, "provider" | "modelId">) {
-      const model = models.getModel(defaultAgent.provider, defaultAgent.modelId);
+      const model = defaultAgent.provider === "openai-codex" ? undefined : models.getModel(defaultAgent.provider, defaultAgent.modelId);
       // A pending/invalid credential must not prevent opening Settings to repair
       // it. Pi's global enumeration rejects if any provider's auth check fails.
-      const available = (await Promise.all(models.getProviders().map(async provider => {
+      const available = (await Promise.all(models.getProviders().filter(provider => provider.id !== "openai-codex").map(async provider => {
         try { return await models.getAvailable(provider.id); }
         catch { return []; } // Provider setup reports the unavailable credential without exposing its error.
       }))).flat();

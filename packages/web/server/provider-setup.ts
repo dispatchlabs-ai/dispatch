@@ -8,7 +8,6 @@ const definitions = [
   { id: "openai", name: "OpenAI", methods: ["oauth", "api_key"] },
   { id: "anthropic", name: "Claude", methods: ["api_key"] },
   { id: "fireworks", name: "Fireworks", methods: ["api_key"] },
-  { id: "openai-codex", name: "OpenAI Codex (legacy)", methods: ["oauth"] },
 ] as const;
 export class ProviderSetupError extends Error {
   constructor(readonly status: 400 | 404 | 409 | 503, message: string) { super(message); }

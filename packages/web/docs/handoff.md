@@ -1,5 +1,19 @@
 # Dispatch Web implementation handoff
 
+## Single OpenAI provider — October 10, 2026
+
+Chris requested removing the legacy option and manually moving all OpenAI agents to the already connected `openai` ChatGPT OAuth account. This supersedes the earlier decision to expose a separate legacy reconnect path. No reusable migrator, credential import, global Pi configuration change or hosted deployment is part of this package.
+
+Acceptance:
+
+- Remove legacy Codex from Settings, provider setup routes/types and model choices; reject new agent configurations using it. Ignore a retired provider inherited from global Pi defaults when seeding a new default agent, without changing global Pi settings. Keep normal OpenAI OAuth/API-key setup and Pi-owned authentication/refresh.
+- Gracefully stop the sole local writer and preserve a restricted full-state recovery copy before the one-time operation. Keep all model IDs, supported thinking levels, archived flags, instructions, tools, grants and transcript entries. Append new definition revisions and update current participant/native configurations without rewriting history.
+- Verify the existing `openai` credential remains OAuth and unchanged by the data edit. Check all migrated model/thinking combinations against the installed Pi catalog. Verify a real OAuth chat/tool call and existing-chat configuration after restart.
+- Review Settings on desktop and 390 px phone, including keyboard navigation of remaining controls. Record remaining UI-rule and physical-device limits. Keep account-bearing captures in ignored `.local/`.
+- Complete source/deslop/full-diff/whitespace review, Nix-shell TypeScript/application checks, Apple Silicon Nix build and flake checks. Commit, publish normally to `main`, verify remote inclusion and fast-forward the clean canonical checkout.
+
+**Local data operation and real OAuth chat/tool qualification completed; source publication and final UI qualification pending.** The stopped-writer operation used Pi's public storage commit interface under the runtime-owner lock. It appended 15 definition revisions (eight active, seven archived), updated 270 participant snapshots and 273 native `pi.agent` configurations in one atomic commit. Every model ID and thinking level was supported by `openai`. All 62,978 entries, 73,271 terminal tasks, 9,466 submissions and 368 conversations remained present; no history record was changed. The encrypted OpenAI credential was OAuth, had no pending update, and was byte-for-byte unchanged by the operation. Historical definition revisions retain `openai-codex` provenance. After restart, Chris resumed existing chat `171659` and confirmed it was working. Native records show successful `openai-responses` replies using `openai/gpt-6.1-sol` and `openai/gpt-6-astra`, including successful `bash` tool results followed by completed assistant responses. No replacement key or reauthorization was needed. Private recovery and operation receipts remain under canonical `.local/backups/openai-cutover-20261010/` and `.local/openai-cutover/`.
+
 ## Pi 1.1.0 and shared-context caching — October 10, 2026
 
 Chris authorized upgrading Pi, correcting the Anthropic caching issue, adapting PostgreSQL compatibility, running the updated local version and verifying real cache reuse. This package preserves current shared-context freshness and native Pi execution/recovery. It does not change browser UI or deploy a hosted installation.
@@ -17,7 +31,7 @@ Acceptance criteria:
 
 Interactive qualification used Claude Opus 5.5 (`claude-opus-5-5`), Low thinking, and three separate sequential reads of synthetic fixtures. A disposable PostgreSQL 17.11 app on port 5185 completed the native tool loop and restored its saved chat after browser reload and the integration-triggered backend restart. All eleven resulting native tasks were terminal. The temporary app/database were stopped. Cursor conflict/legacy rules, fork bounds and store predicates were reviewed against upstream source; their full combination space was not exercised. No automated test suite was added or run.
 
-The canonical service was gracefully stopped, its full existing state cloned privately, dependencies installed with `npm ci`, and the same SQLite state/workspace restarted at `http://localhost:5174`. The separately landed provider-settings cutover uses encrypted application credentials: the existing Claude API key was retained there without logging it or replacing any existing credential; legacy `auth.json` and OAuth grants were preserved. The default legacy Codex agent still requires its one-time Settings reconnect under that package's policy; that account flow is outside this cache qualification. The updated local chat `177272`, with native agent conversation `177281`, completed the same three reads and restored its result after browser reload.
+The canonical service was gracefully stopped, its full existing state cloned privately, dependencies installed with `npm ci`, and the same SQLite state/workspace restarted at `http://localhost:5174`. The separately landed provider-settings cutover uses encrypted application credentials: the existing Claude API key was retained there without logging it or replacing any existing credential; legacy `auth.json` and OAuth grants were preserved. At that checkpoint the default legacy Codex agent still required its one-time Settings reconnect; the later single-provider cutover below supersedes that requirement. That account flow was outside the cache qualification. The updated local chat `177272`, with native agent conversation `177281`, completed the same three reads and restored its result after browser reload.
 
 Actual Pi assistant usage records (USD; input includes additional uncached request-only context):
 
@@ -36,7 +50,10 @@ The final local request reused 99.66% of the tokens accounted as cache reads/wri
 
 ## Model provider setup — October 10, 2026
 
+**Historical compatibility choice superseded:** the later single-OpenAI-provider cutover removes the legacy option and manually updates the sole local installation. The original acceptance and evidence below describe the earlier package.
+
 **Completed and published to main at `9b465fc`; local main synchronized.** Integrated source/type/build and scoped disposable browser checks pass. Chris reported successful local testing on October 10; providers, methods and exact workflows were not specified, so this does not establish the broader qualification below. Chris requested Settings → Model providers for OpenAI Codex, Claude and Fireworks, using Pi's public authentication/model interfaces and the existing encrypted credential store. Developer owns backend/integration, Designer owns responsive design review, Pi Durable Expert verifies provider/method mappings, Deslop reviews behavior-preserving simplification, and Documenter maintains package documentation. [The spec](spec.md#model-provider-setup) records the user outcomes and ownership boundaries.
+
 
 Acceptance:
 
