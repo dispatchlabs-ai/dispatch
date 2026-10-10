@@ -3,7 +3,7 @@ import { Client, type ClientConfig, type QueryResultRow } from "pg";
 import type { AuthOperationOptions, Credential, CredentialInfo, CredentialStore } from "@earendil-works/pi-ai";
 import { z } from "zod";
 
-const credentialSchema = z.union([
+export const credentialSchema = z.union([
   z.object({ type: z.literal("api_key"), key: z.string().optional(), env: z.record(z.string(), z.string()).optional() }),
   z.object({ type: z.literal("oauth"), access: z.string(), refresh: z.string(), expires: z.number() }).passthrough(),
 ]);
@@ -132,6 +132,11 @@ export class PostgresCredentialStore implements CredentialStore {
 
   read(providerId: string, options?: AuthOperationOptions): Promise<Credential | undefined> {
     return this.enqueue(async () => this.decode(await this.row(providerId)), options);
+  }
+
+  /** Side-effect-free interrupted-update metadata for Settings; never resolves auth. */
+  inspect(providerId: string, options?: AuthOperationOptions): Promise<{ pending: boolean }> {
+    return this.enqueue(async () => ({ pending: !!(await this.row(providerId))?.pending }), options);
   }
 
   list(options?: AuthOperationOptions): Promise<readonly CredentialInfo[]> {
