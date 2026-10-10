@@ -1,53 +1,59 @@
 # Changelog
 
-## Unreleased — planned controller handover
+## [Unreleased]
+
+### Lockstep versioning
+
+- Add SemVer release preparation, package-derived Nix and browser build versions. Keep release publication and deployment explicit.
+
+### planned controller handover
 
 - Keep undispatched request expiry separate from controller failure; reject public traffic while a claimed local owner is unready without blocking authenticated startup maintenance.
 - Add opt-in backend/launcher listener overlap with identity-bound planned ownership transfer, fresh-state activation, private readiness, bounded undispatched waiting and response-body draining. Preserve worker executors and store recovery latches; do not replay dispatched mutations or take over on timeout.
 - Add explicit snapshot-checked controller recovery and generic managed-launcher ingress with rolling drain budgets. Source review is not deployed continuity; see the [handover package](docs/handoff.md#safe-controller-overlap-for-ecs-rolling-deployment--october-9-2026) for activation prerequisites, observed native replacements and coverage limits.
 
-## Unreleased — live agent indicator
+### live agent indicator
 
 - Replace Activity/Working disclosure labels with agent names and arrows; show current working/responding indicators separately without visible status text. Preserve accessible status and reduced-motion support.
 - Remove the teal pending-prompt surface while retaining Sending and Retry.
 
-## Unreleased — ECS deployment mode selection
+### ECS deployment mode selection
 
 - Add explicit per-controller `stop-first` (0/100) or `rolling` (100/200) deployment selection to the reusable AWS module; preserve stop-first defaults. Rolling requires application-level overlap and readiness support absent from legacy controllers. The selection option alone changes no live deployment mode.
 
-## Unreleased — activity disclosure recovery
+### activity disclosure recovery
 
 - Remove activity count labels and empty live-only timeline disclosures while preserving loaded historical activity.
 - Resolve settled activity detail identities; stop loading on failure with Retry and retain output during background refresh.
 
-## Unreleased — composer typing isolation
+### composer typing isolation
 
 - Notify only the affected main/thread composer on draft edits rather than rerendering the workspace and unrelated chats; retain workspace-lifetime drafts, uploads and send/retry guards.
 - Avoid duplicate mention scans for the same editor state while retaining synchronous Markdown updates, initial imports and external replacements. See the [correction package](docs/handoff.md#composer-typing-responsiveness--october-9-2026) for evidence and limits.
 
-## Unreleased — project participants and sign-in diagnostics
+### project participants and sign-in diagnostics
 
 - Include current project members in chat Participants and inline mention choices before their first message; preserve former authors and reject new mentions after project removal.
 - Allow project changes while an existing member recovers their account, preserving that member's unchanged identity and role.
 - Record structured authentication failures with browser context, safe passkey rejection categories and a user-visible support reference.
 
-## Unreleased — borderless activity labels
+### borderless activity labels
 
 - Remove the visible box around agent activity labels while retaining click-to-expand, hover feedback and keyboard focus styling. Tighten activity-only row spacing and label padding, retaining 44 px touch targets.
 
-## Unreleased — chat completion guidance
+### chat completion guidance
 
 - Point shared agents to the saved chat Definition of Done and latest human direction, use the conversation goal when blank, and finish after evidenced completion instead of expanding work from broader checklists.
 
-## Unreleased — project import placement
+### project import placement
 
 - Move project import from the chat sidebar into Settings → Import & export, with paired project export, a file drop area and Continue to archive review. Retain existing approval and retry behavior.
 
-## Unreleased — agent criteria editing
+### agent criteria editing
 
 - Add opt-in Edit Definition of Done capability with current-chat read/write tool, revision protection and durable retry receipts. Disabled by default; existing instances adopt capability changes at safe idle boundaries.
 
-## Unreleased — continuing simplification
+### continuing simplification
 
 - Align runtime/setup and agent workflow guidance with current contracts and testing-policy exceptions; distinguish historical editor proposals and deployment/qualification evidence from current claims.
 - Ignore root generated image outputs/run metadata without deleting user files or tracked design assets.
@@ -58,7 +64,7 @@
 
 Integrated source/build checks passed; runtime/rendered qualification remains unverified. See [acceptance evidence](docs/handoff.md#continuing-simplification--october-8-2026).
 
-## Unreleased — five-finding simplification
+### five-finding simplification
 
 - Replace full-transcript chat listing with lightweight summaries and target pending base upgrades instead of scanning all chats after unrelated commits.
 - Consolidate composer state and coordinate list refreshes with stale-response protection, preserving draft and retry safeguards.
@@ -66,150 +72,150 @@ Integrated source/build checks passed; runtime/rendered qualification remains un
 
 Integrated source review and TypeScript/application/Apple Silicon Nix checks passed; no deployment or new runtime/UI qualification is established. See [acceptance evidence](docs/handoff.md#five-finding-simplification--october-8-2026).
 
-## Unreleased — chat presentation performance
+### chat presentation performance
 
 - Replace sidebar transcript projection with transactionally maintained public summaries and checkpointed existing-chat initialization.
 - Load recent chat/thread previews first, fetch older history on demand, stream delivered-state deltas, and virtualize transcript rows. Expand paired tool activity in pages; complete message/activity downloads retain access to oversized content.
 - Source-published at `e87c0ab`: scoped authenticated desktop/390 px presence-update measurements meet the <100 ms typing budget; native cancellation/paging/SSE and integrated Apple Silicon checks passed. Guarded local installation and source-equivalent authenticated desktop/390 px demonstrations are recorded. See the [performance package](docs/handoff.md#chat-presentation-performance--october-8-2026) for measurement limits; arbitrary model-output loads are not qualified.
 
-## Unreleased — chat criteria response
+### chat criteria response
 
 - Detach saved Definition of Done criteria inside the native read transaction so chats with criteria can serialize after settlement.
 
-## Unreleased — chat Definition of Done
+### chat Definition of Done
 
 - Add shared Markdown completion criteria in chat Details, with authorized editing, revision conflicts, retained drafts and refresh-before-retry. Agents receive current criteria as guidance, not completion or work authorization.
 
-## Unreleased — agent management eligibility
+### agent management eligibility
 
 - Allow explicitly granted agent management for agents with tools, skills, extensions or connections, including default-agent and granted-editor targets. Preserve human grants, revision pins and permitted tuning fields.
 
-## Unreleased — project working directories
+### project working directories
 
 - Add an optional service-host working directory in Project settings. New agent instances retain the selected workspace; changing project settings never redirects existing instances. Blank uses the installation default.
 
-## Unreleased — shared work continuity
+### shared work continuity
 
 - Align shared-chat instructions and both history notifications: check recent history and relevant spec/work-package criteria before ending, and continue authorized, unblocked work without redundant public replies. No scheduling, native lifecycle or agent-definition changes.
 
-## Unreleased — integration secrets
+### integration secrets
 
 - Add Settings → Secrets for encrypted Exa keys or explicit server-environment grants, owner-scoped management, revision-conflict protection, and use-time credential authorization. Environment-only search now requires explicit agent grants.
 
-## Unreleased — starter and GitHub bundles
+### starter and GitHub bundles
 
 - Add an explicit-model Developer starter through the existing archive preview/import path.
 - Add public GitHub commit-pinned imports and tracked updates with durable reviewed previews, conservative local-edit conflicts, retained removed entries and atomic retry receipts. Updated definitions follow the existing safe-idle adoption policy. Source/build checked; later bounded runtime/browser observations and remaining limits are recorded in [portability evidence](docs/handoff.md#portability-manual-qualification--october-8-2026).
 
-## Unreleased — portable agent and skill bundles
+### portable agent and skill bundles
 
 - Add Agents import/export with bounded ZIP parsing, requirement preview, exact assigned skill revisions and independent local copies. Native atomic receipts preserve same-operation retries; connections, credentials and existing instances remain untouched. The initial slice excluded GitHub updates, starter distribution, project exports and backups; subsequent deliveries and bounded manual qualification are recorded in the [handoff](docs/handoff.md#portability-manual-qualification--october-8-2026).
 
-## Unreleased — separate web capabilities
+### separate web capabilities
 
 - Split Web research into independently assigned Web reading (`web_read`: open/find/click, no search key required) and Web search (`web_search`: search_query, requiring an Exa grant). Legacy combined assignments migrate to both without changing grants; saved evidence remains intact. Activation and full workflow qualification remain pending in [WP-054](docs/handoff.md#capability-split--october-9-2026).
 
-## Unreleased — native web research
+### native web research
 
 - Add the Web research capability with native search, page reading, literal find and numbered-link traversal, durable instance-local evidence and source citations. Interrupted network batches are not automatically replayed. Qualification tracked in [WP-054](docs/handoff.md#wp-054--native-web-research).
 
-## Unreleased — agent authoring design
+### agent authoring design
 
 - Redesign agent overview, editor, sidebar and evaluation configuration around the approved concepts. Add section/case navigation, a persistent required evaluation change reason and shared Markdown formatting controls. Preserve existing draft, revision and profile-only boundaries. See [acceptance evidence](docs/handoff.md#agent-authoring-redesign--october-8-2026).
 
-## Unreleased — Developer default
+### Developer default
 
 - Make Developer the company default and archive retired Dash/Dispatch without deleting revisions or changing existing conversation instances. Preserve Developer settings and migrate project defaults; new projects and implicit chat selections use Developer. Acceptance evidence and remaining qualification are tracked in the [handoff](docs/handoff.md#developer-default-and-dash-retirement--october-8-2026).
 
-## Unreleased — browser skills
+### browser skills
 
 - Add pinned agent-browser core and dogfood exploratory-QA guidance for explicit skill assignment, without installing browser tooling or changing existing instance snapshots. Checks and activation limits are recorded in [the handoff](docs/handoff.md#bundled-agent-browser-and-dogfood-skills).
 
-## Unreleased — project overview
+### project overview
 
 - Add project chat search, All chats/Active filters, status and last activity. Move members, default agents and existing settings into the contextual details panel, with adaptive desktop/phone rows. See [implementation evidence](docs/handoff.md#project-overview-redesign--october-8-2026).
 
-## Unreleased — in-place agent base upgrades
+### in-place agent base upgrades
 
 - Apply saved base revisions to active instances at safe idle boundaries, preserving identity/history, instance supplements and workspace paths. Retain immutable revisions and explicit MCP assignment; display applied base revision separately from actual connections. Source/build candidate evidence and outstanding recovery/UI qualification are tracked in [the handoff](docs/handoff.md#in-place-agent-upgrades--october-8-2026).
 
-## Unreleased — project-row chat creation
+### project-row chat creation
 
 - Start a chat directly from a project row using its default agents, without a setup dialog; focus the new composer and retain existing drafts. Use Chat terminology in product controls.
 - Remove obsolete personal-project creation/listing/move paths; preserve ungrouped access and stored retry identities. Source/build checked; rendered and functional qualification remains outstanding in [WP-053](docs/handoff.md#wp-053--project-row-chat-creation-and-shared-only-projects).
 
-## Unreleased — multiple agent instances
+### multiple agent instances
 
 - Add explicit same-definition instances with optional names and creation-only instruction supplements, immutable instance targeting and stable creation retries. Source/build checked; runtime and rendered UI remain unqualified. Evidence in [WP-050](docs/handoff.md#wp-050--multiple-agent-instances-and-supplemental-instructions).
 
-## Unreleased — MCP credential renewal recovery
+### MCP credential renewal recovery
 
 - Preserve authorization after known pre-exchange connection failures and explicit temporary OAuth errors; allow the next attempt to renew. Keep uncertain rotations and rejected grants blocked, and report safe renewal reasons to tools.
 
-## Unreleased — conversation agent removal
+### conversation agent removal
 
 - Add per-instance removal: fence participation, cancel native work durably, preserve history and require explicit human re-addition as a fresh instance after cleanup. Source/build checked; runtime and rendered UI remain unqualified. Evidence and outstanding acceptance are tracked in [WP-049](docs/handoff.md#wp-049--remove-conversation-agents).
 
-## Unreleased — inline agent invitations
+### inline agent invitations
 
 - Extend inline `@` selection to available company agents, inviting them only on Send. Resolve invitation mentions and save the message/deliveries in one native commit; preserve existing instances and unchanged-request retries. Implementation and local acceptance evidence are tracked in [WP-048](docs/handoff.md#wp-048--invite-agents-through-inline-mentions).
 
-## Unreleased — agent evaluation profiles
+### agent evaluation profiles
 
 - Refine editing into a focused evaluation workspace with scannable expectations/cases, progressive disclosure, persistent save controls and profile history in context/phone Details. Gemini’s scoped designer-agent assessment is 91/100 (A−); human comprehension, broader accessibility and native-select arrow behavior remain unverified. See [WP-047](docs/handoff.md#wp-047--agent-evaluation-profiles-and-editor) for receipt-review limits.
 
 - Add independently versioned evaluation profiles, criteria and standalone cases to saved agent definitions, with immutable history, conflict checks and retry receipts. Keep evaluator-only material out of operating instructions.
 - Preserve archived profile access and company boundaries. This slice edits evaluation definitions; it does not execute cases, assess real conversations or produce results.
 
-## Unreleased — image editing and visual verification
+### image editing and visual verification
 
 - Stop injecting `input_fidelity` into GPT Image 2/2.5 edits, including when older skill snapshots request it; retain explicit supported legacy-model values.
 - Return generated pixels to the model for visual review alongside existing paths and audit records. Clarify mask preparation, review-before-publication, rejected-parameter recovery and truthful fallback guidance in the reusable image skill.
 
-## Unreleased — permissioned agent management
+### permissioned agent management
 
 - Add native authorized definition reads, revisioned tuning saves and forward restoration, with trusted instance identity, dual editor-revision pins, atomic receipts, explicit rolling quotas and no live rollout.
 - Add separate human-session grant administration and audit APIs. No grants are seeded; Doctor's target and direct-save trial remain unconfigured. Proposal workflows, eval automation and a grant UI are not included.
 
-## Unreleased — specification reconciliation
+### specification reconciliation
 
 - Separate current acceptance contracts, legacy personal-group compatibility and future designs. Reconcile project authority, agent editing/context, admitted public replies and conversation-wide Stop; scope deployment and PostgreSQL evidence without claiming full qualification.
 
-## Unreleased — agent file sharing
+### agent file sharing
 
 - Prepare workspace files privately with `conversation_attach` and publish saved attachment IDs through contribution review. Reuse existing attachment storage and rendering; Stop/discard does not publish prepared files.
 - Omit `input_fidelity` on prompt-only image generation and include sanitized rejected-parameter diagnostics. Live generation, publication and recovery remain unverified.
 
-## Unreleased — agent archive response
+### agent archive response
 
 - Detach nested agent configuration from the catalog transaction before returning it, so successful archives do not display a failed-request error. The same public projection covers saved-agent retries and retained skill selections.
 
-## Unreleased — backend reload cleanup
+### backend reload cleanup
 
 - Release cached model WebSockets and provider idle timers after Pi work drains, allowing backend reloads to finish without waiting for cache expiry.
 
-## Unreleased — local PostgreSQL storage
+### local PostgreSQL storage
 
 - Add an opt-in PostgreSQL adapter for Pi Durable 1.0.4, with isolated logical stores, atomic batches, document history and a dedicated single-owner connection. SQLite remains the default; existing state is not migrated.
 - Document separate-state PostgreSQL 17 container and Homebrew setups. Authentication, connections and attachments remain local; distributed workers, automatic takeover and AWS deployment are not implemented. Runtime qualification remains pending.
 
-## Unreleased — preserved contribution review
+### preserved contribution review
 
 - Add opt-in OpenAI image generation/editing and separately assigned skill guidance, with workspace output records and explicit interrupted-request uncertainty.
 
 - Preserve prepared contributions and their speaking reservation through final review/publication while other work continues. Human typing pauses publication without discarding drafts.
 - Explicit posts report pending until sibling tools finish; stable publication receipts, native successor checks and Stop cleanup cover the new ownership boundary. Runtime qualification remains pending.
 
-## Unreleased — container architectures
+### container architectures
 
 - Add Linux ARM64 image output and default ECS to ARM64, retaining explicit X86_64 selection. Multi-platform registry publication and per-platform execution remain pending.
 
-## Unreleased — independent agent work
+### independent agent work
 
 - Separate concurrent model/tool work from public speaking admission; keep unadmitted prose private, including Stop/failure output.
 - Scope conversation observation and reuse unchanged committed histories. Runtime performance and recovery qualification remain pending.
 
-## Unreleased
+### Earlier unreleased changes
 
 - Removed the attachment explanation paragraphs from the + menu and below the composer.
 
@@ -342,7 +348,7 @@ Integrated source review and TypeScript/application/Apple Silicon Nix checks pas
 - Initial package layout with draft specification, implementation handoff, and usage-guide locations. The initial skeleton reserved source and test locations.
 
 
-## Portability continuation — October 8, 2026
+### Portability continuation — October 8, 2026
 
 - Add bounded project-history JSON export/import with attachment checksums, manager export authorization, independent projects, inert history and atomic retry-safe admission.
 - Add restricted offline SQLite recovery tooling requiring stopped writers and fenced original ownership; restore never starts a service.

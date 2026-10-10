@@ -1,5 +1,6 @@
 {
   "name": "dispatch-web-next",
+  "version": "0.1.0",
   "private": true,
   "workspaces": [
     "packages/web"
@@ -14,7 +15,8 @@
     "typecheck": "npm run typecheck --workspace @dispatch/web",
     "check": "npm run typecheck && npm run build",
     "start": "tsx scripts/start.ts",
-    "auth": "tsx scripts/auth.ts"
+    "auth": "tsx scripts/auth.ts",
+    "release": "tsx scripts/release.ts"
   },
   "type": "module"
 }
