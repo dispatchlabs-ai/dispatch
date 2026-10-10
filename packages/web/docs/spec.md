@@ -169,6 +169,12 @@ Resume test work only after there is enough useful, stable behavior worth preser
 
 **October 6 focused exception:** Chris explicitly requested coordinator-led use of the local development site to validate the conversation layout refinement. Manual browser interaction and rendered desktop/phone comparison are authorized for [WP-028](handoff.md#wp-028--conversation-layout-refinement). This does not authorize adding or running automated tests or qualify unrelated runtime workflows. Record the specific observed outcomes and remaining limitations.
 
+## Application release version
+
+**Accepted October 9, 2026:** adopt Pi's lockstep release workflow with SemVer and per-package unreleased changelogs. The [repository policy](../../../CONTRIBUTING.md#versioning-and-releases) owns bump semantics and release commands. The initial `0.1.0` baseline is metadata, not evidence of a tagged release.
+
+The Nix artifact and browser assets derive their version from `packages/web/package.json`. Show the built browser version as quiet `v<version>` text at the right of the desktop status bar and beside Sign out in the phone/tablet Menu drawer. Do not add a permanent mobile row or displace connection state or chat controls. Do not hardcode a display version or present it as the current backend's identity. A release setup does not authorize tagging, registry publication or deployment. Acceptance evidence belongs in [the release work package](handoff.md#lockstep-semver-and-visible-application-version--october-9-2026).
+
 ## Company access and authentication
 
 **Accepted October 3, 2026.** Dispatch Web is a tool for companies. Access requires an authenticated user session with two-factor authentication (2FA). Support both time-based one-time passwords (TOTP) from authenticator apps and passkeys using WebAuthn/FIDO2.

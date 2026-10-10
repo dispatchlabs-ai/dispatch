@@ -1,5 +1,19 @@
 # Dispatch Web implementation handoff
 
+## Lockstep SemVer and visible application version — October 9, 2026
+
+Chris authorized adopting Pi's lockstep workflow, removing the Nix version literal and showing the version in the app. Scope: retain `0.1.0` as the baseline, synchronize root/participating package manifests and lockfile at release preparation, convert accumulated package `Unreleased` notes into dated release history, and derive Nix/browser version metadata from the web manifest. [Repository policy](../../../CONTRIBUTING.md#versioning-and-releases) owns the commands and SemVer rules. No release publication or deployment is included.
+
+Acceptance:
+
+- Release preparation supports patch/minor/major or an explicit version and a non-mutating dry-run; it leaves a fresh `Unreleased` section and preserves existing released history.
+- Version preparation does not commit, tag, push, publish or deploy. Manifest/lockfile versions remain consistent; include the shipped capability manifest outside npm workspaces. Future packages retain their own changelogs while sharing the release version.
+- Nix reads the web manifest version; Vite exposes the same version to browser assets. No duplicated version literal or runtime polling is needed.
+- The version appears at the right of the desktop status bar and beside Sign out in the phone/tablet Menu drawer, including at 390 px without losing connection state, accessibility or chat controls. It identifies browser assets rather than backend/deployment provenance.
+- Complete source/deslop review, TypeScript/application and Apple Silicon Nix checks, diff/link review and permitted rendered verification. Record actual evidence below; build success alone does not establish runtime/UI correctness.
+
+Implementation and integrated check evidence are pending. The wiki home could not be read from this environment (private-address access restriction); this entry records the explicit current-chat decision, not a wiki publication.
+
 ## Live agent indicator and neutral pending prompt — October 9, 2026
 
 Chris requested replacing Activity/Working disclosure labels with a small current-work animation that stops on completion, and removing the teal pending-prompt treatment. Reuse ConversationPresence's current participant-status projection and existing spinner, with agent names only visually and status retained for assistive technology. Listening remains a static icon. Recorded tool disclosures retain their name, arrow, accessible label, expansion and Retry; no historical activity drives animation. The pending prompt becomes transparent while preserving its border, content and Sending/Retry controls.

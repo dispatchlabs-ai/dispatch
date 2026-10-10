@@ -55,7 +55,7 @@ The wiki maintains product intent and decision history. Package documents define
 
 ## Agent workflows
 
-These prompts adapt [Pi's development workflow](https://github.com/earendil-works/pi/tree/4c6fb7cfe8c538a668726f6f8b3554098c39faee/.pi) to Dispatch Web. They follow this repository's package contracts, worktree/publication policy, and available checks. They do not assume Pi's npm commands, release versioning, GitHub labels, or terminal UI.
+These prompts adapt [Pi's development workflow](https://github.com/earendil-works/pi/tree/4c6fb7cfe8c538a668726f6f8b3554098c39faee/.pi) to Dispatch Web. They follow this repository's package contracts, worktree/publication policy, and available checks. They do not assume Pi's npm commands, GitHub labels, or terminal UI. Our release workflow adopts lockstep versions with the SemVer policy below.
 
 In Pi, launch from the repository or task-worktree root and grant project trust to load `.pi/` resources. Invoke a prompt by its filename, such as `/deslop` or `/is <issue-url>`; use `/reload` after changing templates in an active session. Other agents should read and follow the linked Markdown directly; these files are not automatically registered as commands in every client.
 
@@ -71,7 +71,7 @@ In Pi, launch from the repository or task-worktree root and grant project trust 
 Load these longer procedures only when their task applies:
 
 - [Interactive testing](.pi/skills/interactive-testing.md): verify specified browser workflows and observable outcomes once a runnable application exists.
-- [Release](.pi/skills/release.md): establish the actual release target and commands, validate the candidate, and verify an authorized publication. Release tooling is currently unconfigured.
+- [Release](.pi/skills/release.md): establish the actual release target and commands, validate the candidate, and verify an authorized publication. Use the lockstep SemVer workflow below.
 
 Use `/deslop` after implementing a work package, then rerun affected checks before `/wr`. `/is` and `/pr` are investigation/review tasks; neither authorizes implementation or external messages. `/wr` follows the Git publication policy below, but does not itself authorize GitHub comments, issue-state changes, a deployment, or starting the next work package.
 
@@ -83,4 +83,21 @@ Also run `git diff --check` (and `git diff --cached --check` after staging), ins
 
 Use a task branch and worktree for concurrent work; edit canonical `main` only with exclusive checkout ownership. Before publication, fetch the latest remote target, reconcile any changes, and rerun the applicable checks. Commit only task changes, push normally to `main` unless the task requires a PR, and verify the published commit. Fast-forward a clean canonical checkout after publication; preserve existing edits and unpublished work.
 
-CI and release automation are not configured. Existing shared CI policy continues to apply; an empty workflow directory does not enable GitHub Actions.
+CI and automatic release publication are not configured. Existing shared CI policy continues to apply; an empty workflow directory does not enable GitHub Actions.
+
+## Versioning and releases
+
+**Accepted October 9, 2026:** follow Pi's lockstep workflow: the root manifest, workspace packages and shipped capability package (`packages/web/capabilities/package.json`, outside npm workspaces) share one SemVer version, while each package keeps its own changelog. Preserve `0.1.0` as the initial-development baseline; adding version metadata does not retroactively cut a release. Nix and the browser build derive their version from the web package manifest, not separate literals.
+
+During development, keep meaningful changes under each owning package's `Unreleased` section. Do not bump versions for individual work packages. At an explicitly requested release, select one version for the accumulated changes: patch for compatible fixes, minor for compatible additions, and major for incompatible public-contract changes after `1.0.0`. During `0.x` development, use minor bumps for breaking changes and document them; compatibility is not yet stable. Dependency versions and portable bundle format versions are separate identities.
+
+From the root, inside `nix develop`:
+
+```sh
+npm run release -- minor --dry-run
+npm run release -- minor
+```
+
+Replace `minor` with `patch`, `major`, or an explicitly selected SemVer version. The release command prepares lockstep manifest/lockfile versions and dated per-package changelog sections, leaving a fresh `Unreleased` section. Review the dry-run and complete diff before proceeding. It does not commit, tag, push, publish packages, or deploy. Follow the [release procedure](.pi/skills/release.md) for candidate checks and separately authorized publication. Tag the approved release revision as `v<version>`; do not move published tags. Private packages are not npm registry publication targets merely because they have a version.
+
+The version shown in the web app identifies its built browser assets, not a live backend handshake or proof of deployment. Retain source revision/artifact digest alongside versions when identifying deployed artifacts.
