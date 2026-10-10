@@ -1393,10 +1393,16 @@ export class DispatchRuntime {
   /** Reads the configured spec from its public repository. External I/O stays outside native commits. */
   async getProjectSpec(scope: RuntimeScope, id: string): Promise<ProjectSpecDocument> {
     const binding = (project: SharedProjectRecord) => {
-      const repository = project.spec && project.repositories?.find(item => item.id === project.spec!.repositoryId);
-      return project.spec && repository ? { repositoryId: repository.id, url: repository.url, path: project.spec.path } : undefined;
+      const spec = project.spec;
+      if (spec?.source !== "repository") return undefined;
+      const repository = project.repositories?.find(item => item.id === spec.repositoryId);
+      return repository ? { repositoryId: repository.id, url: repository.url, path: spec.path } : undefined;
     };
-    const source = await this.harness.commit(async tx => binding(await requireProjectAccess(tx, scope, id, "read", this.readAll(scope))), context);
+    const source = await this.harness.commit(async tx => {
+      const project = await requireProjectAccess(tx, scope, id, "read", this.readAll(scope));
+      if (project.spec?.source === "directory") throw new ProjectSpecError(400, "Directory-backed specs aren't available in this view.");
+      return binding(project);
+    }, context);
     if (!source) throw new ProjectSpecError(404, "This project has no spec file configured.");
     const loaded = await fetchPublicGithubSpec(source.url, source.path);
     await this.harness.commit(async tx => {

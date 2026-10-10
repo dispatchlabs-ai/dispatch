@@ -12,8 +12,10 @@ type Source = { projectId: string; repositoryId: string; url: string; path: stri
 
 /** The configured spec's source identity; a changed URL can keep its repository ID. */
 export function projectSpecSource(project: Project): Source | null {
-  const repository = project.spec && project.repositories?.find(item => item.id === project.spec!.repositoryId);
-  return project.spec && repository ? { projectId: project.id, repositoryId: repository.id, url: repository.url, path: project.spec.path } : null;
+  const spec = project.spec;
+  if (spec?.source !== "repository") return null;
+  const repository = project.repositories?.find(item => item.id === spec.repositoryId);
+  return repository ? { projectId: project.id, repositoryId: repository.id, url: repository.url, path: spec.path } : null;
 }
 const sourceKey = (source: Source | null) => source ? JSON.stringify([source.projectId, source.repositoryId, source.url, source.path]) : "";
 const isMarkdown = (path: string) => /\.(?:md|markdown|mdx)$/i.test(path);
@@ -114,13 +116,13 @@ export function ProjectSpecView({ project, onBack, onDirtyChange }: {
     <header className="project-spec-header">
       <div>
         <h1 id={`project-spec-title-${project.id}`}>Spec</h1>
-        <p className="project-spec-path">{shown?.path ?? current?.path ?? "No spec file configured"}</p>
+        <p className="project-spec-path">{shown?.path ?? project.spec?.path ?? "No spec file configured"}</p>
         {shown ? <p className="project-spec-provenance"><span>{repository}</span> · <span title={shown.commit}><span className="sr-only">loaded at commit </span>{shown.commit.slice(0, 7)}</span></p> : null}
       </div>
       {shown && !editing ? <Button variant="secondary" onClick={edit}>Edit</Button> : null}
     </header>
     {requested !== currentKey && currentKey ? <Notice tone="info">The project's spec reference changed. This draft belongs to the previous file. <Button variant="ghost" onClick={openCurrent}>Open current spec</Button></Notice> : null}
-    {!current && !shown ? <p className="text-muted">This project has no spec file configured.</p> : null}
+    {!current && !shown ? <p className="text-muted">{project.spec?.source === "directory" ? "Directory-backed specs aren't available in this view." : "This project has no spec file configured."}</p> : null}
     {error ? <Notice>{error} <Button variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></Notice> : null}
     {requested && !shown && !error ? <Spinner label="Loading spec" /> : null}
     {shown ? <>
