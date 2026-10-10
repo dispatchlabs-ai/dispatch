@@ -107,6 +107,16 @@ and evidence belong in the [baseline work package](handoff.md#ecs-infrastructure
 with caller interfaces and costs documented in the standalone module. This does
 not authorize customer access, live deployment or state migration.
 
+**Idle-cost optimization authorized October 10, 2026:** minimize effective cost
+when not in use, rather than merely discounting continuously running resources.
+Evaluate Aurora Serverless v2 scaling/auto-pause together with application
+connections and retained workers/controllers; a zero-ACU input alone is not an
+idle-cost result. Preserve authentication, exclusive execution, durable history,
+uncertain-call recovery and the disposable-workspace policy. The design is not
+yet settled; the [idle-cost work package](handoff.md#idle-cost-optimization--october-10-2026)
+tracks residual costs, wake tradeoffs and bounded evidence. No customer access,
+live deployment or state migration is authorized by this optimization work.
+
 ### Ubuntu agent execution image
 
 **Accepted and implementation/deployment authorized October 9, 2026; qualification pending.** Keep Nix for Dispatch and its pinned runtime. Define the agent image with a `Containerfile`, using Ubuntu with separately built Linux ARM64 and AMD64 variants. Provide a useful development toolbox and allow agents to install missing tools through their normal noninteractive shell during work; preinstalled tools alone do not satisfy this contract. Promote recurring dependencies into the image recipe over time. Project-selected runtimes must not replace Dispatch's pinned runtime.

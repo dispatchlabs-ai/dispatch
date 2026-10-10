@@ -2330,3 +2330,32 @@ Final Developer build verification on October 10: the integrated application pas
 checks; incompatible Linux checks omitted). The deterministic SPA bundle checksum
 is `d1ccba643c72ac50efcda3b636373b5a140d7e339d0bd69f9afd9daff5eaad96`.
 These are source/type/build checks, not image publication or live qualification.
+
+## Idle-cost optimization — October 10, 2026
+
+**Optimization work authorized; design and acceptance pending.** Minimize effective
+cost while the installation is not in use; active-use infrastructure spending is
+acceptable. This extends the accepted baseline source, not its live qualification.
+Deployer owns Aurora auto-pause constraints and revised idle/active cost estimates;
+Deslop reviews always-on services/polling and architectural complexity. Application
+and infrastructure changes must preserve the existing ownership, authentication,
+no-replay and durable-history guarantees; disposable workspaces remain disposable.
+
+Acceptance for the selected design:
+
+- Define idle eligibility without treating disconnected browsers as proof of no
+  active/pending work; account for background execution and retained connections.
+- Describe how workers/controllers retire and resume without overlapping old
+  executors, replaying uncertain external effects or implying workspace restoration.
+- Verify Aurora engine/region and pause blockers; expose actual connection-release
+  prerequisites rather than advertising a zero-ACU setting as achieved sleep.
+- Update the module's canonical regional estimate with residual idle resources,
+  active duty cycles, wake costs/latency assumptions and exclusions. Distinguish
+  warm-idle, paused compute and any retained networking/storage/observability floor.
+- Document the selected caller controls and cold-wake/authentication behavior.
+  Record source/build/mock checks separately from real wake, pause, interruption
+  and billing observations. Existing offline passes do not qualify these changes.
+
+The current baseline has no automatic worker idle retirement and retains database
+owner connections. It is not the completed idle-optimized design. No customer/live
+AWS access or storage migration is authorized; real outcomes remain unverified.
