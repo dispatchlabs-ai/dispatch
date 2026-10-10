@@ -365,6 +365,9 @@ input::placeholder, textarea::placeholder { color: var(--color-muted); }
 .file-change-note { display: flex; align-items: baseline; gap: var(--space-2); padding: var(--space-2) var(--space-3); color: var(--color-muted); line-height: 1.75; overflow-wrap: anywhere; }
 .file-change-raw { margin: 0; max-height: 400px; overflow: auto; padding: var(--space-3); font-size: var(--text-xs); line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
 .file-diff-viewport { max-height: min(420px, 55dvh); overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; border-top: 1px solid var(--color-border); }
+.code-editor-viewport { min-height: 18rem; overflow: auto; overscroll-behavior: contain; }
+.code-editor-viewport:focus-visible, .code-editor-viewport:focus-within { outline: 2px solid var(--focus); outline-offset: -2px; }
+.code-editor-viewport diffs-container { display: block; --diffs-font-size: var(--text-sm); --diffs-line-height: 1.75; --diffs-header-font-family: var(--font-sans); }
 .file-diff-viewport diffs-container { display: block; --diffs-font-size: var(--text-xs); --diffs-line-height: 1.75; --diffs-header-font-family: var(--font-sans); --diffs-addition-color-override: var(--color-success); --diffs-deletion-color-override: var(--color-danger); }
 .file-change :focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
 .agent-working, .run-outcome { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); line-height: 1.7; color: var(--color-muted); margin: var(--space-6) 0 var(--space-5) var(--space-8); }
@@ -1250,4 +1253,8 @@ input::placeholder, textarea::placeholder { opacity: 1; }
   .project-repository-fields, .project-spec-fields { grid-template-columns: minmax(0, 1fr); }
   .project-references > div { align-items: flex-start; }
   .project-references dt { flex-basis: 100%; }
+}
+
+@media (max-width: 799px) {
+  .code-editor-viewport diffs-container { --diffs-font-size: var(--text-base); }
 }

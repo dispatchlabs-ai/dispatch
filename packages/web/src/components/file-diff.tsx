@@ -1,7 +1,8 @@
 import { Virtualizer, type VirtualFileMetrics } from "@pierre/diffs";
-import { MultiFileDiff, PatchDiff, VirtualizerContext, WorkerPoolContextProvider, type FileDiffOptions, type WorkerInitializationRenderOptions } from "@pierre/diffs/react";
-import WorkerUrl from "@pierre/diffs/worker/worker.js?worker&url";
+import { MultiFileDiff, PatchDiff, VirtualizerContext, type FileDiffOptions } from "@pierre/diffs/react";
 import { memo, useCallback, useMemo, useState, type ReactNode } from "react";
+
+import { PierreProvider } from "./pierre";
 
 type FileDiffProps = { kind: "write"; path: string; content: string } | { kind: "edit"; path: string; patch: string } | { kind: "read"; path: string; content: string; firstLine: number; lineCount: number };
 
@@ -11,8 +12,6 @@ const options: FileDiffOptions<undefined, undefined> = {
   disableErrorHandling: true,
 };
 const metrics: VirtualFileMetrics = { lineHeight: 21, diffHeaderHeight: 0, hunkLineCount: 100, spacing: 8 };
-const poolOptions = { workerFactory: () => new Worker(WorkerUrl, { type: "module" }) };
-const highlighterOptions: WorkerInitializationRenderOptions = { theme: "github-light" };
 const readOptions: FileDiffOptions<undefined, undefined> = { ...options, diffIndicators: "none", disableBackground: true, hunkSeparators: "simple" };
 
 export default memo(function FileDiff(props: FileDiffProps) {
@@ -27,11 +26,11 @@ export default memo(function FileDiff(props: FileDiffProps) {
     const lines = content.split("\n").slice(0, lineCount).map(line => ` ${line}`).join("\n");
     return `--- ${name}\n+++ ${name}\n@@ -${firstLine},${lineCount} +${firstLine},${lineCount} @@\n${lines}\n`;
   }, [props.path, content, firstLine, lineCount]);
-  return <WorkerPoolContextProvider poolOptions={poolOptions} highlighterOptions={highlighterOptions}>
+  return <PierreProvider>
     <DiffViewport label={`${props.kind === "write" ? "Written content" : props.kind === "read" ? "Read content" : "Recorded changes"} for ${props.path}`}>
       {props.kind === "write" ? <MultiFileDiff oldFile={null} newFile={newFile} options={options} metrics={metrics} /> : <PatchDiff patch={props.kind === "read" ? readPatch : props.patch} options={props.kind === "read" ? readOptions : options} metrics={metrics} />}
     </DiffViewport>
-  </WorkerPoolContextProvider>;
+  </PierreProvider>;
 });
 
 // Own the scroll element so keyboard users can focus the virtualized code region.
