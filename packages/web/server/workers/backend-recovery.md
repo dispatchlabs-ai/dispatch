@@ -102,12 +102,9 @@ tracks source and runtime evidence separately.
 
 ## Observed scope
 
-An independent October 8, 2026 Surton ECS/CloudWatch review of
-`backend-recovery-review.json` confirmed the one-off recovery backend STOPPED with
-exit 0: all three retained owners recovered, admission remained closed, zero
-workers/unresolved attempts, and graceful shutdown while the launcher was
-reachable. Helper review found no manual SQL latch clearing or master authority.
-This is a zero-worker controller-recovery observation, not interrupted workload
-recovery, encrypted restore/retired-authority qualification, normal service startup
-or deployed browser acceptance. The Surton consumer owns the
-[exact task/plan receipt](https://github.com/dispatchlabs-ai/dispatch-infra/blob/8c2192e/environments/surton/dispatch-workers/evidence/3a90b6d-live-deployment.json).
+An October 2026 zero-worker ECS recovery observation confirmed a stopped
+one-off backend with exit 0, recovered retained owners, admission still closed,
+no unresolved attempts and graceful shutdown with the launcher reachable.
+This does not qualify interrupted-workload recovery, encrypted restore,
+retired-authority denial or a fresh installation. Installation-specific task and
+plan receipts belong in the operator's infrastructure repository.

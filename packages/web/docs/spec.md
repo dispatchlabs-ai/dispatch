@@ -47,7 +47,12 @@ October 7 development update: frontend-only edits continue to avoid Pi restarts.
 
 ### AWS container deployment target
 
-**Accepted target, October 7, 2026; ECS application implemented October 8, with bounded Surton deployment/browser evidence recorded October 9.** The [Surton POC](conversation-workers.md#isolated-surton-aws-poc--october-8-2026) records the single-owner ECS launcher, task-role artifacts and secret-file bootstrap alongside scoped evidence; the [rebased rollout](handoff.md#rebased-surton-deployment-and-bounded-readiness--october-9-2026) records deployment and observed workflows. These observations do not establish full AWS/recovery qualification or deployment-independent performance parity. The earlier single-server rehearsal and synthetic checks do not qualify AWS execution. Separate the Dispatch backend (authentication, authorization, company catalog, project/conversation directory, request routing and streamed results) from conversation workers. Each active conversation gets an ECS Fargate worker embedding Pi Durable and Dispatch's room/agent behavior. All collaborating agents in that conversation run within its owning Pi runtime, not separate role-specific containers. Historical conversations need durable state, not permanently running tasks.
+**Accepted target, October 7, 2026; ECS application implemented October 8.**
+The [worker contract](conversation-workers.md) owns application boundaries; the
+standalone [AWS module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch)
+owns infrastructure and customer installation instructions. Source, build and
+bounded runtime observations are not full AWS/recovery qualification or measured
+responsiveness parity. Separate the Dispatch backend (authentication, authorization, company catalog, project/conversation directory, request routing and streamed results) from conversation workers. Each active conversation gets an ECS Fargate worker embedding Pi Durable and Dispatch's room/agent behavior. All collaborating agents in that conversation run within its owning Pi runtime, not separate role-specific containers. Historical conversations need durable state, not permanently running tasks.
 
 Use RDS PostgreSQL for durable conversation history, private agent context, tasks, checkpoints and recorded tool calls/results, including available edit diffs. Each conversation has a logically separate Pi store: sharing one physical database must not broaden task scans or recovery across stores. Pi Durable 1.0.4 has no upstream PostgreSQL backend; Dispatch's adapter uses its public asynchronous `Storage` interface, preserving Pi's execution/recovery ownership. The POC candidate also wires separately scoped authentication and connection persistence; its remaining recovery/authorization qualification is tracked in the work package. This is not a database configuration switch.
 
@@ -72,19 +77,31 @@ Keep one active executor per conversation's logical store. Replacement must not 
 
 Retain the ARM64 AWS target and a multi-platform OCI index with separately built, inspected and qualified `linux/arm64` and `linux/amd64` images. Preserve native host packages, local development and current LAN deployments. Generic infrastructure must remain independent of installation accounts, domains, credentials, state backends and private repositories; caller roots supply settings and immutable module/image pins. Review actual plan and cost and obtain explicit authorization before any AWS apply or storage migration.
 
-The earlier single-service SQLite + S3 Files module is a prepared, source-reviewed candidate, **not this worker/Postgres topology**. Its [runbook](aws-deployment.md) and [SQLite qualification procedure](aws-sqlite-qualification.md) remain applicable only to that candidate and existing storage-specific evidence. See [WP-041](handoff.md#wp-041--generic-aws-container-deployment) for implementation history and outstanding evidence. Before real-data use, qualify the selected storage, ownership, interrupted-work recovery, authorization and backup/restore through an explicitly scoped work package. Prior Palm results, local image checks and source publication do not qualify the new target.
+The earlier single-service SQLite + S3 Files AWS candidate is retired from the
+supported AWS deployment path. Local SQLite remains supported. New AWS callers
+use the standalone PostgreSQL/conversation-worker module; there is no state
+migration or compatibility wrapper. Before real-data use, qualify the selected
+storage, ownership, interrupted-work recovery, authorization and backup/restore
+under an explicitly scoped work package. Local image checks and source
+publication alone do not qualify a new AWS installation.
 
 ### Ubuntu agent execution image
 
 **Accepted and implementation/deployment authorized October 9, 2026; qualification pending.** Keep Nix for Dispatch and its pinned runtime. Define the agent image with a `Containerfile`, using Ubuntu with separately built Linux ARM64 and AMD64 variants. Provide a useful development toolbox and allow agents to install missing tools through their normal noninteractive shell during work; preinstalled tools alone do not satisfy this contract. Promote recurring dependencies into the image recipe over time. Project-selected runtimes must not replace Dispatch's pinned runtime.
 
-Preserve Pi Durable execution/recovery ownership, confirmed executor retirement and existing installation state. Review worker installation permissions and credential exposure explicitly; do not silently extend worker privileges to backend/launcher controllers. Runtime installations do not automatically survive ECS replacement or change the published image. Record useful additions in versioned setup/image configuration, retain the disposable-workspace recovery policy above, and do not claim filesystem restoration from retained conversation/tool history. The [Ubuntu worker work package](handoff.md#ubuntu-agent-image--october-9-2026) owns implementation decisions and acceptance evidence; the existing Terraform module and Surton caller configuration own rollout and immutable image pins.
+Preserve Pi Durable execution/recovery ownership, confirmed executor retirement and existing installation state. Review worker installation permissions and credential exposure explicitly; do not silently extend worker privileges to backend/launcher controllers. Runtime installations do not automatically survive ECS replacement or change the published image. Record useful additions in versioned setup/image configuration, retain the disposable-workspace recovery policy above, and do not claim filesystem restoration from retained conversation/tool history. The [Ubuntu worker work package](handoff.md#ubuntu-agent-image--october-9-2026) owns implementation decisions and acceptance evidence; the standalone AWS module and caller repository own rollout and immutable image pins.
 
 ### Pre-AWS application readiness
 
 **Team execution authorized October 8, 2026; completion design and acceptance pending.** The original sequencing required closing the remaining application and single-server rehearsal prerequisites before starting the AWS Terraform module for the worker/PostgreSQL target, not merely moving backend state off local disks. The isolated-trial scope change below supersedes that sequencing, not completion requirements. The [control-plane draft](conversation-workers.md#host-independent-control-plane--next-work-package) is its starting point. Resolve its persistence, OAuth and least-privilege revocation choices, and account for every remaining rehearsal/application acceptance gap in the [evidence record](conversation-workers.md#acceptance-and-evidence). Publish the concrete implementation contracts and ordered acceptance criteria as soon as the completion approach is known; do not call the application ready while prerequisites remain unresolved or unqualified.
 
-**Scope change, October 8, 2026:** Chris directed the team to try AWS and iterate, then clarified that this POC must use a Terraform module and the Surton AWS account and become Surton's own version, improved iteratively—not a throwaway substitute. The POC may proceed in parallel with unfinished application/rehearsal qualification; those gaps are no longer blanket prerequisites for starting AWS implementation. Start with fresh state, preserve existing installations and do not migrate existing data. Keep generic module code separate from Surton's caller-owned account/configuration and secret references. Developer owns application/ECS integration, Deployer the caller target/access and concrete plan/cost, and Pi Durable Expert executor-replacement review. Retain one owner initially and stop on uncertain executor retirement; no HA expansion is included. The actual plan/cost still requires review before apply. POC authorization does not establish production readiness or close the outstanding recovery, authorization and credential-lifecycle acceptance criteria. Chris's subsequent Definition of Done is a live login-ready Dispatch URL from that Surton Terraform deployment, manually validated with `agent-browser` before handoff; the [POC acceptance criteria](conversation-workers.md#isolated-surton-aws-poc--october-8-2026) own the workflow/evidence requirements.
+**Scope update, October 10, 2026:** the standalone AWS module is a generic
+fresh-install product. Customer repositories own account configuration, plan/cost
+review and installation evidence. No customer environment is a source dependency
+or standing authorization to deploy. The [fresh-install acceptance](conversation-workers.md#aws-module-and-fresh-install-acceptance)
+requires released artifacts and independent caller instructions, not an application
+checkout or private deployment runbook. No existing-state migration or
+compatibility shim is part of this extraction.
 
 ### Single-server container rehearsal
 
@@ -122,7 +139,7 @@ This slice does not implement per-conversation workers, distributed executor own
 
 **October 8 chat-performance scope:** Chris authorized completing the agreed [chat presentation performance definition of done](#chat-presentation-performance), which requires focused before/after profiling, runtime/reconnect and responsive-browser verification, local target deployment and a running-version demonstration. Coordinate the exact target and reference browser/device before exercising live state; preserve existing history and active work, keep authenticated traces private, and do not create billable model requests merely to generate load. This scope does not authorize remote deployment, a broad regression suite or unrelated deployment/storage qualification.
 
-**October 8 Surton AWS POC exception:** Chris directed the team to try AWS and iterate, then explicitly required manual `agent-browser` validation of the actual deployed application before delivering its login-ready URL. Focused harmless-data startup, enrollment/login, deployed application workflows, model/tool, persistence, executor-replacement and desktop/390 px browser checks for the [Surton POC](conversation-workers.md#isolated-surton-aws-poc--october-8-2026) are permitted. Preserve existing installations; this does not authorize existing-data migration or a broad unrelated regression suite. Fix observed failures and repeat affected checks; record exercised workflows, deployed revisions and unqualified outcomes rather than treating source/build evidence as browser acceptance.
+**October 8 AWS POC exception:** Chris directed the team to try AWS and iterate, then explicitly required manual `agent-browser` validation of the actual deployed application before delivering its login-ready URL. Focused harmless-data startup, enrollment/login, deployed application workflows, model/tool, persistence, executor-replacement and desktop/390 px browser checks for the [AWS installation](conversation-workers.md#aws-module-and-fresh-install-acceptance) are permitted. Preserve existing installations; this does not authorize existing-data migration or a broad unrelated regression suite. Fix observed failures and repeat affected checks; record exercised workflows, deployed revisions and unqualified outcomes rather than treating source/build evidence as browser acceptance.
 
 When the workflows are ready to lock in, prioritize end-to-end tests and API tests that protect observable behavior and service contracts. These are the kinds of tests Chris wants in this codebase. Unit tests and tests that mirror implementation details are not the default; do not add them merely for coverage. Any exception needs a concrete benefit that the preferred test types cannot provide. Do not preemptively build a test framework or add test maintenance work while the product is still changing quickly.
 
@@ -996,7 +1013,7 @@ An operator may configure `DISPATCH_READ_ALL_PROJECT_USER_IDS` (comma-separated 
 
 The server evaluates current policy within each protected action transaction and before SSE snapshot delivery, and filters list/history routes accordingly. Browser lists reconcile removed access and clear inaccessible active snapshots on denied refresh. Pins/archive remain personal preferences and never grant access.
 
-This is application authorization, not execution isolation. Company-shared agent/skill definitions and connections must not contain restricted project content; coding tools currently share service-account filesystem access. Restricted-data deployment requires separately qualified tool/credential/filesystem boundaries. No Surton deployment or blanket security qualification is included in this implementation slice.
+This is application authorization, not execution isolation. Company-shared agent/skill definitions and connections must not contain restricted project content; coding tools currently share service-account filesystem access. Restricted-data deployment requires separately qualified tool/credential/filesystem boundaries. No customer deployment or blanket security qualification is included in this implementation slice.
 
 ### Shared observation invalidation — October 7 correction
 
@@ -1072,6 +1089,6 @@ to stop-first for omitted services. Rolling is available only to callers whose
 application safely supports overlapping owners and readiness-gated traffic.
 Legacy exclusive-owner controllers must remain stop-first. Source `8fb001f` adds
 opt-in planned handover and private readiness; activation requires the
-[module prerequisites](../infra/aws-workers/README.md#ecs-service-deployment-selection).
+[module prerequisites](https://github.com/dispatchlabs-ai/terraform-aws-dispatch#updates).
 Infrastructure percentages do not replace ownership fencing or make liveness a readiness check.
 Standalone worker retirement and live consumer configuration remain unchanged.

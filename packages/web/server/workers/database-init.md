@@ -124,65 +124,16 @@ partial result. An operator-reviewed recovery is separate from this command.
 Never remove retained resources merely to rerun creation. Application startup and
 schema migration are later stages after this helper exits successfully.
 
-## Scoped evidence
+## Qualification scope
 
-The initial implementation passed TypeScript/application builds and a focused
-synthetic-secret macOS ARM64/PostgreSQL 17.11 check using verified TLS/SCRAM and a
-non-superuser operator granted only the required creation/session-setting powers.
-Eleven observations covered fresh initialization, seven-owner/isolation checks,
-repeat verification, existing-target refusal, a real worker provisioner creating
-and opening a scoped store, unsafe-file/reused-identity/confirmation refusal, and
-no fixture passwords in command output or database logs. The local receipt is
-`.local/rds-init-result.json` in the initializer worktree; fixtures are not product
-tests or AWS evidence. Initial fixture setup failures (Unix socket path length and
-CA certificate construction) were corrected before these observations.
+October 2026 local PostgreSQL 17.11 TLS/SCRAM checks covered fresh creation,
+seven-owner isolation, verification, existing-target refusal and unsafe logging
+refusal. An inherited safe logging value is accepted without attempting a denied
+`SET`; an unsafe value still fails before provisioning. Later operator-reviewed
+RDS PostgreSQL 17.9 create and separate verify tasks exited successfully. These
+bounded observations do not establish a fresh external caller's installation,
+full audit/proxy logging coverage or application/model/tool acceptance.
 
-Documenter inspected the [integrated native-image receipts](https://github.com/dispatchlabs-ai/dispatch-infra/blob/7d5ace9/environments/surton/dispatch-workers/evidence/6aa1b82-native-images.json)
-at `6aa1b82` for Linux ARM64 and AMD64. Network-disabled synthetic-secret containers
-passed volume initialization, nonroot/read-only bootstrap `database-init --help`,
-0700/0600 UID-owned materialization, exact key decoding and collision denial.
-These are packaging checks, not database initialization; their local image IDs
-are not registry/index digests. No database, hosted model or ECS was exercised.
-
-The first October 8 Surton operator task reached private RDS PostgreSQL 17.9 with
-verified TLS and completed volume initialization, then failed before role creation
-because RDS denied `SET log_parameter_max_length`. Its sanitized stage error and
-private RDS log were independently inspected; `DescribeTasks` confirmed STOPPED,
-initializer exit 1 and volume-init exit 0. Original inputs remain preserved.
-The correction checks effective values before changing settings, with the two
-bound-parameter settings enforced by the dedicated RDS parameter group. A new
-image and explicit operator-controlled attempt are required; this is not an
-automatic retry/resume or permission to reset partial state. Correction source/deslop
-review, TypeScript/application checks and Apple Silicon Nix build passed; flake
-evaluation passed with zero runnable checks and omitted Linux systems.
-A subsequent focused macOS ARM64/PostgreSQL 17.11 TLS/SCRAM qualification denied
-the synthetic operator `SET log_parameter_max_length`: inherited `0` permitted
-full fresh creation and verification, whereas an unsafe inherited value was
-refused before any store role existed. Repeat-create refusal and password-free
-client/server logs also passed. The initial fixture needed an explicit safe
-server default; after correction, all eleven observations passed and the stopped
-fixture was removed. Receipt: `.local/rds-settings-result.json` in the initializer
-worktree. These observations alone do not establish the corrected image's RDS execution.
-
-### Live RDS create and separate verification
-
-Later October 8, Deployer ran the corrected application image at `94c02c4` against
-the private Surton RDS PostgreSQL 17.9 instance. Pi independently read ECS
-`DescribeTasks` and CloudWatch records for create task
-`136412ba87e74504ae24ab5ca476f54f` and separate verify task
-`38060a8ae70747f08d8fb60cae17828b`. Both used operator definition
-`surton-dispatch-db-init:2` and image manifest
-`sha256:a5e498c1b5be4695de9c98753d6d71651527b6689f5537ab0e2b62df74ebd2b4`.
-Each task was confirmed STOPPED with initializer and volume-init exit codes zero;
-the respective reports were `created` and `verified`, with verified TLS, all seven
-stores, separate database owners and worker-provisioner-only CREATEROLE. Successful
-creation also establishes that this actual operator session passed the required
-logging-value checks before any role/password provisioning. It does not constitute
-a complete server/audit/proxy logging audit.
-
-Temporary operator-task/IAM/SG removal is separate from database creation and must
-preserve the databases and original secret versions. Pi reviewed the saved removal
-plan as deleting only that temporary authority and caller guard; applying it remains
-Deployer-owned. Live application/worker workflows, executor replacement and browser
-acceptance remain unverified. This scoped database result does not complete the
-login-ready URL handoff.
+Keep task identities, credential references and deployment receipts in the owning
+installation repository. Publication of this helper is not authorization to
+initialize an existing database or replay an uncertain creation attempt.
