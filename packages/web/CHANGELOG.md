@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Project repositories and spec reference
+
+- Store manager-editable repository URL references and a repository-relative spec reference without requiring a host directory. Preserve omitted metadata on older-client saves and reject dangling spec references. Saving does not clone repositories or verify access/file existence. Backend source/type/build checks pass; UI and runtime qualification remain pending.
+
 ### operator idle sleep
 
 - Add a non-cancelling operator sleep gate using sealed admission, native live/background work inspection and confirmed worker retirement. Busy workers keep support callbacks and reopen RPC admission; uncertain outcomes remain fail-closed. See [idle sleep](docs/idle-sleep.md) for partial refusal, recovery and live-qualification limits.

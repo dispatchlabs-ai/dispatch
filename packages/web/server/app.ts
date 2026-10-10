@@ -9,6 +9,7 @@ import { bodyLimit } from "hono/body-limit";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { z } from "zod";
 import type { createAuth, AuthPrincipal } from "./auth.js";
+import { projectRepositoriesSchema, projectSpecSchema } from "../src/shared/project-sources.js";
 import { ProjectAccessError } from "./project-access.js";
 import { RuntimeError } from "./runtime.js";
 import type { RuntimeService } from "./runtime-service.js";
@@ -204,6 +205,7 @@ export function createApp(options: AppOptions) {
         .refine(members => new Set(members.map(member => member.userId)).size === members.length && members.some(member => member.role === "manager"), "Choose unique members and retain at least one manager."),
       defaultAgentDefinitionIds: identities.max(50),
       cwd: z.string().trim().max(4096).nullable().optional(),
+      repositories: projectRepositoriesSchema.optional(), spec: projectSpecSchema.nullable().optional(),
     }).strict().parse(await c.req.json());
     return c.json({ project: await runtime.saveProject(c.get("principal"), c.req.param("id"), input) });
   });

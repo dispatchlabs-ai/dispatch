@@ -24,6 +24,7 @@ import type { GitHubInstallation, GitHubBundleSource, GitHubBundlePreview, GitHu
 import { isManagedConnection } from "../src/shared/contracts.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata } from "./attachments.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
+import { projectSourcesSchema } from "../src/shared/project-sources.js";
 import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
 import { createWebResearch } from "./extensions/web.js";
 import { createWebBackend } from "./web/backend.js";
@@ -1236,6 +1237,7 @@ export class DispatchRuntime {
   private projectSummary(project: SharedProjectRecord, scope: RuntimeScope): Project {
     const access = projectAccess(project, scope, this.readAll(scope));
     return { id: project.id, name: project.name, ...(project.cwd ? { cwd: project.cwd } : {}), createdAt: project.createdAt, kind: "shared", revision: project.revision,
+      repositories: (project.repositories ?? []).map(repository => ({ ...repository })), ...(project.spec ? { spec: { ...project.spec } } : {}),
       members: project.members.map(({ userId, role }) => ({ userId, role })), defaultAgentDefinitionIds: [...project.defaultAgentDefinitionIds], canManage: access.manage, canParticipate: access.participate };
   }
 
@@ -1393,10 +1395,13 @@ export class DispatchRuntime {
     if (cwd && (cwd.length > 4096 || cwd.includes("\0") || !isAbsolute(cwd))) {
       throw new RuntimeError(400, "Working directory must be an absolute path on the service host.");
     }
+    const sources = projectSourcesSchema.parse({ repositories: input.repositories, spec: input.spec });
     const key = JSON.stringify([scope.companyId, scope.userId, id, input.requestId]);
-    // Preserve pre-cwd fingerprints for clients that omit the new field.
-    const fields = [input.expectedRevision, input.name, input.members, input.defaultAgentDefinitionIds];
-    const fingerprint = JSON.stringify(cwd === undefined ? fields : [...fields, cwd]);
+    // Preserve historical fingerprints when newer optional fields are omitted.
+    const fields: unknown[] = [input.expectedRevision, input.name, input.members, input.defaultAgentDefinitionIds];
+    if (cwd !== undefined) fields.push(cwd);
+    if (sources.repositories !== undefined || sources.spec !== undefined) fields.push(sources);
+    const fingerprint = JSON.stringify(fields);
     const replay = async (tx: Tx) => {
       const current = await requireProjectAccess(tx, scope, id, "manage", this.readAll(scope));
       const prior = (await tx.doc(ProjectsDoc)).requests[key];
@@ -1427,6 +1432,15 @@ export class DispatchRuntime {
       if (cwd !== undefined) {
         if (cwd === null) delete project.cwd;
         else project.cwd = normalize(cwd);
+      }
+      if (sources.repositories !== undefined) project.repositories = sources.repositories;
+      if (sources.spec !== undefined) {
+        if (sources.spec === null) delete project.spec;
+        else project.spec = sources.spec;
+      }
+      const spec = project.spec;
+      if (spec && !project.repositories?.some(repository => repository.id === spec.repositoryId)) {
+        throw new RuntimeError(400, "Clear or reassign the spec file before removing its repository.");
       }
       const doc = await tx.doc(ProjectsDoc);
       doc.projects[id] = project; doc.requests[key] = { fingerprint, projectId: project.id };

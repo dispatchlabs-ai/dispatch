@@ -1,11 +1,13 @@
 import { defineDoc, type Tx } from "@earendil-works/pi-durable";
-import type { RuntimeScope } from "../src/shared/contracts.js";
+import type { ProjectRepository, ProjectSpec, RuntimeScope } from "../src/shared/contracts.js";
 
 export type SharedProjectRecord = {
   id: string;
   companyId: string;
   name: string;
   cwd?: string;
+  repositories?: ProjectRepository[];
+  spec?: ProjectSpec;
   revision: number;
   createdAt: number;
   updatedAt: number;
