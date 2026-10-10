@@ -61,9 +61,9 @@ export function httpTelemetry(): MiddlewareHandler {
         span.setStatus({ code: SpanStatusCode.ERROR });
         throw error;
       } finally {
-        // Log sampled requests and server failures; health polling stays silent.
+        // Only the outer request boundary logs; nested owner dispatch retains its span.
         // Registered route templates, not requested URLs or user identifiers.
-        if (span.isRecording() || status >= 500) {
+        if (!localParent && (span.isRecording() || status >= 500)) {
           const identity = span.spanContext();
           console.info(JSON.stringify({ timestamp: new Date().toISOString(), event: "http.response_headers", service,
             method, route, status, duration_ms: Math.round(performance.now() - started),

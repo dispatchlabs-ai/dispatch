@@ -20,7 +20,9 @@ X-Ray compatible. Trace context is diagnostic, never authorization or durable
 operation identity.
 
 Sampled requests and server failures produce JSON stdout records with the same
-trace/span IDs. Readiness/liveness polling is excluded. No raw URLs, queries,
+trace/span IDs at the outer request boundary; nested in-process owner dispatch
+retains its span without duplicating the request-summary log. Readiness/liveness
+polling is excluded. No raw URLs, queries,
 headers, exceptions, SQL, environment values, model/tool inputs/results or native
 Pi Durable traces are exported by this instrumentation. The HTTP error handler
 also avoids printing raw exception objects. This is not a blanket guarantee about
