@@ -2341,6 +2341,16 @@ Deslop reviews always-on services/polling and architectural complexity. Applicat
 and infrastructure changes must preserve the existing ownership, authentication,
 no-replay and durable-history guarantees; disposable workspaces remain disposable.
 
+Current candidate: IAM operator-driven sleep/wake, zero-ACU Aurora eligibility,
+no permanent NAT, and isolated listeners on one managed-domain private ALB. The
+[module idle/active model](https://github.com/dispatchlabs-ai/terraform-aws-dispatch/blob/main/releases/idle-cost-estimate.md)
+is provisional, not a demonstrated minimum or measured bill. Historical pooled
+per-workspace prices do not establish this isolated installation's floor, and old
+filesystem persistence assumptions do not supersede disposable workspaces.
+The [sleep API contract](conversation-workers.md#idle-sleep-contract--october-10-2026)
+requires non-cancelling refusal, retained support callbacks and full admission
+reopening after partial refusal; implementation/review remains pending.
+
 Acceptance for the selected design:
 
 - Define idle eligibility without treating disconnected browsers as proof of no

@@ -46,6 +46,34 @@ This rehearsal is ECS-shaped, not evidence of scalable ECS operation. Routing jo
 
 A single launcher serializes installation lifecycle mutations. Its own exclusive ownership and durable journal must survive restart. Docker restart policies for dynamic workers must not compete with this state machine. Database advisory locks supplement, not replace, process termination. Container termination cannot cancel an external request already accepted elsewhere; exactly-once external effects are not promised.
 
+## Idle sleep contract — October 10, 2026
+
+**Implementation contract, not completed/runtime-qualified behavior.** Private,
+operator-authenticated `POST /internal/sleep` with empty JSON is non-cancelling;
+existing `/internal/drain` is not an idle gate because it cancels work.
+
+- **200 `{quiesced:true}`:** each running worker sealed new-work RPC admission,
+  found no native live/background tasks or unsettled submissions, cleanly closed
+  its runtime, and existing launcher retirement confirmed actual termination.
+- **409 `{quiesced:false,reason:"busy"}`:** refuse without cancelling busy work.
+  Keep authenticated worker support callbacks available so admitted work can finish.
+- **503:** unresolved/failure, never permission to stop controllers. Reuse persisted
+  stop intent, orphan reconciliation and confirmed termination; no second reaper.
+
+Admission remains closed after an attempt. A partial refusal may have retired
+already-idle workers; explicit `/internal/undrain` must reopen surviving worker RPC
+admission as well as backend/launcher admission. Retired workers resume through
+normal fresh attempts and the existing disposable-workspace recovery policy.
+`waitForIdle()` alone excludes background tasks and cannot authorize shutdown.
+
+Only after successful quiescence may operator orchestration stop/confirm backend,
+then launcher, closing their database owners cleanly. Wake starts launcher, then
+backend and explicit activation; clean-reopen markers and crash-recovery latches
+retain their distinct meanings. No automatic idle timer, anonymous browser wake,
+unsafe transaction replay or forced latch clearing is included. The module owns
+selected-network operator commands and the provisional idle/active cost model;
+see the [idle-cost work package](handoff.md#idle-cost-optimization--october-10-2026).
+
 ## ECS follow-up plan (proposed, not deployed)
 
 The accepted [AWS target](spec.md#aws-container-deployment-target) preserves these application contracts. The following is an implementation sequence, not a qualified AWS design or authorization to apply it:
