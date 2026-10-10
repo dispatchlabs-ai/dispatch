@@ -85,6 +85,25 @@ storage, ownership, interrupted-work recovery, authorization and backup/restore
 under an explicitly scoped work package. Local image checks and source
 publication alone do not qualify a new AWS installation.
 
+**Infrastructure baseline authorized October 10, 2026:** fill the standalone
+module's audited gaps: ALB-to-Fargate ingress with access logs, ACM/Route 53 domain
+integration, CloudFront SPA delivery, rolling controller defaults, scoped Secrets
+Manager delivery, autoscaling PostgreSQL evaluation/implementation and short-lived
+application logs/traces. Keep the platform small and compare actual database
+costs; Aurora Serverless v2 is not inherently the cheapest choice. Controllers
+stay On-Demand; worker Spot is opt-in and must preserve confirmed executor
+termination, fail-closed ownership and explicit interrupted-work recovery.
+CloudFront must preserve authentication/cookies, origin checks and streaming;
+never cache authenticated API responses or rewrite API errors as SPA pages.
+Tracing/logs must exclude secrets, URL queries, SQL and model/tool contents;
+private enrollment/provider terminals remain unrecorded. No EFS and no filesystem
+layer without an actual durable-workspace requirement; ordinary S3 artifacts and
+disposable workspaces remain the target. Source/offline checks do not establish
+zero downtime, Spot recovery, Aurora failover or AWS operation. Implementation
+and evidence belong in the [baseline work package](handoff.md#ecs-infrastructure-baseline--october-10-2026),
+with caller interfaces and costs documented in the standalone module. This does
+not authorize customer access, live deployment or state migration.
+
 ### Ubuntu agent execution image
 
 **Accepted and implementation/deployment authorized October 9, 2026; qualification pending.** Keep Nix for Dispatch and its pinned runtime. Define the agent image with a `Containerfile`, using Ubuntu with separately built Linux ARM64 and AMD64 variants. Provide a useful development toolbox and allow agents to install missing tools through their normal noninteractive shell during work; preinstalled tools alone do not satisfy this contract. Promote recurring dependencies into the image recipe over time. Project-selected runtimes must not replace Dispatch's pinned runtime.

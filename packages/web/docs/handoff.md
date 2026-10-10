@@ -2237,3 +2237,34 @@ Acceptance evidence:
   login/model/tool/browser acceptance, replacement and measured rollout speed are
   **not established** by this extraction. They remain explicit release acceptance,
   not a reason to claim current source is deployed or publicly consumable.
+
+
+## ECS infrastructure baseline — October 10, 2026
+
+**Gap implementation authorized; not deployed or qualified.** Chris authorized
+filling the [audited standalone-module gaps](https://github.com/dispatchlabs-ai/terraform-aws-dispatch/blob/b5fffb4/docs/operations.md#infrastructure-baseline-review--october-10-2026).
+Developer owns ingress/DNS/ACM/CloudFront, rolling defaults and integration;
+Deployer owns access-log delivery/retention, Aurora Serverless v2/cost comparison
+and collector/IAM; Pi owns application tracing and opt-in worker Spot lifecycle;
+Documenter owns contracts, caller example, guide and evidence review. Use isolated
+branches, send commits for integration and do not access customer infrastructure.
+
+Acceptance remains open:
+
+- Standalone caller interfaces initialize/validate under both engines; offline
+  plans assert ALB logging, DNS/certificates, CloudFront routing/cache boundaries,
+  rolling defaults, database settings and least-privilege secret/trace scope.
+- SPA delivery preserves sign-in, authenticated API isolation, origin enforcement
+  and SSE; no API error-to-index rewrite or authenticated response caching.
+- Controller overlap retains workers; opt-in Spot refuses premature replacement
+  and exposes interruption/recovery without replaying uncertain external effects.
+- Database version/region compatibility and workload-aware cost comparison are
+  explicit; persistent owner connections, failover and effective secret-safe
+  database settings are accounted for. No cheapest/transparent-failover claim
+  based solely on serverless sizing or a mock plan.
+- Operational logs/traces have bounded retention/sampling and safe metadata only;
+  credential terminals stay unrecorded. No EFS or speculative durable filesystem.
+- Record exact source/build/engine/provider versions and bounded verification.
+  Actual AWS log delivery, certificate/DNS/CDN operation, distributed trace export,
+  database failover, Spot interruption and zero-downtime browser/worker/SSE
+  outcomes require separate runtime evidence; no live apply is authorized here.
