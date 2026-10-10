@@ -1,5 +1,19 @@
 # Dispatch Web implementation handoff
 
+## Single composer Send/Stop action — October 10, 2026
+
+**Authorized; implementation and verification pending.** Chris approved the four composer-only design sheets and interaction notes, then requested implementation. Developer owns the shared main/thread UI, Pi Durable Expert cancellation/state review, Designer rendered integration review, and Documenter package documentation. The [composer contract](spec.md#message-composer) supersedes the separate Stop all toolbar control; no Pi lifecycle or backend admission change is included.
+
+Acceptance:
+
+- One stable fixed-size action uses the existing navy rounded-square styling; idle/drafting shows Send, active work with no local draft shows Stop. Clearing text and attachments restores Stop while work continues.
+- Distinguish draft presence from send eligibility: whitespace, composition, oversized drafts and uploading/failed attachments cannot accidentally select Stop. Ready attachment-only drafts send normally.
+- Preserve main/thread isolation, permission/read-only restrictions, pending-send preview/retry identities and newer-input guards. Active-work sending does not implicitly cancel work.
+- Stop remains whole-chat with explicit tooltip/accessibility scope. Editor Enter never stops work; retain keyboard/touch/IME rules and stable focus. Pending requests prevent duplicates; stop failure preserves input and offers recovery without claiming cancellation succeeded.
+- Apply source/deslop review, TypeScript/application and applicable Nix checks, whitespace/diff/local-link review. Record actual desktop/390 px rendered evidence and any unmet UI rules separately from runtime keyboard, touch, screen-reader and cancellation evidence; comply with the standing testing policy. No deployment is implied.
+
+The review artifacts are design proposals, not runtime evidence. Documentation records the approved current-chat decision; no wiki publication is claimed. Implementation/check outcomes will be added when supplied.
+
 ## Lockstep SemVer and visible application version — October 9, 2026
 
 Chris authorized adopting Pi's lockstep workflow, removing the Nix version literal and showing the version in the app. Scope: retain `0.1.0` as the baseline, synchronize root/participating package manifests and lockfile at release preparation, convert accumulated package `Unreleased` notes into dated release history, and derive Nix/browser version metadata from the web manifest. [Repository policy](../../../CONTRIBUTING.md#versioning-and-releases) owns the commands and SemVer rules. No release publication or deployment is included.

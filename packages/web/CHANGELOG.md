@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Single composer Send/Stop action
+
+- Approved a single fixed-position Send/Stop button for main and thread composers, with draft presence separate from send eligibility and explicit whole-chat cancellation scope. Implementation and checks are pending; see the [handoff](docs/handoff.md#single-composer-sendstop-action--october-10-2026).
+
 ### Lockstep versioning
 
 - Add SemVer release preparation, package-derived Nix and browser build versions. Keep release publication and deployment explicit.
