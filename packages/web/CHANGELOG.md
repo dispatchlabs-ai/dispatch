@@ -16,10 +16,9 @@
 ### Model provider setup
 
 - Remove the legacy Codex setup/model choice and reject new legacy-provider agent saves. Existing local OpenAI configurations were manually updated to the single OpenAI provider with the saved ChatGPT OAuth grant; no reusable migration code is shipped.
-
 - Add Settings → Model providers for OpenAI ChatGPT OAuth/API keys, Claude API keys and Fireworks API keys. Keep Pi responsible for authentication, refresh and model catalogs; show stored authorization separately from live verification and externally managed credentials.
 - Use encrypted application credential storage locally, preserving Pi `auth.json` without importing grants. Existing local credentials need a one-time application reconnect. Keep interrupted updates recoverable by explicit disconnect/reconnect and distinguish storage failure from an uncertain grant. Disconnect removes local credentials, not upstream authorization or operator-configured fallback credentials.
-- Integrated source/type/build and scoped disposable-key browser checks pass, including four responsive sizes and recovery/restart observations. Real-provider/account and deployment qualification remain unverified. See [acceptance evidence](docs/handoff.md#model-provider-setup--october-10-2026).
+- Integrated source/type/build and scoped disposable-key browser checks pass, including four responsive sizes and recovery/restart observations. Local OpenAI OAuth replies and tool use are also verified after the manual cutover; broader account lifecycle and deployment qualification remain unverified. See [cutover evidence](docs/handoff.md#single-openai-provider--october-10-2026) and [original provider-package evidence](docs/handoff.md#model-provider-setup--october-10-2026).
 
 ### Repository identity
 
