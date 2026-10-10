@@ -12,7 +12,9 @@ const statusLabels: Record<ProviderStatus["state"], string> = {
   not_connected: "Not connected", key_saved: "Key saved", authorized: "Authorized",
   reconnect_required: "Reconnect required", externally_managed: "Externally managed", unavailable: "Unavailable",
 };
-function methodLabel(method: Method) { return method === "oauth" ? "ChatGPT (OAuth)" : "API key"; }
+function methodLabel(method: Method, provider: ProviderStatus) {
+  return method === "api_key" ? "API key" : provider.id === "openai" || provider.id === "openai-codex" ? "ChatGPT (OAuth)" : "OAuth";
+}
 function ongoing(attempt: ProviderLogin) { return attempt.state === "working" || attempt.state === "awaiting_input"; }
 
 function ProviderPrompt({ prompt, busy, onAnswer }: {
@@ -43,7 +45,7 @@ function ProviderLoginDialog({ provider, initialAttempt, reconnect, open, onFini
   provider: ProviderStatus; initialAttempt?: ProviderLogin; reconnect: boolean; open: boolean; onFinished: (changed?: boolean) => void;
 }) {
   const { api } = useSession();
-  const [method, setMethod] = useState<Method>(provider.type ?? provider.methods[0]);
+  const [method, setMethod] = useState<Method>(provider.type && provider.methods.includes(provider.type) ? provider.type : provider.methods[0]);
   const [attempt, setAttempt] = useState<ProviderLogin | null>(initialAttempt ?? null);
   const [busy, setBusy] = useState<"starting" | "answering" | "cancelling" | "reloading" | null>(null);
   const [error, setError] = useState("");
@@ -135,12 +137,12 @@ function ProviderLoginDialog({ provider, initialAttempt, reconnect, open, onFini
   }
   const terminalError = attempt?.state === "failed" ? attempt.message || "Setup could not be confirmed." : "";
   return <Modal title={`${reconnect ? "Reconnect" : provider.type ? "Update" : "Connect"} ${provider.name}`}
-    open={open} onOpenChange={next => { if (!next) void close(); }}>
+    open={open} onOpenChange={next => { if (!next) void close(); }} finalFocus={() => document.getElementById(`provider-${provider.id}`)}>
     <div className="provider-login connection-dialog-form" aria-busy={Boolean(busy)}>
       {error || terminalError ? <Notice>{error || terminalError}<Button variant="ghost" disabled={Boolean(busy)} onClick={() => void reload()}>Reload status</Button></Notice> : null}
       {!attempt && !busy && !error ? <form className="connection-dialog-form" onSubmit={event => { event.preventDefault(); void start(); }}>
         <Field label="Method">{props => <Select {...props} value={method} onChange={event => setMethod(event.target.value as Method)}>
-          {provider.methods.map(value => <option key={value} value={value}>{methodLabel(value)}</option>)}
+          {provider.methods.map(value => <option key={value} value={value}>{methodLabel(value, provider)}</option>)}
         </Select>}</Field>
         {provider.type ? <p className="field-hint">Current credentials stay until saved.</p> : null}
         <div className="button-row"><Button variant="secondary" onClick={() => void close()}>Cancel</Button><Button type="submit">Continue</Button></div>
@@ -193,6 +195,11 @@ export function ModelProvidersPage({ active, onChanged }: { active: boolean; onC
     } catch (error) { setDisconnectError(errorMessage(error)); }
     finally { disconnectPending.current = false; setDisconnecting(false); }
   }
+  function closeDisconnect() {
+    if (disconnecting) return;
+    setDisconnect(null);
+    if (disconnectError) { reload(); onChanged(); }
+  }
   const resumeProvider = data?.providers.find(provider => provider.id === data.attempt?.providerId);
   return <section className="agent-view connections-page model-providers-page">
     <header className="view-heading"><h1>Model providers</h1><Button variant="ghost" disabled={loading || Boolean(editing) || disconnecting} onClick={reload}><RefreshCw /> Reload</Button></header>
@@ -207,16 +214,16 @@ export function ModelProvidersPage({ active, onChanged }: { active: boolean; onC
         const uncertain = provider.state === "reconnect_required";
         const disabled = loading || Boolean(error) || Boolean(editing) || Boolean(data.attempt) || disconnecting;
         return <article className="connection-card model-provider-card" key={provider.id} aria-labelledby={`provider-${provider.id}`}>
-          <div className="connection-heading"><h2 id={`provider-${provider.id}`}>{provider.name}</h2><span className="revision-badge">{statusLabels[provider.state]}</span></div>
-          {provider.type ? <p className="field-hint">{methodLabel(provider.type)}</p> : null}
+          <div className="connection-heading"><h2 id={`provider-${provider.id}`} tabIndex={-1}>{provider.name}</h2><span className="revision-badge">{statusLabels[provider.state]}</span></div>
+          {provider.type ? <p className="field-hint">{methodLabel(provider.type, provider)}</p> : null}
           {provider.type === "oauth" ? <p className="provider-account">{provider.account || "Account not provided"}</p> : null}
           {provider.state === "externally_managed" ? <p className="field-hint">Operator credentials remain active.</p> : null}
           {provider.state === "unavailable" ? <p className="field-hint">Credential storage unavailable. Contact your operator.</p> : null}
           {uncertain ? <p className="field-hint">Disconnect the uncertain credential before reconnecting.</p> : null}
           <div className="button-row">
             {provider.state !== "unavailable" && !uncertain ? <Button variant={saved ? "secondary" : "primary"} disabled={disabled}
-              onClick={() => setEditing({ provider, reconnect: false })}>{saved ? provider.type === "oauth" ? "Change account" : "Replace key" : "Connect"}</Button> : null}
-            {saved && provider.type === "oauth" ? <Button variant="secondary" disabled={disabled} onClick={() => setEditing({ provider, reconnect: true })}>Reconnect</Button> : null}
+              onClick={() => setEditing({ provider, reconnect: false })}>{saved ? provider.type === "oauth" && provider.methods.includes("oauth") ? "Change account" : "Replace key" : "Connect"}</Button> : null}
+            {saved && provider.type === "oauth" && provider.methods.includes("oauth") ? <Button variant="secondary" disabled={disabled} onClick={() => setEditing({ provider, reconnect: true })}>Reconnect</Button> : null}
             {saved || uncertain ? <Button variant="ghost" disabled={disabled} onClick={() => { setDisconnectError(""); setDisconnect(provider); }}>Disconnect</Button> : null}
           </div>
         </article>;
@@ -224,9 +231,9 @@ export function ModelProvidersPage({ active, onChanged }: { active: boolean; onC
     </div></div>
     {editing ? <ProviderLoginDialog provider={editing.provider} initialAttempt={editing.attempt} reconnect={editing.reconnect} open={active} onFinished={finished} /> : null}
     {disconnect ? <Modal title={`Disconnect ${disconnect.name}?`} description="Remove Dispatch’s saved credential. Operator credentials may still apply; revoke provider access separately."
-      open={active} onOpenChange={open => { if (!open && !disconnecting) setDisconnect(null); }}>
-      {disconnectError ? <Notice>{disconnectError}<Button variant="ghost" onClick={() => { setDisconnect(null); reload(); }}>Reload status</Button></Notice> : null}
-      <div className="button-row"><Button variant="secondary" disabled={disconnecting} onClick={() => setDisconnect(null)}>Cancel</Button><Button variant="danger" disabled={disconnecting || Boolean(disconnectError)} onClick={() => void remove()}>{disconnecting ? <Spinner /> : null}Disconnect</Button></div>
+      open={active} onOpenChange={open => { if (!open) closeDisconnect(); }} finalFocus={() => document.getElementById(`provider-${disconnect.id}`)}>
+      {disconnectError ? <Notice>{disconnectError}<Button variant="ghost" onClick={closeDisconnect}>Reload status</Button></Notice> : null}
+      <div className="button-row"><Button variant="secondary" disabled={disconnecting} onClick={closeDisconnect}>Cancel</Button><Button variant="danger" disabled={disconnecting || Boolean(disconnectError)} onClick={() => void remove()}>{disconnecting ? <Spinner /> : null}Disconnect</Button></div>
     </Modal> : null}
   </section>;
 }
