@@ -18,6 +18,11 @@ export async function openModels(
   credentials?: NonNullable<Parameters<typeof ModelRuntime.create>[0]>["credentials"],
   refreshOnCreate = credentials === undefined,
 ) {
+  // Pi lazily loads OAuth implementations, some of which capture this value.
+  // Browser setup must never open a public callback listener, even on remote hosts.
+  if (process.env.PI_OAUTH_CALLBACK_HOST && process.env.PI_OAUTH_CALLBACK_HOST !== "127.0.0.1")
+    throw new Error("Provider OAuth callbacks require PI_OAUTH_CALLBACK_HOST=127.0.0.1; remote browsers use the manual redirect flow.");
+  process.env.PI_OAUTH_CALLBACK_HOST = "127.0.0.1";
   const agentDir = resolve(environment.DISPATCH_PI_AGENT_DIR ?? join(homedir(), ".pi", "agent"));
   let defaults: z.infer<typeof defaultsSchema> = {};
   try { defaults = defaultsSchema.parse(JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8"))); }
