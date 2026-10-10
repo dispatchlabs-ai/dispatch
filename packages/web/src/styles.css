@@ -543,16 +543,18 @@ input::placeholder, textarea::placeholder { color: var(--color-muted); }
   .workspace-content { grid-column: 2; }
   .mobile-navigation { display: block; }
   .mobile-workspace-actions { display: flex; align-items: center; }
-  .mobile-destinations { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-half); margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-1)) var(--space-5); }
-  .mobile-destinations .button { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2) var(--space-half); font-size: var(--text-xs); }
+  .mobile-destinations { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-half); margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-1)) var(--space-5); }
+  .mobile-destinations .button { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; gap: var(--space-2); padding: var(--space-2) var(--space-half); font-size: var(--text-xs); }
   .dialog-left { display: flex; flex-direction: column; }
   .dialog-left > .dialog-heading, .dialog-left > .mobile-destinations { flex-shrink: 0; }
-  .dialog-left .section-sidebar-panel:not([hidden]), .dialog-left > .section-sidebar { flex: 1; min-height: 0; }
-  .dialog-left .collection-sidebar { padding: 0; height: 100%; min-height: 0; }
-  .dialog-left .sidebar-list { flex: 1; overflow-y: auto; }
+  .dialog-left > .dialog-heading > div { min-width: 0; overflow-wrap: anywhere; }
+  .dialog-left .section-sidebar-panel:not([hidden]), .dialog-left > .section-sidebar { flex: 1 0 auto; min-height: min-content; }
+  .dialog-left .collection-sidebar { padding: 0; height: auto; min-height: 100%; }
+  .dialog-left .sidebar-list { flex: 1 0 auto; overflow-y: visible; }
   .status-version { display: none; }
-  .mobile-menu-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-shrink: 0; margin-top: var(--space-4); border-top: 1px solid var(--color-border); padding-top: var(--space-4); }
+  .mobile-menu-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); flex-shrink: 0; margin-top: var(--space-4); border-top: 1px solid var(--color-border); padding-top: var(--space-4); }
   .mobile-menu-footer > .button { flex-shrink: 0; }
+  .mobile-menu-footer > .app-version { flex-shrink: 0; max-width: 100%; margin-left: auto; }
   .agent-instructions-editor .composer-input, .agent-instructions-editor .composer-placeholder { font-size: var(--text-md); }
 }
 
