@@ -10,11 +10,43 @@ Dispatch is built on [Pi Durable](https://github.com/earendil-works/pi): Pi owns
 
 | Where you want to run Dispatch | Start here |
 | --- | --- |
-| **Apple Silicon Mac** — one machine for development | The portable Mac release package is being prepared. For now, use the source-development steps below with Nix. |
+| **Apple Silicon Mac** — one machine for development | Use the [portable Mac package](#apple-silicon-mac). It includes its runtime; no Nix or Homebrew is needed to run it. |
 | **Windows with WSL2** — containers on your desktop | The container quick start is being prepared and is not yet installation-qualified. |
 | **AWS** — your own infrastructure and ECR | Follow the [terraform-aws-dispatch module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) for Terraform/OpenTofu setup. The application release artifacts and complete installation are still being qualified. |
 
-We are preparing the first packaged release. A successful build is not yet a verified installation on each platform; this README will gain the exact download and startup steps as those packages are checked. No separate Pi installation is needed.
+We are preparing the first public packaged release. The Mac candidate has been installed and its login page checked on Apple Silicon; account enrollment and a model conversation are still being qualified. Windows and complete AWS installation remain pending. No separate Pi installation is needed.
+
+## Apple Silicon Mac
+
+The portable package includes Node and Dispatch. **A public release download is not available yet.** The steps below apply to the candidate archive supplied by the maintainer; do not download similarly named files from an untrusted source.
+
+In Terminal, change to the directory containing `dispatch-0.2.0-darwin-arm64.tar.gz` and its `SHA256SUMS`, then:
+
+```sh
+shasum -a 256 -c SHA256SUMS
+```
+
+Proceed only if the checksum check passes. Obtain both files through the trusted maintainer/release channel: the checksum checks integrity, not publisher identity by itself.
+
+```sh
+tar -xzf dispatch-0.2.0-darwin-arm64.tar.gz
+cd dispatch-0.2.0-darwin-arm64
+./bin/dispatch version
+./bin/dispatch invite --email you@example.com --name "Your Name"
+./bin/dispatch
+```
+
+Replace the example email and name with your own. Keep the private enrollment link printed by `invite`, start Dispatch, then open that link to create your account. The app runs at **http://localhost:3001**. Keep the terminal running; Ctrl-C stops Dispatch. Once enrolled, [connect a model and start working](#connect-a-model-and-start-working).
+
+State and project workspace live in `~/Library/Application Support/Dispatch`, outside the extracted application directory. Keep that directory when replacing the package and back up its complete contents together. Stop Dispatch before running `invite` or `reset` commands. The package does not install a login or reboot service.
+
+Contributors can build the archive locally on an Apple Silicon Mac with Nix:
+
+```sh
+nix build .#macos-release
+```
+
+The archive and checksum file are in `result/`. Building requires Nix; running the extracted package does not.
 
 ## Run from source
 
