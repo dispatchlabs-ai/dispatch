@@ -280,7 +280,7 @@ export function Workspace() {
       const selected = next[Math.max(0, Math.min(tabs.findIndex(tab => tab.id === tabId) - 1, next.length - 1))];
       focusId = selected.id;
       setActiveId(selected.id);
-      setSearchParams(tabLocation(selected), { replace: true });
+      setSearchParams(selected.kind === "project" && projectEditing[selected.projectId] ? { ...tabLocation(selected), view: "settings" } : tabLocation(selected), { replace: true });
     }
     requestAnimationFrame(() => {
       (tabList.current?.querySelector<HTMLElement>(`[data-work-tab="${CSS.escape(focusId)}"]`) ?? document.getElementById("main-workspace"))?.focus();
@@ -456,7 +456,7 @@ export function Workspace() {
   }
   const supporting = (inDrawer = false) => projectEditorOpen ? null : selectedProject ? <ProjectSettings key={selectedProject.id}
     project={selectedProject} agents={agents} showHeader={!inDrawer}
-    editing={projectEditing[selectedProject.id] ?? null}
+    editing={null}
     onEditingChange={editing => changeProjectEditing(selectedProject.id, editing)}
     onSaved={savedProject} /> : section === "agents" && !editingAgent && evaluationAgent === selectedAgent?.id ? <div className="agent-details">{!inDrawer ? <header className="context-header"><h2>Evaluation profile</h2></header> : null}<div className="context-body">{evaluationContext}</div></div> : section === "agents" ? <AgentDetails agent={selectedAgent} editing={editingAgent} config={config} showHeader={!inDrawer} /> : active.kind === "chat" && snapshot ? <SharedContextPanel agents={agents} key={snapshot.conversation.id} snapshot={snapshot} models={config?.models ?? []} threadId={threads[active.chatId] ?? null}
     criteriaDraft={criteriaDrafts[active.chatId]} onCriteriaDraft={draft => setCriteriaDrafts(current => ({ ...current, [active.chatId]: draft }))}
