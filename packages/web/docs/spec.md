@@ -95,8 +95,11 @@ stay On-Demand; worker Spot is opt-in and must preserve confirmed executor
 termination, fail-closed ownership and explicit interrupted-work recovery.
 CloudFront must preserve authentication/cookies, origin checks and streaming;
 never cache authenticated API responses or rewrite API errors as SPA pages.
-Tracing/logs must exclude secrets, URL queries, SQL and model/tool contents;
-private enrollment/provider terminals remain unrecorded. No EFS and no filesystem
+Application spans/structured logs must exclude secrets, URL queries, SQL and
+model/tool contents; private enrollment/provider terminals remain unrecorded.
+ALB access logs include request paths/queries and require restricted access/short
+retention; the managed CDN strips OAuth callback GET queries before the ALB,
+without changing browser URLs or other API query behavior. No EFS and no filesystem
 layer without an actual durable-workspace requirement; ordinary S3 artifacts and
 disposable workspaces remain the target. Source/offline checks do not establish
 zero downtime, Spot recovery, Aurora failover or AWS operation. Implementation

@@ -326,8 +326,9 @@ endpoint, collection is disabled. Hosted ordinary backend/launcher/worker tasks
 export through loopback ADOT to X-Ray; operator tasks/credential terminals are
 excluded. HTTP/RPC spans propagate W3C traceparent and use X-Ray-compatible IDs.
 HTTP/SSE spans measure response-header latency without wrapping streams; they do
-not measure completion or model token latency. Sampled structured request logs
-contain registered route templates, method/status/duration and trace identities,
+not measure completion or model token latency. Only the outer request boundary emits sampled structured request-summary logs;
+nested owner spans remain without duplicate summaries. Logs contain registered
+route templates, method/status/duration and trace identities,
 not raw URLs/query strings, headers, user identifiers, SQL, model/tool payloads or
 Pi's native durable traces. Health polling is excluded; export shutdown is
 bounded/best-effort after owners close. Telemetry must not retry application
