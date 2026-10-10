@@ -33,7 +33,9 @@ function EditorSession({ path, initialValue, readOnly = false, autoFocus = false
   const shouldFocus = useRef(false);
   shouldFocus.current = autoFocus && !readOnly;
   const onAttach = useCallback((editor: Editor<"file", undefined, undefined>) => {
-    if (shouldFocus.current) editor.focus({ preventScroll: true });
+    if (!shouldFocus.current) return;
+    const selections = editor.getViewState().selections;
+    editor.focus(selections?.length ? { preventScroll: true } : { preventScroll: true, lineNumber: 1, character: 0 });
   }, []);
   const editorOptions = useMemo(() => ({
     onAttach, ariaLabel: label, spellcheck: /\.(?:md|markdown|mdx|txt|rst)$/i.test(path),
