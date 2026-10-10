@@ -2307,3 +2307,10 @@ bundle and network-disabled collector startup. Publisher/module guide owns
 receipt-backed immutable uploads, not this application handoff. Public bundles,
 images/registry and live CDN/log/trace/Aurora/Spot/provider/rolling/SSE outcomes
 remain unverified; none is implied by source acceptance.
+
+Final Developer build verification on October 10: the integrated application passed
+`nix develop --command npm run check`, the Apple Silicon application and
+`nix build .#frontend` artifact builds, and flake evaluation (zero native Darwin
+checks; incompatible Linux checks omitted). The deterministic SPA bundle checksum
+is `d1ccba643c72ac50efcda3b636373b5a140d7e339d0bd69f9afd9daff5eaad96`.
+These are source/type/build checks, not image publication or live qualification.
