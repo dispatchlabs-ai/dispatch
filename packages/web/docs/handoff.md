@@ -2273,3 +2273,22 @@ Do not imply Aurora is cheapest or omit idle foundation/owner-connection costs.
   Actual AWS log delivery, certificate/DNS/CDN operation, distributed trace export,
   database failover, Spot interruption and zero-downtime browser/worker/SSE
   outcomes require separate runtime evidence; no live apply is authorized here.
+
+
+Baseline source checkpoint: application `3dff8d6` integrates Pi slice `f5c9674`
+(Spot, sanitized telemetry, backend SPA opt-out and explicit initializer majors
+17/18). Pi reports Nix-shell application/type/build, Apple Silicon Nix build,
+flake evaluation and source/whitespace review passed; no runtime tests or cloud
+calls. Module `ae4ef52` passes Developer's 18 mock plans per engine (OpenTofu
+1.13.1/Terraform 1.13.5, AWS provider 6.67.0), 17 Python helper checks, activation
+syntax and offline edge-function checks. Documenter inspected the integrated
+module check output; these remain source/offline results.
+
+The managed CDN removes query parameters only from GET
+`/api/connections/oauth/callback` before the ALB, retaining the browser URL for
+callback HTML to read and POST completion JSON. Ordinary API queries stay intact.
+This bounds ALB authorization-code exposure, not browser history or future CDN
+viewer logging; actual provider authorization remains unqualified. Cost estimates,
+released-frontend tooling and final external-caller rechecking are still required
+for completion. Live CDN/API/SSE, trace/log delivery, Aurora, Spot and zero-downtime
+claims remain separate from this source checkpoint.
