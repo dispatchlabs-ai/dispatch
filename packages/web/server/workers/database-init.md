@@ -7,6 +7,11 @@ effective logging settings and initialization still need runtime qualification. 
 recovery command. The application’s normal loaders own schema migrations. No
 existing installation is converted, reset or deleted by this helper.
 
+The baseline extension explicitly allows majors 17 and 18 for Aurora Serverless
+v2 compatibility; it does not allow arbitrary future majors. Historical runtime
+checks below used PostgreSQL 17. Actual Aurora 18 initialization, effective
+logging/role privileges and failover behavior remain separately unqualified.
+
 ## Invocation and secret boundary
 
 Run from a trusted operator host with private database reachability, or the
