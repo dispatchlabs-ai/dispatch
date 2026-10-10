@@ -909,6 +909,16 @@ Source review of Agent Wiki `8d8810c` found human-session/CSRF-protected agent a
 
 Before implementation, define the delegated provisioning API/authentication/scopes and lifecycle responses; settle principal and instance granularity, protected credential storage/execution, shared-conversation audiences, and conflict/partial-save behavior. Preserve existing grants until an explicit migration is specified. [WP-029](handoff.md#wp-029--personal-wiki-connections) records dependencies and acceptance criteria. The earlier [ImageGen concept](agent-mcp-access-design.md) is historical visual evidence, not the final authorization contract.
 
+## Model provider setup
+
+**Authorized October 10, 2026; implementation pending.** Settings → Model providers initially supports OpenAI Codex, Claude and Fireworks. Users can connect, inspect connected account/status, change accounts or replace credentials, reconnect, and disconnect without operator terminal access. Use OpenAI (`openai`) for ChatGPT OAuth or API keys. Preserve existing legacy Codex (`openai-codex`) provider/model IDs and expose its OAuth-only management separately when present; never store an API key under that provider. Claude (`anthropic`) and Fireworks (`fireworks`) initially expose API keys only. Claude's API-key-only setup is an application policy, not a Pi limitation: Pi 1.0.4 also exposes Anthropic OAuth.
+
+The backend owns authentication exchanges, token refresh and persistence through Pi's public authentication interfaces and the existing encrypted credential store. Keep secret material out of browser snapshots, logs, model context, Git and build artifacts. The browser may collect credentials for submission, but must not persist or redisplay them. Available models and supported thinking levels come from the underlying Pi libraries, not a separate hard-coded Dispatch catalog.
+
+Status must distinguish stored credential metadata from verified provider connectivity. A Settings read must not refresh tokens or silently replay an interrupted credential mutation. Show uncertain/interrupted updates as requiring reconnection. Show account identity only when supplied by a reliable provider interface; do not invent account names for API keys. Disconnect must distinguish local credential removal from upstream revocation and explain any remaining provider-side action. Credentials are installation-wide; disclose that workspace agents share their authority. Shared agent definitions do not establish a new per-user provider credential boundary. The exact authenticated credential-management authorization remains an implementation contract to verify.
+
+[The work package](handoff.md#model-provider-setup--october-10-2026) owns acceptance evidence and unresolved implementation choices.
+
 ## Contracts and state ownership
 
 **Accepted ownership boundaries for chat:**

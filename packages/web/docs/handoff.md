@@ -1,5 +1,20 @@
 # Dispatch Web implementation handoff
 
+## Model provider setup — October 10, 2026
+
+**Authorized; implementation and qualification pending.** Chris requested Settings → Model providers for OpenAI Codex, Claude and Fireworks, using Pi's public authentication/model interfaces and the existing encrypted credential store. Developer owns backend/integration, Designer owns responsive design review, Pi Durable Expert verifies provider/method mappings, Deslop reviews behavior-preserving simplification, and Documenter maintains package documentation. [The spec](spec.md#model-provider-setup) records the user outcomes and ownership boundaries.
+
+Acceptance:
+
+- Use the verified Pi 1.0.4 matrix: OpenAI OAuth/API key, legacy Codex OAuth only, Claude and Fireworks API key initially. Preserve legacy IDs. Claude OAuth exclusion is application policy. Verify credential-management authority, installation-wide sharing disclosure and encrypted-store availability in each supported runtime mode.
+- Connect, inspect account/status, change accounts/replace credentials, reconnect and disconnect through Settings. Preserve useful recovery after cancellation, rejected credentials and interrupted exchanges; do not label stored metadata as live verification.
+- Backend-only token refresh/persistence preserves the existing store's serialized updates and uncertain-rotation recovery. Settings reads do not refresh tokens. Secrets never enter public payloads, logs or persistent browser storage.
+- Derive available models and supported thinking levels from Pi; reflect credential changes without inventing a second provider/model catalog. Report effects on existing configured agents honestly.
+- Review designs before frontend implementation; apply source/deslop, TypeScript/application and applicable Nix checks, full diff/whitespace/local-link review. Record permitted rendered desktop/390 px evidence separately from actual OAuth/API-key, keyboard/touch and recovery outcomes. Follow the standing testing policy; no new functional-test exception or deployment is implied.
+- Update usage and changelog against implemented behavior, and record published source revision and verified/unverified acceptance evidence here.
+
+Documentation preparation: reviewed existing credential-store and model-runtime integration. The repository wiki home could not be retrieved through the available web reader (private-address block); no wiki update or wiki review is claimed. No implementation, builds, account flows or browser outcomes have yet been verified for this package.
+
 ## Repository rename — October 10, 2026
 
 Chris requested the application repository name `dispatch`, with the previous occupant renamed and kept private. GitHub repository `1403128960` moved from `dispatchlabs-ai/dispatch-web-next` to `dispatchlabs-ai/dispatch`. The retired repository `1349656036` moved from `dispatchlabs-ai/dispatch` to `dispatchlabs-ai/dispatch-retired`; it remains private and archived, retaining its history, tags and release artifacts. `dispatch-legacy` was already occupied and was not changed.
