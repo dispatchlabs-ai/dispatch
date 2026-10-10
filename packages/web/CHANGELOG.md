@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Pierre source editor and project spec reading
+
+- Use the maintained Dispatch Pierre fork for chat file/diff presentation and the shared literal source editor, preserving historical excerpt semantics and React/worker import paths. Pin the immutable fork release with npm integrity and the Nix dependency hash; retain Apache notices.
+- Add project-spec Preview/Source and in-memory editing labelled Draft · not saved, without a Save action. Load configured public GitHub specs at a pinned commit with bounded UTF-8 reads and access/source-identity rechecks. Directory references remain configurable but unsupported by this reader; repository writes and durable draft recovery are deferred. See the [work package](docs/handoff.md#pierre-fork-and-project-spec-editor--october-10-2026) for qualification limits.
+
 ### Repository identity
 
 - Rename the private application repository to `dispatch` and update container source labels and documentation links. The retired repository is preserved privately as `dispatch-retired`; existing application, state and checkout paths stay compatible.
