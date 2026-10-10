@@ -1,6 +1,6 @@
 # Dispatch Web package
 
-This package owns the Dispatch browser workspace and its integration with stock Pi Durable 1.0.4. It implements invitation enrollment, password/TOTP and verified passkeys, shared conversations with native persistence/recovery, independent agent participants and reply threads, versioned company agent definitions, and a branded responsive workspace.
+This package owns the Dispatch browser workspace and its integration with stock Pi Durable 1.1.0. It implements invitation enrollment, password/TOTP and verified passkeys, shared conversations with native persistence/recovery, independent agent participants and reply threads, versioned company agent definitions, and a branded responsive workspace.
 
 React Router in SPA mode, React, TypeScript, Vite, Tailwind, and shared Base UI primitives provide the browser app. A persistent Node/Hono service owns authentication and the native Pi runtime. Frontend hot reload does not restart that owner.
 

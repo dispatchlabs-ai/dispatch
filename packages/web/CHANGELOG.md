@@ -6,7 +6,7 @@
 
 - Align Pi packages at 1.1.0, including upstream context derivation and Anthropic system/tool cache fixes.
 - Cache saved conversation history before the fresh shared-context suffix, preserving listening behavior and native provider credentials.
-- Support ordered PostgreSQL scans and cursor continuation, including inherited fork history.
+- Support ordered PostgreSQL scans and cursor continuation, including inherited fork history. Scoped local SQLite/PostgreSQL tool-loop, reopen and live Claude cache-reuse observations are recorded in the [upgrade work package](docs/handoff.md#pi-110-and-shared-context-caching--october-10-2026); hosted worker and broad recovery qualification are not established.
 
 ### Pierre source editor and project spec reading
 
@@ -41,6 +41,23 @@
 ### inline image attachments
 
 - Show large, uncropped, responsive image attachments in main chat and threads, with stacked previews and filenames underneath. Keep originals optional, small images at native size and non-image files compact. Retain original links and a short status when previews fail.
+
+### Conversation workers and shared service storage
+
+- Add opt-in per-conversation PostgreSQL workers with backend-owned authentication, catalogs and credential mediation, plus Docker/ECS launcher lifecycle and attempt-bound RPC/callback authorization. Preserve native single-runtime mode and Pi-owned execution/recovery; confirm old executors are stopped before replacement.
+- Add encrypted PostgreSQL authentication/provider/MCP persistence, routing/admission journals, backend-mediated attachments and S3 project archives. Existing SQLite installations are not automatically migrated. See [worker contracts and bounded observations](docs/conversation-workers.md) for installation, recovery and remaining qualification limits.
+
+### Named agent secrets
+
+- Extend Settings → Secrets with write-only named credentials and explicit per-definition grants checked at use time. Add metadata-only `secrets_list` and credential-internal GitHub HTTPS `git_clone`; imported definitions do not inherit grants. Scoped disposable storage/browser and Git observations pass; real private cloning and hosted secret-tool acceptance remain unverified. See [acceptance evidence](docs/handoff.md#named-agent-secrets--october-9-2026).
+
+### Ubuntu worker environment
+
+- Add ARM64/AMD64 Ubuntu worker recipes retaining the pinned Nix application while allowing ordinary agent-shell package installation. Controllers remain non-root/read-only; coding workers are trusted environments, not hostile-code sandboxes. Bounded native and hosted new-chat installation observations pass; runtime-installed tools, local files and unpushed commits are not automatically restored. See [image acceptance](docs/handoff.md#ubuntu-agent-image--october-9-2026).
+
+### Standalone AWS module
+
+- Move AWS infrastructure, generated caller configuration and installation/update instructions to [terraform-aws-dispatch](https://github.com/dispatchlabs-ai/terraform-aws-dispatch). The application retains its runtime/bootstrap and OCI recipes; extraction does not migrate existing installations or qualify a fresh installation.
 
 ### Lockstep versioning
 

@@ -610,7 +610,7 @@ Apply this guidance consistently in the shared system-prompt section, incoming-m
 - Only explicit human invitation, including an invitation through a definition mention, can add that definition again, as a fresh instance using its current available revision. Retain the removed instance as history, without reviving its queued work. Agents cannot undo a human removal by reinviting the definition.
 - Removal is idempotent by immutable participant ID. Retrying cleanup must not cancel another instance, duplicate membership or affect unrelated work. Cancellation cannot undo completed file changes, external actions or charges.
 
-Dispatch owns membership policy and fences; stock Pi Durable 1.0.4 owns task cancellation, execution and recovery. This is distinct from conversation-wide Stop, which allows later participation by the same members.
+Dispatch owns membership policy and fences; stock Pi Durable 1.1.0 owns task cancellation, execution and recovery. This is distinct from conversation-wide Stop, which allows later participation by the same members.
 
 ### Implementation approach and preservation
 
@@ -971,7 +971,7 @@ This is an accepted architecture constraint for future work packages. It does no
 - A retry of the same logical submission reuses its request ID within the correct conversation and authorization scope. Distinct submissions receive distinct IDs; reusing an ID with changed content returns 409 rather than silently accepting different intent. Native submission deduplication does not make external tool effects exactly once; effect-specific retry/reconciliation rules depend on the chosen workflow.
 - A service restart reopens storage, reinstalls the required implementations, and resumes work through Pi's public recovery interfaces. The browser can reconnect to the recovered state. Do not equate reopening storage alone with a completed recovery implementation.
 
-These contracts follow [Pi's public README](https://github.com/earendil-works/pi/blob/b60993bcc299c705731f0281e2b4d0db7c72188b/packages/durable/README.md) and the [maintained capability assessment](https://wiki.chrisreynolds.me/wiki/pi-durable-capabilities/). The implementation pins Pi Durable 1.0.4 and uses its public interfaces. An interrupted provider request may be retried from the committed checkpoint, not from the exact final streamed token, and can incur another provider request. External-effect recovery belongs to later tool workflows.
+These contracts follow [Pi's public README](https://github.com/earendil-works/pi/blob/b60993bcc299c705731f0281e2b4d0db7c72188b/packages/durable/README.md) and the [maintained capability assessment](https://wiki.chrisreynolds.me/wiki/pi-durable-capabilities/). The implementation pins Pi Durable 1.1.0 and uses its public interfaces. An interrupted provider request may be retried from the committed checkpoint, not from the exact final streamed token, and can incur another provider request. External-effect recovery belongs to later tool workflows.
 
 ## Acceptance
 
