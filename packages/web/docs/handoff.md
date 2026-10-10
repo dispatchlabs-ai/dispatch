@@ -13,7 +13,26 @@ Acceptance criteria:
 - Publish normally to `main`, verify remote inclusion and synchronize the clean canonical checkout. Gracefully restart the local launcher with the same state/workspaces after preserving a private recovery copy.
 - Use the requested small live Claude verification conversation, record exact model/revision and per-response cache reads/writes/cost, and establish reuse of saved conversation history beyond the static tool/system prefix. Keep private captures and diagnostics in ignored `.local/`. Target under $1 for qualification calls; this is a verification budget, not a new runtime concurrency or spending restriction.
 
-Status: implementation and qualification in progress. Evidence is recorded below as each criterion is completed.
+**Implemented and published at `7f5d677`; locally qualified October 10.** Reconciled provider-setup main `9b465fc` before normal publication; verified remote equality and fast-forwarded the clean canonical M1 Air checkout. Nix-shell `npm run check`, Apple Silicon `nix build --no-link`, and the one declared native flake check passed after reconciliation. Linux systems were omitted. Source/deslop, full diff/whitespace and changed-link review passed. The correction uses one model wrapper and a request-local suffix identity; it adds no alternative execution path, persisted message metadata or upstream patch. Scan semantics match Pi 1.1.0's storage implementation, including direction/cursor validation and inherited ascending entry segments.
+
+Interactive qualification used Claude Opus 5.5 (`claude-opus-5-5`), Low thinking, and three separate sequential reads of synthetic fixtures. A disposable PostgreSQL 17.11 app on port 5185 completed the native tool loop and restored its saved chat after browser reload and the integration-triggered backend restart. All eleven resulting native tasks were terminal. The temporary app/database were stopped. Cursor conflict/legacy rules, fork bounds and store predicates were reviewed against upstream source; their full combination space was not exercised. No automated test suite was added or run.
+
+The canonical service was gracefully stopped, its full existing state cloned privately, dependencies installed with `npm ci`, and the same SQLite state/workspace restarted at `http://localhost:5174`. The separately landed provider-settings cutover uses encrypted application credentials: the existing Claude API key was retained there without logging it or replacing any existing credential; legacy `auth.json` and OAuth grants were preserved. The default legacy Codex agent still requires its one-time Settings reconnect under that package's policy; that account flow is outside this cache qualification. The updated local chat `177272`, with native agent conversation `177281`, completed the same three reads and restored its result after browser reload.
+
+Actual Pi assistant usage records (USD; input includes additional uncached request-only context):
+
+| Storage / response | Cache reads | Cache writes | Uncached input | Request cost |
+| --- | ---: | ---: | ---: | ---: |
+| PostgreSQL 1 | 0 | 5,882 | 866 | $0.0340740 |
+| PostgreSQL 2 | 5,882 | 18,989 | 840 | $0.1012014 |
+| PostgreSQL 3 | 5,882 | 19,077 | 840 | $0.1010814 |
+| PostgreSQL 4 | 24,959 | 85 | 840 | $0.0089768 |
+| Local SQLite 1 | 3,576 | 2,287 | 856 | $0.0167742 |
+| Local SQLite 2 | 5,863 | 18,989 | 831 | $0.1006216 |
+| Local SQLite 3 | 24,852 | 90 | 831 | $0.0099044 |
+| Local SQLite 4 | 24,942 | 85 | 831 | $0.0089374 |
+
+The final local request reused 99.66% of the tokens accounted as cache reads/writes, or 96.46% of all input including the fresh suffix. This establishes reuse beyond the old 3,576-token static prefix, not a promise that every request hits: PostgreSQL response 3 rewrote history before response 4 reused it. Total qualification cost was $0.3815712 ($0.1362376 local). Usage-only diagnostics and browser captures remain ignored under canonical `.local/qualification/`; state recovery is under `.local/backups/pi-1.1.0-20261010T140137/`. No hosted deployment, Linux runtime, worker-runtime live call or broad regression qualification is claimed.
 
 ## Model provider setup — October 10, 2026
 
