@@ -307,6 +307,37 @@ Membership synchronization, MCP actor authority/rollout and durable summaries ha
 
 Source review also requires enforcing storage isolation below application query predicates, backend-verifiable management actor authority, and admission/shutdown tracking for MCP discovery/refresh, reconnect credential renewal and catalog callbacks before backup readiness. Durable resolved creation choices, directory/routing crash reconciliation, consistent external-ID translation and a fresh-workspace notice before resumed model work remain recovery requirements. Successful revocation must join previously admitted MCP calls and deny later unauthorized calls; it cannot reverse upstream effects. Activation/RPC admission and policy mutation plus acknowledgement need coordinated ordering so a concurrently starting worker cannot accept a delayed old-policy RPC after revocation returns. Bootstrap/definition callbacks must remain available during reconciliation to avoid deadlock. The local ordering correction waits for earlier activation/RPC operations, then performs mutation plus acknowledgement inside the MCP policy gate; later operations wait and reauthorize while independent conversations remain concurrent. Missing launcher attempts must be stopped/tombstoned and verified absent, not skipped. Failed acknowledgement without confirmed retirement returns failure; another catalog fetch alone is insufficient. Component checks do not establish the deployed ordering boundary. Callback authority must also be checked at use time: revalidate the current route/attempt/token after POST body parsing, inside MCP invocation admission, and after asynchronous authorization/reconnect immediately before upstream invocation. An earlier authentication check cannot authorize a delayed callback from a retired attempt. The October 8 source-review finding blocked `d606f09` activation. Corrections revalidate all POST callbacks after parsing (`0445420`), require invocation-time `assertCurrent` through the native MCP-client handoff (`7caa835`), and join admitted MCP calls before replacement retirement (`3f40a82`). Replacement still independently requires stopped/absent confirmation. Local call settlement is not proof of remote-effect completion after transport failure; the scoped deployed HTTP/Docker held-call/delayed-body/revocation check below passed, but external OAuth and full concurrent membership/recovery acceptance remain pending. These are blockers, not limitations waived by a private startup rehearsal.
 
+## Worker Spot and service tracing — October 10, 2026
+
+Authorized baseline extension: the ECS driver accepts `capacityProvider` as
+`"FARGATE"` (default) or `"FARGATE_SPOT"`. It submits a single-provider strategy,
+not `launchType`, and includes provider selection in the immutable launch
+fingerprint. The owning infrastructure must associate both providers with the
+worker cluster; controllers remain On-Demand. A changed provider applies to new
+attempts, never to an already running worker. Spot capacity is not guaranteed;
+interruption does not relax exact-task reconciliation, no uncertain-call replay
+or confirmed termination before replacement. Workspace recovery remains the
+[disposable-disk policy](spec.md#aws-container-deployment-target), not checkpointed
+external effects or an automatic persistent-filesystem promise.
+
+Explicit service tracing uses `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`,
+`OTEL_SERVICE_NAME` and `OTEL_TRACES_SAMPLER_ARG` (default ratio 0.1). Without an
+endpoint, collection is disabled. Hosted ordinary backend/launcher/worker tasks
+export through loopback ADOT to X-Ray; operator tasks/credential terminals are
+excluded. HTTP/RPC spans propagate W3C traceparent and use X-Ray-compatible IDs.
+HTTP/SSE spans measure response-header latency without wrapping streams; they do
+not measure completion or model token latency. Sampled structured request logs
+contain registered route templates, method/status/duration and trace identities,
+not raw URLs/query strings, headers, user identifiers, SQL, model/tool payloads or
+Pi's native durable traces. Health polling is excluded; export shutdown is
+bounded/best-effort after owners close. Telemetry must not retry application
+operations or let an incoming sampled flag override local collection policy.
+
+The managed CloudFront path disables backend SPA serving, preventing unknown API
+routes from becoming `index.html`. CDN cookies/origin enforcement, actual exported
+spans, Spot interruption and streaming/rolling behavior still need runtime
+qualification; TypeScript/build/source review alone establishes none of them.
+
 ## Acceptance and evidence
 
 Inspected `05fbdeb-linux-readiness-report.json`, published in Palm `b15fab8`: disposable native ARM64 Linux Docker backend/launcher/two nonroot, mount-free workers use six dedicated PostgreSQL controller databases, TLS-only SCRAM and verified backend HTTPS. PostgreSQL-selected CLI invitation and fresh password/TOTP enrollment pass. Replacement preserves committed history and Garage artifact bytes, verifies old-container absence before activation, and leaves the second worker unchanged. After full drain and clean controller exits, deletion/recreation of both local writable directories preserves drain, session, directory/routing data, worker history and artifacts. Application image `sha256:3b335f61df510d955b16bbd6a02f81486832878732537ea49c9bc8dc8f96a16e`; Palm preparation `5ecaac1`. Limits: Docker CLI graph, not Compose apply or managed delivery; unchanged PostgreSQL/Garage, not restored encrypted archives; synthetic credentials/human-only messages, no hosted model, OAuth or browser; no hard crash or retired callback/token/database replay. Containers/network removed; cold synthetic state retained for paired recovery. Omarchy and registry untouched. Reuse this scoped evidence; encrypted recovery, Linux crash/retired-authority checks and actual restored model/tool work remain required.
