@@ -7,6 +7,7 @@
 ### Pi runtime and prompt caching
 
 - Align Pi packages at 1.1.0, including upstream context derivation and Anthropic system/tool cache fixes.
+- Align the shipped capability artifact’s exact Pi AI/Durable peers and host instructions with the 1.1.0 build.
 - Cache saved conversation history before the fresh shared-context suffix, preserving listening behavior and native provider credentials.
 - Support ordered PostgreSQL scans and cursor continuation, including inherited fork history. Scoped local SQLite/PostgreSQL tool-loop, reopen and live Claude cache-reuse observations are recorded in the [upgrade work package](docs/handoff.md#pi-110-and-shared-context-caching--october-10-2026); hosted worker and broad recovery qualification are not established.
 

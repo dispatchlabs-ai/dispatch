@@ -1,6 +1,6 @@
 # Dispatch native capabilities
 
-`@dispatch/pi-capabilities` is a private, host-installed code artifact for **Pi Durable 1.0.4**, built from the same TypeScript modules used by Dispatch Web. It is not an agent bundle or a plugin loader. No registry publication, service deployment or runtime qualification is implied by building it.
+`@dispatch/pi-capabilities` is a private, host-installed code artifact for **Pi Durable 1.1.0**, built from the same TypeScript modules used by Dispatch Web. It is not an agent bundle or a plugin loader. No registry publication, service deployment or runtime qualification is implied by building it.
 
 ## Build and distribute
 
@@ -56,4 +56,4 @@ Native replay declarations are unchanged: skills are read-only/replay-safe; web 
 
 Build/type checks and archive-content inspection are packaging evidence only. [Dated portability observations](../docs/handoff.md#portability-manual-qualification--october-8-2026) cover bounded independent-host installation/execution/reopen of the earlier artifact; they do not qualify the revised web factory or every provider/credential integration. [Native web split observations](../docs/handoff.md#wp-054--native-web-research) record separate extension gating/recovery evidence and its limits. No runtime tests are included or authorized by this package.
 
-Native contract: [Pi Durable v1.0.4 extensions](https://github.com/earendil-works/pi/blob/v1.0.4/packages/durable/README.md#extensions).
+Native contract: [Pi Durable v1.1.0 extensions](https://github.com/earendil-works/pi/blob/v1.1.0/packages/durable/README.md#extensions).
