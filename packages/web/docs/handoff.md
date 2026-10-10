@@ -2,7 +2,7 @@
 
 ## Model provider setup — October 10, 2026
 
-**Backend candidate implemented; frontend integration and qualification pending.** Chris requested Settings → Model providers for OpenAI Codex, Claude and Fireworks, using Pi's public authentication/model interfaces and the existing encrypted credential store. Developer owns backend/integration, Designer owns responsive design review, Pi Durable Expert verifies provider/method mappings, Deslop reviews behavior-preserving simplification, and Documenter maintains package documentation. [The spec](spec.md#model-provider-setup) records the user outcomes and ownership boundaries.
+**Backend/frontend candidate implemented; final integration review/checks and qualification pending.** Chris requested Settings → Model providers for OpenAI Codex, Claude and Fireworks, using Pi's public authentication/model interfaces and the existing encrypted credential store. Developer owns backend/integration, Designer owns responsive design review, Pi Durable Expert verifies provider/method mappings, Deslop reviews behavior-preserving simplification, and Documenter maintains package documentation. [The spec](spec.md#model-provider-setup) records the user outcomes and ownership boundaries.
 
 Acceptance:
 
@@ -26,6 +26,8 @@ Deslop reviewed backend source through `9ff6cbf`, finding earlier mutation-admis
 Pi Durable Expert also found the cancellation/drain source boundaries sound through `9ff6cbf`. Its callback-listener finding was corrected in `3dcd057`: shared model startup rejects any nonempty `PI_OAUTH_CALLBACK_HOST` other than `127.0.0.1` and pins loopback before lazy OAuth loading for both local and backend modes. Developer reported type/build/whitespace checks passing; OAuth/runtime verification remains pending.
 
 Developer found no blocking layout concerns in the four responsive concept frames, while requiring disconnect copy to avoid promising removal of external credentials. The frames are illustrative proposals, not browser acceptance. Focused disposable fixture-key/restart/browser verification was requested from Chris; approval has not yet been recorded. No live-state access, model call, real OAuth exchange or deployment is claimed.
+
+**Frontend candidate:** Designer supplied `0784cda`, integrated as `453c78e`, adding desktop Settings/phone navigation and the direct `/?section=model-providers` link, provider cards, Pi-driven modal prompts, session-attempt recovery and explicit disconnect confirmation. Source masks key/callback entry and clears submitted values; inactive setup is not polled. Routine dismissal avoids a full model-availability refresh; saves, disconnects and uncertain exchanges retain refresh. Designer reported Nix-shell `npm run check`, diff and whitespace checks passing. Deslop's routine-dismissal finding was resolved, but lost-disconnect-response configuration refresh remains under review. Final integrated checks, Claude review, desktop/390 px rendered evidence and actual provider/recovery outcomes remain pending; no test exception approval has been recorded.
 
 ## Repository rename — October 10, 2026
 
