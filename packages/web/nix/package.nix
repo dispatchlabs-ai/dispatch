@@ -2,7 +2,7 @@
 
 buildNpmPackage {
   pname = "dispatch-web";
-  version = "0.1.0";
+  version = (builtins.fromJSON (builtins.readFile ../package.json)).version;
   nodejs = nodejs_24;
   nativeBuildInputs = [ makeWrapper ];
 
