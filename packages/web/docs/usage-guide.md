@@ -141,14 +141,14 @@ Candidate API (authenticated same-origin requests):
 
 | Endpoint under `/api/model-providers` | Request / result |
 | --- | --- |
-| `GET /` | `{ providers }`: stored status, supported methods, model catalog and opaque revision |
+| `GET /` | `{ providers, attempt }`: stored status, supported methods, model catalog, opaque revision and this session's active attempt or `null` |
 | `POST /:providerId/connect` | `{ type, revision }` → login attempt |
 | `GET /attempts/:id` | Current session-bound attempt |
 | `POST /attempts/:id/answer` | `{ promptId, value }` → updated attempt |
 | `POST /attempts/:id/cancel` | `{}` → attempt after admitted work settles |
 | `POST /:providerId/disconnect` | `{ revision }` → refreshed `{ providers }` |
 
-Use the latest opaque revision; a stale revision returns 409 and requires reloading status. Attempts belong to their initiating session, and only an active attempt needs polling. Completion refreshes the application's model configuration. Provider setup unavailable on an installation returns 503. See [acceptance evidence](handoff.md#model-provider-setup--october-10-2026).
+Use the latest opaque revision; a stale revision returns 409 and requires reloading status. Attempts belong to their initiating session, and only an active attempt needs polling. After a lost Connect response or browser reload, reload provider status to recover the current session's active attempt instead of replaying Connect. Attempts are ephemeral server state; a backend restart requires a fresh setup after reviewing stored status. Completion refreshes the application's model configuration. Provider setup unavailable on an installation returns 503. See [acceptance evidence](handoff.md#model-provider-setup--october-10-2026).
 
 ### Pi configuration and agent defaults
 

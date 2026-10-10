@@ -2,7 +2,7 @@
 
 ## Model provider setup — October 10, 2026
 
-**Authorized; implementation and qualification pending.** Chris requested Settings → Model providers for OpenAI Codex, Claude and Fireworks, using Pi's public authentication/model interfaces and the existing encrypted credential store. Developer owns backend/integration, Designer owns responsive design review, Pi Durable Expert verifies provider/method mappings, Deslop reviews behavior-preserving simplification, and Documenter maintains package documentation. [The spec](spec.md#model-provider-setup) records the user outcomes and ownership boundaries.
+**Backend candidate implemented; frontend integration and qualification pending.** Chris requested Settings → Model providers for OpenAI Codex, Claude and Fireworks, using Pi's public authentication/model interfaces and the existing encrypted credential store. Developer owns backend/integration, Designer owns responsive design review, Pi Durable Expert verifies provider/method mappings, Deslop reviews behavior-preserving simplification, and Documenter maintains package documentation. [The spec](spec.md#model-provider-setup) records the user outcomes and ownership boundaries.
 
 Acceptance:
 
@@ -15,9 +15,13 @@ Acceptance:
 
 Selected local cutover: preserve `auth.json` without importing its OAuth grants; app-managed providers use encrypted application storage and require a one-time Settings reconnect. Usage instructions must explain this compatibility change and the manual callback-paste flow for remote OpenAI authorization. Cancellation must join admitted exchanges through persistence. These are implementation choices, not verified runtime outcomes.
 
-Documentation preparation: reviewed existing credential-store and model-runtime integration. The repository wiki home could not be retrieved through the available web reader (private-address block); no wiki update or wiki review is claimed. Full application/Nix builds, account flows and browser outcomes remain unverified for this package.
+Documentation preparation: reviewed existing credential-store and model-runtime integration. The repository wiki home could not be retrieved through the available web reader (private-address block); no wiki update or wiki review is claimed. Developer reported intermediate application type/build checks passing; final integrated application/Nix checks, account flows and browser outcomes remain unverified for this package.
 
 **October 10 adapter source evidence:** Pi Durable Expert supplied `8b76de2` (local encrypted store and side-effect-free pending inspection on both stores) and `56a0275` (local wiring). The local adapter reuses application encryption/key handling, holds an exclusive SQLite owner lock, and persists uncertain-update intent before provider callbacks; `inspect()` exposes only `{ pending }`. Expert reported focused strict TypeScript checking inside Nix plus source/deslop and whitespace review passing. This is adapter/source evidence, not integrated application, persistence/restart or account-flow qualification. Candidate usage/API documentation describes storage/key pairing, manual callback handling and compatibility cutover; provider fallback suppression and final runtime behavior remain under integration review.
+
+**Backend candidate and recovery:** `e988968` adds authenticated provider setup/session orchestration and `967db44` integrates per-provider model availability isolation (Expert's `c9867f8`, focused strict TypeScript/whitespace passed). Preserve the default model when unavailable so users can reach Settings for repair. External credentials are labeled rather than suppressed; storage/decryption failures remain unavailable and cannot trigger automatic logout. Legacy Codex remains connectable even with no encrypted grant. The current list response includes only the requesting session's active attempt or `null`, permitting lost-response/reload recovery without browser secret persistence; do not automatically replay Connect. These source contracts do not prove functional recovery.
+
+Developer found no blocking layout concerns in the four responsive concept frames, while requiring disconnect copy to avoid promising removal of external credentials. The frames are illustrative proposals, not browser acceptance. Focused disposable fixture-key/restart/browser verification was requested from Chris; approval has not yet been recorded. No live-state access, model call, real OAuth exchange or deployment is claimed.
 
 ## Repository rename — October 10, 2026
 
