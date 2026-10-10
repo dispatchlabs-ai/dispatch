@@ -13,6 +13,8 @@ Acceptance:
 - Review designs before frontend implementation; apply source/deslop, TypeScript/application and applicable Nix checks, full diff/whitespace/local-link review. Record permitted rendered desktop/390 px evidence separately from actual OAuth/API-key, keyboard/touch and recovery outcomes. Follow the standing testing policy; no new functional-test exception or deployment is implied.
 - Update usage and changelog against implemented behavior, and record published source revision and verified/unverified acceptance evidence here.
 
+Selected local cutover: preserve `auth.json` without importing its OAuth grants; app-managed providers use encrypted application storage and require a one-time Settings reconnect. Usage instructions must explain this compatibility change and the manual callback-paste flow for remote OpenAI authorization. Cancellation must join admitted exchanges through persistence. These are implementation choices, not verified runtime outcomes.
+
 Documentation preparation: reviewed existing credential-store and model-runtime integration. The repository wiki home could not be retrieved through the available web reader (private-address block); no wiki update or wiki review is claimed. No implementation, builds, account flows or browser outcomes have yet been verified for this package.
 
 ## Repository rename — October 10, 2026

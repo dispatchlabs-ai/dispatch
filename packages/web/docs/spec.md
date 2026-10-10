@@ -917,6 +917,8 @@ The backend owns authentication exchanges, token refresh and persistence through
 
 Status must distinguish stored credential metadata from verified provider connectivity. A Settings read must not refresh tokens or silently replay an interrupted credential mutation. Show uncertain/interrupted updates as requiring reconnection. Show account identity only when supplied by a reliable provider interface; do not invent account names for API keys. Disconnect must distinguish local credential removal from upstream revocation and explain any remaining provider-side action. Credentials are installation-wide; disclose that workspace agents share their authority. Shared agent definitions do not establish a new per-user provider credential boundary. The exact authenticated credential-management authorization remains an implementation contract to verify.
 
+**Local credential cutover selected October 10:** encrypted application storage becomes authoritative for app-managed providers. Preserve the operator's existing Pi `auth.json` on disk without copying OAuth grants into the new store; existing local users reconnect once through Settings. This does not revoke the old upstream grant. During cancellation, stop pending prompts but join admitted provider exchanges through persistence rather than discarding issued credentials. Remote OpenAI sign-in uses a manual full-loopback-callback-URL paste into Dispatch; that callback is sensitive authentication material, not a URL to share in conversation or logs.
+
 [The work package](handoff.md#model-provider-setup--october-10-2026) owns acceptance evidence and unresolved implementation choices.
 
 ## Contracts and state ownership
