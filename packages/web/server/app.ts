@@ -11,6 +11,7 @@ import { z } from "zod";
 import type { createAuth, AuthPrincipal } from "./auth.js";
 import { projectRepositoriesSchema, projectSpecSchema } from "../src/shared/project-sources.js";
 import { ProjectAccessError } from "./project-access.js";
+import { ProjectSpecError } from "./project-spec.js";
 import { RuntimeError } from "./runtime.js";
 import type { RuntimeService } from "./runtime-service.js";
 import { CollaborationError } from "./collaboration/shared.js";
@@ -194,6 +195,10 @@ export function createApp(options: AppOptions) {
     return c.json({ archive: await runtime.exportProjectArchive(c.get("principal"), c.req.param("id"), input.chatIds) });
   });
   app.get("/api/projects/:id/history", async c => c.json({ archive: await runtime.getProjectArchive(c.get("principal"), c.req.param("id")) }));
+  app.get("/api/projects/:id/spec", async c => {
+    c.header("Cache-Control", "no-store");
+    return c.json({ spec: await runtime.getProjectSpec(c.get("principal"), c.req.param("id")) });
+  });
   app.get("/api/projects", async (c) => c.json({ projects: await runtime.listProjects(c.get("principal")) }));
   app.post("/api/projects", async (c) => {
     const input = z.object({ requestId, name: z.string().trim().min(1).max(100), kind: z.literal("shared") }).strict().parse(await c.req.json());
@@ -360,7 +365,7 @@ export function createApp(options: AppOptions) {
   }
   app.onError((error, c) => {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return c.json({ error: { code: "invalid_request", message: "The request is invalid. Check the fields and try again." } }, 400);
-    if (error instanceof ProjectArchiveError || error instanceof BundleError || error instanceof EvaluationError || error instanceof ManagementError || error instanceof AttachmentError || error instanceof ProjectAccessError || error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
+    if (error instanceof ProjectArchiveError || error instanceof BundleError || error instanceof EvaluationError || error instanceof ManagementError || error instanceof AttachmentError || error instanceof ProjectAccessError || error instanceof ProjectSpecError || error instanceof RuntimeError || error instanceof CollaborationError || error instanceof ConnectionError) return c.json({ error: { code: "runtime", message: error.message } }, error.status as 400);
     // Raw exceptions can contain database statements, URLs or credentials.
     console.error("Dispatch request failed");
     return c.json({ error: { code: "internal", message: "The request could not be completed. Try again." } }, 500);

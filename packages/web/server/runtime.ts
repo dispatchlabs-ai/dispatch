@@ -18,7 +18,7 @@ import { PostgresStorage } from "./storage/postgres/storage.js";
 import { openPiStorage, type PiStorageConfig } from "./storage/open.js";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
-import type { CreateAgentInstanceInput, CreateAgentInstanceResult, AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
+import type { CreateAgentInstanceInput, CreateAgentInstanceResult, AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, ProjectSpecDocument, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
 import type { BundleExportInput, BundleImportResult, BundlePreview, PortableBundle, PortableAgent, PortableSkill } from "../src/shared/bundles.js";
 import type { GitHubInstallation, GitHubBundleSource, GitHubBundlePreview, GitHubBundleApplyInput, GitHubBundleApplyResult } from "../src/shared/github-bundles.js";
 import { isManagedConnection } from "../src/shared/contracts.js";
@@ -26,6 +26,7 @@ import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata } 
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { projectSourcesSchema } from "../src/shared/project-sources.js";
 import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
+import { fetchPublicGithubSpec, ProjectSpecError } from "./project-spec.js";
 import { createWebResearch } from "./extensions/web.js";
 import { createWebBackend } from "./web/backend.js";
 import { Skills, SkillBindingsDoc } from "./extensions/skills.js";
@@ -1387,6 +1388,24 @@ export class DispatchRuntime {
     const archive = blob ? await this.projectArchiveStore.read(blob) : null;
     await this.harness.commit(async tx => { await requireProjectAccess(tx, scope, id, "read", this.readAll(scope)); }, context);
     return archive;
+  }
+
+  /** Reads the configured spec from its public repository. External I/O stays outside native commits. */
+  async getProjectSpec(scope: RuntimeScope, id: string): Promise<ProjectSpecDocument> {
+    const binding = (project: SharedProjectRecord) => {
+      const repository = project.spec && project.repositories?.find(item => item.id === project.spec!.repositoryId);
+      return project.spec && repository ? { repositoryId: repository.id, url: repository.url, path: project.spec.path } : undefined;
+    };
+    const source = await this.harness.commit(async tx => binding(await requireProjectAccess(tx, scope, id, "read", this.readAll(scope))), context);
+    if (!source) throw new ProjectSpecError(404, "This project has no spec file configured.");
+    const loaded = await fetchPublicGithubSpec(source.url, source.path);
+    await this.harness.commit(async tx => {
+      const current = binding(await requireProjectAccess(tx, scope, id, "read", this.readAll(scope)));
+      if (current?.repositoryId !== source.repositoryId || current.url !== source.url || current.path !== source.path) {
+        throw new ProjectSpecError(409, "The project's spec reference changed while loading. Reload to open the current spec.");
+      }
+    }, context);
+    return { projectId: id, ...source, ...loaded };
   }
 
   async saveProject(scope: RuntimeScope, id: string, input: SaveProjectInput): Promise<Project> {

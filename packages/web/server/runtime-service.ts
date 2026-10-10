@@ -8,6 +8,7 @@ export type RuntimeService = Pick<DispatchRuntime,
   | "importProjectArchive"
   | "exportProjectArchive"
   | "getProjectArchive"
+  | "getProjectSpec"
   | "transcriptPage"
   | "publicDetail"
   | "saveDefinitionOfDone"
