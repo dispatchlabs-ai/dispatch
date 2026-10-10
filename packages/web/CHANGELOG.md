@@ -4,7 +4,7 @@
 
 ### Single composer Send/Stop action
 
-- Replace the separate Stop all control with a single fixed-position Send/Stop button for main and thread composers, with draft presence separate from send eligibility and explicit whole-chat cancellation scope. Source/type/build and synthetic component visual reviews pass; authenticated integration and publication are pending. See the [handoff](docs/handoff.md#single-composer-sendstop-action--october-10-2026).
+- Replace the separate Stop all control with a single fixed-position Send/Stop button for main and thread composers, with draft presence separate from send eligibility and explicit whole-chat cancellation scope. Source/type/build and synthetic component visual reviews pass; authenticated integration remains unverified. See the [handoff](docs/handoff.md#single-composer-sendstop-action--october-10-2026).
 
 ### Lockstep versioning
 

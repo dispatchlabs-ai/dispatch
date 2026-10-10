@@ -2,7 +2,7 @@
 
 ## Single composer Send/Stop action — October 10, 2026
 
-**Implemented in candidate `47d8b27`; component visual review passed, authenticated integration and publication pending.** Chris approved the four composer-only design sheets and interaction notes, then requested implementation. Developer owns the shared main/thread UI, Pi Durable Expert cancellation/state review, Designer rendered integration review, and Documenter package documentation. The [composer contract](spec.md#message-composer) supersedes the separate Stop all toolbar control; no Pi lifecycle or backend admission change is included.
+**Implemented and published as `47d8b27`; component visual review passed, authenticated integration remains blocked.** Chris approved the four composer-only design sheets and interaction notes, then requested implementation. Developer owns the shared main/thread UI, Pi Durable Expert cancellation/state review, Designer rendered integration review, and Documenter package documentation. The [composer contract](spec.md#message-composer) supersedes the separate Stop all toolbar control; no Pi lifecycle or backend admission change is included.
 
 Acceptance:
 
@@ -13,6 +13,8 @@ Acceptance:
 - Apply source/deslop review, TypeScript/application and applicable Nix checks, whitespace/diff/local-link review. Record actual desktop/390 px rendered evidence and any unmet UI rules separately from runtime keyboard, touch, screen-reader and cancellation evidence; comply with the standing testing policy. No deployment is implied.
 
 The review artifacts are design proposals, not runtime evidence. Documentation records the approved current-chat decision; no wiki publication is claimed. Source/Pi and Deslop reviews found no remaining blockers after keying the outer composer by chat/thread identity; editor-local content/composition flags and errors now reset with Lexical, while workspace drafts remain separately owned. Developer reported passing TypeScript/application builds after refreshing isolated dependencies, plus Apple Silicon Nix build and flake evaluation; the flake reported zero native checks and omitted incompatible Linux systems. Whitespace review passed. Designer rendered the actual candidate components/CSS with synthetic read-only props at 390×844, 768×1024, 1280×720 and 1440×900, plus phone/desktop thread specimens; source hashes matched `47d8b27`. No component visual blockers or horizontal overflow were found: one 44×44 action, correct Send/Stop/uploading states and pending-Send progress. This is component-layout evidence, not full-workspace acceptance. Authenticated candidate access reached sign-in; desktop/390 px main/thread integration requires approved manual authentication or supplied captures. Pending Stop, dynamic transitions, focus indicators, comprehensive contrast and text zoom were not verified. Synthetic captures/review remain ignored under `.local/send-stop-review-e7f87bc8/`; no account screenshots were committed. Runtime cancellation/failure recovery, keyboard/IME, touch, focus and screen-reader behavior remain unverified; builds and source review do not establish these outcomes. No tests or deployment are claimed.
+
+Publication: implementation `47d8b27` and component-review documentation `ed91aac` were pushed normally to `main`, remote SHA equality verified, and the clean canonical checkout fast-forwarded. No remote deployment occurred.
 
 ## Lockstep SemVer and visible application version — October 9, 2026
 
