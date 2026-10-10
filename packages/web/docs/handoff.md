@@ -2333,7 +2333,7 @@ These are source/type/build checks, not image publication or live qualification.
 
 ## Idle-cost optimization — October 10, 2026
 
-**Optimization implemented in a candidate; final source acceptance pending.** Minimize effective
+**Source optimization accepted; live acceptance remains unverified.** Minimize effective
 cost while the installation is not in use; active-use infrastructure spending is
 acceptable. This extends the accepted baseline source, not its live qualification.
 Deployer owns Aurora auto-pause constraints and revised idle/active cost estimates;
@@ -2349,8 +2349,8 @@ per-workspace prices do not establish this isolated installation's floor, and ol
 filesystem persistence assumptions do not supersede disposable workspaces.
 The [canonical sleep/wake contract](idle-sleep.md) owns non-cancelling refusal,
 retained support callbacks, partial reopening, planned-quiescence health and clean
-owner shutdown. Implementation/review is available; final integrated checks and
-independent consumer acceptance remain pending.
+owner shutdown. The [module source acceptance](https://github.com/dispatchlabs-ai/terraform-aws-dispatch/blob/main/docs/releases.md#idle-cost-source-acceptance--october-10-2026)
+records bounded offline checks; this is not runtime qualification.
 
 Acceptance for the selected design:
 
@@ -2371,3 +2371,23 @@ Automatic worker retirement between turns remains absent; operator sleep must
 retire workers/controllers to close every database owner. No achieved idle-price
 or universal minimum-cost claim follows from source implementation. No customer/live
 AWS access or storage migration is authorized; real outcomes remain unverified.
+
+### Idle-cost source evidence
+
+At module `192c6ce` / application `a502fc8`, Pi/Deslop close source-review findings,
+including current-task drift protection before mutations. The runtime guide owns
+non-cancelling refusal, planned health and retained recovery boundaries. Deployer
+reports independent archives/external callers at `8b8ee00`: Terraform 1.13.5,
+OpenTofu 1.12.6, provider 6.67.0, 28 mock plans/engine, 33 Python checks, nine
+operator-request cases and edge checks. The follow-up adds one lifecycle refusal
+case; Pi verifies all 11 lifecycle checks. Documenter independently passed all
+34 Python checks, nine operator-request cases and complete caller init/validate
+on Terraform 1.13.5/OpenTofu 1.13.1 after `192c6ce`; no AWS calls.
+
+Developer reports integrated npm type/build, Apple Silicon Nix application/frontend
+builds and flake evaluation passed at `a502fc8`; zero runnable Darwin checks, Linux
+omitted. Pi's `1114256` has matching reviewed server source and build/whitespace
+passes. No application runtime tests or live AWS sleep/wake were exercised.
+Estimated residual idle cost remains conditional, not an invoice or demonstrated
+minimum. Automatic between-turn retirement, browser wake and actual pause/latency/
+billing verification remain absent; operator tooling does not silently add them.
