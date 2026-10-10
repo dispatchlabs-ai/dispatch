@@ -38,7 +38,7 @@ cd dispatch-0.2.0-darwin-arm64
 
 Replace the example email and name with your own. Keep the private enrollment link printed by `invite`, start Dispatch, then open that link to create your account. The app runs at **http://localhost:3001**. Keep the terminal running; Ctrl-C stops Dispatch. Once enrolled, [connect a model and start working](#connect-a-model-and-start-working).
 
-State and project workspace live in `~/Library/Application Support/Dispatch`, outside the extracted application directory. Keep that directory when replacing the package and back up its complete contents together. Stop Dispatch before running `invite` or `reset` commands. The package does not install a login or reboot service.
+State and project workspace live in `~/Library/Application Support/Dispatch`, outside the extracted application directory. Keep that directory when replacing the package and back up its complete contents together. Stop Dispatch before replacing the package or making a file-copy backup of this directory. Also stop it before running `invite` or `reset` commands. The package does not install a login or reboot service.
 
 Contributors can build the archive locally on an Apple Silicon Mac with Nix:
 
