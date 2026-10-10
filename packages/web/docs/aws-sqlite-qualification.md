@@ -1,6 +1,6 @@
 # AWS SQLite and recovery qualification
 
-**AWS procedure; live qualification pending.** The local probe rehearsal below is not AWS evidence. This is the focused disposable-state qualification authorized for the [AWS container target](spec.md#aws-container-deployment-target), not a general application test suite. Do not use an existing personal or team installation. A build, successful mount, healthy ALB target, or clean SQLite integrity result alone does not establish application recovery.
+**Historical SQLite AWS candidate procedure; live qualification was not completed.** The standalone [PostgreSQL/conversation-worker module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) is the supported new AWS installation path. This procedure preserves earlier SQLite probe mechanics and evidence, not prerequisites for that module. The local probe rehearsal below is not AWS evidence. This is the focused disposable-state qualification authorized for the [AWS container target](spec.md#aws-container-deployment-target), not a general application test suite. Do not use an existing personal or team installation. A build, successful mount, healthy ALB target, or clean SQLite integrity result alone does not establish application recovery.
 
 Use the exact candidate image and module revisions. Record results in the deployment work package's acceptance criteria and the installation's private deployment record. Stop qualification and retain failure evidence if an invariant below fails; do not promote the installation to real data.
 
