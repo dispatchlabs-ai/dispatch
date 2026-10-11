@@ -8,6 +8,11 @@ export type SpecImportProvenance = ProjectSpecImport;
 export type ProjectMarkdownRevision = ProjectMarkdownDocument & { savedAt: number; savedBy: string };
 export type { ProjectMarkdownDocument, SaveProjectMarkdownInput };
 
+/** Detach nested provenance before the native commit's document proxies are revoked. */
+function revisionCopy(revision: ProjectMarkdownRevision): ProjectMarkdownRevision {
+  return { ...revision, ...(revision.importedFrom ? { importedFrom: { ...revision.importedFrom } } : {}) };
+}
+
 /** Immutable revisions and actor-scoped receipts; access lives in ProjectsDoc, not historical content. */
 export const ProjectMarkdownDoc = defineDoc<{
   revisions: Record<string, ProjectMarkdownRevision[]>;
@@ -29,7 +34,7 @@ export async function readProjectMarkdown(tx: Tx, scope: RuntimeScope, id: strin
   const revisions = (await tx.doc(ProjectMarkdownDoc)).revisions[id] ?? [];
   const saved = revision === undefined ? revisions.at(-1) : revisions.find(item => item.revision === revision);
   if (revision !== undefined && !saved) throw new ProjectSpecError(404, "Spec revision not found.");
-  if (saved) return { ...saved };
+  if (saved) return revisionCopy(saved);
   return { projectId: id, revision: 0, content: "", contentHash: markdownHash(""), legacyImportRequired: Boolean(project.spec) };
 }
 
@@ -47,7 +52,7 @@ export async function replayProjectMarkdown(tx: Tx, scope: RuntimeScope, id: str
   if (prior.fingerprint !== fingerprint) throw new ProjectSpecError(409, "Request ID was already used for a different spec change.");
   const revision = doc.revisions[id]?.find(item => item.revision === prior.revision);
   if (!revision) throw new ProjectSpecError(409, "Saved spec receipt has no revision. Reload and review.");
-  return { ...revision };
+  return revisionCopy(revision);
 }
 
 /** All access, conflict, append and receipt mutations belong to the caller's one native commit. */
@@ -76,7 +81,7 @@ export async function saveProjectMarkdown(tx: Tx, scope: RuntimeScope, id: strin
   project.specRevision = saved.revision;
   doc.requests[requestKey(scope, id, input.requestId)] = { fingerprint, projectId: id, revision: saved.revision };
   if (migration) { delete project.spec; project.revision += 1; project.updatedAt = saved.savedAt; }
-  return { ...saved };
+  return revisionCopy(saved);
 }
 
 /** Caller authorizes current room/agent membership; project identity is resolved from that room, never arguments. */
