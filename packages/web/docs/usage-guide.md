@@ -690,6 +690,7 @@ October 11 candidate checks cover `f346543` / `e4dd806`, with imported-response 
 | Brand-new native project chat | Claude verified chat 204728 returned Dispatch Web revision 1 and the imported digest; chat 204575 returned the disposable project's own revision 12. Neither changed spec/settings. Existing-chat pagination remains separately verified. |
 | Hosted worker interaction, access loss | Hosted mediation/current access checks source-reviewed, not interactively qualified here. |
 | Responsive entry/editor/recovery | Designer completed entry/editor, conflict and actual unconfirmed-save visual review at 1440, 1280, 768 and 390 px, plus migrated Dispatch Web captures; no blocking clipping/overlap. At 390 px, Retry save wraps and remains visible. These image checks do not replace Claude’s separately reported interactions or human design acceptance. Chris subsequently rejected the narrower Preview; the original review missed Preview/Source width consistency. |
+| Preview ↔ Source uses available panel width | Correction `e3a5ac5`: Claude measured equal panel/Preview/Source widths at 1440 (1032 px) and 390 (358 px), with no page-level horizontal overflow. Read-only switches left the imported revision unchanged. Other widths were not remeasured for this correction. |
 
 This qualifies neither spec-led automation nor chat working-copy editing. Save does not acquire new execution authority. Data migration, application publication and walkthrough acceptance are distinct.
 
