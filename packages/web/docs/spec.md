@@ -34,14 +34,27 @@ Pre-release walkthroughs: action → observable outcome; check the failure/recov
   - Add files with +, paste an image or receive an attachment → composer previews, appropriately sized uncropped inline images, original downloads and scrollable inline patch diffs.
   - Unsupported/unavailable/oversized previews show a useful fallback. Attachment paths never authorize filesystem access or patch application.
 - **Organize projects**
-  - Create a shared project, restrict access, choose default agents and quickly start a chat from it → visibility/defaults follow project policy.
+  - Open the far-left rail in order Projects → Agents → Chats; create/select a shared project → manage intent without starting a chat.
+  - Projects is the only project-management interface; editing moves out of Chats. Chats retains execution details/questions; management links open Projects, not another editor.
+  - Choose project agents/defaults in Projects; edit reusable agent definitions in Agents. Optional chat grouping filters project conversations.
   - Managers control membership/defaults; readers cannot post/control work. Removing access blocks protected actions. No separate personal-project mode.
+- **Tend project intent**
+  - Refine the official spec from Projects → inspect its revision, changes and associated work without opening a work chat.
+  - Report a bug/failed walkthrough → track the failure against intended behavior; refine the spec if intent is missing, not to excuse failure.
+  - Conflicting saves require review and preserve recoverable input. Agents need explicit authority to adopt spec changes. Storage and execution triggers remain open below.
+- **Deliver spec-led project work**
+  - Make a feature/fix actionable under enabled policy → automatically create associated chats and continue authorized work to its Definition of Done without routine prompting.
+  - Inspect progress, blockers, critical questions and evidence in Projects → open the linked chat for details/answers, without maintaining a separate task board.
+  - Dispatch preserves outcome/work identity through edits; chats/status link to the targeted spec revision and outcome. Users need not maintain IDs in Markdown.
+  - Reconcile edits/retries/restarts → no duplicate assignments or silent superseded work. Stop cannot trigger automatic replacement work; pauses, approvals and access limits remain effective.
+  - Inspect completion → criteria and evidence against intended behavior. Idle, failed or unverified work is not a pass; agents cannot weaken requirements to claim success.
 - **Prepare a project workspace**
   - Select a local directory or one-to-many repositories and set ordinary environment variables → chat agents know the configured project and intended working directory.
   - Each cloud chat uses a writable ephemeral workspace and clones configured repos using granted credentials; commit/push completed work before normal teardown. No shared persistent project storage is required.
   - Failed pushes are not completion; unexpected workspace loss can lose unpushed work. Missing repos/access/directories are actionable failures; a working directory is not a sandbox. Cloud teardown does not delete a configured local directory.
 - **Read and edit project files**
-  - Designate the official spec in a directory project or configured repo, then view/edit it at the chat level → inspect the chosen file and saved changes in that chat's working copy, using a lightweight editor shared with chat code/diff presentation.
+  - Open repository/project-directory files from a chat → inspect and edit that chat's working-copy files, including uncommitted changes, in a lightweight editor shared with chat code/diff presentation.
+  - Save writes the selected working-copy file; commit/push are separate authorized actions. A designated repository spec can be opened here, but this file editor is separate from tending project intent in Projects.
   - Missing, inaccessible or changed files require recovery/review. Displaying a proposal does not apply or approve it.
 - **Manage agents and instances**
   - Edit instructions/model/thinking/resources; add named instances with supplements → inspect saved settings and adopted revisions. Existing instances update at a safe idle boundary, preserving identity/history/supplements.
@@ -70,7 +83,7 @@ Pre-release walkthroughs: action → observable outcome; check the failure/recov
 
 ## Rules
 
-- Humans control scope, participation, approvals and Stop. Criteria guide the current authorized task; historical handoffs/unfinished spec items do not create assignments. Continuation yields to Stop, pauses, blockers and required approvals.
+- Humans control scope, participation, approvals and Stop. Criteria guide the current authorized task; historical handoffs and unfinished spec items alone do not authorize work. Assignments require human direction or an explicitly enabled project automation policy. Continuation yields to Stop, pauses, blockers and required approvals.
 - Enforce company/project/chat authority; resolve identity from trusted membership, not agent claims. Separate agent contexts do not isolate shared host files.
 - Public messages, replies and shared files are visible to authorized chat readers, including later invitees. Diagnostics do not turn private context or pending contributions into public messages.
 - Separate saved, submitted, running, completed, failed and cancelled states. Tool success, idle agents and finished deliveries do not prove task completion; expose uncertainty/recovery.
@@ -78,14 +91,21 @@ Pre-release walkthroughs: action → observable outcome; check the failure/recov
 - Pi owns durable execution/recovery. Updates preserve history and admitted work; Stop/removal/revocation do not roll back effects.
 - Keep typing, caret position and submission responsive during updates and long chats, locally and hosted. Layout/tab changes preserve drafts; reload need not. Errors preserve recoverable input where possible.
 - Terse UI labels, compact expandable detail, keyboard/touch controls and standard navigation links supporting new tabs; no hover-only actions. Phone layouts prioritize the main work area/vertical space and place the main menu upper-left.
-- The chat's fourth column is a multi-use, multi-tab panel for participants and file editing, including the designated spec; not a participants-only surface.
+- The chat's fourth column is a multi-use, multi-tab panel for participants and file editing, including a repository-backed spec; not a participants-only surface.
 - Repository-only product documentation: requirements here, local links for detail, company infrastructure in the operator's own repo. Generic MCP remains; no particular wiki dependency.
+
+## Projects decisions still open
+
+- **Official spec authority:** retain a designated repository/file (or existing local-directory file), or adopt a project-owned versioned document stored by Dispatch? Exactly one is authoritative; any exported copy must identify its source revision and not become a second master. Database ownership would replace designated-file spec authority; Dispatch product documentation remains repo-local, with no wiki dependency.
+- **Actionability:** does an edit immediately trigger automation under project policy, or remain a saved draft until explicitly adopted? The proposed default is save draft → review/adopt → reconcile work; saving alone would not launch work.
+- **Default destination:** open Projects or Chats when there is no explicit destination? Rail order does not settle this. Explicit chat/section links remain respected.
+- **Design:** exact project subviews and phone presentation await review; Spec/Work/Agents tabs are proposed labels, not approved structure.
 
 ## Implementation and pre-release status
 
 - Adoption, implementation and verification are separate. This working spec is adopted; per-use-case implementation and walkthrough results are not yet comprehensively recorded.
 - Spec editor at `ad2d1fa`: configuration persistence verified; directory viewing and file Save missing; public-GitHub draft editing browser-unverified. [Qualification](usage-guide.md#shared-projects).
-- Chat-level working-copy editing is directed, not implemented or verified by this record; project-level remote publication is not the selected model.
+- Top-level Projects, spec-led work automation and chat working-copy file editing are desired scope, not implemented or verified by this record. Projects ownership/trigger decisions above require approval before implementation.
 - Before release, record revision and each approved walkthrough's result: verified, failed, blocked or not checked, with evidence/limits. Builds alone do not qualify behavior.
 - No automated repository tests; authorized interactive agent-browser verification is permitted. Product evaluation execution is not permission to add automated repository tests.
 
