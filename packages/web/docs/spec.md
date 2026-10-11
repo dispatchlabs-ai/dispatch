@@ -105,7 +105,7 @@ Pre-release walkthroughs: action → observable outcome; check the failure/recov
 
 - Adoption, implementation and verification are separate. This working spec is adopted; per-use-case implementation and walkthrough results are not yet comprehensively recorded.
 - Spec editor at `ad2d1fa`: configuration persistence verified; directory viewing and file Save missing; public-GitHub draft editing browser-unverified. [Qualification](usage-guide.md#shared-projects).
-- Top-level Projects, spec-led work automation and chat working-copy file editing are desired scope, not implemented or verified by this record. Projects ownership/trigger decisions above require approval before implementation.
+- Projects build authorized October 11, 2026 against the reviewed working spec; implementation and walkthrough results are pending. Storage authority, activation and default-destination choices remain open; navigation/project-management work can proceed independently.
 - Before release, record revision and each approved walkthrough's result: verified, failed, blocked or not checked, with evidence/limits. Builds alone do not qualify behavior.
 - No automated repository tests; authorized interactive agent-browser verification is permitted. Product evaluation execution is not permission to add automated repository tests.
 
