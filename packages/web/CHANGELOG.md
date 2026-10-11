@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Projects navigation
+
+- Add Projects before Agents and Chats in workspace navigation; move project creation, overview, settings and spec viewing out of Chats while retaining conversation grouping and legacy project links.
+- Add project-list search, full-width spec references and upper-left narrow-screen navigation; keep project, spec and chat drafts mounted across destination switches.
+- This slice does not implement project-document spec storage, adoption-triggered automation or chat working-copy Save.
+
 ### Inline conversation diffs
 
 - Preview published UTF-8 `.patch` and `.diff` attachments directly in messages using the Pierre fork, with expanded unified changes, file headers, bounded scrolling and an original-patch link. Invalid or oversized patches retain a readable fallback; previews never apply changes.
