@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-11
+
 ### Database-owned project specs
 
 - Use the full spec-panel width for Markdown Preview, matching Source rather than applying a narrower reading-column cap.
