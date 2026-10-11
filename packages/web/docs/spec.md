@@ -1,6 +1,6 @@
 # Dispatch specification
 
-**Proposed for approval.** Desired outcomes, not implementation or release-readiness claims.
+**Working spec.** Desired outcomes, not implementation or release-readiness claims.
 
 ## Purpose and scope
 
@@ -38,7 +38,8 @@ Pre-release walkthroughs: action → observable outcome; check the failure/recov
   - Managers control membership/defaults; readers cannot post/control work. Removing access blocks protected actions. No separate personal-project mode.
 - **Prepare a project workspace**
   - Select a local directory or one-to-many repositories and set ordinary environment variables → chat agents know the configured project and intended working directory.
-  - Repository work can start in a writable cloud workspace using granted clone credentials. Missing repos/access/directories are actionable failures; a working directory is not a sandbox.
+  - Each cloud chat uses a writable ephemeral workspace and clones configured repos using granted credentials; commit/push completed work before normal teardown. No shared persistent project storage is required.
+  - Failed pushes are not completion; unexpected workspace loss can lose unpushed work. Missing repos/access/directories are actionable failures; a working directory is not a sandbox. Cloud teardown does not delete a configured local directory.
 - **Read and edit project files**
   - Designate the official spec in a directory project or configured repo, then view/edit it → inspect the chosen file and saved changes in a lightweight editor shared with chat code/diff presentation.
   - Missing, inaccessible or changed files require recovery/review. Displaying a proposal does not apply or approve it.
@@ -81,7 +82,9 @@ Pre-release walkthroughs: action → observable outcome; check the failure/recov
 
 ## Implementation and pre-release status
 
-- Approval, implementation and verification are separate. This proposal qualifies no use case as implemented or verified.
+- Adoption, implementation and verification are separate. This working spec is adopted; per-use-case implementation and walkthrough results are not yet comprehensively recorded.
+- Spec editor at `ad2d1fa`: configuration persistence verified; directory viewing and file Save missing; public-GitHub draft editing browser-unverified. [Qualification](usage-guide.md#shared-projects).
+- Open decision: the cloud editor's working-copy target and publication action. Ephemeral chat storage does not settle whether it edits a selected chat clone or a remote revision.
 - Before release, record revision and each approved walkthrough's result: verified, failed, blocked or not checked, with evidence/limits. Builds alone do not qualify behavior.
 - No automated repository tests; authorized interactive agent-browser verification is permitted. Product evaluation execution is not permission to add automated repository tests.
 

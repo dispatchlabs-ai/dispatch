@@ -51,7 +51,7 @@ Language-specific manifests and build configuration belong beside the relevant p
 
 Use this repository's checks below and the current testing policy.
 
-The repository is the authoritative home for Dispatch documentation. The specification is the primary product document: supported use cases and rules stay concise; agent-facing implementation detail lives in linked repo documents. Historical handoffs are reference material, not a second product specification. The current spec is intentionally a draft outline: do not restore requirements from history or supporting documents, populate it from code, or treat missing requirements as approval. Build its content with Chris before implementing new product scope.
+The repository is the authoritative home for Dispatch documentation. The specification is the primary product document: supported use cases and rules stay concise; agent-facing implementation detail lives in linked repo documents. Historical handoffs are reference material, not a second product specification. The current spec is the adopted working copy: do not restore requirements from history or supporting documents, populate it from code, or treat missing requirements as approval. Iterate its requirements with Chris; adoption does not authorize implementing its backlog.
 
 ## Agent workflows
 
