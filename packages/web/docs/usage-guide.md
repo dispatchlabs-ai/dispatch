@@ -676,7 +676,7 @@ New project now creates an empty shared project with you as its manager. Project
 
 #### Database spec qualification
 
-October 11 candidate checks cover `f346543` / `e4dd806`, with imported-response repair at `588d908` and integrated code/changelog at `820f94b`. TypeScript/application/capability and Apple Silicon Nix build/flake checks passed again after the repair. Designer completed four-size visual acceptance, including genuine unconfirmed-save recovery. Claude also verified reads in newly created chats for Dispatch Web and a disposable project. The accepted candidate is ready for Git publication; this is not hosted deployment acceptance. Source/build checks are separate from browser evidence; no automated tests ran. Raw screenshots and ledgers remain local.
+October 11 candidate checks cover `f346543` / `e4dd806`, with imported-response repair at `588d908` and integrated code/changelog at `820f94b`. TypeScript/application/capability and Apple Silicon Nix build/flake checks passed again after the repair. Designer reviewed four-size entry/recovery layouts, including genuine unconfirmed-save recovery; this did not qualify Preview/Source width consistency. Claude also verified reads in newly created chats for Dispatch Web and a disposable project. The database-spec slice was published through `18706d7`; this is not hosted deployment acceptance. Source/build checks are separate from browser evidence; no automated tests ran. Raw screenshots and ledgers remain local.
 
 | Walkthrough/boundary | Reported coverage |
 | --- | --- |
@@ -689,7 +689,7 @@ October 11 candidate checks cover `f346543` / `e4dd806`, with imported-response 
 | Existing-chat native agent read | Documenter read all 15,970 characters in revision-1 pages at offsets 0/12000, same source digest, final nextOffset null. Claude/Pi also reported matching reads. |
 | Brand-new native project chat | Claude verified chat 204728 returned Dispatch Web revision 1 and the imported digest; chat 204575 returned the disposable project's own revision 12. Neither changed spec/settings. Existing-chat pagination remains separately verified. |
 | Hosted worker interaction, access loss | Hosted mediation/current access checks source-reviewed, not interactively qualified here. |
-| Responsive entry/editor/recovery | Designer completed entry/editor, conflict and actual unconfirmed-save visual review at 1440, 1280, 768 and 390 px, plus migrated Dispatch Web captures; no blocking clipping/overlap. At 390 px, Retry save wraps and remains visible. These image checks do not replace Claude’s separately reported interactions. |
+| Responsive entry/editor/recovery | Designer completed entry/editor, conflict and actual unconfirmed-save visual review at 1440, 1280, 768 and 390 px, plus migrated Dispatch Web captures; no blocking clipping/overlap. At 390 px, Retry save wraps and remains visible. These image checks do not replace Claude’s separately reported interactions or human design acceptance. Chris subsequently rejected the narrower Preview; the original review missed Preview/Source width consistency. |
 
 This qualifies neither spec-led automation nor chat working-copy editing. Save does not acquire new execution authority. Data migration, application publication and walkthrough acceptance are distinct.
 
