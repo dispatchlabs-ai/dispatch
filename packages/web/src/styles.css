@@ -1270,7 +1270,7 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .project-spec-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); }
 .project-spec-draft { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); color: var(--color-muted); font-size: var(--text-sm); }
 .project-spec-preview { min-width: 0; }
-.project-spec-preview .markdown { max-width: 72ch; font-size: var(--text-base); }
+.project-spec-preview .markdown { font-size: var(--text-base); }
 .project-spec-source { min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
 .project-spec-source[hidden] { display: none; }
 @container (max-width: 560px) {

@@ -4,6 +4,7 @@
 
 ### Database-owned project specs
 
+- Use the full spec-panel width for Markdown Preview, matching Source rather than applying a narrower reading-column cap.
 - Store authoritative project Markdown as immutable database revisions; write a first spec or edit an existing one directly from Projects, without a file path or repository prerequisite.
 - Preserve drafts on conflicts and uncertain responses. Stable actor-scoped Save receipts confirm the originally committed revision on retry, even after another writer advances the spec; Save does not start agents or publish Git changes.
 - Import a reviewed legacy spec and retire its active file reference atomically, preserving source provenance and unrelated project settings. Remove the old file-write endpoint and normal spec-source configuration.
