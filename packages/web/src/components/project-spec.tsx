@@ -105,7 +105,9 @@ export function ProjectSpecView({ project, active, onBack, onDirtyChange }: {
   }
   function discard() {
     if (!confirmDiscard()) return;
-    draft.current = null; setDirty(false); setEditing(false); setSaved(false); setCopyStatus(""); setSession(value => value + 1);
+    draft.current = null; retrySubmission.current = null;
+    setDirty(false); setEditing(false); setSaved(false); setCopyStatus("");
+    setSaveError(""); setSaveBlocked(false); setSession(value => value + 1);
   }
   function showSource() { setSourceShown(true); setView("source"); }
   function edit() { setEditing(true); showSource(); }
