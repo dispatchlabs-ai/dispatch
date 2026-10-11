@@ -225,6 +225,8 @@ See [NIST's distinction between single-factor and multi-factor cryptographic aut
 
 ### Equal access now; RBAC later
 
+**Current implementation.** The [user-management proof of concept](#user-management-proof-of-concept) below introduces roles for account administration; broader RBAC remains deferred.
+
 All authenticated users have the same baseline application capabilities and independent identities/sessions. Resource-specific authority still applies: shared projects distinguish managers from members, connection credentials have an owner, and conversation participation requires current access. These are current authorization requirements, not future RBAC. Broader application roles and role-management UI remain future work through the same server-side authorization boundary.
 
 Each installation serves one company. Accounts have separate identities. Unbound conversation access uses explicit [shared-conversation membership](#shared-conversations); conversations in a shared project use [current project policy](#shared-project-access-and-default-agents). Agent definitions are shared within the company. Human-facing service operations receive their company/user scope from the authenticated session. The planned [agent-management operations](#permissioned-agent-management) instead resolve an agent principal from its trusted native instance binding; they must not borrow a human session or user identity. These boundaries do not grant cross-company access.
@@ -233,13 +235,26 @@ The accepted future [personal Wiki connection](#personal-wiki-connections) adds 
 
 ### Enrollment, recovery, and sessions
 
-An operator provisions an expiring, single-use invitation through the local CLI; there is no public registration or invented application administrator role. The invited user enrolls either a verified passkey or password plus TOTP. Passkey enrollment proceeds directly to the browser/password-manager ceremony without asking for a credential name. New enrollment requests omit the optional `passkeyName`; the service uses its existing `Passkey` label and still accepts labels from older clients. A restricted enrollment cookie cannot access chats, agent definitions, or live subscriptions.
+Currently, an operator provisions an expiring, single-use invitation through the local CLI; the [proof of concept](#user-management-proof-of-concept) replaces routine provisioning with live administration. There is no public registration. The invited user enrolls either a verified passkey or password plus TOTP. Passkey enrollment proceeds directly to the browser/password-manager ceremony without asking for a credential name. New enrollment requests omit the optional `passkeyName`; the service uses its existing `Passkey` label and still accepts labels from older clients. A restricted enrollment cookie cannot access chats, agent definitions, or live subscriptions.
 
 Password/TOTP enrollment issues one-use recovery codes. Password plus a recovery code starts restricted re-enrollment and revokes existing sessions; it does not restore application access until a fresh factor is verified. An operator can issue a reset invitation after independently establishing account ownership, including for passkey-only accounts. Completing recovery replaces the old sign-in methods.
 
 Sessions use 256-bit opaque tokens stored as hashes on the service. Cookies are HttpOnly, SameSite Strict, and Secure on HTTPS; only loopback development may use HTTP. A single-desktop container may explicitly set `DISPATCH_CONTAINER_LOOPBACK_HTTP=1` to use an HTTP loopback origin with a non-loopback container-internal bind. The operator must publish only on host loopback; startup warns about this assumption because the app cannot inspect Docker's host-side publication. Non-loopback HTTP origins remain rejected, and serving other machines requires HTTPS. Sessions expire after 12 hours absolute or 30 minutes without authenticated requests. Live stream heartbeats do not extend idle expiry. Logout and in-process revocations close subscriptions immediately; snapshots and periodic checks also enforce expiry and changes made by a separate operator process. Existing agent work continues when a session ends.
 
 Account security supports additional/removable passkeys, password/TOTP enrollment or replacement, and session revocation. Factor changes require a sign-in completed within the previous ten minutes. The last complete sign-in method cannot be removed.
+
+### User management proof of concept
+
+**Specified October 11, 2026; implementation pending.** Routine user administration must work through the running backend without stopping services or interrupting other users or agent work. [Decision record](https://wiki.dispatchworks.ai/wiki/dispatch-web-authentication/#section-user-management-proof-of-concept-october-11-2026).
+
+- Use two fixed company roles: **Admin** and **Member**. Admin adds user-management authority; existing project, agent and credential policies remain unchanged. Existing users default to Member; an operator explicitly selects the first Admin by account ID. Prevent suspension or demotion of the last active Admin.
+- **Settings → People** lists name, email, role and account/invitation status. Admins can invite Members by email, copy/reissue/revoke invitation links, change roles, and suspend/reactivate accounts. Reuse existing passkey or password/TOTP enrollment; email delivery is deferred.
+- Enforce current Admin authority and company scope in backend operations, including retries. Members cannot list the administration directory or invoke its actions. Preserve the existing participant directory. Role changes and suspension require recent sign-in under the existing ten-minute rule.
+- Enrollment is invitation-only: no public signup or automatic account creation at sign-in. Require a valid Admin-issued invitation bound to the invited email and company; applicants cannot substitute another identity. Links expire and are single-use. Reissuing/revoking invalidates prior enrollment access; retries cannot duplicate accounts. Inviting an enrolled account must not reset it.
+- Suspension is separate from factor recovery: block sign-in/enrollment, revoke sessions and close subscriptions; preserve history and authorship. Reactivation does not revive revoked sessions or links. Already admitted agent work continues under the existing runtime contract.
+- Record actor, target, action and time for administration changes, excluding credentials and invitation tokens.
+
+Keep operator bootstrap/recovery available. Custom roles, teams, guests, project viewers, finer agent/tool permissions, SSO and an audit browser are later work. [Acceptance](handoff.md#user-management-proof-of-concept--october-11-2026).
 
 ## Dispatch branding
 

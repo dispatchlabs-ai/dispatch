@@ -1,5 +1,13 @@
 # Dispatch Web implementation handoff
 
+## User management proof of concept — October 11, 2026
+
+**Specified; implementation pending.** Implement only the [bounded user-management scope](spec.md#user-management-proof-of-concept). Acceptance:
+
+- An Admin invites a Member who completes enrollment while another user's session, live stream and running agent work continue; no maintenance window or restart.
+- Uninvited enrollment and Member/foreign-company administration are denied; superseded/revoked links fail, suspension removes access, reactivation preserves history, and the last active Admin is protected.
+- Verify People on desktop and 390 px, including keyboard use and recoverable errors. Apply source/deslop review, TypeScript/application and applicable Nix checks under the existing testing policy; record functional evidence and remaining gaps here. No automated tests.
+
 ## Single OpenAI provider — October 10, 2026
 
 Chris requested removing the legacy option and manually moving all OpenAI agents to the already connected `openai` ChatGPT OAuth account. This supersedes the earlier decision to expose a separate legacy reconnect path. No reusable migrator, credential import, global Pi configuration change or hosted deployment is part of this package.
