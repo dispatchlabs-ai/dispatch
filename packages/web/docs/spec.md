@@ -78,6 +78,7 @@ Pre-release walkthroughs: action → observable outcome; check the failure/recov
 - Pi owns durable execution/recovery. Updates preserve history and admitted work; Stop/removal/revocation do not roll back effects.
 - Keep typing, caret position and submission responsive during updates and long chats, locally and hosted. Layout/tab changes preserve drafts; reload need not. Errors preserve recoverable input where possible.
 - Terse UI labels, compact expandable detail, keyboard/touch controls and standard navigation links supporting new tabs; no hover-only actions. Phone layouts prioritize the main work area/vertical space and place the main menu upper-left.
+- The chat's fourth column is a multi-use, multi-tab panel for participants and file editing, including the designated spec; not a participants-only surface.
 - Repository-only product documentation: requirements here, local links for detail, company infrastructure in the operator's own repo. Generic MCP remains; no particular wiki dependency.
 
 ## Implementation and pre-release status
