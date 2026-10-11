@@ -791,7 +791,7 @@ export function Workspace() {
         <div className="mobile-navigation">
           <Modal title="Your workspace" description={config.company.name} side="left" open={navigationOpen} onOpenChange={setNavigationOpen} finalFocus={section === "projects" ? () => document.querySelector<HTMLButtonElement>(".projects-mobile-header button") : undefined} trigger={section === "projects" ? undefined : <Button variant="ghost" className="workspace-action">
             <Menu size={21} /> Menu</Button>}>
-            <nav className="mobile-destinations" aria-label="Workspace navigation">
+            <nav className={`mobile-destinations ${section === "projects" ? "projects-destinations" : ""}`} aria-label="Workspace navigation">
               {(["projects", "agents", "chats"] as const).map(destination => <a key={destination} className="button button-ghost" href={`/?${new URLSearchParams(sectionLocation(destination))}`} aria-current={section === destination ? "page" : undefined} onClick={event => navigateSection(event, destination)}>
                 {destination === "projects" ? <Folder /> : destination === "agents" ? <Bot /> : <MessageSquare />} {destination === "projects" ? "Projects" : destination === "agents" ? "Agents" : "Chats"}
               </a>)}
