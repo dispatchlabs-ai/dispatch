@@ -31,7 +31,7 @@ Use `npm run auth -- invite --email person@example.com --name "Person"` to provi
 | `.pi/skills/` | Focused browser-testing and release procedures |
 | `packages/<package>/README.md` | Package purpose, usage, and documentation links |
 | `packages/<package>/CHANGELOG.md` | Package changes and release history |
-| `packages/<package>/docs/spec.md` | Intended behavior, contracts, and explicit unresolved questions |
+| `packages/<package>/docs/spec.md` | Package specification where applicable; Dispatch Web retains only a database-spec access pointer |
 | `packages/<package>/docs/handoff.md` | Historical implementation notes and verification evidence |
 | `packages/<package>/docs/usage-guide.md` | Detailed integration guidance when the package has usable interfaces |
 | `packages/<package>/src/` | Implementation |
@@ -43,7 +43,7 @@ Language-specific manifests and build configuration belong beside the relevant p
 
 ## Specification and implementation
 
-1. Read authoritative project intent and relevant affected-package documentation; follow the declared authority transition below for Dispatch Web.
+1. Read authoritative project intent and relevant affected-package documentation; follow the database authority below for Dispatch Web.
 2. Agree the user workflow and observable outcomes. Record behavior and contracts in the authoritative spec, including state ownership, failure paths, and recovery. Mark proposed or unresolved details explicitly; do not edit a repository copy as live intent after database cutover.
 3. Keep implementation notes and verification receipts in repo-local supporting documents when needed. Link useful detail from the specification; do not create additional product requirements or ticket numbering by default.
 4. Implement the current authorized task. Record source/type/build evidence and unverified functional outcomes in the task report or relevant linked supporting document; document actual usage.
@@ -51,9 +51,9 @@ Language-specific manifests and build configuration belong beside the relevant p
 
 Use this repository's checks below and the current testing policy.
 
-The repository is the authoritative home for Dispatch documentation. The specification is the primary product document: supported use cases and rules stay concise; agent-facing implementation detail lives in linked repo documents. Historical handoffs are reference material, not a second product specification. The current spec is the adopted working copy: do not restore requirements from history or supporting documents, populate it from code, or treat missing requirements as approval. Iterate its requirements with Chris; adoption does not authorize implementing its backlog.
+The repository is the authoritative home for product setup, usage, runtime and contribution documentation. Dispatch Web's live project requirements are versioned Markdown stored only in Dispatch's database. Read them in Projects → project → Spec or through `conversation_project_spec`, pinning the returned revision across pages. The repo [spec-access pointer](packages/web/docs/spec.md) contains no requirements body or export. Other package-local specifications remain documentation where applicable.
 
-For Dispatch Web's project, the [chosen intent authority](packages/web/docs/spec.md#project-spec-authority) is versioned Markdown in Dispatch's database. Until import and authorized human/agent access are verified, the repo working spec is the migration source; do not delete it or pretend a database export already exists. After cutover, read live project intent from the database only: no editable repository spec copy or automatic file synchronization. Setup, usage and runtime documentation remain repo-local.
+Historical handoffs and retired Git content are evidence, not a second authority. Do not restore requirements from history, populate intent from code, or treat omissions as approval. Iterate intent with Chris; reading/adoption does not authorize implementing a backlog. No file synchronization or competing editable master. Keep technical detail repo-local and link it from the project document when appropriate.
 
 ## Agent workflows
 

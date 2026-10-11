@@ -20,7 +20,7 @@ Follow the [testing policy](../../CONTRIBUTING.md#testing-policy) for permitted 
 
 ## Documentation
 
-- [Specification](docs/spec.md): behavior, ownership, authentication, layout, and testing policy.
+- [Project spec access](docs/spec.md): read authoritative database Markdown; no spec body or export is stored here.
 - [Implementation handoff](docs/handoff.md): work packages, source/build evidence, and unverified outcomes.
 - [Usage guide](docs/usage-guide.md): startup, account/model configuration, API, state, and troubleshooting.
 - [Runtime integration](docs/runtime.md): native Pi ownership, request identity, cancellation, and recovery.

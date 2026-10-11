@@ -144,7 +144,7 @@ Run these from the repository's Nix shell. They check types and builds, not end-
 - [Web package](packages/web/README.md) — implementation and documentation index
 - [Usage guide](packages/web/docs/usage-guide.md) — detailed setup and operation
 - [Changelog](packages/web/CHANGELOG.md) — changes and release history
-- [Specification](packages/web/docs/spec.md) and [handoff](packages/web/docs/handoff.md) — contracts and scoped verification evidence
+- [Project spec access](packages/web/docs/spec.md) and [handoff](packages/web/docs/handoff.md) — database intent and historical verification evidence
 - [AWS deployment module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) — infrastructure and AWS installation instructions
 
 ## License
