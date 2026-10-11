@@ -676,7 +676,7 @@ New project now creates an empty shared project with you as its manager. Project
 
 #### Database spec qualification
 
-October 11 candidate checks cover `f346543` / `e4dd806`, with imported-response repair at `588d908` and integrated code/changelog at `820f94b`. TypeScript/application/capability and Apple Silicon Nix build/flake checks passed again after the repair. Publication and remaining unconfirmed-state visual/new-chat acceptance are pending. Source/build checks are separate from browser evidence; no automated tests ran. Raw screenshots and ledgers remain local.
+October 11 candidate checks cover `f346543` / `e4dd806`, with imported-response repair at `588d908` and integrated code/changelog at `820f94b`. TypeScript/application/capability and Apple Silicon Nix build/flake checks passed again after the repair. Designer completed four-size visual acceptance, including genuine unconfirmed-save recovery. Publication and new-chat acceptance are pending. Source/build checks are separate from browser evidence; no automated tests ran. Raw screenshots and ledgers remain local.
 
 | Walkthrough/boundary | Reported coverage |
 | --- | --- |
@@ -688,7 +688,7 @@ October 11 candidate checks cover `f346543` / `e4dd806`, with imported-response 
 | Imported document → current/exact HTTP read → Edit/Discard | Initial HTTP 500 exposed escaped transaction-owned provenance. At `588d908`, Claude confirmed both reads and the real editor; discarded without saving. Source re-review by Pi/Deslop passed; no re-import/data change. |
 | Existing-chat native agent read | Documenter read all 15,970 characters in revision-1 pages at offsets 0/12000, same source digest, final nextOffset null. Claude/Pi also reported matching reads. |
 | Brand-new chat, hosted worker interaction, access loss | New-chat verification pending; hosted mediation/current access checks source-reviewed, not interactively qualified here. |
-| Responsive entry/editor/recovery | Designer found no clipping/overlap in reported post-import and 1280/768/390 entry/editor/conflict captures. Actual unconfirmed-save capture review remains pending; captures showing ordinary Preview do not qualify it. |
+| Responsive entry/editor/recovery | Designer completed entry/editor, conflict and actual unconfirmed-save visual review at 1440, 1280, 768 and 390 px, plus migrated Dispatch Web captures; no blocking clipping/overlap. At 390 px, Retry save wraps and remains visible. These image checks do not replace Claude’s separately reported interactions. |
 
 This qualifies neither spec-led automation nor chat working-copy editing. Save does not acquire new execution authority. Data migration, application publication and walkthrough acceptance are distinct.
 
