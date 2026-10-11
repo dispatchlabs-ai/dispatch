@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Inline conversation diffs
+
+- Preview published UTF-8 `.patch` and `.diff` attachments directly in messages using the Pierre fork, with expanded unified changes, file headers, bounded scrolling and an original-patch link. Invalid or oversized patches retain a readable fallback; previews never apply changes.
+
 ### Repository documentation reset
 
 - Replace the former product specification with a short draft outline centered on supported use cases, rules and repo-local detail.

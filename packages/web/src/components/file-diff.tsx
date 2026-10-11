@@ -1,10 +1,10 @@
-import { Virtualizer, type VirtualFileMetrics } from "@pierre/diffs";
+import { DEFAULT_VIRTUAL_FILE_METRICS, Virtualizer, type VirtualFileMetrics } from "@pierre/diffs";
 import { MultiFileDiff, PatchDiff, VirtualizerContext, type FileDiffOptions } from "@pierre/diffs/react";
 import { memo, useCallback, useMemo, useState, type ReactNode } from "react";
 
 import { PierreProvider } from "./pierre";
 
-type FileDiffProps = { kind: "write"; path: string; content: string } | { kind: "edit"; path: string; patch: string } | { kind: "read"; path: string; content: string; firstLine: number; lineCount: number };
+type FileDiffProps = { kind: "write"; path: string; content: string } | { kind: "edit"; path: string; patch: string; showFileHeader?: boolean } | { kind: "read"; path: string; content: string; firstLine: number; lineCount: number };
 
 const options: FileDiffOptions<undefined, undefined> = {
   theme: "github-light", themeType: "light", diffStyle: "unified", diffIndicators: "classic",
@@ -12,6 +12,8 @@ const options: FileDiffOptions<undefined, undefined> = {
   disableErrorHandling: true,
 };
 const metrics: VirtualFileMetrics = { lineHeight: 21, diffHeaderHeight: 0, hunkLineCount: 100, spacing: 8 };
+const headerMetrics: VirtualFileMetrics = { ...metrics, diffHeaderHeight: DEFAULT_VIRTUAL_FILE_METRICS.diffHeaderHeight };
+const headerOptions = { ...options, disableFileHeader: false };
 const readOptions: FileDiffOptions<undefined, undefined> = { ...options, diffIndicators: "none", disableBackground: true, hunkSeparators: "simple" };
 
 export default memo(function FileDiff(props: FileDiffProps) {
@@ -28,7 +30,7 @@ export default memo(function FileDiff(props: FileDiffProps) {
   }, [props.path, content, firstLine, lineCount]);
   return <PierreProvider>
     <DiffViewport label={`${props.kind === "write" ? "Written content" : props.kind === "read" ? "Read content" : "Recorded changes"} for ${props.path}`}>
-      {props.kind === "write" ? <MultiFileDiff oldFile={null} newFile={newFile} options={options} metrics={metrics} /> : <PatchDiff patch={props.kind === "read" ? readPatch : props.patch} options={props.kind === "read" ? readOptions : options} metrics={metrics} />}
+      {props.kind === "write" ? <MultiFileDiff oldFile={null} newFile={newFile} options={options} metrics={metrics} /> : <PatchDiff patch={props.kind === "read" ? readPatch : props.patch} options={props.kind === "read" ? readOptions : props.showFileHeader ? headerOptions : options} metrics={props.kind === "edit" && props.showFileHeader ? headerMetrics : metrics} />}
     </DiffViewport>
   </PierreProvider>;
 });
