@@ -51,7 +51,7 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
   const personName = (id: string) => people?.find(person => person.id === id)?.name ?? id;
   const agentName = (id: string) => agents.find(agent => agent.id === id)?.name ?? id;
 
-  function update(patch: Partial<Pick<SaveProjectInput, "name" | "cwd" | "members" | "defaultAgentDefinitionIds" | "repositories" | "spec">>) {
+  function update(patch: Partial<Pick<SaveProjectInput, "name" | "cwd" | "members" | "defaultAgentDefinitionIds" | "repositories">>) {
     if (!editing || disabled) return;
     onEditingChange({ ...editing, error: undefined, input: { ...editing.input, ...patch, requestId: crypto.randomUUID() } });
   }
@@ -136,7 +136,7 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
         </label>)}
         {unavailableDefaults.map(id => <div className="connection-card" key={id}><p>{agentName(id)} is unavailable. Remove it before saving.</p><Button variant="secondary" onClick={() => update({ defaultAgentDefinitionIds: defaults.filter(item => item !== id) })}>Remove unavailable default</Button></div>)}
       </fieldset>
-      {<details className="project-advanced"><summary>Advanced</summary>{directoryField}</details>}
+      <details className="project-advanced"><summary>Advanced</summary>{directoryField}</details>
       </div></div>
       <footer className="project-editor-actions"><p className="project-editor-content field-hint">References only · No cloning or agent runs</p><div className="project-editor-content button-row"><Button variant="secondary" disabled={editing.busy} onClick={discard}>Discard</Button><Button type="submit" disabled={disabled || editing.conflict || !editing.input.name.trim() || !managerCount || Boolean(unavailableDefaults.length)}>{editing.busy ? <Spinner label="Saving project" /> : null}Save project</Button></div></footer>
     </form> : <>

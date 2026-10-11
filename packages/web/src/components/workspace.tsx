@@ -136,6 +136,13 @@ export function Workspace() {
       setSpecOpen(current => current[projectId] ? current : { ...current, [projectId]: true });
     }
   }, [searchParams]);
+  // Legacy spec-settings links now open the database document, not a removed form field.
+  useEffect(() => {
+    const projectId = searchParams.get("project");
+    if (projectId && searchParams.get("view") === "settings" && searchParams.get("focus") === "spec") {
+      setSearchParams({ section: "projects", project: projectId, view: "spec" }, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const specLocation = useLocation();
   const [specEditRequests, setSpecEditRequests] = useState<Record<string, number>>({});
   useEffect(() => {
@@ -524,19 +531,18 @@ export function Workspace() {
     if (!editing) setSearchParams({ section: "projects", project: projectId }, { replace: true });
     requestAnimationFrame(() => (editing ? document.getElementById(`project-editor-${projectId}`) : document.getElementById("main-workspace"))?.focus());
   }
-  function editProject(project: Project, specOnly = false) {
+  function editProject(project: Project) {
     if (!project.canManage || project.revision === undefined) return;
     setSavedProjectId(null);
-    setSearchParams({ section: "projects", project: project.id, view: "settings", ...(specOnly ? { focus: "spec" } : {}) });
+    setSearchParams({ section: "projects", project: project.id, view: "settings" });
     changeProjectEditing(project.id, projectEditing[project.id] ?? beginProjectEdit(project));
-    if (specOnly) requestAnimationFrame(() => document.getElementById(`project-spec-${project.id}`)?.focus());
   }
   useEffect(() => {
     if (!projectEditorOpen || !selectedProject || projectEditing[selectedProject.id]) return;
     const editing = beginProjectEdit(selectedProject);
     if (!editing) return;
     setProjectEditing(current => ({ ...current, [selectedProject.id]: editing }));
-    requestAnimationFrame(() => document.getElementById(`${searchParams.get("focus") === "spec" ? "project-spec" : "project-editor"}-${selectedProject.id}`)?.focus());
+    requestAnimationFrame(() => document.getElementById(`project-editor-${selectedProject.id}`)?.focus());
   }, [projectEditorOpen, selectedProject, projectEditing, searchParams]);
   function savedProject(project: Project) {
     setSavedProjectId(project.id);
@@ -741,7 +747,7 @@ export function Workspace() {
                 search={projectSearch[tab.projectId] ?? ""} onSearchChange={search => setProjectSearch(current => ({ ...current, [tab.projectId]: search }))}
                 project={project} saved={savedProjectId === tab.projectId} chats={chats} creating={creating || createFailed} updating={updatingChats}
                 onCreate={() => chooseAgents(config.defaultAgentId, tab.projectId)} onSelect={selectChat}
-                onEdit={specOnly => { if (project) editProject(project, specOnly); }}
+                onEdit={() => { if (project) editProject(project); }}
                 onRename={renameChat} onUpdate={updateChatAction}
               /> : null}
               </>;

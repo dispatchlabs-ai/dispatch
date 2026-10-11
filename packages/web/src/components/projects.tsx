@@ -47,7 +47,7 @@ export function ProjectPage({ project, saved, chats, creating, updating, onCreat
   search: string;
   onOpenSpec: (edit?: boolean) => void;
   onSearchChange: (search: string) => void;
-  onEdit: (specOnly?: boolean) => void;
+  onEdit: () => void;
   project?: Project;
   saved: boolean;
   chats: ChatSummary[];
@@ -63,10 +63,10 @@ export function ProjectPage({ project, saved, chats, creating, updating, onCreat
   const projectChats = chats.filter(chat => chat.projectId === project.id && !chat.archived);
   const visible = projectChats.filter(chat => (!activeOnly || chat.status === "running") && chat.title.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const settingsUrl = `?${new URLSearchParams({ project: project.id, view: "settings" })}`;
-  function editLink(event: MouseEvent<HTMLAnchorElement>, specOnly = false) {
+  function editLink(event: MouseEvent<HTMLAnchorElement>) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
-    onEdit(specOnly);
+    onEdit();
   }
   return <section className="project-page">
     <header className="project-page-header">

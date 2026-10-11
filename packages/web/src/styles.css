@@ -1221,8 +1221,6 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .project-references dd { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .project-references ul { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); list-style: none; margin: 0; padding: 0; }
 .project-references a { display: inline-block; padding-block: var(--space-1); text-decoration: underline; text-underline-offset: 3px; }
-.project-spec-reference { display: flex; flex-direction: column; gap: var(--space-2); }
-.project-spec-reference strong { font-weight: 600; }
 .project-editor { height: 100%; min-height: 0; }
 .project-editor-form { height: 100%; display: flex; flex-direction: column; min-height: 0; }
 .project-editor-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-8); }
@@ -1236,20 +1234,13 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .project-repository-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--space-4); }
 .project-repository-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
 .project-repository-actions .field-hint { margin: 0; }
-.project-spec-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--space-4); align-items: start; }
-.project-directory-spec { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.5fr); }
-.project-directory-preview { display: none; }
 .project-advanced { border-top: 1px solid var(--color-border); padding-top: var(--space-4); }
 .project-advanced summary { cursor: pointer; font-size: var(--text-sm); color: var(--color-navy); padding-block: var(--space-3); }
 .project-advanced .field { margin-top: var(--space-3); }
 .project-editor-actions { flex-shrink: 0; background: var(--color-surface); border-top: 1px solid var(--color-border); padding: var(--space-4) var(--space-8); }
 .project-editor-actions .button-row { justify-content: flex-end; }
 .project-editor-actions > .field-hint { margin-bottom: var(--space-3); }
-@media (max-width: 1000px) {
-  .project-directory-spec { grid-template-columns: minmax(0, 1fr); }
-}
 @media (max-width: 800px) {
-  .project-directory-preview { display: block; overflow-wrap: anywhere; }
   .project-editor-scroll { padding: var(--space-6) var(--space-5); }
   .project-editor-actions { padding: var(--space-3) var(--space-5); }
   .project-editor-actions .button-row { display: grid; grid-template-columns: 1fr 1fr; }
@@ -1260,7 +1251,7 @@ input::placeholder, textarea::placeholder { opacity: 1; }
   .project-advanced summary { min-height: 44px; }
 }
 @media (max-width: 600px) {
-  .project-repository-fields, .project-spec-fields { grid-template-columns: minmax(0, 1fr); }
+  .project-repository-fields { grid-template-columns: minmax(0, 1fr); }
   .project-references > div { align-items: flex-start; }
   .project-references dt { flex-basis: 100%; }
 }
@@ -1276,7 +1267,6 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 .project-spec-header > div { flex: 1; min-width: min(240px, 100%); }
 .project-spec-header h1 { font-size: clamp(var(--text-2xl), 2.5vw, var(--text-3xl)); line-height: 1.2; font-weight: 600; letter-spacing: -.035em; }
 .project-spec-path { margin-top: var(--space-2); font-family: var(--font-mono, ui-monospace, monospace); overflow-wrap: anywhere; }
-.project-spec-provenance { margin-top: var(--space-1); font-size: var(--text-sm); color: var(--color-muted); overflow-wrap: anywhere; }
 .project-spec-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); }
 .project-spec-draft { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); color: var(--color-muted); font-size: var(--text-sm); }
 .project-spec-preview { min-width: 0; }
@@ -1331,6 +1321,6 @@ a.button, a.icon-button { text-decoration: none; }
 .project-spec-header > div:first-child { min-width: 0; }
 .project-spec-header > .project-spec-edit-actions { flex: 0 0 auto; min-width: 0; }
 .project-spec-edit-actions, .project-spec-recovery { display: flex; flex-wrap: wrap; gap: var(--space-3); }
-.project-spec-header > .project-spec-path, .project-spec-header > .project-spec-provenance { flex: 1 1 100%; margin-top: 0; }
+.project-spec-header > .project-spec-path { flex: 1 1 100%; margin-top: 0; }
 .project-spec-status, .project-spec-helper { font-size: var(--text-sm); color: var(--color-muted); }
 .project-spec-recovery { margin-top: var(--space-3); }
