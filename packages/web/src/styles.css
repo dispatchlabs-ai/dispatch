@@ -1327,3 +1327,10 @@ a.button, a.icon-button { text-decoration: none; }
   .mobile-destinations.projects-destinations .button { flex-direction: row; justify-content: flex-start; min-height: 44px; padding: var(--space-3); font-size: var(--text-md); }
   .projects-sidebar input { font-size: var(--text-md); }
 }
+
+.project-spec-header > div:first-child { min-width: 0; }
+.project-spec-header > .project-spec-edit-actions { flex: 0 0 auto; min-width: 0; }
+.project-spec-edit-actions, .project-spec-recovery { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.project-spec-header > .project-spec-path, .project-spec-header > .project-spec-provenance { flex: 1 1 100%; margin-top: 0; }
+.project-spec-status, .project-spec-helper { font-size: var(--text-sm); color: var(--color-muted); }
+.project-spec-recovery { margin-top: var(--space-3); }

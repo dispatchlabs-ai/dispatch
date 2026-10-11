@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Local spec file editing
+
+- Read and edit the configured directory-backed spec in Projects on local installations; Save writes the designated file only, without Git publication, adoption or agent work.
+- Bind saves to current manager authority, project reference and loaded file version; retain drafts on conflicts or uncertain responses, with explicit copy/reload recovery. Hosted local-directory access remains unsupported.
+- Serialize Dispatch saves and replace files atomically. External editors are not locked; filesystem-wide compare-and-swap is not promised.
+
 ### Projects navigation
 
 - Add Projects before Agents and Chats in workspace navigation; move project creation, overview, settings and spec viewing out of Chats while retaining conversation grouping and legacy project links.

@@ -72,10 +72,14 @@ export async function saveLocalProjectSpec(cwd: string, path: string, expectedVe
     const file = await target(cwd, path);
     if (file !== key) throw new ProjectSpecError(409, "Spec directory changed. Reload before saving.");
     const before = await snapshot(file);
-    if (before.version !== expectedVersion) throw new ProjectSpecError(409, "Spec changed on disk. Draft retained; reload and review before saving.");
+    if (before.version !== expectedVersion) {
+      // Confirm only that these bytes are present now; do not attribute a prior write.
+      if (before.content === content) return { content: before.content, commit: before.commit, version: before.version };
+      throw new ProjectSpecError(409, "Spec changed on disk. Draft retained; reload and review before saving.");
+    }
     if (before.links !== 1) throw new ProjectSpecError(400, "Saving hard-linked spec files is not supported.");
     if (Buffer.byteLength(content, "utf8") > SPEC_MAX_BYTES) throw new ProjectSpecError(413, "Spec exceeds the 512 KiB limit.");
-    if (content.includes("\0")) throw new ProjectSpecError(400, "Spec must be text without NUL bytes.");
+    if (content.includes("\0") || Buffer.from(content, "utf8").toString("utf8") !== content) throw new ProjectSpecError(400, "Spec must be valid UTF-8 text without NUL bytes.");
     const temporary = join(dirname(file), `.dispatch-spec-${randomUUID()}.tmp`);
     try {
       const handle = await open(temporary, "wx", before.mode & 0o777);

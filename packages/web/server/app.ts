@@ -108,9 +108,11 @@ export function createApp(options: AppOptions) {
   const jsonLimit = bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: { code: "too_large", message: "Request is too large." } }, 413) });
   const bundleLimit = bodyLimit({ maxSize: 12 * 1024 * 1024, onError: c => c.json({ error: { code: "too_large", message: "Bundle request is too large." } }, 413) });
   const projectArchiveLimit = bodyLimit({ maxSize: 64 * 1024 * 1024 + 1024, onError: c => c.json({ error: { code: "too_large", message: "Project archive request is too large." } }, 413) });
+  // JSON escaping can expand a 512 KiB text file up to sixfold.
+  const specLimit = bodyLimit({ maxSize: 6 * 512 * 1024 + 1024, onError: c => c.json({ error: { code: "too_large", message: "Spec request is too large." } }, 413) });
   const isUpload = (method: string, path: string) => method === "POST" && /^\/api\/chats\/[^/]+\/attachments$/.test(path);
   // Upload bytes are counted only after authentication and conversation authorization below.
-  app.use("/api/*", (c, next) => isUpload(c.req.method, c.req.path) ? next() : /^\/api\/project-archives\/(preview|import)$/.test(c.req.path) ? projectArchiveLimit(c, next) : /^\/api\/bundles\/(preview|import)$/.test(c.req.path) ? bundleLimit(c, next) : jsonLimit(c, next));
+  app.use("/api/*", (c, next) => isUpload(c.req.method, c.req.path) ? next() : /^\/api\/project-archives\/(preview|import)$/.test(c.req.path) ? projectArchiveLimit(c, next) : /^\/api\/bundles\/(preview|import)$/.test(c.req.path) ? bundleLimit(c, next) : c.req.method === "POST" && /^\/api\/projects\/[^/]+\/spec$/.test(c.req.path) ? specLimit(c, next) : jsonLimit(c, next));
   app.use("/api/*", async (c, next) => {
     c.header("Cache-Control", "no-store");
     if (!["GET", "HEAD"].includes(c.req.method)) {
