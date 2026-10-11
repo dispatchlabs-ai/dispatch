@@ -41,7 +41,7 @@ Pre-release walkthroughs: action → observable outcome; check the failure/recov
   - Each cloud chat uses a writable ephemeral workspace and clones configured repos using granted credentials; commit/push completed work before normal teardown. No shared persistent project storage is required.
   - Failed pushes are not completion; unexpected workspace loss can lose unpushed work. Missing repos/access/directories are actionable failures; a working directory is not a sandbox. Cloud teardown does not delete a configured local directory.
 - **Read and edit project files**
-  - Designate the official spec in a directory project or configured repo, then view/edit it → inspect the chosen file and saved changes in a lightweight editor shared with chat code/diff presentation.
+  - Designate the official spec in a directory project or configured repo, then view/edit it at the chat level → inspect the chosen file and saved changes in that chat's working copy, using a lightweight editor shared with chat code/diff presentation.
   - Missing, inaccessible or changed files require recovery/review. Displaying a proposal does not apply or approve it.
 - **Manage agents and instances**
   - Edit instructions/model/thinking/resources; add named instances with supplements → inspect saved settings and adopted revisions. Existing instances update at a safe idle boundary, preserving identity/history/supplements.
@@ -84,7 +84,7 @@ Pre-release walkthroughs: action → observable outcome; check the failure/recov
 
 - Adoption, implementation and verification are separate. This working spec is adopted; per-use-case implementation and walkthrough results are not yet comprehensively recorded.
 - Spec editor at `ad2d1fa`: configuration persistence verified; directory viewing and file Save missing; public-GitHub draft editing browser-unverified. [Qualification](usage-guide.md#shared-projects).
-- Open decision: the cloud editor's working-copy target and publication action. Ephemeral chat storage does not settle whether it edits a selected chat clone or a remote revision.
+- Chat-level working-copy editing is directed, not implemented or verified by this record; project-level remote publication is not the selected model.
 - Before release, record revision and each approved walkthrough's result: verified, failed, blocked or not checked, with evidence/limits. Builds alone do not qualify behavior.
 - No automated repository tests; authorized interactive agent-browser verification is permitted. Product evaluation execution is not permission to add automated repository tests.
 
