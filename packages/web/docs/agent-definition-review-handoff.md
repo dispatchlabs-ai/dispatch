@@ -1,14 +1,13 @@
 # Handoff to Claude: agent definition design review
 
-**Historical review request, October 6, 2026.** Chris requested an independent opinion on the original design, before implementation approval. The revised editor was subsequently approved and implemented in [WP-030](handoff.md#wp-030--agent-editor-and-existing-wiki-authorization), with generic connection setup corrected in [WP-031](handoff.md#wp-031--generic-mcp-connections). The implementation descriptions and review instructions below preserve that earlier baseline; they are not current editor/base-adoption contracts.
+**Historical review request, October 6, 2026.** Chris requested an independent opinion on the original design, before implementation approval. The revised editor was subsequently approved and implemented in [WP-030](handoff.md#wp-030--agent-editor-and-connection-authorization), with generic connection setup corrected in [WP-031](handoff.md#wp-031--generic-mcp-connections). The implementation descriptions and review instructions below preserve that earlier baseline; they are not current editor/base-adoption contracts.
 
 ## Read and inspect these first
 
-Open both PNGs as images, rather than inferring their contents from filenames or this document. The numbered groups 1–10 match across them.
+The original review used two matching illustrations. The editor illustration was retired during the documentation reset; the technical mapping below remains available.
 
-1. [Proposed agent editor](assets/agent-definition-2026-10-06/01-agent-editor.png): the Recovery Engineer definition and a separate project assignment panel.
-2. [Pi Durable field mapping](assets/agent-definition-2026-10-06/02-pi-durable-mapping.png): how those fields relate to saved configuration, registered executable code, and runtime state.
-3. [Detailed design and storage reference](agent-definition-design.md): the precise mapping, current/proposed distinctions, and links to inspected implementation sources. Treat this text and the source as the authority when an illustration simplifies a detail.
+1. [Pi Durable field mapping](assets/agent-definition-2026-10-06/02-pi-durable-mapping.png): how those fields relate to saved configuration, registered executable code, and runtime state.
+2. [Detailed design and storage reference](agent-definition-design.md): the precise mapping, current/proposed distinctions, and links to inspected implementation sources. Treat this text and the source as the authority when an illustration simplifies a detail.
 
 The canonical local checkout is `/Users/chrisreynolds/Work/m1-air/repos/dispatch-web-next`. These files live under `packages/web/docs/`. The visual proposal was published in `868d95954976e834de787a250087b645f068243e`, following the conversation-layout implementation recorded in `98d2ad20553a51fb15465224cc7b820bac450473`.
 
@@ -40,7 +39,7 @@ We previously compared Dispatch's conversation view with Slack and implemented t
 
 Use those existing screens as visual and interaction context. The new editor proposal uses the same general Dispatch navy/aqua palette, Inter typography, rail/sidebar/content structure, and right context area. It has not had responsive or interactive acceptance review. Generated desktop imagery is not proof of keyboard, phone, focus, save/error, or recovery behavior.
 
-Optional local actual captures are in the canonical checkout's ignored `.local/conversation-refinement/2026-10-06/` directory, especially `after-main.png` and `after-thread.png`. Keep account-bearing captures out of Git. The maintained [repository home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) records product intent; [agent runtime architecture](https://wiki.dispatchworks.ai/wiki/agent-runtime-architecture/) and [no-code agent factory](https://wiki.dispatchworks.ai/wiki/no-code-agent-factory/) supply the business design context. The newly connected personal `wiki` MCP accesses the Palm wiki; do not assume it also grants access to the separate Dispatch wiki.
+Optional local actual captures are in the canonical checkout's ignored `.local/conversation-refinement/2026-10-06/` directory, especially `after-main.png` and `after-thread.png`. Keep account-bearing captures out of Git.
 
 ## Review requested
 

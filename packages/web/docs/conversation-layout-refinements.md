@@ -4,13 +4,11 @@
 
 ## Main conversation
 
-[![Proposed main conversation layout](assets/conversation-layout-2026-10-06/01-main-conversation.png)](assets/conversation-layout-2026-10-06/01-main-conversation.png)
 
 Use consistent left alignment for the header, message avatars, and composer. Reduce message spacing and sidebar row height, show message actions on interaction, and keep existing reply counts visible. Distinguish agent avatars and present tool activity through readable summaries with expandable technical detail. The right context panel is closed in this state.
 
 ## Open thread
 
-[![Proposed conversation with an open thread](assets/conversation-layout-2026-10-06/02-open-thread.png)](assets/conversation-layout-2026-10-06/02-open-thread.png)
 
 The same workspace opens the selected message's thread in the right panel. The parent message, replies, activity, and thread composer remain visually connected. The main conversation keeps its own composer and header. Participants remain accessible from the header; selecting an agent can reveal its configuration.
 
@@ -30,7 +28,7 @@ Chris requested this checklist on October 6 to make the intended visual changes 
 | V08 | Keep configuration available without making it the default reading surface. | The normal conversation view has no persistent participant/model inspector. The header's participant button opens the participant context, and selecting an agent exposes its details. Thread and participant views use the same context area. A quiet connected state can remain in the footer; meaningful failures remain visible. The routine Ready badge is absent from the illustrated header. |
 | V09 | Make projects and conversations quicker to scan. | Sidebar rows use a compact, consistent rhythm. The selected conversation uses pale aqua emphasis and a narrow navy left indicator. New conversation is an outlined control. Project disclosure controls and indentation remain clear. Empty projects do not consume an extra explanatory row, and repeated total counts are removed from this view. Existing project, archive, and conversation actions remain reachable. |
 | V10 | Make speakers recognizable at a glance. | Human and agent identities remain explicit. Different agents have distinct, stable avatars/icons, repeated consistently in the main stream, reply summaries, and thread panel. Names carry the strongest emphasis; Agent badges and timestamps remain secondary. Identity does not depend on color alone. |
-| V11 | Explain tool activity in readable language. | Collapsed activity is a compact disclosure such as Developer searched the wiki, with an accurate working/completed/failed state. Raw tool identifiers do not dominate the collapsed view. Expansion preserves technical identifiers and available results/details. Summaries are derived from the actual activity and do not invent what a tool accomplished. |
+| V11 | Explain tool activity in readable language. | Collapsed activity is a compact disclosure such as Developer called a remote tool, with an accurate working/completed/failed state. Raw tool identifiers do not dominate the collapsed view. Expansion preserves technical identifiers and available results/details. Summaries are derived from the actual activity and do not invent what a tool accomplished. |
 | V12 | Preserve one Dispatch visual system across both states. | Both views use the same existing font family, navy/aqua palette, white conversation surface, pale sidebar, thin borders, modest corner radii, icon style, and spacing scale. Existing design tokens and shared components carry these decisions. Titles and names are prominent; timestamps, badges, and activity metadata remain quieter. Browser chrome in the images is outside application scope. |
 
 ## Visual completion evidence
@@ -47,6 +45,7 @@ Review also needs a narrower desktop and the repository-required 390 px phone re
 
 These desktop concepts retain Dispatch's light navy/aqua identity, project groups, inline mentions, and arrow-only send button. Unread tracking, mention notifications, reactions, message-content search, and new agent attention states require separate product decisions and are not added by these images.
 
-Generated with the built-in ImageGen tool using the [recorded prompt set](assets/conversation-layout-2026-10-06/prompts.json). Source attachments are not committed. Names, sample messages, timestamps, and statuses are illustrative, not records of new agent actions.
 
 Images are raster implementation references, not rendered browser captures or pixel specifications. Their original generation task changed design documentation only. Implementation qualification, including alignment, density, readable text, consistency, interaction, responsiveness, contrast, and remaining limitations, belongs to [WP-028](handoff.md#wp-028--conversation-layout-refinement).
+
+The historical provider-specific illustrations and generation records were retired during the documentation reset; their originals remain in Git history.

@@ -1,9 +1,9 @@
 # Repository guidance
 
 - Use the startup and check commands in [CONTRIBUTING.md](CONTRIBUTING.md).
-- Follow the [testing policy](packages/web/docs/spec.md#testing-policy): do not add or run automated tests. AI-agent interactive verification using `agent-browser` is permitted; use source review, TypeScript and build checks too. Future coverage prioritizes stable end-to-end and API behavior.
-- Before changing behavior, read the affected package's `docs/spec.md` and `docs/handoff.md`, and the relevant use cases and decisions linked from the [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/).
-- Before changing browser UI, read the spec's [UI implementation rules](packages/web/docs/spec.md#ui-implementation-rules). Report any rule you did not meet or check as a deviation or as unverified; never describe it as done.
+- Follow the [testing policy](CONTRIBUTING.md#testing-policy): do not add or run automated tests. AI-agent interactive verification using `agent-browser` is permitted; use source review, TypeScript and build checks too. Future coverage prioritizes stable end-to-end and API behavior.
+- Before changing behavior, read the affected package's `docs/spec.md` and relevant linked repo-local guidance. Historical handoffs are supporting evidence, not a second product specification.
+- Before changing browser UI, read relevant repo-local UI guidance and review records. Report requirements you did not meet or check as deviations or unverified; never describe them as done.
 - Review UI on rendered desktop and 390 px phone screens, not from source alone. If you cannot sign in, ask Chris or the coordinator for captures. Keep captures in the gitignored `.local/`, and never commit ones that show account data. Still images do not verify keyboard, touch, or recovery flows.
 - Follow [CONTRIBUTING.md](CONTRIBUTING.md) for development and publication. Implement the current agreed work package, verify its acceptance criteria, then review with Chris before proceeding to the next.
 - Use the [agent workflow index](CONTRIBUTING.md#agent-workflows) to find reusable prompts and procedures. Read only those relevant to the current task; agents outside Pi can follow the same Markdown files directly.

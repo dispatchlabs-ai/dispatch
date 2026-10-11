@@ -1,6 +1,6 @@
 # AWS SQLite and recovery qualification
 
-**Historical SQLite AWS candidate procedure; live qualification was not completed.** The standalone [PostgreSQL/conversation-worker module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) is the supported new AWS installation path. This procedure preserves earlier SQLite probe mechanics and evidence, not prerequisites for that module. The local probe rehearsal below is not AWS evidence. This is the focused disposable-state qualification authorized for the [AWS container target](spec.md#aws-container-deployment-target), not a general application test suite. Do not use an existing personal or team installation. A build, successful mount, healthy ALB target, or clean SQLite integrity result alone does not establish application recovery.
+**Historical SQLite AWS candidate procedure; live qualification was not completed.** The standalone [PostgreSQL/conversation-worker module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) is the supported new AWS installation path. This procedure preserves earlier SQLite probe mechanics and evidence, not prerequisites for that module. The local probe rehearsal below is not AWS evidence. This is the focused disposable-state qualification authorized for the AWS container target, not a general application test suite. Do not use an existing personal or team installation. A build, successful mount, healthy ALB target, or clean SQLite integrity result alone does not establish application recovery.
 
 Use the exact candidate image and module revisions. Record results in the deployment work package's acceptance criteria and the installation's private deployment record. Stop qualification and retain failure evidence if an invariant below fails; do not promote the installation to real data.
 
@@ -15,7 +15,6 @@ Reviewed application source: `f0449e9`, Pi Durable `1.0.4`, Node 24. Recheck the
 - [`auth-cli.ts`](../server/auth-cli.ts) opens authentication without taking the runtime lock. For this deployment, run separate enrollment/recovery helpers only while the service is stopped and all prior tasks have exited. This avoids relying on unqualified cross-client WAL access.
 - [Pi 1.0.4](https://github.com/earendil-works/pi/tree/v1.0.4/packages/durable) uses SQLite WAL with `synchronous=NORMAL`. Process-crash recovery is not a zero-loss guarantee for host/power/storage failure. Recovery of an interrupted tool is governed by its replay policy, not exactly-once external execution.
 
-[Prior Palm/AWS evidence](https://wiki.chrisreynolds.me/wiki/portable-application-deployment/#section-limits-and-everyday-team-use) establishes same-task WAL exclusion and crash recovery for earlier applications. It does not establish this application's recovery or exclusion across distinct Fargate mount clients. Preserve that distinction in the new result.
 
 ## Preconditions and evidence
 

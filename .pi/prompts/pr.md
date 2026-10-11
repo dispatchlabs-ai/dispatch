@@ -7,7 +7,7 @@ Review: $ARGUMENTS
 
 1. Read `AGENTS.md`, `CONTRIBUTING.md`, the PR description, discussion, commits, changed files, and relevant linked issues. Record the base and head revisions being reviewed.
 2. Inspect the diff and full affected files, including related callers and implementation paths needed to judge behavior. Use fetched refs and `git show`/`git diff`, or a separate review worktree; do not switch or disturb a checkout owned by another task.
-3. Compare the change with package specifications, the current handoff's scope and acceptance criteria, and relevant wiki decisions. Check state ownership, failure/recovery behavior, and the boundary with stock Pi Durable where affected.
+3. Compare the change with package specifications, the current handoff's scope and acceptance criteria and relevant repo-local decisions. Check state ownership, failure/recovery behavior, and the boundary with stock Pi Durable where affected.
 4. Assess tests against the outcomes they should prove. Identify a plausible broken implementation each important test should reject. Run appropriate existing checks when the review environment supports them; distinguish observed results from reported CI results and unrun checks.
 5. Check whether package README, specification, handoff, usage examples, or changelog need corresponding updates. Flag unsupported claims and unresolved decisions presented as settled behavior.
 

@@ -4,7 +4,7 @@ October 6, 2026. Chris requested new ImageGen images using Claude's independent 
 
 Chris subsequently requested a clearer MCP management flow. The [full-length MCP access concept](agent-mcp-access-design.md) replaces the passive Connections summary below with Add connection, server and identity details, available tools, and an explicit new/existing-instance access choice. These earlier images remain as the preceding design iteration.
 
-**Implementation update:** Chris approved the editor and MCP screens on October 6. [WP-030](handoff.md#wp-030--agent-editor-and-existing-wiki-authorization) implements that scope using existing Wiki identities; the separate project assignment sketch remains an open contract. The following text preserves the original proposal context.
+**Implementation update:** Chris approved the editor and MCP screens on October 6. [WP-030](handoff.md#wp-030--agent-editor-and-connection-authorization) implements that scope using existing provider identities; the separate project assignment sketch remains an open contract. The following text preserves the original proposal context.
 
 ## Desktop editor
 

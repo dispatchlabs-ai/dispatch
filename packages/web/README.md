@@ -16,7 +16,7 @@ npm run dev
 
 Open `http://localhost:5173`. Use the root `npm run auth -- invite --email person@example.com --name "Person"` command to create an enrollment link. Run `npm run check` for TypeScript/build checks, `nix build` for the pinned application artifact, and `nix flake check` for declared build checks. Root `npm start` serves the built app at the same URL/state location after stopping development.
 
-Follow the [testing policy](docs/spec.md#testing-policy) for the zero-tests rule and scoped exceptions. Outside those exceptions, use source, TypeScript and build review; runtime/browser qualification remains unverified. Future coverage prioritizes stable end-to-end and API behavior.
+Follow the [testing policy](../../CONTRIBUTING.md#testing-policy) for permitted checks. Interactive agent-browser verification of authorized work is allowed; source and build checks alone do not establish runtime correctness. Future coverage prioritizes stable end-to-end and API behavior.
 
 ## Documentation
 
@@ -28,6 +28,6 @@ Follow the [testing policy](docs/spec.md#testing-policy) for the zero-tests rule
 - [AWS deployment module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch): infrastructure, caller example and installation instructions.
 - [UI/UX review](docs/ui-ux-review.md): October 3, 2026 review of `d83f70d` that introduced the spec's UI implementation rules.
 - [Brand asset provenance](src/assets/README.md) and [changelog](CHANGELOG.md).
-- [Repository contribution workflow](../../CONTRIBUTING.md) and [wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/).
+- [Repository contribution workflow](../../CONTRIBUTING.md).
 
 Browser code belongs in `src/`; the application service is in `server/`. Package-specific build configuration and the Nix recipe stay here; shared workspace scripts, manifests, and locks live at the repository root. Existing `test/` placeholders do not authorize adding tests while the current policy is active.

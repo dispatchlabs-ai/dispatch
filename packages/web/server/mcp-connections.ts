@@ -9,7 +9,6 @@ import { extractWWWAuthenticateParams } from "@modelcontextprotocol/sdk/client/a
 import type { ConnectMcpInput, ConnectMcpResult, ConnectionAuthentication, ConnectionAuthorizationState, RuntimeScope } from "../src/shared/contracts.js";
 import { decryptSecret, digest, encryptSecret, loadSecretKey, randomToken } from "./auth/crypto.js";
 import { ConnectionError, RenewalError, connectionURL, exchangeCode, prepareOAuth, refreshTokens, revokeTokens, type OAuthConfiguration, type StoredTokens } from "./mcp-oauth.js";
-import { legacyWikiIdentity, verifyLegacyWikiIdentity } from "./legacy-wiki-connection.js";
 import { McpDatabase, MCP_SCHEMA, type ConnectionRow, type McpPostgresOptions, type McpQuery } from "./storage/mcp-database.js";
 import { decryptMcpSecret, encryptMcpSecret } from "./storage/mcp-secrets.js";
 
@@ -102,31 +101,10 @@ export class McpConnections {
     const db = new DatabaseSync(this.databasePath);
     chmodSync(this.databasePath, 0o600);
     db.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;");
-    const legacy = Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='wiki_connections'").get());
     db.exec("BEGIN IMMEDIATE");
     try {
-      if (legacy) {
-        db.exec(`ALTER TABLE wiki_connections RENAME TO mcp_connections;
-          ALTER TABLE wiki_oauth_pending RENAME TO mcp_oauth_pending;
-          ALTER TABLE mcp_connections ADD COLUMN authentication TEXT NOT NULL DEFAULT 'oauth';
-          ALTER TABLE mcp_connections ADD COLUMN provider TEXT NOT NULL DEFAULT 'agent-wiki';
-          ALTER TABLE mcp_connections ADD COLUMN server_name TEXT NOT NULL DEFAULT '';
-          ALTER TABLE mcp_connections ADD COLUMN disconnect_notice TEXT;`);
-      }
       db.exec(MCP_SCHEMA);
       this.key = loadSecretKey(this.keyPath, Boolean(db.prepare("SELECT 1 FROM mcp_connections WHERE secret IS NOT NULL UNION SELECT 1 FROM mcp_oauth_pending UNION SELECT 1 FROM integration_secrets WHERE secret IS NOT NULL UNION SELECT 1 FROM named_secrets LIMIT 1").get()));
-      if (legacy) {
-        for (const row of db.prepare("SELECT * FROM mcp_connections").all() as ConnectionRow[]) {
-          const old = JSON.parse(row.config) as { issuer: string; clientId: string; authorize: string; token: string; revoke: string };
-          const requestedScopes = JSON.parse(row.scopes) as string[];
-          const config: OAuthConfiguration = { issuer: old.issuer, resource: row.endpoint, requestedScopes,
-            metadata: { issuer: old.issuer, authorization_endpoint: old.authorize, token_endpoint: old.token, revocation_endpoint: old.revoke,
-              response_types_supported: ["code"], code_challenge_methods_supported: ["S256"], authorization_response_iss_parameter_supported: true } };
-          const credential: Credential = { client: { client_id: old.clientId, issuer: old.issuer },
-            ...(row.secret ? { tokens: { ...JSON.parse(this.unseal(row.secret, this.binding(row))) as StoredTokens, issuer: old.issuer } } : {}) };
-          db.prepare("UPDATE mcp_connections SET config=?,secret=? WHERE id=?").run(JSON.stringify(config), encryptSecret(JSON.stringify(credential), this.key), row.id);
-        }
-      }
       db.prepare("UPDATE mcp_connections SET state='reauthorize',refreshing=0,error=? WHERE refreshing=1")
         .run("Credential renewal was interrupted. Authorize this connection again.");
       db.prepare(`UPDATE mcp_connections SET state='reauthorize',error=? WHERE state='pending' AND NOT EXISTS
@@ -474,7 +452,6 @@ export class McpConnections {
       if (!credential.client) throw new ConnectionError(400, "The OAuth client registration is missing. Start again.");
       credential.tokens = await exchangeCode(config, credential.client, params.get("code")!, this.unseal(pending.verifier, this.pendingBinding(row, pending, "verifier")), this.redirectURI);
       await this.saveCredential(row.id, credential);
-      await this.verifyLegacy(row.id, credential.tokens.access_token);
       await this.mark(row.id, "authorized", null);
       return { id: row.id, authorized: this.authorized(this.row(row.id)) };
     } catch {
@@ -495,26 +472,16 @@ export class McpConnections {
     await this.db!.write([id], query => query("UPDATE mcp_connections SET state=$1,error=$2,refreshing=0 WHERE id=$3", [state, error, id]));
   }
 
-  private async verifyLegacy(id: string, token: string) {
-    const row = this.row(id);
-    if (row.provider !== "agent-wiki") return;
-    const info = await verifyLegacyWikiIdentity(row.endpoint, token, row.upstream_agent);
-    await this.db!.write([id], query => query("UPDATE mcp_connections SET upstream_agent=$1,upstream_run=$2 WHERE id=$3", [info.agent, info.run, id]));
-  }
-
   beforeConnect(id: string) {
     return this.admit(async () => {
       const row = this.row(id);
       if (!this.authorized(row)) throw new ConnectionError(401, row.error ?? "Connect this server in Settings → Connections.");
-      if (row.provider === "agent-wiki") await this.verifyLegacy(id, (await this.tokenOnce(id))!);
     });
   }
 
-  recordServer(id: string, name: string, instructions: string): Promise<void> {
+  recordServer(id: string, name: string): Promise<void> {
     return this.admit(async () => {
-      const row = this.row(id);
-      await this.db!.write([id], query => query("UPDATE mcp_connections SET server_name=$1,identity=$2 WHERE id=$3",
-        [name, row.provider === "agent-wiki" ? legacyWikiIdentity(instructions, row.upstream_agent) : row.identity, id]));
+      await this.db!.write([id], query => query("UPDATE mcp_connections SET server_name=$1 WHERE id=$2", [name, id]));
     });
   }
 

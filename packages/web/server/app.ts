@@ -98,7 +98,7 @@ export function createApp(options: AppOptions) {
           document.getElementById("heading").textContent=result.authorized?"Connection authorized":"Connection needs attention";
           document.getElementById("message").textContent=result.message;
           button.hidden=result.authorized;
-          if(window.opener){window.opener.postMessage({type:"dispatch-mcp-authorized"},${JSON.stringify(options.origin)});window.opener.postMessage({type:"dispatch-wiki-authorized"},${JSON.stringify(options.origin)});if(result.authorized)window.close();}
+          if(window.opener){window.opener.postMessage({type:"dispatch-mcp-authorized"},${JSON.stringify(options.origin)});if(result.authorized)window.close();}
         }catch(error){document.getElementById("heading").textContent="Connection needs attention";document.getElementById("message").textContent=error.message+" Open Dispatch to sign in if needed, then try again here.";}
         finally{button.disabled=false;}
       }

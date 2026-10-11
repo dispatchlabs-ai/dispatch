@@ -4,7 +4,7 @@
 - **Source:** worktree `codex/agents-design-fixes`. The working tree contains uncommitted changes on top of `ca0c343` (the docs, `agent-sidebar.tsx`, `agents.tsx`, `ui.tsx`, `workspace.tsx`, and `styles.css`).
 - **Screenshots:** twelve fresh captures in the canonical checkout's ignored `.local/agents-design-fixes/2026-10-03/`, cited below as `01`–`12`. `screenshots.json` records each CSS viewport, `scrollWidth`, and `visualScale`.
 - **Measured against:** the [initial review](agents-design-review.md) and the accepted spec text.
-- **Scope:** visual design and source review only. No code changes, tests, commits, or wiki edits.
+- **Scope:** visual design and source review only. No code changes, tests, commits.
 
 ## Verdict
 

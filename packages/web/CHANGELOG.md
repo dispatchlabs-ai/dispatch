@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Repository documentation reset
+
+- Replace the former product specification with a short draft outline centered on supported use cases, rules and repo-local detail.
+- Make repository guidance self-contained; retain the existing testing policy in the contribution guide and retire obsolete external-document references and illustrations.
+- Remove provider-specific MCP migration, identity checks, callback compatibility and activity labels while retaining generic MCP support. Existing pre-generic connection databases no longer receive that retired migration.
+
 ### Licensing
 
 - License Dispatch under the MIT License.
@@ -314,8 +320,8 @@ Integrated source review and TypeScript/application/Apple Silicon Nix checks pas
 - Agent Instructions now use the shared live Markdown editor with document-style Enter behavior and retain rendered formatting in saved views. Markdown storage and revision saves are preserved; oversized instructions remain editable with a visible save-blocking error.
 - Updated Pi Durable and the directly used Pi AI, Chord, Coding Agent, and MCP packages from 1.0.1 to 1.0.4, with matching dependency locks and Nix inputs. This includes upstream provider-session affinity, OAuth refresh, and file/tool fixes; resolution of the observed WebSocket authentication error remains unverified.
 
-- Corrected MCP connection setup to be provider-neutral: remote Streamable HTTP with OAuth, bearer tokens, custom headers or no authentication; server-supplied tool labels; migration of existing Wiki credentials/bindings; explicit local-only disconnect when provider revocation is unavailable. Wiki principal provisioning remains separate future work.
-- Rebuilt agent editing around compact identity, dominant instructions, model/capability summaries, staged MCP changes and one revision-save bar on desktop and phones. Added Settings authorization for existing Wiki agents, owner-managed disconnect/renewal, explicit application to existing instances, and retry-safe revision saves. API-based Wiki agent registration and delegated personal access remain deferred.
+- Corrected MCP connection setup to be provider-neutral: remote Streamable HTTP with OAuth, bearer tokens, custom headers or no authentication; server-supplied tool labels; migration of existing connection credentials/bindings; explicit local-only disconnect when provider revocation is unavailable.
+- Rebuilt agent editing around compact identity, dominant instructions, model/capability summaries, staged MCP changes and one revision-save bar on desktop and phones. Added Settings authorization for existing provider identities, owner-managed disconnect/renewal, explicit application to existing instances, and retry-safe revision saves. API-based provider registration and delegated personal access remain deferred.
 
 - Refined Conversations around consistent left alignment, compact messages and navigation, contextual reply/copy actions, data-backed reply summaries, distinct agent avatars, and readable tool disclosures. Threads and participants open a contextual panel on demand; main and thread composers retain their own destinations and drafts.
 
@@ -339,7 +345,7 @@ Integrated source review and TypeScript/application/Apple Silicon Nix checks pas
 
 ### Added
 
-- Per-agent MCP connections with dedicated identity, tool discovery, native Pi tool execution, connection status and reconnect controls. Developer can use all personal-Wiki article and evidence tools through a separate, operator-provisioned credential; explicitly granted existing instances retain their history and workspaces.
+- Per-agent MCP connections with dedicated identity, tool discovery, native Pi tool execution, connection status and reconnect controls. Developer can use all configured remote tools through a separate, operator-provisioned credential; explicitly granted existing instances retain their history and workspaces.
 
 - Invite-only shared conversations with starting-agent selection, human/agent invitations, mentions, full public history and independent agent instances. Native Pi tasks deliver other participants’ messages, permit silence and recover admitted work; Stop all cancels the conversation’s admitted work. Existing conversations retain IDs, history, configuration, workspaces and queued work through migration.
 

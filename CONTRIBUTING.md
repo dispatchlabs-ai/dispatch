@@ -2,9 +2,9 @@
 
 Dispatch Web has a local browser/service implementation with authentication, native Pi Durable chat, named agents, and a branded responsive workspace. Continue through focused work packages and the check policy below.
 
-## Current check policy
+## Testing policy
 
-Follow the package's [testing policy](packages/web/docs/spec.md#testing-policy): do not add or run automated tests. This does not apply to AI agents using `agent-browser` for interactive verification of authorized work; no separate testing-policy exception is needed. Source review, TypeScript checks and builds remain permitted. Future coverage should prioritize stable end-to-end and API behavior, not implementation details or coverage counts. Builds do not establish runtime correctness; record dated observations and unverified outcomes in the package handoff.
+Do not add or run automated tests. This does not apply to AI agents using `agent-browser` for interactive verification of authorized work; no separate testing-policy exception is needed. Source review, TypeScript checks and builds remain permitted. Future coverage should prioritize stable end-to-end and API behavior, not implementation details or coverage counts. Builds do not establish runtime correctness; record dated observations and unverified outcomes in the package handoff.
 
 ## Local development and Nix builds
 
@@ -32,7 +32,7 @@ Use `npm run auth -- invite --email person@example.com --name "Person"` to provi
 | `packages/<package>/README.md` | Package purpose, usage, and documentation links |
 | `packages/<package>/CHANGELOG.md` | Package changes and release history |
 | `packages/<package>/docs/spec.md` | Intended behavior, contracts, and explicit unresolved questions |
-| `packages/<package>/docs/handoff.md` | Implementation decisions, ordered work packages, and acceptance criteria |
+| `packages/<package>/docs/handoff.md` | Historical implementation notes and verification evidence |
 | `packages/<package>/docs/usage-guide.md` | Detailed integration guidance when the package has usable interfaces |
 | `packages/<package>/src/` | Implementation |
 | `packages/<package>/server/` | Owning package’s persistent service integration |
@@ -43,15 +43,15 @@ Language-specific manifests and build configuration belong beside the relevant p
 
 ## Specification and implementation
 
-1. Read the relevant product intent and decisions from the [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/), then the affected package's specification and handoff.
+1. Read the affected package's specification and relevant repo-local documentation.
 2. Agree the user workflow and observable outcomes. Record behavior and contracts in `docs/spec.md`, including state ownership, failure paths, and recovery. Mark proposed or unresolved details explicitly.
-3. Translate the design into ordered work packages in `docs/handoff.md`. Each package needs its scope, dependencies, acceptance criteria, and applicable checks. Link significant decisions to their maintained wiki record.
+3. Keep implementation notes and verification receipts in repo-local supporting documents when needed. Link useful detail from the specification; do not create additional product requirements or ticket numbering by default.
 4. Implement the current work package. Keep source/type/build evidence and unverified functional outcomes in its acceptance criteria; document actual usage.
 5. Run the permitted repository checks, inspect the diff, update the package changelog as appropriate, and review the result with Chris before starting the next package. Do not redesign later packages while implementing the current one.
 
 The reference is [Pi Durable's Pico5 handoff](https://github.com/earendil-works/pi/blob/v1.0.0/packages/durable/docs/pico-v5-handoff.md). Use this repository's actual checks below; follow the current testing policy for any future coverage.
 
-The wiki maintains product intent and decision history. Package documents define implementation contracts and execution steps linked to those decisions. Keep both current when an authorized change affects them.
+The repository is the authoritative home for Dispatch documentation. The specification is the primary product document: supported use cases and rules stay concise; agent-facing implementation detail lives in linked repo documents. Historical handoffs are reference material, not a second product specification.
 
 ## Agent workflows
 
@@ -77,7 +77,7 @@ Use `/deslop` after implementing a work package, then rerun affected checks befo
 
 ## Checks and publication
 
-Run `npm run check` inside `nix develop` for code changes. Run `nix flake check` for the declared type/build check and `nix build` to produce artifacts. There is no functional test suite under the current zero-tests rule. AI-agent interactive verification using `agent-browser` is permitted under the [package testing policy](packages/web/docs/spec.md#testing-policy).
+Run `npm run check` inside `nix develop` for code changes. Run `nix flake check` for the declared type/build check and `nix build` to produce artifacts. There is no functional test suite under the current zero-tests rule. AI-agent interactive verification using `agent-browser` is permitted under the [testing policy](#testing-policy).
 
 Also run `git diff --check` (and `git diff --cached --check` after staging), inspect the full diff, and verify changed local documentation links. Documentation checks do not verify application behavior.
 

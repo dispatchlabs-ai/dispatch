@@ -1,10 +1,10 @@
 # Dispatch Web usage guide
 
-Dispatch Web provides company sign-in, invite-only shared conversations on stock Pi Durable, shared named agent definitions, and a branded desktop/mobile workspace. This is a local development implementation. Source/type/build checks are permitted; functional and browser qualification are deferred under the [testing policy](spec.md#testing-policy).
+Dispatch Web provides company sign-in, invite-only shared conversations on stock Pi Durable, shared named agent definitions, and a branded desktop/mobile workspace. This is a local development implementation. Source/type/build checks are permitted; functional and browser qualification are deferred under the [testing policy](../../../CONTRIBUTING.md#testing-policy).
 
 ## Start development
 
-Use Nix with `nix-command` and `flakes` enabled. M1 Air's Nix prerequisite is managed by [Palm](https://wiki.chrisreynolds.me/wiki/palm-nix-builders/); application tooling is owned here. Open a new terminal after installing Nix. An existing terminal can use `/nix/var/nix/profiles/default/bin/nix` directly.
+Use Nix with `nix-command` and `flakes` enabled. Install Nix before using the application tooling. Open a new terminal after installing Nix. An existing terminal can use `/nix/var/nix/profiles/default/bin/nix` directly.
 
 From the repository root:
 
@@ -158,7 +158,7 @@ When seeding the company's default agent for the first time, explicit `DISPATCH_
 
 Developer (`developer`) is the default agent and includes local coding tools. It is saved on first startup and can be edited in Agents just like other definitions; subsequent restarts or changes to the service defaults do not overwrite it. The Agents section creates company-shared definitions with instructions, provider/model, and supported thinking levels. Each save produces a new immutable revision. New instances copy that configuration; existing active instances adopt base updates at the next safe idle boundary, preserving identity and history. A stale edit returns a conflict. Archived definitions cannot start new chats or be edited; user-driven archive restoration is not supported (the Developer default migration below is a startup exception). Configuration restoration for an eligible active target is described under [permissioned agent management](#permissioned-agent-management).
 
-**Update policy:** saved does not mean applied. In Participants, **Base revision applied** identifies adopted instructions/model/capabilities/selected skills; a newer saved base revision shows Pending until adoption succeeds. Instance connections lists actual MCP assignments separately, with Pending update for queued connection work. Supplements and workspace paths survive upgrades. No remove/reinvite is needed. A failed application retains the old configuration and reports a safe error; reconciliation retries on later eligible boundaries and startup. Candidate source/build evidence does not establish runtime or rendered acceptance. See [the contract](spec.md#in-place-agent-revision-upgrades).
+**Update policy:** saved does not mean applied. In Participants, **Base revision applied** identifies adopted instructions/model/capabilities/selected skills; a newer saved base revision shows Pending until adoption succeeds. Instance connections lists actual MCP assignments separately, with Pending update for queued connection work. Supplements and workspace paths survive upgrades. No remove/reinvite is needed. A failed application retains the old configuration and reports a safe error; reconciliation retries on later eligible boundaries and startup. Candidate source/build evidence does not establish runtime or rendered acceptance.
 
 In Agents, New agent is at the top of the sidebar, followed by Find an agent and the saved-agent list. Select an agent to read its description and instructions; the right column shows its saved configuration. Start chat opens the starting-agent chooser with that definition selected. Hover or focus an agent's row for Edit and, for non-default agents, Archive; touch layouts keep the actions visible. Archived agents is at the bottom of the sidebar and supports inspection, not restoration. The default agent keeps its Default tag and cannot be archived.
 
@@ -174,7 +174,7 @@ Switching back to **Overview** retains an evaluation draft in memory. To discard
 
 ### Agent evaluation profiles
 
-WP-047 adds a separate Evaluation profile section for saved agents. Focused disposable-data demonstrations cover persistence, conflict recovery and desktop/390 px rendering; broader accessibility, real-device and crash-recovery qualification remain outside that evidence. See the [data contract](spec.md#individual-agent-evaluation) and [acceptance scope](handoff.md#wp-047--agent-evaluation-profiles-and-editor).
+WP-047 adds a separate Evaluation profile section for saved agents. Focused disposable-data demonstrations cover persistence, conflict recovery and desktop/390 px rendering; broader accessibility, real-device and crash-recovery qualification remain outside that evidence. md#wp-047--agent-evaluation-profiles-and-editor).
 
 1. Save the agent definition first, then select **Evaluations** to open its evaluation workspace. Select **Create evaluation profile** for first use or **Edit profile** for an existing profile. The saved overview links to Expectations, Grading criteria and Cases; **Show all expectations** reveals the complete expectations.
 2. Use **Expectations**, **Grading criteria** and **Cases** to move through one draft. Enter responsibilities, expected behavior and at least one criterion. Criteria choose direct checks, judge or human review; critical-failure flags and grading guidance describe how to assess work, not an assessment already performed.
@@ -255,61 +255,16 @@ Read uses the same file card with the number of returned lines and their origina
 
 Refreshing also applies these views to existing tool calls. The cards use the original recorded read/write content and edit patch, even if the file later changes. They do not rerun the tools or read files from disk. The shared public log remains available across native context resets and compaction. Private working inputs and reasoning are excluded from browser snapshots.
 
-### Developer's Wiki connection
-
-Open **Agents → Developer → Connections** to see the personal Wiki endpoint,
-**Dispatch Developer** identity, connection status and discovered tools. Its configured
-Wiki grants cover article search/read/history/preview/save and conversation-trace/attachment
-access; discovery itself does not prove those grants. The other named agents retain their own configured capabilities.
-
-The local operator provisions this connection through Palm's
-`infra/playbooks/dispatch-developer-wiki.yml`. It uses a dedicated Wiki signing
-credential and the existing official adapter. The definition editor preserves the
-connection; it does not accept passwords or arbitrary executable commands.
-
-The operator file defaults to `<DISPATCH_DATA_DIR>/agent-connections.json`:
-
-```json
-{
-  "connections": [{
-    "id": "wiki",
-    "agentId": "developer",
-    "name": "Wiki",
-    "endpoint": "https://wiki.chrisreynolds.me/mcp",
-    "identity": "Dispatch Developer",
-    "command": "/absolute/path/to/node",
-    "args": ["/absolute/path/to/agent-mcp.mjs", "/private/path/to/developer-wiki.json"],
-    "instructions": "Consult maintained articles and relevant traces; follow the wiki writing guide before saving.",
-    "applyToExisting": true
-  }]
-}
-```
-
-Paths above are examples; Palm writes the installation's actual paths. Override the
-file path with `DISPATCH_AGENT_CONNECTIONS_FILE`. Restart the service after changing
-the manifest. Keep secrets in the referenced adapter configuration/key store.
-`applyToExisting` grants the connection to existing instances explicitly; it does
-not replace their saved instructions or model. Removing an entry and restarting
-removes that connection from definitions and instances. Upstream revocation is
-still enforced by Wiki independently of this file.
-
-An unavailable connection shows its last discovered tools and a **Reconnect**
-action. A successful initialization establishes the advertised catalog, not that
-all tool operations succeeded. An interrupted write is never automatically replayed;
-inspect its outcome before retrying with Wiki's operation ID rules.
-
 ### Connect an MCP server
 
 1. Open **Settings → Connections → Connect server**, or **Agents → Edit → MCP connections → Add connection → Connect another server**.
 2. Enter a name and the server's Streamable HTTP URL. HTTPS endpoints can use any path; HTTP is supported only on loopback. Choose the authentication method documented by the provider: **OAuth**, **Bearer token**, **Custom headers**, or **No authentication**. Token and header values are entered in password fields and stored encrypted by the service.
-3. For OAuth, continue to the provider's sign-in/consent window. **Advanced OAuth settings** accepts optional space-separated scopes and a registered client ID/secret when automatic client registration is unavailable; it shows the callback URL to register. Blank scopes use the server's advertised requirements. Dispatch does not assume a Wiki account or create an upstream agent.
+3. For OAuth, continue to the provider's sign-in/consent window. **Advanced OAuth settings** accepts optional space-separated scopes and a registered client ID/secret when automatic client registration is unavailable; it shows the callback URL to register. Blank scopes use the server's advertised requirements. Dispatch does not create an upstream account or agent.
 4. Choose the connection in the agent editor, review the shared-conversation notice, and choose new instances only or new and existing instances. **Save new revision** commits the selection. Connecting alone does not grant an agent access.
 
-Connections are reserved for one definition and use the configured provider authority. Participants, including later invitees, can receive connected content; teammates can edit the shared definition. This is not the future delegated personal-Wiki permission model. MCP server/tool names and OAuth scopes are shown when available; a discovered tool list does not prove permission to perform every operation. Existing operator-managed connections remain on their definitions and are edited through their manifest.
+Connections are reserved for one definition and use the configured provider authority. Participants, including later invitees, can receive connected content; teammates can edit the shared definition. MCP server/tool names and OAuth scopes are shown when available; a discovered tool list does not prove permission to perform every operation. Existing operator-managed connections remain on their definitions and are edited through their manifest.
 
 **Discard** abandons staged definition changes. An unused connection remains in Settings. **Disconnect** disables future Dispatch access for all bound instances. For OAuth providers that advertise revocation, it also revokes the tokens; retry a pending revocation. Without that endpoint, or for pasted credentials, Dispatch removes its stored credentials and tells you to revoke them with the provider separately. Reauthorization keeps the scope ceiling; use a new connection to change endpoint, authentication method or permissions.
-
-Existing Wiki authorizations retain their identity check and bindings during migration. A newly connected Wiki uses the same generic MCP setup as other services, with its own consent screen and grants deciding access. API-based Wiki agent registration is still deferred.
 
 The editor's Files and commands capability selects native local coding tools for new instances and safe idle base upgrades of active instances. Newly selected MCP connections still require explicit existing-instance assignment. Switching between editor and Settings preserves the draft; reloading or ending the sign-in session does not.
 
@@ -327,7 +282,7 @@ Use **+** to pick files/images, or paste an image into the message or reply comp
 
 Image attachments appear uncropped inline; select the image or filename to open the original.
 
-**Uploading shares the file immediately with authorized conversation members, before Send.** Removing a preview does not delete the uploaded file; it remains a conversation asset. Verified PNG/JPEG/GIF/WebP images up to 4 MiB can reach agents as images (8 MiB total per delivery/history read). Larger originals remain previewable/downloadable, but require a smaller upload for agent use. Omitted images are identified explicitly; agents can retrieve total-budget omissions individually. These application limits do not guarantee provider acceptance, and validated UTF-8 files can be read through their attachment tool. Other files, including PDF/Office/binary formats, are download-only; upload does not mean an agent can interpret them. SVG is download-only, not displayed inline or exposed as agent-readable text. See [the attachment contract](spec.md#message-attachments).
+**Uploading shares the file immediately with authorized conversation members, before Send.** Removing a preview does not delete the uploaded file; it remains a conversation asset. Verified PNG/JPEG/GIF/WebP images up to 4 MiB can reach agents as images (8 MiB total per delivery/history read). Larger originals remain previewable/downloadable, but require a smaller upload for agent use. Omitted images are identified explicitly; agents can retrieve total-budget omissions individually. These application limits do not guarantee provider acceptance, and validated UTF-8 files can be read through their attachment tool. Other files, including PDF/Office/binary formats, are download-only; upload does not mean an agent can interpret them. SVG is download-only, not displayed inline or exposed as agent-readable text.
 
 Conversations are visible only to their human members within the installation’s company. New chat opens a chooser for one or more company agents and an optional conversation name. Enter a name of up to 200 characters (surrounding whitespace is trimmed), or leave it blank to use the existing first-message preview. An explicit name stays as entered, including “New conversation”; it is shared with other members and can be changed later with Rename. A failed creation keeps the name and selected agents for retry. Selecting an agent in Participants opens its saved configuration and per-agent usage. Add participants invites existing active company people or available agents; newcomers can read the full public history. Each agent has an independent working context. Agents consider messages from humans and other agents and may remain silent.
 
@@ -356,7 +311,7 @@ Agents waiting to publish show **Listening**. An agent with the speaking turn sh
 
 **Source-published in `89f9ff7`; runtime and rendered UI qualification pending.** Open **Participants** from the chat header (or **Details** on a phone). Under **Definition of Done**, choose **Set criteria** or **Edit criteria**, enter Markdown and choose **Save criteria**. To clear, remove the text and save. **Cancel** discards the edit after confirmation when changed. Drafts remain in browser memory while switching open tabs or responsive layouts, not across a reload. After any save error or conflicting edit, review the saved criteria using **Review latest; keep my draft** before saving again; a lost response may follow a successful save.
 
-Optional shared Markdown criteria guide all chat participants; checklists are supported. Only authorized human participants can edit them. Clearing criteria leaves chat history intact. Criteria do not declare the chat complete, stop agents or authorize additional work. Agents receive the saved value on their next shared-context refresh; saving alone does not activate them. See [the contract](spec.md#chat-definition-of-done).
+Optional shared Markdown criteria guide all chat participants; checklists are supported. Only authorized human participants can edit them. Clearing criteria leaves chat history intact. Criteria do not declare the chat complete, stop agents or authorize additional work. Agents receive the saved value on their next shared-context refresh; saving alone does not activate them.
 
 #### Agent editing capability
 
@@ -367,7 +322,7 @@ Enabled active participants use `conversation_definition_of_done` in their curre
 - Save with `{ markdown, expectedRevision, operationId }`, using the saved revision and a nonempty operation ID of at most 200 characters. Markdown is limited to 20,000 characters before trimming; empty text clears it.
 - Retry identical edits with the **same** operation ID. A replay returns its original result, which may be older than current criteria; read again for current state. Changing the text or expected revision under that ID conflicts. After a stale-revision error, read and review before starting a new logical edit with a new ID.
 
-Tool calls recheck active membership and the instance's applied capability, including receipt replay; Stop transitions block calls. This capability edits shared criteria, not authority, task completion or human approval. Agents without it still receive criteria through shared context. See [the opt-in contract](spec.md#opt-in-agent-definition-of-done-editing).
+Tool calls recheck active membership and the instance's applied capability, including receipt replay; Stop transitions block calls. This capability edits shared criteria, not authority, task completion or human approval. Agents without it still receive criteria through shared context.
 
 ### Adding another agent instance
 
@@ -498,7 +453,7 @@ Authenticated routes:
 | `POST /api/bundles/github/preview` | `{ source: { owner, repository, commit, path }, installationId? }` → actor/company-bound durable preview |
 | `POST /api/bundles/github/apply` | `{ previewId, requestId }` → installation/result mapping |
 
-Apply references exactly the server-saved preview, not browser package content or a refetched commit. Preserve the request ID for retries. These routes do not make GitHub a live dependency of imported agents. See [update contracts](spec.md#github-sources-and-updates) and [acceptance evidence](handoff.md#github-bundle-imports-and-updates--october-8-2026).
+Apply references exactly the server-saved preview, not browser package content or a refetched commit. Preserve the request ID for retries. These routes do not make GitHub a live dependency of imported agents. md#github-bundle-imports-and-updates--october-8-2026).
 
 ### Bundle archive profile
 
@@ -516,7 +471,7 @@ Authenticated JSON routes use base64 archive bytes, not multipart uploads:
 | `/api/bundles/preview` | `{ archive }` | Parsed bundle, blockers and warnings |
 | `/api/bundles/import` | `{ archive, requestId }` | Imported agent/skill ID mapping |
 
-Reuse the same `requestId` and contents for the same import; changed contents under the same operation conflict. Use a new ID only for a deliberate additional copy. Native receipts are actor/company-scoped. Transport base64 increases request size and is not encryption. See [the first-slice contract](spec.md#first-archive-slice) for atomicity and compatibility requirements.
+Reuse the same `requestId` and contents for the same import; changed contents under the same operation conflict. Use a new ID only for a deliberate additional copy. Native receipts are actor/company-scoped. Transport base64 increases request size and is not encryption.
 
 ### Host-installed capabilities
 
@@ -541,11 +496,11 @@ Authenticated candidate routes:
 | `POST /api/project-archives/import` | `{ archive: string, requestId: string }` → `{ project }` |
 | `GET /api/projects/:id/history` | `{ archive }`, or null when no imported history; requires project read access |
 
-Preview is a summary, not a durable reviewed-content token; import sends the archive again. Keep the same archive and request ID for uncertain retries: changed content with a reused ID conflicts. Replay still requires destination read access. Immutable restricted blobs are saved before atomic project/pointer/receipt admission; failed admission can leave non-visible orphan files. Back up the complete state/runtime directory, including project archive blobs. See [project contract](spec.md#project-content-and-operational-recovery) and [acceptance evidence](handoff.md#project-content-portability--october-8-2026).
+Preview is a summary, not a durable reviewed-content token; import sends the archive again. Keep the same archive and request ID for uncertain retries: changed content with a reused ID conflicts. Replay still requires destination read access. Immutable restricted blobs are saved before atomic project/pointer/receipt admission; failed admission can leave non-visible orphan files. Back up the complete state/runtime directory, including project archive blobs. md#project-content-portability--october-8-2026).
 
 ## Offline installation recovery
 
-**CLI source-published at `64298d7`; source-reviewed instructions, not verified recovery.** This is secret-bearing installation material, not a shareable project archive. SQLite only; PostgreSQL, symlinks/special files and overlapping roots are rejected. See [recovery contract](spec.md#project-content-and-operational-recovery) and [acceptance evidence](handoff.md#installation-backup-and-restore--october-8-2026).
+**CLI source-published at `64298d7`; source-reviewed instructions, not verified recovery.** This is secret-bearing installation material, not a shareable project archive. SQLite only; PostgreSQL, symlinks/special files and overlapping roots are rejected. md#installation-backup-and-restore--october-8-2026).
 
 Before any authorized operational use, stop supervisors, services, auth CLI, provider refreshers and every other writer. The runtime lock is only an additional guard. Fence the original executor before recovery. These acknowledgments are operator assertions, not automatic shutdown/proof; documentation does not authorize stopping a live service.
 
@@ -648,7 +603,7 @@ The runtime pins Pi Durable, Pi AI, Chord, Pi Coding Agent, and Pi MCP to 1.1.0.
 
 Use exact versions in the owning manifest and commit the root dependency lock. To update `npmDepsHash` in `packages/web/nix/package.nix`, temporarily set `lib.fakeHash`, run `nix build`, replace the placeholder with the reported actual hash, then rebuild. Never commit a placeholder. Toolchain changes through `nix flake update` also require a build.
 
-Installation-specific hosting, artifact pins and deployment evidence belong in the owning infrastructure repository; the [handoff](handoff.md#wp-043--isolated-palm-postgresql-trial) links the isolated Palm trial and its qualification limits. This does not establish deployment of the latest source. Loopback development cannot be opened directly from a phone; real-device access requires an authorized reachable environment. CI and automatic release publication are unconfigured; use the [lockstep SemVer workflow](../../../CONTRIBUTING.md#versioning-and-releases) for version/changelog preparation. Follow the [testing policy](spec.md#testing-policy) for permitted verification.
+Installation-specific hosting, artifact pins and deployment evidence belong in the owning infrastructure repository; the [handoff](handoff.md#wp-043--isolated-palm-postgresql-trial) links the isolated Palm trial and its qualification limits. This does not establish deployment of the latest source. Loopback development cannot be opened directly from a phone; real-device access requires an authorized reachable environment. CI and automatic release publication are unconfigured; use the [lockstep SemVer workflow](../../../CONTRIBUTING.md#versioning-and-releases) for version/changelog preparation. Follow the [testing policy](../../../CONTRIBUTING.md#testing-policy) for permitted verification.
 
 ### Agent skills
 
@@ -687,7 +642,7 @@ Both path fields use `/` separators without absolute paths, `.`/`..` or empty se
 
 **Read/edit spec (source delivered; integration/browser acceptance pending):** **View spec** opens the configured public-GitHub repository file at a pinned default-branch commit. **Change** edits its reference, not its content. Directory-backed specs remain configurable but are not readable in this first slice; private repositories and other hosts are unsupported. A failed read does not fall back to an agent workspace or clone a repository. Files must be UTF-8 and at most 512 KiB.
 
-Use **Preview** for Markdown and **Source** for literal highlighted text; **Edit** enables local source editing. Preview uses the current draft. **Draft · not saved** means memory only, not a repository/workspace write; there is no Save. **Discard** restores loaded content after confirmation when changed. Copy needed changes elsewhere before discarding, refreshing or closing: drafts are not durable recovery. Loading a spec neither starts an agent nor authorizes execution of its backlog. See [the editor contract](spec.md#reusable-source-viewereditor-and-project-spec) and [acceptance evidence](handoff.md#pierre-fork-and-project-spec-editor--october-10-2026).
+Use **Preview** for Markdown and **Source** for literal highlighted text; **Edit** enables local source editing. Preview uses the current draft. **Draft · not saved** means memory only, not a repository/workspace write; there is no Save. **Discard** restores loaded content after confirmation when changed. Copy needed changes elsewhere before discarding, refreshing or closing: drafts are not durable recovery. Loading a spec neither starts an agent nor authorizes execution of its backlog. md#pierre-fork-and-project-spec-editor--october-10-2026).
 
 **Project working directory (source-published October 8; type/build checks passed, runtime/rendered qualification pending):** managers can set **Working directory** in Project settings to an absolute existing directory on the executing service host. This is not a path on the browser computer. Worker-hosted instances use their worker workspace rather than this project override. Without a directory-backed spec, leave it blank to use `DISPATCH_WORKSPACE_DIR`. Saving affects new agent instances, including later invitations, not existing instances or their resumed work. The setting does not clone repositories, move files or isolate filesystem access; use explicit Git worktrees and coordinate shared-checkout edits. Missing directories fail at execution rather than being recreated. Project-content exports omit this host-local setting; configure it separately after import.
 

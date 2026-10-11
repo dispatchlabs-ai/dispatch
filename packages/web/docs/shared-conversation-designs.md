@@ -1,6 +1,6 @@
 # Shared-conversation design concepts
 
-**Approved for implementation October 5, 2026.** Chris requested ImageGen concepts for the accepted [shared-conversation behavior](spec.md#shared-conversations), then supplied a Slack screenshot as a better visual model. Chris approved these designs and instructed implementation with subagents. They use Dispatch's light theme, navy/aqua palette and existing project navigation. [WP-024](handoff.md#wp-024--shared-conversations) records implementation and qualification evidence.
+**Approved for implementation October 5, 2026.** Chris requested ImageGen concepts for the accepted shared-conversation behavior, then supplied a Slack screenshot as a better visual model. Chris approved these designs and instructed implementation with subagents. They use Dispatch's light theme, navy/aqua palette and existing project navigation. [WP-024](handoff.md#wp-024--shared-conversations) records implementation and qualification evidence.
 
 The sample messages and agent definitions are illustrative. The concepts do not establish that Designer or Reviewer is registered, that an invitation occurred, or that a displayed status is live.
 
@@ -10,7 +10,7 @@ The sample messages and agent definitions are illustrative. The concepts do not 
 
 Humans and agents share one left-aligned message flow with avatars, author names, timestamps and compact spacing. Agent badges and distinct icons preserve identity. A membership button in the conversation header opens participants; an inline reply count opens the related discussion in the right column. Project groups remain in the sidebar.
 
-The approved reply-thread panel follows the [shared thread contract](spec.md#threads-and-participant-presentation): replies remain visible to all members, agents consider them with their thread context, and automatic replies retain that context. The mockup does not add calls, reactions, canvases or Slack's other features to scope. Showing one open conversation explains the absence of the existing multi-tab strip; this concept does not remove support for open conversation tabs.
+The approved reply-thread panel follows the shared thread contract: replies remain visible to all members, agents consider them with their thread context, and automatic replies retain that context. The mockup does not add calls, reactions, canvases or Slack's other features to scope. Showing one open conversation explains the absence of the existing multi-tab strip; this concept does not remove support for open conversation tabs.
 
 ## Choose starting agents
 

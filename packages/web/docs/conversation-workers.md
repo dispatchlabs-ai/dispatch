@@ -1,6 +1,6 @@
 # Single-server conversation workers
 
-Single-server rehearsal checkpoint: deployed revision `4f625ec`; scoped single-server checks at `7caa835` and the latest candidate passed: AMD64 HTTPS/browser, membership/creator-revoked replacement, MCP rollout/fencing/summaries, Docker hard-crash recovery and isolated restore reads; separate native ARM64 runtime and container-stack checks also passed. This is not overall acceptance. Remaining gaps are listed below. Host operations and edge verification belong in [Palm's runbook](https://github.com/chrisbyboston/palm/blob/main/docs/dispatch-workers-trial.md). Implements the [accepted target](spec.md#aws-container-deployment-target) and [single-server rehearsal](spec.md#single-server-container-rehearsal). Chris authorized implementation, isolated deployment and focused checks on October 7, 2026; existing installations/data remain untouched.
+Single-server rehearsal checkpoint: deployed revision `4f625ec`; scoped single-server checks at `7caa835` and the latest candidate passed: AMD64 HTTPS/browser, membership/creator-revoked replacement, MCP rollout/fencing/summaries, Docker hard-crash recovery and isolated restore reads; separate native ARM64 runtime and container-stack checks also passed. This is not overall acceptance. Remaining gaps are listed below. Host operations and edge verification belong in [Palm's runbook](https://github.com/chrisbyboston/palm/blob/main/docs/dispatch-workers-trial.md). Implements the accepted target and single-server rehearsal. Chris authorized implementation, isolated deployment and focused checks on October 7, 2026; existing installations/data remain untouched.
 
 ## Ownership and boundaries
 
@@ -40,7 +40,7 @@ Blocking support callbacks before worker close can turn unfinished work into ser
 
 Deployment shutdown calls `Harness.close()` through runtime close, not the user-facing Stop operation (which deliberately cancels work). This preserves unfinished durable work for recovery; the scoped deployed Docker SIGKILL recovery check below passed, while host failure and broader recovery qualification remain open. Container termination must still be confirmed separately before replacement. Launcher `close()` closes the controller only; it does not retire workers.
 
-**Chat archival — accepted October 9, implementation pending:** follow the [chat archive lifecycle](spec.md#chat-archive-lifecycle): cancel all work in that chat through conversation-wide Stop, then retire its sandbox through the launcher and confirm termination. Preserve retained history/state and prevent observation or restore alone from relaunching the worker. This is an explicit per-chat cancellation action, distinct from deployment shutdown's preservation of unfinished work; shared services and other chats remain running.
+**Chat archival — accepted October 9, implementation pending:**  Preserve retained history/state and prevent observation or restore alone from relaunching the worker. This is an explicit per-chat cancellation action, distinct from deployment shutdown's preservation of unfinished work; shared services and other chats remain running.
 
 This rehearsal is ECS-shaped, not evidence of scalable ECS operation. Routing journals and exclusive ownership locks are currently local to a single backend/launcher; replicated control planes require shared coordination and fencing, not merely substituting ECS API calls for Docker. AWS networking/IAM, task failover and load qualification remain separate follow-up work.
 
@@ -58,7 +58,7 @@ build and mock acceptance do not establish live pause, wake latency or savings.
 
 ## ECS follow-up plan (proposed, not deployed)
 
-The accepted [AWS target](spec.md#aws-container-deployment-target) preserves these application contracts. The following is an implementation sequence, not a qualified AWS design or authorization to apply it:
+The accepted AWS target preserves these application contracts. The following is an implementation sequence, not a qualified AWS design or authorization to apply it:
 
 1. **Stable services:** ALB/ACM HTTPS to an ECS backend service; private RDS PostgreSQL for Pi stores and ordinary S3 for artifacts; digest-pinned ECR images with separately qualified ARM64/AMD64 runtimes. Keep provider/OAuth administration backend-only. Existing backend authentication, connection and directory persistence must first gain supported shared storage/ownership; placing local SQLite files on several replicas is not a scaling strategy.
 2. **Shared control plane:** move routing/attempt receipts, terminal tombstones, installation admission state and mutation ownership into transactional shared storage (proposed: PostgreSQL). Use compare-and-swap ownership generations for every route mutation/callback, durable operation IDs and recovery reconciliation. Expiring a lease does not prove the old executor is dead; uncertain ownership blocks replacement. Backend replicas need consistent authorization and streamed-result routing without assuming local process memory.
@@ -94,7 +94,7 @@ Pi's review found stopping tasks omitted from inventory and Stop intent lost dur
 
 Discussion consensus, October 8, 2026: make backend and launcher state recoverable independently of their host-local files **before** adding replicas. Chris authorized team execution on October 8; completion design and acceptance remain pending. This is not implemented behavior or authorization to deploy AWS infrastructure. Preserve native installations and the existing PostgreSQL trial.
 
-Chris subsequently sized the next package to close all application/rehearsal prerequisites for the AWS Terraform module, not host independence alone; see the [pre-AWS readiness requirement](spec.md#pre-aws-application-readiness). The scope below is a starting point pending a complete gap inventory, concrete completion design and ordered acceptance criteria.
+Chris subsequently sized the next package to close all application/rehearsal prerequisites for the AWS Terraform module, not host independence alone;  The scope below is a starting point pending a complete gap inventory, concrete completion design and ordered acceptance criteria.
 
 **Completion boundary:** this package ends when application startup/lifecycle integration is implemented and reviewed, the isolated Linux rehearsal proves authorization/transport/failure recovery, an encrypted paired restore performs new model/tool work without overlapping or retired executors, and every pre-AWS checklist gate below is closed with scoped evidence and maintained runbooks. Component builds and logical/file restores alone do not meet that boundary. AWS apply/cost approval, replicas and full HA are separate; existing installations remain intact. Hands-on user testing need not wait for every recovery gate: its separate handoff requires a running isolated instance, verified URL/access, enrollment/provider setup instructions and a short test checklist. That handoff is not package completion or permission to change the existing installation.
 
@@ -327,7 +327,7 @@ worker cluster; controllers remain On-Demand. A changed provider applies to new
 attempts, never to an already running worker. Spot capacity is not guaranteed;
 interruption does not relax exact-task reconciliation, no uncertain-call replay
 or confirmed termination before replacement. Workspace recovery remains the
-[disposable-disk policy](spec.md#aws-container-deployment-target), not checkpointed
+disposable-disk policy, not checkpointed
 external effects or an automatic persistent-filesystem promise.
 
 Explicit service tracing uses `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`,

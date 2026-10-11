@@ -8,7 +8,6 @@ import { McpClient, StdioTransport, StreamableHttpTransport, toLlmContent, type 
 import { z } from "zod";
 import type { AgentConnection, AgentConnectionStatus } from "../src/shared/contracts.js";
 import type { McpConnections, ManagedConnectionRecord } from "./mcp-connections.js";
-import { verifyLegacyOperatorIdentity } from "./legacy-wiki-connection.js";
 
 const context = BACKGROUND_CONTEXT;
 const id = z.string().regex(/^[a-z][a-z0-9_-]*$/).max(40);
@@ -262,9 +261,8 @@ class McpConnection {
     if (this.closed || this.client !== client) return;
     if (new Set(tools.map(tool => tool.name)).size !== tools.length) throw new Error("MCP returned duplicate tool names.");
     const instructions = client.instructions ?? "";
-    if (!this.managed) verifyLegacyOperatorIdentity(this.config.identity, instructions, tools.map(tool => tool.name));
     const serverName = client.serverInfo?.title || client.serverInfo?.name || "";
-    await this.managed?.recordServer(this.config.id, serverName, instructions);
+    await this.managed?.recordServer(this.config.id, serverName);
     this.catalog = { tools: JSON.parse(JSON.stringify(tools)) as JsonRepresentation<Tool>[], instructions, checkedAt: Date.now(), ...(serverName ? { serverName } : {}) };
     this.error = undefined;
     this.install();

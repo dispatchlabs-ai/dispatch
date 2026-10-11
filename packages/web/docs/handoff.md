@@ -1,8 +1,10 @@
 # Dispatch Web implementation handoff
 
+**Historical reference.** The product specification was restarted on October 11, 2026. Entries below preserve earlier implementation notes and dated evidence; they do not repopulate or approve the new specification.
+
 ## User management proof of concept — October 11, 2026
 
-**Specified; implementation pending.** Implement only the [bounded user-management scope](spec.md#user-management-proof-of-concept). Acceptance:
+**Specified; implementation pending.** Implement only the bounded user-management scope. Acceptance:
 
 - An Admin invites a Member who completes enrollment while another user's session, live stream and running agent work continue; no maintenance window or restart.
 - Uninvited enrollment and Member/foreign-company administration are denied; superseded/revoked links fail, suspension removes access, reactivation preserves history, and the last active Admin is protected.
@@ -64,7 +66,7 @@ The final local request reused 99.66% of the tokens accounted as cache reads/wri
 
 **Historical compatibility choice superseded:** the later single-OpenAI-provider cutover removes the legacy option and manually updates the sole local installation. The original acceptance and evidence below describe the earlier package.
 
-**Completed and published to main at `9b465fc`; local main synchronized.** Integrated source/type/build and scoped disposable browser checks pass. Chris reported successful local testing on October 10; providers, methods and exact workflows were not specified, so this does not establish the broader qualification below. Chris requested Settings → Model providers for OpenAI Codex, Claude and Fireworks, using Pi's public authentication/model interfaces and the existing encrypted credential store. Developer owns backend/integration, Designer owns responsive design review, Pi Durable Expert verifies provider/method mappings, Deslop reviews behavior-preserving simplification, and Documenter maintains package documentation. [The spec](spec.md#model-provider-setup) records the user outcomes and ownership boundaries.
+**Completed and published to main at `9b465fc`; local main synchronized.** Integrated source/type/build and scoped disposable browser checks pass. Chris reported successful local testing on October 10; providers, methods and exact workflows were not specified, so this does not establish the broader qualification below. Chris requested Settings → Model providers for OpenAI Codex, Claude and Fireworks, using Pi's public authentication/model interfaces and the existing encrypted credential store. Developer owns backend/integration, Designer owns responsive design review, Pi Durable Expert verifies provider/method mappings, Deslop reviews behavior-preserving simplification, and Documenter maintains package documentation. The spec records the user outcomes and ownership boundaries.
 
 
 Acceptance:
@@ -78,7 +80,7 @@ Acceptance:
 
 Selected local cutover: preserve `auth.json` without importing its OAuth grants; app-managed providers use encrypted application storage and require a one-time Settings reconnect. Usage instructions must explain this compatibility change and the manual callback-paste flow for remote OpenAI authorization. Cancellation must join admitted exchanges through persistence. These are implementation choices, not verified runtime outcomes.
 
-Documentation preparation: reviewed existing credential-store and model-runtime integration. The repository wiki home could not be retrieved through the available web reader (private-address block); no wiki update or wiki review is claimed. Developer reported intermediate application type/build checks passing. Pi Durable Expert reported `nix flake check` and `nix build` passing for frozen backend candidate `b9b149a` on aarch64-darwin, including local storage, provider-manager/worker wiring, session recovery and per-provider availability isolation; incompatible Linux checks were omitted. At that backend checkpoint, frontend-integrated builds, account flows and browser outcomes were unverified; reconciled build evidence follows below.
+Documentation preparation: reviewed existing credential-store and model-runtime integration. Developer reported intermediate application type/build checks passing. Pi Durable Expert reported `nix flake check` and `nix build` passing for frozen backend candidate `b9b149a` on aarch64-darwin, including local storage, provider-manager/worker wiring, session recovery and per-provider availability isolation; incompatible Linux checks were omitted. At that backend checkpoint, frontend-integrated builds, account flows and browser outcomes were unverified; reconciled build evidence follows below.
 
 **October 10 adapter source evidence:** Pi Durable Expert supplied `8b76de2` (local encrypted store and side-effect-free pending inspection on both stores) and `56a0275` (local wiring). The local adapter reuses application encryption/key handling, holds an exclusive SQLite owner lock, and persists uncertain-update intent before provider callbacks; `inspect()` exposes only `{ pending }`. Expert reported focused strict TypeScript checking inside Nix plus source/deslop and whitespace review passing. This is adapter/source evidence, not integrated application, persistence/restart or account-flow qualification. Usage/API documentation describes storage/key pairing, manual callback handling and compatibility cutover; final integrated runtime behavior remains unverified.
 
@@ -116,7 +118,7 @@ This package changes repository and build metadata. It does not change applicati
 
 ## Pierre fork and project spec editor — October 10, 2026
 
-**Fork and both application integrations source-published; bounded browser checks passed, device/input limits remain.** Chris requested implementing the maintained Pierre fork, using it in the existing chat diff viewer and adding the new project spec integration. Developer owns library/application implementation, Designer UI and accessibility review, Security rendering/hardening review, Pi Durable Expert identity/state/recovery review, and Documenter documentation reconciliation. The [source-editor contract](spec.md#reusable-source-viewereditor-and-project-spec) owns boundaries. Source/build delivery below does not establish browser qualification or deployment.
+**Fork and both application integrations source-published; bounded browser checks passed, device/input limits remain.** Chris requested implementing the maintained Pierre fork, using it in the existing chat diff viewer and adding the new project spec integration. Developer owns library/application implementation, Designer UI and accessibility review, Security rendering/hardening review, Pi Durable Expert identity/state/recovery review, and Documenter documentation reconciliation. The source-editor contract owns boundaries. Source/build delivery below does not establish browser qualification or deployment.
 
 Fork baseline is upstream `diffs-v1.5.1`, commit `8f360ae1b39fcbbdaccacbcd8dbbf94fb10a3c38`, in [pierrecomputer/pierre](https://github.com/pierrecomputer/pierre). Library changes belong in its owning repository; preserve upstream history/license obligations and pin reproducible artifacts in Dispatch. The fork is [dispatchlabs-ai/pierre](https://github.com/dispatchlabs-ai/pierre), branch `dispatch-editor`; [library maintenance/API instructions](https://github.com/dispatchlabs-ai/pierre/blob/dispatch-editor/packages/diffs/FORK.md) stay there. Automated tests remain prohibited; AI-agent agent-browser verification is permitted under the October 10 policy clarification. Claude has selected public-GitHub read-only loading and in-memory editing without Save for this slice; its source publication is recorded below, with bounded browser evidence below. The standing Dispatch testing policy is unchanged; discussions of fork checks do not authorize an automated suite here.
 
@@ -143,7 +145,7 @@ Integrated security browser evidence (October 10): Security reports passing real
 
 ## Single composer Send/Stop action — October 10, 2026
 
-**Implemented and published as `47d8b27`; component visual review passed, authenticated integration remains blocked.** Chris approved the four composer-only design sheets and interaction notes, then requested implementation. Developer owns the shared main/thread UI, Pi Durable Expert cancellation/state review, Designer rendered integration review, and Documenter package documentation. The [composer contract](spec.md#message-composer) supersedes the separate Stop all toolbar control; no Pi lifecycle or backend admission change is included.
+**Implemented and published as `47d8b27`; component visual review passed, authenticated integration remains blocked.** Chris approved the four composer-only design sheets and interaction notes, then requested implementation. Developer owns the shared main/thread UI, Pi Durable Expert cancellation/state review, Designer rendered integration review, and Documenter package documentation. The composer contract supersedes the separate Stop all toolbar control; no Pi lifecycle or backend admission change is included.
 
 Acceptance:
 
@@ -153,7 +155,7 @@ Acceptance:
 - Stop remains whole-chat with explicit tooltip/accessibility scope. Editor Enter never stops work; retain keyboard/touch/IME rules and stable focus. Pending requests prevent duplicates; stop failure preserves input and offers recovery without claiming cancellation succeeded.
 - Apply source/deslop review, TypeScript/application and applicable Nix checks, whitespace/diff/local-link review. Record actual desktop/390 px rendered evidence and any unmet UI rules separately from runtime keyboard, touch, screen-reader and cancellation evidence; comply with the standing testing policy. No deployment is implied.
 
-The review artifacts are design proposals, not runtime evidence. Documentation records the approved current-chat decision; no wiki publication is claimed. Source/Pi and Deslop reviews found no remaining blockers after keying the outer composer by chat/thread identity; editor-local content/composition flags and errors now reset with Lexical, while workspace drafts remain separately owned. Developer reported passing TypeScript/application builds after refreshing isolated dependencies, plus Apple Silicon Nix build and flake evaluation; the flake reported zero native checks and omitted incompatible Linux systems. Whitespace review passed. Designer rendered the actual candidate components/CSS with synthetic read-only props at 390×844, 768×1024, 1280×720 and 1440×900, plus phone/desktop thread specimens; source hashes matched `47d8b27`. No component visual blockers or horizontal overflow were found: one 44×44 action, correct Send/Stop/uploading states and pending-Send progress. This is component-layout evidence, not full-workspace acceptance. Authenticated candidate access reached sign-in; desktop/390 px main/thread integration requires approved manual authentication or supplied captures. Pending Stop, dynamic transitions, focus indicators, comprehensive contrast and text zoom were not verified. Synthetic captures/review remain ignored under `.local/send-stop-review-e7f87bc8/`; no account screenshots were committed. Runtime cancellation/failure recovery, keyboard/IME, touch, focus and screen-reader behavior remain unverified; builds and source review do not establish these outcomes. No tests or deployment are claimed.
+The review artifacts are design proposals, not runtime evidence. Documentation records the approved current-chat decision. Source/Pi and Deslop reviews found no remaining blockers after keying the outer composer by chat/thread identity; editor-local content/composition flags and errors now reset with Lexical, while workspace drafts remain separately owned. Developer reported passing TypeScript/application builds after refreshing isolated dependencies, plus Apple Silicon Nix build and flake evaluation; the flake reported zero native checks and omitted incompatible Linux systems. Whitespace review passed. Designer rendered the actual candidate components/CSS with synthetic read-only props at 390×844, 768×1024, 1280×720 and 1440×900, plus phone/desktop thread specimens; source hashes matched `47d8b27`. No component visual blockers or horizontal overflow were found: one 44×44 action, correct Send/Stop/uploading states and pending-Send progress. This is component-layout evidence, not full-workspace acceptance. Authenticated candidate access reached sign-in; desktop/390 px main/thread integration requires approved manual authentication or supplied captures. Pending Stop, dynamic transitions, focus indicators, comprehensive contrast and text zoom were not verified. Synthetic captures/review remain ignored under `.local/send-stop-review-e7f87bc8/`; no account screenshots were committed. Runtime cancellation/failure recovery, keyboard/IME, touch, focus and screen-reader behavior remain unverified; builds and source review do not establish these outcomes. No tests or deployment are claimed.
 
 Publication: implementation `47d8b27` and component-review documentation `ed91aac` were pushed normally to `main`, remote SHA equality verified, and the clean canonical checkout fast-forwarded. No remote deployment occurred.
 
@@ -180,11 +182,11 @@ Acceptance:
 - The version appears at the right of the desktop status bar and beside Sign out in the phone/tablet Menu drawer. Actual desktop, laptop, tablet and 390 px phone captures must confirm crisp readable text, a longer prerelease version (for example `v0.2.0-rc.1`) and enlarged text without crowding the complete connection/session status or Sign out. It identifies browser assets rather than backend/deployment provenance. Placement has peer consensus; the illustrative composites are not final visual approval.
 - Complete source/deslop review, TypeScript/application and Apple Silicon Nix checks, diff/link review and permitted rendered verification. Record actual evidence below; build success alone does not establish runtime/UI correctness.
 
-Implementation is integrated. The Developer read the repository wiki home through the authorized Wiki connection; this new policy records the explicit current-chat decision, not a wiki publication.
+Implementation is integrated.
 
 **October 9 source/build evidence (verification gaps superseded by dated evidence below):** release preparation prevalidates SemVer precedence, clean-tree/tag guards, all participating manifest/lockfile versions and normalized changelogs before writes; no publication commands are invoked. Nested shipped capabilities participate outside npm workspaces. Source/deslop review, TypeScript/client/service/tooling builds, Apple Silicon Nix build and flake evaluation passed after refreshing the dependency hash for the baseline lockfile. Flake evaluation reported zero runnable checks; Linux was not built. No release command or automated tests were executed; release mutation/dry-run behavior remains unverified by execution. The workspace consumes build-time metadata in the desktop status bar and the phone/tablet Menu footer. Final integrated checks were rerun after reconciling remote main and refreshing its lockfile hash. Designer supplied four illustrative placement composites, not live captures. Rendered desktop/390 px, zoom, keyboard/touch and assistive-technology verification remain unverified: installed agent-browser 0.15.1 differs from assigned 0.38.2 guidance. No tooling upgrade, release tag or deployment was performed.
 
-**October 10 focused verification:** Chris directed completion of the saved chat checklist, authorizing the isolated rehearsal and focused browser review recorded in [the testing policy](spec.md#testing-policy). Developer exercised the actual npm command at `e3dc418` for patch (`0.1.1`), minor (`0.2.0`), major (`1.0.0`) and explicit `0.2.0-rc.1`: SHA-256 snapshots confirmed unchanged dry-runs, matching root/web/capability/lockfile versions and dated changelogs preserving notes. Invalid, downgrade and dirty candidates were rejected; the baseline was restored and HEAD/tags unchanged. Receipts: `.local/versioning-rehearsal-evidence.json`. Deslop reviewed both evidence files and found no remaining release issue. Pi Durable Expert additionally exercised the exact `scripts/release.ts` from `e3dc418` with Node 24.21.0 in a disposable repository: prerelease dry-run changed no fixture files; preparation updated root/web/capability and lockfile versions, preserved previous released history byte-for-byte and left fresh Unreleased notes. Malformed changelog and capability-version drift were rejected before writes. No tags or remotes were created. Local receipts: `.local/version-review/evidence.txt`.
+**October 10 focused verification:** Chris directed completion of the saved chat checklist, authorizing the isolated rehearsal and focused browser review recorded in [the testing policy](../../../CONTRIBUTING.md#testing-policy). Developer exercised the actual npm command at `e3dc418` for patch (`0.1.1`), minor (`0.2.0`), major (`1.0.0`) and explicit `0.2.0-rc.1`: SHA-256 snapshots confirmed unchanged dry-runs, matching root/web/capability/lockfile versions and dated changelogs preserving notes. Invalid, downgrade and dirty candidates were rejected; the baseline was restored and HEAD/tags unchanged. Receipts: `.local/versioning-rehearsal-evidence.json`. Deslop reviewed both evidence files and found no remaining release issue. Pi Durable Expert additionally exercised the exact `scripts/release.ts` from `e3dc418` with Node 24.21.0 in a disposable repository: prerelease dry-run changed no fixture files; preparation updated root/web/capability and lockfile versions, preserved previous released history byte-for-byte and left fresh Unreleased notes. Malformed changelog and capability-version drift were rejected before writes. No tags or remotes were created. Local receipts: `.local/version-review/evidence.txt`.
 
 Developer also rebuilt exact source `e3dc418` on Apple Silicon: `nix build` passed application build and recipe TypeScript checking; `nix flake check` evaluation passed with zero runnable native checks.
 
@@ -238,11 +240,11 @@ The existing software TPM was present and ready, but Windows Hello initially had
 
 This verifies adding a Windows Hello passkey to an existing account and a subsequent discoverable-credential sign-in in that VM/browser. It does not establish initial invitation enrollment, Chrome, synced or hardware passkeys, biometric verification, other Windows installations, or the cause of the earlier user's passkey failure. Project/multi-person acceptance remains Chris's separate test.
 
-The local implementation covers the current features listed in [spec.md](spec.md#reading-this-specification), including company authentication, shared conversations, named agents, tools/connections/skills, shared projects, attachments and opt-in PostgreSQL storage. [spec.md](spec.md) defines the current contracts; [usage-guide.md](usage-guide.md) explains operation. The [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/) maintains product intent and decision history. Shared conversations are implemented locally in [WP-024](#wp-024--shared-conversations); [WP-026](#wp-026--listen-before-responding) adds listening and speaking turns. Qualification is scoped to dated evidence below; implementation alone does not establish it.
+The local implementation covered the features listed in the former specification, including company authentication, shared conversations, named agents, tools/connections/skills, shared projects, attachments and opt-in PostgreSQL storage. The former specification defined the contracts at that checkpoint; [usage-guide.md](usage-guide.md) explains operation. Shared conversations are implemented locally in [WP-024](#wp-024--shared-conversations); [WP-026](#wp-026--listen-before-responding) adds listening and speaking turns. Qualification is scoped to dated evidence below; implementation alone does not establish it.
 
 ## Current testing policy
 
-Chris clarified on October 10 that the prohibition applies only to **automated tests**, not AI agents using `agent-browser`. The [testing policy](spec.md#testing-policy) is canonical: do not add or run automated tests; interactive agent-browser verification of authorized work needs no separate testing-policy exception. Source review, TypeScript checks and builds are permitted. Earlier browser-authorization holds below are historical, not current policy. Future automated coverage should prioritize end-to-end/API behavior once separately authorized.
+Chris clarified on October 10 that the prohibition applies only to **automated tests**, not AI agents using `agent-browser`. The [testing policy](../../../CONTRIBUTING.md#testing-policy) is canonical: do not add or run automated tests; interactive agent-browser verification of authorized work needs no separate testing-policy exception. Source review, TypeScript checks and builds are permitted. Earlier browser-authorization holds below are historical, not current policy. Future automated coverage should prioritize end-to-end/API behavior once separately authorized.
 
 No test suites or test frameworks are retained. Scoped exceptions have produced dated functional/browser evidence, including [WP-043](#wp-043--isolated-palm-postgresql-trial) and [chat performance](#chat-presentation-performance--october-8-2026); this is not blanket qualification of the latest integrated revision. Successful type/build checks do not establish functional, security-flow, recovery or real-device outcomes. Earlier WP-001 evidence is historical.
 
@@ -250,7 +252,7 @@ No test suites or test frameworks are retained. Scoped exceptions have produced 
 
 Chris requested an independent Claude review after the integrated build. The [October 3 review](ui-ux-review.md) combines source inspection with 13 authenticated desktop and 390×844 phone screenshots. This specifically authorized visual review does not qualify keyboard, touch, authentication, recovery, or streaming flows and does not lift the zero-tests policy.
 
-The original review recorded deviations in readability/contrast, shared design tokens, truthful connection status, and account-form state preservation, plus additional navigation, tab visibility, defaults, and content-hierarchy gaps. The subsequent [WP-006](#wp-006--resolve-the-uiux-review-findings) implements the accepted fixes; the review document preserves the historical findings and their resolution status. Apply the accepted [UI implementation rules](spec.md#ui-implementation-rules) to subsequent UI work; session-expiry draft retention and in-place identity re-checks remain proposed decisions. Screenshots stay in the canonical checkout's ignored `.local/ui-ux-review/2026-10-03/` directory.
+The original review recorded deviations in readability/contrast, shared design tokens, truthful connection status, and account-form state preservation, plus additional navigation, tab visibility, defaults, and content-hierarchy gaps. The subsequent [WP-006](#wp-006--resolve-the-uiux-review-findings) implements the accepted fixes; the review document preserves the historical findings and their resolution status. Apply the accepted UI implementation rules to subsequent UI work; session-expiry draft retention and in-place identity re-checks remain proposed decisions. Screenshots stay in the canonical checkout's ignored `.local/ui-ux-review/2026-10-03/` directory.
 
 ## October 7, 2026 — Background development and backend reload
 
@@ -283,7 +285,7 @@ Documentation-only acceptance: source/deslop review findings on invitations, rea
 - Require password/TOTP or a user-verified passkey, with restricted invitation/recovery flows and opaque sessions. The local operator provisions accounts; there is no application administrator role.
 - Keep desktop rail/sidebar/main tabs/full contextual column/bottom bar. Mobile uses navigation and context panels, preserving active work and drafts.
 - Prefer explicit service model configuration, then existing Pi settings/credentials. Developer is now the default, with local coding tools; the original chat-only default is retired. Named agent revisions are immutable and copied into new chats.
-- Preserve local development and existing installation state. Current local/LAN evidence is scoped in WP-041 and WP-043; distributed AWS workers, remote sandboxes, personal Wiki delegation, unspecified handoffs, background triggers and schedules remain future work. Installed coding/image tools, generic MCP connections and explicit skills are current features, not blanket deferrals.
+- Preserve local development and existing installation state. Current local/LAN evidence is scoped in WP-041 and WP-043; distributed AWS workers, remote sandboxes, unspecified handoffs, background triggers and schedules remain future work. Installed coding/image tools, generic MCP connections and explicit skills are current features, not blanket deferrals.
 
 ## Coordinated work
 
@@ -337,7 +339,7 @@ Intended outcomes:
 - Company users create/edit named agents, choose provider/model and supported thinking level, and start independent conversations from them.
 - Stale revision edits return conflicts; archived definitions reject editing/new chats. Existing conversations keep their original configuration. The default definition is service-configured and read-only.
 - Root development, built-app, and account commands use the same default company, state, and browser origin. Nix output contains no credentials or writable state.
-- The integrated revision is source-reviewed, passes TypeScript/build checks, and is committed/pushed with maintained docs and wiki evidence.
+- The integrated revision is source-reviewed, passes TypeScript/build checks, and is committed/pushed with maintained docs.
 
 ### WP-006 — Resolve the UI/UX review findings
 
@@ -587,7 +589,7 @@ Pi Durable Expert and Deslop source reviews found no blocking issue or needed si
 
 ## WP-020 — Write and edit diff cards
 
-**Accepted October 4, 2026:** implement the [Pierre Diffs recommendation](https://wiki.dispatchworks.ai/wiki/write-tool-presentation/) for both native file tools. Depends on WP-018's call/result projection. `@pierre/diffs` 1.5.1 is pinned in the package and npm lock, with the matching Nix dependency hash. This is browser presentation; Pi's tools, stored entries and runtime ownership are unchanged.
+**Accepted October 4, 2026:** implement the Pierre Diffs recommendation for both native file tools. Depends on WP-018's call/result projection. `@pierre/diffs` 1.5.1 is pinned in the package and npm lock, with the matching Nix dependency hash. This is browser presentation; Pi's tools, stored entries and runtime ownership are unchanged.
 
 Acceptance criteria and evidence:
 
@@ -600,7 +602,7 @@ Acceptance criteria and evidence:
 
 ## WP-021 — Read file cards
 
-**Accepted October 4, 2026:** show how many lines were read and those lines themselves. Depends on WP-020's shared file card and viewer. The [read presentation decision](https://wiki.dispatchworks.ai/wiki/read-tool-presentation/) owns the intent. This changes the browser projection only; Pi's native read tool, stored records and runtime ownership are unchanged.
+**Accepted October 4, 2026:** show how many lines were read and those lines themselves. Depends on WP-020's shared file card and viewer. This changes the browser projection only; Pi's native read tool, stored records and runtime ownership are unchanged.
 
 Acceptance criteria and evidence:
 
@@ -625,7 +627,7 @@ Acceptance and evidence:
 
 ## WP-023 — Projects inside Conversations
 
-**Accepted October 5, 2026:** implement Chris's approved ImageGen desktop design, with a required name only, many conversations per project, and at most one project per conversation. Scope and contracts are in [Projects in Conversations](spec.md#projects-in-conversations). This is local development; Omarchy stays on its existing deployment.
+**Accepted October 5, 2026:** implement Chris's approved ImageGen desktop design, with a required name only, many conversations per project, and at most one project per conversation. Scope and contracts are in Projects in Conversations. This is local development; Omarchy stays on its existing deployment.
 
 Acceptance criteria:
 
@@ -644,7 +646,7 @@ Implementation and evidence (October 5, 2026):
 
 ## WP-024 — Shared conversations
 
-**Implemented locally October 5, 2026; functional qualification deferred.** Chris accepted shared conversations and resolved activation, invitation authority, agent-instance continuity, and join-history access. The [shared-conversation specification](spec.md#shared-conversations) and [maintained decision](https://wiki.dispatchworks.ai/wiki/agent-collaboration-spaces/) are the product basis. This package depends on the existing authenticated native runtime, revisioned company agent definitions, tool presenters, and WP-023 projects.
+**Implemented locally October 5, 2026; functional qualification deferred.** Chris accepted shared conversations and resolved activation, invitation authority, agent-instance continuity, and join-history access. The former shared-conversation specification recorded the product basis. This package depends on the existing authenticated native runtime, revisioned company agent definitions, tool presenters, and WP-023 projects.
 
 Chris approved the [ImageGen designs](shared-conversation-designs.md) following his Slack reference and authorized implementation with subagents. The package includes the shared message flow, reply threads, starting agents, invitations and phones. Thread replies retain the same conversation membership and agent participation policy; the specification records the concrete contract.
 
@@ -678,69 +680,9 @@ Qualification evidence (October 5, 2026):
 - Shared token styles, 12 px minimum type, labelled actions, native/Base UI controls and phone layouts were reviewed in source and stills. Keyboard, touch, IME/virtual keyboard, assistive technology, all empty/error/loading states, focus restoration, contrast measurements, long-history performance, streaming/retry/recovery and multi-user authorization flows remain unverified. No tests, smoke checks, model requests or browser/API acceptance procedures were run.
 - Captures and sample scripts remain in ignored `.local/shared-layout/2026-10-05/` and the UI task worktree’s `.local/shared-layout/`; user-state backup is in the canonical checkout’s `.local/backups/shared-conversations-20261005-182617/`. The local service was updated; Omarchy and the pilot were not changed.
 
-## WP-025 — Developer's Wiki connection
-
-**Accepted October 5, 2026:** Chris selected per-agent connections and authorized
-Developer's full personal-Wiki MCP access, including existing Developer instances.
-See the [connection specification](spec.md#per-agent-mcp-connections). This package
-uses the current local runtime and preserves the existing Omarchy Dispatch pilot.
-Palm's focused playbook owns the dedicated credential/enrollment and operator
-manifest; Dispatch owns the bridge, public status API and agent UI.
-
-Acceptance criteria and evidence:
-
-- A dedicated **Dispatch Developer** Wiki identity has independent Editor authority
-  and all three read/trace/write scopes. Its private key stays on M1 Air. Enrollment
-  uses the existing application-owned Wiki adapter and does not reuse Codex's key.
-- Developer's definition selects the MCP extension and tools. Existing instances
-  receive the explicitly authorized connection while preserving their model,
-  instructions, working directories and histories. Other definitions do not inherit
-  it. Native Pi documents hold catalog/bindings; Pi owns execution/recovery.
-- Authenticated Agents views show endpoint, identity, current observed connection
-  status, discovered access and actual tools. Reconnect is explicit; failures and
-  stale status remain visible. Secrets do not enter the browser or model context.
-- Source review covers configuration isolation, removed tools/connections, schema
-  discovery failures, credential errors, cancellation, uncertain remote writes and
-  close/reopen ordering. Remote operations use unsafe replay; no substitute durable
-  execution engine or concurrency limit is added.
-- Run source/deslop and full diff review, local documentation links, TypeScript and
-  production builds, `nix build` and `nix flake check`. Review desktop and 390 px
-  layouts. No tests, smoke requests or model-driven tool calls under the standing
-  zero-tests rule. Record observed startup discovery separately from functional
-  qualification of tools, renewal/revocation, interruption/recovery and interaction.
-
-Implementation evidence (October 5, 2026):
-
-- Source/deslop and diff review kept stock Pi responsible for execution, explicit
-  per-conversation bindings for grants, and the maintained Wiki adapter responsible
-  for credential renewal. One shared tool-summary formatter keeps internal provider
-  IDs out of agent detail views; the connection card shows actual remote names.
-- Clean `npm ci`, frontend/service/tooling TypeScript, production builds, Apple
-  Silicon `nix build` and `nix flake check` passed. The existing Vite chunk warning
-  remains; this revision's Linux build was not run. Local documentation links and
-  whitespace checks passed.
-- Palm's focused playbook enrolled the dedicated persistent identity and wrote
-  only Developer's Wiki manifest entry. Ansible 2.21.3 syntax checking passed
-  without connecting to hosts. Normal local startup authenticated as Dispatch
-  Developer and discovered all nine tools. Read-only native metadata shows the
-  `developer/wiki` binding on both existing Developer instances (23 and 97).
-- The actual authenticated Agents page shows Developer revision 2 with Connected,
-  Full access and nine tools; the default definition shows no connections. Desktop
-  1440×1000 and phone 390×844 stills were reviewed, including the expanded catalog.
-  Captures are ignored under the canonical `.local/developer-wiki/2026-10-05/`.
-- Private auth/Pi state was backed up before startup under canonical
-  `.local/backups/developer-wiki-20261005-201104/`. The local app uses its existing
-  state and workspaces. Omarchy's Wiki received the public enrollment; the Omarchy
-  Dispatch application and pilot were not changed.
-- No tests, smoke requests, model prompts or remote tool-operation calls were run.
-  Discovery is observed configuration evidence, not qualification of article/trace
-  operations, writes, token renewal/revocation, cancellation, recovery, Reconnect,
-  keyboard/touch, virtual keyboard, assistive technology or all error/loading
-  states. Contrast and multi-user isolation remain unverified.
-
 ## WP-026 — Listen before responding
 
-**Implemented, October 5, 2026; functional qualification deferred.** Chris accepted the [listen-first behavior](https://wiki.dispatchworks.ai/wiki/agent-collaboration-spaces/#section-listen-before-responding) and instructed implementation. This package depends on WP-024 and preserves the local-only and zero-tests policies.
+**Implemented, October 5, 2026; functional qualification deferred.** Chris accepted the listen-first behavior and instructed implementation. This package depends on WP-024 and preserves the local-only and zero-tests policies.
 
 Scope: native speaking-turn coordination, fresh shared context at every model request, coalesced consideration, independent background tool work, expiring human composing presence, and truthful participant states. Existing public history, native admissions, participant configuration, membership, drafts, threads and Stop remain intact. No Omarchy deployment or new execution engine is included.
 
@@ -755,7 +697,7 @@ Acceptance criteria and evidence:
 Qualification evidence (October 5, 2026):
 
 - Source/deslop review covered competing claims, mention ordering, fresh context, coalesced delivery, resumed native admissions, ordered human presence, Stop and owner-task cleanup. Public progress precedes tool execution, and final publication shares its freshness-check transaction. A shared recent-history formatter and shared presence component avoid duplicate behavior.
-- Frontend/service/tooling TypeScript, production builds, Apple Silicon `nix build` and `nix flake check` passed on the revision integrated with Developer's Wiki connection (`0c6d026`). Clean `npm ci`, whitespace checks and all 43 local documentation links also passed. The existing Vite large-chunk warning remains; x86-64 Linux was not built.
+- Frontend/service/tooling TypeScript, production builds, Apple Silicon `nix build` and `nix flake check` passed on the revision integrated with the per-agent connection integration (`0c6d026`). Clean `npm ci`, whitespace checks and all 43 local documentation links also passed. The existing Vite large-chunk warning remains; x86-64 Linux was not built.
 - Desktop and 390×844 phone stills reviewed actual components with clearly labelled inactive samples for Listening, Responding, Working and human Typing, including participant details. Captures remain in the task worktree's ignored `.local/listen-layout/`; no sample messages were inserted into user state. Shared styling and labelled controls were reviewed. Keyboard/touch, IME, virtual keyboard, assistive technology, measured contrast, real-device behavior and all error/loading states remain unverified.
 - No tests, smoke checks, model requests or browser/API acceptance procedures were run. Functional turn ordering, multi-user access, streaming, presence expiry, provider failure and restart recovery remain unqualified. These limits remain after the normal local startup.
 
@@ -795,7 +737,7 @@ No tests, synthetic messages, model requests or browser/API acceptance procedure
 
 **Accepted October 5, 2026:** Chris rejected the detached Mention dropdown and
 requested Slack's inline mention UI. This replaces the WP-024 composer control
-under the [inline mention contract](spec.md#inline-mentions), preserving shared
+under the inline mention contract, preserving shared
 membership, listen-first participation, typing presence and message retry behavior.
 
 Acceptance criteria and evidence:
@@ -881,7 +823,7 @@ x86-64 Linux, Omarchy and the pilot were not updated or qualified.
 
 ## WP-028 — Conversation layout refinement
 
-**Implemented and manually reviewed on the local development site, October 6, 2026.** Chris approved the [refinement images and V01–V12 criteria](conversation-layout-refinements.md), requested coordinated implementation with subagents, and explicitly required the coordinator to validate it by using the local development site. The [maintained design decision](https://wiki.dispatchworks.ai/wiki/agent-collaboration-spaces/#section-october-6-conversation-layout-refinement) records the scope and focused manual-browser exception to the prior zero-tests policy. Automated tests remain deferred.
+**Implemented and manually reviewed on the local development site, October 6, 2026.** Chris approved the [refinement images and V01–V12 criteria](conversation-layout-refinements.md), requested coordinated implementation with subagents, and explicitly required the coordinator to validate it by using the local development site. Chris authorized a focused manual-browser review for this scope. Automated tests remain deferred.
 
 This package depends on shared conversations, project navigation, inline mentions, and the existing tool presenters. It changes browser presentation and context controls, preserving native Pi ownership, membership, public-message identity, retry/draft state, listening behavior, and specialized Bash/file output.
 
@@ -897,7 +839,7 @@ Coordinator evidence (October 6, 2026):
 
 - Used the authenticated application at `http://localhost:5173`, not a static component fixture. Compared the existing conversation before and after at 1586×910 CSS px, 100% visual-viewport scale and DPR 1; reviewed 1100×850 and 390×844 as well. The generated references were compared by application bounds, excluding their browser chrome. Captures and geometry records are ignored under `.local/conversation-refinement/2026-10-06/` in the canonical checkout: `before-main.png`, `after-main.png`, `after-thread.png`, `after-narrow-thread.png`, `after-phone-main.png`, `after-phone-thread.png`, and before/after layout JSON.
 - Created a clearly labelled local review conversation with Dispatch, sent a harmless main message and a thread reply, and observed one acknowledgement in each destination. The thread summary updated from one to two replies, with the actual human/agent avatars and last-reply time. Reopening the archived review record retained its messages. The review record is archived, its tab is closed, temporary drafts are cleared, and the original conversation is active. No tools were requested from the review agent.
-- Observed thread open/close, selected-parent highlight, participant opening with no agent selected, explicit Developer inspection, collapsed/expanded wiki activity, pointer and keyboard toolbar visibility, Copy feedback/content, and inline mention selection with arrows/Enter and Tab plus Escape dismissal. Enter/Tab selected the mention without sending. Closing the desktop context returned focus to the participant control.
+- Observed thread open/close, selected-parent highlight, participant opening with no agent selected, explicit Developer inspection, collapsed/expanded MCP activity, pointer and keyboard toolbar visibility, Copy feedback/content, and inline mention selection with arrows/Enter and Tab plus Escape dismissal. Enter/Tab selected the mention without sending. Closing the desktop context returned focus to the participant control.
 - Main and thread drafts survived tab switching, context closing/reopening, and desktop/phone remounts. A nonzero transcript scroll position (455 px) survived switching away and back. Empty composers disabled sending; the actual main/thread sends cleared their drafts and displayed agent responding/completed transitions. Phone message actions measured 44×44 CSS px. This is browser viewport and keyboard evidence, not physical-device touch or virtual-keyboard qualification.
 - Browser review found a wrapped long title misaligning the main/thread headers. The fix truncates desktop titles while retaining the full accessible name and hover title; phones retain wrapping. Both header rules now end at 77 px without tabs and 130 px with the 53 px tab strip. The narrower desktop also shares the 77 px boundary.
 
@@ -913,7 +855,7 @@ Coordinator evidence (October 6, 2026):
 | V08 | Matched. Fresh conversation context is closed. Participants opens with an inspection hint; selecting Developer reveals configuration. Closing thread hides context rather than exposing a default inspector. Idle header has no Ready badge. |
 | V09 | Matched. Compact project rows, outlined creation control and aqua/navy selection match the reference intent. Creation, conversation actions, archive and reopening remained reachable. |
 | V10 | Matched. Dispatch and Developer have stable distinct glyphs and initials in the existing conversation; review summary and thread repeat the same Dispatch identity. Author names and Agent labels remain visible. |
-| V11 | Matched for recorded completed wiki activity. Its collapsed text reads “Developer · searched the wiki”; expansion reveals the actual identifier, arguments and result details. Working/failed variants and specialized Bash/file output were source-reviewed but not induced in this browser review. |
+| V11 | Matched for recorded completed MCP activity. Expansion reveals the actual identifier, arguments and result details. Working/failed variants and specialized Bash/file output were source-reviewed but not induced in this browser review. |
 | V12 | Matched visually against both references. Shared Inter, navy/aqua tokens, thin borders, pale sidebar and common composer/control styles are retained. Existing resizable pane widths and the real content determine exact wrapping; illustration-only overflow menus are absent. |
 
 Source/deslop and final diff review passed. `nix develop --command npm run check`, `nix build`, and `nix flake check` passed on Apple Silicon macOS at implementation revision `2628aaa`; later changes record evidence only. Changed local documentation links and whitespace checks passed. No automated tests were added or run. The existing Vite large-chunk advisory remains.
@@ -922,7 +864,7 @@ This qualifies the specific observed local flows above. Multi-user access, live 
 
 ### Activity author alignment correction — October 6, 2026
 
-Chris identified that tool activity indented the agent's identity beneath the preceding message. The terminal itself should retain its styled-code-block presentation. This corrects WP-028's author layout for activity; its earlier visual evidence covered generic wiki disclosures and source-reviewed specialized tool output without exercising this failure state.
+Chris identified that tool activity indented the agent's identity beneath the preceding message. The terminal itself should retain its styled-code-block presentation. This corrects WP-028's author layout for activity; its earlier visual evidence covered generic MCP disclosures and source-reviewed specialized tool output without exercising this failure state.
 
 Public messages and activity now share `ParticipantContent` and the `conversation-entry` layout: equal avatar sizing, the same author text and Agent badge, and a separate content column. Every visible activity group has an author regardless of tool type or response outcome. The old smaller activity-only author treatment and container indentation are removed. Terminal/file renderers, native activity, public message identity and actions remain intact. Exact bash-output references are limited to the immediately preceding associated activity by the same author, with date and image boundaries preserved.
 
@@ -933,53 +875,28 @@ Acceptance evidence:
 - Source/deslop and diff review preserve shared native/public history boundaries and reuse existing tokens and controls. `nix develop --command npm run check`, `nix build`, and `nix flake check` passed on Apple Silicon macOS. The existing Vite large-chunk advisory remains; x86-64 Linux was not built. Whitespace and changed-document local links were checked.
 - No automated tests were added or run under the repository policy. This focused manual layout review does not qualify live streaming, new-turn failure/recovery, multi-user behavior, assistive technology, full contrast/zoom/font-scaling checks, physical touch or virtual keyboards. No Omarchy deployment is included.
 
-## WP-029 — Personal Wiki connections
+## WP-030 — Agent editor and connection authorization
 
-**Accepted design, October 6, 2026; specification recorded, implementation not started.** Chris accepted personal Wiki sign-in and explicitly delegated, scoped agent access first, with administrator-controlled shared connections later. The [specification](spec.md#personal-wiki-connections) and [product decision](https://wiki.dispatchworks.ai/wiki/agent-runtime-architecture/#section-personal-wiki-connections) own this behavior. The prior [MCP screenshot](agent-mcp-access-design.md) is preserved with its superseded assumptions identified.
+**Implemented October 6, 2026.** Chris authorized the revised editor and MCP screens while deferring provider API-based agent registration. The specification records the interim standing-agent authority, owner-controlled authorization and explicit shared-definition audience. Project assignment retains the current conversation flow.
 
-Depends on WP-025's native connection integration and WP-024's participant/access model. Before code work, settle Agent Wiki's delegated provisioning API and scope/ownership contract; credential protection from coding execution; principal/instance granularity; personal-data audiences in shared conversations; and save/conflict/partial-outcome behavior. Existing remote OAuth and operator enrollment are foundations, not completion of those dependencies. Keep current operator-managed Developer access unchanged until a migration is explicitly specified.
-
-Implementation order:
-
-1. Define and provide the Agent Wiki public API for user-authorized provisioning, credential lifecycle, current-rights enforcement, revocation, and idempotent reconciliation. Agent Wiki owns that implementation and contract.
-2. Add Dispatch's owner-bound connection records, protected credentials, identity mappings, authorization and audit through its service boundary. Preserve native Pi execution and recovery ownership.
-3. Add Settings account authorization and the agent's Add connection/actions flow, with truthful pending, active, expired, failed and revoked states. Resolve shared-use and existing-instance policy before exposing those actions.
-
-Acceptance criteria and evidence to complete with implementation:
-
-- A user authorizes their own verified Wiki account and selects permitted actions without supplying a general admin key or retyping the agent identity. Article and original-evidence access remain distinct.
-- Bindings preserve company, user, upstream issuer/account, agent and instance/run identity. Another user's use or copy of a shared definition receives no personal grant. Invocation, configuration, sharing and output audience checks apply at the service boundary.
-- Credential and execution isolation prevents models, coding tools, other users, browser responses, Pi definition documents, logs and Git from obtaining provisioning or refresh secrets. Distinct agent credentials cannot exceed the current user's rights, delegation or requested scope.
-- Refresh, background work, rights reduction, disconnect and upstream revocation preserve those limits. Denials never fall back to Developer's independent credential. Reauthorization is explicit; prior disclosed content is not claimed to disappear.
-- Retried and interrupted provisioning/rotation/revocation reconcile one logical operation. Partial local/upstream failure remains visible, duplicate grants are avoided, and existing instances change only through explicit authorized application. Access is not pinned by a definition revision.
-- Shared administrator-controlled connections remain a later feature with an explicit workspace/user policy and scoped provisioning ceiling.
-- Review source and the complete diff; run the repository's required TypeScript/build/Nix checks for implementation and review desktop/390 px layouts. Follow the then-current testing policy; today's zero-tests rule remains in force. Record functional, security, recovery and interaction evidence or outstanding qualification here rather than inferring success from builds.
-
-This documentation update establishes design and acceptance criteria only. No OAuth integration, provisioning endpoint, credentials, access grants, runtime change or deployment is implemented or qualified by it.
-
-
-## WP-030 — Agent editor and existing Wiki authorization
-
-**Implemented October 6, 2026.** Chris authorized the revised editor and MCP screens while deferring Agent Wiki API-based agent registration. The [specification](spec.md#agent-editor-and-existing-wiki-authorization) records the interim standing-agent authority, owner-controlled authorization and explicit shared-definition audience. WP-029 remains unimplemented. Project assignment retains the current conversation flow.
-
-Historical implementation (connection setup superseded by WP-031): the desktop/phone editor, Settings → Connections, `server/wiki-connections.ts`, existing native MCP bindings, and actor-bound idempotent revision saves. Existing operator credentials are preserved. No Agent Wiki code or infrastructure deployment is part of this package.
+Historical implementation (connection setup superseded by WP-031): the desktop/phone editor, Settings → Connections, the connection service, existing native MCP bindings, and actor-bound idempotent revision saves. Existing operator credentials are preserved. No upstream provider code or infrastructure deployment is part of this package.
 
 Acceptance criteria and evidence:
 
 - Source reviewed: compact identity, large instructions, collapsible model/capabilities, only the installed Files and commands option, read-only connection identity, friendly/exact tool names, truthful revision/dirty states, and one fixed save bar. Desktop details are optional and initially hidden in the editor.
 - Source reviewed: drafts include capabilities and connection selections; additions/removals are staged with an explicit new-only/existing-instance choice. Saves preserve immutable prior definitions and unrelated instance configuration, retain revision conflicts, and deduplicate same-request retries in Pi's native commit.
-- Source reviewed: OAuth metadata/issuer/callback/PKCE/state validation, a same-origin callback relay preserving Strict session cookies, authenticated same-agent verification, encrypted secrets, owner checks, per-definition connection reservation, scoped credential use, rotation uncertainty, and serialized authorize/disconnect transitions. Revocation is not claimed complete before Wiki responds. Native tasks retain unsafe external-write replay semantics.
-- Rendered on the actual local service at 1440×1000 and 390×844: editor identity/instructions, fixed actions, capability/model summaries, the existing connected operator card and its nine friendly tool names, Settings empty state, and the Wiki authorization form. Captures remain in the task checkout's ignored `.local/agent-editor/`. The local sign-in used the existing saved passkey. No agent definition, grant, or message was submitted for this visual review.
+- Source reviewed: OAuth metadata/issuer/callback/PKCE/state validation, a same-origin callback relay preserving Strict session cookies, authenticated same-agent verification, encrypted secrets, owner checks, per-definition connection reservation, scoped credential use, rotation uncertainty, and serialized authorize/disconnect transitions. Revocation is not claimed complete before the provider responds. Native tasks retain unsafe external-write replay semantics.
+- Rendered on the actual local service at 1440×1000 and 390×844: editor identity/instructions, fixed actions, capability/model summaries, the existing connected operator card and its nine friendly tool names, Settings empty state, and the provider authorization form. Captures remain in the task checkout's ignored `.local/agent-editor/`. The local sign-in used the existing saved passkey. No agent definition, grant, or message was submitted for this visual review.
 - Visual review corrected a misleading pristine-draft Unsaved badge. Startup surfaced a strict-JSON migration issue; source now omits optional idempotency properties instead of inserting `undefined` into native documents, and the local service reopened successfully.
 - Source/deslop and diff review passed. `nix develop --command npm run check`, `nix build`, and `nix flake check` passed on Apple Silicon at implementation revision `2610226`. Changed-document local links and whitespace checks passed. The existing Vite large-chunk advisory remains; x86-64 Linux was not built for this package. This subsequent documentation change records the evidence only.
-- Functional/security qualification remains unverified under the current zero-tests policy: OAuth consent/callback end to end, permissions/revocation/renewal, save/retry/conflict/existing-instance behavior, multi-user boundaries, keyboard/assistive technology, zoom/font scaling, physical touch and virtual-keyboard behavior. Static captures and builds do not establish those outcomes. No tests were added or run; no new Wiki authorization was created. Omarchy was not deployed.
+- Functional/security qualification remains unverified under the current zero-tests policy: OAuth consent/callback end to end, permissions/revocation/renewal, save/retry/conflict/existing-instance behavior, multi-user boundaries, keyboard/assistive technology, zoom/font scaling, physical touch and virtual-keyboard behavior. Static captures and builds do not establish those outcomes. No tests were added or run; no new provider authorization was created. Omarchy was not deployed.
 
 
 ## WP-031 — Generic MCP connections
 
-**October 6, 2026 correction to WP-030.** Chris identified Wiki-specific setup as an implementation mistake. Generic MCP is the intended connection layer; provider-specific provisioning remains separate. The [specification](spec.md#generic-mcp-connection-setup) supersedes WP-030's provider restrictions without changing its editor, owner/reservation or instance-application contract.
+**October 6, 2026 correction to WP-030.** Chris identified provider-specific setup as an implementation mistake. Generic MCP is the intended connection layer; provider-specific provisioning remains separate. The specification supersedes WP-030's provider restrictions without changing its editor, owner/reservation or instance-application contract.
 
-Implementation includes generic remote Streamable HTTP setup, OAuth discovery with optional registered clients, bearer tokens, custom headers and unauthenticated servers; server-supplied tool names; honest local-versus-provider disconnect state; and migration of existing Wiki records/bindings with their identity check isolated as compatibility behavior. The official MCP SDK supplies OAuth primitives; stock Pi MCP/Durable retain tool execution and recovery.
+Implementation includes generic remote Streamable HTTP setup, OAuth discovery with optional registered clients, bearer tokens, custom headers and unauthenticated servers; server-supplied tool names; honest local-versus-provider disconnect state; and migration of existing legacy records/bindings with their identity check isolated as compatibility behavior. The official MCP SDK supplies OAuth primitives; stock Pi MCP/Durable retain tool execution and recovery.
 
 Acceptance evidence:
 
@@ -987,11 +904,11 @@ Acceptance evidence:
 - Source/deslop and complete diff review passed. `nix develop --command npm run check`, `nix build`, and `nix flake check` passed for implementation `dc75c4f` on Apple Silicon macOS. The final run used the command-local `--option eval-cache false` after concurrent Nix evaluation reported a busy cache; no persistent Nix configuration changed. The pinned dependency hash was updated for MCP SDK 1.32.1. All 59 changed-document local links/anchors and whitespace checks passed. The existing Vite large-chunk advisory remains; x86-64 Linux was not built.
 - Rendered the authenticated frontend from the isolated worktree at 1440×1000 and 390×844, with shared read-only API access to the unchanged local service. Reviewed the generic OAuth form, expanded client/scope settings and phone header fields including their lower controls. The phone document width was 390 px. Captures are ignored in `.local/generic-mcp/`; no connection, credential, agent revision or message was submitted. The preview is closed. This establishes layout, not new backend behavior.
 - No functional, security or migration tests were added or run under the current zero-tests policy. Real-provider OAuth consent, token/header connection, renewal/revocation, migration/restart, shared access and instance application remain unqualified. Screenshots establish layout only; keyboard, assistive technology, measured contrast, zoom/font scaling, physical touch and virtual-keyboard behavior remain unverified.
-- No new provider grant or Wiki principal was created for review. Omarchy is not deployed. Chris confirmed his draft was saved and authorized updating the running local app; the connection database/key were privately backed up before rollout.
+- No new provider grant or principal was created for review. Omarchy is not deployed. Chris confirmed his draft was saved and authorized updating the running local app; the connection database/key were privately backed up before rollout.
 
 ## WP-032 — Markdown agent instructions
 
-**Accepted October 6, 2026:** Instructions format Markdown while editing and retain rendered formatting in the saved view. The [contract](spec.md#markdown-agent-instructions) extends the shared WP-019 Lexical composer with document editing and uses the existing Markdown viewer for saved instructions.
+**Accepted October 6, 2026:** Instructions format Markdown while editing and retain rendered formatting in the saved view. The contract extends the shared WP-019 Lexical composer with document editing and uses the existing Markdown viewer for saved instructions.
 
 Acceptance criteria and evidence:
 
@@ -1047,7 +964,7 @@ Acceptance evidence:
 
 ## WP-035 — Explicit per-agent text skills
 
-**Authorized October 6, 2026.** Implement the [skills contract](spec.md#explicit-per-agent-skills) with reusable company-scoped immutable text revisions, explicit agent selection, and one native extension. No automatic filesystem discovery or existing-instance migration.
+**Authorized October 6, 2026.** Implement the skills contract with reusable company-scoped immutable text revisions, explicit agent selection, and one native extension. No automatic filesystem discovery or existing-instance migration.
 
 Acceptance criteria:
 
@@ -1084,7 +1001,7 @@ No defects were observed in these checks. This evidence qualifies explicit selec
 
 ## WP-036 — Dispatch conversation renaming
 
-**Accepted October 6, 2026:** add Rename to existing conversation actions, as Dispatch display metadata only. See the [display-title contract](spec.md#conversation-display-titles). Depends on shared conversation membership and the existing sidebar/project action menus.
+**Accepted October 6, 2026:** add Rename to existing conversation actions, as Dispatch display metadata only.  Depends on shared conversation membership and the existing sidebar/project action menus.
 
 Acceptance criteria:
 
@@ -1098,7 +1015,7 @@ Implementation evidence: integrated frontend/service/tooling TypeScript and prod
 
 ## WP-037 — Shared project membership and default agents
 
-Authorized October 6, 2026; [contract](spec.md#shared-project-access-and-default-agents). Preserve legacy private groupings while adding explicit shared projects, manager/member policy, full-history inheritance, default agent selections and operator-controlled read-all-project access. No audience-changing transfer or deployment.
+Authorized October 6, 2026; contract. Preserve legacy private groupings while adding explicit shared projects, manager/member policy, full-history inheritance, default agent selections and operator-controlled read-all-project access. No audience-changing transfer or deployment.
 
 Acceptance: atomic policy edits with revision/request identity; current transaction authorization on reads and actions; current-policy stream delivery and revocation; independent instance snapshots; closed access on missing policy; historical authors do not authorize; old creation retries remain compatible. Controlled editor drafts and desktop/mobile controls must not accidentally save or discard access changes. Source/deslop, TypeScript/application and Nix checks are permitted; tests remain deferred. Rendered UI and functional/security qualification must be reported honestly.
 
@@ -1114,7 +1031,7 @@ Implementation review:
 
 ## WP-038 — Name a conversation at creation
 
-**Authorized October 6, 2026.** Add optional naming to the starting-agent chooser, preserving the existing unnamed fallback, project assignment and independent tabs/drafts. See the [display-title contract](spec.md#conversation-display-titles). Depends on WP-036 display titles and WP-037 creation retry handling.
+**Authorized October 6, 2026.** Add optional naming to the starting-agent chooser, preserving the existing unnamed fallback, project assignment and independent tabs/drafts.  Depends on WP-036 display titles and WP-037 creation retry handling.
 
 Acceptance criteria:
 
@@ -1153,7 +1070,7 @@ Follow-up direction is lightweight summary reads independent of transcript proje
 
 ## WP-040 — Composer files and images
 
-**Authorized October 6, 2026:** Chris requested a lower-left extensible + control for files/images, direct image paste, and top-left prompt previews. The [attachment contract](spec.md#message-attachments) records the agreed limits, audience, retention, supported agent content and request boundaries. Drag-and-drop is not required. Implemented and integrated for source review at `6d7826b`; this entry is not evidence of deployment or working browser behavior.
+**Authorized October 6, 2026:** Chris requested a lower-left extensible + control for files/images, direct image paste, and top-left prompt previews. The attachment contract records the agreed limits, audience, retention, supported agent content and request boundaries. Drag-and-drop is not required. Implemented and integrated for source review at `6d7826b`; this entry is not evidence of deployment or working browser behavior.
 
 Acceptance criteria and evidence:
 
@@ -1170,7 +1087,6 @@ Implementation evidence:
 - Upload parsing is byte-bounded but buffers multiple representations; peak memory and concurrent-upload capacity are not profiled. Each upload retry can create another retained asset; removing a preview is not cleanup. No TTL, deduplication or automatic orphan sweep is promised. Blobs are flushed before native metadata admission; crashes can leave an unreferenced blob. Backups must retain the complete runtime directory with native metadata and attachment blobs.
 - Deployer independently passed integrated `nix develop -c npm run check`, `nix flake check`, `nix build`, and working/staged/branch diff checks at `6d7826b` on Apple Silicon; Linux was skipped. Logs remain ignored in the integration worktree’s `.local/attachment-integrated-*.log`. No tests or runtime qualification are claimed. Rendered desktop/390 px review is unavailable in this session; captures are needed. Clipboard, keyboard/focus/assistive technology, contrast, touch/virtual keyboards, upload failures, draft/send races, provider acceptance, membership/revocation and restart/recovery remain unverified by execution. No live service restart or deployment is included.
 
-Product intent belongs at wiki.dispatchworks.ai; no wiki publication is claimed from this tool session.
 
 ### October 7, 2026 — Attachment UI copy correction
 
@@ -1180,13 +1096,13 @@ Source/deslop review, TypeScript/production builds, Apple Silicon Nix build/flak
 
 ## WP-041 — Generic AWS container deployment
 
-**Historical candidate, October 7, 2026; retired from the supported AWS path October 10.** The standalone [PostgreSQL/worker AWS module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) is the supported new-install path. The following records earlier bounded source/LAN evidence, not requirements for that module. Chris requested a reusable Terraform/OpenTofu module for ECS Fargate, ALB and S3 Files, with caller-owned consumer roots. The [container deployment contract](spec.md#aws-container-deployment-target) owns scope; the [operator runbook](aws-deployment.md) owns installation/upgrade/restore steps. Preserve existing local and pilot deployments. Preparing the module does not itself authorize applying an AWS plan.
+**Historical candidate, October 7, 2026; retired from the supported AWS path October 10.** The standalone [PostgreSQL/worker AWS module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) is the supported new-install path. The following records earlier bounded source/LAN evidence, not requirements for that module. Chris requested a reusable Terraform/OpenTofu module for ECS Fargate, ALB and S3 Files, with caller-owned consumer roots. The container deployment contract owns scope; the [operator runbook](aws-deployment.md) owns installation/upgrade/restore steps. Preserve existing local and pilot deployments. Preparing the module does not itself authorize applying an AWS plan.
 
-October 7 scaling decision supersedes the interim RDS + ordinary ECS investigation and the earlier per-conversation SQLite + S3 Files proposal: Chris selected the [per-conversation Fargate/Postgres target](spec.md#aws-container-deployment-target), with remote project Git repositories, Wiki notes, ordinary S3 artifacts and disposable workspaces. Frequent commit/push guidance and agent-assisted reconstruction are preferred to preemptive synchronization/snapshot machinery. This is an accepted specification target, not implemented PostgreSQL/worker support, deployment qualification, migration or apply authorization. Existing Web Next behavior remains the baseline.
+October 7 scaling decision supersedes the interim RDS + ordinary ECS investigation and the earlier per-conversation SQLite + S3 Files proposal: Chris selected the per-conversation Fargate/Postgres target, with remote project Git repositories, curated notes, ordinary S3 artifacts and disposable workspaces. Frequent commit/push guidance and agent-assisted reconstruction are preferred to preemptive synchronization/snapshot machinery. This is an accepted specification target, not implemented PostgreSQL/worker support, deployment qualification, migration or apply authorization. Existing Web Next behavior remains the baseline.
 
 The prepared single-service module and the criteria/evidence below describe the earlier SQLite/S3 Files candidate; they do not implement or qualify the new target. A follow-on implementation package must settle worker routing/lifecycle, exclusive logical-store ownership, catalog/update guarantees and credential delivery, integrate PostgreSQL through Pi's public storage interface, and define scoped qualification before real-data enrollment. Preserve the historical evidence below rather than converting it into new-target acceptance.
 
-The [historical deployment record](https://wiki.chrisreynolds.me/wiki/portable-application-deployment/#section-dispatch-retirement-approved--september-29-2026) reports same-native-session resumption on a different worker after positive shutdown. [House's architecture](https://wiki.chrisreynolds.me/wiki/agent-house-architecture/) distinguishes independent compute from application authorization and recovery. These are prior implementation evidence, not today's Web Next qualification or a requirement to reuse House. The ownership mechanism remains unresolved; database transactions alone do not establish safe concurrent Pi scheduling, and exclusive ownership does not promise exactly-once external effects.
+The ownership mechanism remained unresolved at this checkpoint; database transactions alone do not establish safe concurrent Pi scheduling, and exclusive ownership does not promise exactly-once external effects.
 
 Acceptance criteria (all pending unless dated evidence below says otherwise):
 
@@ -1213,7 +1129,7 @@ LAN concurrency upgrade, October 7 (owning [Palm upgrade/recovery record](https:
 
 Portability scope clarification, October 7: Chris wants the option of a one-time, operator-assisted setup migration of agents **and conversations**, not a reusable export/import product feature or ongoing synchronization. The earlier agent-only bundle proposal was too narrow. When requested, inspect the chosen source/destination and recovery sets, preserve participant-private Pi context as well as visible history, and verify the imported configuration/context before continuing work. No transfer has been requested or performed; a migration plan and its credential, identity/access and workspace mappings remain to be reviewed. Back up both installations, preserve historical authorship separately from destination membership, and treat private tool history as potentially credential-bearing. Inspect supported Pi interfaces before choosing selective-transfer mechanics: stopped writers do not make database merging safe, and a wholesale store copy replaces rather than merges destination state.
 
-Omarchy LAN trial boundary (runtime settings inspected above; persistent conversation/recovery qualification remains open): fresh disposable state/accounts, trusted LAN-only HTTPS, one dedicated `/data` bind mount and writable ephemeral `/tmp`; existing installations' state and unapproved personal credentials absent from the container namespace; only explicitly approved shared provider authority may be provisioned into the dedicated volume. Verify actual invocation and mounts: UID/GID 65532, read-only root, dropped capabilities, no privileged mode, added capabilities, Docker socket, broad host mounts or host networking. For LAN hosting, bind `0.0.0.0:3001` inside the container and publish only `127.0.0.1:<host-port>:3001` on bridge networking behind Palm's TLS proxy. Review reachable LAN services; container loopback is not host loopback. The network-disabled tmpfs startup check above does not exercise this hosting boundary. Host permissions are defense in depth, not proof of container isolation. Hostname cutover requires separate authorization and the pilot-specific backup/restore gate in the [deployment scope](spec.md#local-development-and-later-internal-deployment); native Web Next remains untouched. These local-disk checks do not close ARM-native, Fargate or S3 Files qualification gates.
+Omarchy LAN trial boundary (runtime settings inspected above; persistent conversation/recovery qualification remains open): fresh disposable state/accounts, trusted LAN-only HTTPS, one dedicated `/data` bind mount and writable ephemeral `/tmp`; existing installations' state and unapproved personal credentials absent from the container namespace; only explicitly approved shared provider authority may be provisioned into the dedicated volume. Verify actual invocation and mounts: UID/GID 65532, read-only root, dropped capabilities, no privileged mode, added capabilities, Docker socket, broad host mounts or host networking. For LAN hosting, bind `0.0.0.0:3001` inside the container and publish only `127.0.0.1:<host-port>:3001` on bridge networking behind Palm's TLS proxy. Review reachable LAN services; container loopback is not host loopback. The network-disabled tmpfs startup check above does not exercise this hosting boundary. Host permissions are defense in depth, not proof of container isolation. Hostname cutover requires separate authorization and the pilot-specific backup/restore gate in the deployment scope; native Web Next remains untouched. These local-disk checks do not close ARM-native, Fargate or S3 Files qualification gates.
 
 Readiness evidence, October 7:
 
@@ -1262,7 +1178,7 @@ Implementation evidence:
 
 ## WP-042 — Local PostgreSQL Pi Storage adapter
 
-**Requested October 7, 2026; implemented and source/build reviewed, focused runtime evidence in WP-043.** Depends on Pi Durable 1.0.4's public `Storage` contract and the [AWS target](spec.md#aws-container-deployment-target). This is the [local adapter slice](spec.md#local-postgresql-adapter-slice), not the worker deployment topology.
+**Requested October 7, 2026; implemented and source/build reviewed, focused runtime evidence in WP-043.** Depends on Pi Durable 1.0.4's public `Storage` contract and the AWS target. This is the local adapter slice, not the worker deployment topology.
 
 Scope:
 - Implement PostgreSQL storage through public Pi interfaces, with explicit logical-store keys in shared tables. Keep Pi responsible for native execution and recovery.
@@ -1285,7 +1201,7 @@ This work package records source/build approval. Subsequent focused Linux deploy
 
 ## WP-043 — Isolated Palm PostgreSQL trial
 
-**Authorized October 7, 2026; focused native Linux trial checks passed.** Chris accepted the proposed isolated Palm trial and asked Developer to work with Deployer. This includes focused disposable-data startup, persistence, restart recovery, duplicate-owner/isolation and paired backup/restore checks as an exception to the [testing policy](spec.md#testing-policy); it does not authorize a broad test suite, existing-installation cutover or real-data migration.
+**Authorized October 7, 2026; focused native Linux trial checks passed.** Chris accepted the proposed isolated Palm trial and asked Developer to work with Deployer. This includes focused disposable-data startup, persistence, restart recovery, duplicate-owner/isolation and paired backup/restore checks as an exception to the [testing policy](../../../CONTRIBUTING.md#testing-policy); it does not authorize a broad test suite, existing-installation cutover or real-data migration.
 
 Depends on [WP-042](#wp-042--local-postgresql-pi-storage-adapter), initially pinned to `d2ffd0be2d9c9c99d447007ecd6de2762673d18e`. Deployer owns Palm infrastructure and isolated installation; Developer owns application corrections; Pi Durable Expert supports storage/recovery review. Palm's repository owns [installation, artifact pins, secrets handling and recovery evidence at `2da6cdb`](https://github.com/chrisbyboston/palm/blob/2da6cdb/docs/dispatch-pg-trial.md). The isolated endpoint is https://dispatch-pg.chrisreynolds.me.
 
@@ -1311,7 +1227,7 @@ Subsequent model check (October 7): the initial agent request failed with `Provi
 
 ## WP-044 — Focused image generation
 
-**Authorized October 7, 2026; implemented; merge authorized.** Scope follows [image generation and editing](spec.md#image-generation-and-editing). Product history: [repository wiki home](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/); the October 7 shared discussion authorizes the skill/tool integration, not a gallery or deployment.
+**Authorized October 7, 2026; implemented; merge authorized.** Scope follows image generation and editing. The October 7 shared discussion authorizes the skill/tool integration, not a gallery or deployment.
 
 Acceptance criteria:
 - Register the direct OpenAI extension before Pi recovery, using public runtime auth, unsafe replay and native cancellation. Retain pre-submission intent and partial evidence; never automatically retry ambiguous paid effects.
@@ -1328,7 +1244,7 @@ Implementation evidence (October 7):
 
 ## WP-045 — Agent file publication and generation request correction
 
-**Authorized October 7, 2026; implemented on `feat/agent-files`, pending Chris review.** Chris accepted the attachment route after the generation-only tool exposed its missing delivery path, and reported a live HTTP 400. Scope follows [agent-prepared attachments](spec.md#agent-prepared-conversation-attachments); no new browser UI or automatic paid retry.
+**Authorized October 7, 2026; implemented on `feat/agent-files`, pending Chris review.** Chris accepted the attachment route after the generation-only tool exposed its missing delivery path, and reported a live HTTP 400. Scope follows agent-prepared attachments; no new browser UI or automatic paid retry.
 
 Acceptance criteria:
 - Snapshot bounded regular workspace files before publication; reject path escapes and special files. Private prepared records are owner-only to agent reads and unavailable to browser downloads until admitted publication.
@@ -1341,11 +1257,11 @@ WP-045 check evidence: Developer ran `nix develop -c npm run check`, `nix build`
 
 ## WP-046 — Permissioned agent management
 
-**Scope clarification, October 7:** Chris clarified that Doctor's intended product is conversation review, eval-backed evidence and suggestions in the agent screen, on request and potentially automatically/on a schedule. This package delivers only permissioned editing infrastructure, not that health-review workflow. See [Doctor agent health review](spec.md#doctor-agent-health-review); integration/work packages remain to be designed after inspecting `agent-eval`.
+**Scope clarification, October 7:** Chris clarified that Doctor's intended product is conversation review, eval-backed evidence and suggestions in the agent screen, on request and potentially automatically/on a schedule. This package delivers only permissioned editing infrastructure, not that health-review workflow.
 
-**Implementation authorized October 7, 2026; published as `16ce61e`, source/build approved, runtime unqualified.** Chris subsequently requested execution through completion after the documentation-only package. Developer owns implementation, Pi Durable Expert and Security own their source reviews, and Documenter owns documentation. No grant or successful Doctor edit is established by this authorization. Depends on the current immutable definition catalog, trusted native participant bindings and Pi Durable 1.0.4 public document/commit interfaces. Scope follows [permissioned agent management](spec.md#permissioned-agent-management). Doctor is the selected trial editor, not an already authorized principal.
+**Implementation authorized October 7, 2026; published as `16ce61e`, source/build approved, runtime unqualified.** Chris subsequently requested execution through completion after the documentation-only package. Developer owns implementation, Pi Durable Expert and Security own their source reviews, and Documenter owns documentation. No grant or successful Doctor edit is established by this authorization. Depends on the current immutable definition catalog, trusted native participant bindings and Pi Durable 1.0.4 public document/commit interfaces. Scope follows permissioned agent management. Doctor is the selected trial editor, not an already authorized principal.
 
-Original Doctor trial choices (not prerequisites for other explicit human grants under the current [management contract](spec.md#permissioned-agent-management)):
+Original Doctor trial choices (not prerequisites for other explicit human grants under the current management contract):
 - Confirm the trial target and immutable IDs/effective privileges, direct-save mode, pinned editor revision, editable fields and explicit hourly limit. The first implementation supports human-session API grant administration, revision-pinned reads/direct saves and no proposal/promotion workflow.
 - Confirm the narrow trial allowlist. Do not provision grants, change Doctor/target configuration, run evals or start model calls as part of this documentation package.
 
@@ -1363,7 +1279,7 @@ Historical October 7 implementation contract (source/build review recorded below
 
 Acceptance criteria:
 - Source/security review covers forged caller/target IDs, cross-company reads/writes, absent/revoked grants, forbidden fields, changed target privileges, editor revisions, human-versus-agent principal handling and every grant-writing path.
-- Source/Pi review covers stale revisions, concurrent human edits/revocation, identical versus changed retries, crash before/after commit, cancellation after save and restart receipt recovery. No duplicate revision may result from replay of one committed operation. At this initial delivery, existing participant configuration remained unchanged; the subsequent [in-place upgrade contract](spec.md#in-place-agent-revision-upgrades) supersedes that restriction.
+- Source/Pi review covers stale revisions, concurrent human edits/revocation, identical versus changed retries, crash before/after commit, cancellation after save and restart receipt recovery. No duplicate revision may result from replay of one committed operation. At this initial delivery, existing participant configuration remained unchanged; the subsequent in-place upgrade contract supersedes that restriction.
 - Review threat boundaries for Doctor and the target, including unrestricted host tools and access to application state; tool exposure or cwd cannot establish isolation. Keep eval evidence untrusted and independently access-controlled.
 - Record attributable before/after definition and grant changes; demonstrate the restoration contract through source review while execution remains deferred. If proposals are selected, specify candidate identity, diff review, promotion authorization and stale-base handling before implementing them.
 - Apply source/deslop review, TypeScript/application and applicable Nix builds for implementation, full diff/whitespace and changed-link checks. Any UI must satisfy desktop/390 px review rules. The zero-tests policy remains active; runtime, security, replay/revocation and actual Doctor edits remain unqualified until separately authorized and observed. No deployment is included.
@@ -1386,7 +1302,7 @@ Acceptance: effective Sunburst/Flare edit requests omit the rejected field even 
 
 ## WP-047 — Agent evaluation profiles and editor
 
-**Authorized October 7, 2026; data/editor slice implemented, independently verified and published October 8; end-to-end recording delivered for user review.** Chris accepted the [individual-agent evaluation data contract](spec.md#individual-agent-evaluation), assigned Pi Durable Expert ownership and requires working demonstration before completion. Developer owns editor UI, Documenter package documentation and Deslop independent integrated review. First delivery is profile/case persistence and editing, not an evaluation runner, automatic grading, Doctor permissions or a separate Doctor screen.
+**Authorized October 7, 2026; data/editor slice implemented, independently verified and published October 8; end-to-end recording delivered for user review.** Chris accepted the individual-agent evaluation data contract, assigned Pi Durable Expert ownership and requires working demonstration before completion. Developer owns editor UI, Documenter package documentation and Deslop independent integrated review. First delivery is profile/case persistence and editing, not an evaluation runner, automatic grading, Doctor permissions or a separate Doctor screen.
 
 Acceptance criteria:
 - Save and reopen per-agent responsibilities, expected behavior, criteria, prohibited actions and standalone prompts/cases. Preserve case/criterion identity, independent immutable profile revisions and author/change attribution. Agent operating instructions and existing instances remain unchanged.
@@ -1409,7 +1325,7 @@ Receipt limits: handlers ran in-process, not through network transport; company-
 
 Candidate `a37b931` integrates case-specific missing-criterion validation; Pi Durable Expert reports TypeScript/application and Apple Silicon Nix checks passing. Developer's `validation.mjs`/`validation.log`, read by Documenter, show deselecting the criterion produces the named-case error and zero profile POSTs; Developer reports draft retention. The probe does not independently compare all draft field values. Captures and authenticated probe/session material remain in ignored local storage, not published documentation. Deslop independently confirmed the validation error/zero-POST evidence, qualifying draft retention as source-supported rather than probe-asserted. No general accessibility audit or crash recovery is established by these receipts.
 
-**Publication status:** Pi Durable Expert reports the [wiki decision record](https://wiki.chrisreynolds.me/wiki/dispatch-web-next-agent-evaluations/) saved as revision 1 and verified by reread after a timeout. Its link and scoped testing-policy exception are integrated into the candidate. Pi Durable Expert shared the desktop/390 px editor captures with Chris in this conversation. Deslop completed independent source and acceptance-evidence review with no unresolved findings within the stated limits. Source was published to `main` as `631e89b`; remote SHA equality was verified and the canonical checkout fast-forwarded, preserving unrelated `imagegen/`. Deployment and evaluation execution are excluded.
+**Publication status:** Pi Durable Expert shared the desktop/390 px editor captures with Chris in this conversation. Deslop completed independent source and acceptance-evidence review with no unresolved findings within the stated limits. Source was published to `main` as `631e89b`; remote SHA equality was verified and the canonical checkout fast-forwarded, preserving unrelated `imagegen/`. Deployment and evaluation execution are excluded.
 
 
 **Archive/draft browser evidence, October 8, 2026.** Developer's ignored `archive.mjs`/`archive.log`, read by Documenter, directly compare the responsibility text after cancelling agent navigation and after archiving the disposable selected agent. The archived draft retains that text; the responsibility field and Save button are disabled. After discarding the draft, selecting revision 1 displays the original saved responsibility. These checks cover that field and control, not every form element or full historical payload; other field locking remains source-supported. Deslop reviewed these assertions and closed its remaining browser evidence gap.
@@ -1426,7 +1342,7 @@ Candidate `a37b931` integrates case-specific missing-criterion validation; Pi Du
 
 ## WP-048 — Invite agents through inline mentions
 
-**Authorized October 8, 2026; implemented locally, functional acceptance outstanding.** Chris requested adding agents through `@` instead of requiring Participants, then directed the team to make it work in the local development application at `http://localhost:5173`. Developer owns composer/client integration and local verification, Pi Durable Expert atomic service admission, Deslop independent review, and Documenter package documentation. The installed Pi Durable 1.0.4 remains unchanged. The [inline mention contract](spec.md#inline-mentions) supersedes the earlier current-participants-only picker for company agents.
+**Authorized October 8, 2026; implemented locally, functional acceptance outstanding.** Chris requested adding agents through `@` instead of requiring Participants, then directed the team to make it work in the local development application at `http://localhost:5173`. Developer owns composer/client integration and local verification, Pi Durable Expert atomic service admission, Deslop independent review, and Documenter package documentation. The installed Pi Durable 1.0.4 remains unchanged. The inline mention contract supersedes the earlier current-participants-only picker for company agents.
 
 Acceptance criteria:
 - Main and thread pickers include current participants and available company agents, distinguish invitation targets, and exclude unavailable/cross-company agents. Selection alone does not invite; deleting the token prevents invitation. Preserve keyboard, IME, draft switching and accessible selection behavior.
@@ -1439,8 +1355,6 @@ Implementation candidate `91fd196` is integrated into canonical local `main`; Do
 
 Developer reports the integrated application available at localhost:5173 and a successful backend restart. A transient hot-update render error mixed old/new component props; refresh the browser before trying the new picker. This is reported availability, not an observed successful invitation. Actual main/thread selection, send/invitation/delivery, deletion, retry/conflict, runtime authorization/recovery and desktop/390 px rendered behavior remain unverified. No tests were added or run; source/build checks do not fulfill Chris's requirement that the workflow work locally. Browser evidence or human confirmation is still needed before completion. Remote `main` remained at `d85dd04` when Documenter checked after local integration; no remote source publication or deployment is claimed.
 
-Product wiki tools are unavailable to Documenter in this session; no wiki publication is claimed.
-
 
 **Live conversation evidence, October 8, 2026.** The shared history records a new agent membership immediately before Chris's public mention, with the mention already resolved to that participant ID. The new agent then replied, acknowledged joining and reviewed the prior implementation discussion/source. Documenter observed those attributed public records. This establishes one real join/resolved-mention/response sequence; the records alone do not show the browser selection gesture or prove the invitation was sent through the new picker rather than Participants. It does not qualify thread, deletion/retry, phone rendering or runtime security edge cases. Security Engineer's source review at `8ad7d57` found no blocking authorization issue and identified an uncapped invitation-target array as low-severity resource amplification; a cap was recommended, not yet recorded as implemented or runtime-verified. Deslop clarified that the existing Participants invitation endpoint is also uncapped; the 50-agent limit belongs to initial creation, so limiting both invitation paths would be new hardening.
 
@@ -1450,7 +1364,7 @@ Product wiki tools are unavailable to Documenter in this session; no wiki public
 
 ## WP-049 — Remove conversation agents
 
-**Authorized October 8, 2026; source published (final code `51dda24`), source/build checked, functional acceptance outstanding.** Chris accepted per-instance removal with preserved history and fresh-instance human re-addition, then directed the team to implement together. Pi Durable Expert owns backend/shared contracts and integration, Developer participant UI/client wiring, and Documenter package documentation. Scope follows [agent removal](spec.md#removing-an-agent-from-a-conversation); no definition deletion, human removal or deployment is included.
+**Authorized October 8, 2026; source published (final code `51dda24`), source/build checked, functional acceptance outstanding.** Chris accepted per-instance removal with preserved history and fresh-instance human re-addition, then directed the team to implement together. Pi Durable Expert owns backend/shared contracts and integration, Developer participant UI/client wiring, and Documenter package documentation. Scope follows agent removal; no definition deletion, human removal or deployment is included.
 
 Agreed interface: `POST /api/chats/:id/participants/:participantId/remove`, JSON body `{}`, returns a refreshed snapshot; retries address the same immutable participant ID. Agent snapshots expose `membership: "active" | "removing" | "removed"` and optional `removalError`. [Usage](usage-guide.md#removing-a-conversation-agent) explains the controls and boundaries.
 
@@ -1462,7 +1376,7 @@ Acceptance criteria:
 - Review source/Pi lifecycle and behavior-preserving simplification; run TypeScript/application and applicable Nix builds, full diff/whitespace and changed-document links. Build success does not qualify runtime cancellation, authorization or recovery.
 - Review rendered desktop/390 px controls, status, cleanup-error retry and historical identity; record unverified keyboard/touch/accessibility/runtime flows explicitly. The zero-tests policy remains active; request focused authorization before prohibited browser/runtime probes.
 
-Documentation records the contract and source-reviewed implementation, not observed runtime behavior. Wiki access returned HTTP 401 and no authenticated wiki tool is available to Documenter; intended product-history home is the established [repository wiki](https://wiki.chrisreynolds.me/wiki/dispatch-web-next/). No wiki publication, runtime verification, tests or deployment is claimed.
+Documentation records the contract and source-reviewed implementation, not observed runtime behavior.
 
 
 Frontend candidate `127e85d`: Documenter reviewed the diff for participant-specific confirmation/removal requests, cleanup-error retry, historical membership badges, retained configuration/usage, active-only presence and mention targets, and fresh-definition invitation availability. Developer reports typecheck/frontend build passing with temporary agreed contract fields (not committed), plus source/deslop and whitespace review. Integrated server/Nix checks remain outstanding. Desktop/390 px rendering, contrast, keyboard/touch, broader accessibility and runtime cancellation/recovery remain unverified; no tests were run.
@@ -1478,7 +1392,7 @@ Final code candidate `51dda24` preserves historical mention references in contri
 
 ## WP-050 — Multiple agent instances and supplemental instructions
 
-**Authorized October 8, 2026; implemented in integrated candidate `a3a7fdf`, source/build checked, functional acceptance outstanding.** Chris approved explicit same-definition instances with creation-time instruction supplements. Pi Durable Expert owns backend/shared contracts and integration, Developer UI/client wiring, Documenter package docs. Depends on WP-049; scope follows [the contract](spec.md#multiple-instances-and-supplemental-instructions) and [planned usage](usage-guide.md#adding-another-agent-instance). No live instruction editing, workspace isolation, permission expansion or deployment is included.
+**Authorized October 8, 2026; implemented in integrated candidate `a3a7fdf`, source/build checked, functional acceptance outstanding.** Chris approved explicit same-definition instances with creation-time instruction supplements. Pi Durable Expert owns backend/shared contracts and integration, Developer UI/client wiring, Documenter package docs. Depends on WP-049; scope follows the contract and [planned usage](usage-guide.md#adding-another-agent-instance). No live instruction editing, workspace isolation, permission expansion or deployment is included.
 
 Acceptance criteria:
 - Human creation checks current participation/company/definition availability; observers and agent tools cannot create duplicates. Preserve existing invitation behavior and prohibit agents reversing removal.
@@ -1488,7 +1402,7 @@ Acceptance criteria:
 - Participants and main/thread pickers expose explicit creation with optional name/instructions, retain conversation drafts on cancel/error, confirm explicit discard of a nonempty instance draft, and insert the returned ID. Creation commits on Add instance, not later Send; deleting its mention does not remove membership. Ordinary mention selection does not create duplicates. Review rendered desktop/390 px, contrast, keyboard/touch and accessibility; record gaps honestly.
 - Review source/lifecycle and deslop, TypeScript/application and applicable Nix builds, full diff/whitespace and changed links. Runtime creation/replay/conflict/restart/authorization/removal and UI behavior remain unverified until authorized evidence; zero tests remains in force.
 
-Documentation records approved intent, not verified behavior. Wiki returned HTTP 401; no wiki update published. The established repository wiki remains the intended product-history home; no alternate-company fallback is used.
+Documentation records approved intent, not verified behavior.
 
 
 Backend candidate `3a2fbf4`: Documenter source-reviewed HTTP limits, transaction participation checks, actor-scoped creation receipts, same-definition cleanup/Stop fences, fresh native conversation configuration and public projection. Base instructions remain in `member.agent`; a separate supplement is composed through native `configure()` before binding, without submitting a model request. Replay checks precede definition/cleanup creation checks and retain historical identity; ambiguous definition mentions conflict. No contract blocker found in this bounded review. Pi Durable Expert reports Nix-shell TypeScript/application builds passing. Frontend integration, Nix artifact checks and runtime/UI qualification remain outstanding; no tests or probes were run.
@@ -1501,7 +1415,7 @@ Final integrated candidate `a3a7fdf`: Pi Durable Expert reviewed/integrated `826
 
 ## MCP renewal recovery — October 8, 2026
 
-Chris reported disconnected Wiki tools and requested that this not recur. Read-only inspection found both affected Dispatch rows in `reauthorize`; the provider still had active grants and unused, unexpired refresh tokens. The earlier catch-all discarded the original failure, so its precise transport cause cannot be recovered from Dispatch.
+Chris reported disconnected MCP tools and requested that this not recur. Read-only inspection found both affected Dispatch rows in `reauthorize`; the provider still had active grants and unused, unexpired refresh tokens. The earlier catch-all discarded the original failure, so its precise transport cause cannot be recovered from Dispatch.
 
 The correction retains authorization for known pre-exchange connection failures and explicit temporary OAuth errors, allowing the next attempt to renew. Unknown exchange outcomes and rejected credentials still require reauthorization. Fixed safe error categories reach tool callers; provider response bodies and credentials are never retained in diagnostics. Successful renewal clears the temporary error. No new background loop, concurrency cap or automatic tool replay is introduced.
 
@@ -1509,12 +1423,12 @@ Acceptance criteria/evidence:
 
 - Source/deslop review covered classification, serialized renewal, disconnect ordering and call-site error propagation. The SDK maps malformed error responses to `ServerError`, so classification inspects the actual OAuth error code rather than trusting that fallback type. Unknown rotation outcomes stay blocked.
 - TypeScript/application builds, Apple Silicon Nix build and flake checks passed; Linux was not built. Final integrated revision checks and publication are recorded below. Whitespace review passed; this change adds no local documentation links.
-- Restored only Pi Durable · Personal Wiki and Palm Wiki — Deployer after independently rechecking active provider grants and unused/unexpired refresh tokens. A private SQLite backup and key were retained locally. The transaction required the exact original credential, error and inactive-refresh state; IDs, bindings and credential material were preserved. Live renewal evidence is recorded below.
+
 - No tests under the standing policy. This backend change adds no UI layout. Fault injection, interruption/replay and cross-provider behavior remain unqualified.
 
 Publication and local recovery: `24f4207`, `3d0a69f` and diagnostic refinement `b5756d4` were pushed normally to remote main and the canonical checkout fast-forwarded under both repository integration locks. The final code candidate passed TypeScript/application builds, Apple Silicon Nix build and flake checks, source/deslop and whitespace review. No automated tests were run.
 
-The running service then exposed `EHOSTUNREACH` while the same Nix Node runtime could read the Wiki's public authorization metadata from the maintenance session. After a graceful launcher restart from that working context, both existing grants renewed successfully and cleared their errors (new access-token expiry approximately 17:10:48 UTC). This establishes process-context reachability failure and successful renewal recovery; the underlying macOS cause is not proven. No OS permissions, network configuration, provider grants or scope ceilings changed. The development launcher remains detached against the existing data. The first background-shell launch did not survive its command session; the replacement uses a separate process session and was verified serving HTTP 200 afterward. Broader longevity and simulated failure coverage remain unqualified.
+The running service then exposed `EHOSTUNREACH` while the same Nix Node runtime could read the provider's public authorization metadata from the maintenance session. After a graceful launcher restart from that working context, both existing grants renewed successfully and cleared their errors (new access-token expiry approximately 17:10:48 UTC). This establishes process-context reachability failure and successful renewal recovery; the underlying macOS cause is not proven. No OS permissions, network configuration, provider grants or scope ceilings changed. The development launcher remains detached against the existing data. The first background-shell launch did not survive its command session; the replacement uses a separate process session and was verified serving HTTP 200 afterward. Broader longevity and simulated failure coverage remain unqualified.
 
 
 ## WP-053 — Project-row chat creation and shared-only projects
@@ -1529,7 +1443,7 @@ Acceptance evidence: Developer integrated Documenter's contract updates and Desl
 
 ### Capability split — October 9, 2026
 
-Chris requested separate Web reading and Web search assignments; see the [revised contract](spec.md#native-web-research). Developer owns runtime/capability/UI integration and publication; Pi Durable Expert owns the native extension split and operation gating/recovery; Documenter records the contract. This supersedes the single-capability assignment design below, not the existing evidence/recovery boundaries.
+Chris requested separate Web reading and Web search assignments;  Developer owns runtime/capability/UI integration and publication; Pi Durable Expert owns the native extension split and operation gating/recovery; Documenter records the contract. This supersedes the single-capability assignment design below, not the existing evidence/recovery boundaries.
 
 Acceptance additions:
 - Agents can receive reading only, search only, both or neither. Enforce each operation server-side; a current Exa grant is additionally required for search and never implicitly enables reading.
@@ -1583,7 +1497,7 @@ Acceptance evidence:
 
 ## Developer default and Dash retirement — October 8, 2026
 
-Chris requested removal of Dash and promotion of Developer to Default. The [contract](spec.md#use-case-chat-with-the-default-agent) replaces the prior `default` identity with `developer`; [usage](usage-guide.md#developer) explains startup migration and the local coding boundary. Implementation archives the retired definition, preserves its revisions and all existing instances, preserves Developer settings (reactivating an archived definition), and migrates company project defaults without changing membership. Configuration, new-project/new-chat fallback, archive protection and management-target exclusion now use Developer.
+Chris requested removal of Dash and promotion of Developer to Default. The contract replaces the prior `default` identity with `developer`; [usage](usage-guide.md#developer) explains startup migration and the local coding boundary. Implementation archives the retired definition, preserves its revisions and all existing instances, preserves Developer settings (reactivating an archived definition), and migrates company project defaults without changing membership. Configuration, new-project/new-chat fallback, archive protection and management-target exclusion now use Developer.
 
 Acceptance criteria/evidence:
 
@@ -1595,11 +1509,11 @@ Acceptance criteria/evidence:
 
 ## Portable definitions and project data — October 8, 2026
 
-**Architecture accepted and implementation authorized; first archive slice source-published, runtime/UI qualification outstanding.** Chris delegated the architecture call to Pi Durable Expert, then accepted its direction and asked the team to implement it. [The specification](spec.md#portable-definitions-and-project-data) owns the execution, privacy and recovery boundaries. Documenter owns these package records; Developer owns first-slice implementation; Pi Durable Expert owns manifest/import contracts and native commit review.
+**Architecture accepted and implementation authorized; first archive slice source-published, runtime/UI qualification outstanding.** Chris delegated the architecture call to Pi Durable Expert, then accepted its direction and asked the team to implement it. The specification owns the execution, privacy and recovery boundaries. Documenter owns these package records; Developer owns first-slice implementation; Pi Durable Expert owns manifest/import contracts and native commit review.
 
 Ordered work:
 
-1. **Agent/text-skill archive import-export:** implement the [selected first-slice contract](spec.md#first-archive-slice): format version 1, UTF-8 instruction references, bounded data-only archive parsing, package-local references, explicit compatibility and independent local-copy semantics. Preview complete requirements before native atomic catalog/reference/receipt saves; no credentials, grants or executable install scripts. Use the same format/path for starters. Preserve existing revisions, snapshots and request/conflict behavior.
+1. **Agent/text-skill archive import-export:** implement the selected first-slice contract: format version 1, UTF-8 instruction references, bounded data-only archive parsing, package-local references, explicit compatibility and independent local-copy semantics. Preview complete requirements before native atomic catalog/reference/receipt saves; no credentials, grants or executable install scripts. Use the same format/path for starters. Preserve existing revisions, snapshots and request/conflict behavior.
 2. **Pinned GitHub imports and updates:** immutable commit provenance, local operation after import, explicit diff/revision updates and preservation of local edits/instances. Define fetch, authorization and failure boundaries separately from native commits.
 3. **Project content export:** selected content/history/attachments, with explicit audience/identity mapping on subsequent import. Exported history never recreates running tasks. Define privacy/selection and attachment completeness before implementation.
 4. **Separate installation backup work package:** stopped-owner consistent native/application/files/credential recovery set, compatible code and exclusive restore ownership. Project-scoped resumable migration and custom task serialization are not included.
@@ -1610,7 +1524,6 @@ Acceptance requirements for each implementation slice:
 - Preserve company authorization, definition revision conflicts, assigned-skill snapshots and existing instances. No silent privilege expansion, credential copying, runtime code installation or live rollout.
 - Follow the standing zero-tests policy. Runtime archive rejection, replay/conflict, interruption/recovery and content/backup round trips remain unverified until explicitly authorized and exercised. Review rendered desktop/390 px UI under repository rules, recording unverified interaction/accessibility flows without claiming qualification.
 
-No wiki publication is claimed: authenticated wiki publication tools are unavailable in this session. Durable product intent belongs in the Dispatch Works knowledgebase; an unpublished safe decision draft is retained locally pending review of the canonical destination. Repository records are implementation contracts, not a substitute-company wiki.
 
 First-slice acceptance additions selected by Pi Durable Expert:
 
@@ -1648,7 +1561,7 @@ Final integrated candidate `429ebad` passed Nix-shell TypeScript/application bui
 
 ## In-place agent upgrades — October 8, 2026
 
-**Accepted October 8, 2026; source published as `00dc7cc`, source/build reviewed, functional qualification outstanding.** Chris requested in-place fixes and authorized the team to deliver after consensus. Developer owns implementation, Pi Durable Expert native lifecycle/recovery review and wiki alignment, Deslop simplification review, Documenter package documentation. Scope follows [the contract](spec.md#in-place-agent-revision-upgrades). Depends on revisioned definitions, trusted native bindings, WP-049 removal fences and WP-050 separate instance supplements.
+**Accepted October 8, 2026; source published as `00dc7cc`, source/build reviewed, functional qualification outstanding.** Chris requested in-place fixes and authorized the team to deliver after consensus. Developer owns implementation, Pi Durable Expert native lifecycle/recovery review, Deslop simplification review, Documenter package documentation. Scope follows the contract. Depends on revisioned definitions, trusted native bindings, WP-049 removal fences and WP-050 separate instance supplements.
 
 Acceptance criteria:
 - All authorized definition-save paths retain immutable revisions/conflicts/receipts and make active instances follow the latest saved configuration without replacement or history loss. Coalesce unapplied edits without discarding revision history; no general pinning mode.
@@ -1658,7 +1571,7 @@ Acceptance criteria:
 - Retain revision-pinned management grants and explicit human reauthorization. Do not copy personal/external credentials, silently assign newly selected MCP connections, or expand an editor's allowed fields/capabilities. Preserve explicit connection-rollout authorization; document the exact interaction with applied revision reporting after source review.
 - Review source/lifecycle and deslop; run permitted TypeScript/application and applicable Nix builds, full diff/whitespace and changed local links. No tests or runtime probes under the standing policy without explicit authorization. Record rendered desktop/390 px, keyboard/touch/accessibility and runtime/recovery gaps separately from build success.
 
-Pi Durable Expert reports the [wiki decision section](https://wiki.chrisreynolds.me/wiki/dispatch-agent-management/#section-in-place-upgrades-authorized-october-8-2026) saved and read-back verified as revision 3. It retains historical policy and labels this delivery authorized, not yet implemented or qualified. Documenter has no authenticated wiki access. Candidate `1ff6144` includes the contract documentation and implementation. Documenter source-reviewed base composition, native configuration/member revision commit, removal exclusions, actual binding projection and participant status wording. Developer reports TypeScript/application builds, Apple Silicon Nix build and flake checks passing; no tests run. Deslop source/simplification review reports no further requested changes. Pi Durable Expert reviewed correction `fd43559` and closed both source blockers: same-operation receipt replay now authenticates unchanged company/instance/definition and payload after base adoption while preserving original revision attribution; legacy shared room/agent streams exclude known room orchestration from task-idle checks without bypassing native work, inbox or Stop/removal guards. Documenter inspected the correction diff. No remaining blockers were reported in the scoped lifecycle/source review. Developer reports TypeScript/application builds passing on the correction; final integration checks/publication are recorded below. Nine added local documentation links/anchors and whitespace checks passed. Runtime edit-during-tool, failure/retry, restart/recovery, authorization and rendered desktop/390 px, keyboard/touch/accessibility remain unverified. Source publication is recorded below; no deployment is established by this entry.
+Candidate `1ff6144` includes the contract documentation and implementation. Documenter source-reviewed base composition, native configuration/member revision commit, removal exclusions, actual binding projection and participant status wording. Developer reports TypeScript/application builds, Apple Silicon Nix build and flake checks passing; no tests run. Deslop source/simplification review reports no further requested changes. Pi Durable Expert reviewed correction `fd43559` and closed both source blockers: same-operation receipt replay now authenticates unchanged company/instance/definition and payload after base adoption while preserving original revision attribution; legacy shared room/agent streams exclude known room orchestration from task-idle checks without bypassing native work, inbox or Stop/removal guards. Documenter inspected the correction diff. No remaining blockers were reported in the scoped lifecycle/source review. Developer reports TypeScript/application builds passing on the correction; final integration checks/publication are recorded below. Nine added local documentation links/anchors and whitespace checks passed. Runtime edit-during-tool, failure/retry, restart/recovery, authorization and rendered desktop/390 px, keyboard/touch/accessibility remain unverified. Source publication is recorded below; no deployment is established by this entry.
 
 Final integration evidence: candidate `7137ea6`, rebased onto remote `71df723`, passed `nix develop -c npm run check`, Apple Silicon `nix build --no-link`, `nix flake check` (zero runnable checks; Linux omitted), and whitespace review. Pi Durable Expert closed both source findings; Deslop found no remaining simplification blocker. No tests or runtime probes were run. Rendered desktop/390 px, keyboard/touch/accessibility, recovery and live upgrade behavior remain unverified. Source publication to remote `main` as `00dc7cc` and canonical checkout equality were independently verified by Documenter on October 8. This is source availability, not a deployment or verified live upgrade.
 
@@ -1679,7 +1592,7 @@ The normal localhost window exposed a narrow desktop header with both side panel
 
 ## Starter packages and onboarding — October 8, 2026
 
-**Source-published at `ce244ca`; runtime/browser qualification pending.** Depends on the published archive codec/preview/import path. Scope follows [the starter contract](spec.md#starter-packages-and-onboarding). Documenter owns package records; Developer owns shared `bundles.tsx`/`app.ts` integration; Dev 2 supplies standalone starter component/server modules and mount/route hooks in a separate worktree.
+**Source-published at `ce244ca`; runtime/browser qualification pending.** Depends on the published archive codec/preview/import path. Scope follows the starter contract. Documenter owns package records; Developer owns shared `bundles.tsx`/`app.ts` integration; Dev 2 supplies standalone starter component/server modules and mount/route hooks in a separate worktree.
 
 Acceptance criteria:
 - First inventory is Developer-only, with repository-owned instructions/coding capability and a visible model choice before import. No private live-agent exports, credentials/grants, machine paths or implicit connection authority.
@@ -1691,7 +1604,7 @@ Starter candidate `32c2c6a`: Documenter inspected repository-owned template gene
 
 ## GitHub bundle imports and updates — October 8, 2026
 
-**Source-published at `ce244ca`; runtime/browser qualification pending.** Depends on the published bundle import path. Developer owns GitHub fetch/API/UI and shared dialog/routes; Pi Durable Expert owns tracked-import/update persistence in `runtime.ts` and shared preview/apply types in a separate worktree. [The specification](spec.md#github-sources-and-updates) owns update semantics.
+**Source-published at `ce244ca`; runtime/browser qualification pending.** Depends on the published bundle import path. Developer owns GitHub fetch/API/UI and shared dialog/routes; Pi Durable Expert owns tracked-import/update persistence in `runtime.ts` and shared preview/apply types in a separate worktree. The specification owns update semantics.
 
 Acceptance criteria:
 - Track repository/path/immutable commit/digest, package keys, local mappings and baseline definition snapshots. Fetch outside native commits and apply the exact reviewed content. Initially use public github.com repositories at an explicit commit SHA/package directory; bounded manifest/Markdown reads only, no clone/scripts/credentials/arbitrary-host URLs. Preview retention/receipt boundaries are specified in the linked contract.
@@ -1716,7 +1629,7 @@ Integrated `nix develop --command npm run check`, Apple Silicon `nix build --no-
 
 ## Project content portability — October 8, 2026
 
-**Source-published at `64298d7`; runtime/UI qualification pending.** Chris asked the team to continue the remaining portability scope. Pi Durable Expert reviews native boundaries; Documenter maintains contracts/usage. Use a separate worktree and coordinate runtime/shared-file ownership before edits. [The specification](spec.md#project-content-and-operational-recovery) owns the content/recovery distinction.
+**Source-published at `64298d7`; runtime/UI qualification pending.** Chris asked the team to continue the remaining portability scope. Pi Durable Expert reviews native boundaries; Documenter maintains contracts/usage. Use a separate worktree and coordinate runtime/shared-file ownership before edits. The specification owns the content/recovery distinction.
 
 Acceptance criteria:
 - Manager-only selected public chats/threads and historical author labels; only publicly referenced attachments, missing bytes reject export, manager access rechecked before return. Destination has only importing-human manager and no default agents; preview authorship separately. Settle archive limits before implementation.
@@ -1743,7 +1656,7 @@ Project UI candidate `124a4a6`: Documenter inspected archive selection/full-cont
 
 ## Native capability artifact — October 8, 2026
 
-**Pi Durable Expert owns artifact/README; source-published at `64298d7`, host/runtime qualification pending.** [The artifact README](../capabilities/README.md) owns procedures; [the web contract](spec.md#host-capability-artifact) owns its relationship to bundles. Documenter inspected package export/file allowlists, exact 1.0.4 peers, no lifecycle scripts and same-source compiler inputs. Expert reports TypeScript/application and actual tarball/content inspection passing (12 expected files, no runtime/auth state); Nix attempts interrupted/rerunning, no pass claimed yet. Source provenance plus tarball digest is required. Host installation/execution/recovery, network/provider/credential integration remain unverified. No new executor, plugin loader or import-triggered installation is introduced.
+**Pi Durable Expert owns artifact/README; source-published at `64298d7`, host/runtime qualification pending.** [The artifact README](../capabilities/README.md) owns procedures; the web contract owns its relationship to bundles. Documenter inspected package export/file allowlists, exact 1.0.4 peers, no lifecycle scripts and same-source compiler inputs. Expert reports TypeScript/application and actual tarball/content inspection passing (12 expected files, no runtime/auth state); Nix attempts interrupted/rerunning, no pass claimed yet. Source provenance plus tarball digest is required. Host installation/execution/recovery, network/provider/credential integration remain unverified. No new executor, plugin loader or import-triggered installation is introduced.
 
 ## Local integration secrets — October 8
 
@@ -1751,7 +1664,7 @@ In progress: owner-bound encrypted Exa storage and current grants, authenticated
 
 Acceptance: owner isolation; explicit definition assignment; rotation without new instances; disconnect blocks later requests without environment fallback; fork/rewind cannot restore access; configured/missing status never claims verified connectivity. Source/deslop review, TypeScript/application/Nix builds and desktop/390px visual review pending. No functional results claimed.
 
-Evidence: TypeScript/application builds, Apple Silicon Nix build and flake checks passed. Source review uses trusted `api.conversationId` and current membership/definition checks; credential values are resolved outside Pi transactions. Removed implicit environment fallback and added transactional settings revisions to prevent stale saves restoring revoked grants. UI reuses existing Dispatch tokens, typography and shared fields; drafts remain mounted across settings navigation. Desktop/390px renders, keyboard/touch behavior, live settings/rotation/revocation and Linux remain unverified. Wiki lookup was unavailable. Pi independent source review approved fc98b24 with no remaining blocking findings in its reviewed scope; live security qualification remains outstanding.
+Evidence: TypeScript/application builds, Apple Silicon Nix build and flake checks passed. Source review uses trusted `api.conversationId` and current membership/definition checks; credential values are resolved outside Pi transactions. Removed implicit environment fallback and added transactional settings revisions to prevent stale saves restoring revoked grants. UI reuses existing Dispatch tokens, typography and shared fields; drafts remain mounted across settings navigation. Desktop/390px renders, keyboard/touch behavior, live settings/rotation/revocation and Linux remain unverified. Pi independent source review approved fc98b24 with no remaining blocking findings in its reviewed scope; live security qualification remains outstanding.
 
 Visual evidence: Developer captured the authenticated disposable preview at 1440×1000 and 390×844; Dev 2 inspected both images. Labels, fields, agent selection and actions are readable and unclipped in the initial unconfigured state. Mobile document width was reported as 390px with no horizontal overflow. Captures remain private under `.local/secrets-review/`. This verifies initial layout only—not measured contrast, focus order, touch, save/conflict/disconnect states, or credential authorization. No real credentials or grants were saved during capture.
 
@@ -1786,7 +1699,7 @@ Acceptance: use saved criteria with latest human direction; fall back to the aut
 
 ## Project working directory — October 8, 2026
 
-Chris authorized an optional `cwd` in Project settings. Developer owns settings UI; Pi Durable Expert owns backend persistence/session-path integration and lifecycle review; Documenter owns contract/usage updates. See the [shared-project contract](spec.md#shared-project-access-and-default-agents).
+Chris authorized an optional `cwd` in Project settings. Developer owns settings UI; Pi Durable Expert owns backend persistence/session-path integration and lifecycle review; Documenter owns contract/usage updates.
 
 Acceptance criteria (source/build evidence below; functional/rendered qualification pending):
 
@@ -1803,14 +1716,14 @@ Developer published the integrated change at `fbeaafd` and synchronized the cano
 
 ## Agent-management eligibility correction — October 8, 2026
 
-Chris rejected the blanket trial restrictions after Pi Durable Expert could not use management with its Wiki connection. Remove capability-based exclusions from grant creation, listing, reads, historical reads and saves. Permit default-agent and granted-editor targets. Keep explicit human grants, trusted company/instance identity, active targets, no self-editing, revision pins, field allowlists, quotas, immutable history and replay receipts. No grants are provisioned by this change. WP-046’s unprivileged-only eligibility above is superseded; its original trial evidence is retained as history.
+Chris rejected the blanket trial restrictions after Pi Durable Expert could not use management with its MCP connection. Remove capability-based exclusions from grant creation, listing, reads, historical reads and saves. Permit default-agent and granted-editor targets. Keep explicit human grants, trusted company/instance identity, active targets, no self-editing, revision pins, field allowlists, quotas, immutable history and replay receipts. No grants are provisioned by this change. WP-046’s unprivileged-only eligibility above is superseded; its original trial evidence is retained as history.
 
 Acceptance: source/deslop review covered grant creation, listing, current/historical reads, saves and restoration, with preserved authorization and tuning-field boundaries. TypeScript/application builds, Apple Silicon Nix build/flake checks and diff/link checks passed. No tests or grants were added or run. Runtime qualification and Linux remain unverified under the zero-tests rule.
 
 
 ## Chat Definition of Done — October 8, 2026
 
-Chris authorized the shared chat-metadata slice proposed by Pi Durable Expert. Developer owns implementation, Pi Durable Expert owns native/architecture review, and Documenter owns spec/usage and evidence reconciliation. See the [contract](spec.md#chat-definition-of-done).
+Chris authorized the shared chat-metadata slice proposed by Pi Durable Expert. Developer owns implementation, Pi Durable Expert owns native/architecture review, and Documenter owns spec/usage and evidence reconciliation.
 
 Acceptance criteria:
 - Optional shared Markdown/checklist criteria can be set, edited and cleared in any chat by current authorized human participants. Read-only observers may read but cannot edit. Existing chats without criteria remain compatible.
@@ -1839,7 +1752,7 @@ Focused recovery observation after `c6c943a`: the affected chat reopened in the 
 
 ## Chat presentation performance — October 8, 2026
 
-Chris authorized coordinated completion after Developer, Pi Durable Expert, Documenter and Deslop agreed on the definition of done. [The contract](spec.md#chat-presentation-performance) preserves native execution and full-history/access boundaries. This package is separate from the chat-metadata feature named “Chat Definition of Done” above. Developer owns UI/integration, Pi Durable Expert runtime/native architecture, Deslop simplification/compatibility review, and Documenter specification/acceptance reconciliation. Developer works in `.local/worktrees/chat-performance` (`work/chat-performance`); Pi Durable Expert owns lightweight summaries, existing-chat initialization and backend measurements in a separate worktree. Concrete code boundaries are coordinated in the shared conversation.
+Chris authorized coordinated completion after Developer, Pi Durable Expert, Documenter and Deslop agreed on the definition of done. The contract preserves native execution and full-history/access boundaries. This package is separate from the chat-metadata feature named “Chat Definition of Done” above. Developer owns UI/integration, Pi Durable Expert runtime/native architecture, Deslop simplification/compatibility review, and Documenter specification/acceptance reconciliation. Developer works in `.local/worktrees/chat-performance` (`work/chat-performance`); Pi Durable Expert owns lightweight summaries, existing-chat initialization and backend measurements in a separate worktree. Concrete code boundaries are coordinated in the shared conversation.
 
 **Current acceptance: complete for the recorded local scope.** Measured/reviewed application code `09dc983` is published and installed as source-equivalent `e87c0ab`. Authenticated desktop/390 px demonstrations were delivered to Chris; installation, metadata retention and scoped receipts are reconciled below. Conservative Chrome Event Timing p95 was 16 ms during received presence updates on M1 Air/Chrome. This is not a guarantee for arbitrary model-output loads, physical-device timing, Linux or remote deployment. Historical failed/intermediate results remain below.
 
@@ -1856,7 +1769,7 @@ Overall acceptance (closed for the recorded local scope below):
 - Source/deslop and independent native/security-boundary review, TypeScript/application and applicable Nix build/flake checks, full diff/whitespace and changed documentation links. Desktop and 390 px rendered review including keyboard/touch/scroll interactions; stills alone do not qualify interaction.
 - Verify source publication, identify the local target and running revision, verify local deployment and demonstrate the running version to Chris. Neither source publication nor a fixture-only profile proves deployed responsiveness. Record private evidence paths without publishing transcripts, credentials or authenticated captures.
 
-Baseline: the read-only recorded-data scaling evidence is maintained under [WP-039](#wp-039--composer-render-isolation). No optimized implementation, new runtime/browser result, deployment or final demonstration is claimed at package creation. Focused verification follows the [testing-policy scope](spec.md#testing-policy); avoid unrelated tests, billable model load and destructive live-state changes.
+Baseline: the read-only recorded-data scaling evidence is maintained under [WP-039](#wp-039--composer-render-isolation). No optimized implementation, new runtime/browser result, deployment or final demonstration is claimed at package creation. Focused verification follows the testing-policy scope; avoid unrelated tests, billable model load and destructive live-state changes.
 
 
 Slice-1 candidate evidence (isolated recorded-state copy, not deployment): Pi Durable Expert exercised real native Session/storage with runtime method calls and external actions disabled, not HTTP/browser or a running Harness. Documenter inspected the private diagnostic and JSONL results in `.local/worktrees/chat-summaries/.local/qualification/summary-profile.{mjs,jsonl}`. Across 51 chats, the warm baseline list took 2,653.6 ms and scanned 31,225 records / 279,063,996 serialized bytes; three candidate passes took 13.9, 6.7 and 6.9 ms with zero entry scans and deep-equal summaries/order. Cold reopening returned equal summaries in 126.6 ms with zero scans; reinitializing completed summaries also scanned zero records. An unrelated user received an empty list without scans. Checkpointed backfill resumed after closing/reopening between page commits; the recorded remaining initialization used 53 pages and about 627 ms. These observations qualify the exercised summary path and graceful session-reopen checkpoint handling, not crash recovery, real executor restart, authenticated API timing or UI responsiveness. Mutation/rollback and builds were still pending at that profiling report; the subsequent candidate evidence follows below. Deslop's candidate source review found no blocker in transactional public-entry coverage, suppressed-alias backfill or list/detail summary/status reuse; integrated review remains required.
@@ -1892,9 +1805,7 @@ Authenticated typing observations at `0d27d4a` (not closure): Documenter inspect
 Deterministic active-Stop evidence: Documenter inspected Pi Durable Expert's `.local/aws-chat-diagnosis/active-stop.mjs` and preserved `active-stop-e04b54a.{json,log}` at `e04b54a79a7f80c12708ad802b2de0a0705fc941`, the delta tie-order fix using native `timelineOrder`. A real disposable DispatchRuntime/Harness with stock Pi 1.0.4 local `fauxProvider` observed active generation/task execution before Stop. Stop propagated provider abort, settled the task as aborted, cleared native run/generation state and delivered stopped presentation through the runtime watch. Stop took 88.9 ms in this case; its bounded snapshot was 10,222 bytes, delta 2,297 bytes, with one changed message and unchanged content omitted. Delta reconstruction matched the stopped snapshot including equal-timestamp order; the previously loaded older page remained equal. Unadmitted private final text was absent, idle Stop retry remained stopped, and graceful reopen did not start a second generation. One local provider call and zero network calls occurred; no live or QA replay store was touched. This qualifies the exercised native cancellation/presentation boundary, not authenticated HTTP/browser Stop or external-provider cancellation. Final authenticated measurement/interaction and delivery gates remain open. Performance-section local links/anchors (eight) and documentation whitespace checks passed.
 
 
-
 Thread/scroll receipt reconciliation: Documenter inspected `.local/chat-performance-instance/thread-scroll.mjs` and `{desktop,phone}-thread-scroll.json`. On both 1440×1000 and 390×844 journeys, original/reopened root IDs matched, main and same-root reply drafts were retained, and the main scroll offset changed by zero pixels across a presence update after loading older history. No page errors were recorded. Desktop Reply uses the supported article-hover reveal; the harness targets the visible thread context rather than a hidden desktop/drawer duplicate. Earlier click interception/empty-draft results were harness targeting errors, not confirmed product defects. This qualifies the recorded root/draft/presence-scroll cases, not all historical-page anchoring or nonempty thread counts; final source/build and latency provenance must still accompany the completed acceptance record.
-
 
 
 Pre-install native observation: Pi Durable Expert's read-only `.local/aws-chat-diagnosis/summary-before-install.json`, inspected by Documenter, recorded all 51 catalog chats with complete summary documents, none missing/incomplete, 52 documents read and zero entry scans. Documenter also confirmed that `collaboration/summary.ts` is unchanged between qualified slice `5b248ca` and parallel integration `2e00aca`. The observation establishes persisted metadata only—not authenticated list behavior, the running service revision, installation or deployment acceptance. Retain the parallel package's targeted upgrade wakeups during integration.
@@ -1979,7 +1890,7 @@ Acceptance:
 - Correct current runtime/setup guidance on shared projects, Developer defaults, safe idle base/skill adoption and check-policy exceptions by linking canonical contracts; preserve historical decisions and scoped evidence.
 - Preserve intentional image outputs, user files, state, credentials, backups and active worktree/qualification evidence. Remove only confirmed task-owned disposable material; uncertain ownership is not permission to delete.
 - Source/deslop and independent affected-boundary review, TypeScript/application and applicable Nix checks for code changes, diff/whitespace and changed documentation links. No expanded tests, billable probes, deployment or live-state cleanup is authorized. Record runtime, rendered desktop/390 px, recovery and Linux outcomes as unverified unless specifically observed.
-- Verify integrated source publication separately from deployment. Apply [deployment-independent responsiveness](spec.md#deployment-independent-responsiveness) to ordinary local/hosted interactions; parity remains unmeasured. Broader chat-performance work retains its separate acceptance criteria.
+- Verify integrated source publication separately from deployment. Apply deployment-independent responsiveness to ordinary local/hosted interactions; parity remains unmeasured. Broader chat-performance work retains its separate acceptance criteria.
 
 Documentation candidate: runtime guidance now follows shared-project authorization/default migration and safe idle adoption rather than obsolete personal-group/new-instance-only rules. Root/package check summaries link the canonical scoped policy. Root `imagegen/` is now ignored to prevent accidental commits of generated images/private run metadata; no files were deleted or moved. Tracked design assets, active worktrees and qualification evidence remain untouched. 141 local file/anchor links, whitespace and source/contract review passed; `git check-ignore` confirms the generated-output rule. No code, runtime, build or deployment outcome is established by this slice; integration remains pending.
 
@@ -2001,14 +1912,14 @@ Expanded documentation review: corrected the release skill's obsolete design-sta
 
 Expanded-pass integration (overall task still open): integrated `de73f91` (unused endpoint aliases and shared blob-download lifecycle), `e047e01` (linear transcript-window overlap), and `ed9b3ea` (page-candidate projection and bounded settlement retention), plus expanded guidance corrections. Independent source review confirmed Pi 1.0.4's ascending submission-scan contract and preservation of timeline ordering, cursor/byte limits and download metadata. Removed the obsolete placeholder in populated `scripts/`; corrected AWS variable descriptions without changing infrastructure resources. Reviewed root launchers, build/configuration manifests, Nix/OCI packaging, AWS module inputs/resources and service/auth/recovery entry points; necessary process shutdown, storage isolation, cryptographic and recovery checks remain. This coverage is not an overall completion claim.
 
-Combined TypeScript/application/capability checks, Apple Silicon Nix build, flake evaluation and whitespace checks passed after integration; flake reported zero runnable checks and omitted Linux. Documenter checked 386 local Markdown links. No tests, billable probes, live-state changes or deployment were performed. Download, transcript paging/performance and rendered desktop/390 px behavior remain unverified for these changes. Temporary integration dependency symlinks are removed after checks; artifacts/evidence remain preserved. Old-editor OAuth request/event shims have concrete historical consumers; retirement requiring a browser reload is proposed to Chris, while persisted Wiki identity/credentials/bindings remain required. Expanded source review continues independently of that decision.
+Combined TypeScript/application/capability checks, Apple Silicon Nix build, flake evaluation and whitespace checks passed after integration; flake reported zero runnable checks and omitted Linux. Documenter checked 386 local Markdown links. No tests, billable probes, live-state changes or deployment were performed. Download, transcript paging/performance and rendered desktop/390 px behavior remain unverified for these changes. Temporary integration dependency symlinks are removed after checks; artifacts/evidence remain preserved. Old-editor OAuth request/event shims have concrete historical consumers; retirement requiring a browser reload is proposed to Chris, while persisted legacy MCP identity/credentials/bindings remain required. Expanded source review continues independently of that decision.
 
 Integrated follow-up `3c99c83`: managed MCP listing now projects rows from one ordered query, status projection reuses its record, and contribution handoff drops an unused argument. Independent diff review and all three permitted integrated code/build checks passed again. Frontend and documentation owners reported no further concrete findings in their expanded coverage; backend lifecycle/projection review and the explicit old-browser retirement decision remain open. This publication is incremental, not overall acceptance.
 
 Integrated `ad76406`: contribution guard completion shares the native reconciliation commit; public live content is sanitized before one detached copy. Deslop independently checked Pi 1.0.4 scheduler `runtime.commit` handling: a returned state is applied within the gated transaction, retaining native task ownership. Documenter independently reviewed the public sanitizer boundary. Combined TypeScript/application/capability, Apple Silicon Nix build, flake evaluation and whitespace checks passed again. Restart/cancellation/live behavior remains source-reviewed only; overall cleanup and the old-browser support decision remain open.
 
 
-Expanded-pass source publication: Documenter independently verified remote `main` and the synchronized canonical checkout at `98d00cf5161cc6ccecf609e480754995a5960ce9`. This delivers the expanded code/guidance fixes above, not overall cleanup acceptance, runtime/rendered qualification or deployment. The old-editor request/event retirement decision remains unresolved; persisted Wiki credentials, bindings and identity checks remain required.
+Expanded-pass source publication: Documenter independently verified remote `main` and the synchronized canonical checkout at `98d00cf5161cc6ccecf609e480754995a5960ce9`. This delivers the expanded code/guidance fixes above, not overall cleanup acceptance, runtime/rendered qualification or deployment. The old-editor request/event retirement decision remains unresolved; persisted legacy MCP credentials, bindings and identity checks remain required.
 
 Legacy-reporter follow-up `4960d61` removes only the unread `afterEntry` input from newly created tasks. Independent source review confirmed the observer reads room/participant identity only; existing task inputs remain untouched and the legacy reporter remains registered at version 1. Integrated TypeScript/application/capability checks, Apple Silicon Nix build, flake evaluation and whitespace passed. Recovery is source-reviewed, not runtime-qualified. Overall acceptance and the old-editor retirement decision remain open.
 
@@ -2043,7 +1954,6 @@ Real GitHub follow-up — October 9, 2026 (Expert, isolated `261d1ec`): the appr
 Expert reviewed and manually requalified the one-line fix `25fea98`, cherry-picked onto `261d1ec` as `a1d7cbc` with a fresh build: **Destination** switches to **New independent copy**, pinned source remains and mobile import succeeds. Documenter independently source-inspected the update of Destination from the successful server preview only; failed previews do not change that selection. Developer reports combined TypeScript/application/capability and Apple Silicon Nix build/flake checks passing. Expert additionally reports receipt replay surviving service restart, changed retry content/forced conflicting apply returning 409 and edits after preview causing stale UI apply rejection. After manually dropping a successful admission response, **Retry same operation** sent identical IDs, returned the same receipt and created exactly one agent. Desktop/390 px content/controls, scrolling to approval/import, Tab/Shift+Tab dialog wrapping and 390 px document width were reviewed by Expert. Documenter inspected the three shared captures, confirming the copy label, contained controls, conflict disclosure and visible approval/import action; still images do not independently prove runtime/keyboard outcomes. Additional Expert sampling on `a1d7cbc` confirmed mobile Escape returning focus to Menu, buttons/disclosures meeting 44 px targets, text contrast ≥6.04:1 and focus-ring contrast 4.63:1 against white. Only Expert's disposable service was stopped; state/evidence were retained. These sampled values are not full contrast, screen-reader or real-device touch certification. No provider calls or automated suite were reported. These observations replace the initial GitHub success/restart gap; fix/evidence publication was independently verified at `3dd9ed2`; Chris's acceptance remains outstanding.
 
 
-
 Project retry/admission evidence (Dev 2, Developer-owned isolated browser-review instance): with a separately enrolled disposable account, repeating an empty-archive import with the same request ID returned the same project ID; altered content under that ID returned 409. Destination membership contained only the importing account as manager, with no default agents. Unauthenticated history reads and exports returned 401. Subsequent nonmember export and history reads against Developer's disposable project returned 404 (project absent or access denied), with no project content returned. These cases establish the exercised nonmember/unauthenticated boundaries, not every membership-change race. The instance owner remains Developer and was not stopped by Dev 2.
 
 
@@ -2059,7 +1969,7 @@ Visual evidence follow-up: Developer inspected native image pixels through prepa
 
 ## Opt-in agent criteria editing — October 8, 2026
 
-Chris agreed to explicit opt-in editing after Developer and Pi Durable Expert distinguished an agent tool from a capability toggle. Developer owns configuration/UI integration and independent review, Expert owns the native tool, Documenter contract/usage and acceptance reconciliation. See [the extension contract](spec.md#opt-in-agent-definition-of-done-editing). Existing human-only criteria qualification remains separate and incomplete.
+Chris agreed to explicit opt-in editing after Developer and Pi Durable Expert distinguished an agent tool from a capability toggle. Developer owns configuration/UI integration and independent review, Expert owns the native tool, Documenter contract/usage and acceptance reconciliation.  Existing human-only criteria qualification remains separate and incomplete.
 
 Acceptance criteria:
 - Per-agent **Edit Definition of Done** is disabled by default; only enabled active agent participants may mutate criteria through an agent-facing tool. Resolve current chat and actor from trusted native bindings, with no caller-supplied cross-chat authority.
@@ -2162,11 +2072,11 @@ Native ARM64 packaging follow-up: Linux ARM64/root passed HTTPS apt installation
 
 Hosted agent-shell acceptance at application `c5d5797` / packaging `a6017e9` covered authenticated new-chat creation and ordinary Bash installation/use of previously absent `tree` through HTTPS apt. The ARM64 worker reported Ubuntu 24.04/root, Node 24.9.0, npm 11.6.0 and Python 3.12.3. This bounded observation meets the Ubuntu execution slice, not production readiness, persistent-filesystem recovery or a fresh third-party installation. Installation task/image correlations and authenticated captures belong in the owning caller's restricted evidence.
 
-The [research article](https://wiki.dispatchworks.ai/wiki/dispatch-worker-environments/) owns the product comparison. The corrected human direction prioritizes runtime installation and iterative base-image improvement; mise, reusable caches and automatic environment snapshots are not assumed delivered by this package.
+The corrected human direction prioritizes runtime installation and iterative base-image improvement; mise, reusable caches and automatic environment snapshots are not assumed delivered by this package.
 
 ## Chat archive lifecycle — October 9, 2026
 
-**Accepted specification; implementation pending.** Chris requested that archiving stop every agent in the chat and perform the cloud sandbox lifecycle work required to retire its container. The [specification](spec.md#chat-archive-lifecycle) supersedes WP-011's preservation of running work. The current `updateChat` operation only writes a personal preference; this documentation change does not alter runtime behavior.
+**Accepted specification; implementation pending.** Chris requested that archiving stop every agent in the chat and perform the cloud sandbox lifecycle work required to retire its container. The specification supersedes WP-011's preservation of running work. The current `updateChat` operation only writes a personal preference; this documentation change does not alter runtime behavior.
 
 Implementation sequence and acceptance:
 
@@ -2372,13 +2282,13 @@ commands, pins and receipts stay in consumer infrastructure, not this repository
 
 ## Named agent secrets — October 9, 2026
 
-Authorized first slice: [named agent secrets contract](spec.md#named-agent-secrets--authorized-october-9-2026). Developer owns encrypted storage/API, Settings and Agent grant UI, and integration; Pi Durable Expert owns non-environment tool consumption/Git and worker identity review; Documenter owns compact spec/usage updates. Preserve existing Exa behavior. Consumption agreed: metadata-only `secrets_list` and credential-internal `git_clone`, with no environment injection or plaintext retrieval tool; suppress credential-bearing Git output. No new principal system or persistent workspace.
+Authorized first slice: named agent secrets contract. Developer owns encrypted storage/API, Settings and Agent grant UI, and integration; Pi Durable Expert owns non-environment tool consumption/Git and worker identity review; Documenter owns compact spec/usage updates. Preserve existing Exa behavior. Consumption agreed: metadata-only `secrets_list` and credential-internal `git_clone`, with no environment injection or plaintext retrieval tool; suppress credential-bearing Git output. No new principal system or persistent workspace.
 
 Acceptance remains open: write-only create/replace/delete and restart persistence; one secret granted to multiple definitions; unauthorized use/sharing denied; copying/importing agents does not carry grants; current grants checked at use time; replacement/revocation applied to later uses; private GitHub clone without tokens in URLs or saved Git configuration. Apply repository verification policy, type/build checks and desktop/390px UI review. Keep credentials/evidence private and distinguish checked outcomes from deployment. Short usage instructions match the published source; remaining functional/deployment limits follow below.
 
 Source-published through `611adf6` (storage/UI/worker mediation `b3a810e`, Git tools `611adf6`). Developer reports TypeScript/application and Apple Silicon Nix build/flake checks passed; Expert reports capability/tool checks passed and found no blocking identity/recovery issue in scoped source review. Documenter inspected published source/labels and updated the short [usage guide](usage-guide.md#named-agent-secrets), including immediate grant saving and HTTPS-only hosted mediation. Whitespace and documentation-link checks passed. These checks do not establish runtime behavior or deployment.
 
-Chris’s subsequent “Continue” authorizes focused disposable local functional/browser qualification under the [named-agent secrets exception](spec.md#testing-policy), not an automated regression suite or deployment. Developer owns Settings/Agent flows and desktop/390px captures; Expert owns Git checks; Documenter reviews evidence. Real private cloning still needs an explicitly approved read-only repo/credential supplied through private secret setup, never chat or workstation credential reuse. Qualification evidence follows; private cloning remains credential-blocked and deployment is separate. No functional tests or real credentials were used before the scoped qualification exception.
+Chris’s subsequent “Continue” authorizes focused disposable local functional/browser qualification under the named-agent secrets exception, not an automated regression suite or deployment. Developer owns Settings/Agent flows and desktop/390px captures; Expert owns Git checks; Documenter reviews evidence. Real private cloning still needs an explicitly approved read-only repo/credential supplied through private secret setup, never chat or workstation credential reuse. Qualification evidence follows; private cloning remains credential-blocked and deployment is separate. No functional tests or real credentials were used before the scoped qualification exception.
 
 Focused Git evidence inspected by Documenter: Expert’s private `secret-manual/receipts.jsonl` and driver at `805177b` use the same extension blob as published `611adf6`. A synthetic-token real `git credential fill` exchange succeeds; wrong host/path and HTTP refuse credentials. A real public GitHub clone succeeds with credential-free Git config. Metadata projection, denied resolution, existing destination and traversal refusal are exercised; inspected token-history/argv/env checks are negative. Native cancellation cleans temporary state, and SIGKILL recovery reports interruption with zero re-resolution/re-execution. Credential-fill modes replace clone execution, and cancellation/crash modes use a slow subprocess stand-in, so these are scoped tool/native-execution observations—not private cloning, backend grant enforcement or deployed worker proof. An approved private credential remains pending.
 
@@ -2574,7 +2484,7 @@ billing verification remain absent; operator tooling does not silently add them.
 
 ## Project repositories and spec reference — October 10, 2026
 
-**Source implemented and design-reviewed; browser/runtime acceptance pending.** Chris requested discoverable Project spec-file configuration, expanded it to multiple repositories, then clarified that project setup must not depend on service-host filesystem paths. [The specification](spec.md#project-repositories-and-spec-reference) owns the scope. Web Application Designer owns responsive designs/UI; Developer owns persistence/shared types; Documenter owns documentation reconciliation. Earlier single-folder proposals are superseded. Watchers, automatic work and cloud cloning are not this slice.
+**Source implemented and design-reviewed; browser/runtime acceptance pending.** Chris requested discoverable Project spec-file configuration, expanded it to multiple repositories, then clarified that project setup must not depend on service-host filesystem paths. The specification owns the scope. Web Application Designer owns responsive designs/UI; Developer owns persistence/shared types; Documenter owns documentation reconciliation. Earlier single-folder proposals are superseded. Watchers, automatic work and cloud cloning are not this slice.
 
 ### Acceptance criteria
 
@@ -2599,7 +2509,7 @@ The integrated editor (`1aaf6d0`, navigation correction `a5e7c75`) incorporates 
 
 The main-area form has URL-first repository entry, editable name inference only when blank, stable repository identities, shared field validation, disambiguated spec choices, explicit Clear spec and visible removal guidance. Existing membership/role/default-agent editing remains; the legacy working directory stays under collapsed Advanced and is omitted from saves unless edited. Ordinary settings/spec navigation uses links with direct-opening support; the targeted spec link focuses its section. Workspace-owned drafts survive navigation and errors, conflict saves stay blocked, and closing a dirty tab still asks before discarding. Source review by Developer and Deslop found a retained-draft editor incorrectly reachable inside Details: `a5e7c75` makes Details read-only and restores the main editor when closing onto a project with a retained draft. Background save completion does not navigate a different active project.
 
-Acceptance evidence: TypeScript/application/capability builds, Apple Silicon Nix application build and one native flake check passed on the integrated candidate before the final navigation correction; final reconciled checks/publication are recorded below. Linux was omitted. Full changed-source and behavior-preserving review and whitespace checks passed. No tests, runtime/browser probes or deployment occurred. The Designer requested focused disposable browser authorization; none is recorded at this checkpoint. Rendered desktop/phone/tablet/laptop, actual text/focus contrast, keyboard/touch, direct links, persistence/retry/restart and authorization remain unverified. Shared control tokens and source rules do not replace those observations. Wiki retrieval was blocked by the web reader’s private-address restriction; the maintained local contract was used.
+Acceptance evidence: TypeScript/application/capability builds, Apple Silicon Nix application build and one native flake check passed on the integrated candidate before the final navigation correction; final reconciled checks/publication are recorded below. Linux was omitted. Full changed-source and behavior-preserving review and whitespace checks passed. No tests, runtime/browser probes or deployment occurred. The Designer requested focused disposable browser authorization; none is recorded at this checkpoint. Rendered desktop/phone/tablet/laptop, actual text/focus contrast, keyboard/touch, direct links, persistence/retry/restart and authorization remain unverified. Shared control tokens and source rules do not replace those observations.
 
 
 Final reconciled candidate `ca9b441` includes both backend commits, the UI/navigation correction and both documentation updates on current remote main. `nix develop --command npm run check`, Apple Silicon `nix build --no-link` and `nix flake check` passed after reconciliation. The earlier Nix pass ran one declared native type/build check; the final pass reused its successfully built derivation and reported zero runnable checks. Linux remains omitted; the existing large browser-chunk advisory is unchanged. The final follow-up changes documentation status only. Source delivery does not establish deployment or close the browser/runtime acceptance gaps above.

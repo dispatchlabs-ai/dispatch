@@ -18,9 +18,9 @@ Startup installs all extensions, opens Pi storage, seeds missing company definit
 
 ## Membership and agent instances
 
-A human creator becomes a member. In unbound chats, authenticated human members may invite active people and available agent definitions from the same company; project-bound human access is managed through project membership. An agent may invite company agents only. Native binding documents derive an agent’s room and author identity; model tool arguments cannot choose another author. Read, command and subscription access require current company and chat authority. Unbound chats use explicit membership; project-bound chats use [shared-project policy](spec.md#shared-project-access-and-default-agents), including observation-only grants.
+A human creator becomes a member. In unbound chats, authenticated human members may invite active people and available agent definitions from the same company; project-bound human access is managed through project membership. An agent may invite company agents only. Native binding documents derive an agent’s room and author identity; model tool arguments cannot choose another author. Read, command and subscription access require current company and chat authority. Unbound chats use explicit membership; project-bound chats use shared-project policy, including observation-only grants.
 
-[WP-050](handoff.md#wp-050--multiple-agent-instances-and-supplemental-instructions) permits explicit human creation of multiple active instances per definition in a conversation; ordinary invitations still ensure an existing instance rather than creating siblings. Removed instances remain historical. Creation copies its immutable revision, model, instructions, capabilities and thinking level. New coding-capable instances receive the absolute configured workspace directory, shared across participants. `DISPATCH_WORKSPACE_DIR` defaults to the repository root in root launchers and the process launch directory for a standalone service; it can select an existing checkout or Git worktree. Startup validates that the directory exists. An optional [project working directory](spec.md#shared-project-access-and-default-agents) overrides the installation workspace for new instances only; existing paths are preserved. Pi’s `NodeExecutionEnv` and the Coding prompt’s environment-derived cwd use the saved native configuration.
+[WP-050](handoff.md#wp-050--multiple-agent-instances-and-supplemental-instructions) permits explicit human creation of multiple active instances per definition in a conversation; ordinary invitations still ensure an existing instance rather than creating siblings. Removed instances remain historical. Creation copies its immutable revision, model, instructions, capabilities and thinking level. New coding-capable instances receive the absolute configured workspace directory, shared across participants. `DISPATCH_WORKSPACE_DIR` defaults to the repository root in root launchers and the process launch directory for a standalone service; it can select an existing checkout or Git worktree. Startup validates that the directory exists. An optional project working directory overrides the installation workspace for new instances only; existing paths are preserved. Pi’s `NodeExecutionEnv` and the Coding prompt’s environment-derived cwd use the saved native configuration.
 
 Creation stores an optional name and separate `instanceInstructions`; later base upgrades replace only the base snapshot and recompose the native prompt. Native `configure()` composes the base and supplement at creation without submitting a model request. Actor-scoped receipts return the original participant ID on identical retries, including after removal; changed input conflicts. New creation conflicts during Stop or same-definition cleanup. Ambiguous definition mentions return 409; mention/removal targets remain immutable participant IDs. All active siblings consider later public messages; instructions do not grant isolation or permissions.
 
@@ -95,7 +95,7 @@ Older request fingerprints and native receipts remain authoritative for retries.
 
 ## Projects and personal preferences
 
-Shared projects have stable UUIDs, current manager/member policy, default agents and optional host-local working directories in the session-scoped Projects document. Membership grants access to bound chats; operator read-all grants allow observation only. Managers edit project settings through revisioned native commits. See the [current authorization contract](spec.md#shared-project-access-and-default-agents).
+Shared projects have stable UUIDs, current manager/member policy, default agents and optional host-local working directories in the session-scoped Projects document. Membership grants access to bound chats; operator read-all grants allow observation only. Managers edit project settings through revisioned native commits.
 
 Pin/archive preferences remain personal and grant no access. Legacy personal-group records and original creation fingerprints remain persisted for history/retry compatibility, but listing, creation and move paths no longer expose them. Audience-changing moves are unsupported; no migration silently shares old chats. Creation retries preserve the original request rather than resolving changed project defaults.
 
@@ -103,7 +103,7 @@ Pin/archive preferences remain personal and grant no access. Legacy personal-gro
 
 Public posts and invitations retain author-scoped request fingerprints in the native shared document. Matching retries reuse their original result; changed text, thread, mentions or invitation set returns `409`. Public append and native task creation share the same transaction. Native delivery request IDs derive from stable task IDs, so restarting an invocation reuses native admission. Agent tool request IDs derive from native task/call IDs.
 
-Source/build evidence, explicitly scoped runtime observations and remaining qualification gaps belong in the [handoff](handoff.md); older [WP-024](handoff.md#wp-024--shared-conversations) evidence does not qualify later changes. Follow the canonical [testing policy](spec.md#testing-policy) before verification.
+Source/build evidence, explicitly scoped runtime observations and remaining qualification gaps belong in the [handoff](handoff.md); older [WP-024](handoff.md#wp-024--shared-conversations) evidence does not qualify later changes. Follow the canonical [testing policy](../../../CONTRIBUTING.md#testing-policy) before verification.
 
 ## Per-agent MCP connections
 
@@ -142,21 +142,19 @@ assignments remain separate from that label. Basic definition edits preserve con
 Every remote call uses Pi's native tool task, propagates its cancellation signal,
 and returns MCP text/images, error state and JSON details. All calls are declared
 `replay: "unsafe"`: recovery reports interruption instead of repeating a possibly
-committed external write. Wiki's `operation_id` contract remains available for an
-informed retry. One adapter is shared per configured agent/connection; its identity
-and Wiki run are not per-human or per-Pi-conversation audit identities.
+committed external write. Inspect the provider's outcome and retry contract before
+retrying. One adapter is shared per configured agent/connection; its identity
+is not a per-human or per-Pi-conversation audit identity.
 
-The service closes adapters after Pi stops its work. Wiki's maintained adapter owns
-short-lived access tokens, renewal and run closure. The published third-party
-Durable adapter was not selected because it binds a runtime to one workspace,
-whereas Developer uses separate persistent directories per instance.
+The service closes adapters after Pi stops its work. Adapter credentials and
+renewal follow the configured provider's contract.
 
 
 ## Managed MCP connections
 
-`server/mcp-connections.ts` owns generic remote Streamable HTTP credentials. `server/mcp-oauth.ts` uses the official MCP SDK's discovery, registration, PKCE, authorization-code and refresh primitives. The Pi MCP client continues to own transport and tool invocation. OAuth supports discovered authorization servers and provider-registered clients; bearer tokens, custom authentication headers and unauthenticated servers bypass OAuth. New connections have no Wiki-specific endpoint, scopes or identity lookup.
+`server/mcp-connections.ts` owns generic remote Streamable HTTP credentials. `server/mcp-oauth.ts` uses the official MCP SDK's discovery, registration, PKCE, authorization-code and refresh primitives. The Pi MCP client continues to own transport and tool invocation. OAuth supports discovered authorization servers and provider-registered clients; bearer tokens, custom authentication headers and unauthenticated servers bypass OAuth. New connections have no provider-specific endpoint, scopes or identity lookup.
 
-`connections.sqlite` and `connections.key` live in `DISPATCH_DATA_DIR`. The manager opens and migrates its database only after the runtime owns its exclusive installation lock. Existing Wiki tables become generic connection tables atomically; IDs, encrypted credentials, pending callbacks, ownership and native binding keys survive. `legacy-wiki-connection.ts` retains the prior identity guard for migrated credentials and existing operator manifests. The internal `oauth/<id>` binding and extension names remain stable even for newly supported auth methods.
+`connections.sqlite` and `connections.key` live in `DISPATCH_DATA_DIR`. The manager opens and migrates its database only after the runtime owns its exclusive installation lock. Existing generic connection records and operator manifests remain supported. The internal `oauth/<id>` binding and extension names remain stable even for newly supported auth methods.
 
 Tokens, client secrets, header values, authorization URLs and PKCE verifiers are encrypted at rest. Retry fingerprints use a keyed digest, never cleartext credentials. Back up the database and key with authentication and Pi state. These protections do not isolate secrets from coding tools running as the service account. Stored credentials stay outside model context, browser responses and Pi documents; raw OAuth error bodies are not exposed or logged.
 
