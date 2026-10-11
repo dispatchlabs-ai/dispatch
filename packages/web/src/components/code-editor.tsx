@@ -1,6 +1,6 @@
-import { Editor, type EditorFactory } from "@pierre/diffs/edit";
+import { Editor, EditStateManager, type EditorFactory } from "@pierre/diffs/edit";
 import { EditProvider, File, type FileOptions } from "@pierre/diffs/react";
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PierreProvider } from "./pierre";
 
 interface CodeEditorProps {
@@ -20,7 +20,7 @@ const options: FileOptions<undefined, undefined> = {
   overflow: "wrap", disableErrorHandling: true,
 };
 
-const createEditor: EditorFactory<undefined, undefined> = (type, editorOptions) => new Editor(type, editorOptions);
+const createEditor: EditorFactory<undefined, undefined> = (type, editorOptions, editStateKey) => new Editor(type, editorOptions, editStateKey);
 
 export default memo(function CodeEditor({ documentId, ...props }: CodeEditorProps) {
   return <EditorSession key={documentId} {...props} />;
@@ -30,6 +30,10 @@ export default memo(function CodeEditor({ documentId, ...props }: CodeEditorProp
 // into Pierre's file prop. The caller owns draft persistence and preview state.
 function EditorSession({ path, initialValue, readOnly = false, autoFocus = false, label, onChange }: Omit<CodeEditorProps, "documentId">) {
   const [file] = useState(() => ({ name: path, contents: initialValue }));
+  // Temporary read-only transitions detach Pierre's editor. Retain its text,
+  // selection and undo for this mount only; discard/reload creates a new mount.
+  const [editStateKey] = useState(() => crypto.randomUUID());
+  useEffect(() => () => { EditStateManager.clear("file", editStateKey); }, [editStateKey]);
   const shouldFocus = useRef(false);
   shouldFocus.current = autoFocus && !readOnly;
   const onAttach = useCallback((editor: Editor<"file", undefined, undefined>) => {
@@ -43,7 +47,7 @@ function EditorSession({ path, initialValue, readOnly = false, autoFocus = false
   }), [label, path, onAttach]);
   return <PierreProvider><EditProvider createEditor={createEditor}>
     <div className="code-editor-viewport" role="region" aria-label={label} tabIndex={readOnly ? 0 : undefined}>
-      <File file={file} options={options} editorOptions={editorOptions} edit={!readOnly}
+      <File file={file} options={options} editorOptions={editorOptions} editStateKey={editStateKey} edit={!readOnly}
         onEditChange={event => onChange?.(event.file.contents)}
         onEditComplete={() => "accept"} />
     </div>
