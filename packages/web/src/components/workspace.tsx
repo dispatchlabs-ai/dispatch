@@ -26,6 +26,7 @@ import { RenameConversationDialog } from "./rename-conversation-dialog";
 import { ConversationSidebar } from "./conversation-sidebar";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ContextPanel } from "./context-panel";
+import { SidebarSearch } from "./sidebar-search";
 import { ProjectSettings, beginProjectEdit, type ProjectEditing } from "./project-settings";
 import { NewProjectButton, ProjectPage } from "./projects";
 import { ProjectSpecView } from "./project-spec";
@@ -73,6 +74,8 @@ export function Workspace() {
   const [showArchivedAgents, setShowArchivedAgents] = useState(false);
   const [config, setConfig] = useState<ApplicationConfig | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [projectListSearch, setProjectListSearch] = useState("");
+  const [projectDetailsVisible, setProjectDetailsVisible] = useState(false);
   const [projectSearch, setProjectSearch] = useState<Record<string, string>>({});
   const [projectEditing, setProjectEditing] = useState<Record<string, ProjectEditing | null>>({});
   const [savedProjectId, setSavedProjectId] = useState<string | null>(null);
@@ -495,10 +498,11 @@ export function Workspace() {
     setSearchParams(open ? { section: "projects", project: projectId, view: "spec" } : { section: "projects", project: projectId });
     if (!open) requestAnimationFrame(() => document.getElementById("main-workspace")?.focus());
   }
-  const detailsVisible = projectEditorOpen ? false : active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : active.kind === "connections" || active.kind === "secrets" || active.kind === "import-export" || active.kind === "model-providers" ? false : otherDetailsVisible;
+  const detailsVisible = projectEditorOpen ? false : section === "projects" ? projectDetailsVisible : active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : active.kind === "connections" || active.kind === "secrets" || active.kind === "import-export" || active.kind === "model-providers" ? false : otherDetailsVisible;
   const detailsWidth = Math.min(preferredDetailsWidth ?? (active.kind === "chat" ? 440 : 360), detailsMax);
   function setDetailsVisible(visible: boolean) {
     if (active.kind === "chat") setChatDetailsVisible(current => ({ ...current, [active.chatId]: visible }));
+    else if (section === "projects") setProjectDetailsVisible(visible);
     else setOtherDetailsVisible(visible);
   }
   const snapshot = active.kind === "chat" ? snapshots[active.chatId] : undefined;
@@ -566,14 +570,15 @@ export function Workspace() {
   const sectionTabs = tabs.filter(tab => section === "projects" ? tab.kind === "project" : tab.kind !== "project");
   const sidebar = <>
     <div className="section-sidebar-panel" hidden={section !== "projects"}>
-      <div className="collection-sidebar">
+      <div className="collection-sidebar projects-sidebar">
         <div className="sidebar-list-heading"><h2>Projects</h2></div>
         <NewProjectButton {...newProjectProps} />
+        <SidebarSearch label="Search projects" value={projectListSearch} onChange={setProjectListSearch} />
         <nav className="sidebar-list" aria-label="Shared projects">
-          {projects.map(project => <a key={project.id} className={`sidebar-select ${selectedProject?.id === project.id ? "selected" : ""}`} href={`/?section=projects&project=${encodeURIComponent(project.id)}`} aria-current={selectedProject?.id === project.id ? "page" : undefined} onClick={event => {
+          {projects.filter(project => project.name.toLocaleLowerCase().includes(projectListSearch.trim().toLocaleLowerCase())).map(project => <div key={project.id} className={`sidebar-row ${selectedProject?.id === project.id ? "selected" : ""}`}><a className={`sidebar-select ${selectedProject?.id === project.id ? "selected" : ""}`} href={`/?section=projects&project=${encodeURIComponent(project.id)}`} aria-current={selectedProject?.id === project.id ? "page" : undefined} onClick={event => {
             if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
             event.preventDefault(); selectProject(project.id);
-          }}><Folder size={16} /><span>{project.name}</span></a>)}
+          }}><Folder size={16} /><span>{project.name}</span></a></div>)}
         </nav>
       </div>
     </div>
@@ -617,7 +622,7 @@ export function Workspace() {
     <Button variant="ghost" onClick={() => void signOut()}>Sign out</Button>
   </main>;
 
-  return <ComposerContext.Provider value={composers}><div className={`workspace ${section === "agents" && editingAgent ? "agent-editing" : ""} ${sidebarVisible ? "" : "sidebar-hidden"} ${detailsVisible ? "" : "details-hidden"}`}
+  return <ComposerContext.Provider value={composers}><div className={`workspace ${section === "projects" ? "projects-workspace" : ""} ${section === "agents" && editingAgent ? "agent-editing" : ""} ${sidebarVisible ? "" : "sidebar-hidden"} ${detailsVisible ? "" : "details-hidden"}`}
     style={{ "--sidebar-width": `${sidebarVisible ? sidebarWidth : 0}px`, "--details-width": `${detailsVisible ? detailsWidth : 0}px` } as CSSProperties}>
     <a className="skip-link" href="#main-workspace">Skip to main content</a>
     <nav className="workspace-rail" aria-label="Workspace navigation">
@@ -652,6 +657,7 @@ export function Workspace() {
     </aside>
     <Tabs.Root className="workspace-content" value={activeId} onValueChange={value => { const tab = tabs.find(tab => tab.id === value); if (tab) activate(tab); }}>
       <div className="main-column">
+        {section === "projects" ? <header className="projects-mobile-header"><Button variant="ghost" aria-haspopup="dialog" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)}><Menu size={21} /> Menu</Button><span>Projects</span></header> : null}
         {(section === "chats" || section === "projects") && sectionTabs.length > 1 ? <header className="workspace-toolbar">
             <p id="tab-keyboard-help" className="sr-only">Use arrow keys to choose a tab, Enter to open it, and Delete to close it.</p>
             <div className="tabs-strip">
@@ -733,7 +739,7 @@ export function Workspace() {
                 onRename={renameChat} onUpdate={updateChatAction}
               /> : null}
               </>;
-            })() : section === "projects" ? <section className="welcome-view"><h1>Projects</h1><p>Choose a project or create one from the sidebar.</p></section> : <Welcome
+            })() : section === "projects" ? <section className="welcome-view"><h1>Projects</h1><p>Choose a project or create one.</p><NewProjectButton {...newProjectProps} /></section> : <Welcome
               name={state.user.name} config={config}
               onCreate={() => chooseAgents()} creating={creating || createFailed}
             />}
@@ -783,7 +789,7 @@ export function Workspace() {
     <footer className="workspace-status">
       <div className="mobile-workspace-actions">
         <div className="mobile-navigation">
-          <Modal title="Your workspace" description={config.company.name} side="left" open={navigationOpen} onOpenChange={setNavigationOpen} trigger={<Button variant="ghost" className="workspace-action">
+          <Modal title="Your workspace" description={config.company.name} side="left" open={navigationOpen} onOpenChange={setNavigationOpen} finalFocus={section === "projects" ? () => document.querySelector<HTMLButtonElement>(".projects-mobile-header button") : undefined} trigger={section === "projects" ? undefined : <Button variant="ghost" className="workspace-action">
             <Menu size={21} /> Menu</Button>}>
             <nav className="mobile-destinations" aria-label="Workspace navigation">
               {(["projects", "agents", "chats"] as const).map(destination => <a key={destination} className="button button-ghost" href={`/?${new URLSearchParams(sectionLocation(destination))}`} aria-current={section === destination ? "page" : undefined} onClick={event => navigateSection(event, destination)}>

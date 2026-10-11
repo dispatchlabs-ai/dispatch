@@ -73,24 +73,24 @@ export function ProjectPage({ project, saved, chats, creating, updating, onCreat
   return <section className="project-page">
     <header className="project-page-header">
       <div><p className="eyebrow">Shared project</p><h1>{project.name}</h1>{saved ? <p className="project-save-notice" role="status">Project saved</p> : null}</div>
-      <div className="project-page-actions"><Button disabled={creating || project.canParticipate === false} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New chat</Button>
-      {project.canManage ? <Link className="button button-secondary" to={settingsUrl} onClick={event => editLink(event)}><Settings size={18} />Project settings</Link> : null}</div>
+      <div className="project-page-actions">{project.canManage ? <Link className="button button-secondary" to={settingsUrl} onClick={event => editLink(event)}><Settings size={18} />Project settings</Link> : null}</div>
     </header>
     <dl className="project-references">
-      <div><dt>Repositories</dt><dd>{project.repositories?.length ? <ul>{project.repositories.map(repository => <li key={repository.id}><a href={repository.url} target="_blank" rel="noreferrer">{repository.name}<span className="sr-only"> (opens in new tab)</span></a></li>)}</ul> : <span className="text-muted">None added</span>}</dd></div>
-      <div><dt>Spec file</dt><dd>{spec ? <span className="project-spec-reference">
+      <div className="project-spec-block"><dt>Spec file</dt><dd>{spec ? <span className="project-spec-reference">
         <strong>{spec.source === "directory" ? "Project directory" : specRepository?.name}</strong>
         {spec.source === "directory" ? <span>{project.cwd}</span> : null}
         <span className="text-muted">{spec.source === "directory" ? "Path in project directory" : "Path in repository"}</span><span>{spec.path}</span>
       </span> : <span className="text-muted">Not set</span>}</dd>
-        {project.spec ? <Link className="button button-secondary" to={`?${new URLSearchParams({ project: project.id, view: "spec" })}`} onClick={event => {
+        <div className="project-spec-actions">{project.spec ? <Link className="button button-secondary" to={`?${new URLSearchParams({ project: project.id, view: "spec" })}`} onClick={event => {
           if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           event.preventDefault(); onOpenSpec();
         }}>View spec</Link> : null}
-        {project.canManage ? <Link className="button button-ghost" to={`${settingsUrl}&focus=spec`} onClick={event => editLink(event, true)} aria-label={project.spec ? "Change spec file" : "Set spec file"}>{project.spec ? "Change" : "Set spec file"}</Link> : null}
+        {project.canManage ? <Link className="button button-ghost" to={`${settingsUrl}&focus=spec`} onClick={event => editLink(event, true)} aria-label={project.spec ? "Change spec file" : "Set spec file"}>{project.spec ? "Change" : "Set spec file"}</Link> : null}</div>
       </div>
+      <div><dt>Repositories</dt><dd>{project.repositories?.length ? <ul>{project.repositories.map(repository => <li key={repository.id}><a href={repository.url} target="_blank" rel="noreferrer">{repository.name}<span className="sr-only"> (opens in new tab)</span></a></li>)}</ul> : <span className="text-muted">None added</span>}</dd></div>
     </dl>
     <ProjectArchiveActions key={project.id} project={project} chats={chats} />
+    <header className="project-chats-heading"><h2>Chats</h2><Button disabled={creating || project.canParticipate === false} onClick={onCreate}>{creating ? <Spinner /> : <Plus />} New chat</Button></header>
     <div className="project-toolbar">
       <div className="search-input"><Search size={18} aria-hidden="true" /><Input type="search" aria-label="Search chats in this project" placeholder="Search chats in this project…" value={search} onChange={event => onSearchChange(event.target.value)} /></div>
       <div className="segmented-control" role="group" aria-label="Filter project chats">
@@ -102,11 +102,14 @@ export function ProjectPage({ project, saved, chats, creating, updating, onCreat
     <p className="sr-only" role="status">{visible.length} {visible.length === 1 ? "chat" : "chats"}</p>
     {visible.length ? <ul className="project-conversations">
       {visible.map(chat => <li key={chat.id}>
-        <button className="project-conversation-link" onClick={() => onSelect(chat.id)} type="button">
+        <a className="project-conversation-link" href={`/?chat=${encodeURIComponent(chat.id)}`} onClick={event => {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault(); onSelect(chat.id);
+        }}>
           <span className="project-chat-title"><span className="project-chat-icon"><MessageSquare size={21} aria-hidden="true" /></span><span>{chat.title}</span>{chat.pinned ? <Pin size={14} aria-label="Pinned" /> : null}</span>
           <span className={`status-badge project-chat-status status-${chat.status}`}>{statusLabels[chat.status]}</span>
           <time dateTime={new Date(chat.updatedAt).toISOString()}>{conversationDate(chat.updatedAt)}</time>
-        </button>
+        </a>
         <ConversationActions chat={chat} busy={updating.has(chat.id)} onRename={onRename} onUpdate={onUpdate} />
       </li>)}
     </ul> : <div className="project-empty"><p>{projectChats.length ? "No matching chats." : "No chats yet."}</p>{projectChats.length ? <Button variant="ghost" onClick={() => { onSearchChange(""); setActiveOnly(false); }}>Clear filters</Button> : <p>Start a chat in this project.</p>}</div>}
