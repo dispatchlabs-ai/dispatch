@@ -2,6 +2,8 @@
 
 **Working spec.** Desired outcomes, not implementation or release-readiness claims.
 
+**Authority transition (October 11):** official project intent is Markdown stored in Dispatch's database with the other project data. This repo working copy is a migration input until import and authorized human/agent access are verified; it is not the database-backed implementation.
+
 ## Purpose and scope
 
 - A shared workspace where people direct AI agents, collaborate in chats, and inspect their work.
@@ -39,9 +41,10 @@ Pre-release walkthroughs: action → observable outcome; check the failure/recov
   - Choose project agents/defaults in Projects; edit reusable agent definitions in Agents. Optional chat grouping filters project conversations.
   - Managers control membership/defaults; readers cannot post/control work. Removing access blocks protected actions. No separate personal-project mode.
 - **Tend project intent**
+  - Create/open a project → write its official Markdown spec in Projects, stored with project data in Dispatch's database; no repository, directory or file path is required for authoring.
   - Edit and save the official spec from Projects, including on localhost → reload saved content and inspect its revision, changes and associated work without opening a work chat.
   - Report a bug/failed walkthrough → track the failure against intended behavior; refine the spec if intent is missing, not to excuse failure.
-  - Conflicting saves require review and preserve recoverable input. Agents need explicit authority to adopt spec changes. Storage and execution triggers remain open below.
+  - Conflicting saves require review and preserve recoverable input. Agents need explicit authority to adopt spec changes. Database ownership is settled; execution triggers remain open below.
 - **Deliver spec-led project work**
   - Make a feature/fix actionable under enabled policy → automatically create associated chats and continue authorized work to its Definition of Done without routine prompting.
   - Inspect progress, blockers, critical questions and evidence in Projects → open the linked chat for details/answers, without maintaining a separate task board.
@@ -54,7 +57,7 @@ Pre-release walkthroughs: action → observable outcome; check the failure/recov
   - Failed pushes are not completion; unexpected workspace loss can lose unpushed work. Missing repos/access/directories are actionable failures; a working directory is not a sandbox. Cloud teardown does not delete a configured local directory.
 - **Read and edit project files**
   - Open repository/project-directory files from a chat → inspect and edit that chat's working-copy files, including uncommitted changes, in a lightweight editor shared with chat code/diff presentation.
-  - Save writes the selected working-copy file; commit/push are separate authorized actions. A designated repository spec can be opened here, but this file editor is separate from tending project intent in Projects.
+  - Save writes the selected working-copy file; commit/push are separate authorized actions. A repository spec snapshot can be opened here, but editing a working-copy file does not change official project intent in Projects.
   - Missing, inaccessible or changed files require recovery/review. Displaying a proposal does not apply or approve it.
 - **Manage agents and instances**
   - Edit instructions/model/thinking/resources; add named instances with supplements → inspect saved settings and adopted revisions. Existing instances update at a safe idle boundary, preserving identity/history/supplements.
@@ -91,12 +94,17 @@ Pre-release walkthroughs: action → observable outcome; check the failure/recov
 - Pi owns durable execution/recovery. Updates preserve history and admitted work; Stop/removal/revocation do not roll back effects.
 - Keep typing, caret position and submission responsive during updates and long chats, locally and hosted. Layout/tab changes preserve drafts; reload need not. Errors preserve recoverable input where possible.
 - Terse UI labels, compact expandable detail, keyboard/touch controls and standard navigation links supporting new tabs; no hover-only actions. Phone layouts prioritize the main work area/vertical space and place the main menu upper-left.
-- The chat's fourth column is a multi-use, multi-tab panel for participants and file editing, including a repository-backed spec; not a participants-only surface.
-- Repository-only product documentation: requirements here, local links for detail, company infrastructure in the operator's own repo. Generic MCP remains; no particular wiki dependency.
+- The chat's fourth column is a multi-use, multi-tab panel for participants and file editing, including repository working-copy files; not a participants-only surface.
+- Product documentation remains repo-local; official project intent follows the database authority below. Use local links for detail; company infrastructure stays in the operator's own repo. Generic MCP remains; no particular wiki dependency.
+
+## Project spec authority
+
+- **Chosen October 11:** the official spec is project-owned Markdown stored only in Dispatch's database with project data, not a designated file or synchronized repository copy.
+- Preserve the current adopted content and provenance. Import the Markdown and retire the active file reference together; verify content and authorized human/agent access to the intended spec revision before declaring migration complete. Thereafter normal spec reads/writes use the database only; remove the legacy file reference from the normal project view/settings, including the authorized local data repair. Do not synchronize a competing live file. Repository paths or temporary workspaces must not be the only way agents can obtain project intent.
+- Repository product documentation remains repo-local, with no wiki dependency. This working copy is a migration input, not a promised future export or second editable authority. Preserve Git history/provenance and reconcile incoming agent/doc links when retiring it.
 
 ## Projects decisions still open
 
-- **Official spec authority:** retain a designated repository/file (or existing local-directory file), or adopt a project-owned versioned document stored by Dispatch? Exactly one is authoritative; any exported copy must identify its source revision and not become a second master. Database ownership would replace designated-file spec authority; Dispatch product documentation remains repo-local, with no wiki dependency.
 - **Actionability:** does an edit immediately trigger automation under project policy, or remain a saved draft until explicitly adopted? The proposed default is save draft → review/adopt → reconcile work; saving alone would not launch work.
 - **Default destination:** open Projects or Chats when there is no explicit destination? Rail order does not settle this. Explicit chat/section links remain respected.
 - **Design:** broader spec/work subviews await review; Spec/Work/Agents tabs are proposed labels, not approved structure. Navigation and local-file editor responsive layouts have been reviewed.
@@ -105,7 +113,7 @@ Pre-release walkthroughs: action → observable outcome; check the failure/recov
 
 - Adoption, implementation and verification are separate. This working spec is adopted; per-use-case implementation and walkthrough results are not yet comprehensively recorded.
 - Localhost designated-file spec editing at `cfe4aab`: open/edit/Save/reload, conflict/reference recovery and editor continuity browser-verified within [recorded coverage](usage-guide.md#local-spec-editing-qualification). Save writes the file only, not Git publication or agent work. This is existing-file editing, not first-spec creation or project-native authoring; the [entry-point limitation](usage-guide.md#shared-projects) remains unresolved. Access revocation and other listed boundaries remain source-reviewed only; public-GitHub draft editing remains browser-unverified.
-- Projects navigation/management at `20f44b0`: browser-qualified within reported coverage; [walkthrough results and limits](usage-guide.md#projects-navigation-qualification). Spec-led automation and chat file editing remain undelivered; storage, activation and default-destination choices remain open.
+- Projects navigation/management at `20f44b0`: browser-qualified within reported coverage; [walkthrough results and limits](usage-guide.md#projects-navigation-qualification). Database-backed project spec authoring, spec-led automation and chat file editing remain undelivered; activation and default-destination choices remain open. The repaired file reference restores the existing editor, not the chosen database-backed model.
 - Before release, record revision and each approved walkthrough's result: verified, failed, blocked or not checked, with evidence/limits. Builds alone do not qualify behavior.
 - No automated repository tests; authorized interactive agent-browser verification is permitted. Product evaluation execution is not permission to add automated repository tests.
 

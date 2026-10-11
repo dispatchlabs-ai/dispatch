@@ -43,8 +43,8 @@ Language-specific manifests and build configuration belong beside the relevant p
 
 ## Specification and implementation
 
-1. Read the affected package's specification and relevant repo-local documentation.
-2. Agree the user workflow and observable outcomes. Record behavior and contracts in `docs/spec.md`, including state ownership, failure paths, and recovery. Mark proposed or unresolved details explicitly.
+1. Read authoritative project intent and relevant affected-package documentation; follow the declared authority transition below for Dispatch Web.
+2. Agree the user workflow and observable outcomes. Record behavior and contracts in the authoritative spec, including state ownership, failure paths, and recovery. Mark proposed or unresolved details explicitly; do not edit a repository copy as live intent after database cutover.
 3. Keep implementation notes and verification receipts in repo-local supporting documents when needed. Link useful detail from the specification; do not create additional product requirements or ticket numbering by default.
 4. Implement the current authorized task. Record source/type/build evidence and unverified functional outcomes in the task report or relevant linked supporting document; document actual usage.
 5. Run the permitted repository checks, inspect the diff, update the package changelog as appropriate, and review the result with Chris before starting further work. Do not expand the agreed scope.
@@ -52,6 +52,8 @@ Language-specific manifests and build configuration belong beside the relevant p
 Use this repository's checks below and the current testing policy.
 
 The repository is the authoritative home for Dispatch documentation. The specification is the primary product document: supported use cases and rules stay concise; agent-facing implementation detail lives in linked repo documents. Historical handoffs are reference material, not a second product specification. The current spec is the adopted working copy: do not restore requirements from history or supporting documents, populate it from code, or treat missing requirements as approval. Iterate its requirements with Chris; adoption does not authorize implementing its backlog.
+
+For Dispatch Web's project, the [chosen intent authority](packages/web/docs/spec.md#project-spec-authority) is versioned Markdown in Dispatch's database. Until import and authorized human/agent access are verified, the repo working spec is the migration source; do not delete it or pretend a database export already exists. After cutover, read live project intent from the database only: no editable repository spec copy or automatic file synchronization. Setup, usage and runtime documentation remain repo-local.
 
 ## Agent workflows
 

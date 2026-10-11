@@ -382,7 +382,7 @@ Claude's authenticated walkthrough at `20f44b0` (October 11) reported these resu
 | Close one of two project tabs, then switch to Chats | Verified: the remaining project stayed active; Chats showed no project page. The last tab has no close control because the strip hides with one view, matching Chats; last-tab closure is unavailable, not a tested success. |
 | Spec-content draft retention across sections | Not checked at `20f44b0`: directory-backed viewing was unsupported. See [later local-file qualification](#local-spec-editing-qualification); no broader intent-editor acceptance inferred. |
 
-This qualifies only the navigation/management slice. Official-spec storage, activation and the default opening destination remain open; spec-led automation and chat file editing are not delivered by this change.
+This qualifies only the navigation/management slice. Official-spec storage is now [database-owned Markdown](spec.md#project-spec-authority), not yet delivered; activation and the default opening destination remain open. Spec-led automation and chat file editing are not delivered by this change.
 
 ## Checks and builds
 
@@ -661,7 +661,7 @@ Both path fields use `/` separators without absolute paths, `.`/`..` or empty se
 
 **Save project** records references only: it does not clone repositories, verify repository access/spec-file existence or start agents. Ordinary reference saves leave `cwd` untouched unless its field is edited. Drafts remain while navigating and after failed saves; retry an ordinary save failure, or discard/reopen after a revision conflict to load current settings. Membership/default-agent controls remain available. Reference setup is separate from content Save; [local-file walkthrough coverage](#local-spec-editing-qualification) does not qualify repository setup. Project-content exports/imports omit repository/spec references; configure them separately after importing.
 
-**Working-spec direction (October 11):** Projects is the single project-management surface for tending intent; Chats remains for execution details/questions and working-copy file editing. Official-spec storage and activation remain [open decisions](spec.md#projects-decisions-still-open). The local-file slice below retains the existing designated source without settling these choices.
+**Working-spec direction (October 11):** Projects is the single project-management surface for tending intent; Chats remains for execution details/questions and working-copy file editing. **Storage direction settled October 11:** the official spec is versioned Markdown stored in Dispatch's database with project data, authored directly in Projects without file-path setup. See [authority and migration](spec.md#project-spec-authority). This model is not yet implemented or browser-qualified; the repaired file reference only restores the old editor. [Activation remains open](spec.md#projects-decisions-still-open); the implementation slice must not add agent-launch behavior to Save. The existing-file procedures below describe the shipped model, not the chosen database-backed authoring flow.
 
 **Current limitation:** a project with no configured spec shows **Not set / Set spec file**, not **Write spec** or an editor. The shipped workflow edits an existing configured file; it does not create the first project spec or provide project-native authoring. First-spec authoring and entry-point discoverability are not qualified by the existing-file walkthrough.
 

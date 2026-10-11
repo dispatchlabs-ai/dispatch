@@ -2,7 +2,8 @@
 
 - Use the startup and check commands in [CONTRIBUTING.md](CONTRIBUTING.md).
 - Follow the [testing policy](CONTRIBUTING.md#testing-policy): do not add or run automated tests. AI-agent interactive verification using `agent-browser` is permitted; use source review, TypeScript and build checks too. Future coverage prioritizes stable end-to-end and API behavior.
-- Before changing behavior, read the affected package's `docs/spec.md` and relevant linked repo-local guidance. Historical handoffs are supporting evidence, not a second product specification.
+- Before changing behavior, read current authoritative project intent and relevant affected-package documentation. Historical handoffs are supporting evidence, not a second product specification.
+- For Dispatch Web project intent, follow the [authority transition](packages/web/docs/spec.md#project-spec-authority): the repo working spec remains the migration source until verified import/access. After cutover, read the intended database-backed project spec revision through authorized access; do not keep or edit a competing live spec file.
 - Before changing browser UI, read relevant repo-local UI guidance and review records. Report requirements you did not meet or check as deviations or unverified; never describe them as done.
 - Review UI on rendered desktop and 390 px phone screens, not from source alone. If you cannot sign in, ask Chris or the coordinator for captures. Keep captures in the gitignored `.local/`, and never commit ones that show account data. Still images do not verify keyboard, touch, or recovery flows.
 - Follow [CONTRIBUTING.md](CONTRIBUTING.md) for development and publication. Complete the current authorized task, verify its agreed outcomes, then review with Chris before starting further work.
