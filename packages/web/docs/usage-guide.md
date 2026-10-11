@@ -162,7 +162,7 @@ Developer (`developer`) is the default agent and includes local coding tools. It
 
 In Agents, New agent is at the top of the sidebar, followed by Find an agent and the saved-agent list. Select an agent to read its description and instructions; the right column shows its saved configuration. Start chat opens the starting-agent chooser with that definition selected. Hover or focus an agent's row for Edit and, for non-default agents, Archive; touch layouts keep the actions visible. Archived agents is at the bottom of the sidebar and supports inspection, not restoration. The default agent keeps its Default tag and cannot be archived.
 
-New agent opens an editor with the saved default agent's model/thinking values. Fill in the sections described under [authoring navigation](#agent-overview-and-authoring-navigation); Discard and Create agent/Save new revision stay below the scrolling form. The right column previews the unsaved draft and distinguishes changes from the saved revision for existing agents. Choosing another agent or starting a new edit asks before discarding unsaved changes. Switching to Chats or Account, hiding a column, or changing screen size preserves the open editor. On phones, Start chat fills its row and the agent view includes a short model/thinking/tools summary; Details exposes the full configuration.
+New agent opens an editor with the saved default agent's model/thinking values. Fill in the sections described under [authoring navigation](#agent-overview-and-authoring-navigation); Discard and Create agent/Save new revision stay below the scrolling form. The right column previews the unsaved draft and distinguishes changes from the saved revision for existing agents. Choosing another agent or starting a new edit asks before discarding unsaved changes. Switching to Projects, Chats or Settings, hiding a column, or changing screen size preserves the open editor. On phones, Start chat fills its row and the agent view includes a short model/thinking/tools summary; Details exposes the full configuration.
 
 Instructions format Markdown while you type or paste, using the same editor as chat. Headings, lists, quotes, emphasis, links and code remain editable. Enter adds a paragraph or list item; Shift+Enter adds a line. Use Create agent or Save new revision to save. Saved instructions stay rendered when viewing the agent. Instructions remain Markdown text; formatting may normalize when edited. Drafts over 50,000 characters including Markdown formatting stay editable and show an error until shortened. Unsupported editor syntax remains text, and drafts are not saved across page reloads.
 
@@ -346,11 +346,11 @@ The endpoint is `POST /api/chats/:id/participants/:participantId/remove` with JS
 
 Sessions last at most twelve hours and expire after thirty minutes without an authenticated request. Stream heartbeats do not extend idle expiry. Expiry or revocation ends protected access; agent work remains owned by the service.
 
-The left rail selects Chats, Agents, or Account and changes both the sidebar and main content. It never adds tabs. Chats retains its open conversations and selected tab while you visit another section; open agent/account forms also remain in memory. Agents lists saved agents in its sidebar, and Account links to its settings sections. Reloading returns to Chats.
+**Navigation at `20f44b0` (October 11; [bounded qualification](#projects-navigation-qualification)):** the far-left rail orders **Projects → Agents → Chats**; **Settings** opens account/provider/tool settings near the bottom. Section links support opening a new tab. Projects and Chats retain their open views while switching sections; unsaved forms remain in memory, not durable storage. Explicit project, chat and section URLs choose the destination; without one, the app still opens Chats.
 
 Within Chats, the main tab strip appears when multiple conversations are open. Close a view with the × on its tab, or focus the tab and press Delete. With one view open, the entire tab header is absent. Use New chat in the sidebar to open another conversation as a new tab, preserving the existing tabs. On narrow screens, open the sidebar with Menu in the bottom bar.
 
-Above 1100 pixels, use the left rail’s conversations and details icons to hide or show either side. Drag either inner divider to resize it, or focus the divider and use Left/Right (Shift for larger steps) or Home/End. These choices last while the workspace is open; reloading restores the defaults. Phone Menu and Details controls live in the bottom bar and open panels.
+Above 1100 pixels, use the left rail’s conversations and details icons to hide or show either side. Drag either inner divider to resize it, or focus the divider and use Left/Right (Shift for larger steps) or Home/End. These choices last while the workspace is open; reloading restores the defaults. At narrow widths, Projects places **Menu** upper-left; other sections retain their bottom-bar Menu. **Details** opens the supporting panel. Project details start closed; project settings use the main area.
 
 Hover or focus a conversation row to open its actions menu on the right. Touch layouts keep the menu button visible. The menu includes Rename, Move to project, Pin/Unpin, and Archive/Restore. Pinned conversations stay above the others within each group. Archive hides a conversation from the regular list without deleting it or stopping work; use Archived conversations at the bottom of the sidebar to reopen or restore it. Pin, archive and project choices are personal to your account, including when the conversation has other members.
 
@@ -358,13 +358,31 @@ Choose **Rename** from a conversation's actions menu (including archived and pro
 
 ### Projects
 
-Choose **New project** inside Chats, enter a name, and select **Create project**. This creates an empty shared project with you as manager; see [Shared projects](#shared-projects) for access and defaults. Names can be reused and contain up to 100 characters. Unassigned chats appear under **Without a project**.
+Open **Projects → New project**, enter a name, and select **Create project**. This creates an empty shared project with you as manager; see [Shared projects](#shared-projects) for access and defaults. Names can be reused and contain up to 100 characters. Unassigned chats appear under **Without a project**.
 
-Select a project name to see its conversations in the main area; use the chevron to expand or collapse its sidebar group. Search finds both project names and conversation titles. **New chat** in the project view opens the starting-agent chooser and keeps that project as the destination. The sidebar's **New chat** also uses the current project's context (including the project of the active chat); starting from an agent or the welcome view makes an unassigned chat.
+Use **Search projects** to filter the loaded list by name, then select a project in Projects to open its overview. In Chats, project folders still group conversations; their names link to Projects and the chevron expands/collapses the conversation group. Chat search finds project names and conversation titles. **New chat** in the project view opens the starting-agent chooser and keeps that project as the destination. The sidebar's **New chat** also uses the current project's context (including the project of the active chat); starting from an agent or the welcome view makes an unassigned chat.
 
 Chats created in a project stay in that project. Moving existing chats into or out of projects is unsupported. Unassigned chats retain their explicit membership and history. Archiving keeps project binding; active counts exclude archived chats.
 
-Projects remain inside Chats and can open alongside conversation tabs. On phones, **Menu** opens the same project controls. New-project input remains available if a responsive layout change closes its popover; reopen New project to continue. Shared-project settings support name, membership and default-agent edits. Project descriptions, deletion UI, files and automatic context sharing remain outside this slice. Omarchy still uses its existing deployment until a later authorized update.
+Project creation, overview, settings and spec viewing live only in Projects, not beside chat tabs. Legacy project/settings/spec URLs still open the project there. On phones, **Menu** offers the same destinations and the current section’s sidebar. New-project input remains available if a responsive layout change closes its popover; reopen New project to continue. Shared-project settings support name, membership and default-agent edits. Project descriptions, deletion UI, files and automatic context sharing remain outside this slice. Omarchy still uses its existing deployment until a later authorized update.
+
+#### Projects navigation qualification
+
+Claude's authenticated walkthrough at `20f44b0` (October 11) reported these results. Source review/builds are separate evidence; raw captures remain local.
+
+| Walkthrough | Result and limit |
+| --- | --- |
+| Rail order; project management out of Chats; project-folder navigation | Verified in the reported walkthrough. |
+| Legacy project/settings/spec URLs, chat and Agents links; switching between two open projects | Verified; only the active project was visible. |
+| Unsent chat text across Projects → Agents → Chats | Verified; temporary input removed afterwards. |
+| Project-page rendering at 1440×900, 1280×720, 768×1024 and 390×844 | Designer reviewed captures with no blocking visual findings; pixels alone do not qualify every control or scrolling path. |
+| Corrected Menu at 390/768 px; choose Chats and dismiss | Interaction verified by Claude; Designer closed the visual finding on refreshed captures. |
+| Unsaved project-settings edit across Projects → Agents → Chats → Projects; discard without saving | Verified. Native confirmation was accepted programmatically because the browser tool cannot click it; reload confirmed the persisted name was unchanged. |
+| Cmd-click Projects from a chat with unsent text | Verified: Projects opened in a new browser tab; the original chat and draft stayed unchanged. |
+| Close one of two project tabs, then switch to Chats | Verified: the remaining project stayed active; Chats showed no project page. The last tab has no close control because the strip hides with one view, matching Chats; last-tab closure is unavailable, not a tested success. |
+| Spec-content draft retention across sections | Not checked: configured directory-backed viewing remains unsupported. No file Save or broader intent-editor acceptance inferred. |
+
+This qualifies only the navigation/management slice. Official-spec storage, activation and the default opening destination remain open; spec-led automation and chat file editing are not delivered by this change.
 
 ## Checks and builds
 
