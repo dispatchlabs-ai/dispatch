@@ -47,6 +47,7 @@ const runtime = await DispatchRuntime.openConversation({
     if (new URL(env.DISPATCH_BACKEND_INTERNAL_URL).protocol !== "https:") throw new RuntimeError(503, "Secrets require encrypted backend transport.");
     return backend("/secrets", { actor, secretId }, signal);
   },
+  workerProjectSpec: (actor, input) => backend("/project-spec", { actor, input }),
   workerSearch: (actor, query, signal) => backend("/search", { actor, query }, signal),
   workerMcp: workerMcp((operation, input, signal) => backend(`/mcp/${operation}`, input, signal)),
   peopleDirectory: { list: companyId => backend("/people", { companyId }), get: (companyId, userId) => backend("/person", { companyId, userId }) },

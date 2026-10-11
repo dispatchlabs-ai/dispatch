@@ -224,12 +224,22 @@ export function createApp(options: AppOptions) {
   app.get("/api/projects/:id/history", async c => c.json({ archive: await runtime.getProjectArchive(c.get("principal"), c.req.param("id")) }));
   app.get("/api/projects/:id/spec", async c => {
     c.header("Cache-Control", "no-store");
-    return c.json({ spec: await runtime.getProjectSpec(c.get("principal"), c.req.param("id")) });
+    const revision = z.coerce.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional().parse(c.req.query("revision"));
+    return c.json({ spec: await runtime.getProjectMarkdown(c.get("principal"), c.req.param("id"), revision) });
   });
   app.post("/api/projects/:id/spec", async c => {
-    const input = z.object({ binding: z.string().regex(/^[a-f0-9]{64}$/), expectedVersion: z.string().regex(/^[a-f0-9]{64}$/), content: z.string().max(512 * 1024) }).strict().parse(await c.req.json());
+    const input = z.object({ requestId, expectedRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER), content: z.string().max(512 * 1024) }).strict().parse(await c.req.json());
     c.header("Cache-Control", "no-store");
-    return c.json({ spec: await runtime.saveProjectSpec(c.get("principal"), c.req.param("id"), input) });
+    return c.json({ spec: await runtime.saveProjectMarkdown(c.get("principal"), c.req.param("id"), input) });
+  });
+  app.get("/api/projects/:id/spec/legacy", async c => {
+    c.header("Cache-Control", "no-store");
+    return c.json({ spec: await runtime.getLegacyProjectSpec(c.get("principal"), c.req.param("id")) });
+  });
+  app.post("/api/projects/:id/spec/import", async c => {
+    const input = z.object({ requestId, expectedProjectRevision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER), sourceVersion: z.string().min(1).max(200), contentHash: z.string().regex(/^[a-f0-9]{64}$/) }).strict().parse(await c.req.json());
+    c.header("Cache-Control", "no-store");
+    return c.json({ spec: await runtime.importProjectMarkdown(c.get("principal"), c.req.param("id"), input) });
   });
   app.get("/api/projects", async (c) => c.json({ projects: await runtime.listProjects(c.get("principal")) }));
   app.post("/api/projects", async (c) => {

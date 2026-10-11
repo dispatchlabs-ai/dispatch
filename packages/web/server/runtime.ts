@@ -19,15 +19,16 @@ import { PostgresStorage } from "./storage/postgres/storage.js";
 import { openPiStorage, type PiStorageConfig } from "./storage/open.js";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
-import type { CreateAgentInstanceInput, CreateAgentInstanceResult, AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, ProjectSpecDocument, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
+import type { CreateAgentInstanceInput, CreateAgentInstanceResult, AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, ProjectSpecDocument, ProjectMarkdownDocument, SaveProjectMarkdownInput, ImportProjectMarkdownInput, ProjectSpecReadInput, ProjectSpecPage, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
 import type { BundleExportInput, BundleImportResult, BundlePreview, PortableBundle, PortableAgent, PortableSkill } from "../src/shared/bundles.js";
 import type { GitHubInstallation, GitHubBundleSource, GitHubBundlePreview, GitHubBundleApplyInput, GitHubBundleApplyResult } from "../src/shared/github-bundles.js";
 import { isManagedConnection } from "../src/shared/contracts.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata } from "./attachments.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { projectSourcesSchema } from "../src/shared/project-sources.js";
+import { ProjectMarkdownDoc, readProjectMarkdown, saveProjectMarkdown, replayProjectMarkdown, markdownHash, projectMarkdownPage } from "./project-markdown.js";
 import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
-import { readLocalProjectSpec, saveLocalProjectSpec } from "./local-project-spec.js";
+import { readLocalProjectSpec } from "./local-project-spec.js";
 import { fetchPublicGithubSpec, ProjectSpecError } from "./project-spec.js";
 import { createWebResearch } from "./extensions/web.js";
 import { createWebBackend } from "./web/backend.js";
@@ -180,6 +181,7 @@ export type RuntimeOptions = {
   workerSearch?: (actor: WorkerManagementActor, query: Parameters<import("./web/types.js").WebBackend["search"]>[0], signal?: AbortSignal) => ReturnType<import("./web/types.js").WebBackend["search"]>;
   workerMcp?: WorkerMcp;
   workerInvitations?: WorkerInvitations;
+  workerProjectSpec?: (actor: WorkerManagementActor, input: ProjectSpecReadInput) => Promise<ProjectSpecPage>;
   workerParticipants?: { report(report: WorkerParticipantReport): Promise<unknown> };
   /** Workers must inject durable remote blob storage; native installations keep their local default. */
   attachmentStore?: AttachmentStore;
@@ -342,6 +344,18 @@ export class DispatchRuntime {
       runtime.workerManagement = options.workerManagement;
       runtime.workerMcp = options.workerMcp;
       runtime.workerParticipants = options.workerParticipants;
+      shared.readProjectSpec = async (instanceId, input) => {
+        if (worker) {
+          if (!options.workerProjectSpec) throw new RuntimeError(503, "Project spec mediation is unavailable.");
+          const actor = await harness.commit(async tx => runtime.remoteActor(tx, await shared.managementActor(tx, instanceId)), context);
+          return options.workerProjectSpec(actor, input);
+        }
+        return harness.commit(async tx => {
+          const actor = await shared.managementActor(tx, instanceId);
+          const room = await tx.doc(SharedDoc, actor.roomId);
+          return projectMarkdownPage(tx, actor.companyId, room.sharedProjectId, input);
+        }, context);
+      };
       if (worker) shared.onParticipantStateChanged = tx => runtime.updateWorkerParticipantReport(tx);
       if (worker) shared.inviteRemote = async (instanceId, requestId, definitionIds) => {
         if (!options.workerInvitations) throw new RuntimeError(503, "Backend invitation service is unavailable.");
@@ -1074,6 +1088,16 @@ export class DispatchRuntime {
     }, context);
   }
 
+  async readWorkerProjectSpec(claim: WorkerManagementActor, input: ProjectSpecReadInput): Promise<ProjectSpecPage> {
+    this.requireDirectoryActor(claim);
+    return this.harness.commit(async tx => {
+      const actor = await this.authoritativeWorkerActor(tx, claim);
+      const room = await tx.doc(SharedDoc, nativeId(claim.conversationKey));
+      if (room.companyId !== actor.companyId) throw new RuntimeError(403, "Project spec access is unavailable.");
+      return projectMarkdownPage(tx, actor.companyId, room.sharedProjectId, input);
+    }, context);
+  }
+
   async authorizeWorkerSearch(claim: WorkerManagementActor) {
     this.requireDirectoryActor(claim);
     return this.harness.commit(async tx => {
@@ -1240,7 +1264,7 @@ export class DispatchRuntime {
   private projectSummary(project: SharedProjectRecord, scope: RuntimeScope): Project {
     const access = projectAccess(project, scope, this.readAll(scope));
     return { id: project.id, name: project.name, ...(project.cwd ? { cwd: project.cwd } : {}), createdAt: project.createdAt, kind: "shared", revision: project.revision,
-      repositories: (project.repositories ?? []).map(repository => ({ ...repository })), ...(project.spec ? { spec: { ...project.spec } } : {}),
+      repositories: (project.repositories ?? []).map(repository => ({ ...repository })), ...(project.spec ? { spec: { ...project.spec } } : {}), ...(project.specRevision ? { specRevision: project.specRevision } : {}),
       members: project.members.map(({ userId, role }) => ({ userId, role })), defaultAgentDefinitionIds: [...project.defaultAgentDefinitionIds], canManage: access.manage, canParticipate: access.participate };
   }
 
@@ -1393,12 +1417,12 @@ export class DispatchRuntime {
   }
 
   /** Reads the configured spec, then rechecks current authority/reference. I/O stays outside native commits. */
-  async getProjectSpec(scope: RuntimeScope, id: string): Promise<ProjectSpecDocument> {
+  private async readLegacyProjectSpec(scope: RuntimeScope, id: string): Promise<ProjectSpecDocument> {
     const binding = (project: SharedProjectRecord) => {
       const spec = project.spec;
       if (spec?.source !== "repository") return undefined;
       const repository = project.repositories?.find(item => item.id === spec.repositoryId);
-      return repository ? { repositoryId: repository.id, url: repository.url, path: spec.path } : undefined;
+      return repository ? { repositoryId: repository.id, url: repository.url, path: spec.path, projectRevision: project.revision } : undefined;
     };
     const source = await this.harness.commit(async tx => {
       const project = await requireProjectAccess(tx, scope, id, "read", this.readAll(scope));
@@ -1409,12 +1433,12 @@ export class DispatchRuntime {
     if ("cwd" in source) {
       const loaded = await readLocalProjectSpec(source.cwd, source.path);
       await this.checkLocalSpec(scope, id, source.binding, "read");
-      return { projectId: id, repositoryId: "", url: source.cwd, path: source.path, source: "directory", binding: source.binding, ...loaded };
+      return { projectId: id, repositoryId: "", url: source.cwd, path: source.path, source: "directory", binding: source.binding, projectRevision: source.projectRevision, ...loaded };
     }
     const loaded = await fetchPublicGithubSpec(source.url, source.path);
     await this.harness.commit(async tx => {
       const current = binding(await requireProjectAccess(tx, scope, id, "read", this.readAll(scope)));
-      if (current?.repositoryId !== source.repositoryId || current.url !== source.url || current.path !== source.path) {
+      if (current?.projectRevision !== source.projectRevision || current?.repositoryId !== source.repositoryId || current.url !== source.url || current.path !== source.path) {
         throw new ProjectSpecError(409, "The project's spec reference changed while loading. Reload to open the current spec.");
       }
     }, context);
@@ -1427,7 +1451,7 @@ export class DispatchRuntime {
     const { cwd } = project;
     const path = project.spec.path;
     const binding = createHash("sha256").update(JSON.stringify([project.id, project.revision, cwd, path])).digest("hex");
-    return { cwd, path, binding };
+    return { cwd, path, binding, projectRevision: project.revision };
   }
 
   private async checkLocalSpec(scope: RuntimeScope, id: string, expectedBinding: string, action: "read" | "manage") {
@@ -1439,11 +1463,39 @@ export class DispatchRuntime {
     }, context);
   }
 
-  async saveProjectSpec(scope: RuntimeScope, id: string, input: { binding: string; expectedVersion: string; content: string }): Promise<ProjectSpecDocument> {
-    const source = await this.checkLocalSpec(scope, id, input.binding, "manage");
-    const loaded = await saveLocalProjectSpec(source.cwd, source.path, input.expectedVersion, input.content, async () => { await this.checkLocalSpec(scope, id, input.binding, "manage"); });
-    await this.checkLocalSpec(scope, id, input.binding, "manage");
-    return { projectId: id, repositoryId: "", url: source.cwd, path: source.path, source: "directory", binding: source.binding, ...loaded };
+  async getProjectMarkdown(scope: RuntimeScope, id: string, revision?: number): Promise<ProjectMarkdownDocument> {
+    this.requireCatalogOwner();
+    return this.harness.commit(tx => readProjectMarkdown(tx, scope, id, revision, this.readAll(scope)), context);
+  }
+
+  async saveProjectMarkdown(scope: RuntimeScope, id: string, input: SaveProjectMarkdownInput): Promise<ProjectMarkdownDocument> {
+    this.requireCatalogOwner();
+    return this.harness.commit(tx => saveProjectMarkdown(tx, scope, id, input), context);
+  }
+
+  async importProjectMarkdown(scope: RuntimeScope, id: string, input: ImportProjectMarkdownInput): Promise<ProjectMarkdownDocument> {
+    this.requireCatalogOwner();
+    // Replay must not require the old file/repository to remain available after migration.
+    // Import receipts bind the reviewed source, not mutable project or filesystem state.
+    const fingerprint = JSON.stringify(["reviewed-import", input.expectedProjectRevision, input.sourceVersion, input.contentHash]);
+    const replay = await this.harness.commit(tx => replayProjectMarkdown(tx, scope, id, input.requestId, fingerprint), context);
+    if (replay) return replay;
+    await this.harness.commit(async tx => {
+      const project = await requireProjectAccess(tx, scope, id, "manage");
+      if (project.revision !== input.expectedProjectRevision) throw new ProjectSpecError(409, "Project changed before import. Reload and review.");
+    }, context);
+    const legacy = await this.readLegacyProjectSpec(scope, id);
+    const sourceVersion = legacy.version ?? legacy.commit;
+    if (sourceVersion !== input.sourceVersion || markdownHash(legacy.content) !== input.contentHash) throw new ProjectSpecError(409, "Spec source changed before import. Reload and review.");
+    const provenance = { source: legacy.source === "directory" ? "directory" as const : "repository" as const, url: legacy.url, path: legacy.path, version: sourceVersion, contentHash: input.contentHash };
+    return this.harness.commit(async tx => saveProjectMarkdown(tx, scope, id,
+      { requestId: input.requestId, expectedRevision: 0, content: legacy.content },
+      { provenance, expectedProjectRevision: input.expectedProjectRevision, fingerprint }), context);
+  }
+
+  async getLegacyProjectSpec(scope: RuntimeScope, id: string): Promise<ProjectSpecDocument> {
+    this.requireCatalogOwner();
+    return this.readLegacyProjectSpec(scope, id);
   }
 
   async saveProject(scope: RuntimeScope, id: string, input: SaveProjectInput): Promise<Project> {
@@ -1491,6 +1543,9 @@ export class DispatchRuntime {
         else project.cwd = normalize(cwd);
       }
       if (sources.repositories !== undefined) project.repositories = sources.repositories;
+      if (sources.spec && (await tx.doc(ProjectMarkdownDoc)).revisions[id]?.length) {
+        throw new RuntimeError(409, "This project uses database-backed Markdown. Reload project settings.");
+      }
       if (sources.spec !== undefined) {
         if (sources.spec === null) delete project.spec;
         else project.spec = sources.spec;

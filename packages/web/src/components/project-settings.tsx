@@ -19,7 +19,7 @@ export function beginProjectEdit(project: Project): ProjectEditing | null {
   return { busy: false, input: {
     requestId: crypto.randomUUID(), expectedRevision: project.revision, name: project.name,
     members: project.members ?? [], defaultAgentDefinitionIds: project.defaultAgentDefinitionIds ?? [],
-    repositories: project.repositories ?? [], spec: project.spec ?? null,
+    repositories: project.repositories ?? [],
   } };
 }
 
@@ -56,26 +56,18 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
     onEditingChange({ ...editing, error: undefined, input: { ...editing.input, ...patch, requestId: crypto.randomUUID() } });
   }
   const repositories = editing?.input.repositories ?? project.repositories ?? [];
-  const spec = editing ? editing.input.spec : project.spec;
-  const sources = { repositories, spec };
+  const sources = { repositories };
   const validation = editing?.showValidation ? projectSourcesSchema.safeParse(sources) : undefined;
   const fieldError = (path: string) => validation?.error?.issues.find(issue => issue.path.join(".") === path)?.message;
   const cwd = editing?.input.cwd === undefined ? project.cwd ?? "" : editing.input.cwd ?? "";
-  const directorySpec = spec?.source === "directory";
-  const missingRepository = spec?.source === "repository" && !repositories.some(repository => repository.id === spec.repositoryId);
-  const missingDirectory = directorySpec && !cwd.trim();
-  const directoryChanged = cwd.trim() !== (project.cwd ?? "");
-  const directoryField = <Field label={directorySpec ? "Project directory" : "Working directory"} hint={directorySpec ? "Service-host directory · Also used by new local agents" : "Local service override · New instances only"} error={editing?.showValidation && missingDirectory ? "Set a project directory, or clear or reassign the spec first." : undefined}>{props => <>
-    <Input {...props} value={cwd} disabled={disabled} maxLength={4096} autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder={directorySpec ? "/path/to/project" : "Default workspace"} onChange={event => update({ cwd: event.target.value })} />
-    {directorySpec && cwd.trim() ? <span className="project-directory-preview field-hint" aria-hidden="true">{cwd.trim()}</span> : null}
-  </>}</Field>;
+  const directoryField = <Field label="Working directory" hint="Local service override · New instances only">{props => <Input {...props} value={cwd} disabled={disabled} maxLength={4096} autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="Default workspace" onChange={event => update({ cwd: event.target.value })} />}</Field>;
 
   function discard() {
     if (!editing?.busy && window.confirm("Discard unsaved project settings?")) onEditingChange(null);
   }
   async function save(form: HTMLFormElement) {
     if (!editing || disabled || editing.conflict || !editing.input.name.trim() || !managerCount || unavailableDefaults.length) return;
-    if (!projectSourcesSchema.safeParse(sources).success || missingRepository || missingDirectory) {
+    if (!projectSourcesSchema.safeParse(sources).success) {
       onEditingChange({ ...editing, showValidation: true });
       requestAnimationFrame(() => form.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
       return;
@@ -112,28 +104,11 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
             }} onChange={event => update({ repositories: repositories.map(item => item.id === repository.id ? { ...item, url: event.target.value } : item) })} />}</Field>
             <Field label="Name" error={fieldError(`repositories.${index}.name`)}>{props => <Input {...props} aria-label={`Repository ${index + 1} name`} value={repository.name} required maxLength={100} onChange={event => update({ repositories: repositories.map(item => item.id === repository.id ? { ...item, name: event.target.value } : item) })} />}</Field>
           </div>
-          <div className="project-repository-actions"><Button variant="ghost" disabled={spec?.source === "repository" && spec.repositoryId === repository.id} aria-label={`Remove repository ${repository.name || index + 1}`} onClick={() => update({ repositories: repositories.filter(item => item.id !== repository.id) })}>Remove</Button>
-            {spec?.source === "repository" && spec.repositoryId === repository.id ? <span className="field-hint">Clear or reassign the spec first.</span> : null}
+          <div className="project-repository-actions"><Button variant="ghost" aria-label={`Remove repository ${repository.name || index + 1}`} onClick={() => update({ repositories: repositories.filter(item => item.id !== repository.id) })}>Remove</Button>
+
           </div>
         </div>)}
         <Button variant="secondary" onClick={() => update({ repositories: [...repositories, { id: crypto.randomUUID(), name: "", url: "" }] })}><Plus size={18} />Add repository</Button>
-      </fieldset>
-      <fieldset className="agent-form-section" disabled={disabled}>
-        <legend tabIndex={-1} id={`project-spec-${project.id}`}>Spec file <span className="text-muted">(optional)</span></legend>
-        <div className={`project-spec-fields${directorySpec ? " project-directory-spec" : ""}`}>
-          <Field label="Source" error={missingRepository ? "Choose a source or clear the spec." : fieldError("spec.source") ?? fieldError("spec.repositoryId")}>{props => <Select {...props} value={spec?.source === "repository" ? `repository:${spec.repositoryId}` : spec?.source ?? ""} onChange={event => {
-            const value = event.target.value;
-            update({ spec: value === "directory" ? { source: "directory", path: spec?.path ?? "" } : value ? { source: "repository", repositoryId: value.slice("repository:".length), path: spec?.path ?? "" } : null });
-          }}>
-            <option value="">No spec file</option>
-            <option value="directory">Project directory</option>
-            {repositories.length ? <optgroup label="Repositories">{repositories.map((repository, index) => <option key={repository.id} value={`repository:${repository.id}`}>{repository.name.trim() || `Repository ${index + 1}`} — {repository.url.replace(/^https:\/\//i, "")}</option>)}</optgroup> : null}
-          </Select>}</Field>
-          {directorySpec ? directoryField : null}
-          {spec ? <Field label={directorySpec ? "Path in project directory" : "Path in repository"} hint={directorySpec ? undefined : "From repository root"} error={fieldError("spec.path")}>{props => <Input {...props} value={spec.path} required maxLength={4096} autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="docs/spec.md" onChange={event => update({ spec: { ...spec, path: event.target.value } })} />}</Field> : null}
-        </div>
-        {directorySpec && directoryChanged ? <p className="field-hint" role="status">Spec base changed · Existing agents unchanged</p> : null}
-        {spec ? <Button variant="ghost" onClick={() => update({ spec: null })}>Clear spec</Button> : null}
       </fieldset>
       {error ? <Notice>People could not be loaded. {error} <Button variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></Notice> : null}
       {!people && !error ? <Spinner label="Loading people" /> : null}
@@ -161,7 +136,7 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
         </label>)}
         {unavailableDefaults.map(id => <div className="connection-card" key={id}><p>{agentName(id)} is unavailable. Remove it before saving.</p><Button variant="secondary" onClick={() => update({ defaultAgentDefinitionIds: defaults.filter(item => item !== id) })}>Remove unavailable default</Button></div>)}
       </fieldset>
-      {!directorySpec ? <details className="project-advanced"><summary>Advanced</summary>{directoryField}</details> : null}
+      {<details className="project-advanced"><summary>Advanced</summary>{directoryField}</details>}
       </div></div>
       <footer className="project-editor-actions"><p className="project-editor-content field-hint">References only · No cloning or agent runs</p><div className="project-editor-content button-row"><Button variant="secondary" disabled={editing.busy} onClick={discard}>Discard</Button><Button type="submit" disabled={disabled || editing.conflict || !editing.input.name.trim() || !managerCount || Boolean(unavailableDefaults.length)}>{editing.busy ? <Spinner label="Saving project" /> : null}Save project</Button></div></footer>
     </form> : <>

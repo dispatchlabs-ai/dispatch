@@ -8,6 +8,7 @@ export type SharedProjectRecord = {
   cwd?: string;
   repositories?: ProjectRepository[];
   spec?: ProjectSpec;
+  specRevision?: number;
   revision: number;
   createdAt: number;
   updatedAt: number;

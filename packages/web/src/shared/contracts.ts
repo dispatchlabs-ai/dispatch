@@ -242,7 +242,17 @@ export type ProjectSpec =
   | { source: "directory"; path: string }
   | { source: "repository"; repositoryId: string; path: string };
 /** Repository reads are commit-pinned; directory reads carry a file version and project binding for Save. */
-export type ProjectSpecDocument = { projectId: string; repositoryId: string; url: string; path: string; commit: string; content: string; source?: "directory"; version?: string; binding?: string };
+export type ProjectSpecDocument = { projectId: string; repositoryId: string; url: string; path: string; commit: string; content: string; source?: "directory"; version?: string; binding?: string; projectRevision?: number };
+
+export type ProjectSpecImport = { source: "directory" | "repository"; url: string; path: string; version: string; contentHash: string };
+export type ProjectMarkdownDocument = {
+  projectId: string; revision: number; content: string; contentHash: string;
+  savedAt?: number; savedBy?: string; importedFrom?: ProjectSpecImport; legacyImportRequired?: boolean;
+};
+export type ProjectSpecReadInput = { revision?: number; offset?: number };
+export type ProjectSpecPage = { projectId: string | null; revision: number; content: string; contentHash?: string; offset: number; textLength: number; nextOffset: number | null; initialized: boolean; legacyImportRequired?: boolean };
+export type SaveProjectMarkdownInput = { requestId: string; expectedRevision: number; content: string };
+export type ImportProjectMarkdownInput = { requestId: string; expectedProjectRevision: number; sourceVersion: string; contentHash: string };
 
 export type ProjectMember = { userId: string; role: "manager" | "member" };
 export interface SaveProjectInput {
@@ -257,6 +267,7 @@ export type Project = {
   cwd?: string;
   repositories?: ProjectRepository[];
   spec?: ProjectSpec;
+  specRevision?: number;
   kind: "shared";
   revision?: number;
   members?: ProjectMember[];

@@ -45,7 +45,7 @@ export function NewProjectButton({ name, busy, error, compact, onNameChange, onC
 
 export function ProjectPage({ project, saved, chats, creating, updating, onCreate, onSelect, onRename, onUpdate, onEdit, onOpenSpec, search, onSearchChange }: {
   search: string;
-  onOpenSpec: () => void;
+  onOpenSpec: (edit?: boolean) => void;
   onSearchChange: (search: string) => void;
   onEdit: (specOnly?: boolean) => void;
   project?: Project;
@@ -63,8 +63,6 @@ export function ProjectPage({ project, saved, chats, creating, updating, onCreat
   const projectChats = chats.filter(chat => chat.projectId === project.id && !chat.archived);
   const visible = projectChats.filter(chat => (!activeOnly || chat.status === "running") && chat.title.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const settingsUrl = `?${new URLSearchParams({ project: project.id, view: "settings" })}`;
-  const spec = project.spec;
-  const specRepository = spec?.source === "repository" ? project.repositories?.find(repository => repository.id === spec.repositoryId) : undefined;
   function editLink(event: MouseEvent<HTMLAnchorElement>, specOnly = false) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
@@ -76,16 +74,17 @@ export function ProjectPage({ project, saved, chats, creating, updating, onCreat
       <div className="project-page-actions">{project.canManage ? <Link className="button button-secondary" to={settingsUrl} onClick={event => editLink(event)}><Settings size={18} />Project settings</Link> : null}</div>
     </header>
     <dl className="project-references">
-      <div className="project-spec-block"><dt>Spec file</dt><dd>{spec ? <span className="project-spec-reference">
-        <strong>{spec.source === "directory" ? "Project directory" : specRepository?.name}</strong>
-        {spec.source === "directory" ? <span>{project.cwd}</span> : null}
-        <span className="text-muted">{spec.source === "directory" ? "Path in project directory" : "Path in repository"}</span><span>{spec.path}</span>
-      </span> : <span className="text-muted">Not set</span>}</dd>
-        <div className="project-spec-actions">{project.spec ? <Link className="button button-secondary" to={`?${new URLSearchParams({ project: project.id, view: "spec" })}`} onClick={event => {
-          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-          event.preventDefault(); onOpenSpec();
-        }}>View spec</Link> : null}
-        {project.canManage ? <Link className="button button-ghost" to={`${settingsUrl}&focus=spec`} onClick={event => editLink(event, true)} aria-label={project.spec ? "Change spec file" : "Set spec file"}>{project.spec ? "Change" : "Set spec file"}</Link> : null}</div>
+      <div className="project-spec-block"><dt>Spec</dt><dd>{project.specRevision ? `Revision ${project.specRevision}` : project.spec ? "Import required" : "No spec yet"}</dd>
+        <div className="project-spec-actions">
+          {project.canManage && !project.spec ? <Link className="button button-primary" to={`?${new URLSearchParams({ section: "projects", project: project.id, view: "spec", edit: "1" })}`} onClick={event => {
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault(); onOpenSpec(true);
+          }}>{project.specRevision ? "Edit spec" : "Write spec"}</Link> : null}
+          {project.specRevision || project.spec || !project.canManage ? <Link className="button button-secondary" to={`?${new URLSearchParams({ section: "projects", project: project.id, view: "spec" })}`} onClick={event => {
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault(); onOpenSpec();
+          }}>View spec</Link> : null}
+        </div>
       </div>
       <div><dt>Repositories</dt><dd>{project.repositories?.length ? <ul>{project.repositories.map(repository => <li key={repository.id}><a href={repository.url} target="_blank" rel="noreferrer">{repository.name}<span className="sr-only"> (opens in new tab)</span></a></li>)}</ul> : <span className="text-muted">None added</span>}</dd></div>
     </dl>

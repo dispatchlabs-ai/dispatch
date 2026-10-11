@@ -9,7 +9,7 @@ import { emptyAttachments } from "../lib/attachments";
 import { Tabs } from "@base-ui/react/tabs";
 import { Bot, ChevronLeft, ChevronRight, CircleHelp, Folder, LogOut, Menu, MessageSquare, PanelLeft, PanelRight, Plus, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
-import { useSearchParams } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 import type { AgentDefinition, ApplicationConfig, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, UpdateChatInput } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
 import { ComposerContext, composerKey, useComposers } from "../lib/composers";
@@ -136,6 +136,12 @@ export function Workspace() {
       setSpecOpen(current => current[projectId] ? current : { ...current, [projectId]: true });
     }
   }, [searchParams]);
+  const specLocation = useLocation();
+  const [specEditRequests, setSpecEditRequests] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const projectId = searchParams.get("project");
+    if (projectId && searchParams.get("view") === "spec" && searchParams.get("edit") === "1") setSpecEditRequests(current => ({ ...current, [projectId]: (current[projectId] ?? 0) + 1 }));
+  }, [specLocation.key]);
   const [specDirty, setSpecDirty] = useState<Record<string, boolean>>({});
   const tabList = useRef<HTMLDivElement>(null);
   const [tabOverflow, setTabOverflow] = useState({ before: false, after: false });
@@ -493,9 +499,9 @@ export function Workspace() {
   const active: WorkspaceTab | { id: string; kind: "agents" | "security" | "connections" | "secrets" | "import-export" | "model-providers" } = section === "chats" || section === "projects" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
   const projectEditorOpen = active.kind === "project" && searchParams.get("view") === "settings";
   const projectSpecOpen = active.kind === "project" && searchParams.get("view") === "spec";
-  function openSpec(projectId: string, open: boolean) {
+  function openSpec(projectId: string, open: boolean, edit = false) {
     setSpecOpen(current => ({ ...current, [projectId]: open }));
-    setSearchParams(open ? { section: "projects", project: projectId, view: "spec" } : { section: "projects", project: projectId });
+    setSearchParams(open ? { section: "projects", project: projectId, view: "spec", ...(edit ? { edit: "1" } : {}) } : { section: "projects", project: projectId });
     if (!open) requestAnimationFrame(() => document.getElementById("main-workspace")?.focus());
   }
   const detailsVisible = projectEditorOpen ? false : section === "projects" ? projectDetailsVisible : active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : active.kind === "connections" || active.kind === "secrets" || active.kind === "import-export" || active.kind === "model-providers" ? false : otherDetailsVisible;
@@ -722,7 +728,7 @@ export function Workspace() {
               const retainSpec = project && (specOpen[tab.projectId] || showSpec);
               return <>
                 {retainSpec ? <div hidden={!showSpec} inert={!showSpec}>
-                  <ProjectSpecView project={project} active={showSpec && tab.id === activeId && section === "projects"} onBack={() => openSpec(tab.projectId, false)}
+                  <ProjectSpecView project={project} editRequest={specEditRequests[tab.projectId] ?? 0} onSaved={() => void load()} active={showSpec && tab.id === activeId && section === "projects"} onBack={() => openSpec(tab.projectId, false)}
                     onDirtyChange={dirty => setSpecDirty(current => current[tab.projectId] === dirty ? current : { ...current, [tab.projectId]: dirty })} />
                 </div> : null}
                 {!showSpec ? project && projectEditing[tab.projectId] && (tab.id !== activeId || projectEditorOpen) ? <ProjectSettings project={project} agents={agents}
@@ -731,7 +737,7 @@ export function Workspace() {
                   if (!editing) changeProjectEditing(tab.projectId, null);
                   else setProjectEditing(current => ({ ...current, [tab.projectId]: editing }));
                 }} onSaved={savedProject} /> : <ProjectPage
-                onOpenSpec={() => openSpec(tab.projectId, true)}
+                onOpenSpec={edit => openSpec(tab.projectId, true, edit)}
                 search={projectSearch[tab.projectId] ?? ""} onSearchChange={search => setProjectSearch(current => ({ ...current, [tab.projectId]: search }))}
                 project={project} saved={savedProjectId === tab.projectId} chats={chats} creating={creating || createFailed} updating={updatingChats}
                 onCreate={() => chooseAgents(config.defaultAgentId, tab.projectId)} onSelect={selectChat}

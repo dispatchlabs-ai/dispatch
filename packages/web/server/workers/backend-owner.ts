@@ -293,6 +293,11 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
     if (person.companyId !== route.companyId) return c.json({ error: "Forbidden" }, 403);
     return c.json(operation === "people" ? await auth.listCompanyPeople(route.companyId) : await auth.getCompanyPerson(route.companyId, person.userId ?? ""));
   }
+  if (operation === "project-spec") {
+    const body = z.object({ actor: z.custom<WorkerManagementActor>(), input: z.object({ revision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional(), offset: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional() }).strict() }).strict().parse(input);
+    if (!body.actor || body.actor.companyId !== route.companyId || body.actor.conversationKey !== route.conversationId || body.actor.storeId !== route.storeId) return c.json({ error: "Forbidden" }, 403);
+    return c.json(await directory.readWorkerProjectSpec(body.actor, body.input));
+  }
   if (operation === "invitation") {
     const body = z.object({ actor: z.custom<WorkerManagementActor>(), requestId: z.string().min(1).max(200), definitionIds: z.array(z.string().min(1).max(200)).max(100) }).strict().parse(input);
     if (!body.actor || body.actor.companyId !== route.companyId || body.actor.conversationKey !== route.conversationId || body.actor.storeId !== route.storeId) return c.json({ error: "Forbidden" }, 403);
