@@ -3,7 +3,6 @@ import { useId } from "react";
 import type { ChatSummary, Project, UpdateChatInput } from "../shared/contracts";
 import { statusLabels } from "../lib/chat";
 import { ConversationActions } from "./conversation-actions";
-import { NewProjectButton, type NewProjectProps } from "./projects";
 import { SidebarSearch } from "./sidebar-search";
 import { Button, IconButton, Spinner } from "./ui";
 
@@ -20,7 +19,6 @@ type ConversationSidebarProps = {
   onShowArchivedChange: (value: boolean) => void;
   collapsedProjects: ReadonlySet<string>;
   onToggleProject: (id: string) => void;
-  newProject: NewProjectProps;
   onSelect: (id: string) => void;
   onSelectProject: (id: string) => void;
   onCreate: () => void;
@@ -29,7 +27,7 @@ type ConversationSidebarProps = {
   onUpdate: (id: string, input: UpdateChatInput) => void;
 };
 
-export function ConversationSidebar({ chats, projects, activeChatId, activeProjectId, search, onSearchChange, creating, updating, showArchived, onShowArchivedChange, collapsedProjects, onToggleProject, newProject, onSelect, onSelectProject, onCreate, onCreateProjectChat, onRename, onUpdate }: ConversationSidebarProps) {
+export function ConversationSidebar({ chats, projects, activeChatId, activeProjectId, search, onSearchChange, creating, updating, showArchived, onShowArchivedChange, collapsedProjects, onToggleProject, onSelect, onSelectProject, onCreate, onCreateProjectChat, onRename, onUpdate }: ConversationSidebarProps) {
   const groupPrefix = useId();
   const visible = chats.filter(chat => chat.archived === showArchived);
   const query = search.trim().toLowerCase();
@@ -57,7 +55,6 @@ export function ConversationSidebar({ chats, projects, activeChatId, activeProje
     <Button variant="secondary" className="sidebar-create" onClick={() => { onShowArchivedChange(false); onCreate(); }} disabled={creating}>{creating ? <Spinner /> : <Plus />} New chat</Button>
     <SidebarSearch label="Search chats" value={search} onChange={onSearchChange} />
     <div className="sidebar-list-heading"><h2>{showArchived ? "Archived" : "Chats"}</h2></div>
-    {!showArchived ? <NewProjectButton {...newProject} /> : null}
     <nav className="sidebar-list conversation-groups" aria-label={showArchived ? "Archived chats" : "Saved chats"}>
       {showArchived ? archived.map(row) : <>
         {groups.map(({ project, filtered }) => {
@@ -66,9 +63,12 @@ export function ConversationSidebar({ chats, projects, activeChatId, activeProje
           return <div className="project-group" key={project.id}>
             <div className={`project-group-header ${project.id === activeProjectId ? "selected" : ""}`}>
               <IconButton className="project-expand" label={`${expanded ? "Collapse" : "Expand"} ${project.name}`} aria-expanded={expanded} aria-controls={groupId} disabled={!!query} onClick={() => onToggleProject(project.id)}>{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</IconButton>
-              <button type="button" className="project-select" onClick={() => onSelectProject(project.id)} aria-current={project.id === activeProjectId ? "page" : undefined} title={project.name}>
+              <a href={`/?section=projects&project=${encodeURIComponent(project.id)}`} className="project-select" onClick={event => {
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                event.preventDefault(); onSelectProject(project.id);
+              }} aria-current={project.id === activeProjectId ? "page" : undefined} title={project.name}>
                 <Folder size={16} /><span>{project.name}</span>
-              </button>
+              </a>
               {project.canParticipate !== false ? <IconButton className="project-compose" label={`New chat in ${project.name}`} disabled={creating} onClick={() => onCreateProjectChat(project)}><SquarePen size={16} /></IconButton> : null}
             </div>
             <div id={groupId} className="project-group-conversations" hidden={!expanded}>

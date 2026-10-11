@@ -59,7 +59,7 @@ export function ProjectPage({ project, saved, chats, creating, updating, onCreat
   onUpdate: (id: string, input: UpdateChatInput) => void;
 }) {
   const [activeOnly, setActiveOnly] = useState(false);
-  if (!project) return <div className="project-page"><h1>Project unavailable</h1><p className="text-muted">Choose a project from Chats.</p></div>;
+  if (!project) return <div className="project-page"><h1>Project unavailable</h1><p className="text-muted">Choose a project from Projects.</p></div>;
   const projectChats = chats.filter(chat => chat.projectId === project.id && !chat.archived);
   const visible = projectChats.filter(chat => (!activeOnly || chat.status === "running") && chat.title.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const settingsUrl = `?${new URLSearchParams({ project: project.id, view: "settings" })}`;

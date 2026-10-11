@@ -27,19 +27,19 @@ import { ConversationSidebar } from "./conversation-sidebar";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ContextPanel } from "./context-panel";
 import { ProjectSettings, beginProjectEdit, type ProjectEditing } from "./project-settings";
-import { ProjectPage } from "./projects";
+import { NewProjectButton, ProjectPage } from "./projects";
 import { ProjectSpecView } from "./project-spec";
 import { SecurityPage } from "./security";
 import { McpConnectionsPage } from "./mcp-connections";
 import { Button, IconButton, Modal, Notice, Spinner } from "./ui";
 
 type WorkspaceTab = { id: string; kind: "chat"; chatId: string } | { id: string; kind: "project"; projectId: string } | { id: string; kind: "welcome" };
-type WorkspaceSection = "chats" | "agents" | "security" | "connections" | "secrets" | "import-export" | "model-providers";
+type WorkspaceSection = "projects" | "chats" | "agents" | "security" | "connections" | "secrets" | "import-export" | "model-providers";
 const welcomeTab: WorkspaceTab = { id: "welcome", kind: "welcome" };
 const appVersion = import.meta.env.VITE_APP_VERSION;
 
 function tabLocation(tab: WorkspaceTab): Record<string, string> {
-  return tab.kind === "chat" ? { chat: tab.chatId } : tab.kind === "project" ? { project: tab.projectId } : {};
+  return tab.kind === "chat" ? { chat: tab.chatId } : tab.kind === "project" ? { section: "projects", project: tab.projectId } : {};
 }
 
 function initialTab(params: URLSearchParams): WorkspaceTab {
@@ -48,12 +48,19 @@ function initialTab(params: URLSearchParams): WorkspaceTab {
   return chatId ? { id: `chat:${chatId}`, kind: "chat", chatId } : projectId ? { id: `project:${projectId}`, kind: "project", projectId } : welcomeTab;
 }
 
+function initialSection(params: URLSearchParams): WorkspaceSection {
+  if (params.has("chat")) return "chats";
+  if (params.has("project")) return "projects";
+  const section = params.get("section");
+  return section === "projects" || section === "agents" || section === "security" || section === "model-providers" || section === "import-export" || section === "secrets" || section === "connections" ? section : "chats";
+}
+
 export function Workspace() {
   const { state, api, auth, setState } = useSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const [criteriaDrafts, setCriteriaDrafts] = useState<Record<string, CriteriaDraft | undefined>>({});
-  const [section, setSection] = useState<WorkspaceSection>(searchParams.get("section") === "security" ? "security" : searchParams.get("section") === "model-providers" ? "model-providers" : searchParams.get("section") === "import-export" ? "import-export" : searchParams.get("section") === "secrets" ? "secrets" : searchParams.get("section") === "connections" ? "connections" : "chats");
-  const [visited, setVisited] = useState({ "model-providers": searchParams.get("section") === "model-providers", "import-export": searchParams.get("section") === "import-export", agents: false, security: searchParams.get("section") === "security", secrets: searchParams.get("section") === "secrets", connections: searchParams.get("section") === "connections" });
+  const [section, setSection] = useState<WorkspaceSection>(() => initialSection(searchParams));
+  const [visited, setVisited] = useState({ "model-providers": searchParams.get("section") === "model-providers", "import-export": searchParams.get("section") === "import-export", agents: searchParams.get("section") === "agents", security: searchParams.get("section") === "security", secrets: searchParams.get("section") === "secrets", connections: searchParams.get("section") === "connections" });
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [evaluationAgent, setEvaluationAgent] = useState<string | null>(null);
   const [evaluationContext, setEvaluationContext] = useState<React.ReactNode>(null);
@@ -87,6 +94,8 @@ export function Workspace() {
   const [loading, setLoading] = useState(true);
   const [tabs, setTabs] = useState<WorkspaceTab[]>(() => [initialTab(searchParams)]);
   const [activeId, setActiveId] = useState(() => initialTab(searchParams).id);
+  const lastChatTab = useRef<WorkspaceTab>(initialTab(searchParams).kind === "chat" ? initialTab(searchParams) : welcomeTab);
+  const lastProjectTab = useRef<WorkspaceTab>(initialTab(searchParams).kind === "project" ? initialTab(searchParams) : welcomeTab);
   const [snapshots, setSnapshots] = useState<Record<string, ChatSnapshot>>({});
   const [connections, setConnections] = useState<Record<string, ConnectionState>>({});
   const [navigationOpen, setNavigationOpen] = useState(false);
@@ -252,27 +261,42 @@ export function Workspace() {
   const composers = useComposers(onSnapshot);
   const attachmentDrafts = composers.attachments;
 
-  function navigateSettings(event: MouseEvent<HTMLAnchorElement>, next: WorkspaceSection) {
+  function navigateSection(event: MouseEvent<HTMLAnchorElement>, next: WorkspaceSection) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     selectSection(next);
   }
 
+  function sectionLocation(next: WorkspaceSection): Record<string, string> {
+    const tab = next === "chats" ? lastChatTab.current : next === "projects" ? lastProjectTab.current : null;
+    return { ...(tab ? projectTabLocation(tab) : {}), section: next };
+  }
+
   function selectSection(next: WorkspaceSection) {
     setSection(next);
-    if (next === "connections" || next === "secrets" || next === "import-export" || next === "model-providers" || next === "security") { setOtherDetailsVisible(false); setSearchParams({ section: next }, { replace: true }); }
-    else if (searchParams.has("section")) setSearchParams({}, { replace: true });
-    if (next !== "chats") setVisited(current => ({ ...current, [next]: true }));
+    if (next === "chats" || next === "projects") {
+      const tab = next === "chats" ? lastChatTab.current : lastProjectTab.current;
+      setActiveId(tab.id);
+      setTabs(current => current.some(item => item.id === tab.id) ? current : [...current, tab]);
+      setSearchParams({ ...projectTabLocation(tab), section: next }, { replace: true });
+    } else {
+      if (next !== "agents") setOtherDetailsVisible(false);
+      setSearchParams({ section: next }, { replace: true });
+    }
+    if (next !== "chats" && next !== "projects") setVisited(current => ({ ...current, [next]: true }));
     setNavigationOpen(false);
     setContextOpen(false);
   }
 
   function activate(tab: WorkspaceTab) {
-    selectSection("chats");
+    setSection(tab.kind === "project" ? "projects" : "chats");
+    if (tab.kind === "project") lastProjectTab.current = tab;
+    else lastChatTab.current = tab;
     setTabs(current => current.some(item => item.id === tab.id) ? current : [...current.filter(item => item.kind !== "welcome"), tab]);
     if (tab.kind === "chat" && tab.id !== activeId) setConnections(current => ({ ...current, [tab.chatId]: "connecting" }));
     setActiveId(tab.id);
     setNavigationOpen(false);
+    setContextOpen(false);
     setSearchParams(projectTabLocation(tab), { replace: true });
   }
   function projectTabLocation(tab: WorkspaceTab) {
@@ -280,6 +304,20 @@ export function Workspace() {
     if (tab.kind === "project" && specOpen[tab.projectId]) return { ...tabLocation(tab), view: "spec" };
     return tabLocation(tab);
   }
+
+  useEffect(() => {
+    const next = initialSection(searchParams);
+    setSection(next);
+    if (next !== "chats" && next !== "projects") {
+      setVisited(current => ({ ...current, [next]: true }));
+      return;
+    }
+    const tab = initialTab(searchParams);
+    setTabs(current => current.some(item => item.id === tab.id) ? current : [...current, tab]);
+    setActiveId(tab.id);
+    if (next === "projects") lastProjectTab.current = tab;
+    else lastChatTab.current = tab;
+  }, [searchParams]);
 
   function requestCloseTab(tabId: string) {
     const tab = tabs.find(item => item.id === tabId);
@@ -304,14 +342,17 @@ export function Workspace() {
     }
     setClosingTab(null);
     const remaining = tabs.filter(tab => tab.id !== tabId);
-    const next = remaining.length ? remaining : [welcomeTab];
+    const sectionRemaining = remaining.filter(tab => section === "projects" ? tab.kind === "project" : tab.kind !== "project");
+    const next = remaining.some(tab => tab.kind === "welcome") || sectionRemaining.length ? remaining : [...remaining, welcomeTab];
     setTabs(next);
     let focusId = activeId;
     if (activeId === tabId) {
-      const selected = next[Math.max(0, Math.min(tabs.findIndex(tab => tab.id === tabId) - 1, next.length - 1))];
+      const selected = sectionRemaining.at(-1) ?? welcomeTab;
+      if (section === "projects") lastProjectTab.current = selected;
+      else lastChatTab.current = selected;
       focusId = selected.id;
       setActiveId(selected.id);
-      setSearchParams(projectTabLocation(selected), { replace: true });
+      setSearchParams({ ...projectTabLocation(selected), section }, { replace: true });
     }
     requestAnimationFrame(() => {
       (tabList.current?.querySelector<HTMLElement>(`[data-work-tab="${CSS.escape(focusId)}"]`) ?? document.getElementById("main-workspace"))?.focus();
@@ -446,12 +487,12 @@ export function Workspace() {
 
   const settingsSection = section === "security" || section === "connections" || section === "secrets" || section === "import-export" || section === "model-providers";
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId) ?? agents.find(agent => agent.id === config?.defaultAgentId);
-  const active: WorkspaceTab | { id: string; kind: "agents" | "security" | "connections" | "secrets" | "import-export" | "model-providers" } = section === "chats" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
+  const active: WorkspaceTab | { id: string; kind: "agents" | "security" | "connections" | "secrets" | "import-export" | "model-providers" } = section === "chats" || section === "projects" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
   const projectEditorOpen = active.kind === "project" && searchParams.get("view") === "settings";
   const projectSpecOpen = active.kind === "project" && searchParams.get("view") === "spec";
   function openSpec(projectId: string, open: boolean) {
     setSpecOpen(current => ({ ...current, [projectId]: open }));
-    setSearchParams(open ? { project: projectId, view: "spec" } : { project: projectId });
+    setSearchParams(open ? { section: "projects", project: projectId, view: "spec" } : { section: "projects", project: projectId });
     if (!open) requestAnimationFrame(() => document.getElementById("main-workspace")?.focus());
   }
   const detailsVisible = projectEditorOpen ? false : active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : active.kind === "connections" || active.kind === "secrets" || active.kind === "import-export" || active.kind === "model-providers" ? false : otherDetailsVisible;
@@ -470,13 +511,13 @@ export function Workspace() {
     setProjectEditing(current => ({ ...current, [projectId]: editing }));
     if (activeProjectRef.current !== projectId) return;
     setContextOpen(false);
-    if (!editing) setSearchParams({ project: projectId }, { replace: true });
+    if (!editing) setSearchParams({ section: "projects", project: projectId }, { replace: true });
     requestAnimationFrame(() => (editing ? document.getElementById(`project-editor-${projectId}`) : document.getElementById("main-workspace"))?.focus());
   }
   function editProject(project: Project, specOnly = false) {
     if (!project.canManage || project.revision === undefined) return;
     setSavedProjectId(null);
-    setSearchParams({ project: project.id, view: "settings", ...(specOnly ? { focus: "spec" } : {}) });
+    setSearchParams({ section: "projects", project: project.id, view: "settings", ...(specOnly ? { focus: "spec" } : {}) });
     changeProjectEditing(project.id, projectEditing[project.id] ?? beginProjectEdit(project));
     if (specOnly) requestAnimationFrame(() => document.getElementById(`project-spec-${project.id}`)?.focus());
   }
@@ -510,20 +551,32 @@ export function Workspace() {
       requestAnimationFrame(() => document.getElementById(`participants-${active.chatId}`)?.focus());
     }} showHeader={!inDrawer}
     /> : <ContextPanel kind={active.kind === "connections" || active.kind === "secrets" || active.kind === "import-export" || active.kind === "model-providers" ? "security" : active.kind} />;
-  const chatNav = () => selectSection("chats");
   const selectChat = (chatId: string) => activate({ id: `chat:${chatId}`, kind: "chat", chatId });
   const conversations = <ConversationSidebar chats={chats} projects={projects}
     activeChatId={active.kind === "chat" ? active.chatId : undefined} activeProjectId={active.kind === "project" ? active.projectId : undefined}
     search={search} onSearchChange={setSearch} creating={creating || createFailed} updating={updatingChats}
     showArchived={showArchivedChats} onShowArchivedChange={setShowArchivedChats} collapsedProjects={collapsedProjects}
     onToggleProject={id => setCollapsedProjects(current => { const next = new Set(current); if (!next.delete(id)) next.add(id); return next; })}
-    newProject={{ name: projectName, busy: creatingProject, error: projectError, compact: viewportWidth <= 1100,
-      onNameChange: name => { setProjectName(name); setProjectError(null); }, onCreate: createProject,
-      onCancel: () => { setProjectName(""); setProjectError(null); projectRequest.current = null; } }}
     onCreateProjectChat={project => { if (project.canParticipate === false) return; void createChat(undefined, project.id); }}
     onSelect={selectChat} onSelectProject={selectProject} onCreate={() => chooseAgents(config?.defaultAgentId, activeProjectId)}
     onRename={renameChat} onUpdate={updateChatAction} />;
+  const newProjectProps = { name: projectName, busy: creatingProject, error: projectError, compact: viewportWidth <= 1100,
+      onNameChange: (name: string) => { setProjectName(name); setProjectError(null); }, onCreate: createProject,
+      onCancel: () => { setProjectName(""); setProjectError(null); projectRequest.current = null; } };
+  const sectionTabs = tabs.filter(tab => section === "projects" ? tab.kind === "project" : tab.kind !== "project");
   const sidebar = <>
+    <div className="section-sidebar-panel" hidden={section !== "projects"}>
+      <div className="collection-sidebar">
+        <div className="sidebar-list-heading"><h2>Projects</h2></div>
+        <NewProjectButton {...newProjectProps} />
+        <nav className="sidebar-list" aria-label="Shared projects">
+          {projects.map(project => <a key={project.id} className={`sidebar-select ${selectedProject?.id === project.id ? "selected" : ""}`} href={`/?section=projects&project=${encodeURIComponent(project.id)}`} aria-current={selectedProject?.id === project.id ? "page" : undefined} onClick={event => {
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault(); selectProject(project.id);
+          }}><Folder size={16} /><span>{project.name}</span></a>)}
+        </nav>
+      </div>
+    </div>
     <div className="section-sidebar-panel" hidden={section !== "chats"}>{conversations}</div>
     <div className="section-sidebar-panel" hidden={section !== "agents"}>
       <AgentSidebar agents={agents} defaultAgentId={config?.defaultAgentId}
@@ -538,11 +591,11 @@ export function Workspace() {
     {settingsSection ? <div className="section-sidebar">
       <h2>Settings</h2>
       <nav aria-label="Settings">
-        <a className="button button-ghost" href="/?section=model-providers" aria-current={section === "model-providers" ? "page" : undefined} onClick={event => navigateSettings(event, "model-providers")}>Model providers</a>
-        <a className="button button-ghost" href="/?section=connections" aria-current={section === "connections" ? "page" : undefined} onClick={event => navigateSettings(event, "connections")}>Connections</a>
-        <a className="button button-ghost" href="/?section=secrets" aria-current={section === "secrets" ? "page" : undefined} onClick={event => navigateSettings(event, "secrets")}>Secrets</a>
-        <a className="button button-ghost" href="/?section=import-export" aria-current={section === "import-export" ? "page" : undefined} onClick={event => navigateSettings(event, "import-export")}>Import &amp; export</a>
-        <a className="button button-ghost" href="/?section=security" aria-current={section === "security" ? "page" : undefined} onClick={event => navigateSettings(event, "security")}>Account and security</a>
+        <a className="button button-ghost" href="/?section=model-providers" aria-current={section === "model-providers" ? "page" : undefined} onClick={event => navigateSection(event, "model-providers")}>Model providers</a>
+        <a className="button button-ghost" href="/?section=connections" aria-current={section === "connections" ? "page" : undefined} onClick={event => navigateSection(event, "connections")}>Connections</a>
+        <a className="button button-ghost" href="/?section=secrets" aria-current={section === "secrets" ? "page" : undefined} onClick={event => navigateSection(event, "secrets")}>Secrets</a>
+        <a className="button button-ghost" href="/?section=import-export" aria-current={section === "import-export" ? "page" : undefined} onClick={event => navigateSection(event, "import-export")}>Import &amp; export</a>
+        <a className="button button-ghost" href="/?section=security" aria-current={section === "security" ? "page" : undefined} onClick={event => navigateSection(event, "security")}>Account and security</a>
         {section === "security" ? [['passkeys', 'Passkeys'], ['password', 'Password & authenticator'], ['sessions', 'Active sessions']].map(([id, label]) => <Button key={id} variant="ghost" onClick={() => {
           setNavigationOpen(false);
           requestAnimationFrame(() => document.getElementById(`account-${id}`)?.scrollIntoView({ block: "start" }));
@@ -572,12 +625,9 @@ export function Workspace() {
         <Brand compact />
       </div>
       <div className="rail-links">
-        <IconButton label="Chats" className={section === "chats" ? "active" : ""} aria-current={section === "chats" ? "page" : undefined} onClick={chatNav}>
-          <MessageSquare size={21} />
-        </IconButton>
-        <IconButton label="Agents" className={active.kind === "agents" ? "active" : ""} aria-current={active.kind === "agents" ? "page" : undefined} onClick={() => selectSection("agents")}>
-          <Bot size={21} />
-        </IconButton>
+        {(["projects", "agents", "chats"] as const).map(destination => <a key={destination} href={`/?${new URLSearchParams(sectionLocation(destination))}`} aria-label={destination === "projects" ? "Projects" : destination === "agents" ? "Agents" : "Chats"} title={destination === "projects" ? "Projects" : destination === "agents" ? "Agents" : "Chats"} className={`icon-button ${section === destination ? "active" : ""}`} aria-current={section === destination ? "page" : undefined} onClick={event => navigateSection(event, destination)}>
+          {destination === "projects" ? <Folder size={21} /> : destination === "agents" ? <Bot size={21} /> : <MessageSquare size={21} />}
+        </a>)}
       </div>
       <div className="rail-layout" role="group" aria-label="Workspace columns">
         <IconButton className="sidebar-toggle" label={sidebarVisible ? "Hide sidebar" : "Show sidebar"} aria-expanded={sidebarVisible} aria-controls="workspace-sidebar" onClick={() => setSidebarVisible(value => !value)}>
@@ -588,7 +638,7 @@ export function Workspace() {
         </IconButton> : null}
       </div>
       <div className="rail-account">
-        <a href="/?section=model-providers" aria-label="Settings" title="Settings" className={`icon-button ${settingsSection ? "active" : ""}`} aria-current={settingsSection ? "page" : undefined} onClick={event => navigateSettings(event, "model-providers")}>
+        <a href="/?section=model-providers" aria-label="Settings" title="Settings" className={`icon-button ${settingsSection ? "active" : ""}`} aria-current={settingsSection ? "page" : undefined} onClick={event => navigateSection(event, "model-providers")}>
           <Settings2 size={20} />
         </a>
         <IconButton label="Sign out" disabled={signingOut} onClick={() => void signOut()}>{signingOut ? <Spinner /> : <LogOut size={19} />}</IconButton>
@@ -596,20 +646,20 @@ export function Workspace() {
         </span>
       </div>
     </nav>
-    <aside className="workspace-sidebar" id="workspace-sidebar" aria-label={section === "chats" ? "Chats" : section === "agents" ? "Agents" : "Account"}>
+    <aside className="workspace-sidebar" id="workspace-sidebar" aria-label={section === "projects" ? "Projects" : section === "chats" ? "Chats" : section === "agents" ? "Agents" : "Account"}>
       {sidebar}
       <ColumnResizeHandle side="left" controls="workspace-sidebar" width={sidebarWidth} min={200} max={sidebarMax} onResize={setSidebarWidth} />
     </aside>
     <Tabs.Root className="workspace-content" value={activeId} onValueChange={value => { const tab = tabs.find(tab => tab.id === value); if (tab) activate(tab); }}>
       <div className="main-column">
-        {section === "chats" && tabs.length > 1 ? <header className="workspace-toolbar">
+        {(section === "chats" || section === "projects") && sectionTabs.length > 1 ? <header className="workspace-toolbar">
             <p id="tab-keyboard-help" className="sr-only">Use arrow keys to choose a tab, Enter to open it, and Delete to close it.</p>
             <div className="tabs-strip">
               {tabOverflow.before || tabOverflow.after ? <IconButton disabled={!tabOverflow.before} className="tab-scroll-button" label="Show earlier tabs" onClick={() => tabList.current?.scrollBy({ left: -200, behavior: "smooth" })}>
                 <ChevronLeft />
               </IconButton> : null}
               <Tabs.List ref={tabList} className="main-tabs" aria-label="Open work" aria-describedby="tab-keyboard-help" activateOnFocus={false} onScroll={updateTabOverflow}>
-                {tabs.map(tab => {
+                {sectionTabs.map(tab => {
                   const title = tab.kind === "chat" ? chats.find(chat => chat.id === tab.chatId)?.title || "Chat" : tab.kind === "project" ? projects.find(project => project.id === tab.projectId)?.name || "Project" : "Workspace";
                   return <div key={tab.id} role="presentation" className={`main-tab-item ${tab.id === activeId ? "selected" : ""}`}>
                     <Tabs.Tab value={tab.id} data-work-tab={tab.id} className="main-tab"
@@ -640,8 +690,8 @@ export function Workspace() {
           <Notice>{error ?? "Chat creation could not be confirmed. Retry to recover it."}</Notice>{createFailed ? <Button variant="secondary" disabled={creating} onClick={() => void createChat([], null, createRequest.current ?? undefined)}>Retry creating chat</Button> : <Button variant="ghost" onClick={() => setError(null)}>Dismiss</Button>}
         </div> : null}
         <main className="workspace-main" id="main-workspace" tabIndex={-1}>
-          <div className="workspace-section" hidden={section !== "chats"}>
-          {tabs.map(tab => <Tabs.Panel key={tab.id} value={tab.id} className="main-tab-panel" role={tabs.length === 1 ? "region" : "tabpanel"} aria-label={tabs.length === 1 ? "Workspace content" : undefined} keepMounted>
+          <div className="workspace-section" hidden={section !== "chats" && section !== "projects"}>
+          {tabs.map(tab => <Tabs.Panel key={tab.id} value={tab.id} className="main-tab-panel" hidden={tab.id !== activeId || (tab.kind === "project" ? section !== "projects" : tab.kind === "chat" ? section !== "chats" : false)} role={sectionTabs.length === 1 ? "region" : "tabpanel"} aria-label={sectionTabs.length === 1 ? "Workspace content" : undefined} keepMounted>
             {tab.kind === "chat" ? <ChatPanel agents={agents}
               active={section === "chats" && tab.id === activeId}
               connection={connections[tab.chatId] || "connecting"}
@@ -662,11 +712,11 @@ export function Workspace() {
               onAccessLost={onAccessLost}
             /> : tab.kind === "project" ? (() => {
               const project = projects.find(project => project.id === tab.projectId);
-              const showSpec = tab.id === activeId && section === "chats" ? projectSpecOpen : Boolean(specOpen[tab.projectId]);
+              const showSpec = tab.id === activeId && section === "projects" ? projectSpecOpen : Boolean(specOpen[tab.projectId]);
               const retainSpec = project && (specOpen[tab.projectId] || showSpec);
               return <>
                 {retainSpec ? <div hidden={!showSpec} inert={!showSpec}>
-                  <ProjectSpecView project={project} active={showSpec && tab.id === activeId && section === "chats"} onBack={() => openSpec(tab.projectId, false)}
+                  <ProjectSpecView project={project} active={showSpec && tab.id === activeId && section === "projects"} onBack={() => openSpec(tab.projectId, false)}
                     onDirtyChange={dirty => setSpecDirty(current => current[tab.projectId] === dirty ? current : { ...current, [tab.projectId]: dirty })} />
                 </div> : null}
                 {!showSpec ? project && projectEditing[tab.projectId] && (tab.id !== activeId || projectEditorOpen) ? <ProjectSettings project={project} agents={agents}
@@ -683,7 +733,7 @@ export function Workspace() {
                 onRename={renameChat} onUpdate={updateChatAction}
               /> : null}
               </>;
-            })() : <Welcome
+            })() : section === "projects" ? <section className="welcome-view"><h1>Projects</h1><p>Choose a project or create one from the sidebar.</p></section> : <Welcome
               name={state.user.name} config={config}
               onCreate={() => chooseAgents()} creating={creating || createFailed}
             />}
@@ -736,11 +786,10 @@ export function Workspace() {
           <Modal title="Your workspace" description={config.company.name} side="left" open={navigationOpen} onOpenChange={setNavigationOpen} trigger={<Button variant="ghost" className="workspace-action">
             <Menu size={21} /> Menu</Button>}>
             <nav className="mobile-destinations" aria-label="Workspace navigation">
-              <Button variant="ghost" aria-current={section === "chats" ? "page" : undefined} onClick={chatNav}>
-                <MessageSquare /> Chats</Button>
-              <Button variant="ghost" aria-current={active.kind === "agents" ? "page" : undefined} onClick={() => selectSection("agents")}>
-                <Bot /> Agents</Button>
-              <a className="button button-ghost" href="/?section=model-providers" aria-current={settingsSection ? "page" : undefined} onClick={event => navigateSettings(event, "model-providers")}>
+              {(["projects", "agents", "chats"] as const).map(destination => <a key={destination} className="button button-ghost" href={`/?${new URLSearchParams(sectionLocation(destination))}`} aria-current={section === destination ? "page" : undefined} onClick={event => navigateSection(event, destination)}>
+                {destination === "projects" ? <Folder /> : destination === "agents" ? <Bot /> : <MessageSquare />} {destination === "projects" ? "Projects" : destination === "agents" ? "Agents" : "Chats"}
+              </a>)}
+              <a className="button button-ghost" href="/?section=model-providers" aria-current={settingsSection ? "page" : undefined} onClick={event => navigateSection(event, "model-providers")}>
                 <Settings2 /> Settings</a>
             </nav>{sidebar}
             <div className="mobile-menu-footer">
