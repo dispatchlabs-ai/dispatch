@@ -224,6 +224,11 @@ export function createApp(options: AppOptions) {
     c.header("Cache-Control", "no-store");
     return c.json({ spec: await runtime.getProjectSpec(c.get("principal"), c.req.param("id")) });
   });
+  app.post("/api/projects/:id/spec", async c => {
+    const input = z.object({ binding: z.string().regex(/^[a-f0-9]{64}$/), expectedVersion: z.string().regex(/^[a-f0-9]{64}$/), content: z.string().max(512 * 1024) }).strict().parse(await c.req.json());
+    c.header("Cache-Control", "no-store");
+    return c.json({ spec: await runtime.saveProjectSpec(c.get("principal"), c.req.param("id"), input) });
+  });
   app.get("/api/projects", async (c) => c.json({ projects: await runtime.listProjects(c.get("principal")) }));
   app.post("/api/projects", async (c) => {
     const input = z.object({ requestId, name: z.string().trim().min(1).max(100), kind: z.literal("shared") }).strict().parse(await c.req.json());

@@ -318,6 +318,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     importProjectArchive: directory.importProjectArchive.bind(directory),
     getProjectArchive: directory.getProjectArchive.bind(directory),
     getProjectSpec: directory.getProjectSpec.bind(directory),
+    saveProjectSpec: directory.saveProjectSpec.bind(directory),
     listGitHubBundles: directory.listGitHubBundles.bind(directory),
     previewGitHubBundle: directory.previewGitHubBundle.bind(directory),
     exportBundle: directory.exportBundle.bind(directory),

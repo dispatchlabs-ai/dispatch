@@ -241,8 +241,8 @@ export type ProjectRepository = { id: string; name: string; url: string };
 export type ProjectSpec =
   | { source: "directory"; path: string }
   | { source: "repository"; repositoryId: string; path: string };
-/** A repository spec read at an immutable commit. */
-export type ProjectSpecDocument = { projectId: string; repositoryId: string; url: string; path: string; commit: string; content: string };
+/** Repository reads are commit-pinned; directory reads carry a file version and project binding for Save. */
+export type ProjectSpecDocument = { projectId: string; repositoryId: string; url: string; path: string; commit: string; content: string; source?: "directory"; version?: string; binding?: string };
 
 export type ProjectMember = { userId: string; role: "manager" | "member" };
 export interface SaveProjectInput {

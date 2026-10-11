@@ -27,6 +27,7 @@ import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata } 
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { projectSourcesSchema } from "../src/shared/project-sources.js";
 import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
+import { readLocalProjectSpec, saveLocalProjectSpec } from "./local-project-spec.js";
 import { fetchPublicGithubSpec, ProjectSpecError } from "./project-spec.js";
 import { createWebResearch } from "./extensions/web.js";
 import { createWebBackend } from "./web/backend.js";
@@ -1391,7 +1392,7 @@ export class DispatchRuntime {
     return archive;
   }
 
-  /** Reads the configured spec from its public repository. External I/O stays outside native commits. */
+  /** Reads the configured spec, then rechecks current authority/reference. I/O stays outside native commits. */
   async getProjectSpec(scope: RuntimeScope, id: string): Promise<ProjectSpecDocument> {
     const binding = (project: SharedProjectRecord) => {
       const spec = project.spec;
@@ -1401,10 +1402,15 @@ export class DispatchRuntime {
     };
     const source = await this.harness.commit(async tx => {
       const project = await requireProjectAccess(tx, scope, id, "read", this.readAll(scope));
-      if (project.spec?.source === "directory") throw new ProjectSpecError(400, "Directory-backed specs aren't available in this view.");
+      if (project.spec?.source === "directory") return this.localSpecBinding(project);
       return binding(project);
     }, context);
     if (!source) throw new ProjectSpecError(404, "This project has no spec file configured.");
+    if ("cwd" in source) {
+      const loaded = await readLocalProjectSpec(source.cwd, source.path);
+      await this.checkLocalSpec(scope, id, source.binding, "read");
+      return { projectId: id, repositoryId: "", url: source.cwd, path: source.path, source: "directory", binding: source.binding, ...loaded };
+    }
     const loaded = await fetchPublicGithubSpec(source.url, source.path);
     await this.harness.commit(async tx => {
       const current = binding(await requireProjectAccess(tx, scope, id, "read", this.readAll(scope)));
@@ -1413,6 +1419,31 @@ export class DispatchRuntime {
       }
     }, context);
     return { projectId: id, ...source, ...loaded };
+  }
+
+  private localSpecBinding(project: SharedProjectRecord) {
+    if (this.directoryOnly || this.worker) throw new ProjectSpecError(400, "Local-directory spec editing is unavailable on cloud workers.");
+    if (project.spec?.source !== "directory" || !project.cwd) throw new ProjectSpecError(400, "Configure a project directory and spec file first.");
+    const { cwd } = project;
+    const path = project.spec.path;
+    const binding = createHash("sha256").update(JSON.stringify([project.id, project.revision, cwd, path])).digest("hex");
+    return { cwd, path, binding };
+  }
+
+  private async checkLocalSpec(scope: RuntimeScope, id: string, expectedBinding: string, action: "read" | "manage") {
+    return this.harness.commit(async tx => {
+      const project = await requireProjectAccess(tx, scope, id, action, this.readAll(scope));
+      const current = this.localSpecBinding(project);
+      if (current.binding !== expectedBinding) throw new ProjectSpecError(409, "Project spec reference or settings changed. Draft retained; reload and review.");
+      return current;
+    }, context);
+  }
+
+  async saveProjectSpec(scope: RuntimeScope, id: string, input: { binding: string; expectedVersion: string; content: string }): Promise<ProjectSpecDocument> {
+    const source = await this.checkLocalSpec(scope, id, input.binding, "manage");
+    const loaded = await saveLocalProjectSpec(source.cwd, source.path, input.expectedVersion, input.content, async () => { await this.checkLocalSpec(scope, id, input.binding, "manage"); });
+    await this.checkLocalSpec(scope, id, input.binding, "manage");
+    return { projectId: id, repositoryId: "", url: source.cwd, path: source.path, source: "directory", binding: source.binding, ...loaded };
   }
 
   async saveProject(scope: RuntimeScope, id: string, input: SaveProjectInput): Promise<Project> {
