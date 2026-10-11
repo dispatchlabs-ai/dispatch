@@ -99,12 +99,12 @@ Pre-release walkthroughs: action → observable outcome; check the failure/recov
 - **Official spec authority:** retain a designated repository/file (or existing local-directory file), or adopt a project-owned versioned document stored by Dispatch? Exactly one is authoritative; any exported copy must identify its source revision and not become a second master. Database ownership would replace designated-file spec authority; Dispatch product documentation remains repo-local, with no wiki dependency.
 - **Actionability:** does an edit immediately trigger automation under project policy, or remain a saved draft until explicitly adopted? The proposed default is save draft → review/adopt → reconcile work; saving alone would not launch work.
 - **Default destination:** open Projects or Chats when there is no explicit destination? Rail order does not settle this. Explicit chat/section links remain respected.
-- **Design:** exact project subviews and phone presentation await review; Spec/Work/Agents tabs are proposed labels, not approved structure.
+- **Design:** broader spec/work subviews await review; Spec/Work/Agents tabs are proposed labels, not approved structure. Navigation and local-file editor responsive layouts have been reviewed.
 
 ## Implementation and pre-release status
 
 - Adoption, implementation and verification are separate. This working spec is adopted; per-use-case implementation and walkthrough results are not yet comprehensively recorded.
-- Localhost spec editing is not ready: directory viewing/file Save still missing at `20f44b0`; configuration persistence verified at `ad2d1fa`. The next slice retains the designated local file: open → edit → Save → reload, with conflict/access recovery; Save only writes the file, not commit/push or agent work. Public-GitHub draft editing remains browser-unverified. [Qualification](usage-guide.md#shared-projects).
+- Localhost designated-file spec editing at `cfe4aab`: open/edit/Save/reload, conflict/reference recovery and editor continuity browser-verified within [recorded coverage](usage-guide.md#local-spec-editing-qualification). Save writes the file only, not Git publication or agent work. Access revocation and other listed boundaries remain source-reviewed only; public-GitHub draft editing remains browser-unverified.
 - Projects navigation/management at `20f44b0`: browser-qualified within reported coverage; [walkthrough results and limits](usage-guide.md#projects-navigation-qualification). Spec-led automation and chat file editing remain undelivered; storage, activation and default-destination choices remain open.
 - Before release, record revision and each approved walkthrough's result: verified, failed, blocked or not checked, with evidence/limits. Builds alone do not qualify behavior.
 - No automated repository tests; authorized interactive agent-browser verification is permitted. Product evaluation execution is not permission to add automated repository tests.
