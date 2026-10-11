@@ -2,17 +2,18 @@
 
 ## [Unreleased]
 
-### Local spec file editing
+### Database-owned project specs
 
-- Read and edit the configured directory-backed spec in Projects on local installations; Save writes the designated file only, without Git publication, adoption or agent work.
-- Bind saves to current manager authority, project reference and loaded file version; retain drafts on conflicts or uncertain responses, with explicit copy/reload recovery. Hosted local-directory access remains unsupported.
-- Serialize Dispatch saves and replace files atomically. External editors are not locked; filesystem-wide compare-and-swap is not promised.
+- Store authoritative project Markdown as immutable database revisions; write a first spec or edit an existing one directly from Projects, without a file path or repository prerequisite.
+- Preserve drafts on conflicts and uncertain responses. Stable actor-scoped Save receipts confirm the originally committed revision on retry, even after another writer advances the spec; Save does not start agents or publish Git changes.
+- Import a reviewed legacy spec and retire its active file reference atomically, preserving source provenance and unrelated project settings. Remove the old file-write endpoint and normal spec-source configuration.
+- Add `conversation_project_spec` for current or exact-revision agent reads, with explicit pagination; hosted workers use authenticated backend mediation rather than local disk.
 
 ### Projects navigation
 
 - Add Projects before Agents and Chats in workspace navigation; move project creation, overview, settings and spec viewing out of Chats while retaining conversation grouping and legacy project links.
 - Add project-list search, full-width spec references and upper-left narrow-screen navigation; keep project, spec and chat drafts mounted across destination switches.
-- This slice does not implement project-document spec storage, adoption-triggered automation or chat working-copy Save.
+- Navigation alone does not implement adoption-triggered automation or chat working-copy Save; database-owned spec editing is described separately above.
 
 ### Inline conversation diffs
 
