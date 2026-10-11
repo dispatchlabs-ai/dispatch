@@ -5,7 +5,7 @@ argument-hint: "[work package or focus]"
 
 Review the completed work package for avoidable complexity. Focus: $ARGUMENTS
 
-Read `AGENTS.md` and the applicable package specification and handoff. Use the current task's diff to establish scope, then read the affected files and relevant callers, tests, and interfaces in full. Keep unrelated cleanup out of the task.
+Read `AGENTS.md`, the applicable package specification and relevant linked guidance. Use the current authorized task's agreed outcomes; historical handoffs are evidence, not current scope. Use the current task's diff to establish scope, then read the affected files and relevant callers, tests, and interfaces in full. Keep unrelated cleanup out of the task.
 
 Look for simpler representations and direct code:
 
@@ -20,4 +20,4 @@ Preserve supported behavior, public contracts, persisted data, security checks, 
 
 Make routine behavior-preserving changes within the authorized scope. For a material removal or behavior change, use any explicit authorization already given; otherwise present the specific change, evidence, affected contract, and recommendation for Chris's decision before applying it. An uncertain purpose is a reason to investigate, not to delete.
 
-Run the applicable checks from `CONTRIBUTING.md` and the package handoff. Inspect the final diff for accidental changes. Report what became simpler, the invariants it relies on, validation results, and any unresolved decisions. Passing checks alone does not establish that the design is easier to understand.
+Run the applicable checks from `CONTRIBUTING.md` and the current task's agreed acceptance criteria. Inspect the final diff for accidental changes. Report what became simpler, the invariants it relies on, validation results, and any unresolved decisions. Passing checks alone does not establish that the design is easier to understand.
