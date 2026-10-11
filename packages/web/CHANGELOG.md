@@ -6,6 +6,7 @@
 
 - Replace the former product specification with a short draft outline centered on supported use cases, rules and repo-local detail.
 - Make repository guidance self-contained; retain the existing testing policy in the contribution guide and retire obsolete external-document references and illustrations.
+- Align reusable workflows and injected collaboration guidance with the current authorized task; historical handoffs are evidence, not scope or a default destination for new work. Keep the draft spec empty until its content is agreed with Chris.
 - Remove provider-specific MCP migration, identity checks, callback compatibility and activity labels while retaining generic MCP support. Existing pre-generic connection databases no longer receive that retired migration.
 
 ### Licensing

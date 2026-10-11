@@ -1,10 +1,10 @@
 # Contributing
 
-Dispatch Web has a local browser/service implementation with authentication, native Pi Durable chat, named agents, and a branded responsive workspace. Continue through focused work packages and the check policy below.
+Dispatch Web has a local browser/service implementation with authentication, native Pi Durable chat, named agents, and a branded responsive workspace. Work within the current authorized task and the check policy below.
 
 ## Testing policy
 
-Do not add or run automated tests. This does not apply to AI agents using `agent-browser` for interactive verification of authorized work; no separate testing-policy exception is needed. Source review, TypeScript checks and builds remain permitted. Future coverage should prioritize stable end-to-end and API behavior, not implementation details or coverage counts. Builds do not establish runtime correctness; record dated observations and unverified outcomes in the package handoff.
+Do not add or run automated tests. This does not apply to AI agents using `agent-browser` for interactive verification of authorized work; no separate testing-policy exception is needed. Source review, TypeScript checks and builds remain permitted. Future coverage should prioritize stable end-to-end and API behavior, not implementation details or coverage counts. Builds do not establish runtime correctness; record dated observations and unverified outcomes in the task report or relevant linked supporting document.
 
 ## Local development and Nix builds
 
@@ -89,7 +89,7 @@ Use a task branch and worktree for concurrent work; edit canonical `main` only w
 
 **Accepted October 9, 2026:** follow Pi's lockstep workflow: the root manifest, workspace packages and shipped capability package (`packages/web/capabilities/package.json`, outside npm workspaces) share one SemVer version, while each package keeps its own changelog. Preserve `0.1.0` as the initial-development baseline; adding version metadata does not retroactively cut a release. Nix and the browser build derive their version from the web package manifest, not separate literals.
 
-During development, keep meaningful changes under each owning package’s `## [Unreleased]` section, using lower-level headings for work-package groups. Do not bump versions for individual work packages. At an explicitly requested release, select one version for the accumulated changes: patch for compatible fixes, minor for compatible additions, and major for incompatible public-contract changes after `1.0.0`. During `0.x` development, use minor bumps for breaking changes and document them; compatibility is not yet stable. Dependency versions and portable bundle format versions are separate identities.
+During development, keep meaningful changes under each owning package’s `## [Unreleased]` section, using concise feature or change headings where useful. Do not bump versions for individual work packages. At an explicitly requested release, select one version for the accumulated changes: patch for compatible fixes, minor for compatible additions, and major for incompatible public-contract changes after `1.0.0`. During `0.x` development, use minor bumps for breaking changes and document them; compatibility is not yet stable. Dependency versions and portable bundle format versions are separate identities.
 
 From the root, inside `nix develop`:
 
