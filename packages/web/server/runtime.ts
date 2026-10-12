@@ -272,6 +272,8 @@ export class DispatchRuntime {
       });
       registry.install(worker ? { ...shared.extension, sections: [...shared.extension.sections ?? [], workerWorkspaceSection] } : shared.extension);
       registry.install(shared.definitionOfDoneExtension);
+      registry.install(shared.sdk.extension);
+      shared.sdkExecutionAllowed = !worker;
       registry.install(CodingTools);
       registry.install(Coding);
       registry.install(Skills);
@@ -2174,7 +2176,7 @@ export class DispatchRuntime {
         if (bindings.some(item => !item)) { preview.blockers.push(`${incoming.name}: an assigned skill has an unresolved update.`); continue; }
         const skills = bindings.map(item => ({ id: item!.id, revision: item!.revision }));
         const desired = { name: incoming.name, description: incoming.description, instructions: incoming.instructions,
-          provider: incoming.provider, modelId: incoming.modelId, thinkingLevel: incoming.thinkingLevel,
+          executionBackend: incoming.executionBackend, provider: incoming.provider, modelId: incoming.modelId, thinkingLevel: incoming.thinkingLevel,
           skills, extensions: selection.extensions, tools: selection.tools };
         // The upstream text may be unchanged while a pinned assigned skill revision changes.
         const upstreamChanged = !entry || agentUpstreamContent(incoming) !== agentUpstreamContent(JSON.parse(entry.upstream));
@@ -2295,7 +2297,7 @@ export class DispatchRuntime {
       if (!sameNames(extensions, selection.extensions) || !sameNames(tools, selection.tools))
         throw new RuntimeError(409, `${agent.name} has a capability selection this bundle format cannot represent.`);
       bundle.agents.push({ key: `agent-${bundle.agents.length + 1}`, name: agent.name, description: agent.description,
-        instructions: agent.instructions, provider: agent.provider, modelId: agent.modelId, thinkingLevel: agent.thinkingLevel,
+        instructions: agent.instructions, executionBackend: agent.executionBackend, provider: agent.provider, modelId: agent.modelId, thinkingLevel: agent.thinkingLevel,
         capabilities, skills: (agent.skills ?? []).map(includeSkill),
         omittedConnections: new Set([...(agent.connections ?? []).map(connection => connection.id),
           ...this.connections.forAgent(id, managedIds(agent)).map(connection => connection.id)]).size });
@@ -2337,7 +2339,7 @@ export class DispatchRuntime {
         const id = randomUUID();
         const selection = capabilitySelection(agent.capabilities);
         catalog.agents.push({ id, revision: 1, archived: false, name: agent.name, description: agent.description,
-          instructions: agent.instructions, provider: agent.provider, modelId: agent.modelId, thinkingLevel: agent.thinkingLevel,
+          instructions: agent.instructions, executionBackend: agent.executionBackend, provider: agent.provider, modelId: agent.modelId, thinkingLevel: agent.thinkingLevel,
           skills: agent.skills.map(key => ({ id: skillIds.get(key)!, revision: 1 })),
           extensions: selection.extensions, tools: selection.tools, connections: [],
           companyId: scope.companyId, savedBy: scope.userId, createdAt: now, updatedAt: now });
@@ -2356,7 +2358,7 @@ export class DispatchRuntime {
     for (const agent of bundle.agents) {
       try {
         this.validateAgent({ name: agent.name, description: agent.description, instructions: agent.instructions,
-          provider: agent.provider, modelId: agent.modelId, thinkingLevel: agent.thinkingLevel });
+          executionBackend: agent.executionBackend, provider: agent.provider, modelId: agent.modelId, thinkingLevel: agent.thinkingLevel });
       } catch (error) {
         if (!(error instanceof RuntimeError)) throw error;
         blockers.push(`${agent.name}: ${error.message}`);
@@ -2439,7 +2441,7 @@ export class DispatchRuntime {
     this.requireCatalogOwner();
     this.validateAgent(input);
     const fingerprint = JSON.stringify([input.id, input.expectedRevision, input.name.trim(), input.description.trim(), input.instructions,
-      input.provider, input.modelId, input.thinkingLevel, input.capabilities?.slice().sort(), input.connectionIds?.slice().sort(), !!input.applyConnectionsToExisting, ...(input.skills === undefined ? [] : [input.skills])]);
+      input.provider, input.modelId, input.thinkingLevel, input.capabilities?.slice().sort(), input.connectionIds?.slice().sort(), !!input.applyConnectionsToExisting, ...(input.skills === undefined ? [] : [input.skills]), ...(input.executionBackend === undefined ? [] : [input.executionBackend])]);
     return this.harness.commit(async (tx) => {
       const catalog = await tx.doc(CatalogDoc);
       const priorRequest = input.requestId ? catalog.agents.find(agent => agent.companyId === scope.companyId && agent.savedBy === scope.userId && agent.saveRequestId === input.requestId) : undefined;
@@ -2451,6 +2453,7 @@ export class DispatchRuntime {
       if (input.id && !prior) throw new RuntimeError(404, "Agent not found.");
       if (prior?.archived) throw new RuntimeError(409, "This agent is archived. Create a new agent to use its configuration again.");
       if (prior && prior.revision !== input.expectedRevision) throw new RuntimeError(409, "The agent has changed. Reload it before saving.");
+      this.validateAgent({ ...input, executionBackend: input.executionBackend ?? prior?.executionBackend });
       const now = Date.now();
       const id = prior?.id ?? randomUUID();
       const skills = input.skills ?? prior?.skills ?? [];
@@ -2483,7 +2486,7 @@ export class DispatchRuntime {
       }
       const agent: StoredAgent = {
         id, name: input.name.trim(), description: input.description.trim(),
-        instructions: input.instructions, provider: input.provider, modelId: input.modelId, thinkingLevel: input.thinkingLevel,
+        instructions: input.instructions, executionBackend: input.executionBackend ?? prior?.executionBackend, provider: input.provider, modelId: input.modelId, thinkingLevel: input.thinkingLevel,
         skills, extensions: [...extensions, ...selection.extensions], tools: [...tools, ...selection.tools], connections: selectedConnections,
         revision: (prior?.revision ?? 0) + 1, archived: false, createdAt: prior?.createdAt ?? now, updatedAt: now, companyId: scope.companyId,
         ...(input.requestId ? { saveRequestId: input.requestId, saveFingerprint: fingerprint, savedBy: scope.userId } : {}),
@@ -2969,6 +2972,8 @@ export class DispatchRuntime {
     requireText(agent.name, "Agent name", 100);
     requireText(agent.description, "Description", 500, true);
     requireText(agent.instructions, "Instructions", 50_000, true);
+    if (agent.executionBackend !== undefined && !["pi", "claude-agent-sdk"].includes(agent.executionBackend)) throw new RuntimeError(400, "Unknown execution backend.");
+    if (agent.executionBackend === "claude-agent-sdk" && agent.provider !== "anthropic") throw new RuntimeError(400, "The Claude Agent SDK requires an Anthropic model.");
     requireText(agent.provider, "Provider", 100);
     if (agent.provider === "openai-codex") throw new RuntimeError(400, "Select an OpenAI model.");
     requireText(agent.modelId, "Model", 200);
@@ -3059,7 +3064,7 @@ function bundleFingerprint(bundle: PortableBundle) {
   // Fixed field order makes retries independent of JSON object property ordering.
   return createHash("sha256").update(JSON.stringify([bundle.formatVersion, bundle.id, bundle.version,
     bundle.agents.map(agent => [agent.key, agent.name, agent.description, agent.instructions, agent.provider,
-      agent.modelId, agent.thinkingLevel, agent.capabilities, agent.skills, agent.omittedConnections]),
+      agent.modelId, agent.thinkingLevel, agent.capabilities, agent.skills, agent.omittedConnections, ...(agent.executionBackend === undefined ? [] : [agent.executionBackend])]),
     bundle.skills.map(skill => [skill.key, skill.name, skill.description, skill.instructions])])).digest("hex");
 }
 
@@ -3073,17 +3078,17 @@ function portableSkill(key: string, skill: Pick<StoredSkill, "name" | "descripti
 function skillContent(skill: Pick<StoredSkill, "name" | "description" | "instructions">) {
   return JSON.stringify([skill.name, skill.description, skill.instructions]);
 }
-function agentContent(agent: Pick<StoredAgent, "name" | "description" | "instructions" | "provider" | "modelId" | "thinkingLevel" | "skills" | "extensions" | "tools">) {
-  return { name: agent.name, description: agent.description, instructions: agent.instructions, provider: agent.provider,
+function agentContent(agent: Pick<StoredAgent, "name" | "description" | "instructions" | "executionBackend" | "provider" | "modelId" | "thinkingLevel" | "skills" | "extensions" | "tools">) {
+  return { name: agent.name, description: agent.description, instructions: agent.instructions, ...(agent.executionBackend ? { executionBackend: agent.executionBackend } : {}), provider: agent.provider,
     modelId: agent.modelId, thinkingLevel: agent.thinkingLevel, skills: agent.skills ?? [],
     extensions: (agent.extensions ?? []).filter(name => !isMcpExtension(name)).sort(), tools: (agent.tools ?? []).filter(name => !isMcpTool(name)).sort() };
 }
 function agentUpstreamContent(agent: PortableAgent) {
   return JSON.stringify([agent.name, agent.description, agent.instructions, agent.provider, agent.modelId, agent.thinkingLevel,
-    [...agent.capabilities].sort(), agent.skills]);
+    [...agent.capabilities].sort(), agent.skills, ...(agent.executionBackend === undefined ? [] : [agent.executionBackend])]);
 }
 function portableTrackedAgent(key: string, agent: StoredAgent, skills: TrackedBundleEntry[]): PortableAgent {
-  return { key, name: agent.name, description: agent.description, instructions: agent.instructions, provider: agent.provider,
+  return { key, name: agent.name, description: agent.description, instructions: agent.instructions, ...(agent.executionBackend ? { executionBackend: agent.executionBackend } : {}), provider: agent.provider,
     modelId: agent.modelId, thinkingLevel: agent.thinkingLevel, capabilities: publicAgent(agent).capabilities ?? [],
     skills: (agent.skills ?? []).map(selection => {
       const entry = skills.find(item => item.id === selection.id);

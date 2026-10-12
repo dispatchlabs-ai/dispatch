@@ -49,6 +49,7 @@ export async function openModels(
       }))).flat();
       const choices = !model || available.some((item) => item.provider === model.provider && item.id === model.id) ? available : [model, ...available];
       return {
+        sdkModels: models.getModels().filter(item => item.provider === "anthropic").map((item): ModelOption => ({ provider: item.provider, id: item.id, name: item.name, reasoning: item.reasoning, thinkingLevels: [...getSupportedThinkingLevels(item)] })),
         models: choices.map((item): ModelOption => ({ provider: item.provider, id: item.id, name: item.name, reasoning: item.reasoning, thinkingLevels: [...getSupportedThinkingLevels(item)] })),
         providerReady: available.some(item => item.provider === defaultAgent.provider),
       };

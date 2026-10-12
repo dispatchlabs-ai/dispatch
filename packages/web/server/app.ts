@@ -40,6 +40,7 @@ const identities = z.array(identity).refine(values => new Set(values).size === v
 const agentSchema = z.object({
   id: z.string().min(1).max(200).optional(), expectedRevision: z.number().int().positive().optional(),
   name: z.string().trim().min(1).max(100), description: z.string().max(500), instructions: z.string().max(50_000),
+  executionBackend: z.enum(["pi", "claude-agent-sdk"]).optional(),
   provider: z.string().min(1).max(100), modelId: z.string().min(1).max(200),
   thinkingLevel: z.enum(["off", "minimal", "low", "medium", "high", "xhigh", "max"]),
   capabilities: z.array(z.enum(["files-and-commands", "image-generation", "web-reading", "web-search", "edit-definition-of-done"])).max(5).optional(),

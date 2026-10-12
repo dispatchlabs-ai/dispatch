@@ -145,7 +145,11 @@ export interface SaveSkillInput {
   name: string; description: string; instructions: string;
 }
 
+export type ExecutionBackend = "pi" | "claude-agent-sdk";
+
 export interface AgentDraft {
+  /** Missing on historical definitions means the native Pi agent loop. */
+  executionBackend?: ExecutionBackend;
   name: string;
   description: string;
   instructions: string;
@@ -322,6 +326,8 @@ export interface ApplicationConfig {
   company: { id: string; name: string };
   defaultAgentId: string;
   models: ModelOption[];
+  /** Known SDK models, independent of Pi credential readiness; not a login-status assertion. */
+  sdkModels?: ModelOption[];
   providerReady: boolean;
 }
 
