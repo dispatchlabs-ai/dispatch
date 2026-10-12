@@ -9,7 +9,6 @@ every hit needs review. Malformed/unsupported image layers fail with exit 1.
 Known-pattern coverage cannot prove absence of arbitrary or encoded secrets.
 """
 import hashlib
-import io
 import json
 import re
 import sys
@@ -41,7 +40,9 @@ def main(archive):
     report = {"archiveSHA256": None, "format": None, "layers": 0,
               "entries": 0, "regularFiles": 0, "contentHits": [], "pathHits": [],
               "limits": "Known-pattern scan, not security clearance; no size/name exclusions. "
-                        "Paths may contain sensitive names; keep receipts private."}
+                        "64 MiB chunks use 4 KiB overlap: longer matches crossing chunk "
+                        "boundaries can be missed. Paths may contain sensitive names; "
+                        "keep receipts private."}
     with open(archive, "rb") as f:
         digest = hashlib.sha256()
         for data in iter(lambda: f.read(CHUNK), b""):
