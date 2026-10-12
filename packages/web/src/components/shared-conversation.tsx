@@ -3,7 +3,7 @@ import { DefinitionOfDone, type CriteriaDraft } from "./definition-of-done";
 import type { OpenInstanceForm } from "./add-instance";
 import { MessageAttachment } from "./message-attachment";
 import { AttachmentPicker, DraftAttachments, type AttachmentComposerProps } from "./composer-attachments";
-import { describeAgentTools } from "../lib/agent-tools";
+import { describeAgentTools, museToolAccessHint } from "../lib/agent-tools";
 import type { Message } from "@earendil-works/pi-ai";
 import { Tabs } from "@base-ui/react/tabs";
 import { ArrowUp, Check, Copy, Ear, LockKeyhole, Pencil, Reply, RotateCcw, Square, UserPlus, X } from "lucide-react";
@@ -226,7 +226,7 @@ export function SharedContextPanel({ criteriaDraft, onCriteriaDraft, snapshot, a
         <h3>{mentionLabel(participant, snapshot.participants)}</h3>
         {participant.kind === "agent" ? <>
           <AgentRemoval key={`${snapshot.conversation.id}:${participant.id}`} participant={participant} chatId={snapshot.conversation.id} canParticipate={snapshot.conversation.canParticipate !== false} onSnapshot={onSnapshot} />
-          <dl className="context-facts"><div><dt>Base revision applied</dt><dd>{participant.agent.name} · {participant.agentRevision}</dd></div><div><dt>Runtime</dt><dd>{participant.agent.executionBackend === "muse-code" ? "Muse Code" : participant.agent.executionBackend === "claude-agent-sdk" ? "Agent SDK" : "Pi"}</dd></div><div><dt>Model</dt><dd>{models.find(model => model.id === participant.agent.modelId && model.provider === participant.agent.provider)?.name || participant.agent.modelId}</dd></div><div><dt>Provider</dt><dd>{participant.agent.provider}</dd></div><div><dt>Thinking</dt><dd>{participant.agent.thinkingLevel}</dd></div><div><dt>Tools</dt><dd>{describeAgentTools(participant.agent.tools)}</dd></div>{participant.agent.cwd ? <div><dt>Local workspace</dt><dd>{participant.agent.cwd}</dd></div> : null}</dl>
+          <dl className="context-facts"><div><dt>Base revision applied</dt><dd>{participant.agent.name} · {participant.agentRevision}</dd></div><div><dt>Runtime</dt><dd>{participant.agent.executionBackend === "muse-code" ? "Muse Code" : participant.agent.executionBackend === "claude-agent-sdk" ? "Agent SDK" : "Pi"}</dd></div><div><dt>Model</dt><dd>{models.find(model => model.id === participant.agent.modelId && model.provider === participant.agent.provider)?.name || participant.agent.modelId}</dd></div><div><dt>Provider</dt><dd>{participant.agent.provider}</dd></div><div><dt>Thinking</dt><dd>{participant.agent.thinkingLevel}</dd></div><div><dt>{participant.agent.executionBackend === "muse-code" ? "Dispatch tools" : "Tools"}</dt><dd>{describeAgentTools(participant.agent.tools, participant.agent.executionBackend)}</dd></div>{participant.agent.cwd ? <div><dt>Local workspace</dt><dd>{participant.agent.cwd}</dd></div> : null}</dl>
           {participant.savedAgentRevision !== undefined && participant.savedAgentRevision !== participant.agentRevision ? <p role="status">Base revision {participant.savedAgentRevision} saved · Pending</p> : null}
           {participant.upgradeError ? <Notice>{participant.upgradeError}</Notice> : null}
           <details><summary>Instance connections{participant.connectionsPending ? " · Pending update" : ""}</summary>{participant.agent.connections?.length ? <ul>{participant.agent.connections.map(connection => <li key={connection.id}>{connection.name}</li>)}</ul> : <p>No connections.</p>}</details>
@@ -242,7 +242,7 @@ export function SharedContextPanel({ criteriaDraft, onCriteriaDraft, snapshot, a
           <details><summary>Instance instructions</summary><Markdown>{participant.instanceInstructions || "No additional instructions."}</Markdown></details>
           {snapshot.conversation.canParticipate !== false && agents.some(agent => agent.id === participant.agentDefinitionId && !agent.archived) && !snapshot.participants.some(person => person.kind === "agent" && person.agentDefinitionId === participant.agentDefinitionId && person.membership === "removing") ? <Button variant="secondary" onClick={() => onAddInstance(participant.agentDefinitionId)}>Add another instance</Button> : null}
           <ParticipantRunDetails participant={participant} activities={snapshot.activities} />
-          <p>Coding tools use the service machine’s access. This workspace is not a sandbox.</p>
+          <p>{participant.agent.executionBackend === "muse-code" ? museToolAccessHint : "Coding tools use the service machine’s access."} This workspace is not a sandbox.</p>
         </> : <p>Human participant since {new Date(participant.joinedAt).toLocaleDateString()}.</p>}
         <details><summary>Participant identity</summary><p className="identity-value">{participant.id}</p></details>
       </section> : <p className="participant-hint">Select a participant to see their details.</p>}

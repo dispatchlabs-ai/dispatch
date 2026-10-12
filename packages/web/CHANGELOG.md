@@ -5,6 +5,7 @@
 ### Muse Code execution (candidate)
 
 - Add native Muse Code runtime/model selection, account-login defaults with optional explicit API keys, and Pi-owned execution/tool/publication wiring.
+- Distinguish optional Dispatch tools from native Muse access in agent and participant summaries; explain runner access without implying a sandbox.
 - Record isolated editor/save acceptance and pending native inference, tool restriction, Stop and recovery qualification; not yet deployment-ready.
 
 ### Agent SDK execution

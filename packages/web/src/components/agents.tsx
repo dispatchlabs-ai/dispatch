@@ -10,7 +10,7 @@ import type {
   ThinkingLevel,
 } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
-import { describeAgentTools } from "../lib/agent-tools";
+import { describeAgentTools, museToolAccessHint } from "../lib/agent-tools";
 import { useSession } from "../lib/session";
 import { Button, Field, Input, Modal, Notice, Select, Spinner } from "./ui";
 import { AgentSkillsEditor, AgentSkillsPanel, type SkillEditing } from "./agent-skills";
@@ -142,6 +142,8 @@ export function AgentsPage({
     );
 
   const isDefault = agent.id === config.defaultAgentId;
+  const isMuse = agent.executionBackend === "muse-code";
+  const toolCount = agent.tools.length + (agent.skills?.length ? 1 : 0);
   const model = modelsForRuntime(config, agent.executionBackend).find(
     (model) => model.provider === agent.provider && model.id === agent.modelId,
   );
@@ -178,7 +180,7 @@ export function AgentsPage({
           <p className="agent-phone-facts">
             {agent.executionBackend && agent.executionBackend !== "pi" ? `${runtimeLabel(agent.executionBackend)} · ` : null}
             {model?.name || agent.modelId || "No model configured"} ·{" "}
-            {thinkingLabel(agent.thinkingLevel)} thinking · {agent.tools.length || agent.skills?.length ? `${agent.tools.length + (agent.skills?.length ? 1 : 0)} tools` : "No tools"}
+            {thinkingLabel(agent.thinkingLevel)} thinking · {toolCount ? `${toolCount} ${isMuse ? "optional Dispatch tools" : "tools"}` : isMuse ? "No optional Dispatch tools" : "No tools"}
           </p>
           <section className="agent-instructions">
             <h2>Instructions</h2>
@@ -308,6 +310,7 @@ export function AgentDetails({
 }) {
   const saved = editing ? editing.saved : agent;
   const current = editing?.draft ?? saved;
+  const isMuse = current?.executionBackend === "muse-code";
   const modelName = (provider: string, id: string, backend: AgentDraft["executionBackend"]) =>
     (config ? modelsForRuntime(config, backend) : []).find(
       (model) => model.provider === provider && model.id === id,
@@ -374,10 +377,11 @@ export function AgentDetails({
               />
               <DraftFact label="Skills" value={String(current.skills?.length ?? 0)} saved={editing && saved ? String(saved.skills?.length ?? 0) : undefined} />
               <div>
-                <dt>Tools</dt>
-                <dd>{editing ? `${describeCapabilities(editing.draft.capabilities)} · ${editing.connectionIds.length + (saved?.connections?.filter(connection => connection.source === "operator").length ?? 0)} connections` : describeAgentTools([...(saved?.tools ?? []), ...(saved?.skills?.length ? ["load_skill"] : [])])}</dd>
+                <dt>{isMuse ? "Dispatch tools" : "Tools"}</dt>
+                <dd>{editing ? `${describeCapabilities(editing.draft.capabilities, current.executionBackend)} · ${editing.connectionIds.length + (saved?.connections?.filter(connection => connection.source === "operator").length ?? 0)} connections` : describeAgentTools([...(saved?.tools ?? []), ...(saved?.skills?.length ? ["load_skill"] : [])], current.executionBackend)}</dd>
               </div>
             </dl>
+            {isMuse ? <p className="field-hint">{museToolAccessHint} This workspace is not a sandbox.</p> : null}
             {contentChanged.length ? (
               <section className="draft-changes">
                 <h3>Unsaved changes</h3>
@@ -655,7 +659,8 @@ function AgentEditor({
             </fieldset>
             </details>
             <details className="agent-settings-section" data-agent-section="Capabilities" tabIndex={-1} open>
-              <summary><strong>Capabilities</strong><span>{describeCapabilities(draft.capabilities)}</span></summary>
+              <summary><strong>{backend === "muse-code" ? "Dispatch capabilities" : "Capabilities"}</strong><span>{describeCapabilities(draft.capabilities, backend)}</span></summary>
+              {backend === "muse-code" ? <p className="field-hint">{museToolAccessHint}</p> : null}
               <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("files-and-commands") ?? false} onChange={event => update("capabilities", event.target.checked ? [...(draft.capabilities ?? []), "files-and-commands"] : (draft.capabilities ?? []).filter(capability => capability !== "files-and-commands"))} /><span>Files and commands<small>Read and edit files, and run commands in the agent's working directory. Commands use the Dispatch service account.</small></span></label>
               <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("image-generation") ?? false} onChange={event => update("capabilities", event.target.checked ? [...(draft.capabilities ?? []), "image-generation"] : (draft.capabilities ?? []).filter(capability => capability !== "image-generation"))} /><span>Image generation<small>OpenAI · paid generation and editing</small></span></label>
               <label className="choice-row capability-choice"><input type="checkbox" disabled={busy} checked={draft.capabilities?.includes("edit-definition-of-done") ?? false} onChange={event => update("capabilities", event.target.checked ? [...(draft.capabilities ?? []), "edit-definition-of-done"] : (draft.capabilities ?? []).filter(capability => capability !== "edit-definition-of-done"))} /><span>Edit Definition of Done<small>Update shared chat completion criteria</small></span></label>
@@ -690,6 +695,6 @@ function AgentEditor({
   );
 }
 
-function describeCapabilities(capabilities: AgentDraft["capabilities"]) {
-  return capabilities?.map(capability => capability === "files-and-commands" ? "Files and commands" : capability === "web-reading" ? "Web reading" : capability === "web-search" ? "Web search" : capability === "edit-definition-of-done" ? "Edit Definition of Done" : "Image generation").join(", ") || "Conversation only";
+function describeCapabilities(capabilities: AgentDraft["capabilities"], backend?: ExecutionBackend) {
+  return capabilities?.map(capability => capability === "files-and-commands" ? "Files and commands" : capability === "web-reading" ? "Web reading" : capability === "web-search" ? "Web search" : capability === "edit-definition-of-done" ? "Edit Definition of Done" : "Image generation").join(", ") || (backend === "muse-code" ? "None selected" : "Conversation only");
 }
