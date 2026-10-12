@@ -130,7 +130,7 @@ export function ChatPanel({ focusComposer, onComposerFocused, agents, active: vi
       {snapshot?.conversation.status !== "idle" ? <span className={`status-badge status-${snapshot?.conversation.status || "idle"}`}>{snapshot ? chatStatusLabel(snapshot) : "Loading"}</span> : null}</div>
     </header>
     {connection === "reconnecting" ? <div className="chat-connection-notice">
-      <Notice tone="info">Reconnecting to this chat. Agent work continues; updates will appear when the connection returns.</Notice>
+      <Notice tone="info">Reconnecting to this chat. Updates will appear when the connection returns.</Notice>
     </div> : null}
         {loadError ? <div className="chat-load-error">
           <Notice>{loadError}</Notice>
