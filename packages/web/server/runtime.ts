@@ -19,7 +19,7 @@ import { PostgresStorage } from "./storage/postgres/storage.js";
 import { openPiStorage, type PiStorageConfig } from "./storage/open.js";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
-import type { CreateAgentInstanceInput, CreateAgentInstanceResult, AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, ProjectSpecDocument, ProjectMarkdownDocument, SaveProjectMarkdownInput, ImportProjectMarkdownInput, ProjectSpecReadInput, ProjectSpecPage, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
+import type { ProjectInstructionsDocument, SaveProjectInstructionsInput, CreateAgentInstanceInput, CreateAgentInstanceResult, AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, ProjectSpecDocument, ProjectMarkdownDocument, SaveProjectMarkdownInput, ImportProjectMarkdownInput, ProjectSpecReadInput, ProjectSpecPage, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
 import type { BundleExportInput, BundleImportResult, BundlePreview, PortableBundle, PortableAgent, PortableSkill } from "../src/shared/bundles.js";
 import type { GitHubInstallation, GitHubBundleSource, GitHubBundlePreview, GitHubBundleApplyInput, GitHubBundleApplyResult } from "../src/shared/github-bundles.js";
 import { isManagedConnection } from "../src/shared/contracts.js";
@@ -27,6 +27,7 @@ import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata } 
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { projectSourcesSchema } from "../src/shared/project-sources.js";
 import { ProjectMarkdownDoc, readProjectMarkdown, saveProjectMarkdown, replayProjectMarkdown, markdownHash, projectMarkdownPage } from "./project-markdown.js";
+import { readProjectInstructions, saveProjectInstructions } from "./project-instructions.js";
 import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
 import { projectChatsSchema, chatSourceUrl, type ProjectChatsInput, type ProjectChatsResult, type ProjectChatMetadata, type ProjectChatReadInput, type ProjectChatResult } from "./project-chat-context.js";
 import { readProjectChat } from "./project-chat-reader.js";
@@ -1334,6 +1335,18 @@ export class DispatchRuntime {
     };
   }
 
+  /** Routing filter only, never authorization: chat keys currently bound to one project. */
+  async projectConversationKeys(companyId: string, projectId: string): Promise<Set<string>> {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    return this.harness.commit(async tx => {
+      const keys = new Set<string>();
+      for (const chat of (await tx.doc(CatalogDoc)).chats) {
+        if (chat.companyId === companyId && (await tx.doc(SharedDoc, nativeId(chat.id))).sharedProjectId === projectId) keys.add(chat.id);
+      }
+      return keys;
+    }, context);
+  }
+
   /** Directory authority and title policy are read together; no worker is started. */
   async directoryChatSummaries(scope: RuntimeScope): Promise<{ conversation: ChatSummary; automaticTitle: boolean }[]> {
     if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
@@ -1373,7 +1386,7 @@ export class DispatchRuntime {
 
   private projectSummary(project: SharedProjectRecord, scope: RuntimeScope): Project {
     const access = projectAccess(project, scope, this.readAll(scope));
-    return { id: project.id, name: project.name, ...(project.cwd ? { cwd: project.cwd } : {}), createdAt: project.createdAt, kind: "shared", revision: project.revision,
+    return { instructionsRevision: project.instructionsRevision ?? 0, id: project.id, name: project.name, ...(project.cwd ? { cwd: project.cwd } : {}), createdAt: project.createdAt, kind: "shared", revision: project.revision,
       repositories: (project.repositories ?? []).map(repository => ({ ...repository })), ...(project.spec ? { spec: { ...project.spec } } : {}), ...(project.specRevision ? { specRevision: project.specRevision } : {}),
       members: project.members.map(({ userId, role }) => ({ userId, role })), defaultAgentDefinitionIds: [...project.defaultAgentDefinitionIds], canManage: access.manage, canParticipate: access.participate };
   }
@@ -1571,6 +1584,16 @@ export class DispatchRuntime {
       if (current.binding !== expectedBinding) throw new ProjectSpecError(409, "Project spec reference or settings changed. Draft retained; reload and review.");
       return current;
     }, context);
+  }
+
+  async getProjectInstructions(scope: RuntimeScope, id: string): Promise<ProjectInstructionsDocument> {
+    this.requireCatalogOwner();
+    return this.harness.commit(tx => readProjectInstructions(tx, scope, id, this.readAll(scope)), context);
+  }
+
+  async saveProjectInstructions(scope: RuntimeScope, id: string, input: SaveProjectInstructionsInput): Promise<ProjectInstructionsDocument> {
+    this.requireCatalogOwner();
+    return this.harness.commit(tx => saveProjectInstructions(tx, scope, id, input), context);
   }
 
   async getProjectMarkdown(scope: RuntimeScope, id: string, revision?: number): Promise<ProjectMarkdownDocument> {
@@ -2694,7 +2717,8 @@ export class DispatchRuntime {
     if (this.closed) return;
     for (const change of publication.changes) {
       if (change.type === "document" || change.type === "document.copy") {
-        if (change.record.kind === CatalogDoc.definition.kind) this.upgradeCatalogDirty = true;
+        // Project instructions adopt independently of agent-definition revisions.
+        if (change.record.kind === CatalogDoc.definition.kind || change.record.kind === ProjectsDoc.definition.kind) this.upgradeCatalogDirty = true;
         else if (change.record.kind === SharedDoc.definition.kind && change.conversationId) this.upgradeRooms.add(change.conversationId);
         else if (change.record.kind === LiveDoc.definition.kind || change.record.kind === InboxDoc.definition.kind) {
           const room = change.conversationId && this.pendingUpgradeRooms.get(change.conversationId);
@@ -2724,15 +2748,18 @@ export class DispatchRuntime {
 
   private async reconcileUpgrades(rooms?: ReadonlySet<ConversationId>) {
     const catalog = (await this.harness.snapshot(CatalogDoc, context))!;
+    const projects = (await this.harness.snapshot(ProjectsDoc, context))?.projects ?? {};
     for (const chat of catalog.chats) {
       const roomId = nativeId(chat.id);
       if (rooms && !rooms.has(roomId)) continue;
       const room = await this.harness.snapshot(SharedDoc, roomId, context);
+      const projectRevision = room?.sharedProjectId !== undefined ? projects[room.sharedProjectId]?.instructionsRevision ?? 0 : undefined;
       for (const member of room?.members ?? []) {
         if (member.conversationId) this.pendingUpgradeRooms.delete(member.conversationId);
         if (member.kind !== "agent" || !member.agentDefinitionId || (member.membership && member.membership !== "active")) continue;
         const latest = latestAgent(catalog, chat.companyId, member.agentDefinitionId);
-        if ((!latest || latest.archived || latest.revision === member.agentRevision) && !member.pendingConnectionIds && !member.pendingWorkerMcp && !member.connectionsRefreshPending) continue;
+        if ((!latest || latest.archived || latest.revision === member.agentRevision) && (projectRevision === undefined || projectRevision === member.projectInstructionsRevision)
+          && !member.pendingConnectionIds && !member.pendingWorkerMcp && !member.connectionsRefreshPending) continue;
         // Index before awaiting the idle check, so a settling task cannot lose its wakeup.
         if (member.conversationId) this.pendingUpgradeRooms.set(member.conversationId, roomId);
         try {
@@ -2760,8 +2787,13 @@ export class DispatchRuntime {
     const desired = mapping ? catalog.agents.find(agent => agent.companyId === companyId && agent.id === member.agentDefinitionId && agent.revision === mapping.desiredRevision) : latest;
     const agent = latest && !latest.archived && (!this.worker || mapping) ? desired : undefined;
     const updateBase = agent && agent.revision !== member.agentRevision;
-    if (!updateBase && !member.pendingConnectionIds && !member.pendingWorkerMcp && !member.connectionsRefreshPending) return;
-    if ((await tx.doc(SharedDoc, roomId)).stopping) return;
+    const room = await tx.doc(SharedDoc, roomId);
+    const project = room.sharedProjectId ? (await tx.doc(ProjectsDoc)).projects[room.sharedProjectId] : undefined;
+    // Latest-only adoption: compare revisions before idle/task scans; intermediate revisions are never replayed.
+    // An unset adopted revision (pre-feature agent) binds once, even at saved revision 0, so display never infers adoption.
+    const updateProject = room.sharedProjectId !== undefined && (project?.instructionsRevision ?? 0) !== member.projectInstructionsRevision;
+    if (!updateBase && !updateProject && !member.pendingConnectionIds && !member.pendingWorkerMcp && !member.connectionsRefreshPending) return;
+    if (room.stopping) return;
     const id = member.conversationId;
     if ((await tx.doc(LiveDoc, id)).run || (await tx.doc(InboxDoc, id)).items.length || await this.hasUnfinishedAgentWork(tx, id, roomId)) return;
     if (member.pendingWorkerMcp) {
@@ -2797,6 +2829,8 @@ export class DispatchRuntime {
       member.agent = { ...publicAgent(agent), connections, extensions: extensions.map(item => item.name), tools: tools.map(item => item.name), ...(cwd ? { cwd } : {}) };
       member.agentRevision = agent.revision;
     }
+    // Independent of base adoption, including unchanged, archived or unmapped definitions.
+    if (updateProject) await this.shared.bindProjectInstructions(tx, room, member);
     if (member.upgradeError) delete member.upgradeError;
     if (this.worker) await this.updateWorkerParticipantReport(tx);
   }

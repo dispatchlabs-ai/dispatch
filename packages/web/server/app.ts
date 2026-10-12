@@ -111,9 +111,10 @@ export function createApp(options: AppOptions) {
   const projectArchiveLimit = bodyLimit({ maxSize: 64 * 1024 * 1024 + 1024, onError: c => c.json({ error: { code: "too_large", message: "Project archive request is too large." } }, 413) });
   // JSON escaping can expand a 512 KiB text file up to sixfold.
   const specLimit = bodyLimit({ maxSize: 6 * 512 * 1024 + 1024, onError: c => c.json({ error: { code: "too_large", message: "Spec request is too large." } }, 413) });
+  const instructionsLimit = bodyLimit({ maxSize: 6 * 50_000 + 1024, onError: c => c.json({ error: { code: "too_large", message: "Instructions request is too large." } }, 413) });
   const isUpload = (method: string, path: string) => method === "POST" && /^\/api\/chats\/[^/]+\/attachments$/.test(path);
   // Upload bytes are counted only after authentication and conversation authorization below.
-  app.use("/api/*", (c, next) => isUpload(c.req.method, c.req.path) ? next() : /^\/api\/project-archives\/(preview|import)$/.test(c.req.path) ? projectArchiveLimit(c, next) : /^\/api\/bundles\/(preview|import)$/.test(c.req.path) ? bundleLimit(c, next) : c.req.method === "POST" && /^\/api\/projects\/[^/]+\/spec$/.test(c.req.path) ? specLimit(c, next) : jsonLimit(c, next));
+  app.use("/api/*", (c, next) => isUpload(c.req.method, c.req.path) ? next() : /^\/api\/project-archives\/(preview|import)$/.test(c.req.path) ? projectArchiveLimit(c, next) : /^\/api\/bundles\/(preview|import)$/.test(c.req.path) ? bundleLimit(c, next) : c.req.method === "POST" && /^\/api\/projects\/[^/]+\/spec$/.test(c.req.path) ? specLimit(c, next) : c.req.method === "POST" && /^\/api\/projects\/[^/]+\/instructions$/.test(c.req.path) ? instructionsLimit(c, next) : jsonLimit(c, next));
   app.use("/api/*", async (c, next) => {
     c.header("Cache-Control", "no-store");
     if (!["GET", "HEAD"].includes(c.req.method)) {
@@ -223,6 +224,15 @@ export function createApp(options: AppOptions) {
     return c.json({ archive: await runtime.exportProjectArchive(c.get("principal"), c.req.param("id"), input.chatIds) });
   });
   app.get("/api/projects/:id/history", async c => c.json({ archive: await runtime.getProjectArchive(c.get("principal"), c.req.param("id")) }));
+  app.get("/api/projects/:id/instructions", async c => {
+    c.header("Cache-Control", "no-store");
+    return c.json({ instructions: await runtime.getProjectInstructions(c.get("principal"), c.req.param("id")) });
+  });
+  app.post("/api/projects/:id/instructions", async c => {
+    const input = z.object({ requestId, expectedRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER), content: z.string().max(50_000) }).strict().parse(await c.req.json());
+    c.header("Cache-Control", "no-store");
+    return c.json({ instructions: await runtime.saveProjectInstructions(c.get("principal"), c.req.param("id"), input) });
+  });
   app.get("/api/projects/:id/spec", async c => {
     c.header("Cache-Control", "no-store");
     const revision = z.coerce.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional().parse(c.req.query("revision"));

@@ -7,6 +7,14 @@
 - Add a separate Codex images connection using Pi-owned OAuth login/refresh and saved account selection, without changing agents' chat providers or copying CLI credentials.
 - Select subscription or API-key image transport explicitly; prefer configured Codex access by default, reject incompatible credentials/controls before submission, and never retry a provider failure through the other billing route.
 
+### Project-wide agent instructions
+
+- Add a project-owned Markdown instructions setting and Projects editor with manager-only, revision-checked saves, no-op revision handling and actor-scoped retry receipts; keep spec and settings revisions separate.
+- Preserve editor drafts and original-request retries across workspace navigation; distinguish conflicting, rejected and uncertain saves, with read-only review before explicit reconciliation and per-agent adopted-revision inspection.
+- Render adopted execution snapshots through stock Pi Durable's native project-instructions section, without copying project rules into reusable definitions or treating prompt text as permission grants.
+- Adopt only the latest saved rules at safe idle boundaries, independently of agent-definition upgrades; initialize later invitees with current rules and propagate hosted changes without retiring active workers on acknowledgement failure.
+
+
 ### Agent project context
 
 - Add project-scoped chat listing and passive public-history/detail reads without joining source chats or resuming their work; preserve project authorization on every page and refuse out-of-project IDs.

@@ -113,10 +113,13 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
       throw error;
     }
   }
-  async function acknowledgePolicy(companyId?: string, requireRevocationFence = true) {
+  async function acknowledgePolicy(companyId?: string, requireRevocationFence = true, conversationIds?: ReadonlySet<string>) {
+    const targets = routes.list().filter(route => (!companyId || route.companyId === companyId) && (!conversationIds || conversationIds.has(route.conversationId)));
+    // A scoped propagation with no routes has nothing to acknowledge; unscoped callers keep the launcher reachability check.
+    if (conversationIds && !targets.length) return;
     const status = await launcher<LauncherStatus>("status");
     if (!status.driverReachable) throw new RuntimeError(503, "Cannot confirm worker policy propagation.");
-    for (const route of routes.list().filter(route => !companyId || route.companyId === companyId)) {
+    for (const route of targets) {
       const attempt = status.attempts.find(item => item.attemptId === route.attemptId);
       if (!attempt && !requireRevocationFence) continue;
       if (!attempt) {
@@ -212,6 +215,15 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
       return policyChange(async () => {
         const result = await directory.saveProject(scope, id, input);
         await acknowledgePolicy(scope.companyId);
+        return result;
+      });
+    },
+    async saveProjectInstructions(scope, id, input) {
+      return policyChange(async () => {
+        const result = await directory.saveProjectInstructions(scope, id, input);
+        // Non-revoking and project-scoped: propagation failure leaves the save committed, never retires
+        // active workers, and unrelated projects' workers cannot fail this save. Same-request retry propagates again.
+        await acknowledgePolicy(scope.companyId, false, await directory.projectConversationKeys(scope.companyId, id));
         return result;
       });
     },
@@ -317,6 +329,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
   return {
     importProjectArchive: directory.importProjectArchive.bind(directory),
     getProjectArchive: directory.getProjectArchive.bind(directory),
+    getProjectInstructions: directory.getProjectInstructions.bind(directory),
     getProjectMarkdown: directory.getProjectMarkdown.bind(directory),
     saveProjectMarkdown: directory.saveProjectMarkdown.bind(directory),
     getLegacyProjectSpec: directory.getLegacyProjectSpec.bind(directory),

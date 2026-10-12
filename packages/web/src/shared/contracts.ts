@@ -68,6 +68,7 @@ export interface AgentParticipant extends ParticipantIdentity {
   agentDefinitionId: string;
   agentRevision: number;
   savedAgentRevision?: number;
+  projectInstructionsRevision?: number;
   upgradeError?: string;
   connectionsPending?: boolean;
   membership: "active" | "removing" | "removed";
@@ -261,6 +262,9 @@ export type SaveProjectMarkdownInput = { requestId: string; expectedRevision: nu
 export type ImportProjectMarkdownInput = { requestId: string; expectedProjectRevision: number; sourceVersion: string; contentHash: string };
 
 export type ProjectMember = { userId: string; role: "manager" | "member" };
+export type ProjectInstructionsDocument = { projectId: string; revision: number; content: string };
+export type SaveProjectInstructionsInput = { requestId: string; expectedRevision: number; content: string };
+
 export interface SaveProjectInput {
   requestId: string; expectedRevision: number; name: string;
   members: ProjectMember[]; defaultAgentDefinitionIds: string[];
@@ -270,6 +274,7 @@ export interface SaveProjectInput {
 }
 
 export type Project = {
+  instructionsRevision: number;
   cwd?: string;
   repositories?: ProjectRepository[];
   spec?: ProjectSpec;
