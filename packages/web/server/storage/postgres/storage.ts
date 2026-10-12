@@ -1,5 +1,6 @@
 // Adapted from @earendil-works/pi-durable 1.1.0 (MIT); see NOTICE.
 import type { Context, JsonValue } from "@earendil-works/chord";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { apply, type Op } from "@earendil-works/chord/delta";
 import { StorageRejected } from "@earendil-works/pi-durable";
 
@@ -164,8 +165,20 @@ export class PostgresStorage implements Storage {
     return new PostgresStorage(await PostgresDatabase.open(options));
   }
 
+  /**
+   * Read existing history without taking the store-owner lock or starting a Harness.
+   * All reads share one repeatable-read, read-only SQL snapshot. The callback must
+   * finish its reads before returning; the storage is closed on success or failure.
+   * Authorization and public/private projection remain the caller's responsibility.
+   */
+  static async readSnapshot<T>(options: PostgresStorageOptions, read: (storage: Storage) => Promise<T>): Promise<T> {
+    const storage = new PostgresStorage(await PostgresDatabase.openReadSnapshot(options));
+    try { return await read(storage); }
+    finally { await storage.close(BACKGROUND_CONTEXT); }
+  }
+
   async commit(writes: readonly StorageWrite[], _context: Context): Promise<Seq> {
-    this.assertOpen();
+    this.assertWritable();
     const documentActions = this.prepareDocumentActions(writes);
     const candidateNextId = this.candidateNextId(writes);
     return this.db.transaction(async (transaction) => {
@@ -190,7 +203,7 @@ export class PostgresStorage implements Storage {
   }
 
   async mintId<I extends Id<string>>(): Promise<I> {
-    this.assertOpen();
+    this.assertWritable();
     return this.db.transaction(async transaction => {
       const row = await transaction.get<{ id: number }>(
         `UPDATE dispatch_pi.durable_metadata SET next_id = next_id + 1
@@ -904,6 +917,11 @@ export class PostgresStorage implements Storage {
         }
       }
     }
+  }
+
+  private assertWritable(): void {
+    this.assertOpen();
+    if (this.db.readOnly) throw new Error("PostgreSQL history snapshot is read-only.");
   }
 
   private assertOpen(): void {

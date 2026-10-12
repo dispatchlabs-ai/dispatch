@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Agent project context
+
+- Add project-scoped chat listing and passive public-history/detail reads without joining source chats or resuming their work; preserve project authorization on every page and refuse out-of-project IDs.
+- Include archived chats in discovery, preserve source references, and exclude private working context and private attachments. Keep activity discovery explicit and distinguish stored activity from current liveness.
+- Read hosted worker history through fixed read-only PostgreSQL snapshots without taking executor ownership, provisioning storage or launching workers. Project search and self-instruction editing remain separate future work.
+
 ## [0.3.0] - 2026-10-11
 
 ### Database-owned project specs

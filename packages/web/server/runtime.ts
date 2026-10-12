@@ -10,7 +10,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, getSupportedThinkingLevels, type Models } from "@earendil-works/pi-ai/models";
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
-import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, LiveDoc, type CommitPublication, type ConversationId, type HarnessSettings, type Registry, type RegistryReader, type Storage, type Tx } from "@earendil-works/pi-durable";
+import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, LiveDoc, type CommitPublication, type ConversationId, type HarnessSettings, type Registry, type RegistryReader, type Storage, type Tx, type EntryRecord, type Cursor } from "@earendil-works/pi-durable";
 import { WorkerActorsDoc, WorkerInstancesDoc, WorkerIdentityDoc, workerParticipantReportSchema, type BackendWorkerActor, type WorkerParticipantReport } from "./workers/participant-identity.js";
 export type { WorkerParticipantReport } from "./workers/participant-identity.js";
 import type { WorkerSummary } from "./workers/summaries.js";
@@ -28,6 +28,9 @@ import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { projectSourcesSchema } from "../src/shared/project-sources.js";
 import { ProjectMarkdownDoc, readProjectMarkdown, saveProjectMarkdown, replayProjectMarkdown, markdownHash, projectMarkdownPage } from "./project-markdown.js";
 import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
+import { projectChatsSchema, chatSourceUrl, type ProjectChatsInput, type ProjectChatsResult, type ProjectChatMetadata, type ProjectChatReadInput, type ProjectChatResult } from "./project-chat-context.js";
+import { readProjectChat } from "./project-chat-reader.js";
+import { PublicSummaryDoc } from "./collaboration/summary.js";
 import { readLocalProjectSpec } from "./local-project-spec.js";
 import { fetchPublicGithubSpec, ProjectSpecError } from "./project-spec.js";
 import { createWebResearch } from "./extensions/web.js";
@@ -182,6 +185,10 @@ export type RuntimeOptions = {
   workerMcp?: WorkerMcp;
   workerInvitations?: WorkerInvitations;
   workerProjectSpec?: (actor: WorkerManagementActor, input: ProjectSpecReadInput) => Promise<ProjectSpecPage>;
+  workerProjectChats?: {
+    list(actor: WorkerManagementActor, input: ProjectChatsInput): Promise<ProjectChatsResult>;
+    read(actor: WorkerManagementActor, input: ProjectChatReadInput): Promise<ProjectChatResult>;
+  };
   workerParticipants?: { report(report: WorkerParticipantReport): Promise<unknown> };
   /** Workers must inject durable remote blob storage; native installations keep their local default. */
   attachmentStore?: AttachmentStore;
@@ -354,6 +361,34 @@ export class DispatchRuntime {
           const actor = await shared.managementActor(tx, instanceId);
           const room = await tx.doc(SharedDoc, actor.roomId);
           return projectMarkdownPage(tx, actor.companyId, room.sharedProjectId, input);
+        }, context);
+      };
+      shared.listProjectChats = async (instanceId, input) => {
+        if (worker) {
+          if (!options.workerProjectChats) throw new RuntimeError(503, "Project chat mediation is unavailable.");
+          const actor = await harness.commit(async tx => runtime.remoteActor(tx, await shared.managementActor(tx, instanceId)), context);
+          return options.workerProjectChats.list(actor, input);
+        }
+        return harness.commit(async tx => runtime.projectChatsIn(tx, await shared.managementActor(tx, instanceId), input), context);
+      };
+      shared.readProjectChat = async (instanceId, input) => {
+        if (worker) {
+          if (!options.workerProjectChats) throw new RuntimeError(503, "Project chat mediation is unavailable.");
+          const actor = await harness.commit(async tx => runtime.remoteActor(tx, await shared.managementActor(tx, instanceId)), context);
+          return options.workerProjectChats.read(actor, input);
+        }
+        return harness.commit(async tx => {
+          const actor = await shared.managementActor(tx, instanceId);
+          const metadata = await runtime.projectChatIn(tx, actor, input.chatId);
+          const roomId = nativeId(input.chatId);
+          if (!await tx.conversation(roomId)) throw new RuntimeError(503, "Chat history is unavailable.");
+          return readProjectChat({ room: await tx.doc(SharedDoc, roomId),
+            entries: async id => { const entries: EntryRecord[] = []; let cursor: Cursor | undefined;
+              do { const page = await tx.scanEntries({ conversationId: id }, 200, cursor); entries.push(...page.items); cursor = page.next; } while (cursor);
+              return entries.reverse(); },
+            live: id => tx.doc(LiveDoc, id), attachments: async () => (await tx.doc(AttachmentsDoc, roomId)).records,
+            bytes: attachment => attachments.read(attachment),
+          }, roomId, metadata, input);
         }, context);
       };
       if (worker) shared.onParticipantStateChanged = tx => runtime.updateWorkerParticipantReport(tx);
@@ -1096,6 +1131,64 @@ export class DispatchRuntime {
       if (room.companyId !== actor.companyId) throw new RuntimeError(403, "Project spec access is unavailable.");
       return projectMarkdownPage(tx, actor.companyId, room.sharedProjectId, input);
     }, context);
+  }
+
+  async listWorkerProjectChats(claim: WorkerManagementActor, raw: unknown): Promise<ProjectChatsResult> {
+    this.requireDirectoryActor(claim);
+    const input = projectChatsSchema.parse(raw);
+    return this.harness.commit(async tx => this.projectChatsIn(tx, await this.authoritativeWorkerActor(tx, claim), input), context);
+  }
+
+  /** Return only a detached, project-authorized target. The backend reads its store
+   * after releasing this transaction, then rechecks before disclosing the result. */
+  async authorizeWorkerProjectChat(claim: WorkerManagementActor, chatId: string) {
+    this.requireDirectoryActor(claim);
+    return this.harness.commit(async tx => {
+      const actor = await this.authoritativeWorkerActor(tx, claim);
+      const metadata = await this.projectChatIn(tx, actor, chatId);
+      return { projectId: (await tx.doc(SharedDoc, actor.roomId)).sharedProjectId!, metadata };
+    }, context);
+  }
+
+  private async agentProjectIn(tx: Tx, actor: ManagementActor) {
+    const room = await tx.doc(SharedDoc, actor.roomId);
+    if (room.companyId !== actor.companyId) throw new RuntimeError(403, "Agent project access is unavailable.");
+    if (!room.sharedProjectId) return undefined;
+    const project = (await tx.doc(ProjectsDoc)).projects[room.sharedProjectId];
+    if (!project || project.companyId !== actor.companyId) throw new RuntimeError(404, "Project not found.");
+    return project.id;
+  }
+
+  private async projectChatsIn(tx: Tx, actor: ManagementActor, input: ProjectChatsInput): Promise<ProjectChatsResult> {
+    const projectId = await this.agentProjectIn(tx, actor);
+    if (!projectId) return { projectId: null, chats: [], nextCursor: null };
+    const candidates = (await tx.doc(CatalogDoc)).chats.filter(chat => chat.companyId === actor.companyId)
+      .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    const chats: ProjectChatMetadata[] = [];
+    const limit = input.limit ?? 50;
+    for (const chat of candidates) {
+      if (input.cursor && chat.id <= input.cursor) continue;
+      const room = await tx.doc(SharedDoc, nativeId(chat.id));
+      if (room.companyId !== actor.companyId || room.sharedProjectId !== projectId) continue;
+      if (chats.length === limit) return { projectId, chats, nextCursor: chats.at(-1)!.id };
+      chats.push(await this.projectChatMetadataIn(tx, chat));
+    }
+    return { projectId, chats, nextCursor: null };
+  }
+
+  private async projectChatIn(tx: Tx, actor: ManagementActor, chatId: string): Promise<ProjectChatMetadata> {
+    const projectId = await this.agentProjectIn(tx, actor);
+    const chat = (await tx.doc(CatalogDoc)).chats.find(chat => chat.id === chatId && chat.companyId === actor.companyId);
+    if (!projectId || !chat) throw new RuntimeError(404, "Chat not found.");
+    const room = await tx.doc(SharedDoc, nativeId(chat.id));
+    if (room.companyId !== actor.companyId || room.sharedProjectId !== projectId) throw new RuntimeError(404, "Chat not found.");
+    return this.projectChatMetadataIn(tx, chat);
+  }
+
+  private async projectChatMetadataIn(tx: Tx, chat: StoredChat): Promise<ProjectChatMetadata> {
+    const summary = await tx.doc(PublicSummaryDoc, nativeId(chat.id));
+    return { id: chat.id, title: chat.displayTitle ?? (chat.title === "New conversation" && !chat.creationTitleExplicit ? summary.first?.text || "New chat" : chat.title),
+      createdAt: chat.createdAt, updatedAt: Math.max(chat.createdAt, summary.updatedAt), url: chatSourceUrl(chat.id) };
   }
 
   async authorizeWorkerSearch(claim: WorkerManagementActor) {

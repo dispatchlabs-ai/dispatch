@@ -35,6 +35,9 @@ import { WorkerStoreProvisioner } from "./postgres-stores.js";
 import { readRestrictedConfigurationFile } from "../storage/restricted-config-file.js";
 import { verifiedPostgresConfig } from "../storage/postgres/tls.js";
 import { WriteAdmission } from "./admission.js";
+import { projectChatsSchema, projectChatReadSchema } from "../project-chat-context.js";
+import { readWorkerProjectChat } from "./project-chat-reader.js";
+import { HistoryCursorError } from "../chat-pages.js";
 
 export async function openBackendOwner() {
 const filename = process.env.DISPATCH_BACKEND_WORKERS_CONFIG_FILE;
@@ -293,6 +296,38 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
     if (person.companyId !== route.companyId) return c.json({ error: "Forbidden" }, 403);
     return c.json(operation === "people" ? await auth.listCompanyPeople(route.companyId) : await auth.getCompanyPerson(route.companyId, person.userId ?? ""));
   }
+  if (operation === "project-chats" || operation === "project-chat-read") return c.json(await mcpPolicy.call(async () => {
+    const body = z.object({ actor: z.custom<WorkerManagementActor>(), input: z.unknown() }).strict().parse(input);
+    if (!body.actor || body.actor.companyId !== route.companyId || body.actor.conversationKey !== route.conversationId || body.actor.storeId !== route.storeId) throw new RuntimeError(403, "Forbidden");
+    assertCurrent();
+    if (operation === "project-chats") {
+      const result = await directory.listWorkerProjectChats(body.actor, projectChatsSchema.parse(body.input));
+      for (const chat of result.chats) {
+        const observation = routes.readSummary(chat.id);
+        if (observation) chat.updatedAt = Math.max(chat.updatedAt, observation.value.updatedAt);
+      }
+      assertCurrent();
+      return result;
+    }
+    const query = projectChatReadSchema.parse(body.input);
+    const authorized = await directory.authorizeWorkerProjectChat(body.actor, query.chatId);
+    const target = routes.get(query.chatId);
+    if (!target || target.companyId !== route.companyId) throw new RuntimeError(503, "Chat history is unavailable.");
+    let result;
+    try {
+      result = await readWorkerProjectChat({ connectionString: storeUrl, ca: storeCa, storeId: target.storeId }, target, authorized.projectId, authorized.metadata, query,
+        attachment => artifacts.read(target.storeId, attachment.id));
+    } catch (error) {
+      if (error instanceof Error && ("status" in error || error instanceof HistoryCursorError)) throw error;
+      throw new RuntimeError(503, "Chat history is unavailable.");
+    }
+    assertCurrent();
+    c.req.raw.signal.throwIfAborted();
+    const current = await directory.authorizeWorkerProjectChat(body.actor, query.chatId);
+    const currentRoute = routes.get(query.chatId);
+    if (current.projectId !== authorized.projectId || currentRoute?.storeId !== target.storeId || currentRoute.nativeRoomId !== target.nativeRoomId) throw new RuntimeError(404, "Chat not found.");
+    return result;
+  }));
   if (operation === "project-spec") {
     const body = z.object({ actor: z.custom<WorkerManagementActor>(), input: z.object({ revision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional(), offset: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional() }).strict() }).strict().parse(input);
     if (!body.actor || body.actor.companyId !== route.companyId || body.actor.conversationKey !== route.conversationId || body.actor.storeId !== route.storeId) return c.json({ error: "Forbidden" }, 403);

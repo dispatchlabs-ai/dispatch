@@ -50,7 +50,7 @@ export class PostgresDatabase implements PostgresExecutor {
   private failure?: Error;
   private readonly executor: Executor;
 
-  private constructor(private client: Client, private storeId: string) {
+  private constructor(private client: Client, private storeId: string, readonly readOnly = false) {
     this.executor = new Executor(client, storeId, () => this.assertHealthy());
     client.on("error", error => { this.failure ??= new Error("PostgreSQL storage connection lost; reopen only after stopping the old executor", { cause: error }); });
     client.on("end", () => { this.failure ??= new Error("PostgreSQL storage connection ended"); });
@@ -58,7 +58,16 @@ export class PostgresDatabase implements PostgresExecutor {
 
   get healthy(): boolean { return !this.failure && !this.closing; }
 
-  static async open(options: PostgresStorageOptions): Promise<PostgresDatabase> {
+  static open(options: PostgresStorageOptions): Promise<PostgresDatabase> {
+    return PostgresDatabase.connect(options, false);
+  }
+
+  /** One fixed read-only snapshot; never acquires executor ownership or initializes storage. */
+  static openReadSnapshot(options: PostgresStorageOptions): Promise<PostgresDatabase> {
+    return PostgresDatabase.connect(options, true);
+  }
+
+  private static async connect(options: PostgresStorageOptions, readOnly: boolean): Promise<PostgresDatabase> {
     if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(options.storeId)) {
       throw new Error("PostgreSQL store ID must be 1–200 ASCII letters, digits, dots, underscores, colons or hyphens, starting with a letter or digit");
     }
@@ -81,10 +90,19 @@ export class PostgresDatabase implements PostgresExecutor {
         },
       },
     });
-    const database = new PostgresDatabase(client, options.storeId);
+    const database = new PostgresDatabase(client, options.storeId, readOnly);
     try {
       await client.connect();
+      if (readOnly) await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
       if (options.access === "worker") await verifyWorkerAccess(client, options.storeId);
+      if (readOnly) {
+        const { rows: [schema] } = await client.query("SELECT version FROM dispatch_pi.schema_version WHERE singleton=1");
+        if (schema?.version !== 1) throw new Error("PostgreSQL history schema is unavailable or unsupported.");
+        const { rows: [metadata] } = await client.query("SELECT 1 FROM dispatch_pi.durable_metadata WHERE store_id=$1", [options.storeId]);
+        if (!metadata) throw new Error("PostgreSQL history store is unavailable.");
+        database.assertHealthy();
+        return database;
+      }
       // Fixed 64-bit digest; collisions conservatively reject an unrelated store, never share it.
       const key = createHash("sha256").update(`dispatch-pi-store:${options.storeId}`).digest().readBigInt64BE().toString();
       const lock = await client.query<{ acquired: boolean }>("SELECT pg_try_advisory_lock($1::bigint) AS acquired", [key]);
@@ -114,6 +132,7 @@ export class PostgresDatabase implements PostgresExecutor {
   }
 
   run(sql: string, ...params: PostgresValue[]): Promise<void> {
+    if (this.readOnly) return Promise.reject(new Error("PostgreSQL history snapshot is read-only."));
     return this.enqueue(() => this.executor.run(sql, ...params));
   }
   get<T extends object>(sql: string, ...params: PostgresValue[]): Promise<T | undefined> {
@@ -125,6 +144,8 @@ export class PostgresDatabase implements PostgresExecutor {
 
   transaction<T>(callback: (transaction: PostgresExecutor) => Promise<T>): Promise<T> {
     return this.enqueue(async () => {
+      // Reads that normally need a transaction already share this callback-scoped snapshot.
+      if (this.readOnly) return callback(this.executor);
       await this.client.query("BEGIN ISOLATION LEVEL REPEATABLE READ");
       let active = true;
       const transaction = new Executor(this.client, this.storeId, () => {
@@ -161,7 +182,8 @@ export class PostgresDatabase implements PostgresExecutor {
   }
 
   close(): Promise<void> {
-    // Closing the connection releases the advisory lock only after admitted database work settles.
+    // Closing rolls back a read snapshot, or releases the writer's advisory lock,
+    // only after admitted database work settles.
     this.closing ??= this.tail.then(() => this.client.end());
     return this.closing;
   }

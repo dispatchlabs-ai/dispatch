@@ -16,6 +16,16 @@ The advisory lock is a duplicate-owner guard, not tool-effect fencing. Automatic
 
 Startup installs all extensions, opens Pi storage, seeds missing company definitions, publishes a fresh runtime instance marker, migrates older conversations and calls `Harness.resume()`. Snapshot revisions use Pi’s native commit sequence. `close()` shuts down without converting interrupted work into an explicit user cancellation.
 
+## Agent project-chat reads
+
+**Local implementation; runtime qualification/publication pending.** `server/project-chat-context.ts` defines `project_chats` and `project_chat_read`; `server/project-chat-reader.ts` provides the shared public projection. Local mode authorizes and reads on the native commit line. Worker mode resolves the acting instance in its local transaction, releases that transaction, and calls the backend mediation interface. The backend authenticates the worker/attempt, resolves the current project and target through the directory, reads the existing store, then reauthorizes before disclosure. No human browser session or creator identity substitutes for the agent principal.
+
+### Passive storage snapshot
+
+**Local implementation; runtime qualification pending.** `PostgresStorage.readSnapshot(options, callback)` exposes Pi's existing `Storage` read APIs within one `REPEATABLE READ, READ ONLY` transaction. It validates the existing schema/store, but takes no executor advisory lock, performs no migration or metadata initialization, and starts no Harness or task recovery. `commit()` and `mintId()` reject. All reads must finish within the callback; its connection closes on success or failure. Missing/unsupported storage is an error, not an empty transcript.
+
+This adapter is not authorization or public-content filtering. Callers must resolve the acting instance/current project and target store server-side, release local Pi transactions before cross-store access, and apply the public-history projection. Ordinary storage `open()`, provisioning `ensure()` and activating worker RPC paths are not substitutes for a passive history read. See [agent usage](usage-guide.md#agent-project-chat-context) for the list/read workflow.
+
 ## Membership and agent instances
 
 A human creator becomes a member. In unbound chats, authenticated human members may invite active people and available agent definitions from the same company; project-bound human access is managed through project membership. An agent may invite company agents only. Native binding documents derive an agent’s room and author identity; model tool arguments cannot choose another author. Read, command and subscription access require current company and chat authority. Unbound chats use explicit membership; project-bound chats use shared-project policy, including observation-only grants.

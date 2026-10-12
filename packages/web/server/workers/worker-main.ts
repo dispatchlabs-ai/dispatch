@@ -48,6 +48,10 @@ const runtime = await DispatchRuntime.openConversation({
     return backend("/secrets", { actor, secretId }, signal);
   },
   workerProjectSpec: (actor, input) => backend("/project-spec", { actor, input }),
+  workerProjectChats: {
+    list: (actor, input) => backend("/project-chats", { actor, input }),
+    read: (actor, input) => backend("/project-chat-read", { actor, input }),
+  },
   workerSearch: (actor, query, signal) => backend("/search", { actor, query }, signal),
   workerMcp: workerMcp((operation, input, signal) => backend(`/mcp/${operation}`, input, signal)),
   peopleDirectory: { list: companyId => backend("/people", { companyId }), get: (companyId, userId) => backend("/person", { companyId, userId }) },

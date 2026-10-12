@@ -16,6 +16,7 @@ import type {
 import { ProjectsDoc, requireProjectAccess, type ProjectAction } from "../project-access.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata, messageAttachments } from "../attachments.js";
 import { managementTools } from "../agent-management.js";
+import { projectChatTools, type ProjectChatsInput, type ProjectChatsResult, type ProjectChatReadInput, type ProjectChatResult } from "../project-chat-context.js";
 import { createDefinitionOfDone, CRITERIA_EXTENSION } from "./definition-of-done.js";
 import { ConversationTurns, TurnsDoc } from "./turns.js";
 import { PublicSummaryDoc, includePublicMessage } from "./summary.js";
@@ -45,7 +46,7 @@ export type Member = {
   activeDelivery?: TaskId; consideredThrough?: string; publicationPriority?: boolean; superseded?: TaskId[];
 };
 type Presentation = { participants: ConversationParticipant[]; messages: ConversationMessage[]; activities: ParticipantActivity[] };
-type SharedState = {
+export type SharedState = {
   companyId: string; sharedProjectId?: string; legacyCreatorId?: string; legacyQueued?: Record<string, string>; members: Member[]; epoch: number; stopping?: TaskId;
   preferences: Record<string, { pinned: boolean; archived: boolean }>;
   requests: Record<string, { hash: string; messageId?: string; participantId?: string }>;
@@ -398,7 +399,16 @@ export class SharedConversations {
       },
     });
     this.extension = defineExtension({
-      name: "dispatch-collaboration", tasks: [this.delivery, this.legacyReporter, this.stopTask, this.removeTask, this.turns.wait, this.turns.expirePresence, this.contributions.guard], tools: [projectSpec, history, attachment, attach, post, invite, ...managementTools(management)],
+      name: "dispatch-collaboration", tasks: [this.delivery, this.legacyReporter, this.stopTask, this.removeTask, this.turns.wait, this.turns.expirePresence, this.contributions.guard], tools: [projectSpec, history, attachment, attach, post, invite, ...managementTools(management), ...projectChatTools({
+        list: (instanceId, input) => {
+          if (!this.listProjectChats) throw new CollaborationError(503, "Project chat service is unavailable.");
+          return this.listProjectChats(instanceId, input);
+        },
+        read: (instanceId, input) => {
+          if (!this.readProjectChat) throw new CollaborationError(503, "Project chat service is unavailable.");
+          return this.readProjectChat(instanceId, input);
+        },
+      })],
       hooks: [hook(GenerationTask, {
         beforeRequest: (request, api, ctx) => this.coordinated(api, ctx, async () => {
           const binding = await api.snapshot(BindingDoc, api.conversationId, ctx);
@@ -507,6 +517,8 @@ export class SharedConversations {
 
   readProjectSpec?: (instanceId: ConversationId, input: ProjectSpecReadInput) => Promise<ProjectSpecPage>;
 
+  listProjectChats?: (instanceId: ConversationId, input: ProjectChatsInput) => Promise<ProjectChatsResult>;
+  readProjectChat?: (instanceId: ConversationId, input: ProjectChatReadInput) => Promise<ProjectChatResult>;
   inviteRemote?: (instanceId: ConversationId, requestId: string, definitionIds: string[]) => Promise<void>;
   availableAgents: (companyId: string) => Promise<unknown> = async () => [];
   bind(harness: Harness, storage: Storage) {
@@ -1157,7 +1169,7 @@ async function scanEntries(tx: Tx, conversationId: ConversationId) {
 }
 function reply(value: unknown) { return { content: [{ type: "text" as const, text: JSON.stringify(value) }] }; }
 
-function projectMessages(entries: EntryRecord[], aliases: Record<string, string> = {}): MessageData[] {
+export function projectMessages(entries: EntryRecord[], aliases: Record<string, string> = {}): MessageData[] {
   const priorIds = new Map<string, string[]>();
   for (const [alias, id] of Object.entries(aliases)) priorIds.set(id, [...(priorIds.get(id) ?? []), alias]);
   return entries.filter(PublicEntry.is).map(entry => entry.data).filter(message => !aliases[message.id]).map(message => ({
@@ -1215,7 +1227,7 @@ function publicLive(live: LiveState): LiveState {
 
 function isContextBoundary(entry: EntryRecord) { return entry.kind === "pi.reset" || entry.kind === "pi.compaction"; }
 
-function projectActivityGroups(member: Member, entries: EntryRecord[], messages: ConversationMessage[]): ParticipantActivity[] {
+export function projectActivityGroups(member: Member, entries: EntryRecord[], messages: ConversationMessage[]): ParticipantActivity[] {
   const publicIds = new Set(messages.flatMap(message => [message.id, ...(message.aliases ?? [])]));
   const groups: { id: string; createdAt: number; threadId: string | null; entries: EntryRecord[]; answerId?: string }[] = [];
   let group: typeof groups[number] | undefined;
@@ -1243,7 +1255,7 @@ function projectActivityGroups(member: Member, entries: EntryRecord[], messages:
   return groups.map(group => ({ id: group.id, participantId: member.id, threadId: group.threadId, createdAt: group.createdAt, ...(group.answerId ? { messageId: group.answerId } : {}), entries: publicActivityEntries(group.entries), live: {}, submissions: [] }));
 }
 
-function overlayLiveActivity(groups: ParticipantActivity[], live: LiveState): ParticipantActivity[] {
+export function overlayLiveActivity(groups: ParticipantActivity[], live: LiveState): ParticipantActivity[] {
   const current = publicLive(live);
   return groups.flatMap((group, index) => {
     if (index !== groups.length - 1) return group.entries.length ? [group] : [];
