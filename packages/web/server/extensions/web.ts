@@ -198,10 +198,10 @@ export function createWebResearch(backend: WebBackend, access: WebResearchAccess
           const reference: WebReference = {
             id: `web_${randomUUID()}`, kind: "search", url: webUrl(result.url), title: clean(result.title).slice(0, 200),
             retrievedAt: new Date().toISOString(), lines: linesOf(excerpt.slice(0, SEARCH_EXCERPT_CHARS)),
-            links: [], linksStartLine: null, truncated: excerpt.length > SEARCH_EXCERPT_CHARS,
+            links: [], linksStartLine: null, truncated: result.snippetTruncated === true || excerpt.length > SEARCH_EXCERPT_CHARS,
           };
           const preview = { ...metadata(reference), snippet: excerpt.slice(0, SEARCH_SNIPPET_CHARS[length]),
-            snippet_truncated: excerpt.length > SEARCH_SNIPPET_CHARS[length] };
+            snippet_truncated: reference.truncated || excerpt.length > SEARCH_SNIPPET_CHARS[length] };
           const size = Buffer.byteLength(JSON.stringify(preview), "utf8") + 1;
           if (bytes + size > searchBudget) continue;
           await save(reference);

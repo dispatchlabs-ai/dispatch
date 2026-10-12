@@ -344,6 +344,7 @@ export function createWebBackend(config: WebBackendConfig = {}): WebBackend {
         return [{
           url: url,
           title: typeof title === "string" ? title.replace(/\s+/g, " ").trim() : "",
+          snippetTruncated: excerpt.length > MAX_SNIPPET_CHARS,
           snippet: excerpt.length > MAX_SNIPPET_CHARS ? `${excerpt.slice(0, MAX_SNIPPET_CHARS - 1)}…` : excerpt,
         }];
       }).slice(0, MAX_RESULTS);
