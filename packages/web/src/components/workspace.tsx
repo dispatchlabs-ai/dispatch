@@ -856,7 +856,7 @@ export function Workspace() {
         </div> : null}
       </div>
       <span className={`connection-status connection-${connection || "unobserved"}`} role="status">
-        <span aria-hidden="true" />{connection === "reconnecting" ? "Reconnecting · agent work continues" : connection === "connecting" ? "Connecting to conversation" : connection === "error" ? "Connection needs attention" : connection === "connected" ? "Conversation connected" : "No live conversation selected"}</span>
+        <span aria-hidden="true" />{connection === "reconnecting" ? "Reconnecting to conversation" : connection === "connecting" ? "Connecting to conversation" : connection === "error" ? "Connection needs attention" : connection === "connected" ? "Conversation connected" : "No live conversation selected"}</span>
       <span className="status-company">{config.company.name}</span>
       <span className="status-user">{state.user.name}</span>
       <span className="app-version status-version"><span className="sr-only">Dispatch version </span>v{appVersion}</span>
