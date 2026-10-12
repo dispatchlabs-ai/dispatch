@@ -168,7 +168,7 @@ Use the latest opaque revision; a stale revision returns 409 and requires reload
 
 ### Claude Agent SDK setup
 
-**Integration in progress; setup and runtime acceptance pending.** The Agent SDK execution backend runs official Claude Code under a Pi-owned task. It is separate from Settings → Model providers: a Claude API key saved there or a historical Pi OAuth grant does not sign in the SDK runner. See the [runtime boundary](runtime.md#claude-agent-sdk-integration).
+**Local integration candidate; authenticated execution and Stop/recovery acceptance pending.** The Agent SDK execution backend runs official Claude Code under a Pi-owned task. It is separate from Settings → Model providers: a Claude API key saved there or a historical Pi OAuth grant does not sign in the SDK runner. See the [runtime boundary](runtime.md#claude-agent-sdk-integration).
 
 Native sign-in must happen on the execution host, under the operating-system account and configuration directory the runner uses. Follow Anthropic's [installation and authentication guidance](https://code.claude.com/docs/en/authentication). With the official CLI installed:
 
@@ -181,7 +181,18 @@ These commands authenticate and inspect Claude Code, not Dispatch. Complete the 
 
 If using a separate native profile, use the same `CLAUDE_CONFIG_DIR` for login, status and execution. Each native profile has its own settings, session history and subscription login. On macOS, native credentials normally use Keychain; other platforms and the macOS fallback use Claude Code's protected credential file. Dispatch must not extract or copy those credentials. A successful terminal login under another account or profile does not establish runner readiness.
 
-The selected initial design also requires an explicit Dispatch user binding for the native environment and current access to the target chat/project; login alone is insufficient. The final operator configuration and editor procedure will be documented against the integrated implementation. Hosted-worker authentication provisioning is not qualified by local login.
+Configure the local service's runner binding before starting SDK work:
+
+| Service environment variable | Purpose |
+| --- | --- |
+| `DISPATCH_CLAUDE_USER_ID` | Required Dispatch user ID owning the native environment, not an Anthropic account ID/email. The owner must be an active human participant with current chat/project participation access. |
+| `DISPATCH_CLAUDE_HOME` | Optional native profile home; defaults to the service environment's home. This changes profile lookup, not the subprocess's operating-system identity or filesystem permissions. |
+| `DISPATCH_CLAUDE_CONFIG_DIR` | Optional native configuration directory, passed as `CLAUDE_CONFIG_DIR`; use the same directory for CLI login/status. Without an override, the runner uses the service environment's native profile settings. |
+| `DISPATCH_CLAUDE_EXECUTABLE` | Optional path to an official, unmodified Claude Code executable; otherwise use the SDK's packaged executable. |
+
+While signed in as the intended owner, inspect `GET /api/auth/session` on this installation and use `user.id` for the binding; do not share the entire response. Restart the local service with the selected configuration. Dispatch does not verify that the native Anthropic account matches this user ID: the operator must bind the correct user's environment. Missing owner configuration, absent participation or revoked access blocks SDK execution. Changing the owner after admission rejects a saved execution checkpoint; it does not silently transfer work to another subscriber.
+
+In Agents → Edit → Model, choose **Runtime → Agent SDK**, an Anthropic model and its supported Thinking level, then save. SDK model choices do not require Pi Anthropic credentials and do not prove native account/model access. Existing definitions without an execution backend use Pi; updates reach existing instances at their safe idle adoption boundary. Native login alone neither changes the saved backend nor connects Dispatch's provider card. Hosted workers reject SDK execution in this candidate; setting local environment variables does not provision per-user hosted authentication.
 
 After interrupted execution, inspect workspace/external effects before retrying. Pi's durable task state and an SDK session ID do not back up the native session files or guarantee exactly-once shell effects. A run interrupted before its result is committed must not be described as completed or silently resent. Stop/restart acceptance remains pending.
 
