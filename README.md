@@ -78,7 +78,7 @@ The archive records `dispatch-web:uncommitted` because it was built from a sourc
 docker tag dispatch-web:uncommitted dispatch-web:0.3.0
 ```
 
-Set `DISPATCH_IMAGE=dispatch-web:0.3.0` in `.env`. This is a local tag, not a registry digest; the verified archive checksum identifies the downloaded bytes. Do not replace it with an unverified registry image. Keep `DISPATCH_PORT=3001` unless it is already in use. Then start the service:
+Set `DISPATCH_IMAGE=dispatch-web:0.3.0` in `.env`. Ignore the stale 0.2.0 image-tag comment in the immutable v0.3.0 `.env.example`; it does not describe this archive. The example on `main` is corrected. This is a local tag, not a registry digest; the verified archive checksum identifies the downloaded bytes. Do not replace it with an unverified registry image. Keep `DISPATCH_PORT=3001` unless it is already in use. Then start the service:
 
 ```sh
 docker compose up
