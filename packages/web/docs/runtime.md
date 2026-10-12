@@ -16,6 +16,12 @@ The task module at `97fec46` checkpoints execution intent before invoking Claude
 
 An SDK session ID alone does not preserve its on-disk session history. Pi checkpoints do not make external commands exactly-once. The transport closes the SDK stream and joins subprocess exit before settlement; this is not proof that every external descendant or remote effect stopped. [Native sign-in guidance](usage-guide.md#claude-agent-sdk-setup) distinguishes runner authentication from Dispatch provider setup. Operator configuration is documented against the integration candidate; authenticated execution, activity grouping and publication/Stop/recovery acceptance remain pending.
 
+### SDK qualification
+
+On 2026-10-12, UI fixture checks for `bc78bb4`/`fcf011c` covered runtime/model/Thinking selection, draft retention after failed save, stable client retry identity, synthetic save/reload, empty SDK catalogs, usage-unavailable presentation, and rendered layouts at 390×844, 768×1024, 1280×720 and 1440×900. Authentication, catalog and persistence adapters were synthetic: these checks do not establish backend persistence, authorization, authenticated SDK execution or Stop/recovery. The existing editor navigation, including its bottom phone Menu, was not redesigned.
+
+The owner-controlled executable wrapper's SDK initialization and joined shutdown were separately verified with SDK 0.3.296/Claude Code 2.1.296, without credentials or an inference prompt. Native login discovery with the minimal environment plus `USER` was verified on macOS; that is not successful inference acceptance. Actual Dispatch inference/tool/publication and Stop/recovery qualification remain pending.
+
 ## Storage and lifetime
 
 Pi owns storage, tasks, submissions, generations, cancellation and recovery. The session-scoped catalog holds company agent definitions and conversation metadata; the separate session-scoped Projects document owns shared-project policy. Each shared conversation has a `dispatch.shared-conversation` document and an application-defined public log of `dispatch.public-message` entries. Dispatch copies public contributions into this log with their author and thread; it is distinct from each agent’s native working transcript, though both are stored by Pi in the same Session. The public log provides shared history without exposing private working context. There is no separate transcript database or application execution engine.
