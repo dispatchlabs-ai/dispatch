@@ -194,6 +194,8 @@ While signed in as the intended owner, inspect `GET /api/auth/session` on this i
 
 In Agents → Edit → Model, choose **Runtime → Agent SDK**, an Anthropic model and its supported Thinking level, then save. SDK model choices do not require Pi Anthropic credentials and do not prove native account/model access. Existing definitions without an execution backend use Pi; updates reach existing instances at their safe idle adoption boundary. Native login alone neither changes the saved backend nor connects Dispatch's provider card. Hosted workers reject SDK execution in this candidate; setting local environment variables does not provision per-user hosted authentication.
 
+If Dispatch reports authentication failure even though `claude auth status` says logged in, repeat `claude auth login` under the configured runner account/profile. Status alone does not prove the provider will accept an inference request. Model-unavailable errors require an account-accessible SDK model; usage/rate-limit errors require checking the native account's limits. Shared status uses fixed error categories rather than raw provider diagnostics; inspect native sessions privately and do not publish their contents.
+
 After interrupted execution, inspect workspace/external effects before retrying. Pi's durable task state and an SDK session ID do not back up the native session files or guarantee exactly-once shell effects. A run interrupted before its result is committed must not be described as completed or silently resent. Stop/restart acceptance remains pending.
 
 ### Pi configuration and agent defaults
