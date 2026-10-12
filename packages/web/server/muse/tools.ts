@@ -33,8 +33,8 @@ export async function museToolServer(scope: MuseRunScope, authorize: () => Promi
     if (request.url !== "/mcp") { response.writeHead(404).end(); return; }
     if (request.method !== "POST") { response.writeHead(405, { Allow: "POST" }).end(); return; }
 
-    // The SDK's stateless HTTP pattern uses a distinct server/transport per request. Tool receipts
-    // remain in Pi, so retrying an MCP request ID joins the same native child rather than rerunning it.
+    // The SDK's stateless HTTP pattern uses a distinct server/transport per request. JSON-RPC IDs
+    // are transport correlation, not durable operation IDs; reconnecting clients can reuse them.
     const server = new Server({ name: "dispatch", version: "1.0.0" }, { capabilities: { tools: {} } });
     // Use stock SSE responses: closing the transport releases pending streams. SDK 1.32.1's
     // JSON-response mode can leave handleRequest waiting after close during an in-flight tool.
@@ -46,9 +46,9 @@ export async function museToolServer(scope: MuseRunScope, authorize: () => Promi
       return { tools: bridge.tools.map(selected => ({ name: selected.name, description: selected.description,
         inputSchema: selected.parameters as Tool["inputSchema"] })) };
     });
-    server.setRequestHandler(CallToolRequestSchema, (request, extra) => {
+    server.setRequestHandler(CallToolRequestSchema, request => {
       if (closing || scope.runtime.signal.aborted) throw new Error("Dispatch tool bridge is closing.");
-      const call: Promise<CallToolResult> = bridge.call(request.params.name, request.params.arguments ?? {}, String(extra.requestId))
+      const call: Promise<CallToolResult> = bridge.call(request.params.name, request.params.arguments ?? {})
         .catch(() => ({ content: [{ type: "text" as const, text: "Dispatch could not complete this tool request. Its effects may be uncertain; inspect the saved activity before retrying." }], isError: true }));
       calls.add(call);
       void call.then(() => calls.delete(call));
