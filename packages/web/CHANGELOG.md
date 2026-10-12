@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Agent SDK execution
+
+- Add an opt-in Agent SDK runtime using the unmodified official Claude Code binary and its native user-bound authentication, with a separate credential-independent model catalog.
+- Keep execution admission, tool receipts, cancellation and contribution publication in stock Pi Durable tasks; preserve the existing Pi runtime by default.
+- Expose committed SDK tool activity and explicit unavailable model-usage accounting. Document query-settlement publication and uncertain interrupted execution without automatic external-effect replay.
+- Qualify local subscription-backed inference, authorized tools, Stop, controlled-restart uncertainty, and saved public readback; hosted execution remains fenced and other platform/auth modes unverified.
+
 ### Image credential routing
 
 - Add a separate Codex images connection using Pi-owned OAuth login/refresh and saved account selection, without changing agents' chat providers or copying CLI credentials.
