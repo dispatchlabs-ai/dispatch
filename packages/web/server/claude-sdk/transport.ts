@@ -95,7 +95,7 @@ function summarizeResult(message: SDKResultMessage): ClaudeRunResult {
     sessionId: message.session_id,
     success,
     text: success && message.subtype === "success" ? message.result : "",
-    ...(success ? {} : { error: `Claude Code ended without a successful answer (${message.subtype}). Check the native sign-in and execution environment.` }),
+    ...(success ? {} : { error: claudeFailure(message) }),
   };
 }
 /** Minimal process environment; credentials never travel from Dispatch's provider store to the SDK. */
@@ -107,4 +107,14 @@ export function nativeClaudeEnvironment(owner: { home?: string; configDir?: stri
   if (owner.home !== undefined) { env.HOME = owner.home; env.USERPROFILE = owner.home; }
   if (owner.configDir !== undefined) env.CLAUDE_CONFIG_DIR = owner.configDir;
   return env;
+}
+
+/** Report fixed actionable categories, never raw provider text or credential-bearing diagnostics. */
+function claudeFailure(message: SDKResultMessage) {
+  const text = message.subtype === "success" ? message.result : message.errors.join("\n");
+  if (/usage limit|rate.?limit|limit reached|too many requests|429/i.test(text)) return "Claude Code reached its usage or rate limit. Check the native account's limits before retrying.";
+  if (/not logged|log.?in|auth|token|credential|401|403/i.test(text)) return "Claude Code authentication or account access failed. Check native auth status and sign in again on the configured runner.";
+  if (/model.*(not|unavailable|unsupported)|not.*model|404/i.test(text)) return "The selected model is unavailable to this Claude Code account. Select an accessible SDK model.";
+  if (/connect|network|timeout|timed out|fetch|ENOTFOUND|ECONN/i.test(text)) return "Claude Code could not reach its provider. Check the runner's network and retry after inspecting any effects.";
+  return `Claude Code ended without a successful answer (${message.subtype}). Inspect the native session on the runner; no raw provider diagnostics are disclosed.`;
 }
