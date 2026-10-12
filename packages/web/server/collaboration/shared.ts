@@ -112,7 +112,7 @@ export class SharedConversations {
   readonly sdk;
   readonly muse;
   readonly delivery;
-  /** Hosted workers must not inherit a backend user's native Claude login. */
+  /** Hosted workers must not inherit a backend user's native account login. */
   sdkExecutionAllowed = true;
   readonly legacyReporter;
   readonly stopTask;
@@ -134,11 +134,11 @@ export class SharedConversations {
       prepare: scope => this.prepareSdk(scope),
       options: async (scope, prepared) => {
         if (prepared.userId !== process.env.DISPATCH_CLAUDE_USER_ID) throw new CollaborationError(403, "The Claude runner owner changed after execution was admitted.");
-        await this.authorizeSdk(scope);
+        await this.authorizeNative(scope);
         return ({
         env: nativeClaudeEnvironment({ home: process.env.DISPATCH_CLAUDE_HOME, configDir: process.env.DISPATCH_CLAUDE_CONFIG_DIR }),
         ...(process.env.DISPATCH_CLAUDE_EXECUTABLE ? { pathToClaudeCodeExecutable: process.env.DISPATCH_CLAUDE_EXECUTABLE } : {}),
-        mcpServers: { dispatch: await sdkToolServer(scope, () => this.authorizeSdk(scope), async name => {
+        mcpServers: { dispatch: await sdkToolServer(scope, () => this.authorizeNative(scope), async name => {
           await scope.runtime.commit(async tx => {
             (await tx.doc(ListeningRequest, scope.runtime.taskId)).publicationOnly = name === "conversation_post";
             for (const item of await this.contributions.forReviewer(tx, scope.input.roomId, scope.runtime.conversationId, scope.runtime.taskId)) {
@@ -150,7 +150,7 @@ export class SharedConversations {
         canUseTool: async (name, input) => name.startsWith("mcp__dispatch__") ? { behavior: "allow", updatedInput: input } : { behavior: "deny", message: "Only explicitly granted Dispatch tools are available." },
       });
       },
-      settle: (scope, result) => this.settleSdk(scope, result),
+      settle: (scope, result) => this.settleNative(scope, result),
     });
     this.muse = createMuseTask({
       prepare: scope => this.prepareMuse(scope),
@@ -159,7 +159,7 @@ export class SharedConversations {
         error: "Muse Code execution is temporarily unavailable while its native tool authorization is corrected.",
       }),
       settle: async (scope, result) => {
-        const continuation = await this.settleSdk(scope, result, "muse-code");
+        const continuation = await this.settleNative(scope, result, "muse-code");
         return continuation ? { prompt: [{ type: "text", text: continuation.prompt }] } : undefined;
       },
     });
@@ -216,16 +216,16 @@ export class SharedConversations {
         });
         if (useSdk || useMuse) {
           const prompt = [{ type: "text" as const, text: notification }, ...(incoming.images ?? []).map(image => ({ type: "image" as const, mediaType: image.mimeType, base64Data: image.data })), ...(await this.attachments.imageContent(incoming.attachments)).filter(image => image.type === "image").map(image => ({ type: "image" as const, mediaType: image.mimeType, base64Data: image.data }))];
-          let sdkId = useMuse ? musePrior : sdkPrior;
-          if (!sdkId) await runtime.commit(async tx => {
+          let nativeTaskId = useMuse ? musePrior : sdkPrior;
+          if (!nativeTaskId) await runtime.commit(async tx => {
             const room = await tx.doc(SharedDoc, task.input.roomId);
             if (room.stopping || room.epoch !== task.input.epoch || !activeMember(room.members.find(item => item.id === member.id))) throw new Error("SDK admission is no longer authorized.");
             const input = { roomId: task.input.roomId, participantId: member.id, messageId: incoming.id, epoch: task.input.epoch };
-            sdkId = useMuse
+            nativeTaskId = useMuse
               ? await this.muse.admit(tx, member.conversationId!, `dispatch-delivery:${task.id}`, { ...input, prompt })
               : await this.sdk.admit(tx, member.conversationId!, `dispatch-delivery:${task.id}`, { ...input, prompt: prompt.map(part => part.type === "text" ? part : { type: "image", source: { type: "base64", media_type: part.mediaType as "image/png", data: part.base64Data } }) });
           }, ctx);
-          const settled = await runtime.waitForTask(sdkId!, ctx);
+          const settled = await runtime.waitForTask(nativeTaskId!, ctx);
           await runtime.commit(async tx => {
             const room = await tx.doc(SharedDoc, task.input.roomId);
             const target = room.members.find(item => item.id === member.id)!;
@@ -595,7 +595,7 @@ export class SharedConversations {
     });
   }
 
-  private async authorizeSdk(scope: ClaudeRunScope | MuseRunScope, backend: "claude-agent-sdk" | "muse-code" = "claude-agent-sdk") {
+  private async authorizeNative(scope: ClaudeRunScope | MuseRunScope, backend: "claude-agent-sdk" | "muse-code" = "claude-agent-sdk") {
     if (!this.sdkExecutionAllowed) throw new CollaborationError(503, "Native execution requires a user-bound local runner; hosted worker authentication is not configured.");
     const userId = backend === "muse-code" ? process.env.DISPATCH_MUSE_USER_ID : process.env.DISPATCH_CLAUDE_USER_ID;
     if (!userId) throw new CollaborationError(503, "Set the native runtime’s DISPATCH_CLAUDE_USER_ID or DISPATCH_MUSE_USER_ID to its Dispatch owner, then sign in on that runner.");
@@ -609,7 +609,7 @@ export class SharedConversations {
     }, scope.context);
   }
 
-  private async sdkContext(scope: ClaudeRunScope | MuseRunScope) {
+  private async nativeContext(scope: ClaudeRunScope | MuseRunScope) {
     let update = "";
     await scope.runtime.commit(async tx => {
       const room = await tx.doc(SharedDoc, scope.input.roomId);
@@ -631,7 +631,7 @@ export class SharedConversations {
   }
 
   private async prepareSdk(scope: ClaudeRunScope) {
-    await this.authorizeSdk(scope);
+    await this.authorizeNative(scope);
     const agent = await scope.runtime.agent(scope.context);
     const env = await scope.runtime.env(scope.context);
     const sections: string[] = [];
@@ -639,7 +639,7 @@ export class SharedConversations {
       const text = await section.render({ conversationId: scope.runtime.conversationId, agent, env, shown: {}, read: scope.runtime }, scope.context);
       if (text !== undefined) sections.push(section.tag === false ? text : `<${section.key}>\n${text}\n</${section.key}>`);
     }
-    const update = await this.sdkContext(scope);
+    const update = await this.nativeContext(scope);
     const content = typeof scope.input.prompt === "string" ? [{ type: "text" as const, text: scope.input.prompt }] : scope.input.prompt;
     return { prompt: [...content, { type: "text" as const, text: update }], systemPrompt: sections.join("\n\n"),
       cwd: agent.cwd ?? (await scope.runtime.snapshot(SharedDoc, scope.input.roomId, scope.context))!.members.find(item => item.id === scope.input.participantId)!.workspaceDefault!,
@@ -648,7 +648,7 @@ export class SharedConversations {
   }
 
   private async prepareMuse(scope: MuseRunScope) {
-    await this.authorizeSdk(scope, "muse-code");
+    await this.authorizeNative(scope, "muse-code");
     const agent = await scope.runtime.agent(scope.context);
     const env = await scope.runtime.env(scope.context);
     const sections: string[] = [];
@@ -656,15 +656,15 @@ export class SharedConversations {
       const text = await section.render({ conversationId: scope.runtime.conversationId, agent, env, shown: {}, read: scope.runtime }, scope.context);
       if (text !== undefined) sections.push(section.tag === false ? text : `<${section.key}>\n${text}\n</${section.key}>`);
     }
-    const update = await this.sdkContext(scope);
+    const update = await this.nativeContext(scope);
     return { prompt: [...scope.input.prompt, { type: "text" as const, text: update }], systemPrompt: sections.join("\n\n"),
       cwd: agent.cwd ?? (await scope.runtime.snapshot(SharedDoc, scope.input.roomId, scope.context))!.members.find(item => item.id === scope.input.participantId)!.workspaceDefault!,
       transportPolicyRevision: MUSE_TRANSPORT_POLICY_REVISION, model: agent.model!.modelId, reasoningEffort: (agent.thinkingLevel === "off" ? "none" : agent.thinkingLevel) as MuseReasoningEffort,
       userId: process.env.DISPATCH_MUSE_USER_ID! };
   }
 
-  private async settleSdk(scope: ClaudeRunScope | MuseRunScope, result: ClaudeRunResult, backend: "claude-agent-sdk" | "muse-code" = "claude-agent-sdk") {
-    await this.authorizeSdk(scope, backend);
+  private async settleNative(scope: ClaudeRunScope | MuseRunScope, result: ClaudeRunResult, backend: "claude-agent-sdk" | "muse-code" = "claude-agent-sdk") {
+    await this.authorizeNative(scope, backend);
     const { runtime, context: ctx } = scope;
     let ids: string[] = [];
     await runtime.commit(async tx => {
@@ -708,7 +708,7 @@ export class SharedConversations {
         if (decision.value === "pause") continue;
         if (decision.value === "review") {
           const item = (await runtime.snapshot(ContributionsDoc, scope.input.roomId, ctx))!.items[id];
-          return { prompt: `Review this preserved contribution at its saved destination. Your final revises it; [[silent]] discards it. Do not repost automatically. If tools are needed the reservation is released.\n${JSON.stringify({ draft: item.draft, contributionId: item.id })}\n${await this.sdkContext(scope)}` };
+          return { prompt: `Review this preserved contribution at its saved destination. Your final revises it; [[silent]] discards it. Do not repost automatically. If tools are needed the reservation is released.\n${JSON.stringify({ draft: item.draft, contributionId: item.id })}\n${await this.nativeContext(scope)}` };
         }
         break;
       }

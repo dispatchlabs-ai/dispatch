@@ -435,7 +435,7 @@ function AgentEditor({
   const dirty = agentEditIsDirty(editing);
   const instructionsTooLong = draft.instructions.length > 50000;
   const backend = draft.executionBackend ?? "pi";
-  const sdk = backend !== "pi";
+  const native = backend !== "pi";
   const models = modelsForRuntime(config, backend);
   const model = models.find(
     (model) => model.provider === draft.provider && model.id === draft.modelId,
@@ -484,7 +484,7 @@ function AgentEditor({
         className="agent-editor-form"
         onSubmit={(event) => {
           event.preventDefault();
-          if (instructionsTooLong || editing.skillEditing || (sdk && !model)) return;
+          if (instructionsTooLong || editing.skillEditing || (native && !model)) return;
           onChange({ ...editing, busy: true });
           setError(null);
           setConflict(false);
@@ -573,7 +573,7 @@ function AgentEditor({
               <summary><strong>Model</strong><span>{model?.name || draft.modelId || "Not configured"} · {thinkingLabel(draft.thinkingLevel)} thinking</span></summary>
             <fieldset disabled={busy} className="agent-form-section">
               <legend className="sr-only">Model settings</legend>
-              <Field label="Runtime" hint={sdk ? `Runs the native ${backend === "muse-code" ? "Muse Code" : "Claude Code"} runtime.` : undefined}>
+              <Field label="Runtime" hint={native ? `Runs the native ${backend === "muse-code" ? "Muse Code" : "Claude Code"} runtime.` : undefined}>
                 {props => <Select {...props} value={backend} onChange={event => changeRuntime(event.target.value as ExecutionBackend)}>
                   <option value="pi">Pi</option>
                   <option value="claude-agent-sdk">Agent SDK</option>
@@ -581,7 +581,7 @@ function AgentEditor({
                 </Select>}
               </Field>
               <div className="form-columns">
-                <Field label="Model" error={sdk && !model ? "Native model unavailable. Reload or ask your operator to check the catalog." : undefined}>
+                <Field label="Model" error={native && !model ? "Native model unavailable. Reload or ask your operator to check the catalog." : undefined}>
                   {(props) => (
                     <Select
                       {...props}
@@ -620,7 +620,7 @@ function AgentEditor({
                           key={JSON.stringify([model.provider, model.id])}
                           value={JSON.stringify([model.provider, model.id])}
                         >
-                          {model.name}{!sdk ? ` · ${model.provider}` : ""}
+                          {model.name}{!native ? ` · ${model.provider}` : ""}
                         </option>
                       ))}
                     </Select>
@@ -648,7 +648,7 @@ function AgentEditor({
                   )}
                 </Field>
               </div>
-              {sdk ? <p className="field-hint">
+              {native ? <p className="field-hint">
                 Sign in with {backend === "muse-code" ? "Muse Code" : "Claude Code"} on the runner. {" "}
                 <a href={`https://github.com/dispatchlabs-ai/dispatch/blob/main/packages/web/docs/usage-guide.md#${backend === "muse-code" ? "muse-code-setup" : "claude-agent-sdk-setup"}`} target="_blank" rel="noopener noreferrer">Setup guide<span className="sr-only"> (opens in a new tab)</span></a>
               </p> : null}
