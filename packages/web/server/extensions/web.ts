@@ -4,6 +4,10 @@ import { defineDoc, defineDocFamily, defineExtension, defineTool, section, type 
 import { WebBackendError, type WebBackend } from "../web/types.js";
 
 const LINE_WIDTH = 240;
+const SEARCH_EXCERPT_CHARS = 2000;
+const SEARCH_SNIPPET_CHARS = { short: 400, medium: 1000, long: 2000 } as const;
+// Includes serialized preview metadata and JSON escaping, shared evenly across search queries.
+const SEARCH_PREVIEW_BYTES = { short: 8000, medium: 16000, long: 32000 } as const;
 const WINDOW_LINES = { short: 20, medium: 60, long: 120 } as const;
 
 type WebReference = {
@@ -36,10 +40,10 @@ const refId = Type.String({ minLength: 1, description: "An HTTP(S) URL or a save
 const lineNumber = Type.Integer({ minimum: 1, description: "1-based line number in the saved snapshot." });
 const parameters = Type.Object({
   search_query: Type.Optional(Type.Array(Type.Object({
-    q: Type.String({ minLength: 1 }),
+    q: Type.String({ minLength: 1, maxLength: 2000 }),
     recency: Type.Optional(Type.Integer({ minimum: 1, description: "Limit results to this many recent days." })),
-    domains: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 253 }))),
-  }, { additionalProperties: false }))),
+    domains: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 253 }), { maxItems: 8 })),
+  }, { additionalProperties: false }), { maxItems: 4 })),
   open: Type.Optional(Type.Array(Type.Object({
     ref_id: refId,
     lineno: Type.Optional(lineNumber),
@@ -118,7 +122,9 @@ export function createWebResearch(backend: WebBackend, access: WebResearchAccess
     replay: "unsafe",
     outputLimits: { maxBytes: 128_000, maxLines: 10_000 },
     execute: async (args: Static<typeof parameters>, api, context) => {
-      const count = WINDOW_LINES[args.response_length ?? "medium"];
+      const length = args.response_length ?? "medium";
+      const count = WINDOW_LINES[length];
+      const searchBudget = Math.floor(SEARCH_PREVIEW_BYTES[length] / Math.max(1, args.search_query?.length ?? 0));
       const signal = context.abortSignal;
       signal?.throwIfAborted();
       const save = async (reference: WebReference) => {
@@ -183,15 +189,27 @@ export function createWebResearch(backend: WebBackend, access: WebResearchAccess
         signal?.throwIfAborted();
         const results = await access.search(api.conversationId, query, signal);
         signal?.throwIfAborted();
-        const found = await Promise.all(results.map(async result => {
-          const reference = await save({
-            id: `web_${randomUUID()}`, kind: "search", url: webUrl(result.url), title: clean(result.title),
-            retrievedAt: new Date().toISOString(), lines: linesOf(result.snippet),
-            links: [], linksStartLine: null, truncated: false,
-          });
-          return { ...metadata(reference), snippet: reference.lines.join("") };
-        }));
-        return { results: found, note: "Search snippets are not full-page evidence. Use web_read, if enabled, to open a result reference and retrieve its page." };
+        const found: Array<ReturnType<typeof metadata> & { snippet: string; snippet_truncated: boolean }> = [];
+        let bytes = 2; // JSON array brackets.
+        for (const result of results.slice(0, 8)) {
+          // Bound before persisting as well as before publication. Never truncate a source URL.
+          if (result.url.length > 4096) continue;
+          const excerpt = clean(result.snippet);
+          const reference: WebReference = {
+            id: `web_${randomUUID()}`, kind: "search", url: webUrl(result.url), title: clean(result.title).slice(0, 200),
+            retrievedAt: new Date().toISOString(), lines: linesOf(excerpt.slice(0, SEARCH_EXCERPT_CHARS)),
+            links: [], linksStartLine: null, truncated: excerpt.length > SEARCH_EXCERPT_CHARS,
+          };
+          const preview = { ...metadata(reference), snippet: excerpt.slice(0, SEARCH_SNIPPET_CHARS[length]),
+            snippet_truncated: excerpt.length > SEARCH_SNIPPET_CHARS[length] };
+          const size = Buffer.byteLength(JSON.stringify(preview), "utf8") + 1;
+          if (bytes + size > searchBudget) continue;
+          await save(reference);
+          found.push(preview);
+          bytes += size;
+        }
+        return { results: found, omitted_results: results.length - found.length,
+          note: "Search excerpts and preview metadata are bounded by response_length; omitted_results counts results excluded by the response budget. Search snippets are not full-page evidence. Use web_read, if enabled, to open a result reference or source URL and fetch its page." };
       }));
       for (const input of args.open ?? []) work.push(operation("open", input, async () =>
         windowOf(await resolvePage(input.ref_id, input.refresh), input.lineno ?? 1, count)));
