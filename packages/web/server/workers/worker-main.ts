@@ -19,7 +19,7 @@ import { ATTACHMENT_RPC_MAX_BYTES, decodeAttachmentBytes, RemoteAttachmentStore 
 import type { WorkerStoreConfig } from "./postgres-stores.js";
 import { tokenMatches } from "./identity.js";
 import { validateBackendCa, workerRequest } from "./transport.js";
-import type { AuthResult } from "@earendil-works/pi-ai";
+import type { AuthCheck, AuthResult } from "@earendil-works/pi-ai";
 import type { RuntimeScope, SendMessageInput, AddParticipantsInput, UpdateChatInput } from "../../src/shared/contracts.js";
 
 const env = z.object({
@@ -38,7 +38,9 @@ const bootstrap = await backend<ConversationWorkerBootstrap & { storage: WorkerS
 if (bootstrap.conversationKey !== env.DISPATCH_CONVERSATION_ID || bootstrap.storeId !== env.DISPATCH_POSTGRES_STORE_ID || bootstrap.storage.storeId !== bootstrap.storeId || bootstrap.storage.access !== "worker") throw new Error("Worker bootstrap identity mismatch.");
 await mkdir("/workspace/state", { recursive: true, mode: 0o700 });
 const providers = await openModels({ DISPATCH_PI_AGENT_DIR: "/workspace/provider-catalog" });
-const models = workerModels(providers.models.getProviders(), (provider, signal) => backend<AuthResult | undefined>("/model-auth", { provider }, signal));
+const models = workerModels(providers.models.getProviders(),
+  (provider, signal) => backend<AuthResult | undefined>("/model-auth", { provider }, signal),
+  (provider, signal) => backend<AuthCheck | undefined>("/model-auth-check", { provider }, signal));
 const runtime = await DispatchRuntime.openConversation({
   stateDir: "/workspace/state", workspaceDir: "/workspace", companyId: bootstrap.scope.companyId,
   piStorage: bootstrap.storage, models,
