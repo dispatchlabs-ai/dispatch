@@ -1,10 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
+import { homedir } from "node:os";
 import { MuseClient, MuseInteractionRequiredError } from "./client.js";
 import { museCommandId, type MuseInvocation, type MusePreparedRun, type MuseRunResult } from "./task.js";
 
 // Increment when the native authorization posture changes; old sessions must start fresh.
-export const MUSE_TRANSPORT_POLICY_REVISION = 1;
+export const MUSE_TRANSPORT_POLICY_REVISION = 2;
 
 type Bridge = { url: string; headers: Record<string, string>; toolNames: string[]; authorize(): Promise<void> };
 type Terminal = { terminal: string; error?: { kind: string } };
@@ -20,7 +21,7 @@ export async function runMuseQuery(input: {
       error: "Muse Code authorization policy changed. This run cannot continue. Ask the operator to review any earlier work and external effects before starting a new run." };
   }
 
-  const workspace = resolve(process.env.DISPATCH_DATA_DIR ?? ".local/state/dispatch", "muse-workspaces", invocation.sessionId);
+  const workspace = resolve(homedir(), ".local", "share", "dispatch", "muse-workspaces", invocation.sessionId);
   await mkdir(workspace, { recursive: true, mode: 0o700 });
   await writeFile(join(workspace, "AGENTS.md"), prepared.systemPrompt, { mode: 0o600 });
   signal.throwIfAborted();
@@ -28,7 +29,7 @@ export async function runMuseQuery(input: {
   const allowed = new Set(bridge.toolNames.map(name => `mcp__dispatch__${name}`));
   const client = new MuseClient(process.env.DISPATCH_MUSE_EXECUTABLE ?? "muse", [
     "serve", "--provider", "meta", "--model", prepared.model,
-    "--trust-workspace", "--disable-shell", "--disable-write", "--sandbox-network", "restricted",
+    "--trust-workspace",
   ], workspace, nativeMuseEnvironment(), async (_method, params) => {
     signal.throwIfAborted();
     if (params.sessionId !== invocation.sessionId || typeof params.approvalId !== "string") throw new MuseInteractionRequiredError();
