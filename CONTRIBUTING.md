@@ -75,6 +75,8 @@ Load these longer procedures only when their task applies:
 - [Interactive testing](.pi/skills/interactive-testing.md): verify specified browser workflows and observable outcomes once a runnable application exists.
 - [Release](.pi/skills/release.md): canonical executable runbook for preparation, local builds, verification, public publication and documentation. A release request authorizes the whole ordinary workflow; prior release chats are not prerequisites.
 
+These repository prompt/skill files and `AGENTS.md` are not automatically loaded by Dispatch agents. Dispatch-native discovery requires a pointer in supplied agent/project context or an explicitly assigned saved catalog skill; see [release discovery](.pi/skills/release.md#discovery-in-dispatch). Verify that connection in a fresh conversation rather than assuming the directory name enables it.
+
 Use `/deslop` after implementing a work package, then rerun affected checks before `/wr`. `/is` and `/pr` are investigation/review tasks; neither authorizes implementation or external messages. `/wr` follows the Git publication policy below, but does not itself authorize GitHub comments, issue-state changes, a deployment, or starting the next work package.
 
 ## Checks and publication

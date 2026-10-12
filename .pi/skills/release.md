@@ -7,6 +7,10 @@ description: Build, verify and publish a requested Dispatch release using local 
 
 This is the canonical release runbook. Start here when asked to make a release; previous chats and private `.local/` scripts are not prerequisites. Read [CONTRIBUTING.md](../../CONTRIBUTING.md), the [web changelog](../../packages/web/CHANGELOG.md), and relevant package guidance.
 
+## Discovery in Dispatch
+
+This file is a repository procedure, not an automatically loaded Dispatch skill. Dispatch does not discover `AGENTS.md` or `.pi/skills/` for its participants. To make release requests discover this procedure, supply its repository URL in the relevant Dispatch-provided instructions, or explicitly assign a saved release skill through the Skills catalog. A repository link alone does not establish that wiring. Verify discovery in a fresh conversation without the human providing the path before claiming “just ask for a release” is supported. Skills provide guidance, not additional tools, credentials or permissions.
+
 ## Authorization and defaults
 
 **Accepted October 12, 2026:** the initial human request to make a release authorizes the entire ordinary workflow: select the SemVer bump, prepare versions/changelog, build and verify artifacts, commit/push to `main`, create/push the immutable tag, publish public GitHub Release assets, publish public registry images with available credentials, and update installation/release documentation. Do not ask for separate approval at each step or stop at a local tag. If asked to announce the version first, do that before mutations; only wait for confirmation if the human explicitly requires it.
