@@ -1,5 +1,5 @@
 /*
- * Dispatch image generation: direct OpenAI Images API calls with injected
+ * Dispatch image generation: credential-specific Images API calls with injected
  * runtime auth (createImageGen(models)). Generation/editing only; evidence,
  * cancellation and workspace containment follow the image-generation contract.
  */
@@ -11,7 +11,8 @@ import { defineExtension, defineTool, section } from "@earendil-works/pi-durable
 
 const DEFAULT_MODEL = "gpt-image-2.5-sunburst";
 const SPEED_VARIANT = "gpt-image-2.5-flare";
-const PROVIDER = "openai";
+const CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex";
+const CODEX_DEFAULT_MODEL = "gpt-image-2";
 const SIZES = ["1024x1024", "1536x1024", "1024x1536"] as const;
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] as const;
 const OUTPUT_DIR = "imagegen";
@@ -32,6 +33,7 @@ interface RunRecord {
   taskId: string;
   callId: string;
   requestedModel: string;
+  provider?: "openai" | "openai-codex";
   request: Record<string, unknown>;
   references: { path: string; sha256: string }[];
   mask?: { path: string; sha256: string };
@@ -143,11 +145,12 @@ export function createImageGen(models: Models) {
   const generateImage = defineTool({
     name: "generate_image",
     description:
-      `Generate or edit an image with the OpenAI Images API (default ${DEFAULT_MODEL}, ${SPEED_VARIANT} for fast iteration). With reference images (and optionally a mask PNG) this calls /v1/images/edits; otherwise /v1/images/generations. Writes PNG outputs and a per-run metadata record (request, reference hashes, dimensions, generation ids) under the workspace imagegen directory and returns the output paths plus native image content for visual inspection. Inspect the returned images before presenting them. When the image-generation skill is assigned, load it first and follow its prompt craft.`,
+      `Generate or edit an image using Codex subscription images (default ${CODEX_DEFAULT_MODEL}) or the separately billed OpenAI Images API (default ${DEFAULT_MODEL}, ${SPEED_VARIANT} for fast iteration). Prefer a configured Codex images connection; choose provider explicitly to select API-key access. Codex edits accept reference images, but not masks or input_fidelity. Writes PNG outputs and a per-run metadata record (request, reference hashes, dimensions, generation ids) under the workspace imagegen directory and returns the output paths plus native image content for visual inspection. Inspect the returned images before presenting them. When the image-generation skill is assigned, load it first and follow its prompt craft.`,
     parameters: Type.Object({
+      provider: Type.Optional(Type.Union([Type.Literal("openai-codex"), Type.Literal("openai")], { description: "Codex subscription or separately billed OpenAI API-key route. Default prefers a configured Codex images connection. No fallback after a provider failure." })),
       prompt: Type.String({ minLength: 1, maxLength: 32_000, description: "Full image prompt, written per the assigned skill's prompt craft." }),
       name: Type.String({ minLength: 1, maxLength: 64, description: "Short slug naming this run's directory, outputs and metadata record." }),
-      model: Type.Optional(Type.String({ maxLength: 64, description: `Images model id. Default ${DEFAULT_MODEL}.` })),
+      model: Type.Optional(Type.String({ maxLength: 64, description: `Images model id. Default ${CODEX_DEFAULT_MODEL} for Codex, ${DEFAULT_MODEL} for API keys.` })),
       size: Type.Optional(Type.Union(SIZES.map((size) => Type.Literal(size)), { description: "Output size. Default 1536x1024." })),
       quality: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("medium"), Type.Literal("high")], { description: "Default high." })),
       input_fidelity: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("high")], { description: "Legacy edit option for gpt-image-1 and gpt-image-1.5 (high/low), or gpt-image-1-mini (low). Omitted for other models, including GPT Image 2/2.5. No default is injected." })),
@@ -165,7 +168,25 @@ export function createImageGen(models: Models) {
       if (args.mask && !args.images?.length)
         return textResult("A mask requires reference images; without them there is no image to edit.", true);
 
-      const requestedModel = args.model ?? DEFAULT_MODEL;
+      const authOptions = { signal: context.abortSignal };
+      let provider: "openai" | "openai-codex";
+      try {
+        // Check each candidate once; configured Codex owns the default, with no failure fallback.
+        let check = await models.checkAuth(args.provider ?? "openai-codex", authOptions);
+        provider = args.provider ?? (check ? "openai-codex" : "openai");
+        if (!args.provider && !check) check = await models.checkAuth("openai", authOptions);
+        if (!check) return textResult(provider === "openai-codex"
+          ? "Connect Codex images in Settings → Model providers. No request was made."
+          : "Connect Codex images or configure an OpenAI API key in Settings → Model providers. No request was made.", true);
+        if (provider === "openai" && check.type !== "api_key")
+          return textResult("The OpenAI chat subscription grant cannot generate images. Connect Codex images in Settings → Model providers; the chat connection can stay unchanged. No request was made.", true);
+        if (provider === "openai-codex" && (args.mask || args.input_fidelity !== undefined))
+          return textResult("Codex images does not support masks or input_fidelity. Use reference images without these options, or explicitly select the OpenAI API-key route. No request was made.", true);
+      } catch {
+        return textResult(context.abortSignal?.aborted ? "Cancelled before submit. No request was made."
+          : "Image credential inspection failed. Review provider status in Settings. No request was made.", true);
+      }
+      const requestedModel = args.model ?? (provider === "openai-codex" ? CODEX_DEFAULT_MODEL : DEFAULT_MODEL);
       const size = args.size ?? "1536x1024";
       const quality = args.quality ?? "high";
       const count = args.n ?? 1;
@@ -177,7 +198,7 @@ export function createImageGen(models: Models) {
         return textResult("gpt-image-1-mini accepts only input_fidelity: low. No request was made.", true);
       const request: Record<string, unknown> = { model: requestedModel, prompt: args.prompt, size, quality, n: count,
         ...(isEditRun && supportsFidelity && args.input_fidelity !== undefined ? { input_fidelity: args.input_fidelity } : {}) };
-      const endpoint = isEditRun ? "https://api.openai.com/v1/images/edits" : "https://api.openai.com/v1/images/generations";
+      const endpoint = `${provider === "openai-codex" ? CODEX_BASE_URL : "https://api.openai.com/v1"}/images/${isEditRun ? "edits" : "generations"}`;
 
       let metadataPath: string | undefined;
       let record: RunRecord | undefined;
@@ -208,12 +229,13 @@ export function createImageGen(models: Models) {
         await mkdir(join(runDir, "outputs"));
         metadataPath = join(runDir, "metadata.json");
         record = {
-          purpose: "Dispatch image generation; API billed cost is not returned and not estimated.",
+          purpose: "Dispatch image generation; API cost/subscription usage is not returned or estimated.",
           name: args.name,
           conversationId: String(api.conversationId),
           taskId: String(api.taskId),
           callId: api.callId,
           requestedModel,
+          provider,
           request,
           references: [],
           endpoint,
@@ -243,25 +265,25 @@ export function createImageGen(models: Models) {
           return textResult("Cancelled before submit. No request was made.", true);
         }
 
-        let apiKey: string | undefined;
-        try { apiKey = (await models.getAuth(PROVIDER, { signal: context.abortSignal }))?.auth.apiKey; }
-        catch (error) {
-          if (context.abortSignal?.aborted) throw error;
-          record.status = "not-submitted";
-          record.error = `credential_resolution_failed (${error instanceof Error ? error.name : "unknown"})`;
-          await persist();
-          return textResult(`Credential resolution failed for the ${PROVIDER} provider. No request was made.`, true);
-        }
-        if (!apiKey) {
-          record.status = "not-submitted";
-          record.error = `No API key configured for the ${PROVIDER} provider.`;
-          await persist();
-          return textResult(record.error, true);
-        }
-
-        const headers: Record<string, string> = { Authorization: `Bearer ${apiKey}` };
+        const resolved = await models.getAuth(provider, authOptions);
+        if (!resolved?.auth.apiKey) throw new ToolError("Image credentials are unavailable. Review provider status in Settings. No request was made.");
+        // A credential change between inspection and resolution must not send chat OAuth to the API.
+        if (provider === "openai" && resolved.source === "OAuth")
+          throw new ToolError("Image connection changed. Review provider status before retrying. No request was made.");
+        const headers: Record<string, string> = { ...resolved.auth.headers, Authorization: `Bearer ${resolved.auth.apiKey}` };
         let body: FormData | string;
-        if (references.length > 0) {
+        if (provider === "openai-codex") {
+          if (resolved.source !== "OAuth")
+            throw new ToolError("Codex images requires a Codex subscription grant. Review provider status. No request was made.");
+          if (!headers["chatgpt-account-id"])
+            throw new ToolError("Codex image credentials are missing the selected account. Reconnect Codex images. No request was made.");
+          headers["x-codex-image-turn-id"] = randomUUID();
+          headers["originator"] = "dispatch";
+          headers["Content-Type"] = "application/json";
+          body = JSON.stringify({ ...request, ...(references.length ? {
+            images: references.map(bytes => ({ image_url: `data:image/png;base64,${Buffer.from(bytes).toString("base64")}` })),
+          } : {}) });
+        } else if (references.length > 0) {
           const form = new FormData();
           for (const [key, value] of Object.entries(request)) form.append(key, String(value));
           for (const [index, bytes] of references.entries())
@@ -273,6 +295,10 @@ export function createImageGen(models: Models) {
           headers["Content-Type"] = "application/json";
           body = JSON.stringify(request);
         }
+        record.endpoint = endpoint;
+        record.requestedModel = requestedModel;
+        // Persist the actual route and parameters before any network request, never credentials/image bytes.
+        await persist();
 
         // Recheck cancellation immediately before submission; after this point an abort is outcome-unknown.
         if (context.abortSignal?.aborted) {
@@ -285,7 +311,7 @@ export function createImageGen(models: Models) {
         record.submittedAt = new Date().toISOString();
         const response = await fetch(endpoint, { method: "POST", headers, body, signal: context.abortSignal });
         record.httpStatus = response.status;
-        record.requestId = response.headers.get("x-request-id");
+        record.requestId = response.headers.get("x-codex-imagegen-request-id") ?? response.headers.get("x-request-id");
         const bodyText = await readBoundedBody(response);
 
         let parsed: unknown;

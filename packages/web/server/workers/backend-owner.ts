@@ -285,11 +285,24 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
     const { id } = attachmentReadRequestSchema.parse(input);
     return c.json({ dataBase64: (await artifacts.read(route.storeId, id)).toString("base64") });
   }
-  if (operation === "model-auth") {
+  if (operation === "model-auth" || operation === "model-auth-check") {
     const { provider: providerId } = z.object({ provider: z.string() }).strict().parse(input);
+    const resolveAuth = () => operation === "model-auth-check"
+      ? provider.models.checkAuth(providerId, { signal: c.req.raw.signal })
+      : provider.models.getAuth(providerId, { signal: c.req.raw.signal });
+    if (providerId === "openai-codex") return c.json(await mcpPolicy.call(async () => {
+      await directory.authorizeWorkerImageCredentials(route.companyId, route.conversationId, route.storeId);
+      assertCurrent();
+      const result = await resolveAuth() ?? null;
+      assertCurrent();
+      c.req.raw.signal.throwIfAborted();
+      return result;
+    }));
     const catalog = await directory.exportWorkerCatalog(route.companyId);
     if (!catalog.agents.some(agent => agent.provider === providerId && !agent.archived)) return c.json({ error: "Forbidden" }, 403);
-    return c.json(await provider.models.getAuth(providerId) ?? null);
+    const result = await resolveAuth() ?? null;
+    assertCurrent();
+    return c.json(result);
   }
   if (operation === "people" || operation === "person") {
     const person = z.object({ companyId: z.string(), userId: z.string().optional() }).strict().parse(input);

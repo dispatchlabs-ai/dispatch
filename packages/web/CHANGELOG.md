@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Image credential routing
+
+- Add a separate Codex images connection using Pi-owned OAuth login/refresh and saved account selection, without changing agents' chat providers or copying CLI credentials.
+- Select subscription or API-key image transport explicitly; prefer configured Codex access by default, reject incompatible credentials/controls before submission, and never retry a provider failure through the other billing route.
+
 ### Project-wide agent instructions
 
 - Add a project-owned Markdown instructions setting with manager-only, revision-checked saves, no-op revision handling and actor-scoped retry receipts; keep spec and settings revisions separate.
