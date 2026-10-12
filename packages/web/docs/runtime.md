@@ -123,7 +123,7 @@ Pin/archive preferences remain personal and grant no access. Legacy personal-gro
 
 ## Project instructions
 
-**Backend candidate; UI and runtime qualification incomplete.** The project owns one editable Markdown setting and its instructions revision. Each native agent conversation retains an adopted execution snapshot containing project identity, revision and Markdown; it is not another editable source.
+**Editor candidate implemented; browser and live runtime qualification pending.** The project owns one editable Markdown setting and its instructions revision. Each native agent conversation retains an adopted execution snapshot containing project identity, revision and Markdown; it is not another editable source.
 
 The collaboration extension uses `ProjectInstructionsBindingDoc` and `projectInstructionsSection` from `server/collaboration/project-instructions.ts`. The conversation-scoped binding uses latest state and initial fork behavior, like participant bindings. Pi Durable 1.1.0's native `section("project-instructions", …)` reads only that committed binding. Pi renders the section before the individual instructions and owns effective system-entry history. Base instructions and instance supplements remain separately composed in `AgentDoc.instructions`. Do not inject project text as a public message, rewrite provider requests or manually append system entries. Prompt order is not authorization, and renderer errors must not serve as access gates.
 
