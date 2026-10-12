@@ -18,7 +18,19 @@ Startup installs all extensions, opens Pi storage, seeds missing company definit
 
 ## Agent project-chat reads
 
-**Local implementation; runtime qualification/publication pending.** `server/project-chat-context.ts` defines `project_chats` and `project_chat_read`; `server/project-chat-reader.ts` provides the shared public projection. Local mode authorizes and reads on the native commit line. Worker mode resolves the acting instance in its local transaction, releases that transaction, and calls the backend mediation interface. The backend authenticates the worker/attempt, resolves the current project and target through the directory, reads the existing store, then reauthorizes before disclosure. No human browser session or creator identity substitutes for the agent principal.
+**Published; local interactive acceptance passed.** `server/project-chat-context.ts` defines `project_chats` and `project_chat_read`; `server/project-chat-reader.ts` provides the shared public projection. Local mode authorizes and reads on the native commit line. Worker mode resolves the acting instance in its local transaction, releases that transaction, and calls the backend mediation interface. The backend authenticates the worker/attempt, resolves the current project and target through the directory, reads the existing store, then reauthorizes before disclosure. No human browser session or creator identity substitutes for the agent principal.
+
+### Project-chat qualification
+
+Local interactive checks on 2026-10-12 covered feature `e694cc7`, integrated/published in `065df1e`:
+
+- Fresh project chat: discovery and public-history reads without target membership; list/history pagination and message detail also checked by reviewers through native tools.
+- Missing, other-project and unbound target IDs: identical `Chat not found.` refusals. Fresh unbound caller: `{ projectId: null, chats: [], nextCursor: null }`.
+- Private prepared attachment: explicit `attachmentId` read refused with `Public item not found.`, including for its uploader. Public image attachment: native image output verified separately by Developer.
+- Explicit activity discovery/detail: stored-observation marker and private compaction-summary filtering checked through native tools.
+- Expanded list/read output at 1440×900 and 390×844: wrapped, scroll-bounded output; document width matched viewport width. A cited `/?chat=<id>` link opened the correct existing chat.
+
+The source chat still had its original participants/messages after the read, with no response in progress when opened. This is not independent monitoring of worker execution, notifications or human read-state changes; those guarantees remain source-reviewed. Distributed PostgreSQL snapshots, stopped/crashed-worker reads and Stop/recovery are not runtime-qualified by these local checks. Scope-change/move and agent-removal races were not exercised; moving chats between projects is not a supported operation. No automated tests were added or run. Developer reported TypeScript/build and Apple Silicon Nix checks passing; this does not qualify other platforms.
 
 ### Passive storage snapshot
 

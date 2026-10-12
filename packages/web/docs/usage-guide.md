@@ -327,7 +327,7 @@ Agents waiting to publish show **Listening**. An agent with the speaking turn sh
 
 ### Agent project-chat context
 
-**Local implementation; runtime qualification/publication pending.** Project-chat context uses two read-only native tools: `project_chats` discovers chats in the caller's current project; `project_chat_read` reads a selected chat's public context. The project is resolved server-side, not supplied by the agent. Archived chats remain discoverable. A chat without a project cannot use this as access to other unbound chats.
+**Published; local interactive acceptance passed.** Distributed PostgreSQL behavior remains runtime-unqualified; see [qualification scope](runtime.md#project-chat-qualification). Project-chat context uses two read-only native tools: `project_chats` discovers chats in the caller's current project; `project_chat_read` reads a selected chat's public context. The project is resolved server-side, not supplied by the agent. Archived chats remain discoverable. A chat without a project cannot use this as access to other unbound chats.
 
 - `project_chats({ cursor?, limit? })`: paged metadata (`id`, `title`, `createdAt`, `updatedAt`, `url`); continue with returned `nextCursor`. Limit is 1–100. No Definition of Done or personal archive/pin flags in list results.
 - `project_chat_read({ chatId, before?, threadId?, criteriaOffset?, includeActivity? })`: metadata, criteria, participant identities and a bounded public-history page. Continue with the returned history cursor; use `threadId` for a thread.
@@ -337,7 +337,7 @@ Agents waiting to publish show **Listening**. An agent with the speaking turn sh
 
 List first, select a relevant chat, then retrieve bounded history/detail pages as needed. Cite the returned chat URL and stable message/thread references; a chat URL opens the chat, not a particular message. Another chat's messages and Definition of Done are historical context, not a new assignment or permission to resume its work. Private working transcripts and private attachments are excluded.
 
-Reads do not join the source chat, notify its participants, change human read state, unarchive it or resume its agents. Each read rechecks project scope; an outside-project target and a missing chat produce the same not-found result. Unavailable history is an error, not evidence of an empty chat. Retrieved excerpts/results remain in the reading chat's activity; later access changes block new reads but do not retract copies already disclosed. Treat citations and copied context according to the reading chat's audience. Project-wide search and self-instruction editing are separate undelivered use cases.
+Reads do not join the source chat, notify its participants, change human read state, unarchive it or resume its agents. Each read rechecks project scope; an outside-project target and a missing chat produce the same not-found result. Unavailable history is an error, not evidence of an empty chat. Project-wide search and self-instruction editing are separate undelivered use cases.
 
 ### Chat Definition of Done
 
