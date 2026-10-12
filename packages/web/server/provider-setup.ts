@@ -6,6 +6,7 @@ import type { ProviderLogin, ProviderStatus, SetupProviderId } from "../src/shar
 
 const definitions = [
   { id: "openai", name: "OpenAI", methods: ["oauth", "api_key"] },
+  { id: "openai-codex", name: "Codex images", methods: ["oauth"] },
   { id: "anthropic", name: "Claude", methods: ["api_key"] },
   { id: "fireworks", name: "Fireworks", methods: ["api_key"] },
 ] as const;
@@ -58,7 +59,7 @@ export class ProviderSetup {
     const account = credential?.type === "oauth" && typeof credential.accountId === "string" ? credential.accountId.slice(0, 200) : undefined;
     return { id, name: definition.name, methods: [...definition.methods], state, type: credential?.type, account,
       revision: this.revision([id, interrupted, unavailable, external, credential ?? null]),
-      models: this.models.getModels(id).map(model => ({ id: model.id, name: model.name })) };
+      models: (id === "openai-codex" ? [] : this.models.getModels(id)).map(model => ({ id: model.id, name: model.name })) };
   }
   async list(principal?: AuthPrincipal) {
     const values: ProviderStatus[] = [];

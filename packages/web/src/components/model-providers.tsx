@@ -13,7 +13,7 @@ const statusLabels: Record<ProviderStatus["state"], string> = {
   reconnect_required: "Reconnect required", externally_managed: "Externally managed", unavailable: "Unavailable",
 };
 function methodLabel(method: Method, provider: ProviderStatus) {
-  return method === "api_key" ? "API key" : provider.id === "openai" ? "ChatGPT (OAuth)" : "OAuth";
+  return method === "api_key" ? "API key" : (provider.id === "openai" || provider.id === "openai-codex") ? "ChatGPT (OAuth)" : "OAuth";
 }
 function ongoing(attempt: ProviderLogin) { return attempt.state === "working" || attempt.state === "awaiting_input"; }
 
