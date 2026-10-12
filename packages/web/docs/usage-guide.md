@@ -586,6 +586,7 @@ All `/api` access requires a fully authenticated session except the authenticati
 | `GET/POST /api/chats` | List conversations you belong to / create with a request ID |
 | `GET/POST /api/projects` | List accessible shared projects / create an empty shared project with a request ID |
 | `GET/POST /api/projects/:id/spec` | Read current/exact database Markdown / manager-only Save with `{ requestId, expectedRevision, content }`. See [spec API and recovery](#shared-projects). |
+| `GET/POST /api/projects/:id/instructions` | Read project rules / manager-only revisioned Save; see [project-wide instructions](#project-wide-agent-instructions). |
 | `POST /api/chats/:id/title` | Rename the shared Dispatch display title |
 | `POST /api/chats/:id/definition-of-done` | Save or clear shared Markdown criteria with an expected revision |
 | `POST /api/chats/:id/preferences` | Set pin/archive flags or assign, move, or remove project membership |
@@ -703,6 +704,20 @@ New project now creates an empty shared project with you as its manager. Project
 - `GET /api/projects/:id/spec/legacy` returns the reviewed configured source for migration only.
 - `POST /api/projects/:id/spec/import` with `{ requestId, expectedProjectRevision, sourceVersion, contentHash }`. Use the reviewed project revision and version/commit; contentHash is SHA-256 of reviewed UTF-8 text. Do not silently substitute current values during retry.
 - Markdown must be valid UTF-8, contain no NUL and be at most 512 KiB. Save creates immutable revisions and actor/company-scoped receipts with current mutation permission checks.
+
+#### Project-wide agent instructions
+
+**Implementation in progress; UI/runtime qualification pending.** Project instructions are standing operating rules, separate from the product spec and the chat Definition of Done. Keep them concise: testing conventions, approval policy and documentation expectations belong here; feature requirements belong in the spec, and the current task remains authorized through human direction or enabled automation policy.
+
+Managers save one Markdown field in Projects. Saving an empty field clears it. Saving does not send a message, wake agents or start work. New project instances receive the latest saved instructions; existing instances adopt the latest revision when safely idle. Busy agents retain their adopted rules across edits and restart, without replaying intermediate revisions afterward.
+
+**Saved revision** identifies the project's current setting; **Adopted revision** identifies an instance's configuration for subsequent requests. Neither label proves that the model has used or obeyed the rules. Clearing also waits for adoption. Use Stop for urgent interruption; it cannot undo prior effects.
+
+Failed or conflicting saves must preserve the draft for review. Identical retries return the original save result rather than creating another revision or restoring an old edit over newer content; unchanged saves do not create revision churn. Drafts are not a durable backup: copy important unsaved text before refreshing or closing.
+
+Instructions are model-visible text, not secret storage, permission grants or automatic assignments. Use the existing secret-grant mechanism for credentials. Application access controls, approvals and Stop remain authoritative. See [runtime integration](runtime.md#project-instructions) for the native Pi boundary.
+
+**Candidate API:** `GET /api/projects/:id/instructions` returns `{ instructions: { projectId, revision, content } }` for authorized readers. Manager-only `POST` at the same route accepts `{ requestId, expectedRevision, content }` and returns the same envelope. The instructions revision is independent of spec/settings revisions; an unset legacy field reads as empty content at revision 0. Content must be valid UTF-8, contain no NUL and be at most 50,000 characters. Reuse the identical request ID and payload after an uncertain response, including when newer content has been saved; do not silently substitute the current revision.
 
 #### Database spec qualification
 

@@ -121,6 +121,18 @@ Shared projects have stable UUIDs, current manager/member policy, default agents
 
 Pin/archive preferences remain personal and grant no access. Legacy personal-group records and original creation fingerprints remain persisted for history/retry compatibility, but listing, creation and move paths no longer expose them. Audience-changing moves are unsupported; no migration silently shares old chats. Creation retries preserve the original request rather than resolving changed project defaults.
 
+## Project instructions
+
+**Implementation in progress; source and runtime qualification pending.** The project owns one editable Markdown setting and its instructions revision. Each native agent conversation retains an adopted execution snapshot containing project identity, revision and Markdown; it is not another editable source.
+
+The collaboration extension uses `ProjectInstructionsBindingDoc` and `projectInstructionsSection` from `server/collaboration/project-instructions.ts`. The conversation-scoped binding uses latest state and initial fork behavior, like participant bindings. Pi Durable 1.1.0's native `section("project-instructions", …)` reads only that committed binding. Pi renders the section before the individual instructions and owns effective system-entry history. Base instructions and instance supplements remain separately composed in `AgentDoc.instructions`. Do not inject project text as a public message, rewrite provider requests or manually append system entries. Prompt order is not authorization, and renderer errors must not serve as access gates.
+
+Creation initializes the binding before the first submission. Existing-instance adoption uses the same safe idle guards as base upgrades, but is independent of base-definition eligibility. Project-only edits reconcile even when the definition is unchanged or archived. Adopt the latest revision directly; active/unfinished admitted work retains its snapshot across restart and authenticated worker synchronization. Stop/removal and access checks remain in force. Hosted instruction propagation must use non-revoking catalog acknowledgement: a propagation failure is saved-but-pending/error state, not permission to stop or retire an active worker. An adopted empty snapshot removes the section on the next prepared request.
+
+The binding slice `faf4eeb` passed TypeScript/application/capability and Apple Silicon Nix build/flake checks. API/storage slice `9d629cc` was source-reviewed for authorization, original-result replay and no-op/conflict handling; its initial check remained blocked on the distributed facade methods. These are slice-level observations, not integrated acceptance.
+
+The [user guide](usage-guide.md#project-wide-agent-instructions) explains saved versus adopted revisions and interruption limits. Runtime evidence must cover idle project-only adoption, active/restart snapshot retention, hosted synchronization, later invitees and clearing; source/build checks alone do not qualify those behaviors.
+
 ## Request identity
 
 Public posts and invitations retain author-scoped request fingerprints in the native shared document. Matching retries reuse their original result; changed text, thread, mentions or invitation set returns `409`. Public append and native task creation share the same transaction. Native delivery request IDs derive from stable task IDs, so restarting an invocation reuses native admission. Agent tool request IDs derive from native task/call IDs.

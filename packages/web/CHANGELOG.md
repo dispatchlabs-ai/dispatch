@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Project-wide agent instructions
+
+- Add a project-owned Markdown instructions setting with manager-only, revision-checked saves, no-op revision handling and actor-scoped retry receipts; keep spec and settings revisions separate.
+- Render adopted execution snapshots through stock Pi Durable's native project-instructions section, without copying project rules into reusable definitions or treating prompt text as permission grants.
+
+
 ### Agent project context
 
 - Add project-scoped chat listing and passive public-history/detail reads without joining source chats or resuming their work; preserve project authorization on every page and refuse out-of-project IDs.
