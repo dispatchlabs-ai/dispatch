@@ -17,7 +17,7 @@ export async function runMuseQuery(input: {
   signal.throwIfAborted();
   if (prepared.transportPolicyRevision !== MUSE_TRANSPORT_POLICY_REVISION) {
     return { sessionId: invocation.sessionId, text: "", success: false,
-      error: "Muse Code authorization policy changed after this run was prepared. Start a new run." };
+      error: "Muse Code authorization policy changed. This run cannot continue. Ask the operator to review any earlier work and external effects before starting a new run." };
   }
 
   const workspace = resolve(process.env.DISPATCH_DATA_DIR ?? ".local/state/dispatch", "muse-workspaces", invocation.sessionId);
