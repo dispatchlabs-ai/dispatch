@@ -1,3 +1,4 @@
+import { MUSE_TRANSPORT_POLICY_REVISION } from "../muse/transport.js";
 import { createMuseTask, MuseSessionDoc, type MuseRunScope, type MuseReasoningEffort } from "../muse/task.js";
 import { claudeThinkingOptions } from "../claude-sdk/thinking.js";
 import { nativeClaudeEnvironment } from "../claude-sdk/transport.js";
@@ -658,7 +659,7 @@ export class SharedConversations {
     const update = await this.sdkContext(scope);
     return { prompt: [...scope.input.prompt, { type: "text" as const, text: update }], systemPrompt: sections.join("\n\n"),
       cwd: agent.cwd ?? (await scope.runtime.snapshot(SharedDoc, scope.input.roomId, scope.context))!.members.find(item => item.id === scope.input.participantId)!.workspaceDefault!,
-      model: agent.model!.modelId, reasoningEffort: (agent.thinkingLevel === "off" ? "none" : agent.thinkingLevel) as MuseReasoningEffort,
+      transportPolicyRevision: MUSE_TRANSPORT_POLICY_REVISION, model: agent.model!.modelId, reasoningEffort: (agent.thinkingLevel === "off" ? "none" : agent.thinkingLevel) as MuseReasoningEffort,
       userId: process.env.DISPATCH_MUSE_USER_ID! };
   }
 

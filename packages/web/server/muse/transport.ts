@@ -3,6 +3,9 @@ import { resolve, join } from "node:path";
 import { MuseClient, MuseInteractionRequiredError } from "./client.js";
 import { museCommandId, type MuseInvocation, type MusePreparedRun, type MuseRunResult } from "./task.js";
 
+// Increment when the native authorization posture changes; old sessions must start fresh.
+export const MUSE_TRANSPORT_POLICY_REVISION = 1;
+
 type Bridge = { url: string; headers: Record<string, string>; toolNames: string[]; authorize(): Promise<void> };
 type Terminal = { terminal: string; error?: { kind: string } };
 
