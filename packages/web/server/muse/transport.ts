@@ -79,7 +79,7 @@ export async function runMuseQuery(input: {
     submitted = true;
     const admission = await client.request<{ turnId: string }>("turn/start", {
       commandId: invocation.commandId, sessionId: invocation.sessionId,
-      input: prepared.prompt, reasoningEffort: prepared.reasoningEffort,
+      input: prepared.prompt, reasoningEffort: prepared.reasoningEffort, workspaceRoots: [workspace],
     });
     turnId = admission.turnId;
     const result = await terminal;
