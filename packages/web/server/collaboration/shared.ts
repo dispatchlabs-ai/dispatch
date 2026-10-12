@@ -1,3 +1,5 @@
+import { claudeThinkingOptions } from "../claude-sdk/thinking.js";
+import { nativeClaudeEnvironment } from "../claude-sdk/transport.js";
 import { createClaudeSdkTask, ClaudeSessionDoc, type ClaudeRunScope, type ClaudeRunResult } from "../claude-sdk/task.js";
 import { sdkToolServer, SdkToolBinding } from "./sdk-tools.js";
 import { transcriptPage } from "../chat-pages.js";
@@ -122,7 +124,12 @@ export class SharedConversations {
     });
     this.sdk = createClaudeSdkTask({
       prepare: scope => this.prepareSdk(scope),
-      options: async scope => ({
+      options: async (scope, prepared) => {
+        if (prepared.userId !== process.env.DISPATCH_CLAUDE_USER_ID) throw new CollaborationError(403, "The Claude runner owner changed after execution was admitted.");
+        await this.authorizeSdk(scope);
+        return ({
+        env: nativeClaudeEnvironment({ home: process.env.DISPATCH_CLAUDE_HOME, configDir: process.env.DISPATCH_CLAUDE_CONFIG_DIR }),
+        ...(process.env.DISPATCH_CLAUDE_EXECUTABLE ? { pathToClaudeCodeExecutable: process.env.DISPATCH_CLAUDE_EXECUTABLE } : {}),
         mcpServers: { dispatch: await sdkToolServer(scope, () => this.authorizeSdk(scope), async name => {
           await scope.runtime.commit(async tx => {
             (await tx.doc(ListeningRequest, scope.runtime.taskId)).publicationOnly = name === "conversation_post";
@@ -133,7 +140,8 @@ export class SharedConversations {
           }, scope.context);
         }) },
         canUseTool: async (name, input) => name.startsWith("mcp__dispatch__") ? { behavior: "allow", updatedInput: input } : { behavior: "deny", message: "Only explicitly granted Dispatch tools are available." },
-      }),
+      });
+      },
       settle: (scope, result) => this.settleSdk(scope, result),
     });
     this.delivery = defineTask<{
@@ -602,6 +610,7 @@ export class SharedConversations {
     const content = typeof scope.input.prompt === "string" ? [{ type: "text" as const, text: scope.input.prompt }] : scope.input.prompt;
     return { prompt: [...content, { type: "text" as const, text: update }], systemPrompt: sections.join("\n\n"),
       cwd: agent.cwd ?? (await scope.runtime.snapshot(SharedDoc, scope.input.roomId, scope.context))!.members.find(item => item.id === scope.input.participantId)!.workspaceDefault!,
+      ...claudeThinkingOptions(scope.runtime.models.getModel(agent.model!.provider, agent.model!.modelId)!, agent.thinkingLevel),
       model: agent.model!.modelId, userId: process.env.DISPATCH_CLAUDE_USER_ID! };
   }
 
