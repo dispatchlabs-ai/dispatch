@@ -1109,6 +1109,21 @@ export class DispatchRuntime {
     member.agent.connections = detached(selection.connections ?? []);
   }
 
+  async authorizeWorkerImageCredentials(companyId: string, conversationKey: string, storeId: string) {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Only the directory authorizes worker image credentials.");
+    return this.harness.commit(async tx => {
+      const room = await tx.doc(SharedDoc, nativeId(conversationKey));
+      const catalog = await tx.doc(CatalogDoc);
+      const actors = (await tx.doc(WorkerActorsDoc)).actors[conversationKey] ?? [];
+      const allowed = room.companyId === companyId && actors.some(actor => {
+        if (actor.companyId !== companyId || (actor.membership ?? "active") !== "active" || actor.worker?.storeId !== storeId) return false;
+        const definition = latestAgent(catalog, companyId, actor.definitionId);
+        return definition && !definition.archived && agentCapabilities(definition).includes("image-generation");
+      });
+      if (!allowed) throw new RuntimeError(403, "Image credentials are not authorized for this worker.");
+    }, context);
+  }
+
   /** Attempt authentication belongs to the backend route. Never execute the returned
    * authorization after a concurrent revocation barrier; the invocation owns that ordering.
    */

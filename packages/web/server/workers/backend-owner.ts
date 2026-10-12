@@ -287,6 +287,14 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
   }
   if (operation === "model-auth") {
     const { provider: providerId } = z.object({ provider: z.string() }).strict().parse(input);
+    if (providerId === "openai-codex") return c.json(await mcpPolicy.call(async () => {
+      await directory.authorizeWorkerImageCredentials(route.companyId, route.conversationId, route.storeId);
+      assertCurrent();
+      const result = await provider.models.getAuth(providerId) ?? null;
+      assertCurrent();
+      c.req.raw.signal.throwIfAborted();
+      return result;
+    }));
     const catalog = await directory.exportWorkerCatalog(route.companyId);
     if (!catalog.agents.some(agent => agent.provider === providerId && !agent.archived)) return c.json({ error: "Forbidden" }, 403);
     return c.json(await provider.models.getAuth(providerId) ?? null);

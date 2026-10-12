@@ -275,7 +275,7 @@ export function createImageGen(models: Models) {
         if (provider === "openai-codex") {
           if (resolved.source !== "OAuth")
             throw new ToolError("Codex images requires a Codex subscription grant. Review provider status. No request was made.");
-          if (!headers["ChatGPT-Account-ID"])
+          if (!headers["chatgpt-account-id"])
             throw new ToolError("Codex image credentials are missing the selected account. Reconnect Codex images. No request was made.");
           headers["x-codex-image-turn-id"] = randomUUID();
           headers["originator"] = "dispatch";

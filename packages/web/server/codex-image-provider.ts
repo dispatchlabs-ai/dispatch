@@ -14,7 +14,7 @@ export function codexImageProvider() {
           const auth = await oauth.toAuth(credential);
           if (typeof credential.accountId !== "string" || !credential.accountId)
             throw new Error("Codex credential is missing its account selection. Reconnect Codex images.");
-          return { ...auth, headers: { ...auth.headers, "ChatGPT-Account-ID": credential.accountId } };
+          return { ...auth, headers: { ...auth.headers, "chatgpt-account-id": credential.accountId } };
         },
       },
     },
