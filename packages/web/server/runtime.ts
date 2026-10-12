@@ -1319,6 +1319,18 @@ export class DispatchRuntime {
   }
 
   /** Directory authority and title policy are read together; no worker is started. */
+  /** Routing filter only, never authorization: chat keys currently bound to one project. */
+  async projectConversationKeys(companyId: string, projectId: string): Promise<Set<string>> {
+    if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
+    return this.harness.commit(async tx => {
+      const keys = new Set<string>();
+      for (const chat of (await tx.doc(CatalogDoc)).chats) {
+        if (chat.companyId === companyId && (await tx.doc(SharedDoc, nativeId(chat.id))).sharedProjectId === projectId) keys.add(chat.id);
+      }
+      return keys;
+    }, context);
+  }
+
   async directoryChatSummaries(scope: RuntimeScope): Promise<{ conversation: ChatSummary; automaticTitle: boolean }[]> {
     if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
     return this.harness.commit(async tx => {
