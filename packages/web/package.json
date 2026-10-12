@@ -14,6 +14,7 @@
     "build:capabilities": "tsc -p tsconfig.capabilities.json"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.296",
     "@aws-sdk/client-ecs": "3.1147.0",
     "@aws-sdk/client-s3": "3.1147.0",
     "@aws-sdk/credential-provider-http": "3.972.74",
