@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Image credential routing
+
+- Add a separate Codex images connection using Pi-owned OAuth login/refresh and saved account selection, without changing agents' chat providers or copying CLI credentials.
+- Select subscription or API-key image transport explicitly; prefer configured Codex access by default, reject incompatible credentials/controls before submission, and never retry a provider failure through the other billing route.
+
 ### Agent project context
 
 - Add project-scoped chat listing and passive public-history/detail reads without joining source chats or resuming their work; preserve project authorization on every page and refuse out-of-project IDs.
