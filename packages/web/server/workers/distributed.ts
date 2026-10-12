@@ -114,11 +114,9 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     }
   }
   async function acknowledgePolicy(companyId?: string, requireRevocationFence = true, conversationIds?: ReadonlySet<string>) {
-    const targets = routes.list().filter(route => (!companyId || route.companyId === companyId) && (!conversationIds || conversationIds.has(route.conversationId)));
-    if (!targets.length) return;
     const status = await launcher<LauncherStatus>("status");
     if (!status.driverReachable) throw new RuntimeError(503, "Cannot confirm worker policy propagation.");
-    for (const route of targets) {
+    for (const route of routes.list().filter(route => (!companyId || route.companyId === companyId) && (!conversationIds || conversationIds.has(route.conversationId)))) {
       const attempt = status.attempts.find(item => item.attemptId === route.attemptId);
       if (!attempt && !requireRevocationFence) continue;
       if (!attempt) {
