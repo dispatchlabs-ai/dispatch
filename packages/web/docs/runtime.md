@@ -121,6 +121,12 @@ Shared projects have stable UUIDs, current manager/member policy, default agents
 
 Pin/archive preferences remain personal and grant no access. Legacy personal-group records and original creation fingerprints remain persisted for history/retry compatibility, but listing, creation and move paths no longer expose them. Audience-changing moves are unsupported; no migration silently shares old chats. Creation retries preserve the original request rather than resolving changed project defaults.
 
+## Image credentials
+
+The subscription-image candidate keeps Codex OAuth login/refresh in Pi and carries the same credential's saved account selection through `server/codex-image-provider.ts`. It does not copy CLI credentials or change agents' chat providers. See [image setup and transport selection](usage-guide.md#image-generation).
+
+Hosted `model-auth` requests for `openai-codex` use `authorizeWorkerImageCredentials()`: the company/conversation must match, with an active backend participant mapped to that worker store whose latest non-archived definition enables image generation. The existing policy barrier orders authorization against changes; the broker rechecks the current worker attempt after resolution. The worker adapter preserves OAuth source and account headers. This is source-reviewed authorization, not hosted execution or authenticated-generation acceptance.
+
 ## Request identity
 
 Public posts and invitations retain author-scoped request fingerprints in the native shared document. Matching retries reuse their original result; changed text, thread, mentions or invitation set returns `409`. Public append and native task creation share the same transaction. Native delivery request IDs derive from stable task IDs, so restarting an invocation reuses native admission. Agent tool request IDs derive from native task/call IDs.
