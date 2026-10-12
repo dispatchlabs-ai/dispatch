@@ -5,6 +5,7 @@ import type {
   AgentDefinition,
   AgentDraft,
   ApplicationConfig,
+  ExecutionBackend,
   SaveAgentInput,
   ThinkingLevel,
 } from "../shared/contracts";
@@ -35,6 +36,7 @@ export function beginAgentEdit(
   defaultAgent?: AgentDefinition,
 ): AgentEditing {
   const initialDraft: AgentDraft = {
+    executionBackend: (saved ?? defaultAgent)?.executionBackend ?? "pi",
     name: saved?.name ?? "",
     description: saved?.description ?? "",
     instructions: saved?.instructions ?? "",
@@ -65,6 +67,16 @@ export function agentEditIsDirty(editing: AgentEditing) {
 
 function agentConnectionsChanged(editing: AgentEditing) {
   return JSON.stringify([...editing.connectionIds].sort()) !== JSON.stringify([...editing.initialConnectionIds].sort());
+}
+
+function runtimeLabel(backend: AgentDraft["executionBackend"]) {
+  return backend === "claude-agent-sdk" ? "Agent SDK" : "Pi";
+}
+
+function modelsForRuntime(config: ApplicationConfig, backend: AgentDraft["executionBackend"]) {
+  return backend === "claude-agent-sdk"
+    ? (config.sdkModels ?? []).filter(model => model.provider === "anthropic")
+    : config.models;
 }
 
 function thinkingLabel(level: ThinkingLevel) {
@@ -130,7 +142,7 @@ export function AgentsPage({
     );
 
   const isDefault = agent.id === config.defaultAgentId;
-  const model = config.models.find(
+  const model = modelsForRuntime(config, agent.executionBackend).find(
     (model) => model.provider === agent.provider && model.id === agent.modelId,
   );
   return (
@@ -164,6 +176,7 @@ export function AgentsPage({
         <div className="agent-content-inner">
           <div hidden={evaluationOpen}>
           <p className="agent-phone-facts">
+            {agent.executionBackend === "claude-agent-sdk" ? "Agent SDK · " : null}
             {model?.name || agent.modelId || "No model configured"} ·{" "}
             {thinkingLabel(agent.thinkingLevel)} thinking · {agent.tools.length || agent.skills?.length ? `${agent.tools.length + (agent.skills?.length ? 1 : 0)} tools` : "No tools"}
           </p>
@@ -295,8 +308,8 @@ export function AgentDetails({
 }) {
   const saved = editing ? editing.saved : agent;
   const current = editing?.draft ?? saved;
-  const modelName = (provider: string, id: string) =>
-    config?.models.find(
+  const modelName = (provider: string, id: string, backend: AgentDraft["executionBackend"]) =>
+    (config ? modelsForRuntime(config, backend) : []).find(
       (model) => model.provider === provider && model.id === id,
     )?.name || id;
   const contentChanged = editing?.saved
@@ -332,11 +345,16 @@ export function AgentDetails({
                 </div>
               ) : null}
               <DraftFact
+                label="Runtime"
+                value={runtimeLabel(current.executionBackend)}
+                saved={editing && saved ? runtimeLabel(saved.executionBackend) : undefined}
+              />
+              <DraftFact
                 label="Model"
-                value={modelName(current.provider, current.modelId)}
+                value={modelName(current.provider, current.modelId, current.executionBackend)}
                 saved={
                   editing && saved
-                    ? modelName(saved.provider, saved.modelId)
+                    ? modelName(saved.provider, saved.modelId, saved.executionBackend)
                     : undefined
                 }
               />
@@ -406,15 +424,42 @@ function AgentEditor({
     setSection(name);
     const target = formRef.current?.querySelector<HTMLElement>(`[data-agent-section="${name}"]`);
     if (target instanceof HTMLDetailsElement) target.open = true;
-    target?.scrollIntoView({ block: "start" });
+    // Keep section navigation inside the form instead of moving the page viewport.
+    const scroll = target?.closest<HTMLElement>(".agent-editor-scroll");
+    if (target && scroll) {
+      scroll.scrollTo({ top: scroll.scrollTop + target.getBoundingClientRect().top - scroll.getBoundingClientRect().top - parseFloat(getComputedStyle(target).scrollMarginTop) });
+    }
     target?.focus({ preventScroll: true });
   }
   const saveRequest = useRef<{ fingerprint: string; requestId: string } | null>(null);
   const dirty = agentEditIsDirty(editing);
   const instructionsTooLong = draft.instructions.length > 50000;
-  const model = config.models.find(
+  const backend = draft.executionBackend ?? "pi";
+  const sdk = backend === "claude-agent-sdk";
+  const models = modelsForRuntime(config, backend);
+  const model = models.find(
     (model) => model.provider === draft.provider && model.id === draft.modelId,
   );
+  const runtimeSelections = useRef<Partial<Record<ExecutionBackend, Pick<AgentDraft, "provider" | "modelId" | "thinkingLevel">>>>({});
+  function changeRuntime(next: ExecutionBackend) {
+    runtimeSelections.current[backend] = {
+      provider: draft.provider, modelId: draft.modelId, thinkingLevel: draft.thinkingLevel,
+    };
+    const choices = modelsForRuntime(config, next);
+    const prior = runtimeSelections.current[next];
+    const selected = choices.find(value => value.provider === (prior ?? draft).provider && value.id === (prior ?? draft).modelId) ?? choices[0];
+    const thinking = prior?.thinkingLevel ?? draft.thinkingLevel;
+    onChange({
+      ...editing,
+      draft: {
+        ...draft,
+        executionBackend: next,
+        provider: selected?.provider ?? (next === "claude-agent-sdk" ? "anthropic" : ""),
+        modelId: selected?.id ?? "",
+        thinkingLevel: selected?.thinkingLevels.includes(thinking) ? thinking : selected?.thinkingLevels[0] ?? "off",
+      },
+    });
+  }
   const modelKey = JSON.stringify([draft.provider, draft.modelId]);
   function update<K extends keyof AgentDraft>(key: K, value: AgentDraft[K]) {
     onChange({ ...editing, draft: { ...draft, [key]: value } });
@@ -439,7 +484,7 @@ function AgentEditor({
         className="agent-editor-form"
         onSubmit={(event) => {
           event.preventDefault();
-          if (instructionsTooLong || editing.skillEditing) return;
+          if (instructionsTooLong || editing.skillEditing || (sdk && !model)) return;
           onChange({ ...editing, busy: true });
           setError(null);
           setConflict(false);
@@ -528,8 +573,14 @@ function AgentEditor({
               <summary><strong>Model</strong><span>{model?.name || draft.modelId || "Not configured"} · {thinkingLabel(draft.thinkingLevel)} thinking</span></summary>
             <fieldset disabled={busy} className="agent-form-section">
               <legend className="sr-only">Model settings</legend>
+              <Field label="Runtime" hint={sdk ? "Runs the official Claude Code runtime." : undefined}>
+                {props => <Select {...props} value={backend} onChange={event => changeRuntime(event.target.value as ExecutionBackend)}>
+                  <option value="pi">Pi</option>
+                  <option value="claude-agent-sdk">Agent SDK</option>
+                </Select>}
+              </Field>
               <div className="form-columns">
-                <Field label="Model">
+                <Field label="Model" error={sdk && !model ? "SDK model unavailable. Reload or ask your operator to check the catalog." : undefined}>
                   {(props) => (
                     <Select
                       {...props}
@@ -539,7 +590,7 @@ function AgentEditor({
                         const [provider, modelId] = JSON.parse(
                           event.target.value,
                         ) as [string, string];
-                        const selected = config.models.find(
+                        const selected = models.find(
                           (model) =>
                             model.provider === provider && model.id === modelId,
                         )!;
@@ -563,12 +614,12 @@ function AgentEditor({
                           {draft.modelId || "No models available"}
                         </option>
                       ) : null}
-                      {config.models.map((model) => (
+                      {models.map((model) => (
                         <option
                           key={JSON.stringify([model.provider, model.id])}
                           value={JSON.stringify([model.provider, model.id])}
                         >
-                          {model.name} · {model.provider}
+                          {model.name}{!sdk ? ` · ${model.provider}` : ""}
                         </option>
                       ))}
                     </Select>
@@ -596,6 +647,10 @@ function AgentEditor({
                   )}
                 </Field>
               </div>
+              {sdk ? <p className="field-hint">
+                Sign in with Claude Code on the runner, then bind it to your Dispatch user. Saving does not sign in. {" "}
+                <a href="https://github.com/dispatchlabs-ai/dispatch/blob/main/packages/web/docs/usage-guide.md#claude-agent-sdk-setup" target="_blank" rel="noopener noreferrer">Setup guide<span className="sr-only"> (opens in a new tab)</span></a>
+              </p> : null}
             </fieldset>
             </details>
             <details className="agent-settings-section" data-agent-section="Capabilities" tabIndex={-1} open>
