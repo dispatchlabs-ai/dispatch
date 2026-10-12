@@ -707,13 +707,13 @@ New project now creates an empty shared project with you as its manager. Project
 
 #### Project-wide agent instructions
 
-**Editor candidate implemented; browser acceptance and live activation pending.** Project instructions are standing operating rules, separate from the product spec and the chat Definition of Done. Keep them concise: testing conventions, approval policy and documentation expectations belong here; feature requirements belong in the spec, and the current task remains authorized through human direction or enabled automation policy.
+**Implemented; isolated local-browser acceptance passed, live activation pending.** Project instructions are standing operating rules, separate from the product spec and the chat Definition of Done. Keep them concise: testing conventions, approval policy and documentation expectations belong here; feature requirements belong in the spec, and the current task remains authorized through human direction or enabled automation policy.
 
 In the candidate build, open **Projects → project → Open instructions**. Managers edit Markdown in **Source** and save it; authorized nonmanagers can read Source and Preview but cannot save. **Preview** renders the current draft, not a separate saved version. **Discard** restores the draft's accepted base after confirmation without changing saved instructions. Saving an empty field clears it.
 
 Saving does not send a message, wake agents or start work. New project instances receive the latest saved instructions; existing instances adopt the latest revision when safely idle. Busy agents retain their adopted rules across edits and restart, without replaying intermediate revisions afterward. In a project chat's participant details, select an agent to inspect **Project instructions** and its adopted revision.
 
-**Saved revision** identifies the project's current setting; **Adopted revision** identifies an instance's configuration for subsequent requests. An unset adopted revision means the instance has not yet adopted a binding, not revision 0. Neither label proves that the model has used or obeyed the rules. Clearing also waits for adoption and removes the effective section, not historical transcript entries. It retains the clearing revision's number; it does not reset saved or adopted revisions to 0. Use Stop for urgent interruption; it cannot undo prior effects.
+**Saved revision** identifies the latest project revision known to this view; it can remain older after a conflict until **Review latest** reads the current saved version. **Adopted revision** identifies an instance's configuration for subsequent requests. An unset adopted revision means the instance has not yet adopted a binding, not revision 0. Neither label proves that the model has used or obeyed the rules. Clearing also waits for adoption and removes the effective section, not historical transcript entries. It retains the clearing revision's number; it does not reset saved or adopted revisions to 0. Use Stop for urgent interruption; it cannot undo prior effects.
 
 Recovery keeps the local draft separate from the saved version:
 
@@ -721,9 +721,17 @@ Recovery keeps the local draft separate from the saved version:
 - **Save not confirmed.** The save may already have committed, including before a hosted propagation error. **Retry** resends the original request ID, expected revision and submitted text—not any newer typing. **Review latest** only reads; even matching content does not confirm the original save, propagation or adoption. Reconciliation stays disabled until the original retry is confirmed.
 - **Save rejected.** Correct the reported input problem before saving again. **Copy draft** is available in recovery; if clipboard access fails, select and copy Source text manually.
 
-Identical retries return the original save result rather than creating another revision or restoring an old edit over newer content; unchanged saves do not create revision churn. A confirmed receipt does not overwrite newer typing. Navigation within the workspace retains the editor, but drafts and retry information are not durable backups: copy important text before refresh, closing the project tab or signing out.
+Identical retries return the original save result rather than creating another revision or restoring an old edit over newer content; unchanged saves do not create revision churn. A confirmed receipt does not overwrite newer typing. Navigation within the workspace retains the editor, but refresh, closing the project tab or signing out loses drafts and retry information. Resolve uncertain saves first when possible; copying important text protects the draft, not the original retry request.
 
-Source review of editor candidate `1e9fce4` and reported TypeScript/build checks cover these contracts; browser recovery, rendered layouts and live usability remain unverified.
+**Local qualification, October 12, 2026:** source review and TypeScript/build checks passed; integrated candidate `c25dd8a` passed Apple Silicon Nix build and flake checks. Manual browser observations use isolated preview `ce1a9a0` with the same editor code and separate synthetic fixture projects:
+
+- **Conflicts, 1440/390 px (Claude):** competing saves produced HTTP 409 with the mounted draft retained and no Retry. Review latest kept the draft; Keep draft followed by Save confirmed it at a new revision, while Use latest replaced text only after confirmation.
+- **Adoption (Pi Expert):** initial revision 0 advanced to 1 at idle, then to empty revision 2 after clearing; the project-editor link worked. No model submissions were made.
+- **Laptop/tablet (Designer):** save/reopen, Source/Preview switching, sidebar collapse and pointer/keyboard guidance disclosure passed at 1280 × 720 and 768 × 1024, with 44 px Instructions controls and no horizontal overflow. Documenter inspected the shared working-UI captures.
+
+- **Desktop/390 px and recovery (Developer):** inspected layout, read-only member access, mounted-text restoration after Discard, navigation away/back during uncertainty, and an emulated touch on Preview passed. Retry after an intervening revision returned the original receipt without overwriting newer saved content or draft text. Typing while a committed save reply was held remained intact. Documenter inspected the shared phone capture.
+
+Live activation and existing-agent adoption here remain pending. These fixture checks do not qualify hosted propagation, real-device touch/virtual keyboards or hard-crash retention. No automated tests were added or run.
 
 Instructions are model-visible text, not secret storage, permission grants or automatic assignments. Use the existing secret-grant mechanism for credentials. Application access controls, approvals and Stop remain authoritative. See [runtime integration](runtime.md#project-instructions) for the native Pi boundary.
 
