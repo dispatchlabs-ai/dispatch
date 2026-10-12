@@ -2,6 +2,16 @@
 
 The service owns `DispatchRuntime` in `server/runtime.ts` and its collaboration extension in `server/collaboration/shared.ts`. Both use stock `@earendil-works/pi-durable` 1.1.0 public interfaces. Authentication supplies company/user scope; model credentials remain on the service.
 
+## Claude Agent SDK integration
+
+**Build authorized October 12, 2026; implementation and runtime qualification pending.** The selected direction keeps Pi Durable responsible for durable task ownership, committed application state, cancellation and recovery. A Pi custom task controls the Agent SDK and Anthropic's published, unmodified Claude Code binary; Claude Code owns authentication, inference, its internal agent loop and compaction. This is not a subscription credential adapter for Pi model calls, and needs no supervisor model or parallel scheduler.
+
+Dispatch's existing authorization and contribution admission remain the boundaries for shared tools and public messages. SDK text and live activity are not automatically published or treated as committed state. The integration must adapt these boundaries explicitly: Pi Durable 1.1.0's ordinary conversation input starts its built-in generation task, and a custom task does not inherit generation-specific inbox handling, prompt hooks or compaction.
+
+The [current Anthropic hosting conditions](https://code.claude.com/docs/en/legal-and-compliance#can-customers-offer-claude-code-in-their-products), read October 12, allow users to sign in to hosted, unmodified Claude Code through Anthropic's own flow. Preserve all built-in authentication methods, use each end user's own account, and do not pool subscriptions, resell inference or extract subscription tokens into Dispatch's provider store, secret grants or model requests. Hosting is subject to the Commercial Terms and branding restrictions. Advertised Pro/Max limits assume ordinary, individual use; the hosting allowance is not an unlimited-usage promise. External confirmation is not an implementation approval gate for this task.
+
+Recovery must reconcile the external execution before repeating uncertain effects. An SDK session ID alone does not preserve its on-disk session history. Pi checkpoints do not make external commands exactly-once, and task cancellation alone does not prove the SDK process stopped. Setup instructions and acceptance evidence will describe the implemented integration, rather than infer readiness from this selected design.
+
 ## Storage and lifetime
 
 Pi owns storage, tasks, submissions, generations, cancellation and recovery. The session-scoped catalog holds company agent definitions and conversation metadata; the separate session-scoped Projects document owns shared-project policy. Each shared conversation has a `dispatch.shared-conversation` document and an application-defined public log of `dispatch.public-message` entries. Dispatch copies public contributions into this log with their author and thread; it is distinct from each agent’s native working transcript, though both are stored by Pi in the same Session. The public log provides shared history without exposing private working context. There is no separate transcript database or application execution engine.
