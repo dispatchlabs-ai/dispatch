@@ -160,8 +160,10 @@ export class SharedConversations {
         const messages = await this.messages(task.input.roomId, ctx);
         const incoming = messages.find(message => message.id === task.input.messageId || message.aliases?.includes(task.input.messageId));
         if (!incoming) throw new Error("The public message for this delivery is missing.");
-        const sdkPrior = await this.harness.commit(async tx => (await tx.doc(ClaudeSessionDoc, member.conversationId!)).requests[`dispatch-delivery:${task.id}`]?.taskId, ctx);
-        const prior = await this.harness.commit(tx => tx.submissionByRequest(member.conversationId!, `dispatch-delivery:${task.id}`), ctx);
+        const { sdkPrior, prior } = await this.harness.commit(async tx => ({
+          sdkPrior: (await tx.doc(ClaudeSessionDoc, member.conversationId!)).requests[`dispatch-delivery:${task.id}`]?.taskId,
+          prior: await tx.submissionByRequest(member.conversationId!, `dispatch-delivery:${task.id}`),
+        }), ctx);
         // A restored admitted submission must be joined even when its request already advanced the listening cursor.
         if (!prior && !sdkPrior && member.consideredThrough && messages.findIndex(message => message.id === member.consideredThrough) >= messages.indexOf(incoming)) {
           await runtime.commit(async tx => {
@@ -175,11 +177,13 @@ export class SharedConversations {
           return;
         }
         let cancelled = false;
+        let useSdk = false;
         await runtime.commit(async tx => {
           const room = await tx.doc(SharedDoc, task.input.roomId);
           if (room.epoch !== task.input.epoch || room.stopping || !activeMember(room.members.find(item => item.id === member.id))) { cancelled = true; return terminal(); }
           const target = room.members.find(item => item.id === member.id)!;
           if (!prior && !sdkPrior) await this.beforeDelivery?.(tx, task.input.roomId, room.companyId, target);
+          useSdk = Boolean(sdkPrior || target.agent?.executionBackend === "claude-agent-sdk");
           target.status = "listening"; delete target.error; target.threadId = incoming.threadId; target.activeDelivery = task.id; target.publicationPriority = incoming.mentions.includes(target.id);
         }, ctx);
         if (cancelled) return;
@@ -190,8 +194,7 @@ export class SharedConversations {
           self: member.id, incoming: { ...messageMetadata(incoming), text: incoming.text.slice(0, 12_000), textLength: incoming.text.length, textTruncated: incoming.text.length > 12_000 }, participants: state!.members.map(memberIdentity),
           publicMessageCount: messages.length, recentMessages: recentMessages(messages),
         });
-        const current = await runtime.snapshot(SharedDoc, task.input.roomId, ctx);
-        if (sdkPrior || current?.members.find(item => item.id === member.id)?.agent?.executionBackend === "claude-agent-sdk") {
+        if (useSdk) {
           const prompt = [{ type: "text" as const, text: notification }, ...(incoming.images ?? []).map(image => ({ type: "image" as const, source: { type: "base64" as const, media_type: image.mimeType as "image/png", data: image.data } })), ...(await this.attachments.imageContent(incoming.attachments)).filter(image => image.type === "image").map(image => ({ type: "image" as const, source: { type: "base64" as const, media_type: image.mimeType as "image/png", data: image.data } }))];
           let sdkId = sdkPrior;
           if (!sdkId) await runtime.commit(async tx => {
