@@ -147,7 +147,7 @@ Pin/archive preferences remain personal and grant no access. Legacy personal-gro
 
 ## Project instructions
 
-**Implemented; isolated local-browser acceptance passed, live activation pending.** The project owns one editable Markdown setting and its instructions revision. Each native agent conversation retains an adopted execution snapshot containing project identity, revision and Markdown; it is not another editable source.
+**Implemented and usable in the running local instance.** The project owns one editable Markdown setting and its instructions revision. Each native agent conversation retains an adopted execution snapshot containing project identity, revision and Markdown; it is not another editable source.
 
 The collaboration extension uses `ProjectInstructionsBindingDoc` and `projectInstructionsSection` from `server/collaboration/project-instructions.ts`. The conversation-scoped binding uses latest state and initial fork behavior, like participant bindings. Pi Durable 1.1.0's native `section("project-instructions", …)` reads only that committed binding. Pi renders the section before the individual instructions and owns effective system-entry history. Base instructions and instance supplements remain separately composed in `AgentDoc.instructions`. Do not inject project text as a public message, rewrite provider requests or manually append system entries. Prompt order is not authorization, and renderer errors must not serve as access gates.
 
@@ -162,7 +162,7 @@ Manual observations use isolated SQLite/native runtimes and synthetic principals
 - **Prompt removal (Pi Expert):** clearing did not submit work. The next separately submitted message produced `{ "project-instructions": null }`; the effective provider-facing prompt omitted project instructions while retaining collaboration and individual instructions. Historical entries retained the old text.
 - **Busy/restart retention (Claude):** adopted revision 1 survived saves of revisions 2/3 and an orderly restart. The reopened run reused revision 1, then adopted revision 3 directly at idle without a new message. The held response was released to finish shutdown; this was not a crash or hard-kill check.
 
-Hosted propagation and remote providers remain unqualified. Isolated browser acceptance is recorded in the linked user guide; live editor confirmation and existing-agent adoption here remain pending. These observations are not full feature acceptance.
+Hosted propagation and remote providers remain unqualified. The linked user guide records isolated browser acceptance and authenticated live save/clear/reload at `d47a367`, including existing idle agents adopting revisions 1 and 2 without being woken. Live acceptance does not extend the isolated restart observations to hard-crash retention.
 
 The [user guide](usage-guide.md#project-wide-agent-instructions) explains saved versus adopted revisions and interruption limits. Runtime evidence must cover idle project-only adoption, active/restart snapshot retention, hosted synchronization, later invitees and clearing; source/build checks alone do not qualify those behaviors.
 
