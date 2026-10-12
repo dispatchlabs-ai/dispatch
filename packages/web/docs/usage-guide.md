@@ -166,6 +166,25 @@ Application API (authenticated same-origin requests):
 
 Use the latest opaque revision; a stale revision returns 409 and requires reloading status. Attempts belong to their initiating session, and only an active attempt needs polling. After a lost Connect response or browser reload, reload provider status to recover the current session's active attempt instead of replaying Connect. Attempts are ephemeral server state; a backend restart requires a fresh setup after reviewing stored status. Completion refreshes the application's model configuration. Provider setup unavailable on an installation returns 503. See [acceptance evidence](handoff.md#model-provider-setup--october-10-2026).
 
+### Claude Agent SDK setup
+
+**Integration in progress; setup and runtime acceptance pending.** The Agent SDK execution backend runs official Claude Code under a Pi-owned task. It is separate from Settings → Model providers: a Claude API key saved there or a historical Pi OAuth grant does not sign in the SDK runner. See the [runtime boundary](runtime.md#claude-agent-sdk-integration).
+
+Native sign-in must happen on the execution host, under the operating-system account and configuration directory the runner uses. Follow Anthropic's [installation and authentication guidance](https://code.claude.com/docs/en/authentication). With the official CLI installed:
+
+```sh
+claude auth login
+claude auth status --text
+```
+
+These commands authenticate and inspect Claude Code, not Dispatch. Complete the browser/code flow in Claude Code's terminal; do not paste tokens, callback URLs or login codes into chat or Dispatch's secrets/provider fields. Authentication status can contain account information; keep it out of shared logs and screenshots.
+
+If using a separate native profile, use the same `CLAUDE_CONFIG_DIR` for login, status and execution. Each native profile has its own settings, session history and subscription login. On macOS, native credentials normally use Keychain; other platforms and the macOS fallback use Claude Code's protected credential file. Dispatch must not extract or copy those credentials. A successful terminal login under another account or profile does not establish runner readiness.
+
+The selected initial design also requires an explicit Dispatch user binding for the native environment and current access to the target chat/project; login alone is insufficient. The final operator configuration and editor procedure will be documented against the integrated implementation. Hosted-worker authentication provisioning is not qualified by local login.
+
+After interrupted execution, inspect workspace/external effects before retrying. Pi's durable task state and an SDK session ID do not back up the native session files or guarantee exactly-once shell effects. A run interrupted before its result is committed must not be described as completed or silently resent. Stop/restart acceptance remains pending.
+
 ### Pi configuration and agent defaults
 
 The service uses Pi's public `ModelRuntime` from the pinned coding-agent package. Before the provider-setup cutover it reads the operator's Pi credential/model files from `~/.pi/agent`; the candidate above replaces credential ownership for app-managed providers. Pi owns credential resolution and serialized refresh, including OAuth. Secrets stay on the service and do not enter browser snapshots, Git, build artifacts, or the Nix store.
