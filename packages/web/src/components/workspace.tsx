@@ -30,6 +30,7 @@ import { SidebarSearch } from "./sidebar-search";
 import { ProjectSettings, beginProjectEdit, type ProjectEditing } from "./project-settings";
 import { NewProjectButton, ProjectPage } from "./projects";
 import { ProjectSpecView } from "./project-spec";
+import { ProjectInstructionsView } from "./project-instructions";
 import { SecurityPage } from "./security";
 import { McpConnectionsPage } from "./mcp-connections";
 import { Button, IconButton, Modal, Notice, Spinner } from "./ui";
@@ -150,6 +151,19 @@ export function Workspace() {
     if (projectId && searchParams.get("view") === "spec" && searchParams.get("edit") === "1") setSpecEditRequests(current => ({ ...current, [projectId]: (current[projectId] ?? 0) + 1 }));
   }, [specLocation.key]);
   const [specDirty, setSpecDirty] = useState<Record<string, boolean>>({});
+  const [instructionsOpen, setInstructionsOpen] = useState<Record<string, boolean>>({});
+  const [instructionsDirty, setInstructionsDirty] = useState<Record<string, boolean>>({});
+  const [documentViews, setDocumentViews] = useState<Record<string, "spec" | "instructions" | undefined>>(() => {
+    const id = searchParams.get("project"), view = searchParams.get("view");
+    return id && (view === "spec" || view === "instructions") ? { [id]: view } : {};
+  });
+  useEffect(() => {
+    const id = searchParams.get("project"), view = searchParams.get("view");
+    if (!id) return;
+    const documentView = view === "spec" || view === "instructions" ? view : undefined;
+    setDocumentViews(current => current[id] === documentView ? current : { ...current, [id]: documentView });
+    if (view === "instructions") setInstructionsOpen(current => current[id] ? current : { ...current, [id]: true });
+  }, [searchParams]);
   const tabList = useRef<HTMLDivElement>(null);
   const [tabOverflow, setTabOverflow] = useState({ before: false, after: false });
 
@@ -316,8 +330,8 @@ export function Workspace() {
     setSearchParams(projectTabLocation(tab), { replace: true });
   }
   function projectTabLocation(tab: WorkspaceTab) {
+    if (tab.kind === "project" && documentViews[tab.projectId]) return { ...tabLocation(tab), view: documentViews[tab.projectId]! };
     if (tab.kind === "project" && projectEditing[tab.projectId]) return { ...tabLocation(tab), view: "settings" };
-    if (tab.kind === "project" && specOpen[tab.projectId]) return { ...tabLocation(tab), view: "spec" };
     return tabLocation(tab);
   }
 
@@ -340,7 +354,7 @@ export function Workspace() {
     const dirty = tab?.kind === "chat" && composers.isDirty(tab.chatId);
     if (tab?.kind === "project" && projectEditing[tab.projectId]?.busy) return;
     if (tab?.kind === "chat" && criteriaDrafts[tab.chatId]?.busy) return;
-    if (dirty || (tab?.kind === "chat" && criteriaDrafts[tab.chatId]) || (tab?.kind === "project" && (projectEditing[tab.projectId] || projectSearch[tab.projectId] || specDirty[tab.projectId]))) setClosingTab(tabId);
+    if (dirty || (tab?.kind === "chat" && criteriaDrafts[tab.chatId]) || (tab?.kind === "project" && (projectEditing[tab.projectId] || projectSearch[tab.projectId] || specDirty[tab.projectId] || instructionsDirty[tab.projectId]))) setClosingTab(tabId);
     else closeTab(tabId);
   }
 
@@ -351,6 +365,9 @@ export function Workspace() {
       setProjectSearch(current => { const next = { ...current }; delete next[closing.projectId]; return next; });
       setSpecOpen(current => ({ ...current, [closing.projectId]: false }));
       setSpecDirty(current => ({ ...current, [closing.projectId]: false }));
+      setInstructionsOpen(current => ({ ...current, [closing.projectId]: false }));
+      setInstructionsDirty(current => ({ ...current, [closing.projectId]: false }));
+      setDocumentViews(current => ({ ...current, [closing.projectId]: undefined }));
     }
     if (closing?.kind === "chat") {
       setCriteriaDrafts(current => ({ ...current, [closing.chatId]: undefined }));
@@ -470,7 +487,8 @@ export function Workspace() {
   }, [viewportWidth]);
 
   async function signOut() {
-    if (Object.values(specDirty).some(Boolean) && !window.confirm("Discard unsaved spec drafts and sign out?")) return;
+    if ((Object.values(specDirty).some(Boolean) || Object.values(instructionsDirty).some(Boolean))
+      && !window.confirm("Discard project drafts and save-retry information, then sign out? Saved effects are not undone.")) return;
     setSigningOut(true); setError(null);
     try { setState(await auth("/api/auth/logout", {})); } catch (error) { setError(errorMessage(error)); } finally { setSigningOut(false); }
   }
@@ -506,6 +524,12 @@ export function Workspace() {
   const active: WorkspaceTab | { id: string; kind: "agents" | "security" | "connections" | "secrets" | "import-export" | "model-providers" } = section === "chats" || section === "projects" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
   const projectEditorOpen = active.kind === "project" && searchParams.get("view") === "settings";
   const projectSpecOpen = active.kind === "project" && searchParams.get("view") === "spec";
+  const projectInstructionsOpen = active.kind === "project" && searchParams.get("view") === "instructions";
+  function openInstructions(projectId: string, open: boolean) {
+    if (open) setInstructionsOpen(current => ({ ...current, [projectId]: true }));
+    setSearchParams({ section: "projects", project: projectId, ...(open ? { view: "instructions" } : {}) });
+    if (!open) requestAnimationFrame(() => document.getElementById("main-workspace")?.focus());
+  }
   function openSpec(projectId: string, open: boolean, edit = false) {
     setSpecOpen(current => ({ ...current, [projectId]: open }));
     setSearchParams(open ? { section: "projects", project: projectId, view: "spec", ...(edit ? { edit: "1" } : {}) } : { section: "projects", project: projectId });
@@ -730,20 +754,29 @@ export function Workspace() {
               onAccessLost={onAccessLost}
             /> : tab.kind === "project" ? (() => {
               const project = projects.find(project => project.id === tab.projectId);
-              const showSpec = tab.id === activeId && section === "projects" ? projectSpecOpen : Boolean(specOpen[tab.projectId]);
+              const currentProject = tab.id === activeId && section === "projects";
+              const showInstructions = currentProject ? projectInstructionsOpen : documentViews[tab.projectId] === "instructions";
+              const showSpec = currentProject ? projectSpecOpen : documentViews[tab.projectId] === "spec";
               const retainSpec = project && (specOpen[tab.projectId] || showSpec);
               return <>
+                {project && (instructionsOpen[tab.projectId] || showInstructions) ? <div hidden={!showInstructions} inert={!showInstructions}>
+                  <ProjectInstructionsView project={project} active={showInstructions && currentProject} onBack={() => openInstructions(tab.projectId, false)}
+                    onDirtyChange={dirty => setInstructionsDirty(current => current[tab.projectId] === dirty ? current : { ...current, [tab.projectId]: dirty })}
+                    onSaved={document => setProjects(current => current.map(item => item.id === document.projectId && item.instructionsRevision < document.revision
+                      ? { ...item, instructionsRevision: document.revision } : item))} />
+                </div> : null}
                 {retainSpec ? <div hidden={!showSpec} inert={!showSpec}>
                   <ProjectSpecView project={project} editRequest={specEditRequests[tab.projectId] ?? 0} onSaved={() => void load()} active={showSpec && tab.id === activeId && section === "projects"} onBack={() => openSpec(tab.projectId, false)}
                     onDirtyChange={dirty => setSpecDirty(current => current[tab.projectId] === dirty ? current : { ...current, [tab.projectId]: dirty })} />
                 </div> : null}
-                {!showSpec ? project && projectEditing[tab.projectId] && (tab.id !== activeId || projectEditorOpen) ? <ProjectSettings project={project} agents={agents}
+                {!showSpec && !showInstructions ? project && projectEditing[tab.projectId] && (tab.id !== activeId || projectEditorOpen) ? <ProjectSettings project={project} agents={agents}
                 editing={projectEditing[tab.projectId]}
                 onEditingChange={editing => {
                   if (!editing) changeProjectEditing(tab.projectId, null);
                   else setProjectEditing(current => ({ ...current, [tab.projectId]: editing }));
                 }} onSaved={savedProject} /> : <ProjectPage
                 onOpenSpec={edit => openSpec(tab.projectId, true, edit)}
+                onOpenInstructions={() => openInstructions(tab.projectId, true)}
                 search={projectSearch[tab.projectId] ?? ""} onSearchChange={search => setProjectSearch(current => ({ ...current, [tab.projectId]: search }))}
                 project={project} saved={savedProjectId === tab.projectId} chats={chats} creating={creating || createFailed} updating={updatingChats}
                 onCreate={() => chooseAgents(config.defaultAgentId, tab.projectId)} onSelect={selectChat}
@@ -790,7 +823,7 @@ export function Workspace() {
       </div>
     </Modal>
     {archivingAgent ? <AgentArchiveDialog key={archivingAgent.id} agent={archivingAgent} onClose={() => setArchivingAgent(null)} onSaved={updateAgent} onRefresh={load} /> : null}
-    <Modal title="Discard unsaved work?" description="Closing this tab discards its unsaved input. Saved work and any running response remain available."
+    <Modal title="Discard unsaved work?" description="Closing loses this tab’s drafts and save-retry information. Saved effects are not undone; running work continues."
       finalFocus={() => tabList.current?.querySelector<HTMLElement>('[aria-selected="true"]') ?? document.getElementById("main-workspace")}
       open={closingTab !== null} onOpenChange={open => { if (!open) setClosingTab(null); }}>
       <div className="button-row">

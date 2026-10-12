@@ -1324,3 +1324,34 @@ a.button, a.icon-button { text-decoration: none; }
 .project-spec-header > .project-spec-path { flex: 1 1 100%; margin-top: 0; }
 .project-spec-status, .project-spec-helper { font-size: var(--text-sm); color: var(--color-muted); }
 .project-spec-recovery { margin-top: var(--space-3); }
+
+/* Project instructions share the Markdown surface, not Spec's save semantics. */
+.instructions-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-4); }
+.instructions-heading h1 { font-size: 2rem; line-height: 1.2; font-weight: 600; letter-spacing: -.035em; }
+.instructions-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.instructions-actions .button, .project-instructions-page .button { min-height: 44px; }
+.instructions-revision { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); font-size: var(--text-sm); }
+.instructions-help { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-5); color: var(--color-muted); font-size: var(--text-sm); }
+.instructions-help p { margin: 0; }
+.instructions-help summary { cursor: pointer; min-height: 44px; align-content: center; }
+.instructions-help details > div { display: grid; gap: var(--space-2); padding-block: var(--space-2); }
+.instructions-source { min-height: max(260px, calc(100dvh - 380px)); border-radius: var(--radius-md); }
+.instructions-source .code-editor-viewport { min-height: inherit; }
+.instructions-source diffs-container { --diffs-font-size: var(--text-md); }
+.instructions-review { min-width: 0; padding: var(--space-4); display: grid; gap: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-raised); }
+.instructions-review-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.instructions-review-heading h2 { font-size: var(--text-md); font-weight: 600; }
+.instructions-review-content { max-height: 280px; overflow: auto; overflow-wrap: anywhere; }
+.instructions-review > p { color: var(--color-muted); font-size: var(--text-sm); }
+.participant-project-instructions { margin-block: var(--space-5); padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); }
+.participant-project-instructions h4 { font-weight: 600; margin-bottom: var(--space-2); }
+.participant-project-instructions p { margin-block: var(--space-2); font-size: var(--text-sm); }
+.participant-project-instructions a { display: inline-flex; align-items: center; min-height: 44px; color: var(--color-navy); text-underline-offset: 3px; }
+@container (max-width: 560px) {
+  .instructions-heading { grid-template-columns: minmax(0, 1fr); }
+  .instructions-heading > .instructions-actions { grid-row: 3; justify-content: flex-end; }
+  .instructions-revision { grid-row: 2; }
+  .instructions-help { display: block; }
+  .instructions-help details { margin-top: var(--space-2); }
+  .project-instructions-page .project-spec-recovery .button { flex: 1 1 auto; }
+}

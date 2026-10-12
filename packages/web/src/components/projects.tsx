@@ -43,9 +43,10 @@ export function NewProjectButton({ name, busy, error, compact, onNameChange, onC
   </Popover.Root>;
 }
 
-export function ProjectPage({ project, saved, chats, creating, updating, onCreate, onSelect, onRename, onUpdate, onEdit, onOpenSpec, search, onSearchChange }: {
+export function ProjectPage({ project, saved, chats, creating, updating, onCreate, onSelect, onRename, onUpdate, onEdit, onOpenSpec, onOpenInstructions, search, onSearchChange }: {
   search: string;
   onOpenSpec: (edit?: boolean) => void;
+  onOpenInstructions: () => void;
   onSearchChange: (search: string) => void;
   onEdit: () => void;
   project?: Project;
@@ -85,6 +86,12 @@ export function ProjectPage({ project, saved, chats, creating, updating, onCreat
             event.preventDefault(); onOpenSpec();
           }}>View spec</Link> : null}
         </div>
+      </div>
+      <div className="project-spec-block"><dt>Instructions</dt><dd>Saved revision {project.instructionsRevision}</dd>
+        <div className="project-spec-actions"><Link className="button button-secondary" to={`?${new URLSearchParams({ section: "projects", project: project.id, view: "instructions" })}`} onClick={event => {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault(); onOpenInstructions();
+        }}>Open instructions</Link></div>
       </div>
       <div><dt>Repositories</dt><dd>{project.repositories?.length ? <ul>{project.repositories.map(repository => <li key={repository.id}><a href={repository.url} target="_blank" rel="noreferrer">{repository.name}<span className="sr-only"> (opens in new tab)</span></a></li>)}</ul> : <span className="text-muted">None added</span>}</dd></div>
     </dl>

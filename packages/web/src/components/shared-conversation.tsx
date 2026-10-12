@@ -8,6 +8,7 @@ import type { Message } from "@earendil-works/pi-ai";
 import { Tabs } from "@base-ui/react/tabs";
 import { ArrowUp, Check, Copy, Ear, LockKeyhole, Pencil, Reply, RotateCcw, Square, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Link } from "react-router";
 import type { AddParticipantsInput, AgentDefinition, AgentParticipant, ApplicationConfig, ChatSnapshot, CompanyPerson, ConversationMessage, ConversationParticipant, ParticipantActivity } from "../shared/contracts";
 import { ApiError, errorMessage } from "../lib/api";
 import { useComposer } from "../lib/composers";
@@ -230,6 +231,13 @@ export function SharedContextPanel({ criteriaDraft, onCriteriaDraft, snapshot, a
           {participant.upgradeError ? <Notice>{participant.upgradeError}</Notice> : null}
           <details><summary>Instance connections{participant.connectionsPending ? " · Pending update" : ""}</summary>{participant.agent.connections?.length ? <ul>{participant.agent.connections.map(connection => <li key={connection.id}>{connection.name}</li>)}</ul> : <p>No connections.</p>}</details>
           {participant.error ? <Notice>{participant.error}</Notice> : null}
+          {snapshot.conversation.sharedProjectId ? <section className="participant-project-instructions" aria-label="Project instructions">
+            <h4>Project instructions</h4>
+            <p>{participant.projectInstructionsRevision === undefined ? "Not yet adopted" : `Adopted revision ${participant.projectInstructionsRevision}`}</p>
+            <p className="text-muted">{participant.projectInstructionsRevision === undefined ? "Changes apply when this agent is idle."
+              : "Applies to subsequent requests; not proof of compliance."}</p>
+            <Link to={`/?${new URLSearchParams({ section: "projects", project: snapshot.conversation.sharedProjectId, view: "instructions" })}`}>Open instructions</Link>
+          </section> : null}
           <details><summary>Base instructions</summary><Markdown>{participant.agent.instructions || "No base instructions."}</Markdown></details>
           <details><summary>Instance instructions</summary><Markdown>{participant.instanceInstructions || "No additional instructions."}</Markdown></details>
           {snapshot.conversation.canParticipate !== false && agents.some(agent => agent.id === participant.agentDefinitionId && !agent.archived) && !snapshot.participants.some(person => person.kind === "agent" && person.agentDefinitionId === participant.agentDefinitionId && person.membership === "removing") ? <Button variant="secondary" onClick={() => onAddInstance(participant.agentDefinitionId)}>Add another instance</Button> : null}
