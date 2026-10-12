@@ -24,6 +24,8 @@ const SEARCH_ENDPOINT = "https://api.exa.ai/search";
 const USER_AGENT = "DispatchWeb-WebResearch/0.1";
 const ACCEPT = "text/html,application/xhtml+xml,text/plain;q=0.9,application/json;q=0.8,*/*;q=0.5";
 const MAX_RESULTS = 8;
+/** Search returns short excerpts, not page text; agents read full pages with web_read. */
+const MAX_SNIPPET_CHARS = 1_200;
 
 const BLOCKED_HOST_LABELS = new Set(["localhost"]);
 const BLOCKED_HOST_SUFFIXES = [".local", ".internal", ".lan", ".home.arpa", ".in-addr.arpa", ".alt.arpa"];
@@ -306,7 +308,8 @@ export function createWebBackend(config: WebBackendConfig = {}): WebBackend {
         query: q,
         numResults: MAX_RESULTS,
         type: "auto",
-        contents: { text: true },
+        // Query-relevant excerpts. Requesting page text here returned whole pages as "snippets".
+        contents: { highlights: true },
       };
       const domains = query.domains
         ?.map(domain => domain.trim().toLowerCase().replace(/^[.*]+|[.*]+$/g, ""))
@@ -333,12 +336,15 @@ export function createWebBackend(config: WebBackendConfig = {}): WebBackend {
       const results = (parsed as { results?: unknown }).results;
       if (!Array.isArray(results)) throw new WebBackendError("The search provider response had no results array.");
       return results.flatMap(item => {
-        const { url, title, text: snippet } = item as { url?: unknown; title?: unknown; text?: unknown };
+        const { url, title, highlights } = item as { url?: unknown; title?: unknown; highlights?: unknown };
         if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return [];
+        const excerpt = Array.isArray(highlights)
+          ? highlights.filter((part): part is string => typeof part === "string").map(part => part.replace(/\s+/g, " ").trim()).filter(Boolean).join(" … ")
+          : "";
         return [{
           url: url,
           title: typeof title === "string" ? title.replace(/\s+/g, " ").trim() : "",
-          snippet: typeof snippet === "string" ? snippet : "",
+          snippet: excerpt.length > MAX_SNIPPET_CHARS ? `${excerpt.slice(0, MAX_SNIPPET_CHARS - 1)}…` : excerpt,
         }];
       }).slice(0, MAX_RESULTS);
     },
