@@ -57,7 +57,7 @@ The archive and checksum file are in `result/`. Building requires Nix; running t
 
 The earlier 0.2.0 controller was checked with **Ubuntu on WSL2, Docker Engine 29.1.3 and Compose 2.40.3**, opening the app in Windows Edge. Docker Desktop is a different service lifecycle and has not been separately qualified.
 
-The [0.3.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.3.0) contains the Linux/AMD64 controller archive. GHCR images have been pushed from the reviewed archives, but anonymous access is still pending because the packages are private. [Registry references and digests](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.3.0) are in the release notes; use the downloadable archive without rebuilding. Use a dedicated directory inside Ubuntu, not an existing deployment directory.
+The [0.3.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.3.0) contains the Linux/AMD64 controller archive. The controller and worker GHCR packages are public, and anonymous pulls by the reviewed digests were verified. Choose the registry option below or the checksum-verified downloadable archive; neither requires rebuilding. Use a dedicated directory inside Ubuntu, not an existing deployment directory.
 
 Download `dispatch-controller-9e8acef-amd64.tar.gz` and `SHA256SUMS` from that release. Also download the matching [Compose file](https://raw.githubusercontent.com/dispatchlabs-ai/dispatch/v0.3.0/compose.yaml) and [environment example](https://raw.githubusercontent.com/dispatchlabs-ai/dispatch/v0.3.0/.env.example), saving them as `compose.yaml` and `.env.example`. From an Ubuntu WSL terminal in that directory:
 
@@ -79,6 +79,20 @@ docker tag dispatch-web:uncommitted dispatch-web:0.3.0
 ```
 
 Set `DISPATCH_IMAGE=dispatch-web:0.3.0` in `.env`. Ignore the stale 0.2.0 image-tag comment in the immutable v0.3.0 `.env.example`; it does not describe this archive. The example on `main` is corrected. This is a local tag, not a registry digest; the verified archive checksum identifies the downloaded bytes. Do not replace it with an unverified registry image. Keep `DISPATCH_PORT=3001` unless it is already in use.
+
+**Registry alternative:** skip the archive download/load/retag steps, but download the matching `compose.yaml` and `.env.example` linked above. Copy `.env.example` to `.env`, then set:
+
+```dotenv
+DISPATCH_IMAGE=ghcr.io/dispatchlabs-ai/dispatch:0.3.0@sha256:95d0ea8ac2ca38396329e32b5a11ab7a2eaf531ccfa8b1c2dff7041a01beee33
+```
+
+Pull the pinned controller without signing in:
+
+```sh
+docker compose pull
+```
+
+Then follow the same first-account and foreground-startup steps below. The Ubuntu worker is published separately as `ghcr.io/dispatchlabs-ai/dispatch-worker:0.3.0@sha256:8b12bfafb652330caec396af8060aa6d00772c2e96f71b866a031ef54f5f36c2`; the desktop Compose file does not start it. Worker conversations and hosted AWS operation remain unverified for 0.3.0.
 
 For the first account, while the controller is still stopped, run this from the same Compose directory (replace the example email and name):
 
