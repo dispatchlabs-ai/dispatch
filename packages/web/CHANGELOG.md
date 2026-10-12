@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Muse Code execution (candidate)
+
+- Add native Muse Code runtime/model selection, account-login defaults with optional explicit API keys, and Pi-owned execution/tool/publication wiring.
+- Record isolated editor/save acceptance and pending native inference, tool restriction, Stop and recovery qualification; not yet deployment-ready.
+
 ### Agent SDK execution
 
 - Add an opt-in Agent SDK runtime using the unmodified official Claude Code binary and its native user-bound authentication, with a separate credential-independent model catalog.

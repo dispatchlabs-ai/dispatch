@@ -70,13 +70,13 @@ function agentConnectionsChanged(editing: AgentEditing) {
 }
 
 function runtimeLabel(backend: AgentDraft["executionBackend"]) {
-  return backend === "claude-agent-sdk" ? "Agent SDK" : "Pi";
+  return backend === "muse-code" ? "Muse Code" : backend === "claude-agent-sdk" ? "Agent SDK" : "Pi";
 }
 
 function modelsForRuntime(config: ApplicationConfig, backend: AgentDraft["executionBackend"]) {
-  return backend === "claude-agent-sdk"
-    ? (config.sdkModels ?? []).filter(model => model.provider === "anthropic")
-    : config.models;
+  return backend && backend !== "pi"
+    ? (config.sdkModels ?? []).filter(model => model.provider === (backend === "muse-code" ? "muse-code" : "anthropic"))
+    : config.models.filter(model => model.provider !== "muse-code");
 }
 
 function thinkingLabel(level: ThinkingLevel) {
@@ -176,7 +176,7 @@ export function AgentsPage({
         <div className="agent-content-inner">
           <div hidden={evaluationOpen}>
           <p className="agent-phone-facts">
-            {agent.executionBackend === "claude-agent-sdk" ? "Agent SDK · " : null}
+            {agent.executionBackend && agent.executionBackend !== "pi" ? `${runtimeLabel(agent.executionBackend)} · ` : null}
             {model?.name || agent.modelId || "No model configured"} ·{" "}
             {thinkingLabel(agent.thinkingLevel)} thinking · {agent.tools.length || agent.skills?.length ? `${agent.tools.length + (agent.skills?.length ? 1 : 0)} tools` : "No tools"}
           </p>
@@ -435,7 +435,7 @@ function AgentEditor({
   const dirty = agentEditIsDirty(editing);
   const instructionsTooLong = draft.instructions.length > 50000;
   const backend = draft.executionBackend ?? "pi";
-  const sdk = backend === "claude-agent-sdk";
+  const sdk = backend !== "pi";
   const models = modelsForRuntime(config, backend);
   const model = models.find(
     (model) => model.provider === draft.provider && model.id === draft.modelId,
@@ -454,7 +454,7 @@ function AgentEditor({
       draft: {
         ...draft,
         executionBackend: next,
-        provider: selected?.provider ?? (next === "claude-agent-sdk" ? "anthropic" : ""),
+        provider: selected?.provider ?? (next === "muse-code" ? "muse-code" : next === "claude-agent-sdk" ? "anthropic" : ""),
         modelId: selected?.id ?? "",
         thinkingLevel: selected?.thinkingLevels.includes(thinking) ? thinking : selected?.thinkingLevels[0] ?? "off",
       },
@@ -573,14 +573,15 @@ function AgentEditor({
               <summary><strong>Model</strong><span>{model?.name || draft.modelId || "Not configured"} · {thinkingLabel(draft.thinkingLevel)} thinking</span></summary>
             <fieldset disabled={busy} className="agent-form-section">
               <legend className="sr-only">Model settings</legend>
-              <Field label="Runtime" hint={sdk ? "Runs the official Claude Code runtime." : undefined}>
+              <Field label="Runtime" hint={sdk ? `Runs the native ${backend === "muse-code" ? "Muse Code" : "Claude Code"} runtime.` : undefined}>
                 {props => <Select {...props} value={backend} onChange={event => changeRuntime(event.target.value as ExecutionBackend)}>
                   <option value="pi">Pi</option>
                   <option value="claude-agent-sdk">Agent SDK</option>
+                  <option value="muse-code">Muse Code</option>
                 </Select>}
               </Field>
               <div className="form-columns">
-                <Field label="Model" error={sdk && !model ? "SDK model unavailable. Reload or ask your operator to check the catalog." : undefined}>
+                <Field label="Model" error={sdk && !model ? "Native model unavailable. Reload or ask your operator to check the catalog." : undefined}>
                   {(props) => (
                     <Select
                       {...props}
@@ -648,8 +649,8 @@ function AgentEditor({
                 </Field>
               </div>
               {sdk ? <p className="field-hint">
-                Sign in with Claude Code on the runner, then bind it to your Dispatch user. Saving does not sign in. {" "}
-                <a href="https://github.com/dispatchlabs-ai/dispatch/blob/main/packages/web/docs/usage-guide.md#claude-agent-sdk-setup" target="_blank" rel="noopener noreferrer">Setup guide<span className="sr-only"> (opens in a new tab)</span></a>
+                Sign in with {backend === "muse-code" ? "Muse Code" : "Claude Code"} on the runner. {" "}
+                <a href={`https://github.com/dispatchlabs-ai/dispatch/blob/main/packages/web/docs/usage-guide.md#${backend === "muse-code" ? "muse-code-setup" : "claude-agent-sdk-setup"}`} target="_blank" rel="noopener noreferrer">Setup guide<span className="sr-only"> (opens in a new tab)</span></a>
               </p> : null}
             </fieldset>
             </details>

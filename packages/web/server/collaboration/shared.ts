@@ -1,3 +1,6 @@
+import { createMuseTask, MuseSessionDoc, type MuseRunScope, type MuseReasoningEffort } from "../muse/task.js";
+import { runMuseQuery } from "../muse/transport.js";
+import { museToolServer } from "../muse/tools.js";
 import { claudeThinkingOptions } from "../claude-sdk/thinking.js";
 import { nativeClaudeEnvironment } from "../claude-sdk/transport.js";
 import { createClaudeSdkTask, ClaudeSessionDoc, type ClaudeRunScope, type ClaudeRunResult } from "../claude-sdk/task.js";
@@ -108,6 +111,7 @@ export class SharedConversations {
   readonly extension;
   readonly definitionOfDoneExtension;
   readonly sdk;
+  readonly muse;
   readonly delivery;
   /** Hosted workers must not inherit a backend user's native Claude login. */
   sdkExecutionAllowed = true;
@@ -149,6 +153,28 @@ export class SharedConversations {
       },
       settle: (scope, result) => this.settleSdk(scope, result),
     });
+    this.muse = createMuseTask({
+      prepare: scope => this.prepareMuse(scope),
+      execute: async (scope, prepared, invocation) => {
+        if (prepared.userId !== process.env.DISPATCH_MUSE_USER_ID) throw new CollaborationError(403, "The Muse runner owner changed after admission.");
+        await this.authorizeSdk(scope, "muse-code");
+        const bridge = await museToolServer(scope, () => this.authorizeSdk(scope, "muse-code"), async name => {
+          await scope.runtime.commit(async tx => {
+            (await tx.doc(ListeningRequest, scope.runtime.taskId)).publicationOnly = name === "conversation_post";
+            for (const item of await this.contributions.forReviewer(tx, scope.input.roomId, scope.runtime.conversationId, scope.runtime.taskId)) {
+              item.needsReview = true;
+              await this.contributions.release(tx, scope.input.roomId, item);
+            }
+          }, scope.context);
+        });
+        try { return await runMuseQuery({ prepared, invocation, bridge, signal: scope.runtime.signal }); }
+        finally { await bridge.close(); }
+      },
+      settle: async (scope, result) => {
+        const continuation = await this.settleSdk(scope, result, "muse-code");
+        return continuation ? { prompt: [{ type: "text", text: continuation.prompt }] } : undefined;
+      },
+    });
     this.delivery = defineTask<{
       roomId: ConversationId; participantId: string; messageId: string; epoch: number; previous?: TaskId;
     }, { phase: "deliver" }, null>({
@@ -163,12 +189,13 @@ export class SharedConversations {
         const messages = await this.messages(task.input.roomId, ctx);
         const incoming = messages.find(message => message.id === task.input.messageId || message.aliases?.includes(task.input.messageId));
         if (!incoming) throw new Error("The public message for this delivery is missing.");
-        const { sdkPrior, prior } = await this.harness.commit(async tx => ({
+        const { sdkPrior, musePrior, prior } = await this.harness.commit(async tx => ({
           sdkPrior: (await tx.doc(ClaudeSessionDoc, member.conversationId!)).requests[`dispatch-delivery:${task.id}`]?.taskId,
+          musePrior: (await tx.doc(MuseSessionDoc, member.conversationId!)).requests[`dispatch-delivery:${task.id}`]?.taskId,
           prior: await tx.submissionByRequest(member.conversationId!, `dispatch-delivery:${task.id}`),
         }), ctx);
         // A restored admitted submission must be joined even when its request already advanced the listening cursor.
-        if (!prior && !sdkPrior && member.consideredThrough && messages.findIndex(message => message.id === member.consideredThrough) >= messages.indexOf(incoming)) {
+        if (!prior && !sdkPrior && !musePrior && member.consideredThrough && messages.findIndex(message => message.id === member.consideredThrough) >= messages.indexOf(incoming)) {
           await runtime.commit(async tx => {
             const turns = await tx.doc(TurnsDoc, task.input.roomId);
             turns.queue = turns.queue.filter(ticket => ticket.owner !== task.id);
@@ -181,12 +208,14 @@ export class SharedConversations {
         }
         let cancelled = false;
         let useSdk = false;
+        let useMuse = false;
         await runtime.commit(async tx => {
           const room = await tx.doc(SharedDoc, task.input.roomId);
           if (room.epoch !== task.input.epoch || room.stopping || !activeMember(room.members.find(item => item.id === member.id))) { cancelled = true; return terminal(); }
           const target = room.members.find(item => item.id === member.id)!;
-          if (!prior && !sdkPrior) await this.beforeDelivery?.(tx, task.input.roomId, room.companyId, target);
+          if (!prior && !sdkPrior && !musePrior) await this.beforeDelivery?.(tx, task.input.roomId, room.companyId, target);
           useSdk = Boolean(sdkPrior || target.agent?.executionBackend === "claude-agent-sdk");
+          useMuse = Boolean(musePrior || target.agent?.executionBackend === "muse-code");
           target.status = "listening"; delete target.error; target.threadId = incoming.threadId; target.activeDelivery = task.id; target.publicationPriority = incoming.mentions.includes(target.id);
         }, ctx);
         if (cancelled) return;
@@ -197,13 +226,16 @@ export class SharedConversations {
           self: member.id, incoming: { ...messageMetadata(incoming), text: incoming.text.slice(0, 12_000), textLength: incoming.text.length, textTruncated: incoming.text.length > 12_000 }, participants: state!.members.map(memberIdentity),
           publicMessageCount: messages.length, recentMessages: recentMessages(messages),
         });
-        if (useSdk) {
-          const prompt = [{ type: "text" as const, text: notification }, ...(incoming.images ?? []).map(image => ({ type: "image" as const, source: { type: "base64" as const, media_type: image.mimeType as "image/png", data: image.data } })), ...(await this.attachments.imageContent(incoming.attachments)).filter(image => image.type === "image").map(image => ({ type: "image" as const, source: { type: "base64" as const, media_type: image.mimeType as "image/png", data: image.data } }))];
-          let sdkId = sdkPrior;
+        if (useSdk || useMuse) {
+          const prompt = [{ type: "text" as const, text: notification }, ...(incoming.images ?? []).map(image => ({ type: "image" as const, mediaType: image.mimeType, base64Data: image.data })), ...(await this.attachments.imageContent(incoming.attachments)).filter(image => image.type === "image").map(image => ({ type: "image" as const, mediaType: image.mimeType, base64Data: image.data }))];
+          let sdkId = useMuse ? musePrior : sdkPrior;
           if (!sdkId) await runtime.commit(async tx => {
             const room = await tx.doc(SharedDoc, task.input.roomId);
             if (room.stopping || room.epoch !== task.input.epoch || !activeMember(room.members.find(item => item.id === member.id))) throw new Error("SDK admission is no longer authorized.");
-            sdkId = await this.sdk.admit(tx, member.conversationId!, `dispatch-delivery:${task.id}`, { roomId: task.input.roomId, participantId: member.id, messageId: incoming.id, epoch: task.input.epoch, prompt });
+            const input = { roomId: task.input.roomId, participantId: member.id, messageId: incoming.id, epoch: task.input.epoch };
+            sdkId = useMuse
+              ? await this.muse.admit(tx, member.conversationId!, `dispatch-delivery:${task.id}`, { ...input, prompt })
+              : await this.sdk.admit(tx, member.conversationId!, `dispatch-delivery:${task.id}`, { ...input, prompt: prompt.map(part => part.type === "text" ? part : { type: "image", source: { type: "base64", media_type: part.mediaType as "image/png", data: part.base64Data } }) });
           }, ctx);
           const settled = await runtime.waitForTask(sdkId!, ctx);
           await runtime.commit(async tx => {
@@ -432,7 +464,7 @@ export class SharedConversations {
           if (reviewing?.phase === "closed") return contributionCopy(reviewing);
           const id = `tool:${api.taskId}:${api.callId}`;
           const item = await this.contributions.prepare(tx, binding.roomId!, {
-            id, participantId: member.id, conversationId: api.conversationId, reviewer: run.taskId, ...(sdkReviewer ? { executionBackend: "claude-agent-sdk" as const } : {}),
+            id, participantId: member.id, conversationId: api.conversationId, reviewer: run.taskId, ...(sdkReviewer ? { executionBackend: member.agent!.executionBackend as "claude-agent-sdk" | "muse-code" } : {}),
             draft: { text: args.text, threadId: args.threadId === undefined ? member.threadId ?? null : args.threadId, mentions: args.mentions ?? [], attachmentIds, createdAt: Date.now() },
             ...(preparation.through ? { through: preparation.through } : {}), priority: member.publicationPriority ?? false,
           });
@@ -575,21 +607,21 @@ export class SharedConversations {
     });
   }
 
-  private async authorizeSdk(scope: ClaudeRunScope) {
-    if (!this.sdkExecutionAllowed) throw new CollaborationError(503, "Agent SDK execution requires a user-bound local runner; hosted worker authentication is not configured.");
-    const userId = process.env.DISPATCH_CLAUDE_USER_ID;
-    if (!userId) throw new CollaborationError(503, "Set DISPATCH_CLAUDE_USER_ID to the Dispatch user owning this native Claude Code environment, then sign in on that runner.");
+  private async authorizeSdk(scope: ClaudeRunScope | MuseRunScope, backend: "claude-agent-sdk" | "muse-code" = "claude-agent-sdk") {
+    if (!this.sdkExecutionAllowed) throw new CollaborationError(503, "Native execution requires a user-bound local runner; hosted worker authentication is not configured.");
+    const userId = backend === "muse-code" ? process.env.DISPATCH_MUSE_USER_ID : process.env.DISPATCH_CLAUDE_USER_ID;
+    if (!userId) throw new CollaborationError(503, "Set the native runtime’s DISPATCH_CLAUDE_USER_ID or DISPATCH_MUSE_USER_ID to its Dispatch owner, then sign in on that runner.");
     await scope.runtime.commit(async tx => {
       const room = await tx.doc(SharedDoc, scope.input.roomId);
       const member = requireActiveMember(room, scope.input.participantId);
-      if (room.stopping || room.epoch !== scope.input.epoch || member.conversationId !== scope.runtime.conversationId || member.agent?.executionBackend !== "claude-agent-sdk") throw new CollaborationError(409, "SDK execution is no longer admitted.");
+      if (room.stopping || room.epoch !== scope.input.epoch || member.conversationId !== scope.runtime.conversationId || member.agent?.executionBackend !== backend) throw new CollaborationError(409, "SDK execution is no longer admitted.");
       const owner = room.members.find(item => item.kind === "human" && item.userId === userId && activeMember(item));
-      if (!owner) throw new CollaborationError(403, "The configured Claude runner owner must participate in this chat.");
+      if (!owner) throw new CollaborationError(403, "The configured native runner owner must participate in this chat.");
       await this.authorize(tx, { companyId: room.companyId, userId }, scope.input.roomId, "participate");
     }, scope.context);
   }
 
-  private async sdkContext(scope: ClaudeRunScope) {
+  private async sdkContext(scope: ClaudeRunScope | MuseRunScope) {
     let update = "";
     await scope.runtime.commit(async tx => {
       const room = await tx.doc(SharedDoc, scope.input.roomId);
@@ -627,8 +659,24 @@ export class SharedConversations {
       model: agent.model!.modelId, userId: process.env.DISPATCH_CLAUDE_USER_ID! };
   }
 
-  private async settleSdk(scope: ClaudeRunScope, result: ClaudeRunResult) {
-    await this.authorizeSdk(scope);
+  private async prepareMuse(scope: MuseRunScope) {
+    await this.authorizeSdk(scope, "muse-code");
+    const agent = await scope.runtime.agent(scope.context);
+    const env = await scope.runtime.env(scope.context);
+    const sections: string[] = [];
+    for (const section of agent.sections) {
+      const text = await section.render({ conversationId: scope.runtime.conversationId, agent, env, shown: {}, read: scope.runtime }, scope.context);
+      if (text !== undefined) sections.push(section.tag === false ? text : `<${section.key}>\n${text}\n</${section.key}>`);
+    }
+    const update = await this.sdkContext(scope);
+    return { prompt: [...scope.input.prompt, { type: "text" as const, text: update }], systemPrompt: sections.join("\n\n"),
+      cwd: agent.cwd ?? (await scope.runtime.snapshot(SharedDoc, scope.input.roomId, scope.context))!.members.find(item => item.id === scope.input.participantId)!.workspaceDefault!,
+      model: agent.model!.modelId, reasoningEffort: (agent.thinkingLevel === "off" ? "none" : agent.thinkingLevel) as MuseReasoningEffort,
+      userId: process.env.DISPATCH_MUSE_USER_ID! };
+  }
+
+  private async settleSdk(scope: ClaudeRunScope | MuseRunScope, result: ClaudeRunResult, backend: "claude-agent-sdk" | "muse-code" = "claude-agent-sdk") {
+    await this.authorizeSdk(scope, backend);
     const { runtime, context: ctx } = scope;
     let ids: string[] = [];
     await runtime.commit(async tx => {
@@ -644,7 +692,7 @@ export class SharedConversations {
       } else if (!current && result.text.trim() && result.text.trim() !== "[[silent]]") {
         const item = await this.contributions.prepare(tx, scope.input.roomId, {
           id: `final:${member.id}:${runtime.taskId}`, participantId: member.id, conversationId: runtime.conversationId,
-          reviewer: runtime.taskId, executionBackend: "claude-agent-sdk", priority: member.publicationPriority ?? false,
+          reviewer: runtime.taskId, executionBackend: backend, priority: member.publicationPriority ?? false,
           through: preparation.through, draft: { text: result.text, threadId: member.threadId ?? null, mentions: [], createdAt: runtime.now() },
         });
         candidates.push(item); preparation.contributionId = item.id;
@@ -1289,7 +1337,7 @@ export class SharedConversations {
         const removalError = member.membership === "removing" && (!removal || removal.state.status === "terminal")
           ? "Removal incomplete. Retry removal." : undefined;
         participants.push({ ...participant, ...(pendingConnectionIds || pendingWorkerMcp || connectionsRefreshPending ? { connectionsPending: true } : {}), membership: member.membership ?? "active", ...(removalError ? { removalError } : {}),
-          ...observed, usage, ...(member.agent?.executionBackend === "claude-agent-sdk" ? { modelUsageUnavailable: true } : {}) } as ConversationParticipant);
+          ...observed, usage, ...(member.agent?.executionBackend && member.agent.executionBackend !== "pi" ? { modelUsageUnavailable: true } : {}) } as ConversationParticipant);
       }
       else participants.push({ ...participant, status: Object.values(turns.presence).some(presence => presence.participantId === member.id && presence.until > Date.now()) ? "typing" : "idle" } as ConversationParticipant);
     }

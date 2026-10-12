@@ -148,7 +148,7 @@ export interface SaveSkillInput {
   name: string; description: string; instructions: string;
 }
 
-export type ExecutionBackend = "pi" | "claude-agent-sdk";
+export type ExecutionBackend = "pi" | "claude-agent-sdk" | "muse-code";
 
 export interface AgentDraft {
   /** Missing on historical definitions means the native Pi agent loop. */

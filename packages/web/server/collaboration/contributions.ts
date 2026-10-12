@@ -10,7 +10,7 @@ type Boundary = { kind: "final" | "tools"; from: TaskId; after: EntryId; marker?
 export type Contribution = {
   id: string; participantId: string; conversationId: ConversationId; owner: TaskId;
   /** SDK reviewers retain one native task across review rounds. */
-  executionBackend?: "claude-agent-sdk";
+  executionBackend?: "claude-agent-sdk" | "muse-code";
   reviewer: TaskId; inputs: SubmissionId[]; draft: ContributionDraft; through?: string;
   priority: boolean; phase: "prepared" | "review" | "closed"; boundary?: Boundary;
   messageId?: string; finalGenerations?: TaskId[]; needsReview?: boolean;
@@ -53,9 +53,9 @@ export class Contributions {
     const doc = await tx.doc(ContributionsDoc, roomId);
     if (doc.items[input.id]) return doc.items[input.id];
     const reviewer = await tx.task(input.reviewer);
-    const run = input.executionBackend === "claude-agent-sdk" ? undefined : (await tx.doc(LiveDoc, input.conversationId)).run;
-    if (input.executionBackend === "claude-agent-sdk") {
-      if (!reviewer || reviewer.kind !== "dispatch.claude-sdk-run" || reviewer.conversationId !== input.conversationId || reviewer.abortRequested || reviewer.state.status === "terminal") throw new Error("The contribution's SDK task is no longer active.");
+    const run = input.executionBackend ? undefined : (await tx.doc(LiveDoc, input.conversationId)).run;
+    if (input.executionBackend) {
+      if (!reviewer || reviewer.kind !== (input.executionBackend === "muse-code" ? "dispatch.muse-run" : "dispatch.claude-sdk-run") || reviewer.conversationId !== input.conversationId || reviewer.abortRequested || reviewer.state.status === "terminal") throw new Error("The contribution's SDK task is no longer active.");
     } else if (!run || run.taskId !== input.reviewer) throw new Error("The contribution's native run is no longer active.");
     const owner = await tx.createTask(this.guard, { roomId, id: input.id }, { conversationId: roomId, ownership: { kind: "conversation" }, background: true });
     doc.items[input.id] = { ...input, owner, inputs: [...(run?.inputs ?? [])], phase: "prepared" };
@@ -117,8 +117,8 @@ export class Contributions {
   private async reconcile(tx: Tx, roomId: ConversationId, item: Contribution) {
     if (item.phase === "closed") return;
     const reviewer = await tx.task(item.reviewer);
-    if (item.executionBackend === "claude-agent-sdk") {
-      if (!reviewer || reviewer.kind !== "dispatch.claude-sdk-run" || reviewer.conversationId !== item.conversationId || reviewer.abortRequested || reviewer.state.status === "terminal") await this.close(tx, roomId, item);
+    if (item.executionBackend) {
+      if (!reviewer || reviewer.kind !== (item.executionBackend === "muse-code" ? "dispatch.muse-run" : "dispatch.claude-sdk-run") || reviewer.conversationId !== item.conversationId || reviewer.abortRequested || reviewer.state.status === "terminal") await this.close(tx, roomId, item);
       return;
     }
     const live = await tx.doc(LiveDoc, item.conversationId);

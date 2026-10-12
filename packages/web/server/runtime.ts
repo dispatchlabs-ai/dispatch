@@ -1,3 +1,4 @@
+import { museProvider } from "./muse/models.js";
 import { createAgentSecrets } from "./extensions/agent-secrets.js";
 import { withSharedContextCache } from "./collaboration/prompt-cache.js";
 import type { TranscriptQuery } from "../src/shared/contracts.js";
@@ -274,6 +275,7 @@ export class DispatchRuntime {
       registry.install(worker ? { ...shared.extension, sections: [...shared.extension.sections ?? [], workerWorkspaceSection] } : shared.extension);
       registry.install(shared.definitionOfDoneExtension);
       registry.install(shared.sdk.extension);
+      registry.install(shared.muse.extension);
       shared.sdkExecutionAllowed = !worker;
       registry.install(CodingTools);
       registry.install(Coding);
@@ -3006,8 +3008,9 @@ export class DispatchRuntime {
     requireText(agent.name, "Agent name", 100);
     requireText(agent.description, "Description", 500, true);
     requireText(agent.instructions, "Instructions", 50_000, true);
-    if (agent.executionBackend !== undefined && !["pi", "claude-agent-sdk"].includes(agent.executionBackend)) throw new RuntimeError(400, "Unknown execution backend.");
+    if (agent.executionBackend !== undefined && !["pi", "claude-agent-sdk", "muse-code"].includes(agent.executionBackend)) throw new RuntimeError(400, "Unknown execution backend.");
     if (agent.executionBackend === "claude-agent-sdk" && agent.provider !== "anthropic") throw new RuntimeError(400, "The Claude Agent SDK requires an Anthropic model.");
+    if ((agent.executionBackend === "muse-code") !== (agent.provider === "muse-code")) throw new RuntimeError(400, "Muse Code models require the Muse Code runtime.");
     requireText(agent.provider, "Provider", 100);
     if (agent.provider === "openai-codex") throw new RuntimeError(400, "Select an OpenAI model.");
     requireText(agent.modelId, "Model", 200);
@@ -3040,6 +3043,7 @@ function productionModels() {
   const models = createModels();
   models.setProvider(openaiProvider());
   models.setProvider(anthropicProvider());
+  models.setProvider(museProvider());
   return models;
 }
 

@@ -1,3 +1,4 @@
+import { museProvider } from "./muse/models.js";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -36,6 +37,7 @@ export async function openModels(
     modelsPath: join(agentDir, "models.json"), allowModelNetwork: false, refreshOnCreate,
   });
   models.registerNativeProvider(codexImageProvider());
+  models.registerNativeProvider(museProvider());
   const thinkingLevel = (environment.DISPATCH_THINKING ?? defaults.defaultThinkingLevel ?? "off") as ThinkingLevel;
   return {
     models, provider, modelId, thinkingLevel,
@@ -49,7 +51,7 @@ export async function openModels(
       }))).flat();
       const choices = !model || available.some((item) => item.provider === model.provider && item.id === model.id) ? available : [model, ...available];
       return {
-        sdkModels: models.getModels().filter(item => item.provider === "anthropic").map((item): ModelOption => ({ provider: item.provider, id: item.id, name: item.name, reasoning: item.reasoning, thinkingLevels: [...getSupportedThinkingLevels(item)] })),
+        sdkModels: models.getModels().filter(item => (item.provider === "anthropic" || item.provider === "muse-code")).map((item): ModelOption => ({ provider: item.provider, id: item.id, name: item.name, reasoning: item.reasoning, thinkingLevels: [...getSupportedThinkingLevels(item)] })),
         models: choices.map((item): ModelOption => ({ provider: item.provider, id: item.id, name: item.name, reasoning: item.reasoning, thinkingLevels: [...getSupportedThinkingLevels(item)] })),
         providerReady: available.some(item => item.provider === defaultAgent.provider),
       };

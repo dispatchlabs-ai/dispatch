@@ -198,6 +198,27 @@ If Dispatch reports authentication failure while your terminal reports logged in
 
 After interrupted execution, inspect workspace/external effects before retrying. Pi's durable task state and an SDK session ID do not back up the native session files or guarantee exactly-once shell effects. A run interrupted before its result is committed must not be described as completed or silently resent. See the [bounded interactive qualification](runtime.md#sdk-qualification) for checked Stop behavior and remaining recovery limits.
 
+### Muse Code setup
+
+**Candidate integration; native execution acceptance is pending.** Muse Code is an execution backend, not a Pi HTTP model provider. The editor/runtime selection was browser-checked on October 12, 2026 at desktop and 390 px phone sizes. Actual Dispatch inference, tool execution, Stop and restart qualification remain held until adopted instructions and the Dispatch-only tool boundary work together. Do not treat model selection or a terminal login as a successful Dispatch run. See the [runtime boundary](runtime.md#muse-code-integration).
+
+Install Muse Code on the local execution host, then run `muse` under the operating-system account/profile the service uses and complete its native sign-in flow. Keep login codes, tokens and account diagnostics out of chat, screenshots and Dispatch's provider/secret fields. The default route uses native account login; an explicitly supplied `META_API_KEY` remains supported. Dispatch does not inject a key from its provider store, forbid API-key use, or implement a billing cap. Native subscription/model access and usage limits remain Muse's responsibility.
+
+| Service environment variable | Purpose |
+| --- | --- |
+| `DISPATCH_MUSE_USER_ID` | Required Dispatch user ID owning the native environment. This human must participate in the chat and retain current participation access. It is not a Muse account ID or email. |
+| `DISPATCH_MUSE_EXECUTABLE` | Optional Muse binary or owner-controlled launcher path; defaults to `muse` on the runner's `PATH`. |
+| `MUSE_HOME`, `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `XDG_DATA_HOME` | Native profile paths inherited from the service. Use the same profile for terminal login and execution. |
+| `META_API_KEY` | Optional explicit native API-key authentication. Omit it for the normal account-login route. Supply secrets through the operator's protected process-injection mechanism, never command-line literals or project environment settings. |
+
+Inspect the signed-in installation's `GET /api/auth/session` and use only `user.id` for the runner binding. Restart the local service with that configuration. Dispatch rechecks the owner, chat/project access, active participant, adopted backend and Stop epoch before execution and tool calls. It does not establish that the native Muse account matches the Dispatch user; the operator must bind the correct environment. Hosted workers are not provisioned with per-user Muse authentication and reject this backend.
+
+In **Agents → Edit → Model**, choose **Runtime → Muse Code**, then **Muse Wonder Full** or **Muse Wonder** and a Thinking level. Save the definition; existing instances adopt at a safe idle boundary. Native choices are credential-independent selection metadata, not proof of subscription entitlement. Saving does not log in or run inference. The current catalog omits Spark until its native subscription availability is confirmed.
+
+The candidate uses a Dispatch-owned instruction workspace rather than overwriting a project's `AGENTS.md`. Assigned tools execute through Pi child tasks using the configured project directory. Native session logs stay in the Muse profile, outside Pi checkpoints; back them up separately if native conversation continuation is required. Available tool activity comes from committed Pi receipts; native thinking/prose is not automatically public history. Model-usage accounting currently shows unavailable rather than claiming zero usage or zero charges.
+
+A missing executable/login/model access produces a fixed setup or turn-failure message. Stop joins native process and bridge cleanup; it cannot undo committed effects or charges. If external execution may have happened but its result was not saved, recovery reports uncertainty rather than automatically resending. Inspect the native session and workspace/external effects before retrying. These are candidate contracts, not completed functional acceptance.
+
 ### Pi configuration and agent defaults
 
 The service uses Pi's public `ModelRuntime` from the pinned coding-agent package. Before the provider-setup cutover it reads the operator's Pi credential/model files from `~/.pi/agent`; the candidate above replaces credential ownership for app-managed providers. Pi owns credential resolution and serialized refresh, including OAuth. Secrets stay on the service and do not enter browser snapshots, Git, build artifacts, or the Nix store.
