@@ -23,6 +23,7 @@ export async function runClaudeQuery(input: QueryInput): Promise<ClaudeRunResult
   input.signal.addEventListener("abort", abort, { once: true });
   const exits: Promise<void>[] = [];
   let result: ClaudeRunResult | undefined;
+  let apiError: string | undefined;
   let stream: Query | undefined;
   try {
     stream = query({
@@ -65,7 +66,8 @@ export async function runClaudeQuery(input: QueryInput): Promise<ClaudeRunResult
     });
     for await (const message of stream) {
       input.signal.throwIfAborted();
-      if (message.type === "result") result = summarizeResult(message);
+      if (message.type === "assistant" && message.error) apiError = message.error;
+      if (message.type === "result") result = summarizeResult(message, apiError);
       else await input.observe(message);
     }
   } catch (error) {
@@ -89,13 +91,13 @@ async function* userPrompt(input: QueryInput): AsyncGenerator<SDKUserMessage> {
   yield { type: "user", message: { role: "user", content: input.prepared.prompt },
     parent_tool_use_id: null, session_id: input.sessionId, uuid: randomUUID() };
 }
-function summarizeResult(message: SDKResultMessage): ClaudeRunResult {
+function summarizeResult(message: SDKResultMessage, apiError?: string): ClaudeRunResult {
   const success = message.subtype === "success" && !message.is_error;
   return {
     sessionId: message.session_id,
     success,
     text: success && message.subtype === "success" ? message.result : "",
-    ...(success ? {} : { error: claudeFailure(message) }),
+    ...(success ? {} : { error: claudeFailure(message, apiError) }),
   };
 }
 /** Minimal process environment; credentials never travel from Dispatch's provider store to the SDK. */
@@ -110,7 +112,12 @@ export function nativeClaudeEnvironment(owner: { home?: string; configDir?: stri
 }
 
 /** Report fixed actionable categories, never raw provider text or credential-bearing diagnostics. */
-function claudeFailure(message: SDKResultMessage) {
+function claudeFailure(message: SDKResultMessage, apiError?: string) {
+  if (apiError === "authentication_failed") return "Claude Code authentication failed. Sign in again through the native Claude Code flow on the configured runner.";
+  if (apiError === "model_not_found") return "The selected model is unavailable to this Claude Code account. Select an accessible SDK model.";
+  if (apiError === "rate_limit") return "Claude Code reached its usage or rate limit. Check the native account's limits before retrying.";
+  if (apiError === "invalid_request") return "Claude Code rejected the request configuration. Inspect the native session and SDK model/thinking settings.";
+  if ("api_error_status" in message && (message.api_error_status === 401 || message.api_error_status === 403)) return "Claude Code authentication or account access failed. Check native sign-in on the configured runner.";
   const text = message.subtype === "success" ? message.result : message.errors.join("\n");
   if (/usage limit|rate.?limit|limit reached|too many requests|429/i.test(text)) return "Claude Code reached its usage or rate limit. Check the native account's limits before retrying.";
   if (/not logged|log.?in|auth|token|credential|401|403/i.test(text)) return "Claude Code authentication or account access failed. Check native auth status and sign in again on the configured runner.";
