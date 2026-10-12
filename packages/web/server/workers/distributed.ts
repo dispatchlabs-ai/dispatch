@@ -215,6 +215,15 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
         return result;
       });
     },
+    async saveProjectInstructions(scope, id, input) {
+      return policyChange(async () => {
+        const result = await directory.saveProjectInstructions(scope, id, input);
+        // Non-revoking: propagation failure leaves the save committed and never retires active workers.
+        // A same-request retry replays the receipt and propagates again.
+        await acknowledgePolicy(scope.companyId, false);
+        return result;
+      });
+    },
     async refreshMcpConnections(id) {
       return policyChange(async () => {
         await directory.refreshMcpConnections(id);
@@ -317,6 +326,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
   return {
     importProjectArchive: directory.importProjectArchive.bind(directory),
     getProjectArchive: directory.getProjectArchive.bind(directory),
+    getProjectInstructions: directory.getProjectInstructions.bind(directory),
     getProjectMarkdown: directory.getProjectMarkdown.bind(directory),
     saveProjectMarkdown: directory.saveProjectMarkdown.bind(directory),
     getLegacyProjectSpec: directory.getLegacyProjectSpec.bind(directory),

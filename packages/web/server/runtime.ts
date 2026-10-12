@@ -2687,7 +2687,8 @@ export class DispatchRuntime {
     if (this.closed) return;
     for (const change of publication.changes) {
       if (change.type === "document" || change.type === "document.copy") {
-        if (change.record.kind === CatalogDoc.definition.kind) this.upgradeCatalogDirty = true;
+        // Project instructions adopt independently of agent-definition revisions.
+        if (change.record.kind === CatalogDoc.definition.kind || change.record.kind === ProjectsDoc.definition.kind) this.upgradeCatalogDirty = true;
         else if (change.record.kind === SharedDoc.definition.kind && change.conversationId) this.upgradeRooms.add(change.conversationId);
         else if (change.record.kind === LiveDoc.definition.kind || change.record.kind === InboxDoc.definition.kind) {
           const room = change.conversationId && this.pendingUpgradeRooms.get(change.conversationId);
@@ -2717,15 +2718,18 @@ export class DispatchRuntime {
 
   private async reconcileUpgrades(rooms?: ReadonlySet<ConversationId>) {
     const catalog = (await this.harness.snapshot(CatalogDoc, context))!;
+    const projects = (await this.harness.snapshot(ProjectsDoc, context))?.projects ?? {};
     for (const chat of catalog.chats) {
       const roomId = nativeId(chat.id);
       if (rooms && !rooms.has(roomId)) continue;
       const room = await this.harness.snapshot(SharedDoc, roomId, context);
+      const projectRevision = room?.sharedProjectId ? projects[room.sharedProjectId]?.instructionsRevision ?? 0 : 0;
       for (const member of room?.members ?? []) {
         if (member.conversationId) this.pendingUpgradeRooms.delete(member.conversationId);
         if (member.kind !== "agent" || !member.agentDefinitionId || (member.membership && member.membership !== "active")) continue;
         const latest = latestAgent(catalog, chat.companyId, member.agentDefinitionId);
-        if ((!latest || latest.archived || latest.revision === member.agentRevision) && !member.pendingConnectionIds && !member.pendingWorkerMcp && !member.connectionsRefreshPending) continue;
+        if ((!latest || latest.archived || latest.revision === member.agentRevision) && projectRevision === (member.projectInstructionsRevision ?? 0)
+          && !member.pendingConnectionIds && !member.pendingWorkerMcp && !member.connectionsRefreshPending) continue;
         // Index before awaiting the idle check, so a settling task cannot lose its wakeup.
         if (member.conversationId) this.pendingUpgradeRooms.set(member.conversationId, roomId);
         try {
@@ -2753,8 +2757,12 @@ export class DispatchRuntime {
     const desired = mapping ? catalog.agents.find(agent => agent.companyId === companyId && agent.id === member.agentDefinitionId && agent.revision === mapping.desiredRevision) : latest;
     const agent = latest && !latest.archived && (!this.worker || mapping) ? desired : undefined;
     const updateBase = agent && agent.revision !== member.agentRevision;
-    if (!updateBase && !member.pendingConnectionIds && !member.pendingWorkerMcp && !member.connectionsRefreshPending) return;
-    if ((await tx.doc(SharedDoc, roomId)).stopping) return;
+    const room = await tx.doc(SharedDoc, roomId);
+    const project = room.sharedProjectId ? (await tx.doc(ProjectsDoc)).projects[room.sharedProjectId] : undefined;
+    // Latest-only adoption: compare revisions before idle/task scans; intermediate revisions are never replayed.
+    const updateProject = room.sharedProjectId !== undefined && (project?.instructionsRevision ?? 0) !== (member.projectInstructionsRevision ?? 0);
+    if (!updateBase && !updateProject && !member.pendingConnectionIds && !member.pendingWorkerMcp && !member.connectionsRefreshPending) return;
+    if (room.stopping) return;
     const id = member.conversationId;
     if ((await tx.doc(LiveDoc, id)).run || (await tx.doc(InboxDoc, id)).items.length || await this.hasUnfinishedAgentWork(tx, id, roomId)) return;
     if (member.pendingWorkerMcp) {
@@ -2790,6 +2798,8 @@ export class DispatchRuntime {
       member.agent = { ...publicAgent(agent), connections, extensions: extensions.map(item => item.name), tools: tools.map(item => item.name), ...(cwd ? { cwd } : {}) };
       member.agentRevision = agent.revision;
     }
+    // Independent of base adoption, including unchanged, archived or unmapped definitions.
+    if (updateProject) await this.shared.bindProjectInstructions(tx, room, member);
     if (member.upgradeError) delete member.upgradeError;
     if (this.worker) await this.updateWorkerParticipantReport(tx);
   }
