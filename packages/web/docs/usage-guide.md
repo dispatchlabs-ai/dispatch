@@ -179,7 +179,7 @@ claude auth status --text
 
 These commands authenticate and inspect Claude Code, not Dispatch. Complete the browser/code flow in Claude Code's terminal; do not paste tokens, callback URLs or login codes into chat or Dispatch's secrets/provider fields. Authentication status can contain account information; keep it out of shared logs and screenshots.
 
-If using a separate native profile, use the same `CLAUDE_CONFIG_DIR` for login, status and execution. Each native profile has its own settings, session history and subscription login. On macOS, native credentials normally use Keychain; other platforms and the macOS fallback use Claude Code's protected credential file. Dispatch must not extract or copy those credentials. A successful terminal login under another account or profile does not establish runner readiness.
+If using a separate native profile, use the same `CLAUDE_CONFIG_DIR` for login, status and execution. Each native profile has its own settings, session history and subscription login. On macOS, native credentials normally use Keychain; other platforms and the macOS fallback use Claude Code's protected credential file. Dispatch must not extract or copy those credentials. A successful terminal login under another account or profile does not establish runner readiness. The candidate runner does not inherit Dispatch's API/cloud credentials or filesystem `apiKeyHelper` settings. Owner-controlled API-key/cloud launch paths remain unverified; the executable override is not yet a qualified workaround for those methods.
 
 Configure the local service's runner binding before starting SDK work:
 
