@@ -57,7 +57,7 @@ The archive and checksum file are in `result/`. Building requires Nix; running t
 
 The earlier 0.2.0 controller was checked with **Ubuntu on WSL2, Docker Engine 29.1.3 and Compose 2.40.3**, opening the app in Windows Edge. Docker Desktop is a different service lifecycle and has not been separately qualified.
 
-The [0.3.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.3.0) contains the Linux/AMD64 controller archive. **GHCR images and registry digests are still pending**; use the downloadable archive without rebuilding. Use a dedicated directory inside Ubuntu, not an existing deployment directory.
+The [0.3.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.3.0) contains the Linux/AMD64 controller archive. GHCR images have been pushed from the reviewed archives, but anonymous access is still pending because the packages are private. [Registry references and digests](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.3.0) are in the release notes; use the downloadable archive without rebuilding. Use a dedicated directory inside Ubuntu, not an existing deployment directory.
 
 Download `dispatch-controller-9e8acef-amd64.tar.gz` and `SHA256SUMS` from that release. Also download the matching [Compose file](https://raw.githubusercontent.com/dispatchlabs-ai/dispatch/v0.3.0/compose.yaml) and [environment example](https://raw.githubusercontent.com/dispatchlabs-ai/dispatch/v0.3.0/.env.example), saving them as `compose.yaml` and `.env.example`. From an Ubuntu WSL terminal in that directory:
 
