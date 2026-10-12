@@ -78,17 +78,25 @@ The archive records `dispatch-web:uncommitted` because it was built from a sourc
 docker tag dispatch-web:uncommitted dispatch-web:0.3.0
 ```
 
-Set `DISPATCH_IMAGE=dispatch-web:0.3.0` in `.env`. Ignore the stale 0.2.0 image-tag comment in the immutable v0.3.0 `.env.example`; it does not describe this archive. The example on `main` is corrected. This is a local tag, not a registry digest; the verified archive checksum identifies the downloaded bytes. Do not replace it with an unverified registry image. Keep `DISPATCH_PORT=3001` unless it is already in use. Then start the service:
+Set `DISPATCH_IMAGE=dispatch-web:0.3.0` in `.env`. Ignore the stale 0.2.0 image-tag comment in the immutable v0.3.0 `.env.example`; it does not describe this archive. The example on `main` is corrected. This is a local tag, not a registry digest; the verified archive checksum identifies the downloaded bytes. Do not replace it with an unverified registry image. Keep `DISPATCH_PORT=3001` unless it is already in use.
+
+For the first account, while the controller is still stopped, run this from the same Compose directory (replace the example email and name):
+
+```sh
+docker compose run --rm --no-deps dispatch dispatch-auth invite --email you@example.com --name "Your Name"
+```
+
+This uses the same `dispatch-data` volume as the controller and prints a private, single-use enrollment link with an expiry. Its localhost port follows `DISPATCH_PORT`. Do not publish or share the link. Then start the service:
 
 ```sh
 docker compose up
 ```
 
-Open **http://localhost:3001** in your Windows browser (use your chosen port if you changed it). Keep the WSL terminal open. In the verified Docker Engine route, detached startup with `docker compose up -d` did not keep WSL alive after its last shell exited. Ctrl-C stops the foreground service; run `docker compose up` again to resume. This route does not yet provide verified unattended startup after reboot.
+Open the printed enrollment link in your Windows browser to create the account and passkey. After enrollment, open **http://localhost:3001** (use your chosen port if you changed it). Keep the WSL terminal open. In the verified Docker Engine route, detached startup with `docker compose up -d` did not keep WSL alive after its last shell exited. Ctrl-C stops the foreground service; run `docker compose up` again to resume. This route does not yet provide verified unattended startup after reboot.
 
 Compose publishes only on host loopback and preserves state/workspace in the `dispatch-data` named volume. Keep the same Compose directory/project identity when restarting or replacing the image. Do not use `docker compose down -v` for an upgrade: it deletes the data volume. Do not mount your Windows or Linux home directory into the agent workspace.
 
-The 0.2.0 login page was verified; 0.3.0 container startup, account enrollment and model use are not yet qualified. Provisioning uses the image's `dispatch-auth` CLI with the same data volume while the controller is stopped; complete target-qualified enrollment steps remain pending. There is no default account or public signup.
+The published 0.3.0 controller passed isolated Windows 11/Ubuntu 24.04 WSL2 startup, enrollment/sign-in, a real model response and saved-state persistence after an idle restart. The interactive check used Chrome on M1 through a tunnel with a virtual passkey—not Windows Edge or a physical passkey device; see [qualification and limits](packages/web/docs/usage-guide.md#030-windowswsl2-qualification). There is no default account or public signup. These were fresh-install checks; upgrading retained state from an earlier version and restoring a backup are not yet verified.
 
 ## Run from source
 
