@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Bounded web search
+
+- Request query-relevant Exa highlights instead of full pages, and bound excerpts before durable storage and tool publication.
+- Honor short/medium/long search previews with serialized metadata-aware budgets and bounded batches; expose truncation and omission without breaking source URLs or reference-based page reads.
+
 ### Agent SDK execution
 
 - Add an opt-in Agent SDK runtime using the unmodified official Claude Code binary and its native user-bound authentication, with a separate credential-independent model catalog.
