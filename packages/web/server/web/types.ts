@@ -7,6 +7,7 @@ export interface WebBackend {
     url: string;
     title: string;
     snippet: string;
+    snippetTruncated?: boolean;
   }>>;
   open(url: string, signal?: AbortSignal): Promise<{
     url: string;

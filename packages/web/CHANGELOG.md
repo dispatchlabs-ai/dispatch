@@ -6,7 +6,12 @@
 
 - Add native Muse Code runtime/model selection, account-login defaults with optional explicit API keys, and Pi-owned execution/tool/publication wiring.
 - Distinguish optional Dispatch tools from native Muse access in agent and participant summaries; explain runner access without implying a sandbox.
-- Record isolated editor/save acceptance and pending native inference, tool restriction, Stop and recovery qualification; not yet deployment-ready.
+- Qualify isolated subscription inference, adopted instructions, committed Dispatch tool receipts, native-session continuation, active-inference Stop and interrupted recovery without automatic replay. Active-tool cancellation and updated UI capture review remain pending.
+
+### Bounded web search
+
+- Request query-relevant Exa highlights instead of full pages, and bound excerpts before durable storage and tool publication.
+- Honor short/medium/long search previews with serialized metadata-aware budgets and bounded batches; expose truncation and omission without breaking source URLs or reference-based page reads.
 
 ### Agent SDK execution
 
