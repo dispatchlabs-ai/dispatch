@@ -168,7 +168,25 @@ export function createImageGen(models: Models) {
       if (args.mask && !args.images?.length)
         return textResult("A mask requires reference images; without them there is no image to edit.", true);
 
-      let requestedModel = args.model ?? DEFAULT_MODEL;
+      const authOptions = { signal: context.abortSignal };
+      let provider: "openai" | "openai-codex";
+      try {
+        // Check each candidate once; configured Codex owns the default, with no failure fallback.
+        let check = await models.checkAuth(args.provider ?? "openai-codex", authOptions);
+        provider = args.provider ?? (check ? "openai-codex" : "openai");
+        if (!args.provider && !check) check = await models.checkAuth("openai", authOptions);
+        if (!check) return textResult(provider === "openai-codex"
+          ? "Connect Codex images in Settings → Model providers. No request was made."
+          : "Connect Codex images or configure an OpenAI API key in Settings → Model providers. No request was made.", true);
+        if (provider === "openai" && check.type !== "api_key")
+          return textResult("The OpenAI chat subscription grant cannot generate images. Connect Codex images in Settings → Model providers; the chat connection can stay unchanged. No request was made.", true);
+        if (provider === "openai-codex" && (args.mask || args.input_fidelity !== undefined))
+          return textResult("Codex images does not support masks or input_fidelity. Use reference images without these options, or explicitly select the OpenAI API-key route. No request was made.", true);
+      } catch {
+        return textResult(context.abortSignal?.aborted ? "Cancelled before submit. No request was made."
+          : "Image credential inspection failed. Review provider status in Settings. No request was made.", true);
+      }
+      const requestedModel = args.model ?? (provider === "openai-codex" ? CODEX_DEFAULT_MODEL : DEFAULT_MODEL);
       const size = args.size ?? "1536x1024";
       const quality = args.quality ?? "high";
       const count = args.n ?? 1;
@@ -180,7 +198,7 @@ export function createImageGen(models: Models) {
         return textResult("gpt-image-1-mini accepts only input_fidelity: low. No request was made.", true);
       const request: Record<string, unknown> = { model: requestedModel, prompt: args.prompt, size, quality, n: count,
         ...(isEditRun && supportsFidelity && args.input_fidelity !== undefined ? { input_fidelity: args.input_fidelity } : {}) };
-      let endpoint = isEditRun ? "https://api.openai.com/v1/images/edits" : "https://api.openai.com/v1/images/generations";
+      const endpoint = `${provider === "openai-codex" ? CODEX_BASE_URL : "https://api.openai.com/v1"}/images/${isEditRun ? "edits" : "generations"}`;
 
       let metadataPath: string | undefined;
       let record: RunRecord | undefined;
@@ -217,6 +235,7 @@ export function createImageGen(models: Models) {
           taskId: String(api.taskId),
           callId: api.callId,
           requestedModel,
+          provider,
           request,
           references: [],
           endpoint,
@@ -246,19 +265,6 @@ export function createImageGen(models: Models) {
           return textResult("Cancelled before submit. No request was made.", true);
         }
 
-        // Native metadata distinguishes an OAuth token from an API key; the apiKey field alone does not.
-        const authOptions = { signal: context.abortSignal };
-        const provider = args.provider ?? (await models.checkAuth("openai-codex", authOptions) ? "openai-codex" : "openai");
-        const check = await models.checkAuth(provider, authOptions);
-        record.provider = provider;
-        if (!check) throw new ToolError(provider === "openai-codex"
-          ? "Connect Codex images in Settings → Providers. No request was made."
-          : "Connect Codex images or configure an OpenAI API key in Settings → Providers. No request was made.");
-        if (provider === "openai" && check.type !== "api_key")
-          throw new ToolError("The OpenAI chat subscription grant cannot generate images. Connect Codex images in Settings → Providers; the chat connection can stay unchanged. No request was made.");
-        if (provider === "openai-codex" && (args.mask || args.input_fidelity !== undefined))
-          throw new ToolError("Codex images does not support masks or input_fidelity. Use reference images without these options, or explicitly select the OpenAI API-key route. No request was made.");
-
         const resolved = await models.getAuth(provider, authOptions);
         if (!resolved?.auth.apiKey) throw new ToolError("Image credentials are unavailable. Review provider status in Settings. No request was made.");
         // A credential change between inspection and resolution must not send chat OAuth to the API.
@@ -271,9 +277,6 @@ export function createImageGen(models: Models) {
             throw new ToolError("Codex images requires a Codex subscription grant. Review provider status. No request was made.");
           if (!headers["ChatGPT-Account-ID"])
             throw new ToolError("Codex image credentials are missing the selected account. Reconnect Codex images. No request was made.");
-          endpoint = `${CODEX_BASE_URL}/images/${isEditRun ? "edits" : "generations"}`;
-          requestedModel = args.model ?? CODEX_DEFAULT_MODEL;
-          request.model = requestedModel;
           headers["x-codex-image-turn-id"] = randomUUID();
           headers["originator"] = "dispatch";
           headers["Content-Type"] = "application/json";
