@@ -103,7 +103,7 @@ function summarizeResult(message: SDKResultMessage, apiError?: string): ClaudeRu
 /** Minimal process environment; credentials never travel from Dispatch's provider store to the SDK. */
 export function nativeClaudeEnvironment(owner: { home?: string; configDir?: string } = {}): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = {};
-  for (const key of ["PATH", "HOME", "USERPROFILE", "SYSTEMROOT", "WINDIR", "TMPDIR", "TEMP", "TMP", "LANG", "LC_ALL", "SHELL", "XDG_CONFIG_HOME", "CLAUDE_CONFIG_DIR"]) {
+  for (const key of ["PATH", "HOME", "USER", "USERPROFILE", "SYSTEMROOT", "WINDIR", "TMPDIR", "TEMP", "TMP", "LANG", "LC_ALL", "SHELL", "XDG_CONFIG_HOME", "CLAUDE_CONFIG_DIR"]) {
     if (process.env[key] !== undefined) env[key] = process.env[key];
   }
   if (owner.home !== undefined) { env.HOME = owner.home; env.USERPROFILE = owner.home; }
