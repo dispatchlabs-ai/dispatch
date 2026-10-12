@@ -77,6 +77,8 @@ export interface AgentParticipant extends ParticipantIdentity {
   status: ParticipantStatus;
   error?: string;
   usage: UsageState;
+  /** SDK model usage is not measured by Pi UsageDoc. Tool usage remains in the native document. */
+  modelUsageUnavailable?: boolean;
   /** Configuration saved for this instance, not the definition's latest revision. */
   agent: AgentDraft & { extensions: string[]; tools: string[]; cwd?: string; connections?: AgentConnection[] };
 }
