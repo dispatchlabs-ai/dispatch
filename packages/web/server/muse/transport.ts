@@ -12,6 +12,7 @@ export async function runMuseQuery(input: {
 }): Promise<MuseRunResult> {
   const { prepared, invocation, bridge, signal } = input;
   signal.throwIfAborted();
+
   const workspace = resolve(process.env.DISPATCH_DATA_DIR ?? ".local/state/dispatch", "muse-workspaces", invocation.sessionId);
   await mkdir(workspace, { recursive: true, mode: 0o700 });
   await writeFile(join(workspace, "AGENTS.md"), prepared.systemPrompt, { mode: 0o600 });
@@ -21,7 +22,7 @@ export async function runMuseQuery(input: {
   const client = new MuseClient(process.env.DISPATCH_MUSE_EXECUTABLE ?? "muse", [
     "serve", "--provider", "meta", "--model", prepared.model,
     "--trust-workspace", "--disable-shell", "--disable-write", "--sandbox-network", "restricted",
-  ], nativeMuseEnvironment(), async (_method, params) => {
+  ], workspace, nativeMuseEnvironment(), async (_method, params) => {
     signal.throwIfAborted();
     if (params.sessionId !== invocation.sessionId || typeof params.approvalId !== "string") throw new MuseInteractionRequiredError();
     const subject = params.subject as { kind?: string; toolName?: string; origin?: { kind?: string; url?: string } } | undefined;
@@ -71,7 +72,7 @@ export async function runMuseQuery(input: {
     signal.throwIfAborted();
     await client.request(invocation.resume ? "session/resume" : "session/start", {
       commandId: invocation.sessionCommandId, sessionId: invocation.sessionId,
-      ...(invocation.resume ? { excludeItems: true } : { workspaceRoot: workspace, modelId: prepared.model, providerId: "meta", approvalMode: "promptUnmatched" }),
+      ...(invocation.resume ? { excludeItems: true } : { workspaceRoot: workspace, workspaceRoots: [workspace], modelId: prepared.model, providerId: "meta", approvalMode: "promptUnmatched" }),
       config: { mcpServers: { dispatch: { transport: "streamableHttp", url: bridge.url, headers: bridge.headers, mode: "required" } } },
     });
     signal.throwIfAborted();

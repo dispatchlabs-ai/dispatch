@@ -1,6 +1,4 @@
 import { createMuseTask, MuseSessionDoc, type MuseRunScope, type MuseReasoningEffort } from "../muse/task.js";
-import { runMuseQuery } from "../muse/transport.js";
-import { museToolServer } from "../muse/tools.js";
 import { claudeThinkingOptions } from "../claude-sdk/thinking.js";
 import { nativeClaudeEnvironment } from "../claude-sdk/transport.js";
 import { createClaudeSdkTask, ClaudeSessionDoc, type ClaudeRunScope, type ClaudeRunResult } from "../claude-sdk/task.js";
@@ -155,21 +153,10 @@ export class SharedConversations {
     });
     this.muse = createMuseTask({
       prepare: scope => this.prepareMuse(scope),
-      execute: async (scope, prepared, invocation) => {
-        if (prepared.userId !== process.env.DISPATCH_MUSE_USER_ID) throw new CollaborationError(403, "The Muse runner owner changed after admission.");
-        await this.authorizeSdk(scope, "muse-code");
-        const bridge = await museToolServer(scope, () => this.authorizeSdk(scope, "muse-code"), async name => {
-          await scope.runtime.commit(async tx => {
-            (await tx.doc(ListeningRequest, scope.runtime.taskId)).publicationOnly = name === "conversation_post";
-            for (const item of await this.contributions.forReviewer(tx, scope.input.roomId, scope.runtime.conversationId, scope.runtime.taskId)) {
-              item.needsReview = true;
-              await this.contributions.release(tx, scope.input.roomId, item);
-            }
-          }, scope.context);
-        });
-        try { return await runMuseQuery({ prepared, invocation, bridge, signal: scope.runtime.signal }); }
-        finally { await bridge.close(); }
-      },
+      execute: async (_scope, _prepared, invocation) => ({
+        sessionId: invocation.sessionId, text: "", success: false,
+        error: "Muse Code execution is temporarily unavailable while its native tool authorization is corrected.",
+      }),
       settle: async (scope, result) => {
         const continuation = await this.settleSdk(scope, result, "muse-code");
         return continuation ? { prompt: [{ type: "text", text: continuation.prompt }] } : undefined;

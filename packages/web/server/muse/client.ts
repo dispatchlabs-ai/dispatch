@@ -20,10 +20,10 @@ export class MuseClient {
   private shutdown?: Promise<void>;
   private readonly requests = new Set<Promise<void>>();
 
-  constructor(executable: string, args: string[], env: NodeJS.ProcessEnv, handleRequest?: (method: string, params: Record<string, unknown>) => Promise<void>) {
+  constructor(executable: string, args: string[], cwd: string, env: NodeJS.ProcessEnv, handleRequest?: (method: string, params: Record<string, unknown>) => Promise<void>) {
     this.failed = new Promise((_, reject) => { this.rejectFailure = reject; });
     void this.failed.catch(() => {});
-    this.process = spawn(executable, args, { env, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+    this.process = spawn(executable, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
     this.process.stderr.resume();
     this.process.stdin.on("error", () => this.fail(new Error("Muse Code input connection closed.")));
     const lines = createInterface({ input: this.process.stdout });
