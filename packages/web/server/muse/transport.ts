@@ -35,12 +35,14 @@ export async function runMuseQuery(input: {
     if (params.sessionId !== invocation.sessionId || typeof params.approvalId !== "string") throw new MuseInteractionRequiredError();
     const subject = params.subject as { kind?: string; toolName?: string; origin?: { kind?: string; url?: string } } | undefined;
     const choices = params.availableChoices as Array<{ choiceId: string; decision: string; scope: string }> | undefined;
-    // Identity comes from the invocation's configured server and exact assigned tool names.
-    // Unknown origins/kinds and native-child requests never acquire the parent's authority.
-    const approve = params.turnId === turnId && !params.subagentOrigin && typeof params.toolName === "string"
-      && allowed.has(params.toolName) && subject?.kind === "tool"
-      && subject.toolName === params.toolName
-      && (subject.origin === undefined || (subject.origin.kind === "mcp" && subject.origin.url === bridge.url));
+    // Dispatch MCP calls retain exact invocation identity. Native capabilities use the
+    // owner-bound runner's permissions, not the agent's optional Dispatch tool list.
+    const dispatchTool = typeof params.toolName === "string" && params.toolName.startsWith("mcp__dispatch__");
+    const approve = params.turnId === turnId && (dispatchTool
+      ? !params.subagentOrigin && allowed.has(params.toolName as string) && subject?.kind === "tool"
+        && subject.toolName === params.toolName
+        && (subject.origin === undefined || (subject.origin.kind === "mcp" && subject.origin.url === bridge.url))
+      : subject !== undefined && ["shell", "fileAccess", "network", "unixSocket", "process", "tool"].includes(subject.kind ?? ""));
     if (approve) await bridge.authorize();
     signal.throwIfAborted();
     const choice = choices?.find(choice => choice.scope === "once" && choice.decision === (approve ? "approved" : "denied"))
