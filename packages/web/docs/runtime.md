@@ -144,9 +144,9 @@ The [user guide](usage-guide.md#project-wide-agent-instructions) explains saved 
 
 ## Image credentials
 
-The subscription-image candidate keeps Codex OAuth login/refresh in Pi and carries the same credential's saved account selection through `server/codex-image-provider.ts`. It does not copy CLI credentials or change agents' chat providers. See [image setup and transport selection](usage-guide.md#image-generation).
+The subscription-image implementation keeps Codex OAuth login/refresh in Pi and carries the same credential's saved account selection through `server/codex-image-provider.ts`. It does not copy CLI credentials or change agents' chat providers. See [image setup and transport selection](usage-guide.md#image-generation).
 
-Hosted `model-auth` and metadata-only `model-auth-check` requests for `openai-codex` share `authorizeWorkerImageCredentials()`: the company/conversation must match, with an active backend participant mapped to that worker store whose latest non-archived definition enables image generation. The existing policy barrier orders authorization against changes; the broker rechecks the current worker attempt after resolution. The worker adapter preserves OAuth source and account headers. Pi's native check hook returns only authentication metadata; credential resolution remains fresh and uncached. This is source-reviewed authorization, not hosted execution or authenticated-generation acceptance.
+Hosted `model-auth` and metadata-only `model-auth-check` requests for `openai-codex` share `authorizeWorkerImageCredentials()`: the company/conversation must match, with an active backend participant mapped to that worker store whose latest non-archived definition enables image generation. The existing policy barrier orders authorization against changes; the broker rechecks the current worker attempt after resolution. The worker adapter preserves OAuth source and account headers. Pi's native check hook returns only authentication metadata; credential resolution remains fresh and uncached. This broker authorization is source-reviewed, not hosted execution acceptance. The user guide records the separate local Codex reference-edit observation.
 
 ## Request identity
 
