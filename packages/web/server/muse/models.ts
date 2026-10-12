@@ -6,6 +6,7 @@ export function museProvider(): Provider<"openai-completions"> {
   const models = [
     ["muse-wonder-full-1.0", "Muse Wonder Full"],
     ["muse-wonder-1.0", "Muse Wonder"],
+    ["muse-spark-1.3", "Muse Spark"],
   ] as const;
   const catalog = models.map(([id, name]): Model<"openai-completions"> => ({
     id, name, provider: MUSE_PROVIDER, api: "openai-completions", baseUrl: "",

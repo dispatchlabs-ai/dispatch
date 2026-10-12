@@ -3,7 +3,7 @@ import { resolve, join } from "node:path";
 import { MuseClient, MuseInteractionRequiredError } from "./client.js";
 import { museCommandId, type MuseInvocation, type MusePreparedRun, type MuseRunResult } from "./task.js";
 
-type Bridge = { url: string; headers: Record<string, string> };
+type Bridge = { url: string; headers: Record<string, string>; toolNames: string[] };
 type Terminal = { terminal: string; error?: { kind: string } };
 
 /** Native login/env remain native; only execution metadata and committed Pi tools cross this boundary. */
@@ -16,12 +16,30 @@ export async function runMuseQuery(input: {
   await mkdir(workspace, { recursive: true, mode: 0o700 });
   await writeFile(join(workspace, "AGENTS.md"), prepared.systemPrompt, { mode: 0o600 });
   signal.throwIfAborted();
+  let turnId = invocation.commandId;
+  const allowed = new Set(bridge.toolNames.map(name => `mcp__dispatch__${name}`));
   const client = new MuseClient(process.env.DISPATCH_MUSE_EXECUTABLE ?? "muse", [
     "serve", "--provider", "meta", "--model", prepared.model,
-    "--trust-workspace", "--disable-shell", "--disable-write",
-  ], nativeMuseEnvironment());
+    "--trust-workspace", "--disable-shell", "--disable-write", "--sandbox-network", "restricted",
+  ], nativeMuseEnvironment(), async (_method, params) => {
+    signal.throwIfAborted();
+    if (params.sessionId !== invocation.sessionId || typeof params.approvalId !== "string") throw new MuseInteractionRequiredError();
+    const subject = params.subject as { kind?: string; toolName?: string; origin?: { kind?: string; url?: string } } | undefined;
+    const choices = params.availableChoices as Array<{ choiceId: string; decision: string; scope: string }> | undefined;
+    // Identity comes from the invocation's configured server and exact assigned tool names.
+    // Unknown origins/kinds and native-child requests never acquire the parent's authority.
+    const approve = params.turnId === turnId && !params.subagentOrigin && typeof params.toolName === "string"
+      && allowed.has(params.toolName) && subject?.kind === "tool"
+      && subject.toolName === params.toolName
+      && (subject.origin === undefined || (subject.origin.kind === "mcp" && subject.origin.url === bridge.url));
+    const choice = choices?.find(choice => choice.scope === "once" && choice.decision === (approve ? "approved" : "denied"))
+      ?? (!approve ? choices?.find(choice => choice.scope === "once" && choice.decision === "abort") : undefined);
+    const requirement = params.currentRequirementId as { approvalId?: string; sourceIndex?: number } | undefined;
+    if (!choice || typeof choice.choiceId !== "string" || requirement?.approvalId !== params.approvalId || typeof requirement.sourceIndex !== "number") throw new MuseInteractionRequiredError();
+    await client.request("approval/decide", { commandId: museCommandId(), sessionId: invocation.sessionId,
+      approvalId: params.approvalId, choiceId: choice.choiceId, requirementId: requirement });
+  });
   let submitted = false;
-  let turnId = invocation.commandId;
   const messages = new Map<string, string>();
   let complete!: (result: Terminal) => void;
   let fail!: (error: Error) => void;
@@ -69,11 +87,11 @@ export async function runMuseQuery(input: {
         : "Muse Code could not complete this turn. Check the selected model’s subscription access, native account usage, and runner configuration before retrying.";
       return { sessionId: invocation.sessionId, text: "", success: false, error };
     }
-    return { sessionId: invocation.sessionId, text: [...messages.values()].join("\n\n"), success: true };
+    return { sessionId: invocation.sessionId, text: [...messages.values()].at(-1) ?? "", success: true };
   } catch (error) {
     signal.throwIfAborted();
     if (error instanceof MuseInteractionRequiredError) return { sessionId: invocation.sessionId, text: "", success: false,
-      error: "Muse Code requested unsupported native approval or input. The run was stopped; inspect saved activity and external effects before retrying." };
+      error: "Muse Code requested unsupported native approval or input. The run was stopped. Ask the operator to inspect the native Muse session and external effects before retrying." };
     if (submitted) throw error;
     return { sessionId: invocation.sessionId, text: "", success: false,
       error: "Muse Code could not initialize. Install Muse, sign in on the configured runner, and check model access and DISPATCH_MUSE_EXECUTABLE before retrying." };

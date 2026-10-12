@@ -18,8 +18,9 @@ export class MuseClient {
   private rejectFailure!: (error: Error) => void;
   private failure?: Error;
   private shutdown?: Promise<void>;
+  private readonly requests = new Set<Promise<void>>();
 
-  constructor(executable: string, args: string[], env: NodeJS.ProcessEnv) {
+  constructor(executable: string, args: string[], env: NodeJS.ProcessEnv, handleRequest?: (method: string, params: Record<string, unknown>) => Promise<void>) {
     this.failed = new Promise((_, reject) => { this.rejectFailure = reject; });
     void this.failed.catch(() => {});
     this.process = spawn(executable, args, { env, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
@@ -30,9 +31,17 @@ export class MuseClient {
       try {
         const frame = JSON.parse(line) as Frame;
         if (frame.method && frame.id !== undefined) {
-          this.process.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: frame.id, error: { code: -32601, message: "Dispatch does not support native interactive requests." } }) + "\n");
-          this.fail(new MuseInteractionRequiredError("Muse Code requested unsupported native interaction."));
-          this.process.kill("SIGTERM");
+          if (frame.method === "approval/request" && handleRequest) {
+            // A presentation receipt changes no permission. Decisions are separate MSP commands.
+            this.process.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: frame.id, result: {} }) + "\n");
+            const work = handleRequest(frame.method, frame.params ?? {}).catch(() => {
+              this.fail(new MuseInteractionRequiredError("Muse Code approval could not be resolved safely."));
+            }).finally(() => this.requests.delete(work));
+            this.requests.add(work);
+          } else {
+            this.process.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: frame.id, error: { code: -32601, message: "Dispatch does not support native interactive requests." } }) + "\n");
+            this.fail(new MuseInteractionRequiredError("Muse Code requested unsupported native interaction."));
+          }
         } else if (typeof frame.id === "number") {
           const pending = this.pending.get(frame.id);
           if (!pending) return;
@@ -80,7 +89,7 @@ export class MuseClient {
     this.process.stdin.end();
     const terminate = setTimeout(() => this.process.kill("SIGTERM"), 5_000);
     const kill = setTimeout(() => this.process.kill("SIGKILL"), 10_000);
-    try { await this.exited; } finally { clearTimeout(terminate); clearTimeout(kill); }
+    try { await this.exited; await Promise.allSettled([...this.requests]); } finally { clearTimeout(terminate); clearTimeout(kill); }
   }
   private fail(error: Error) {
     if (this.failure) return;
