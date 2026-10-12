@@ -6,6 +6,7 @@
 
 - Add a project-owned Markdown instructions setting with manager-only, revision-checked saves, no-op revision handling and actor-scoped retry receipts; keep spec and settings revisions separate.
 - Render adopted execution snapshots through stock Pi Durable's native project-instructions section, without copying project rules into reusable definitions or treating prompt text as permission grants.
+- Adopt only the latest saved rules at safe idle boundaries, independently of agent-definition upgrades; initialize later invitees with current rules and propagate hosted changes without retiring active workers on acknowledgement failure.
 
 
 ### Agent project context
