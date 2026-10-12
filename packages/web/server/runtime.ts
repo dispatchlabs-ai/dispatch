@@ -19,7 +19,7 @@ import { PostgresStorage } from "./storage/postgres/storage.js";
 import { openPiStorage, type PiStorageConfig } from "./storage/open.js";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
-import type { CreateAgentInstanceInput, CreateAgentInstanceResult, AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, ProjectSpecDocument, ProjectMarkdownDocument, SaveProjectMarkdownInput, ImportProjectMarkdownInput, ProjectSpecReadInput, ProjectSpecPage, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
+import type { ProjectInstructionsDocument, SaveProjectInstructionsInput, CreateAgentInstanceInput, CreateAgentInstanceResult, AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, ProjectSpecDocument, ProjectMarkdownDocument, SaveProjectMarkdownInput, ImportProjectMarkdownInput, ProjectSpecReadInput, ProjectSpecPage, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
 import type { BundleExportInput, BundleImportResult, BundlePreview, PortableBundle, PortableAgent, PortableSkill } from "../src/shared/bundles.js";
 import type { GitHubInstallation, GitHubBundleSource, GitHubBundlePreview, GitHubBundleApplyInput, GitHubBundleApplyResult } from "../src/shared/github-bundles.js";
 import { isManagedConnection } from "../src/shared/contracts.js";
@@ -27,6 +27,7 @@ import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata } 
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { projectSourcesSchema } from "../src/shared/project-sources.js";
 import { ProjectMarkdownDoc, readProjectMarkdown, saveProjectMarkdown, replayProjectMarkdown, markdownHash, projectMarkdownPage } from "./project-markdown.js";
+import { readProjectInstructions, saveProjectInstructions } from "./project-instructions.js";
 import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
 import { projectChatsSchema, chatSourceUrl, type ProjectChatsInput, type ProjectChatsResult, type ProjectChatMetadata, type ProjectChatReadInput, type ProjectChatResult } from "./project-chat-context.js";
 import { readProjectChat } from "./project-chat-reader.js";
@@ -1356,7 +1357,7 @@ export class DispatchRuntime {
 
   private projectSummary(project: SharedProjectRecord, scope: RuntimeScope): Project {
     const access = projectAccess(project, scope, this.readAll(scope));
-    return { id: project.id, name: project.name, ...(project.cwd ? { cwd: project.cwd } : {}), createdAt: project.createdAt, kind: "shared", revision: project.revision,
+    return { instructionsRevision: project.instructionsRevision ?? 0, id: project.id, name: project.name, ...(project.cwd ? { cwd: project.cwd } : {}), createdAt: project.createdAt, kind: "shared", revision: project.revision,
       repositories: (project.repositories ?? []).map(repository => ({ ...repository })), ...(project.spec ? { spec: { ...project.spec } } : {}), ...(project.specRevision ? { specRevision: project.specRevision } : {}),
       members: project.members.map(({ userId, role }) => ({ userId, role })), defaultAgentDefinitionIds: [...project.defaultAgentDefinitionIds], canManage: access.manage, canParticipate: access.participate };
   }
@@ -1554,6 +1555,16 @@ export class DispatchRuntime {
       if (current.binding !== expectedBinding) throw new ProjectSpecError(409, "Project spec reference or settings changed. Draft retained; reload and review.");
       return current;
     }, context);
+  }
+
+  async getProjectInstructions(scope: RuntimeScope, id: string): Promise<ProjectInstructionsDocument> {
+    this.requireCatalogOwner();
+    return this.harness.commit(tx => readProjectInstructions(tx, scope, id, this.readAll(scope)), context);
+  }
+
+  async saveProjectInstructions(scope: RuntimeScope, id: string, input: SaveProjectInstructionsInput): Promise<ProjectInstructionsDocument> {
+    this.requireCatalogOwner();
+    return this.harness.commit(tx => saveProjectInstructions(tx, scope, id, input), context);
   }
 
   async getProjectMarkdown(scope: RuntimeScope, id: string, revision?: number): Promise<ProjectMarkdownDocument> {

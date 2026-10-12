@@ -9,6 +9,8 @@ export type SharedProjectRecord = {
   repositories?: ProjectRepository[];
   spec?: ProjectSpec;
   specRevision?: number;
+  instructions?: string;
+  instructionsRevision?: number;
   revision: number;
   createdAt: number;
   updatedAt: number;
@@ -22,6 +24,7 @@ export const ProjectsDoc = defineDoc<{
   projects: Record<string, SharedProjectRecord>;
   /** Actor-scoped request receipts; replay must still check the current project's permissions. */
   requests: Record<string, { fingerprint: string; projectId: string }>;
+  instructionsRequests?: Record<string, { fingerprint: string; result: { projectId: string; revision: number; content: string } }>;
 }>({
   kind: "dispatch.projects", version: 1, scope: "session",
   initial: () => ({ projects: {}, requests: {} }),

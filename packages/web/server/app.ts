@@ -222,6 +222,15 @@ export function createApp(options: AppOptions) {
     return c.json({ archive: await runtime.exportProjectArchive(c.get("principal"), c.req.param("id"), input.chatIds) });
   });
   app.get("/api/projects/:id/history", async c => c.json({ archive: await runtime.getProjectArchive(c.get("principal"), c.req.param("id")) }));
+  app.get("/api/projects/:id/instructions", async c => {
+    c.header("Cache-Control", "no-store");
+    return c.json({ instructions: await runtime.getProjectInstructions(c.get("principal"), c.req.param("id")) });
+  });
+  app.post("/api/projects/:id/instructions", async c => {
+    const input = z.object({ requestId, expectedRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER), content: z.string().max(50_000) }).strict().parse(await c.req.json());
+    c.header("Cache-Control", "no-store");
+    return c.json({ instructions: await runtime.saveProjectInstructions(c.get("principal"), c.req.param("id"), input) });
+  });
   app.get("/api/projects/:id/spec", async c => {
     c.header("Cache-Control", "no-store");
     const revision = z.coerce.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional().parse(c.req.query("revision"));
