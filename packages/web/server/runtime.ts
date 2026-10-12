@@ -2735,12 +2735,12 @@ export class DispatchRuntime {
       const roomId = nativeId(chat.id);
       if (rooms && !rooms.has(roomId)) continue;
       const room = await this.harness.snapshot(SharedDoc, roomId, context);
-      const projectRevision = room?.sharedProjectId ? projects[room.sharedProjectId]?.instructionsRevision ?? 0 : 0;
+      const projectRevision = room?.sharedProjectId !== undefined ? projects[room.sharedProjectId]?.instructionsRevision ?? 0 : undefined;
       for (const member of room?.members ?? []) {
         if (member.conversationId) this.pendingUpgradeRooms.delete(member.conversationId);
         if (member.kind !== "agent" || !member.agentDefinitionId || (member.membership && member.membership !== "active")) continue;
         const latest = latestAgent(catalog, chat.companyId, member.agentDefinitionId);
-        if ((!latest || latest.archived || latest.revision === member.agentRevision) && projectRevision === (member.projectInstructionsRevision ?? 0)
+        if ((!latest || latest.archived || latest.revision === member.agentRevision) && (projectRevision === undefined || projectRevision === member.projectInstructionsRevision)
           && !member.pendingConnectionIds && !member.pendingWorkerMcp && !member.connectionsRefreshPending) continue;
         // Index before awaiting the idle check, so a settling task cannot lose its wakeup.
         if (member.conversationId) this.pendingUpgradeRooms.set(member.conversationId, roomId);
@@ -2772,7 +2772,8 @@ export class DispatchRuntime {
     const room = await tx.doc(SharedDoc, roomId);
     const project = room.sharedProjectId ? (await tx.doc(ProjectsDoc)).projects[room.sharedProjectId] : undefined;
     // Latest-only adoption: compare revisions before idle/task scans; intermediate revisions are never replayed.
-    const updateProject = room.sharedProjectId !== undefined && (project?.instructionsRevision ?? 0) !== (member.projectInstructionsRevision ?? 0);
+    // An unset adopted revision (pre-feature agent) binds once, even at saved revision 0, so display never infers adoption.
+    const updateProject = room.sharedProjectId !== undefined && (project?.instructionsRevision ?? 0) !== member.projectInstructionsRevision;
     if (!updateBase && !updateProject && !member.pendingConnectionIds && !member.pendingWorkerMcp && !member.connectionsRefreshPending) return;
     if (room.stopping) return;
     const id = member.conversationId;
