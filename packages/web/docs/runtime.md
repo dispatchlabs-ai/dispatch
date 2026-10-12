@@ -138,7 +138,7 @@ Manual observations use isolated SQLite/native runtimes and synthetic principals
 - **Prompt removal (Pi Expert):** clearing did not submit work. The next separately submitted message produced `{ "project-instructions": null }`; the effective provider-facing prompt omitted project instructions while retaining collaboration and individual instructions. Historical entries retained the old text.
 - **Busy/restart retention (Claude):** adopted revision 1 survived saves of revisions 2/3 and an orderly restart. The reopened run reused revision 1, then adopted revision 3 directly at idle without a new message. The held response was released to finish shutdown; this was not a crash or hard-kill check.
 
-Hosted propagation and remote providers remain unqualified, and frontend implementation remains blocked. These observations are not full feature acceptance.
+Hosted propagation and remote providers remain unqualified, and frontend acceptance remains pending. These observations are not full feature acceptance.
 
 The [user guide](usage-guide.md#project-wide-agent-instructions) explains saved versus adopted revisions and interruption limits. Runtime evidence must cover idle project-only adoption, active/restart snapshot retention, hosted synchronization, later invitees and clearing; source/build checks alone do not qualify those behaviors.
 
