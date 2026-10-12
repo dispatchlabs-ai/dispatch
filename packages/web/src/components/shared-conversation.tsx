@@ -225,7 +225,7 @@ export function SharedContextPanel({ criteriaDraft, onCriteriaDraft, snapshot, a
         <h3>{mentionLabel(participant, snapshot.participants)}</h3>
         {participant.kind === "agent" ? <>
           <AgentRemoval key={`${snapshot.conversation.id}:${participant.id}`} participant={participant} chatId={snapshot.conversation.id} canParticipate={snapshot.conversation.canParticipate !== false} onSnapshot={onSnapshot} />
-          <dl className="context-facts"><div><dt>Base revision applied</dt><dd>{participant.agent.name} · {participant.agentRevision}</dd></div><div><dt>Model</dt><dd>{models.find(model => model.id === participant.agent.modelId && model.provider === participant.agent.provider)?.name || participant.agent.modelId}</dd></div><div><dt>Provider</dt><dd>{participant.agent.provider}</dd></div><div><dt>Thinking</dt><dd>{participant.agent.thinkingLevel}</dd></div><div><dt>Tools</dt><dd>{describeAgentTools(participant.agent.tools)}</dd></div>{participant.agent.cwd ? <div><dt>Local workspace</dt><dd>{participant.agent.cwd}</dd></div> : null}</dl>
+          <dl className="context-facts"><div><dt>Base revision applied</dt><dd>{participant.agent.name} · {participant.agentRevision}</dd></div><div><dt>Runtime</dt><dd>{participant.agent.executionBackend === "claude-agent-sdk" ? "Agent SDK" : "Pi"}</dd></div><div><dt>Model</dt><dd>{models.find(model => model.id === participant.agent.modelId && model.provider === participant.agent.provider)?.name || participant.agent.modelId}</dd></div><div><dt>Provider</dt><dd>{participant.agent.provider}</dd></div><div><dt>Thinking</dt><dd>{participant.agent.thinkingLevel}</dd></div><div><dt>Tools</dt><dd>{describeAgentTools(participant.agent.tools)}</dd></div>{participant.agent.cwd ? <div><dt>Local workspace</dt><dd>{participant.agent.cwd}</dd></div> : null}</dl>
           {participant.savedAgentRevision !== undefined && participant.savedAgentRevision !== participant.agentRevision ? <p role="status">Base revision {participant.savedAgentRevision} saved · Pending</p> : null}
           {participant.upgradeError ? <Notice>{participant.upgradeError}</Notice> : null}
           <details><summary>Instance connections{participant.connectionsPending ? " · Pending update" : ""}</summary>{participant.agent.connections?.length ? <ul>{participant.agent.connections.map(connection => <li key={connection.id}>{connection.name}</li>)}</ul> : <p>No connections.</p>}</details>
@@ -279,9 +279,11 @@ function ParticipantRunDetails({ participant, activities }: { participant: Agent
   return <details className="participant-run">
     <summary>Run &amp; usage</summary>
     <p>{participant.name} · {agentStatus(participant)}</p>
+    {participant.modelUsageUnavailable ? <p>Model usage unavailable for Agent SDK.</p> : <>
     <dl className="context-facts"><div><dt>Total tokens</dt><dd>{tokens.toLocaleString()}</dd></div><div><dt>Estimated cost</dt><dd>{new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 4 }).format(cost)}</dd></div></dl>
     {!models.length ? <p>No usage has been recorded yet.</p> : null}
     {models.map(([model, usage]) => <section className="context-section" key={model}><h4 className="model-label">{model}</h4><dl className="context-facts"><div><dt>Input tokens</dt><dd>{usage.input.toLocaleString()}</dd></div><div><dt>Output tokens</dt><dd>{usage.output.toLocaleString()}</dd></div><div><dt>Cached input</dt><dd>{usage.cacheRead.toLocaleString()}</dd></div></dl></section>)}
+    </>}
     {submissions.length ? <details className="delivery-details"><summary>Message delivery</summary><ul>{submissions.map(submission => <li key={submission.id}><span>{submission.type === "input" ? "Message" : "Entry"}</span><strong>{submission.status === "done" ? "Completed" : submission.status === "unanswered" ? "Not answered" : submission.status === "placed" ? "In progress" : "Queued"}</strong>{submission.status === "unanswered" ? <details><summary>Technical delivery details</summary><p>{submission.reason}</p></details> : null}</li>)}</ul></details> : null}
   </details>;
 }
