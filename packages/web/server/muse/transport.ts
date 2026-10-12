@@ -15,6 +15,10 @@ export async function runMuseQuery(input: {
 }): Promise<MuseRunResult> {
   const { prepared, invocation, bridge, signal } = input;
   signal.throwIfAborted();
+  if (prepared.transportPolicyRevision !== MUSE_TRANSPORT_POLICY_REVISION) {
+    return { sessionId: invocation.sessionId, text: "", success: false,
+      error: "Muse Code authorization policy changed after this run was prepared. Start a new run." };
+  }
 
   const workspace = resolve(process.env.DISPATCH_DATA_DIR ?? ".local/state/dispatch", "muse-workspaces", invocation.sessionId);
   await mkdir(workspace, { recursive: true, mode: 0o700 });
