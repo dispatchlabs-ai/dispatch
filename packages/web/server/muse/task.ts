@@ -24,6 +24,8 @@ export type MusePreparedRun = {
   cwd: string;
   model: string;
   reasoningEffort: MuseReasoningEffort;
+  /** Native authorization configuration; absent on checkpoints saved before policy versioning. */
+  transportPolicyRevision?: number;
   /** Trusted runner owner resolved by Dispatch, not a model-supplied identity. */
   userId: string;
 };
@@ -60,6 +62,7 @@ export type MuseTaskHost = {
   prepare(scope: MuseRunScope): Promise<MusePreparedRun>;
   /**
    * Reauthorize the saved owner, reconstruct invocation-bound tools, and run Muse under runtime.signal.
+   * Reject absent/stale transportPolicyRevision before external execution, including saved review continuations.
    * MUST join subprocess/bridge cleanup before returning or throwing, including on cancellation.
    * Only selected activity is persisted; native prose/thinking is not automatically public history.
    */
@@ -175,6 +178,7 @@ function scopeFor(input: MuseRunInput, runtime: MuseTaskRuntime, context: Contex
 function configurationKey(prepared: MusePreparedRun) {
   return createHash("sha256").update(JSON.stringify([
     prepared.userId, prepared.cwd, prepared.systemPrompt, prepared.model, prepared.reasoningEffort,
+    prepared.transportPolicyRevision ?? 0,
   ])).digest("hex");
 }
 function invocationFor(sessionId: string, resume: boolean, now: number): MuseInvocation {
