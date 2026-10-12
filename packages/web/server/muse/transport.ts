@@ -3,7 +3,7 @@ import { resolve, join } from "node:path";
 import { MuseClient, MuseInteractionRequiredError } from "./client.js";
 import { museCommandId, type MuseInvocation, type MusePreparedRun, type MuseRunResult } from "./task.js";
 
-type Bridge = { url: string; headers: Record<string, string>; toolNames: string[] };
+type Bridge = { url: string; headers: Record<string, string>; toolNames: string[]; authorize(): Promise<void> };
 type Terminal = { terminal: string; error?: { kind: string } };
 
 /** Native login/env remain native; only execution metadata and committed Pi tools cross this boundary. */
@@ -32,6 +32,8 @@ export async function runMuseQuery(input: {
       && allowed.has(params.toolName) && subject?.kind === "tool"
       && subject.toolName === params.toolName
       && (subject.origin === undefined || (subject.origin.kind === "mcp" && subject.origin.url === bridge.url));
+    if (approve) await bridge.authorize();
+    signal.throwIfAborted();
     const choice = choices?.find(choice => choice.scope === "once" && choice.decision === (approve ? "approved" : "denied"))
       ?? (!approve ? choices?.find(choice => choice.scope === "once" && choice.decision === "abort") : undefined);
     const requirement = params.currentRequirementId as { approvalId?: string; sourceIndex?: number } | undefined;

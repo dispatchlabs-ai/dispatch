@@ -97,5 +97,5 @@ export async function museToolServer(scope: MuseRunScope, authorize: () => Promi
   }
   host = `127.0.0.1:${address.port}`;
   if (scope.runtime.signal.aborted) { await close(); scope.runtime.signal.throwIfAborted(); }
-  return { url: `http://${host}/mcp`, headers: { Authorization: authorization }, toolNames: bridge.tools.map(tool => tool.name), close };
+  return { url: `http://${host}/mcp`, headers: { Authorization: authorization }, toolNames: bridge.tools.map(tool => tool.name), authorize, close };
 }
