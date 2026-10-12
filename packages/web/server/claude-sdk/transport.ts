@@ -118,10 +118,5 @@ function claudeFailure(message: SDKResultMessage, apiError?: string) {
   if (apiError === "rate_limit") return "Claude Code reached its usage or rate limit. Check the native account's limits before retrying.";
   if (apiError === "invalid_request") return "Claude Code rejected the request configuration. Inspect the native session and SDK model/thinking settings.";
   if ("api_error_status" in message && (message.api_error_status === 401 || message.api_error_status === 403)) return "Claude Code authentication or account access failed. Check native sign-in on the configured runner.";
-  const text = message.subtype === "success" ? message.result : message.errors.join("\n");
-  if (/usage limit|rate.?limit|limit reached|too many requests|429/i.test(text)) return "Claude Code reached its usage or rate limit. Check the native account's limits before retrying.";
-  if (/not logged|log.?in|auth|token|credential|401|403/i.test(text)) return "Claude Code authentication or account access failed. Check native auth status and sign in again on the configured runner.";
-  if (/model.*(not|unavailable|unsupported)|not.*model|404/i.test(text)) return "The selected model is unavailable to this Claude Code account. Select an accessible SDK model.";
-  if (/connect|network|timeout|timed out|fetch|ENOTFOUND|ECONN/i.test(text)) return "Claude Code could not reach its provider. Check the runner's network and retry after inspecting any effects.";
   return `Claude Code ended without a successful answer (${message.subtype}). Inspect the native session on the runner; no raw provider diagnostics are disclosed.`;
 }
