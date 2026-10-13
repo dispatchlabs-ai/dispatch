@@ -1355,3 +1355,31 @@ a.button, a.icon-button { text-decoration: none; }
   .instructions-help details { margin-top: var(--space-2); }
   .project-instructions-page .project-spec-recovery .button { flex: 1 1 auto; }
 }
+
+/* Evaluation experiments retain authoring drafts in their separate mounted pane. */
+.eval-experiments { padding: 20px; min-width: 0; }
+.eval-experiments[hidden] { display: none; }
+.eval-experiments h2 { margin: 12px 0; }
+.eval-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.eval-pair, .eval-create-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.eval-case, .eval-run-details { margin-block: 16px; border: 1px solid var(--color-border); border-radius: 8px; }
+.eval-case > summary, .eval-run-details > summary { padding: 14px; cursor: pointer; }
+.eval-case > summary span { display: block; margin-top: 6px; }
+.eval-case > .eval-pair, .eval-criterion, .eval-run-details > div, .eval-run-details > dl { padding: 16px; }
+.eval-criterion { border-top: 1px solid var(--color-border); }
+.eval-criterion h3 { font-size: 16px; }
+.eval-criterion h4 { text-transform: capitalize; }
+.eval-evidence { padding-left: 20px; }
+.eval-experiments pre, .eval-experiments dd, .eval-experiments a, .eval-experiments p { overflow-wrap: anywhere; }
+.eval-experiments pre { white-space: pre-wrap; }
+.eval-experiments fieldset { min-width: 0; border: 0; padding: 0; }
+.eval-fixture-row { padding-block: 12px; border-bottom: 1px solid var(--color-border); }
+.eval-fixture-row > label { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.eval-experiments textarea { width: 100%; }
+@media (max-width: 1000px) { .eval-pair, .eval-create-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
+@media (max-width: 600px) {
+  .eval-experiments { padding: 12px; }
+  .eval-experiments input, .eval-experiments textarea, .eval-experiments select { font-size: 16px; }
+  .eval-experiments summary, .eval-experiments .button, .eval-experiments nav a { min-height: 44px; }
+  .eval-experiments label { min-height: 44px; }
+}

@@ -63,8 +63,8 @@ export function Workspace() {
   const [criteriaDrafts, setCriteriaDrafts] = useState<Record<string, CriteriaDraft | undefined>>({});
   const [section, setSection] = useState<WorkspaceSection>(() => initialSection(searchParams));
   const [visited, setVisited] = useState({ "model-providers": searchParams.get("section") === "model-providers", "import-export": searchParams.get("section") === "import-export", agents: searchParams.get("section") === "agents", security: searchParams.get("section") === "security", secrets: searchParams.get("section") === "secrets", connections: searchParams.get("section") === "connections" });
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [evaluationAgent, setEvaluationAgent] = useState<string | null>(null);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(() => searchParams.get("agent"));
+  const [evaluationAgent, setEvaluationAgent] = useState<string | null>(() => searchParams.get("eval") ? searchParams.get("agent") : null);
   const [evaluationContext, setEvaluationContext] = useState<React.ReactNode>(null);
   const [evaluationGuard, setEvaluationGuard] = useState({ dirty: false, busy: false });
   const [editingAgent, setEditingAgent] = useState<AgentEditing | null>(null);
@@ -337,6 +337,10 @@ export function Workspace() {
 
   useEffect(() => {
     const next = initialSection(searchParams);
+    if (next === "agents") {
+      if (searchParams.get("agent")) setSelectedAgentId(searchParams.get("agent"));
+      setEvaluationAgent(searchParams.get("eval") ? searchParams.get("agent") : null);
+    }
     setSection(next);
     if (next !== "chats" && next !== "projects") {
       setVisited(current => ({ ...current, [next]: true }));
@@ -520,7 +524,7 @@ export function Workspace() {
   }
 
   const settingsSection = section === "security" || section === "connections" || section === "secrets" || section === "import-export" || section === "model-providers";
-  const selectedAgent = agents.find(agent => agent.id === selectedAgentId) ?? agents.find(agent => agent.id === config?.defaultAgentId);
+  const selectedAgent = selectedAgentId ? agents.find(agent => agent.id === selectedAgentId) : agents.find(agent => agent.id === config?.defaultAgentId);
   const active: WorkspaceTab | { id: string; kind: "agents" | "security" | "connections" | "secrets" | "import-export" | "model-providers" } = section === "chats" || section === "projects" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
   const projectEditorOpen = active.kind === "project" && searchParams.get("view") === "settings";
   const projectSpecOpen = active.kind === "project" && searchParams.get("view") === "spec";
@@ -625,7 +629,7 @@ export function Workspace() {
         editing={editingAgent ? editingAgent.saved ? agentEditIsDirty(editingAgent) : "new" : false} busy={editingAgent?.busy ?? false}
         search={agentSearch} onSearchChange={setAgentSearch} showArchived={showArchivedAgents} onShowArchivedChange={setShowArchivedAgents}
         onBundles={() => { setNavigationOpen(false); setBundlesOpen(true); }} onCreate={() => editAgent()}
-        onSelect={id => requestAgentAction(() => { setEditingAgent(null); setSelectedAgentId(id); })}
+        onSelect={id => requestAgentAction(() => { setEditingAgent(null); setSelectedAgentId(id); setSearchParams({ section: "agents", agent: id }); })}
         onEdit={editAgent}
         onArchive={agent => requestAgentAction(() => { setEditingAgent(null); setArchivingAgent(agent); })} />
     </div>
@@ -791,7 +795,7 @@ export function Workspace() {
           </Tabs.Panel>)}
           </div>
           {visited.agents ? <div className="workspace-section" hidden={section !== "agents"}>
-            <AgentsPage evaluationAgent={evaluationAgent} onEvaluationAgentChange={setEvaluationAgent} onEvaluationContextChange={setEvaluationContext} onEvaluationGuardChange={setEvaluationGuard} agent={selectedAgent} editing={editingAgent} config={config} onEditingChange={setEditingAgent}
+            <AgentsPage evaluationAgent={evaluationAgent} onEvaluationAgentChange={id => { setEvaluationAgent(id); setSearchParams({ section: "agents", ...(selectedAgent ? { agent: selectedAgent.id } : {}), ...(id ? { eval: "profile" } : {}) }); }} onEvaluationContextChange={setEvaluationContext} onEvaluationGuardChange={setEvaluationGuard} agent={selectedAgent} editing={editingAgent} config={config} onEditingChange={setEditingAgent}
               onSaved={finishAgentEdit} onConnectionsSettings={() => selectSection("connections")}
               onCancel={() => requestAgentAction(() => finishAgentEdit())} onEdit={editAgent}
               onStartChat={agentId => chooseAgents(agentId)} creating={creating || createFailed} />
