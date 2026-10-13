@@ -1424,3 +1424,6 @@ a.button, a.icon-button { text-decoration: none; }
   .eval-compact-header > span { display: none; }
   .eval-experiments { padding-top: 8px; }
 }
+
+.eval-execution-content { padding: 0; }
+.eval-experiments .field > label { min-height: 0; }

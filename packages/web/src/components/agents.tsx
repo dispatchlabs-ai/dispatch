@@ -182,7 +182,7 @@ export function AgentsPage({
         <Link className="button button-ghost" aria-current={!evaluationOpen ? "page" : undefined} to={`/?section=agents&agent=${encodeURIComponent(agent.id)}`} onClick={event => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0) onEvaluationAgentChange(null); }}>Overview</Link>
         <Link className="button button-ghost evaluation-entry" aria-current={evaluationOpen ? "page" : undefined} to={evaluationUrl(agent.id)}>Evaluations</Link>
       </nav>
-      <div className={evaluationOpen ? "agent-content evaluation-workspace" : "agent-content"}>
+      <div className={executionOpen ? "agent-content evaluation-workspace eval-execution-content" : evaluationOpen ? "agent-content evaluation-workspace" : "agent-content"}>
         <div className="agent-content-inner">
           <div hidden={evaluationOpen}>
           <p className="agent-phone-facts">
