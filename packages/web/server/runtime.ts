@@ -2568,25 +2568,29 @@ export class DispatchRuntime {
       };
       catalog.agents.push(agent);
       if (input.applyConnectionsToExisting && prior) {
-        for (const chat of catalog.chats.filter(chat => chat.companyId === scope.companyId)) {
-          if (this.directoryOnly) {
-            const actors = (await tx.doc(WorkerActorsDoc)).actors[chat.id] ?? [];
-            for (const actor of actors.filter(actor => actor.definitionId === id && (!actor.membership || actor.membership === "active"))) {
-              const desired = workerMcpSelection(publicAgent(agent));
-              if (setWorkerMcpSelection(actor, desired)) (await tx.doc(WorkerInvitationsDoc)).rooms[chat.id].revision++;
-            }
-            continue;
-          }
-          const room = await tx.doc(SharedDoc, nativeId(chat.id));
-          for (const member of room.members) {
-            if (member.kind !== "agent" || member.agentDefinitionId !== id || !member.conversationId || !member.agent) continue;
-            if (member.membership && member.membership !== "active") continue;
-            member.pendingConnectionIds = [...selectedManaged];
-          }
-        }
+        await this.queueConnectionSelection(tx, catalog, scope.companyId, agent, selectedManaged);
       }
       return publicAgent(agent);
     }, context);
+  }
+
+  private async queueConnectionSelection(tx: Tx, catalog: Catalog, companyId: string, agent: StoredAgent, selectedManaged: string[]) {
+    for (const chat of catalog.chats.filter(chat => chat.companyId === companyId)) {
+      if (this.directoryOnly) {
+        const actors = (await tx.doc(WorkerActorsDoc)).actors[chat.id] ?? [];
+        for (const actor of actors.filter(actor => actor.definitionId === agent.id && (!actor.membership || actor.membership === "active"))) {
+          const desired = workerMcpSelection(publicAgent(agent));
+          if (setWorkerMcpSelection(actor, desired)) (await tx.doc(WorkerInvitationsDoc)).rooms[chat.id].revision++;
+        }
+        continue;
+      }
+      const room = await tx.doc(SharedDoc, nativeId(chat.id));
+      for (const member of room.members) {
+        if (member.kind !== "agent" || member.agentDefinitionId !== agent.id || !member.conversationId || !member.agent) continue;
+        if (member.membership && member.membership !== "active") continue;
+        member.pendingConnectionIds = [...selectedManaged];
+      }
+    }
   }
 
   async managementGrants(principal: AuthPrincipal) {
@@ -2603,6 +2607,13 @@ export class DispatchRuntime {
       if (!editor || editor.archived || editor.revision !== input.policy!.editorRevision) throw new ManagementError(409, "Reload the editor revision before granting access.");
       this.requireManagementTarget(target);
       if (input.policy!.action === "save" && !input.policy!.fields.length) throw new ManagementError(400, "Choose editable fields for a save grant.");
+      if (input.policy!.approvedConnectionIds?.length && !input.policy!.fields.includes("connections")) throw new ManagementError(400, "Connection approvals require the connections field.");
+      for (const id of input.policy!.approvedConnectionIds ?? []) {
+        if (!this.managed) throw new ManagementError(503, "MCP connections are unavailable.");
+        this.managed.requireAssignment({ companyId: principal.companyId, userId: principal.userId }, id);
+        const owner = catalog.connectionOwners?.[id];
+        if (owner && owner !== target.id) throw new ManagementError(409, "That connection belongs to another agent.");
+      }
     }), context);
   }
 
@@ -2624,7 +2635,7 @@ export class DispatchRuntime {
 
   private managementView(agent: StoredAgent) {
     return { id: agent.id, name: agent.name, description: agent.description, revision: agent.revision,
-      instructions: agent.instructions, provider: agent.provider, modelId: agent.modelId, thinkingLevel: agent.thinkingLevel };
+      instructions: agent.instructions, provider: agent.provider, modelId: agent.modelId, thinkingLevel: agent.thinkingLevel, skills: agent.skills ?? [], capabilities: agentCapabilities(agent), connections: managedIds(agent) };
   }
 
   private async readManagedAgent(tx: Tx, instance: ConversationId, raw: unknown) {
@@ -2672,7 +2683,8 @@ export class DispatchRuntime {
     const receipts = await tx.doc(ManagementReceiptsDoc);
     const workerStoreId = "storeId" in actor ? actor.storeId : undefined;
     const fingerprint = JSON.stringify([input.targetId, input.expectedRevision, input.reason, input.evidence ?? [], input.restoreRevision ?? null,
-      input.patch ? managementFields.filter(field => input.patch![field] !== undefined).map(field => [field, input.patch![field]]) : null]);
+      input.patch ? managementFields.filter(field => input.patch![field] !== undefined).map(field => [field, input.patch![field]]) : null,
+      ...(input.applyConnectionsToExisting ? [true] : [])]);
     // Durable call identity catches transport replay; operation identity also catches a new call retry.
     const receipt = receipts.receipts.find(item => item.companyId === actor.companyId && item.workerStoreId === workerStoreId && item.instanceId === String(actor.instanceId) &&
       (item.callId === callId || item.operationId === input.operationId));
@@ -2690,19 +2702,52 @@ export class DispatchRuntime {
     if (input.restoreRevision) {
       const historical = catalog.agents.find(agent => agent.companyId === actor.companyId && agent.id === target.id && agent.revision === input.restoreRevision);
       if (!historical) throw new ManagementError(404, "Restore revision not found.");
-      patch = Object.fromEntries(policy.fields.map(field => [field, historical[field]]));
+      patch = Object.fromEntries(policy.fields.map(field => [field, this.managementView(historical)[field]]));
     }
     const fields = Object.keys(patch!);
+    if (input.applyConnectionsToExisting && patch?.connections === undefined) throw new ManagementError(400, "Applying connections to existing instances requires a connections patch or restore.");
     if (fields.some(field => !policy.fields.includes(field as typeof managementFields[number]))) throw new ManagementError(403, "The patch includes a field outside this grant.");
     const now = Date.now();
     const recent = receipts.receipts.filter(item => item.companyId === actor.companyId && item.definitionId === actor.definitionId && item.at > now - 3_600_000).sort((a, b) => a.at - b.at);
     if (recent.length >= policy.maxSavesPerHour)
       throw new ManagementError(429, `The editor's limit of ${policy.maxSavesPerHour} committed saves per hour has been reached. Retry after ${new Date(recent[recent.length - policy.maxSavesPerHour].at + 3_600_000).toISOString()}.`);
-    const next: StoredAgent = { ...detached(target), ...patch, revision: target.revision + 1, updatedAt: now };
+    const { capabilities, connections: connectionIds, ...tuning } = patch!;
+    const next: StoredAgent = { ...detached(target), ...tuning, revision: target.revision + 1, updatedAt: now };
+    for (const selection of tuning.skills ?? []) {
+      if (!catalog.skills?.some(skill => skill.companyId === actor.companyId && skill.id === selection.id && skill.revision === selection.revision))
+        throw new ManagementError(409, "A selected skill revision is unavailable. Reload the skills catalog.");
+    }
+    if (capabilities !== undefined) {
+      const selected = capabilitySelection(capabilities);
+      next.extensions = [...(next.extensions ?? []).filter(name => !capabilityExtensions.has(name)), ...selected.extensions];
+      next.tools = [...(next.tools ?? []).filter(name => !capabilityTools.has(name)), ...selected.tools];
+    }
+    if (connectionIds !== undefined) {
+      for (const id of connectionIds) {
+        if (!managedIds(target).includes(id)) {
+          if (!policy.approvedConnectionIds?.includes(id) || !grant.grantedBy) throw new ManagementError(403, "This new connection is not approved by the granting human.");
+          await this.person(actor.companyId, grant.grantedBy);
+          if (!this.managed) throw new ManagementError(503, "MCP connections are unavailable.");
+          this.managed.requireAssignment({ companyId: actor.companyId, userId: grant.grantedBy }, id);
+        }
+        const owner = catalog.connectionOwners?.[id];
+        if (owner && owner !== target.id) throw new ManagementError(409, "That connection belongs to another agent.");
+      }
+      const connections = this.connections.forAgent(target.id, connectionIds);
+      if (connectionIds.some(id => !connections.some(connection => connection.id === id && isManagedConnection(connection))))
+        throw new ManagementError(409, "A selected connection is unavailable. Update it in Settings before saving.");
+      catalog.connectionOwners ??= {};
+      for (const id of connectionIds) catalog.connectionOwners[id] = target.id;
+      const selection = this.connections.selection(target.id, connectionIds);
+      next.connections = connections;
+      next.extensions = [...(next.extensions ?? []).filter(name => !isMcpExtension(name)), ...selection.extensions];
+      next.tools = [...(next.tools ?? []).filter(name => !isMcpTool(name)), ...selection.tools];
+    }
     // Do not copy a human save receipt onto an agent-authored revision.
     delete next.savedBy; delete next.saveRequestId; delete next.saveFingerprint;
     this.validateAgent(next);
     catalog.agents.push(next);
+    if (input.applyConnectionsToExisting) await this.queueConnectionSelection(tx, catalog, actor.companyId, next, patch!.connections!);
     const outcome: ManagementReceipt = { companyId: actor.companyId, definitionId: actor.definitionId, revision: actor.revision,
       instanceId: String(actor.instanceId), roomId: String(actor.roomId), participantId: actor.participantId,
       ...("storeId" in actor ? { workerStoreId: actor.storeId, conversationKey: actor.conversationKey } : {}),
