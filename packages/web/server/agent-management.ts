@@ -10,8 +10,12 @@ export const managementSaveSchema = z.object({
   evidence: z.array(z.string().min(1).max(2000)).max(20).optional(),
   patch: z.object({ instructions: z.string().max(50_000).optional(), provider: z.string().min(1).max(100).optional(),
     modelId: z.string().min(1).max(200).optional(), thinkingLevel: z.enum(["off", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
+    skills: z.array(z.object({ id, revision: z.number().int().positive() }).strict()).max(100).optional(),
+    capabilities: z.array(z.enum(["files-and-commands", "image-generation", "web-reading", "web-search", "edit-definition-of-done"])).max(5).refine(items => new Set(items).size === items.length).optional(),
+    connections: z.array(id).max(100).refine(items => new Set(items).size === items.length).optional(),
   }).strict().optional(),
   restoreRevision: z.number().int().positive().optional(),
+  applyConnectionsToExisting: z.boolean().optional(),
 }).strict().refine(input => (input.restoreRevision !== undefined) !== (input.patch !== undefined), "Supply a patch or restoreRevision, not both.")
   .refine(input => !input.patch || Object.keys(input.patch).length > 0, "Patch must not be empty.");
 export function managementTools(operations: {
@@ -31,8 +35,11 @@ export function managementTools(operations: {
     parameters: Type.Object({ targetId: text(), operationId: text(), expectedRevision: revision(), reason: Type.String({ minLength: 1, maxLength: 2000 }),
       evidence: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 2000 }), { maxItems: 20 })),
       patch: Type.Optional(Type.Object({ instructions: Type.Optional(Type.String({ maxLength: 50_000 })), provider: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })), modelId: Type.Optional(text()),
+        skills: Type.Optional(Type.Array(Type.Object({ id: text(), revision: revision() }, { additionalProperties: false }), { maxItems: 100 })),
+        capabilities: Type.Optional(Type.Array(Type.Union(["files-and-commands", "image-generation", "web-reading", "web-search", "edit-definition-of-done"].map(value => Type.Literal(value))), { maxItems: 5, uniqueItems: true })),
+        connections: Type.Optional(Type.Array(text(), { maxItems: 100, uniqueItems: true })),
         thinkingLevel: Type.Optional(Type.Union(["off", "minimal", "low", "medium", "high", "xhigh", "max"].map(value => Type.Literal(value)))),
-      }, { additionalProperties: false })), restoreRevision: Type.Optional(revision()),
+      }, { additionalProperties: false })), restoreRevision: Type.Optional(revision()), applyConnectionsToExisting: Type.Optional(Type.Boolean()),
     }, { additionalProperties: false }), replay: "safe",
     outputLimits: { maxBytes: 4096, maxLines: 10 },
     execute: async (args, api, ctx) => reply(await api.commit(tx => operations.save(tx, api.conversationId, `${api.taskId}:${api.callId}`, args), ctx)),

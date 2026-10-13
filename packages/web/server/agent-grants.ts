@@ -2,19 +2,20 @@ import { defineDoc, type Tx } from "@earendil-works/pi-durable";
 import { z } from "zod";
 import type { AuthPrincipal } from "./auth.js";
 
-export const managementFields = ["instructions", "provider", "modelId", "thinkingLevel"] as const;
+export const managementFields = ["instructions", "provider", "modelId", "thinkingLevel", "skills", "capabilities", "connections"] as const;
 const id = z.string().min(1).max(200);
 export const grantInputSchema = z.object({
   editorId: id, targetId: id, expectedVersion: z.number().int().nonnegative(), requestId: id,
   reason: z.string().trim().min(1).max(2000),
   policy: z.object({
     editorRevision: z.number().int().positive(), action: z.enum(["read", "save"]),
-    fields: z.array(z.enum(managementFields)).max(4).refine(items => new Set(items).size === items.length),
+    fields: z.array(z.enum(managementFields)).max(7).refine(items => new Set(items).size === items.length),
     maxSavesPerHour: z.number().int().min(1).max(100),
+    approvedConnectionIds: z.array(id).max(100).refine(items => new Set(items).size === items.length).optional(),
   }).strict().nullable(),
 }).strict();
 export type GrantInput = z.infer<typeof grantInputSchema>;
-export type Grant = { companyId: string; editorId: string; targetId: string; version: number; policy: GrantInput["policy"] };
+export type Grant = { grantedBy?: string; companyId: string; editorId: string; targetId: string; version: number; policy: GrantInput["policy"] };
 type GrantChange = { companyId: string; userId?: string; at: number; requestId: string; fingerprint: string; reason: string; before: Grant | null; after: Grant;
   source?: "self-save"; actor?: { definitionId: string; instanceId: string; operationId: string } };
 const GrantsDoc = defineDoc<{ grants: Grant[]; changes: GrantChange[] }>({
@@ -61,7 +62,7 @@ export async function writeGrant(tx: Tx, principal: AuthPrincipal, raw: unknown,
   const before = doc.grants.find(grant => grant.companyId === principal.companyId && grant.editorId === input.editorId && grant.targetId === input.targetId);
   if ((before?.version ?? 0) !== input.expectedVersion) throw new ManagementError(409, "The grant changed. Reload it before saving.");
   if (input.policy) await validate(input);
-  const after: Grant = { companyId: principal.companyId, editorId: input.editorId, targetId: input.targetId, version: input.expectedVersion + 1, policy: input.policy };
+  const after: Grant = { grantedBy: principal.userId, companyId: principal.companyId, editorId: input.editorId, targetId: input.targetId, version: input.expectedVersion + 1, policy: input.policy };
   doc.changes.push({ companyId: principal.companyId, userId: principal.userId, at: Date.now(), requestId: input.requestId, fingerprint, reason: input.reason, before: before ? detached(before) : null, after });
   if (before) Object.assign(before, after); else doc.grants.push(after);
   return detached(after);
