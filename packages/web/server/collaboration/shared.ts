@@ -1409,9 +1409,10 @@ export class SharedConversations {
     }
     const page = transcriptPage(messages, activities, query, createHash("sha256").update(JSON.stringify(room.messageAliases ?? {})).digest("hex"));
     const participantIds = new Set(room.members.map(member => member.id));
+    const membershipKey = JSON.stringify([...participantIds].sort());
     const originals = new Map(messages.map(message => [message.id, message]));
-    page.messages = page.messages.map(message => ({ ...message, mentions: projectedMessageMentions(originals.get(message.id)!, participantIds) }));
-    if (page.root) page.root = { ...page.root, mentions: projectedMessageMentions(originals.get(page.root.id)!, participantIds) };
+    page.messages = page.messages.map(message => ({ ...message, mentions: projectedMessageMentions(originals.get(message.id)!, participantIds, membershipKey) }));
+    if (page.root) page.root = { ...page.root, mentions: projectedMessageMentions(originals.get(page.root.id)!, participantIds, membershipKey) };
     return { room, page };
   }
 
@@ -1421,7 +1422,8 @@ export class SharedConversations {
     const messages = await this.publicMessages(roomId, room.messageAliases);
     const generation = createHash("sha256").update(JSON.stringify([room.messageAliases ?? {}, userId, "mentions"])).digest("hex");
     const participantIds = new Set(room.members.map(member => member.id));
-    return mentionsPage(messages.map(message => ({ ...message, mentions: projectedMessageMentions(message, participantIds) })), member?.id ?? `human:${userId}`, before, generation);
+    const membershipKey = JSON.stringify([...participantIds].sort());
+    return mentionsPage(messages.map(message => ({ ...message, mentions: projectedMessageMentions(message, participantIds, membershipKey) })), member?.id ?? `human:${userId}`, before, generation);
   }
 
   async page(tx: Tx, roomId: ConversationId, query: TranscriptQuery): Promise<TranscriptPage> {

@@ -39,8 +39,7 @@ export function participantMentionLinks(text: string, participantIds: ReadonlySe
 
 const messageMentions = new WeakMap<ConversationMessage, { members: string; ids: string[] }>();
 /** Read-only compatibility for older public messages; never rewrites their entries or emits notifications. */
-export function projectedMessageMentions(message: ConversationMessage, participantIds: ReadonlySet<string>): string[] {
-  const members = JSON.stringify([...participantIds].sort());
+export function projectedMessageMentions(message: ConversationMessage, participantIds: ReadonlySet<string>, members: string): string[] {
   const cached = messageMentions.get(message);
   if (cached?.members === members) return cached.ids;
   const ids = [...new Set([...message.mentions, ...participantMentionLinks(message.text, participantIds)])].sort();
