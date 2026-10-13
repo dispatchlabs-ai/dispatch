@@ -46,7 +46,7 @@ import { SharedConversations, SharedDoc, PublicEntry, type Member, type PeopleDi
 import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
 import type { AuthPrincipal } from "./auth.js";
 import { ManagementError, detached, grantHistory, managementFields, readGrants, writeGrant, type Grant } from "./agent-grants.js";
-import { appendEvaluationResult, createEvaluationComparison, parseAppendEvaluationResult, parseCreateEvaluationComparison, parseEvaluationProfile, readEvaluationComparison, readEvaluationProfile, readEvaluationProfileRevision, resolveEvaluationFixtures, saveEvaluationProfile, type FrozenRunConfiguration } from "./evaluations.js";
+import { appendEvaluationResult, createEvaluationComparison, findEvaluationComparisonReplay, parseAppendEvaluationResult, parseCreateEvaluationComparison, parseEvaluationProfile, readEvaluationComparison, readEvaluationProfile, readEvaluationProfileRevision, resolveEvaluationFixtures, saveEvaluationProfile, type FrozenRunConfiguration } from "./evaluations.js";
 import { managementReadSchema, managementSaveSchema } from "./agent-management.js";
 import type { McpConnections } from "./mcp-connections.js";
 
@@ -2133,6 +2133,13 @@ export class DispatchRuntime {
 
   async createEvaluationComparison(scope: RuntimeScope, agentId: string, raw: unknown) {
     const input = parseCreateEvaluationComparison(raw);
+    // A committed creation whose response was lost returns its original receipt before any
+    // fresh-admission prerequisite (fixtures, archived state, agent revision) is rechecked.
+    const replay = await this.harness.commit(async tx => {
+      if (!latestAgent(await tx.doc(CatalogDoc), scope.companyId, agentId)) throw new RuntimeError(404, "Agent not found.");
+      return findEvaluationComparisonReplay(tx, scope, agentId, input);
+    }, context);
+    if (replay) return replay;
     // Fixture readiness is verified against the operator registry before anything is persisted.
     const fixtures = await resolveEvaluationFixtures(input);
     return this.harness.commit(async tx => {

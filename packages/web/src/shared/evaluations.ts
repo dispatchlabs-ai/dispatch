@@ -145,9 +145,7 @@ export type CreateEvaluationComparisonInput = {
   caseIds: string[];
   /** Instruction-only candidate; stored server-side, identified publicly by digest. */
   candidateInstructions: string;
-  /** Exposure per case as declared by the evaluator; held_out cases default to previously exposed. */
-  exposure?: Record<string, EvaluationExposure>;
-  /** Fixture definitions resolve server-side; clients never attest readiness. */
+  /** Exposure is server-derived from each case's split, and fixture definitions resolve server-side; clients attest neither. */
   fixtures: Record<string, { fixtureId: string; scriptedMessages: EvaluationScriptedMessage[] }>;
 }
 

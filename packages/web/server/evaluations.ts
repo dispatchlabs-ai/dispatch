@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
+import { sep } from "node:path";
 import { defineDoc, type Tx } from "@earendil-works/pi-durable";
 import { z } from "zod";
 import type { RuntimeScope } from "../src/shared/contracts.js";
@@ -119,7 +120,6 @@ const emptyMeasurements: EvaluationMeasurements = { totalTokens: null, cachedInp
 const createComparisonSchema = z.object({
   operationId: nonblank(200), profileRevision: revision, expectedAgentRevision: revision,
   caseIds: z.array(z.string().uuid()).min(1).max(100), candidateInstructions: z.string().max(100_000),
-  exposure: z.record(z.string().uuid(), z.enum(["tuning", "previously_exposed_validation", "held_out_clean"])).optional(),
   fixtures: z.record(z.string().uuid(), z.object({
     fixtureId: nonblank(200),
     scriptedMessages: z.array(z.object({ authorLabel: nonblank(200), text: nonblank(20_000) }).strict()).max(50),
@@ -175,17 +175,22 @@ export async function resolveEvaluationFixtures(input: CreateEvaluationCompariso
   try { registry = fixtureRegistrySchema.parse(JSON.parse(await readFile(file, "utf8"))) as FixtureRegistryEntry[]; }
   catch { throw new EvaluationError(409, "The evaluation fixture registry is unreadable or invalid. Fix DISPATCH_EVAL_FIXTURES_FILE before starting a comparison."); }
   const resolved: Record<string, Record<EvaluationVariantKind, EvaluationFixtureBinding>> = {};
+  // Canonical paths across the whole request: aliased or nested instances are not independent.
+  const claimed: string[] = [];
+  const overlaps = (a: string, b: string) => a === b || a.startsWith(b + sep) || b.startsWith(a + sep);
   for (const caseId of input.caseIds) {
     const entry = registry.find(item => item.id === input.fixtures[caseId]!.fixtureId);
     if (!entry) throw new EvaluationError(409, `Fixture "${input.fixtures[caseId]!.fixtureId}" is not in the operator-provisioned registry.`);
-    if (entry.instances.baseline.path === entry.instances.candidate.path)
-      throw new EvaluationError(409, `Fixture "${entry.id}" must provision separate baseline and candidate instances.`);
     const bindings = {} as Record<EvaluationVariantKind, EvaluationFixtureBinding>;
     for (const variant of ["baseline", "candidate"] as const) {
       const instance = entry.instances[variant];
       const info = await stat(instance.path).catch(() => null);
       if (!info?.isDirectory()) throw new EvaluationError(409, `Fixture "${entry.id}" ${variant} instance is not an existing directory: ${instance.path}`);
-      bindings[variant] = { fixtureId: entry.id, definitionSha256: entry.definitionSha256, instanceId: instance.instanceId, effectivePath: instance.path, capturedState: [...entry.capturedState] };
+      const canonical = await realpath(instance.path);
+      if (claimed.some(path => overlaps(path, canonical)))
+        throw new EvaluationError(409, `Fixture "${entry.id}" ${variant} instance overlaps another instance in this comparison: ${instance.path}`);
+      claimed.push(canonical);
+      bindings[variant] = { fixtureId: entry.id, definitionSha256: entry.definitionSha256, instanceId: instance.instanceId, effectivePath: canonical, capturedState: [...entry.capturedState] };
     }
     resolved[caseId] = bindings;
   }
@@ -212,6 +217,29 @@ const ComparisonsDoc = defineDoc<{ comparisons: StoredComparison[]; runs: Stored
 });
 
 export type FrozenRunConfiguration = EvaluationRun["configuration"];
+export type EvaluationComparisonReceipt = { comparisonId: string; runs: { caseId: string; variant: EvaluationVariantKind; runId: string }[] };
+
+function comparisonFingerprint(agentId: string, input: CreateEvaluationComparisonInput): string {
+  return sha256(JSON.stringify([agentId, input.profileRevision, input.expectedAgentRevision, input.caseIds, sha256(input.candidateInstructions), input.fixtures]));
+}
+
+function comparisonReceipt(doc: { runs: StoredRun[] }, comparison: StoredComparison): EvaluationComparisonReceipt {
+  return { comparisonId: comparison.id, runs: doc.runs.filter(run => run.comparisonId === comparison.id)
+    .map(run => ({ caseId: run.source.kind === "standalone" ? run.source.caseId : "", variant: run.variant.kind, runId: run.id })) };
+}
+
+/**
+ * Scoped retry lookup, checked after caller authorization but before any fresh-admission
+ * prerequisite (fixture readiness, archived state, agent revision): a committed creation
+ * whose response was lost must return its original receipt, not a prerequisite failure.
+ */
+export async function findEvaluationComparisonReplay(tx: Tx, scope: RuntimeScope, agentId: string, input: CreateEvaluationComparisonInput): Promise<EvaluationComparisonReceipt | null> {
+  const doc = await tx.doc(ComparisonsDoc);
+  const replay = doc.comparisons.find(item => item.companyId === scope.companyId && item.requestedBy === scope.userId && item.operationId === input.operationId);
+  if (!replay) return null;
+  if (replay.fingerprint !== comparisonFingerprint(agentId, input)) throw new EvaluationError(409, "This operation ID was already used for a different comparison.");
+  return comparisonReceipt(doc, replay);
+}
 
 /**
  * Atomically persists the admission manifest and every expected run as pending.
@@ -222,13 +250,13 @@ export async function createEvaluationComparison(tx: Tx, scope: RuntimeScope, ag
   resolved: { fixtures: Record<string, Record<EvaluationVariantKind, EvaluationFixtureBinding>>; agentRevision: number;
     configuration: Record<EvaluationVariantKind, FrozenRunConfiguration>; baselineInstructions: string }): Promise<{ comparisonId: string; runs: { caseId: string; variant: EvaluationVariantKind; runId: string }[] }> {
   const profile = await readEvaluationProfileRevision(tx, scope, agentId, input.profileRevision);
-  const fingerprint = sha256(JSON.stringify([agentId, input.profileRevision, input.expectedAgentRevision, input.caseIds, sha256(input.candidateInstructions), input.exposure ?? {}, input.fixtures]));
+  const fingerprint = comparisonFingerprint(agentId, input);
   const doc = await tx.doc(ComparisonsDoc);
+  // Second line of defense for a concurrent identical creation; the runtime checks replay first.
   const replay = doc.comparisons.find(item => item.companyId === scope.companyId && item.requestedBy === scope.userId && item.operationId === input.operationId);
   if (replay) {
     if (replay.fingerprint !== fingerprint) throw new EvaluationError(409, "This operation ID was already used for a different comparison.");
-    return { comparisonId: replay.id, runs: doc.runs.filter(run => run.comparisonId === replay.id)
-      .map(run => ({ caseId: run.source.kind === "standalone" ? run.source.caseId : "", variant: run.variant.kind, runId: run.id })) };
+    return comparisonReceipt(doc, replay);
   }
   const now = Date.now();
   const comparisonId = randomUUID();
@@ -238,12 +266,9 @@ export async function createEvaluationComparison(tx: Tx, scope: RuntimeScope, ag
     const item = profile.cases.find(entry => entry.id === caseId);
     if (!item) throw new EvaluationError(409, `Case ${caseId} is not in profile revision ${input.profileRevision}.`);
     if (!item.enabled) throw new EvaluationError(409, `Case "${item.name}" is disabled in profile revision ${input.profileRevision}.`);
-    const declared = input.exposure?.[caseId];
-    const exposure: EvaluationExposure = item.split === "tuning" ? "tuning" : (declared ?? "previously_exposed_validation");
-    if (item.split === "tuning" && declared && declared !== "tuning")
-      throw new EvaluationError(409, `Case "${item.name}" is a tuning case; its exposure is "tuning".`);
-    if (item.split === "held_out" && declared === "tuning")
-      throw new EvaluationError(409, `Case "${item.name}" is held out; declare previously exposed or held-out clean exposure.`);
+    // Server-derived provenance: held_out_clean stays unavailable until an evaluator-controlled
+    // mechanism can substantiate that the tested agent never saw the case.
+    const exposure: EvaluationExposure = item.split === "tuning" ? "tuning" : "previously_exposed_validation";
     const criteria = item.criterionIds.map(criterionId => {
       const criterion = profile.criteria.find(entry => entry.id === criterionId)!;
       return { criterionId, description: criterion.description, criticalFailure: criterion.criticalFailure, gradingMethod: criterion.gradingMethod };
