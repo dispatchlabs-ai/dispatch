@@ -16,6 +16,7 @@
 
 ### Shared conversation context
 
+- Avoid repeated full-history searches when projecting chat activity and reduce mention-history indexing, preserving aliases, ordering and privacy filtering.
 - Preserve authenticated mention metadata in saved messages and their read projections, including permitted mention-based invitations.
 - Avoid saving a duplicate recent-history snapshot in new delivery notifications; retain fresh request-time context for Pi, Claude SDK and Muse execution without changing recovery cursors or historical inputs.
 - Deliver new message images by reference instead of copying base64 bytes into each recipient's input, task admission, and checkpoints. Pi requests resolve the delivered messages' images transiently per request; native Claude SDK and Muse runs resolve them at execute time after the recovery-intent commit, keeping every checkpoint reference-only. Already-admitted inline prompts still execute unchanged, attachment references remain discoverable for later `conversation_attachment` reads, and unloadable images surface as an explicit limitation rather than a silent omission. Historical inline entries are unchanged; explicitly reading an image through a tool still stores that tool result.
