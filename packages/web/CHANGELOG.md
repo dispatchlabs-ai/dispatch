@@ -18,6 +18,7 @@
 
 ### Shared conversation context
 
+- Make Claude/Muse contribution-review settlement replay-safe, committing the review prompt with its listening cursor so recovery does not reapply an older answer against a newer review round. Exact crash-window behavior remains interactively unverified.
 - Avoid repeated full-history searches when projecting chat activity and reduce mention-history indexing, preserving aliases, ordering and privacy filtering.
 - Preserve authenticated mention metadata in saved messages and their read projections, including permitted mention-based invitations.
 - Avoid saving a duplicate recent-history snapshot in new delivery notifications; retain fresh request-time context for Pi, Claude SDK and Muse execution without changing recovery cursors or historical inputs.
@@ -41,6 +42,7 @@
 - Keep execution admission, tool receipts, cancellation and contribution publication in stock Pi Durable tasks; preserve the existing Pi runtime by default.
 - Expose committed SDK tool activity and explicit unavailable model-usage accounting. Document query-settlement publication and uncertain interrupted execution without automatic external-effect replay.
 - Qualify local subscription-backed inference, authorized tools, Stop, controlled-restart uncertainty, and saved public readback; hosted execution remains fenced and other platform/auth modes unverified.
+- Keep unknown Claude SDK query diagnostics out of persisted task errors by returning a fixed uncertain-effects outcome; categorized failures and cancellation remain distinct.
 - Supply the current adopted system prompt on resumed SDK requests without reusing the SDK's earlier prompt snapshot. This preserves native session history; changed-prompt delivery remains live-unqualified.
 
 ### Image credential routing
