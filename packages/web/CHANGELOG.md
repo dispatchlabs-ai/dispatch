@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Agent guidance
+
+- Clarify in the shared-conversation prompt that agents are generic and their definitions are used across projects.
+
 ### Sign-in
 
 - Prevent development effect restarts from cancelling and replaying a one-use invitation claim, which could reject a fresh enrollment link as already used.
