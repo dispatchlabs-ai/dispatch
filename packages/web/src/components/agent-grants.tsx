@@ -18,7 +18,7 @@ export function AgentGrants({ agent, busy, onBusy }: { agent: AgentDefinition; b
   const [retry, setRetry] = useState<GrantRequest | null>(null);
   const origin = useRef<HTMLElement | null>(null);
   const formHeading = useRef<HTMLHeadingElement>(null);
-  const eligible = state.agents.filter(item => item.id !== agent.id && !item.archived);
+  const eligible = state.agents.filter(item => !item.archived);
   const name = (id: string) => state.agents.find(item => item.id === id)?.name ?? `Unavailable agent (${id})`;
   const current = state.grants?.find(item => item.targetId === draft?.targetId);
   function open(grant: ManagementGrant | undefined, revoke: boolean, control: HTMLElement) {
@@ -55,7 +55,7 @@ export function AgentGrants({ agent, busy, onBusy }: { agent: AgentDefinition; b
   }}>
     <header className="agent-access-heading"><div><h2>Agent access</h2><p>{agent.name} · saved editor rev {agent.revision}</p></div><Button type="button" variant="secondary" disabled={busy || pending || Boolean(draft) || state.loading || Boolean(state.error) || agent.archived || !eligible.length} onClick={event => open(undefined, false, event.currentTarget)}>Add access</Button></header>
     <p>Grant and revoke actions apply immediately. Discard only affects agent edits.</p>
-    <p className="field-hint">New editor revisions need fresh grants. Configured access also requires the running instance to adopt the matching revision.</p>
+    <p className="field-hint">Self-grants follow self-authored saves; edits by others need renewal. Cross-agent grants remain revision-pinned. Running instances must adopt the matching revision.</p>
     {state.loading ? <Spinner label="Loading agent access" /> : null}
     {state.error ? <Notice>{state.error} <Button type="button" variant="secondary" disabled={pending} onClick={() => void state.refresh()}>Reload access</Button></Notice> : null}
     {success ? <Notice tone="success">{success}</Notice> : null}
@@ -63,9 +63,10 @@ export function AgentGrants({ agent, busy, onBusy }: { agent: AgentDefinition; b
     <div>{state.grants?.filter(item => item.policy).map(grant => <div className="agent-access-row" key={grant.targetId}><div><strong>{name(grant.targetId)}</strong><p>{describe(grant.policy)} · Editor rev {grant.policy!.editorRevision}</p>{grant.policy!.editorRevision !== agent.revision ? <strong>Needs renewal</strong> : null}</div><div className="button-row"><Button type="button" variant="secondary" disabled={busy || pending || Boolean(draft) || state.loading || Boolean(state.error) || agent.archived || !eligible.some(item => item.id === grant.targetId)} onClick={event => open(grant, false, event.currentTarget)}>{grant.policy!.editorRevision !== agent.revision ? "Renew" : "Edit"}</Button><Button type="button" variant="danger" disabled={busy || pending || Boolean(draft) || state.loading || Boolean(state.error)} onClick={event => open(grant, true, event.currentTarget)}>Revoke</Button></div></div>)}</div>
     {draft ? <div className="agent-access-form">
       <h3 ref={formHeading} tabIndex={-1}>{draft.policy ? "Grant access" : `Revoke access to ${name(draft.targetId)}`}</h3>
-      {draft.policy ? <><div className="agent-access-grid"><Field label="Agent">{props => <Select {...props} disabled={locked || draft.version > 0} value={draft.targetId} onChange={event => { const grant = state.grants?.find(item => item.targetId === event.target.value); setDraft({ ...draft, targetId: event.target.value, version: grant?.version ?? 0 }); }}><option value="">Select an agent</option>{eligible.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</Select>}</Field>
+      {draft.policy ? <><div className="agent-access-grid"><Field label="Agent">{props => <Select {...props} disabled={locked || draft.version > 0} value={draft.targetId} onChange={event => { const grant = state.grants?.find(item => item.targetId === event.target.value); setDraft({ ...draft, targetId: event.target.value, version: grant?.version ?? 0 }); }}><option value="">Select an agent</option>{eligible.map(item => <option key={item.id} value={item.id}>{item.name}{item.id === agent.id ? " (self)" : ""}</option>)}</Select>}</Field>
       <Field label="Access">{props => <Select {...props} disabled={locked} value={draft.policy!.action} onChange={event => setDraft({ ...draft, policy: { ...draft.policy!, action: event.target.value as "read" | "save" } })}><option value="read">Read only</option><option value="save">Edit</option></Select>}</Field></div>
-      <p className="field-hint">Read access exposes instructions, provider, model and thinking settings. Editable fields restrict writes, not reads.</p>
+      <p className="field-hint">Read access exposes tuning settings, skill selections, capabilities and managed connection IDs. Editable fields restrict writes, not reads.</p>
+      {draft.targetId === agent.id ? <p className="field-hint">Self-access is not approval. Each self-improvement needs manager approval.</p> : null}
       {draft.policy.action === "save" ? <><fieldset disabled={locked} className="agent-access-fields"><legend>Editable fields</legend>{fields.map(([key, label]) => <label key={key}><input type="checkbox" checked={draft.policy!.fields.includes(key)} onChange={event => setDraft({ ...draft, policy: { ...draft.policy!, fields: event.target.checked ? [...draft.policy!.fields, key] : draft.policy!.fields.filter(item => item !== key) } })} />{label}</label>)}</fieldset><Field label="Saves / hour" hint="1–100">{props => <Input {...props} type="number" min={1} max={100} step={1} disabled={locked} value={draft.policy!.maxSavesPerHour} onChange={event => setDraft({ ...draft, policy: { ...draft.policy!, maxSavesPerHour: Number(event.target.value) } })} />}</Field></> : null}
       <p>Uses saved editor rev {draft.policy.editorRevision}, not unsaved edits.</p></> : null}
       <Field label="Reason" hint="Required for grant, renewal and revocation.">{props => <Input {...props} maxLength={2000} disabled={locked} value={draft.reason} onChange={event => setDraft({ ...draft, reason: event.target.value })} />}</Field>
