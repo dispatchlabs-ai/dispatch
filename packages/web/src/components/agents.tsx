@@ -16,6 +16,7 @@ import { Button, Field, Input, Modal, Notice, Select, Spinner } from "./ui";
 import { AgentSkillsEditor, AgentSkillsPanel, type SkillEditing } from "./agent-skills";
 import { AgentConnectionsEditor, AgentConnectionsPanel } from "./agent-connections";
 import { AgentEvaluation } from "./agent-evaluation";
+import { AgentGrants } from "./agent-grants";
 import { Markdown } from "./markdown";
 import { MarkdownComposer } from "./markdown-composer";
 
@@ -424,6 +425,7 @@ function AgentEditor({
   const [conflict, setConflict] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const [section, setSection] = useState("Identity");
+  const [grantBusy, setGrantBusy] = useState(false);
   function selectSection(name: string) {
     setSection(name);
     const target = formRef.current?.querySelector<HTMLElement>(`[data-agent-section="${name}"]`);
@@ -483,12 +485,12 @@ function AgentEditor({
         </div>
         <span className="revision-badge">{dirty ? "Unsaved changes" : agent ? `Revision ${agent.revision}` : "Draft"}</span>
       </header>
-      <nav className="object-section-nav" aria-label="Agent editor sections">{["Identity", "Instructions", "Model", "Capabilities", "Skills", "Connections"].map(name => <Button key={name} variant="ghost" aria-current={section === name ? "location" : undefined} onClick={() => selectSection(name)}>{name}</Button>)}</nav>
+      <nav className="object-section-nav" aria-label="Agent editor sections">{["Identity", "Instructions", "Model", "Capabilities", "Skills", "Connections", "Agent access"].map(name => <Button key={name} variant="ghost" aria-current={section === name ? "location" : undefined} onClick={() => selectSection(name)}>{name}</Button>)}</nav>
       <form ref={formRef}
         className="agent-editor-form"
         onSubmit={(event) => {
           event.preventDefault();
-          if (instructionsTooLong || editing.skillEditing || (native && !model)) return;
+          if (busy || grantBusy || instructionsTooLong || editing.skillEditing || (native && !model)) return;
           onChange({ ...editing, busy: true });
           setError(null);
           setConflict(false);
@@ -674,16 +676,17 @@ function AgentEditor({
               onChange={connectionIds => onChange({ ...editing, connectionIds })}
               applyExisting={editing.applyConnectionsToExisting} onApplyExisting={applyConnectionsToExisting => onChange({ ...editing, applyConnectionsToExisting })}
               onSettings={onConnectionsSettings} /></div>
+            <div data-agent-section="Agent access" tabIndex={-1}>{agent ? <AgentGrants key={agent.id} agent={agent} busy={busy} onBusy={setGrantBusy} /> : <p>Save this agent before granting access.</p>}</div>
           </div>
         </div>
         <footer className="agent-editor-actions">
           <div className="agent-editor-actions-inner">
           <p className="editor-note">{agentConnectionsChanged(editing) && editing.applyConnectionsToExisting ? "Base and connection updates apply when idle." : "Base updates apply to existing instances when idle."}</p>
           <div className="button-row">
-            <Button variant="secondary" disabled={busy} onClick={onCancel}>
+            <Button variant="secondary" disabled={busy || grantBusy} onClick={onCancel}>
               Discard
             </Button>
-            <Button type="submit" disabled={busy || Boolean(editing.skillEditing) || !model || conflict || instructionsTooLong || Boolean(agent && !dirty)}>
+            <Button type="submit" disabled={busy || grantBusy || Boolean(editing.skillEditing) || !model || conflict || instructionsTooLong || Boolean(agent && !dirty)}>
               {busy ? <Spinner label="Saving agent" /> : null}
               {agent ? "Save new revision" : "Create agent"}
             </Button>

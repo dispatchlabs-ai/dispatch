@@ -1355,3 +1355,22 @@ a.button, a.icon-button { text-decoration: none; }
   .instructions-help details { margin-top: var(--space-2); }
   .project-instructions-page .project-spec-recovery .button { flex: 1 1 auto; }
 }
+
+.agent-access { display: grid; gap: 16px; }
+.agent-access h2, .agent-access h3, .agent-access p { margin: 0; }
+.agent-access-heading, .agent-access-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.agent-access-row { padding: 16px 0; border-bottom: 1px solid var(--color-border); }
+.agent-access-row > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.agent-access-row p { margin-top: 6px; }
+.agent-access-form { display: grid; gap: 16px; }
+.agent-access-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.agent-access-fields { display: flex; flex-wrap: wrap; gap: 12px 24px; border: 0; padding: 0; margin: 0; }
+.agent-access-fields legend { margin-bottom: 8px; }
+.agent-access-fields label { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 600px) {
+  .agent-access-heading, .agent-access-row { align-items: flex-start; flex-direction: column; }
+  .agent-access .button, .agent-access select, .agent-access input, .agent-access-fields label { min-height: 44px; }
+  .agent-access-fields input { min-height: auto; }
+  .agent-access-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agent-access .button-row { flex-wrap: wrap; }
+}
