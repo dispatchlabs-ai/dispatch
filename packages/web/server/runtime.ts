@@ -1888,7 +1888,7 @@ export class DispatchRuntime {
     this.requireWorkerRoom(scope, id);
     return this.harness.commit(async tx => {
       await this.shared.authorize(tx, scope, nativeId(id), "read", this.readAll(scope));
-      return { ...await this.shared.page(tx, nativeId(id), query), revision: this.commitRevision };
+      return { ...await (query.mentionsOnly ? this.shared.mentionsPage(tx, nativeId(id), scope.userId, query.before) : this.shared.page(tx, nativeId(id), query)), revision: this.commitRevision };
     }, context);
   }
 

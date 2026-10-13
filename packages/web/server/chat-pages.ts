@@ -16,7 +16,7 @@ export function messagePreview(message: ConversationMessage): ConversationMessag
   if (cached) return cached;
   let result: ConversationMessage = bytes(message) <= ITEM_BYTES ? message : {
     id: message.id, kind: message.kind, authorId: message.authorId, createdAt: message.createdAt,
-    threadId: message.threadId, aliases: message.aliases?.slice(0, 32), mentions: [], text: message.text.slice(0, 4000), truncated: true,
+    threadId: message.threadId, aliases: message.aliases?.slice(0, 32), mentions: message.mentions, text: message.text.slice(0, 4000), truncated: true,
   };
   while (bytes(result) > ITEM_BYTES && result.text.length) result = { ...result, text: result.text.slice(0, Math.floor(result.text.length / 2)) };
   messagePreviews.set(message, result);
@@ -29,7 +29,8 @@ export function activityPreview(activity: ParticipantActivity): ParticipantActiv
 
 /** Cursors identify immutable timeline position, not an offset into a changing array. */
 export function transcriptPage(messages: ConversationMessage[], activities: ParticipantActivity[], query: TranscriptQuery = {}, generation = ""): TranscriptPage {
-  const threadId = query.threadId ?? null;
+  const destination = query.messageId ? messages.find(message => message.id === query.messageId || message.aliases?.includes(query.messageId!)) : undefined;
+  const threadId = query.threadId ?? destination?.threadId ?? null;
   const root = threadId ? messages.find(m => m.id === threadId || m.aliases?.includes(threadId)) : undefined;
   const canonical = root?.id ?? threadId;
   const replies = new Map<string, { count: number; authorIds: string[]; lastAt: number }>();
@@ -43,7 +44,7 @@ export function transcriptPage(messages: ConversationMessage[], activities: Part
     ...messages.map((message, timelineOrder) => ({ key: `m:${message.id}`, at: message.createdAt, timelineOrder, message, activity: undefined as ParticipantActivity | undefined })).filter(item => item.message.threadId === canonical),
     ...activities.map((activity, timelineOrder) => ({ key: `a:${activity.id}`, at: activity.createdAt, timelineOrder, message: undefined as ConversationMessage | undefined, activity })).filter(item => item.activity.threadId === canonical),
   ].sort((a, b) => a.at - b.at);
-  let end = items.length;
+  let end = destination ? Math.min(items.length, items.findIndex(item => item.message?.id === destination.id) + 1) : items.length;
   if (query.before) {
     let cursor: { key: string; generation: string };
     try { cursor = JSON.parse(Buffer.from(query.before, "base64url").toString("utf8")); }
@@ -103,4 +104,22 @@ export function activityPage(activity: ParticipantActivity, before?: number): Ac
     items.unshift(item);
   }
   return { items, before: index >= 0 ? index + 1 : null, total: blocks.length };
+}
+
+/** Existing public metadata only: main and thread cutoffs are independent; reading never changes them. */
+export function mentionsPage(messages: ConversationMessage[], participantId: string, before?: string, generation = ""): TranscriptPage {
+  const lastReply = new Map<string | null, number>();
+  for (const [index, message] of messages.entries()) if (message.authorId === participantId && message.kind === "message") lastReply.set(message.threadId, index);
+  const newer = new Set<string>();
+  const mentioned = messages.flatMap((message, index) => {
+    if (message.kind !== "message" || !message.mentions.includes(participantId)) return [];
+    if (index > (lastReply.get(message.threadId) ?? -1)) newer.add(message.id);
+    // Compact previews avoid inline images/attachments; preserve only navigation and public attribution.
+    return [{ id: message.id, kind: message.kind, authorId: message.authorId, createdAt: message.createdAt,
+      threadId: null, mentions: [participantId], text: message.text.slice(0, 280), truncated: message.text.length > 280 }];
+  });
+  const page = transcriptPage(mentioned, [], { before }, generation);
+  const originals = new Map(messages.map(message => [message.id, message]));
+  return { ...page, messages: page.messages.map(message => ({ ...message, threadId: originals.get(message.id)!.threadId })),
+    mentionSummary: { total: mentioned.length, newCount: newer.size, newIds: page.messages.filter(message => newer.has(message.id)).map(message => message.id) } };
 }

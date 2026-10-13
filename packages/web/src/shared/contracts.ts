@@ -27,8 +27,8 @@ export interface ChatSummary {
   error?: string;
 }
 
-export interface TranscriptQuery { threadId?: string | null; before?: string }
-export interface TranscriptPage { revision?: number; generation: string; messages: ConversationMessage[]; activities: ParticipantActivity[]; before: string | null; threadId: string | null; root?: ConversationMessage; replyCount?: number }
+export interface TranscriptQuery { threadId?: string | null; before?: string; mentionsOnly?: boolean; messageId?: string }
+export interface TranscriptPage { mentionSummary?: { total: number; newCount: number; newIds: string[] }; revision?: number; generation: string; messages: ConversationMessage[]; activities: ParticipantActivity[]; before: string | null; threadId: string | null; root?: ConversationMessage; replyCount?: number }
 
 export interface ChatSnapshot {
   history?: { before: string | null; generation: string };

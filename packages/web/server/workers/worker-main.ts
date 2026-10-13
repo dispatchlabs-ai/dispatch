@@ -135,7 +135,7 @@ app.post("/rpc", async c => {
       result = { attachment: download.attachment, dataBase64: download.bytes.toString("base64") }; break;
     }
     case "transcriptPage": {
-      const query = z.object({ threadId: z.string().max(300).optional(), before: z.string().max(1000).optional() }).strict().parse(input);
+      const query = z.object({ threadId: z.string().max(300).optional(), before: z.string().max(1000).optional(), mentionsOnly: z.boolean().optional(), messageId: z.string().min(1).max(300).optional() }).strict().parse(input);
       result = await runtime.transcriptPage(scope, roomId, query); break;
     }
     case "publicDetail": {
