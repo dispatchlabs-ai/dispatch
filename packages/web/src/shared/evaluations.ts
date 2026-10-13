@@ -101,6 +101,9 @@ export type EvaluationRun = {
     skills: { id: string; revision: number }[]; capabilities: { name: string; version: string | null }[];
     environmentReference: string; environmentSha256: string | null };
   status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  /** Server-derived from the admitted attempt's terminal state and committed public-entry
+   * boundary. "unknown" until execution wiring can confirm silence; never infer it client-side. */
+  output: "public_reply" | "no_public_reply" | "unknown";
   requestedBy: string;
   operationId: string;
   createdAt: number;

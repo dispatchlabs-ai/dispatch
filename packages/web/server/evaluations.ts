@@ -284,7 +284,7 @@ export async function createEvaluationComparison(tx: Tx, scope: RuntimeScope, ag
         caseSplit: item.split, exposure, fixture: resolved.fixtures[caseId]![variant],
         attempt: { taskId: null, roomId: null, participantId: null, entryBoundary: null },
         source: { kind: "standalone", caseId, agentConversationId: null },
-        configuration: resolved.configuration[variant], status: "pending",
+        configuration: resolved.configuration[variant], status: "pending", output: "unknown",
         requestedBy: scope.userId, operationId: input.operationId, createdAt: now,
         startedAt: null, finishedAt: null, error: null, evidenceReferences: [], coverageLimitations: [],
       });
