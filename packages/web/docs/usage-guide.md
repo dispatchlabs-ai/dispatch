@@ -29,7 +29,11 @@ nohup node --import tsx scripts/dev.ts > .local/dev/dev.log 2>&1 < /dev/null &
 echo $! > .local/dev/dev.pid
 ```
 
-This keeps development running independently of the terminal, with logs in `.local/dev/dev.log`. It does not register a login or reboot service. Inspect the recorded launcher before stopping it:
+This keeps development running independently of the terminal, with logs in `.local/dev/dev.log`. It does not register a login or reboot service.
+
+**Do not restart the Dispatch host from an agent session owned by that host.** Shutdown can cancel the tool performing the restart before it launches the replacement. Prepare configuration in advance, then hand the complete stop/start operation to an independent operator session or established service supervisor. A background child or `nohup` launched by the same host-owned tool is not proof of independence. Verify readiness and browser reconnection from outside the restarted service; if an independent operator already restored it, inspect rather than restarting again.
+
+Inspect the recorded launcher before stopping it:
 
 ```sh
 ps -p "$(cat .local/dev/dev.pid)" -o pid=,command=
@@ -278,7 +282,7 @@ The profile API stores definitions, not executed evaluations. Real-conversation 
 
 #### Comparison inspection and human grading (pilot)
 
-**Qualification, October 13:** the comparison storage and interface are integrated into canonical local `main`. Developer reports limited browser coverage of the creation empty-state and profile-link navigation; populated manifest, comparison and judgment workflows remain unverified. Execution admission/lifecycle wiring is unfinished: comparison creation currently produces pending records, not executed cases. The procedures below describe the implemented interface, not a demonstrated evaluation. See the [pilot evidence record](handoff.md#evaluation-pilot--case-authoring-and-evidence-boundaries).
+**Qualification, October 13:** the comparison storage and interface are integrated into canonical local `main`. Developer reports limited browser coverage of the creation empty-state and profile-link navigation. Designer’s rendered review leaves visual acceptance open for phone header compaction and upper-left menu placement; comparison readback subsequently failed with HTTP 500 during non-executing UI qualification; populated comparison/judgment and broader manifest/retry checks remain blocked or unverified. Execution admission/lifecycle wiring is unfinished: comparison creation currently produces pending records, not executed cases. Pending records without a committed backend admission receipt are **not admitted**; recording or inspecting them grants no entitlement to later execution. The procedures below describe the implemented interface, not a demonstrated evaluation. See the [pilot evidence record](handoff.md#evaluation-pilot--case-authoring-and-evidence-boundaries).
 
 From the agent's Evaluations workspace, open **Results** and enter a saved **Comparison ID**, or follow its comparison link. There is no comparison-list endpoint; retain the ID/link. Expand a case to inspect baseline and candidate execution, then every frozen criterion's verdict, rationale, grader and evidence. **Run details** shows configuration and snapshot identity. Split describes intended use; exposure separately describes prior access. The pilot derives tuning cases as **Tuning** and held-out cases as **Previously exposed validation**, not clean held-out evidence.
 
