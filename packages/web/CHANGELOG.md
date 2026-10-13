@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Shared conversation context
+
+- Avoid saving a duplicate recent-history snapshot in new delivery notifications; retain fresh request-time context for Pi, Claude SDK and Muse execution without changing recovery cursors or historical inputs.
+
 ### Muse Code execution
 
 - Add native Muse Code runtime/model selection, account-login defaults with optional explicit API keys, and Pi-owned execution/tool/publication wiring.
