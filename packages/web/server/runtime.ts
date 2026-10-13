@@ -2774,7 +2774,8 @@ export class DispatchRuntime {
       for (const candidate of grants.filter(grant => grant.editorId === actor.definitionId && grant.policy)) {
         try {
           const { grant, target } = this.requireManagementGrant(catalog, actor, candidate.targetId, grants);
-          targets.push({ id: target.id, name: target.name, revision: target.revision, policy: grant.policy });
+          const { maxSavesPerHour: _legacyLimit, ...policy } = grant.policy!;
+          targets.push({ id: target.id, name: target.name, revision: target.revision, policy });
         } catch (error) { if (!(error instanceof ManagementError)) throw error; }
       }
       return detached({ targets: targets.slice(input.offset ?? 0, (input.offset ?? 0) + 100), total: targets.length,
@@ -2783,7 +2784,8 @@ export class DispatchRuntime {
     const { grant, target } = this.requireManagementGrant(catalog, actor, input.targetId, grants);
     const selected = input.revision ? catalog.agents.find(agent => agent.companyId === actor.companyId && agent.id === target.id && agent.revision === input.revision) : target;
     if (!selected) throw new ManagementError(404, "Revision not found.");
-    return detached({ agent: this.managementView(selected), policy: grant.policy });
+    const { maxSavesPerHour: _legacyLimit, ...policy } = grant.policy!;
+    return detached({ agent: this.managementView(selected), policy });
   }
 
   private async saveManagedAgent(tx: Tx, instance: ConversationId, callId: string, raw: unknown) {
