@@ -3,14 +3,16 @@ import type { AgentDefinition } from "../shared/contracts";
 import { ApiError, errorMessage } from "./api";
 import { useSession } from "./session";
 
-export type ManagementField = "instructions" | "provider" | "modelId" | "thinkingLevel";
+export type ManagementField = "instructions" | "provider" | "modelId" | "thinkingLevel" | "skills" | "capabilities" | "connections";
 export type ManagementPolicy = {
   editorRevision: number;
   action: "read" | "save";
   fields: ManagementField[];
   maxSavesPerHour: number;
+  approvedConnectionIds?: string[];
 };
 export type ManagementGrant = {
+  grantedBy?: string;
   editorId: string;
   targetId: string;
   version: number;
