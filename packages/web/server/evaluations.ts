@@ -480,7 +480,9 @@ export async function reconcileEvaluationComparison(tx: Tx, scope: RuntimeScope,
     if (run.attempt.roomId && run.attempt.participantId) {
       try {
         const entries: EntryRecord[] = []; let cursor: Cursor | undefined;
-        do { const page = await tx.scanEntries({ conversationId: Number(run.attempt.roomId) as ConversationId }, 200, cursor); entries.push(...page.items); cursor = page.next; } while (cursor);
+        // scanEntries defaults to descending; committed order is required so the
+        // boundary slice selects entries newer than the seeded prompt across pages.
+        do { const page = await tx.scanEntries({ conversationId: Number(run.attempt.roomId) as ConversationId, order: "ascending" }, 200, cursor); entries.push(...page.items); cursor = page.next; } while (cursor);
         const publicEntries = entries.filter(PublicEntry.is);
         // Output is attributed by the admitted task (byTaskId covers final answers and
         // explicit posts alike) in committed entry order after the seeded prompt. The
