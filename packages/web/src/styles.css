@@ -1391,7 +1391,7 @@ a.button, a.icon-button { text-decoration: none; }
 .eval-criterion h3 { font-size: 16px; }
 .eval-criterion h4 { text-transform: capitalize; }
 .eval-evidence { padding-left: 20px; }
-.eval-experiments pre, .eval-experiments dd, .eval-experiments a, .eval-experiments p { overflow-wrap: anywhere; }
+.eval-experiments pre, .eval-experiments dd, .eval-experiments a, .eval-experiments p, .eval-evidence li, .eval-experiments label { overflow-wrap: anywhere; }
 .eval-experiments pre { white-space: pre-wrap; }
 .eval-experiments fieldset { min-width: 0; border: 0; padding: 0; }
 .eval-fixture-row { padding-block: 12px; border-bottom: 1px solid var(--color-border); }
