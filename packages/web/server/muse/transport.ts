@@ -21,7 +21,11 @@ export async function runMuseQuery(input: {
       error: "Muse Code authorization policy changed. This run cannot continue. Ask the operator to review any earlier work and external effects before starting a new run." };
   }
 
-  const workspace = resolve(homedir(), ".local", "share", "dispatch", "muse-workspaces", invocation.sessionId);
+  // Eval runs root native Muse at the variant fixture so native shell and bridged tools
+  // resolve relative paths identically; ordinary chats keep the isolated session workspace.
+  const workspace = prepared.nativeWorkspace
+    ? resolve(prepared.nativeWorkspace)
+    : resolve(homedir(), ".local", "share", "dispatch", "muse-workspaces", invocation.sessionId);
   await mkdir(workspace, { recursive: true, mode: 0o700 });
   await writeFile(join(workspace, "AGENTS.md"), prepared.systemPrompt, { mode: 0o600 });
   signal.throwIfAborted();

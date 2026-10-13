@@ -22,6 +22,8 @@ export type MusePreparedRun = {
   prompt: MusePrompt;
   systemPrompt: string;
   cwd: string;
+  /** Eval-only: native Muse must run rooted here so its shell resolves relative paths like the bridged tools do. Absent keeps the isolated session workspace. */
+  nativeWorkspace?: string;
   model: string;
   reasoningEffort: MuseReasoningEffort;
   /** Native authorization configuration; absent on checkpoints saved before policy versioning. */
@@ -177,7 +179,7 @@ function scopeFor(input: MuseRunInput, runtime: MuseTaskRuntime, context: Contex
 }
 function configurationKey(prepared: MusePreparedRun) {
   return createHash("sha256").update(JSON.stringify([
-    prepared.userId, prepared.cwd, prepared.systemPrompt, prepared.model, prepared.reasoningEffort,
+    prepared.userId, prepared.cwd, prepared.nativeWorkspace ?? null, prepared.systemPrompt, prepared.model, prepared.reasoningEffort,
     prepared.transportPolicyRevision ?? 0,
   ])).digest("hex");
 }
