@@ -316,16 +316,20 @@ function publicResult(result: StoredResult): EvaluationResult {
   return JSON.parse(JSON.stringify(rest)) as EvaluationResult;
 }
 
-/** Total gate: anything short of a complete, fully passing critical set is blocked or unresolved, never clear. */
+/**
+ * Total gate: an observed critical failure blocks first, regardless of row order or grading
+ * completeness; anything short of a complete, fully passing critical set is unresolved, never clear.
+ */
 export function evaluationGateFor(frozen: Pick<FrozenCase, "criteria">, candidate: { run: EvaluationRun; latestResult: EvaluationResult | null } | null): EvaluationGate {
   if (!candidate || !terminalRun(candidate.run) || !candidate.latestResult) return "unresolved";
   const latest = candidate.latestResult;
-  if (latest.gradingStatus !== "completed") return "unresolved";
   const rows = new Map(latest.criteria.map(row => [row.criterionId, row.verdict]));
+  for (const criterion of frozen.criteria)
+    if (criterion.criticalFailure && rows.get(criterion.criterionId) === "fail") return "blocked";
+  if (latest.gradingStatus !== "completed") return "unresolved";
   for (const criterion of frozen.criteria) {
     const verdict = rows.get(criterion.criterionId);
     if (verdict === undefined) return "unresolved";
-    if (criterion.criticalFailure && verdict === "fail") return "blocked";
     if (criterion.criticalFailure && verdict !== "pass") return "unresolved";
   }
   return "clear";
