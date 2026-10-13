@@ -443,7 +443,7 @@ input::placeholder, textarea::placeholder { color: var(--color-muted); }
 .agent-content-inner > .editor-note, .agent-content-inner > .notice { margin-top: var(--space-4); }
 .agent-phone-facts { display: none; }
 .agent-editor-form { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.agent-editor-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-6) var(--agent-gutter) var(--space-8); }
+.agent-editor-scroll { position: relative; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-6) var(--agent-gutter) var(--space-8); }
 .agent-form-sections { display: grid; gap: var(--space-8); max-width: 1040px; }
 .agent-form-section { display: grid; gap: var(--space-5); min-width: 0; border: 0; padding: 0; margin: 0; }
 .agent-form-section legend { margin-bottom: var(--space-5); padding: 0; }
