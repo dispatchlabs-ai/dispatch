@@ -1,3 +1,4 @@
+import { RuntimeError } from "./runtime-error.js";
 import { museProvider } from "./muse/models.js";
 import { createAgentSecrets } from "./extensions/agent-secrets.js";
 import { withSharedContextCache } from "./collaboration/prompt-cache.js";
@@ -168,10 +169,7 @@ const CatalogDoc = defineDoc<Catalog>({
   initial: () => ({ chats: [], agents: [] }),
 });
 
-export class RuntimeError extends Error {
-  status: number;
-  constructor(status: number, message: string) { super(message); this.status = status; }
-}
+export { RuntimeError } from "./runtime-error.js";
 
 export type RuntimeOptions = {
   stateDir: string;
