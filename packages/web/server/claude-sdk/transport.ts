@@ -72,10 +72,10 @@ export async function runClaudeQuery(input: QueryInput): Promise<ClaudeRunResult
       if (message.type === "result") result = summarizeResult(message, apiError);
       else await input.observe(message);
     }
-  } catch (error) {
-    // The SDK throws after yielding an error result. Preserve that committed failure path without
-    // exposing arbitrary subprocess stderr. Other errors leave the execution uncertain.
-    if (!result || result.success) throw error;
+  } catch {
+    // Preserve a categorized SDK failure, but never persist arbitrary transport diagnostics
+    // as Pi task faults. An exception after a success result still leaves execution uncertain.
+    if (!result || result.success) result = undefined;
   } finally {
     // close() itself is synchronous. Awaiting the actual process close is necessary for Pi's
     // cancellation/idle/worker-retirement guarantees; never leave a detached SDK subprocess behind.
