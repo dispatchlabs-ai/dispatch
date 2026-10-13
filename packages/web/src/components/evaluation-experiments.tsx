@@ -28,6 +28,7 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  useEffect(() => { setError(null); }, [view, comparisonId]);
   const [openId, setOpenId] = useState("");
   const [candidate, setCandidate] = useState(agent.instructions);
   const [baselineRevision, setBaselineRevision] = useState(agent.revision);
