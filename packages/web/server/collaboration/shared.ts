@@ -212,7 +212,10 @@ export class SharedConversations {
           prior: await tx.submissionByRequest(member.conversationId!, `dispatch-delivery:${task.id}`),
         }), ctx);
         // A restored admitted submission must be joined even when its request already advanced the listening cursor.
-        if (!prior && !sdkPrior && !musePrior && member.consideredThrough && messages.findIndex(message => message.id === member.consideredThrough) >= messages.indexOf(incoming)) {
+        // An image-bearing message with no prior submission or admission was never supplied with
+        // its pixels: refreshed context carries only its metadata, so that appearance advancing
+        // the cursor must not count as completed delivery.
+        if (!prior && !sdkPrior && !musePrior && !hasImages(incoming) && member.consideredThrough && messages.findIndex(message => message.id === member.consideredThrough) >= messages.indexOf(incoming)) {
           await runtime.commit(async tx => {
             const turns = await tx.doc(TurnsDoc, task.input.roomId);
             turns.queue = turns.queue.filter(ticket => ticket.owner !== task.id);
@@ -568,7 +571,6 @@ export class SharedConversations {
             member.publicationPriority ||= unseen.some(message => message.mentions.includes(member.id));
             const preparation = await tx.doc(ListeningRequest, api.taskId);
             preparation.through = messages.at(-1)?.id;
-            const hasImages = (message: MessageData) => Boolean(message.images?.length || message.attachments?.some(attachment => attachment.kind === "image"));
             const imageMessages = messages.filter(message => hasImages(message)
               && (runMessageIds.has(message.id) || message.aliases?.some(alias => runMessageIds.has(alias))));
             const candidates = await this.contributions.forReviewer(tx, binding.roomId!, api.conversationId, api.taskId);
@@ -1574,6 +1576,9 @@ export function overlayLiveActivity(groups: ParticipantActivity[], live: LiveSta
 function nativeContent(entry: Pick<EntryRecord, "model">): Pick<MessageData, "text" | "images"> {
   const images = (entry.model ?? []).flatMap(message => typeof message.content === "string" ? [] : message.content.flatMap(part => part.type === "image" ? [{ mimeType: part.mimeType, data: part.data }] : []));
   return { text: textOf(entry).trim(), ...(images.length ? { images } : {}) };
+}
+function hasImages(message: MessageData) {
+  return Boolean(message.images?.length || message.attachments?.some(attachment => attachment.kind === "image"));
 }
 function hasPublicContent(content: Pick<MessageData, "text" | "images">) {
   return Boolean((content.text && content.text !== "[[silent]]") || content.images?.length);
