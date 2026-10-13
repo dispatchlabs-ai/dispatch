@@ -22,7 +22,7 @@ import type {
 } from "../../src/shared/contracts.js";
 import { ProjectsDoc, requireProjectAccess, type ProjectAction, type SharedProjectRecord } from "../project-access.js";
 import { ProjectInstructionsBindingDoc, projectInstructionsSection } from "./project-instructions.js";
-import { assertEvaluationBinding } from "../evaluation-bindings.js";
+import { assertEvaluationBinding, EvaluationBindingDoc } from "../evaluation-bindings.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata, messageAttachments } from "../attachments.js";
 import { managementTools } from "../agent-management.js";
 import { skillLibraryTools } from "../skill-library.js";
@@ -531,6 +531,10 @@ export class SharedConversations {
       })],
       hooks: [hook(GenerationTask, {
         beforeRequest: (request, api, ctx) => this.coordinated(api, ctx, async () => {
+          // Frozen evaluation gate: inside coordinated() so a drift failure cancels the task
+          // (a bare hook throw is reported and swallowed by Pi). Ordinary chats only pay a snapshot read.
+          const evaluation = await api.snapshot(EvaluationBindingDoc, api.conversationId, ctx);
+          if (evaluation?.binding) await this.harness.commit(async tx => { await assertEvaluationBinding(tx, api.conversationId); }, ctx);
           const binding = await api.snapshot(BindingDoc, api.conversationId, ctx);
           if (!binding?.roomId || !binding.participantId) return undefined;
           const reviewing = await this.harness.commit(async tx => {

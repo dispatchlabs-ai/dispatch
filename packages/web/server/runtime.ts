@@ -48,6 +48,7 @@ import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
 import type { AuthPrincipal } from "./auth.js";
 import { ManagementError, advanceSelfGrant, detached, grantHistory, managementFields, readGrants, writeGrant, type Grant } from "./agent-grants.js";
 import { appendEvaluationResult, createEvaluationComparison, findEvaluationComparisonReplay, parseAppendEvaluationResult, parseCreateEvaluationComparison, parseEvaluationProfile, readEvaluationComparison, readEvaluationProfile, readEvaluationProfileRevision, resolveEvaluationFixtures, saveEvaluationProfile, type FrozenRunConfiguration } from "./evaluations.js";
+import { assertEvaluationBinding } from "./evaluation-bindings.js";
 import { managementReadSchema, managementSaveSchema } from "./agent-management.js";
 import { readSkillLibraryGrants, skillLibraryGrantHistory, writeSkillLibraryGrant, type SkillLibraryGrant } from "./skill-library-grants.js";
 import { skillLibraryReadSchema, skillLibrarySaveSchema } from "./skill-library.js";
@@ -2977,6 +2978,9 @@ export class DispatchRuntime {
 
   private async upgradeParticipant(tx: Tx, roomId: ConversationId, companyId: string, member: Member) {
     if (!member.conversationId || !member.agent || !member.agentDefinitionId || (member.membership && member.membership !== "active")) return;
+    // A bound evaluation participant keeps its frozen snapshot; adoption would silently
+    // change the experiment. Authorization, revocation and Stop stay on their own paths.
+    if (await assertEvaluationBinding(tx, member.conversationId)) return;
     const catalog = await tx.doc(CatalogDoc);
     const latest = latestAgent(catalog, companyId, member.agentDefinitionId);
     const mapping = this.worker ? Object.values((await tx.doc(WorkerIdentityDoc)).mappings).find(mapping => mapping.participantId === member.id) : undefined;
