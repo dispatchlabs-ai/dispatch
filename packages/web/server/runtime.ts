@@ -2145,6 +2145,10 @@ export class DispatchRuntime {
     return this.harness.commit(async tx => {
       const agent = latestAgent(await tx.doc(CatalogDoc), scope.companyId, agentId);
       if (!agent) throw new RuntimeError(404, "Agent not found.");
+      // Two identical requests can both miss the first lookup; whoever commits second must
+      // still return the committed receipt rather than fail fresh-admission prerequisites.
+      const raced = await findEvaluationComparisonReplay(tx, scope, agentId, input);
+      if (raced) return raced;
       if (agent.archived) throw new RuntimeError(409, "This agent is archived. Comparisons cannot start.");
       if (agent.revision !== input.expectedAgentRevision)
         throw new RuntimeError(409, "The agent has changed since this comparison was prepared. Reload and review the current revision before running.");
