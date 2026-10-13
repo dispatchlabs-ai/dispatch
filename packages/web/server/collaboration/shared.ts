@@ -22,6 +22,7 @@ import type {
 } from "../../src/shared/contracts.js";
 import { ProjectsDoc, requireProjectAccess, type ProjectAction, type SharedProjectRecord } from "../project-access.js";
 import { ProjectInstructionsBindingDoc, projectInstructionsSection } from "./project-instructions.js";
+import { assertEvaluationBinding } from "../evaluation-bindings.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata, messageAttachments } from "../attachments.js";
 import { managementTools } from "../agent-management.js";
 import { skillLibraryTools } from "../skill-library.js";
@@ -987,6 +988,7 @@ export class SharedConversations {
    * Call only while creating the participant or from the host's safe idle-boundary transaction.
    */
   async bindProjectInstructions(tx: Tx, room: { sharedProjectId?: string }, member: Member) {
+    if (member.conversationId && await assertEvaluationBinding(tx, member.conversationId)) return;
     if (!room.sharedProjectId || !member.conversationId) return;
     const project = (await tx.doc(ProjectsDoc)).projects[room.sharedProjectId];
     const binding = await tx.doc(ProjectInstructionsBindingDoc, member.conversationId);

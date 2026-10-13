@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Context } from "@earendil-works/chord";
+import { assertNativeEvaluation, nativeEvaluationPreparation, prepareNativeEvaluation, type NativeEvaluationPreparation } from "../evaluation-bindings.js";
 import {
   defineDoc, defineExtension, defineTask,
   type ConversationId, type TaskId, type TaskRuntime, type Tx,
@@ -23,6 +24,7 @@ export type ClaudePreparedRun = ClaudeThinkingOptions & {
   systemPrompt: string;
   cwd: string;
   model: string;
+  evaluation?: NativeEvaluationPreparation;
   /** Trusted host binding, not a user ID supplied by the model. */
   userId: string;
 };
@@ -92,7 +94,10 @@ export function createClaudeSdkTask(host: ClaudeTaskHost) {
         if (record.input.previous) await runtime.waitForTask(record.input.previous, context);
         const scope = scopeFor(record.input, runtime, context, record.state.checkpoint.round);
         const prepared = await host.prepare(scope);
+        const agent = await runtime.agent(context);
         await runtime.commit(async tx => {
+          const binding = await prepareNativeEvaluation(tx, runtime.conversationId, scope.input, "claude-agent-sdk", prepared, agent);
+          if (binding) prepared.evaluation = nativeEvaluationPreparation(binding, prepared.systemPrompt);
           const session = await tx.doc(ClaudeSessionDoc, runtime.conversationId);
           // A different authenticated owner or working directory never inherits another execution's session.
           const resume = Boolean(session.sessionId && session.userId === prepared.userId && session.cwd === prepared.cwd);
@@ -103,6 +108,10 @@ export function createClaudeSdkTask(host: ClaudeTaskHost) {
       execute: async (record, runtime, context) => {
         const { prepared, sessionId, resume, round } = record.state.checkpoint;
         const scope = scopeFor(record.input, runtime, context, round);
+        const agent = await runtime.agent(context);
+        await runtime.commit(async tx => {
+          await assertNativeEvaluation(tx, runtime.conversationId, scope.input, "claude-agent-sdk", prepared, agent);
+        }, context);
         const options = await host.options(scope, prepared);
         // Save intent BEFORE external execution. Only this invocation continues below; after restart the
         // recover handler refuses to resend an uncertain prompt, just like a non-replay-safe Pi tool.
