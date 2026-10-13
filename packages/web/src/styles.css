@@ -1368,6 +1368,7 @@ a.button, a.icon-button { text-decoration: none; }
 .agent-access-fields legend { margin-bottom: 8px; }
 .agent-access-fields label { display: flex; align-items: center; gap: 8px; }
 @media (max-width: 600px) {
+  .agent-access-grid { grid-template-columns: minmax(0, 1fr); }
   .agent-access-heading, .agent-access-row { align-items: flex-start; flex-direction: column; }
   .agent-access .button, .agent-access select, .agent-access input, .agent-access-fields label { min-height: 44px; }
   .agent-access-fields input { min-height: auto; }
