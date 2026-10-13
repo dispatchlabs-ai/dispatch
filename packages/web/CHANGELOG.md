@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Agent definitions
+
+- Default a saved agent to Pi when both the save request and prior definition omit the execution backend, while preserving explicit selections and legacy request replay fingerprints.
+
 ### Shared conversation context
 
 - Avoid saving a duplicate recent-history snapshot in new delivery notifications; retain fresh request-time context for Pi, Claude SDK and Muse execution without changing recovery cursors or historical inputs.

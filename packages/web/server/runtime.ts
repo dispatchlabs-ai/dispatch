@@ -2478,7 +2478,8 @@ export class DispatchRuntime {
       if (input.id && !prior) throw new RuntimeError(404, "Agent not found.");
       if (prior?.archived) throw new RuntimeError(409, "This agent is archived. Create a new agent to use its configuration again.");
       if (prior && prior.revision !== input.expectedRevision) throw new RuntimeError(409, "The agent has changed. Reload it before saving.");
-      this.validateAgent({ ...input, executionBackend: input.executionBackend ?? prior?.executionBackend });
+      const executionBackend = input.executionBackend ?? prior?.executionBackend ?? "pi";
+      this.validateAgent({ ...input, executionBackend });
       const now = Date.now();
       const id = prior?.id ?? randomUUID();
       const skills = input.skills ?? prior?.skills ?? [];
@@ -2511,7 +2512,7 @@ export class DispatchRuntime {
       }
       const agent: StoredAgent = {
         id, name: input.name.trim(), description: input.description.trim(),
-        instructions: input.instructions, executionBackend: input.executionBackend ?? prior?.executionBackend, provider: input.provider, modelId: input.modelId, thinkingLevel: input.thinkingLevel,
+        instructions: input.instructions, executionBackend, provider: input.provider, modelId: input.modelId, thinkingLevel: input.thinkingLevel,
         skills, extensions: [...extensions, ...selection.extensions], tools: [...tools, ...selection.tools], connections: selectedConnections,
         revision: (prior?.revision ?? 0) + 1, archived: false, createdAt: prior?.createdAt ?? now, updatedAt: now, companyId: scope.companyId,
         ...(input.requestId ? { saveRequestId: input.requestId, saveFingerprint: fingerprint, savedBy: scope.userId } : {}),
