@@ -97,8 +97,9 @@ export function AgentsPage({
   creating,
   onConnectionsSettings,
   onEvaluationGuardChange,
-  evaluationAgent, onEvaluationAgentChange, onEvaluationContextChange,
+  evaluationAgent, onEvaluationAgentChange, onEvaluationContextChange, active,
 }: {
+  active: boolean;
   evaluationAgent: string | null;
   onEvaluationAgentChange: (id: string | null) => void;
   onEvaluationContextChange: (context: React.ReactNode) => void;
@@ -115,6 +116,7 @@ export function AgentsPage({
   onConnectionsSettings: () => void;
 }) {
   const [evaluationParams] = useSearchParams();
+  const [profileVersion, setProfileVersion] = useState(0);
   const evaluationOpen = !!agent && evaluationAgent === agent.id;
   const executionOpen = evaluationOpen && !!evaluationParams.get("eval") && evaluationParams.get("eval") !== "profile";
   if (editing)
@@ -204,9 +206,9 @@ export function AgentsPage({
           </div>
           <div hidden={!evaluationOpen || executionOpen} className="evaluation-workspace-content">
             <nav className="evaluation-section-links" aria-label="Evaluation views"><Link to={evaluationUrl(agent.id, "results")}>Results</Link><Link to={evaluationUrl(agent.id, "new")}>New comparison</Link></nav>
-            <AgentEvaluation active={evaluationOpen && !executionOpen} key={`evaluation:${agent.id}`} agentId={agent.id} readOnly={agent.archived} onGuardChange={onEvaluationGuardChange} onContextChange={onEvaluationContextChange} onClose={() => { onEvaluationAgentChange(null); requestAnimationFrame(() => document.querySelector<HTMLElement>(".evaluation-entry")?.focus()); }} />
+            <AgentEvaluation onProfileSaved={() => setProfileVersion(value => value + 1)} active={active && evaluationOpen && !executionOpen} key={`evaluation:${agent.id}`} agentId={agent.id} readOnly={agent.archived} onGuardChange={onEvaluationGuardChange} onContextChange={onEvaluationContextChange} onClose={() => { onEvaluationAgentChange(null); requestAnimationFrame(() => document.querySelector<HTMLElement>(".evaluation-entry")?.focus()); }} />
           </div>
-          <EvaluationExperiments key={`experiments:${agent.id}`} agent={agent} active={executionOpen} />
+          <EvaluationExperiments key={`experiments:${agent.id}`} agent={agent} active={active && executionOpen} profileVersion={profileVersion} />
         </div>
       </div>
     </section>

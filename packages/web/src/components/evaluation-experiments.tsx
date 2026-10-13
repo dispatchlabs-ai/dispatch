@@ -15,21 +15,14 @@ const variants: EvaluationVariantKind[] = ["baseline", "candidate"];
 function Evidence({ items }: { items: EvaluationEvidenceView[] }) {
   return <ul className="eval-evidence">{items.map(item => <li key={item.ref}>{item.available && item.url ? <a href={item.url}>{item.label}</a> : <span>{item.label} · {item.available ? "Link unavailable" : "Unavailable"}</span>}{item.truncated ? " · Truncated" : ""}</li>)}</ul>;
 }
-function gate(item: EvaluationComparisonCaseView, variant: EvaluationVariantKind) {
-  const entry = item.runs[variant];
-  const rows = entry?.latestResult?.criteria ?? [];
-  if (item.criteria.some(criterion => criterion.criticalFailure && rows.some(row => row.criterionId === criterion.criterionId && row.verdict === "fail"))) return "Blocked";
-  if (!entry || !entry.latestResult || entry.latestResult.gradingStatus !== "completed" || !["completed", "failed", "cancelled"].includes(entry.run.status)) return "Unresolved";
-  if (item.criteria.some(criterion => !rows.some(row => row.criterionId === criterion.criterionId) || (criterion.criticalFailure && rows.find(row => row.criterionId === criterion.criterionId)?.verdict !== "pass"))) return "Unresolved";
-  return "Clear";
-}
 
-export function EvaluationExperiments({ agent, active }: { agent: AgentDefinition; active: boolean }) {
+export function EvaluationExperiments({ agent, active, profileVersion }: { agent: AgentDefinition; active: boolean; profileVersion: number }) {
   const { api } = useSession();
   const [params, setParams] = useSearchParams();
   const view = params.get("eval") ?? "profile";
   const comparisonId = params.get("comparison");
   const runId = params.get("run");
+  const comparisonVisible = active && ["compare", "judge", "history"].includes(view);
   const [profile, setProfile] = useState<EvaluationProfileResponse | null>(null);
   const [data, setData] = useState<EvaluationComparisonResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,25 +37,33 @@ export function EvaluationExperiments({ agent, active }: { agent: AgentDefinitio
   const [busy, setBusy] = useState(false);
   const receipt = useRef<{ fingerprint: string; operationId: string } | null>(null);
   const judgmentDrafts = useRef<Record<string, JudgmentDraft>>({});
+  const loadedProfileVersion = useRef<number | null>(null);
   const root = `/api/agents/${encodeURIComponent(agent.id)}/evaluation`;
   useEffect(() => {
+    if (!active || view !== "new" || loadedProfileVersion.current === profileVersion) return;
     let current = true;
-    void api<EvaluationProfileResponse>(root).then(value => { if (current) { setProfile(value); setSelected(value.profile?.cases.filter(item => item.enabled && item.split === "tuning").map(item => item.id) ?? []); } }).catch(err => { if (current) setError(errorMessage(err)); });
+    void api<EvaluationProfileResponse>(root).then(value => {
+      if (!current) return;
+      setProfile(value);
+      if (loadedProfileVersion.current === null) setSelected(value.profile?.cases.filter(item => item.enabled && item.split === "tuning").map(item => item.id) ?? []);
+      else setSelected(current => current.filter(id => value.profile?.cases.some(item => item.id === id && item.enabled)));
+      loadedProfileVersion.current = profileVersion;
+    }).catch(err => { if (current) setError(errorMessage(err)); });
     return () => { current = false; };
-  }, [api, root]);
+  }, [api, root, active, view, profileVersion]);
   useEffect(() => {
-    if (!active || !comparisonId) return;
+    if (!comparisonVisible || !comparisonId) return;
     let current = true;
     setLoading(true); setError(null);
     void api<EvaluationComparisonResponse>(`${root}/comparisons/${encodeURIComponent(comparisonId)}`).then(value => { if (current) setData(value); }).catch(err => { if (current) setError(errorMessage(err)); }).finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [api, root, comparisonId, refresh, active]);
+  }, [api, root, comparisonId, refresh, comparisonVisible]);
   // Refresh committed state only; retries never re-admit inference.
   useEffect(() => {
-    if (!active || !data || data.comparison.id !== comparisonId || !data.cases.some(item => variants.some(variant => ["pending", "running"].includes(item.runs[variant]?.run.status ?? "")))) return;
+    if (!comparisonVisible || !data || data.comparison.id !== comparisonId || !data.cases.some(item => variants.some(variant => ["pending", "running"].includes(item.runs[variant]?.run.status ?? "")))) return;
     const timer = setTimeout(() => setRefresh(value => value + 1), 4000);
     return () => clearTimeout(timer);
-  }, [active, data, comparisonId, refresh]);
+  }, [comparisonVisible, data, comparisonId, refresh]);
   async function create() {
     if (!profile?.profile || busy) return;
     setBusy(true); setError(null);
@@ -98,7 +99,7 @@ export function EvaluationExperiments({ agent, active }: { agent: AgentDefinitio
       <div className="eval-create-grid"><Field label="Candidate instructions">{props => <textarea {...props} required value={candidate} disabled={busy} onChange={event => setCandidate(event.target.value)} rows={12} />}</Field>
       <fieldset disabled={busy} className="eval-manifest"><legend>Expected case × variant manifest</legend>
         {!profile ? <Spinner /> : !profile.profile ? <p>No profile configured. Create a profile before running cases.</p> : profile.profile.cases.map(item => <div key={item.id} className="eval-fixture-row">
-          <label><input type="checkbox" checked={selected.includes(item.id)} onChange={event => setSelected(current => event.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))} /> {item.name} · {item.split === "held_out" ? "Held out" : "Tuning"}</label>
+          <label><input type="checkbox" disabled={!item.enabled} checked={selected.includes(item.id)} onChange={event => setSelected(current => event.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))} /> {item.name}{!item.enabled ? " · Disabled" : ""} · {item.split === "held_out" ? "Held out" : "Tuning"}</label>
           {selected.includes(item.id) ? <><Field label={`Fixture ID for ${item.name}`} hint="Operator-provisioned fixture. Checked on admission.">{props => <Input {...props} required value={fixtures[item.id] ?? ""} onChange={event => setFixtures(current => ({ ...current, [item.id]: event.target.value }))} />}</Field>
           <details><summary>Scripted fixture messages</summary><Field label={`Messages for ${item.name}`} hint="JSON array of authorLabel/text objects. These are fixture actors, not live teammates.">{props => <textarea {...props} rows={3} value={scripts[item.id] ?? ""} onChange={event => setScripts(current => ({ ...current, [item.id]: event.target.value }))} />}</Field></details>
           <p className="field-hint">Baseline: Planned · Candidate: Planned</p></> : null}
@@ -114,7 +115,7 @@ export function EvaluationExperiments({ agent, active }: { agent: AgentDefinitio
         <details className="eval-run-details"><summary>Run details</summary><dl><dt>Candidate SHA-256</dt><dd>{displayed.comparison.candidateInstructionsSha256}</dd><dt>Comparison</dt><dd>{comparisonId}</dd></dl>{displayed.cases.map(item => <div key={item.caseId}><h3>{item.name} · {exposureLabel[item.exposure]}</h3>{variants.map(variant => <details key={variant}><summary>{words(variant)} configuration</summary><pre>{JSON.stringify(item.runs[variant]?.run ?? { status: "Missing run" }, null, 2)}</pre></details>)}</div>)}</details>
         {view === "judge" ? target?.entry ? <Judgment key={target.entry.run.id} item={target.item} entry={target.entry} root={root} drafts={judgmentDrafts.current} onSaved={() => setRefresh(value => value + 1)} /> : <Notice>Requested run is not available in this comparison.</Notice> : view === "history" ? target?.entry ? <div>{target.entry.results.length ? target.entry.results.map(result => <details key={result.id} open><summary>{new Date(result.createdAt).toLocaleString()} · {words(result.gradingStatus)}</summary><ResultRows result={result} evidence={target.entry!.evidence} criteria={target.item.criteria} /></details>) : <p>No judgments yet.</p>}</div> : <Notice>Requested run is not available in this comparison.</Notice> : <>
           <p className="field-hint">Clear is not an adoption decision. Missing evidence is not a pass.</p>
-          {displayed.cases.map(item => <details className="eval-case" key={item.caseId} open={displayed.cases.length === 1 ? true : undefined}><summary><strong>{item.name}</strong><span>{exposureLabel[item.exposure]} · Baseline: {gate(item, "baseline")} · Candidate: {gate(item, "candidate")}</span></summary>
+          {displayed.cases.map(item => <details className="eval-case" key={item.caseId} open={displayed.cases.length === 1 ? true : undefined}><summary><strong>{item.name}</strong><span>{exposureLabel[item.exposure]} · Baseline: {words(item.gates.baseline)} · Candidate: {words(item.gates.candidate)}</span></summary>
             <div className="eval-pair">{variants.map(variant => <RunSummary key={variant} item={item} variant={variant} agentId={agent.id} comparisonId={comparisonId} />)}</div>
             {item.criteria.map(criterion => <section className="eval-criterion" key={criterion.criterionId}><h3>{criterion.description} {criterion.criticalFailure ? <span className="revision-badge">Critical</span> : null}</h3><div className="eval-pair">{variants.map(variant => {
               const entry = item.runs[variant];

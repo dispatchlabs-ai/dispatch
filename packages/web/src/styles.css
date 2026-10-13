@@ -1357,7 +1357,7 @@ a.button, a.icon-button { text-decoration: none; }
 }
 
 /* Evaluation experiments retain authoring drafts in their separate mounted pane. */
-.eval-experiments { padding: 20px; min-width: 0; }
+.eval-experiments { padding: 20px; min-width: 0; height: 100%; overflow-y: auto; container-type: inline-size; }
 .eval-experiments[hidden] { display: none; }
 .eval-experiments h2 { margin: 12px 0; }
 .eval-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
@@ -1376,10 +1376,14 @@ a.button, a.icon-button { text-decoration: none; }
 .eval-fixture-row { padding-block: 12px; border-bottom: 1px solid var(--color-border); }
 .eval-fixture-row > label { display: flex; align-items: center; gap: 8px; min-height: 44px; }
 .eval-experiments textarea { width: 100%; }
-@media (max-width: 1000px) { .eval-pair, .eval-create-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
+@container (max-width: 740px) { .eval-pair, .eval-create-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
 @media (max-width: 600px) {
   .eval-experiments { padding: 12px; }
   .eval-experiments input, .eval-experiments textarea, .eval-experiments select { font-size: 16px; }
   .eval-experiments summary, .eval-experiments .button, .eval-experiments nav a { min-height: 44px; }
   .eval-experiments label { min-height: 44px; }
 }
+
+.evaluation-workspace-content:not([hidden]) { display: flex; flex-direction: column; }
+.evaluation-workspace-content > nav { flex-shrink: 0; }
+.evaluation-workspace-content > .agent-evaluation { flex: 1; min-height: 0; height: auto; }
