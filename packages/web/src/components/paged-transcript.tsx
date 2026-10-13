@@ -41,7 +41,14 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
   const [replyCount, setReplyCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
-  const historyLoaded = useRef(false);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string>();
+  const latest = useRef(snapshot);
+  latest.current = snapshot;
+  const refreshInFlight = useRef(false);
+  const refreshController = useRef<AbortController | null>(null);
   const inFlight = useRef(false);
   const loadedRevision = useRef(-1);
   const [expired, setExpired] = useState(false);
@@ -79,6 +86,21 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
   };
   const base = `/api/chats/${encodeURIComponent(snapshot.conversation.id)}`;
   const query = threadId ? `threadId=${encodeURIComponent(threadId)}&` : "";
+  // A bounded live page may skip past the retained tail after a reconnect.
+  // Walk back to that tail before joining the pages, never hide the interval.
+  const bridge = useCallback(async (page: Pick<TranscriptPage, "messages" | "activities" | "before" | "generation">, retained: Item[], signal?: AbortSignal) => {
+    let incoming = merge([], items(page));
+    if (!retained.length) return incoming;
+    const tail = retained.at(-1)!;
+    let next = page.before;
+    while (next && !incoming.some(item => item.id === tail.id || item.message?.aliases?.includes(tail.id.slice(2))) && (incoming[0]?.at ?? Infinity) >= tail.at) {
+      const older = await api<TranscriptPage>(`${base}/history?${query}before=${encodeURIComponent(next)}`, undefined, signal);
+      if (older.generation !== page.generation) throw new Error("History changed. Reopen this chat.");
+      incoming = merge(items(older), incoming);
+      next = older.before;
+    }
+    return incoming;
+  }, [api, base, query]);
   const load = useCallback(async (before?: string) => {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -93,35 +115,52 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
     }
     try {
       const page = await api<TranscriptPage>(`${base}/history?${query}${before ? `before=${encodeURIComponent(before)}` : ""}`);
+      const incoming = before ? items(page) : await bridge(page, rowsRef.current);
       if (!alive.current) return;
       if (page.generation !== (snapshot.history?.generation ?? page.generation)) return;
       loadedRevision.current = page.revision ?? requestedRevision;
-      setRows(old => before ? merge(items(page), old) : merge(old, items(page)));
-      if (before || !historyLoaded.current) setCursor(page.before);
-      if (before) historyLoaded.current = true;
+      setRows(old => before ? merge(incoming, old) : merge(old, incoming));
+      if (before || !rowsRef.current.length) setCursor(page.before);
       if (page.root) { setRoot(page.root); setReplyCount(page.replyCount ?? 0); }
     } catch (error) { if (alive.current) { setError(errorMessage(error)); setExpired(error instanceof ApiError && error.code === "HISTORY_CHANGED"); } }
     finally {
       inFlight.current = false;
       if (alive.current) setLoading(false);
     }
-  }, [api, base, query, getScrollElement, virtualizer, snapshot.history?.generation]);
+  }, [api, base, query, getScrollElement, virtualizer, snapshot.history?.generation, bridge]);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  useEffect(() => {
-    if (!threadId) {
-      setRows(old => {
-        const incoming = items(snapshot);
-        const incomingIds = new Set(incoming.map(item => item.id));
-        if (old.length && incoming.length && !old.some(item => incomingIds.has(item.id))) {
-          historyLoaded.current = false;
-          setCursor(snapshot.history?.before ?? null);
-          return incoming;
-        }
-        return merge(old, incoming);
-      });
-      if (!historyLoaded.current) setCursor(snapshot.history?.before ?? null);
+  const refresh = useCallback(async () => {
+    if (refreshInFlight.current) return;
+    refreshInFlight.current = true;
+    const controller = new AbortController();
+    refreshController.current = controller;
+    setRefreshError(undefined);
+    let retained = rowsRef.current;
+    try {
+      let current: ChatSnapshot;
+      do {
+        current = latest.current;
+        const incoming = merge([], items(current));
+        const tail = retained.at(-1);
+        const needsBridge = Boolean(tail && current.history?.before && !incoming.some(item => item.id === tail.id || item.message?.aliases?.includes(tail.id.slice(2))) && (incoming[0]?.at ?? Infinity) >= tail.at);
+        if (!retained.length) setCursor(current.history?.before ?? null);
+        if (needsBridge) setRefreshing(true);
+        const connected = await bridge({ ...current, before: current.history?.before ?? null, generation: current.history?.generation ?? "" }, retained, controller.signal);
+        if (controller.signal.aborted) return;
+        retained = merge(retained, connected);
+        setRows(old => merge(old, connected));
+      } while (current !== latest.current);
+    } catch (error) {
+      if (!controller.signal.aborted) setRefreshError(errorMessage(error));
+    } finally {
+      refreshInFlight.current = false;
+      if (!controller.signal.aborted) setRefreshing(false);
     }
-  }, [snapshot.messages, snapshot.activities, snapshot.history?.before, threadId]);
+  }, [bridge]);
+  useEffect(() => {
+    if (!threadId) void refresh();
+  }, [snapshot.messages, snapshot.activities, snapshot.history?.before, threadId, refresh]);
+  useEffect(() => () => refreshController.current?.abort(), []);
   // Thread pages are bounded and refreshed only when the room revision changed.
   useEffect(() => {
     if (!threadId) return;
@@ -178,8 +217,9 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
   return <div ref={host} className="paged-transcript">
     {root ? <><PublicMessage message={root} participants={participants} chatId={snapshot.conversation.id} /><p className="thread-reply-count">{replyCount} {replyCount === 1 ? "reply" : "replies"}</p></> : null}
     {cursor ? <Button variant="secondary" disabled={loading} onClick={() => void load(cursor)}>Load older</Button> : null}
-    {loading ? <Spinner label="Loading history" /> : null}
-    {error ? <Notice>{error}<Button variant="secondary" onClick={() => { if (expired) { historyLoaded.current = false; setRows([]); setCursor(null); setExpired(false); } void load(expired ? undefined : cursor ?? undefined); }}>{expired ? "Reload history" : "Retry"}</Button></Notice> : null}
+    {loading || refreshing ? <Spinner label="Loading history" /> : null}
+    {refreshError ? <Notice>{refreshError}<Button variant="secondary" onClick={() => void refresh()}>Retry history update</Button></Notice> : null}
+    {error ? <Notice>{error}<Button variant="secondary" onClick={() => { if (expired) { rowsRef.current = []; setRows([]); setCursor(null); setExpired(false); } void load(expired ? undefined : cursor ?? undefined); }}>{expired ? "Reload history" : "Retry"}</Button></Notice> : null}
     <div ref={list} style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}>
       {virtualizer.getVirtualItems().map(row => {
         const item = rows[row.index]!;
