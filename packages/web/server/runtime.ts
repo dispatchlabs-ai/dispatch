@@ -45,7 +45,7 @@ import { Coding } from "./extensions/coding.js";
 import { SharedConversations, SharedDoc, PublicEntry, type Member, type PeopleDirectory, type Person } from "./collaboration/shared.js";
 import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
 import type { AuthPrincipal } from "./auth.js";
-import { ManagementError, detached, grantHistory, managementFields, readGrants, writeGrant, type Grant } from "./agent-grants.js";
+import { ManagementError, advanceSelfGrant, detached, grantHistory, managementFields, readGrants, writeGrant, type Grant } from "./agent-grants.js";
 import { appendEvaluationResult, createEvaluationComparison, findEvaluationComparisonReplay, parseAppendEvaluationResult, parseCreateEvaluationComparison, parseEvaluationProfile, readEvaluationComparison, readEvaluationProfile, readEvaluationProfileRevision, resolveEvaluationFixtures, saveEvaluationProfile, type FrozenRunConfiguration } from "./evaluations.js";
 import { managementReadSchema, managementSaveSchema } from "./agent-management.js";
 import type { McpConnections } from "./mcp-connections.js";
@@ -2601,13 +2601,13 @@ export class DispatchRuntime {
       const editor = latestAgent(catalog, principal.companyId, input.editorId);
       const target = latestAgent(catalog, principal.companyId, input.targetId);
       if (!editor || editor.archived || editor.revision !== input.policy!.editorRevision) throw new ManagementError(409, "Reload the editor revision before granting access.");
-      this.requireManagementTarget(target, input.editorId);
+      this.requireManagementTarget(target);
       if (input.policy!.action === "save" && !input.policy!.fields.length) throw new ManagementError(400, "Choose editable fields for a save grant.");
     }), context);
   }
 
-  private requireManagementTarget(target: StoredAgent | undefined, editorId: string): asserts target is StoredAgent {
-    if (!target || target.archived || target.id === editorId)
+  private requireManagementTarget(target: StoredAgent | undefined): asserts target is StoredAgent {
+    if (!target || target.archived)
       throw new ManagementError(403, "This target is not eligible for management.");
   }
 
@@ -2618,7 +2618,7 @@ export class DispatchRuntime {
     if (grant.policy.editorRevision !== actor.revision || editor.revision !== actor.revision)
       throw new ManagementError(403, `Grant is pinned to revision ${grant.policy.editorRevision}; current definition is ${editor.revision}, acting instance is ${actor.revision}. Wait for base adoption and explicitly re-grant the current revision.`);
     const target = latestAgent(catalog, actor.companyId, targetId);
-    this.requireManagementTarget(target, actor.definitionId);
+    this.requireManagementTarget(target);
     return { grant, target };
   }
 
@@ -2710,6 +2710,11 @@ export class DispatchRuntime {
       at: now, reason: input.reason, evidence: input.evidence ?? [], fields, grantVersion: grant.version,
       ...(input.restoreRevision ? { restoreRevision: input.restoreRevision } : {}) };
     receipts.receipts.push(outcome);
+    if (target.id === actor.definitionId) {
+      await advanceSelfGrant(tx, grant, next.revision, {
+        definitionId: actor.definitionId, instanceId: String(actor.instanceId), operationId: input.operationId,
+      }, now);
+    }
     return managementReceipt(outcome);
   }
 
