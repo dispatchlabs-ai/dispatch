@@ -28,6 +28,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [startupError, setStartupError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const enrollmentToken = useRef<string | null>(null);
+  const enrollmentRequest = useRef<Promise<AuthState> | null>(null);
   const readLocation = useRef(false);
 
   const setState = useCallback((next: AuthState) => {
@@ -115,10 +116,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setStartupError(null);
     const load = async () => {
       if (!enrollmentToken.current) return request<AuthState>("/api/auth/session", undefined, controller.signal);
+      // Effect cleanup must not cancel or replay a one-use invitation claim.
+      enrollmentRequest.current ??= request<AuthState>("/api/auth/enrollment/start", { token: enrollmentToken.current });
       try {
-        return await request<AuthState>("/api/auth/enrollment/start", { token: enrollmentToken.current }, controller.signal);
+        return await enrollmentRequest.current;
       } catch (error) {
         if (controller.signal.aborted || started !== generation.current) throw error;
+        enrollmentRequest.current = null;
         // A lost response can follow a successful, one-time invitation claim.
         const restored = await request<AuthState>("/api/auth/session", undefined, controller.signal);
         if (restored.state === "enrollment" || restored.state === "authenticated") return restored;
@@ -129,6 +133,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     load().then(next => {
       if (controller.signal.aborted || started !== generation.current) return;
       enrollmentToken.current = null;
+      enrollmentRequest.current = null;
       setState(next);
     }).catch(error => {
       if (!controller.signal.aborted && started === generation.current) setStartupError(errorMessage(error));

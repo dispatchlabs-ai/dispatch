@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Sign-in
+
+- Prevent development effect restarts from cancelling and replaying a one-use invitation claim, which could reject a fresh enrollment link as already used.
+
 ### Agent access
 
 - Remove required reasons and hourly save limits from human-configured definition and skill-library grants. Preserve selected targets/fields, revision checks and retry receipts; legacy hourly limits are no longer enforced.
