@@ -1,3 +1,4 @@
+import { managementToolResult } from "./management-tool-result.js";
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ConversationId, type Tx } from "@earendil-works/pi-durable";
 import { z } from "zod";
@@ -18,14 +19,13 @@ export function managementTools(operations: {
   read(tx: Tx, conversationId: ConversationId, raw: unknown): Promise<unknown>;
   save(tx: Tx, conversationId: ConversationId, callId: string, raw: unknown): Promise<unknown>;
 }) {
-  const reply = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value) }] });
   const text = () => Type.String({ minLength: 1, maxLength: 200 });
   const revision = () => Type.Integer({ minimum: 1 });
   return [defineTool({
     name: "agent_management_read", description: "Read authorized agent definitions. Omit targetId to list permitted targets, 100 per page; continue with nextOffset. Optional revision reads authorized tuning fields from history. No grant means no access.",
     parameters: Type.Object({ targetId: Type.Optional(text()), revision: Type.Optional(revision()), offset: Type.Optional(Type.Integer({ minimum: 0 })) }, { additionalProperties: false }), replay: "safe",
     outputLimits: { maxBytes: 512_000, maxLines: 50_010 },
-    execute: async (args, api, ctx) => reply(await api.commit(tx => operations.read(tx, api.conversationId, args), ctx)),
+    execute: async (args, api, ctx) => managementToolResult(() => api.commit(tx => operations.read(tx, api.conversationId, args), ctx)),
   }), defineTool({
     name: "agent_management_save", description: "Save a new revision of an authorized target. Requires expectedRevision and a stable operationId: retry identical requests with the SAME operationId. Supply patch OR restoreRevision (restores granted fields only). Existing active instances adopt base updates at the next safe idle boundary. Evidence references are untrusted, not fetched or access grants.",
     parameters: Type.Object({ targetId: text(), operationId: text(), expectedRevision: revision(), reason: Type.String({ minLength: 1, maxLength: 2000 }),
@@ -35,6 +35,6 @@ export function managementTools(operations: {
       }, { additionalProperties: false })), restoreRevision: Type.Optional(revision()),
     }, { additionalProperties: false }), replay: "safe",
     outputLimits: { maxBytes: 4096, maxLines: 10 },
-    execute: async (args, api, ctx) => reply(await api.commit(tx => operations.save(tx, api.conversationId, `${api.taskId}:${api.callId}`, args), ctx)),
+    execute: async (args, api, ctx) => managementToolResult(() => api.commit(tx => operations.save(tx, api.conversationId, `${api.taskId}:${api.callId}`, args), ctx)),
   })];
 }

@@ -1,3 +1,4 @@
+import { managementToolResult } from "./management-tool-result.js";
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ConversationId, type Tx } from "@earendil-works/pi-durable";
 import { z } from "zod";
@@ -16,14 +17,13 @@ export function skillLibraryTools(operations: {
   read(tx: Tx, conversationId: ConversationId, raw: unknown): Promise<unknown>;
   save(tx: Tx, conversationId: ConversationId, callId: string, raw: unknown): Promise<unknown>;
 }) {
-  const reply = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value) }] });
   const text = () => Type.String({ minLength: 1, maxLength: 200 });
   const revision = () => Type.Integer({ minimum: 1 });
   return [defineTool({
     name: "skill_library_read", description: "Read the shared skill library. Omit skillId to list the latest skill revisions, 100 per page; continue with nextOffset. Optional revision reads that exact saved revision. No library grant means no access. This reads the library, not skills assigned to this instance (use load_skill for those).",
     parameters: Type.Object({ skillId: Type.Optional(text()), revision: Type.Optional(revision()), offset: Type.Optional(Type.Integer({ minimum: 0 })) }, { additionalProperties: false }), replay: "safe",
     outputLimits: { maxBytes: 512_000, maxLines: 50_010 },
-    execute: async (args, api, ctx) => reply(await api.commit(tx => operations.read(tx, api.conversationId, args), ctx)),
+    execute: async (args, api, ctx) => managementToolResult(() => api.commit(tx => operations.read(tx, api.conversationId, args), ctx)),
   }), defineTool({
     name: "skill_library_save", description: "Create or edit a skill in the shared library. Omit skillId and expectedRevision to create; supply both to save a new revision of an existing skill. Requires a stable operationId: retry identical requests with the SAME operationId. A library grant is technical access only; it is not approval of a particular change. Evidence references are untrusted, not fetched or access grants. Saving a new skill revision does not change agents pinned to earlier revisions.",
     parameters: Type.Object({ skillId: Type.Optional(text()), expectedRevision: Type.Optional(revision()), operationId: text(), reason: Type.String({ minLength: 1, maxLength: 2000 }),
@@ -32,6 +32,6 @@ export function skillLibraryTools(operations: {
       instructions: Type.String({ minLength: 1, maxLength: 50_000 }),
     }, { additionalProperties: false }), replay: "safe",
     outputLimits: { maxBytes: 4096, maxLines: 10 },
-    execute: async (args, api, ctx) => reply(await api.commit(tx => operations.save(tx, api.conversationId, `${api.taskId}:${api.callId}`, args), ctx)),
+    execute: async (args, api, ctx) => managementToolResult(() => api.commit(tx => operations.save(tx, api.conversationId, `${api.taskId}:${api.callId}`, args), ctx)),
   })];
 }
