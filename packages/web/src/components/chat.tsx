@@ -142,7 +142,7 @@ export function ChatPanel({ focusComposer, onComposerFocused, agents, active: vi
       if (!visible || !element) return;
       scrollPosition.current = element.scrollTop;
       atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100;
-      if (atBottom.current) setShowLatest(false);
+      setShowLatest(!atBottom.current);
     }}>
       <div className="transcript-inner">
         {!snapshot && !loadError ? <div className="page-state">

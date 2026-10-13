@@ -6,7 +6,7 @@ import { AttachmentPicker, DraftAttachments, type AttachmentComposerProps } from
 import { describeAgentTools, museToolAccessHint } from "../lib/agent-tools";
 import type { Message } from "@earendil-works/pi-ai";
 import { Tabs } from "@base-ui/react/tabs";
-import { ArrowUp, Check, Copy, Ear, LockKeyhole, Pencil, Reply, RotateCcw, Square, UserPlus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Copy, Ear, LockKeyhole, Pencil, Reply, RotateCcw, Square, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import type { AddParticipantsInput, AgentDefinition, AgentParticipant, ApplicationConfig, ChatSnapshot, CompanyPerson, ConversationMessage, ConversationParticipant, ParticipantActivity } from "../shared/contracts";
@@ -203,16 +203,22 @@ export function SharedContextPanel({ criteriaDraft, onCriteriaDraft, snapshot, a
   useEffect(() => { setSelectedId(null); }, [snapshot.conversation.id, threadId]);
   const scroller = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
-  useEffect(() => { atBottom.current = true; }, [threadId]);
+  const [showLatest, setShowLatest] = useState(false);
+  useEffect(() => { atBottom.current = true; setShowLatest(false); }, [threadId]);
   useEffect(() => { if (atBottom.current && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight; }, [snapshot, threadId]);
   return <div tabIndex={-1} aria-label={threadId ? "Thread" : "Participants"} className={`shared-context ${threadId ? "thread-context" : "participants-context"}`}>
     {showHeader ? <header className="context-header"><h2>{threadId ? "Thread" : "Participants"}</h2><IconButton label={threadId ? "Close thread" : "Close participants"} onClick={onClose}><X size={18} /></IconButton></header> : null}
     {threadId ? <>
-      <div className="thread-transcript" ref={scroller} onScroll={event => { const element = event.currentTarget; atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100; }}>
+      <div className="thread-transcript" ref={scroller} onScroll={event => { const element = event.currentTarget; atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 100; setShowLatest(!atBottom.current); }}>
         
         <SharedTranscript snapshot={snapshot} threadId={threadId} />
         <ConversationPresence participants={snapshot.participants} />
       </div>
+      {showLatest ? <div className="latest-row"><Button className="latest-button" variant="secondary" onClick={() => {
+        atBottom.current = true;
+        setShowLatest(false);
+        if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
+      }}><ArrowDown /> Latest messages</Button></div> : null}
       <ConversationComposer key={`${snapshot.conversation.id}:${threadId}`} attachments={attachments} onAddFiles={onAddFiles} onRemoveAttachment={onRemoveAttachment} onRetryAttachment={onRetryAttachment} id={`thread-${snapshot.conversation.id}-${threadId}`} chatId={snapshot.conversation.id} threadId={threadId} participants={snapshot.participants} agents={agents} onAddInstance={onAddInstance} disabled={snapshot.conversation.canParticipate === false} thread running={snapshot.conversation.status === "running"} onSnapshot={onSnapshot} />
     </> : <div className="participants-body">
       <DefinitionOfDone snapshot={snapshot} draft={criteriaDraft} onDraft={onCriteriaDraft} onSnapshot={onSnapshot} />

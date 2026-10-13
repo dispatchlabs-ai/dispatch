@@ -50,6 +50,8 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
   const refreshInFlight = useRef(false);
   const refreshController = useRef<AbortController | null>(null);
   const inFlight = useRef(false);
+  const loadFailed = useRef(false);
+  const refreshFailed = useRef(false);
   const loadedRevision = useRef(-1);
   const [expired, setExpired] = useState(false);
   const alive = useRef(true);
@@ -101,8 +103,9 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
     }
     return incoming;
   }, [api, base, query]);
-  const load = useCallback(async (before?: string) => {
-    if (inFlight.current) return;
+  const load = useCallback(async (before?: string, retry = false) => {
+    if (inFlight.current || loadFailed.current && !retry) return;
+    loadFailed.current = false;
     inFlight.current = true;
     const requestedRevision = revision.current;
     setLoading(true); setError(undefined);
@@ -122,15 +125,16 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
       setRows(old => before ? merge(incoming, old) : merge(old, incoming));
       if (before || !rowsRef.current.length) setCursor(page.before);
       if (page.root) { setRoot(page.root); setReplyCount(page.replyCount ?? 0); }
-    } catch (error) { if (alive.current) { setError(errorMessage(error)); setExpired(error instanceof ApiError && error.code === "HISTORY_CHANGED"); } }
+    } catch (error) { if (alive.current) { loadFailed.current = true; setError(errorMessage(error)); setExpired(error instanceof ApiError && error.code === "HISTORY_CHANGED"); } }
     finally {
       inFlight.current = false;
       if (alive.current) setLoading(false);
     }
   }, [api, base, query, getScrollElement, virtualizer, snapshot.history?.generation, bridge]);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  const refresh = useCallback(async () => {
-    if (refreshInFlight.current) return;
+  const refresh = useCallback(async (retry = false) => {
+    if (refreshInFlight.current || refreshFailed.current && !retry) return;
+    refreshFailed.current = false;
     refreshInFlight.current = true;
     const controller = new AbortController();
     refreshController.current = controller;
@@ -151,7 +155,7 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
         setRows(old => merge(old, connected));
       } while (current !== latest.current);
     } catch (error) {
-      if (!controller.signal.aborted) setRefreshError(errorMessage(error));
+      if (!controller.signal.aborted) { refreshFailed.current = true; setRefreshError(errorMessage(error)); }
     } finally {
       refreshInFlight.current = false;
       if (!controller.signal.aborted) setRefreshing(false);
@@ -161,6 +165,15 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
     if (!threadId) void refresh();
   }, [snapshot.messages, snapshot.activities, snapshot.history?.before, threadId, refresh]);
   useEffect(() => () => refreshController.current?.abort(), []);
+  useEffect(() => {
+    const scroll = getScrollElement();
+    if (!scroll || !cursor || loading || error) return;
+    const loadNearTop = () => {
+      if (!following.current && scroll.scrollTop < 240 && !anchor.current) void load(cursor);
+    };
+    scroll.addEventListener("scroll", loadNearTop);
+    return () => scroll.removeEventListener("scroll", loadNearTop);
+  }, [cursor, loading, error, load, getScrollElement]);
   // Thread pages are bounded and refreshed only when the room revision changed.
   useEffect(() => {
     if (!threadId) return;
@@ -216,10 +229,10 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
   const participants = snapshot.participants;
   return <div ref={host} className="paged-transcript">
     {root ? <><PublicMessage message={root} participants={participants} chatId={snapshot.conversation.id} /><p className="thread-reply-count">{replyCount} {replyCount === 1 ? "reply" : "replies"}</p></> : null}
-    {cursor ? <Button variant="secondary" disabled={loading} onClick={() => void load(cursor)}>Load older</Button> : null}
-    {loading || refreshing ? <Spinner label="Loading history" /> : null}
-    {refreshError ? <Notice>{refreshError}<Button variant="secondary" onClick={() => void refresh()}>Retry history update</Button></Notice> : null}
-    {error ? <Notice>{error}<Button variant="secondary" onClick={() => { if (expired) { rowsRef.current = []; setRows([]); setCursor(null); setExpired(false); } void load(expired ? undefined : cursor ?? undefined); }}>{expired ? "Reload history" : "Retry"}</Button></Notice> : null}
+    {cursor ? <Button variant="secondary" disabled={loading} onClick={() => void load(cursor, true)}>{loading ? <><Spinner label="Loading history" /> Loading…</> : "Load older"}</Button> : null}
+    {(loading && !cursor) || refreshing ? <Spinner label="Loading history" /> : null}
+    {refreshError ? <Notice>{refreshError}<Button variant="secondary" onClick={() => void refresh(true)}>Retry history update</Button></Notice> : null}
+    {error ? <Notice>{error}<Button variant="secondary" onClick={() => { if (expired) { rowsRef.current = []; setRows([]); setCursor(null); setExpired(false); } void load(expired ? undefined : cursor ?? undefined, true); }}>{expired ? "Reload history" : "Retry"}</Button></Notice> : null}
     <div ref={list} style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}>
       {virtualizer.getVirtualItems().map(row => {
         const item = rows[row.index]!;
