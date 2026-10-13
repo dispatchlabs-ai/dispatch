@@ -1430,7 +1430,7 @@ export class SharedConversations {
       const entries = await this.committedEntries(member.conversationId);
       activities.push(...this.projectedActivities(member, entries, live, messages));
     }
-    const page = transcriptPage(messages, activities, query, createHash("sha256").update(JSON.stringify(room.messageAliases ?? {})).digest("hex"));
+    const page = transcriptPage(messages, activities, query, publicHistoryGeneration(await this.committedEntries(roomId), room.messageAliases));
     const participantIds = new Set(room.members.map(member => member.id));
     const membershipKey = JSON.stringify([...participantIds].sort());
     const originals = new Map(messages.map(message => [message.id, message]));
@@ -1443,7 +1443,7 @@ export class SharedConversations {
     const room = await tx.doc(SharedDoc, roomId);
     const member = room.members.find(member => member.kind === "human" && member.userId === userId);
     const messages = await this.publicMessages(roomId, room.messageAliases);
-    const generation = createHash("sha256").update(JSON.stringify([room.messageAliases ?? {}, userId, "mentions"])).digest("hex");
+    const generation = createHash("sha256").update(JSON.stringify([publicHistoryGeneration(await this.committedEntries(roomId), room.messageAliases), userId, "mentions"])).digest("hex");
     const participantIds = new Set(room.members.map(member => member.id));
     const membershipKey = JSON.stringify([...participantIds].sort());
     return mentionsPage(messages.map(message => ({ ...message, mentions: projectedMessageMentions(message, participantIds, membershipKey) })), member?.id ?? `human:${userId}`, before, generation);
@@ -1534,6 +1534,18 @@ async function scanEntries(tx: Tx, conversationId: ConversationId) {
   return entries.reverse();
 }
 function reply(value: unknown) { return { content: [{ type: "text" as const, text: JSON.stringify(value) }] }; }
+
+/** Publication aliases name receipts, not old public rows. Only aliases that
+ * rewrite stored IDs or thread references invalidate loaded history. */
+export function publicHistoryGeneration(entries: EntryRecord[], aliases: Record<string, string> = {}): string {
+  const rewrites = new Map<string, string>();
+  for (const entry of entries) if (PublicEntry.is(entry)) {
+    for (const id of [entry.data.id, entry.data.threadId]) {
+      if (id && aliases[id] && aliases[id] !== id) rewrites.set(id, aliases[id]);
+    }
+  }
+  return digest([...rewrites].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
+}
 
 export function projectMessages(entries: EntryRecord[], aliases: Record<string, string> = {}): MessageData[] {
   const priorIds = new Map<string, string[]>();

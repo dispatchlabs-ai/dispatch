@@ -4,7 +4,7 @@ import type { Attachment, ConversationMessage, ParticipantActivity } from "../sr
 import { ATTACHMENT_IMAGE_MAX_BYTES } from "../src/shared/contracts.js";
 import { attachmentMetadata, type StoredAttachment } from "./attachments.js";
 import { activityPage, transcriptPage } from "./chat-pages.js";
-import { CollaborationError, projectMessages, projectActivityGroups, overlayLiveActivity, type SharedState } from "./collaboration/shared.js";
+import { CollaborationError, publicHistoryGeneration, projectMessages, projectActivityGroups, overlayLiveActivity, type SharedState } from "./collaboration/shared.js";
 import { chatSourceUrl, type ProjectChatMetadata, type ProjectChatReadInput, type ProjectChatResult } from "./project-chat-context.js";
 
 /** The caller authorizes the project first. Sources may be a local commit or a
@@ -37,7 +37,8 @@ export async function readProjectChat(source: ProjectChatSource, roomId: Convers
     const text = new TextDecoder("utf-8", { fatal: true }).decode(await source.bytes(attachment));
     return { data: { ...base, attachment, text: text.slice(start, start + 12000), offset: start, textLength: text.length, nextOffset: start + 12000 < text.length ? start + 12000 : null } };
   }
-  const messages = projectMessages(await source.entries(roomId), source.room.messageAliases);
+  const roomEntries = await source.entries(roomId);
+  const messages = projectMessages(roomEntries, source.room.messageAliases);
   if (input.messageId) {
     const message = messages.find(item => item.id === input.messageId || item.aliases?.includes(input.messageId!));
     if (!message) throw new CollaborationError(404, "Public item not found.");
@@ -59,7 +60,7 @@ export async function readProjectChat(source: ProjectChatSource, roomId: Convers
     activities.push(...projected);
   }
   if (input.activityId) throw new CollaborationError(404, "Public item not found.");
-  const generation = createHash("sha256").update(JSON.stringify([metadata.id, Boolean(input.includeActivity), source.room.messageAliases ?? {}])).digest("hex");
+  const generation = createHash("sha256").update(JSON.stringify([metadata.id, Boolean(input.includeActivity), publicHistoryGeneration(roomEntries, source.room.messageAliases)])).digest("hex");
   const page = transcriptPage(messages.map(safeMessage), activities, { before: input.before, threadId: input.threadId }, generation);
   // Criteria can be arbitrarily long: keep the result bounded and identify truncation.
   const criteria = source.room.definitionOfDone?.markdown ?? "";

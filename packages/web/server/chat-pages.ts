@@ -42,7 +42,8 @@ export function transcriptPage(messages: ConversationMessage[], activities: Part
   }
   const items = [
     ...messages.map((message, timelineOrder) => ({ key: `m:${message.id}`, at: message.createdAt, timelineOrder, message, activity: undefined as ParticipantActivity | undefined })).filter(item => item.message.threadId === canonical),
-    ...activities.map((activity, timelineOrder) => ({ key: `a:${activity.id}`, at: activity.createdAt, timelineOrder, message: undefined as ConversationMessage | undefined, activity })).filter(item => item.activity.threadId === canonical),
+    // Live-only groups are status, not history; their disappearing IDs cannot anchor cursors.
+    ...activities.map((activity, timelineOrder) => ({ key: `a:${activity.id}`, at: activity.createdAt, timelineOrder, message: undefined as ConversationMessage | undefined, activity })).filter(item => item.activity.threadId === canonical && item.activity.entries.length > 0),
   ].sort((a, b) => a.at - b.at);
   let end = destination ? Math.min(items.length, items.findIndex(item => item.message?.id === destination.id) + 1) : items.length;
   if (query.before) {
@@ -50,7 +51,7 @@ export function transcriptPage(messages: ConversationMessage[], activities: Part
     try { cursor = JSON.parse(Buffer.from(query.before, "base64url").toString("utf8")); }
     catch { throw new HistoryCursorError("Invalid history cursor. Reload history."); }
     if (!cursor || typeof cursor.key !== "string" || cursor.generation !== generation) throw new HistoryCursorError("History changed. Reload history.");
-    end = items.findIndex(item => item.key === cursor.key);
+    end = items.findIndex(item => item.key === cursor.key || item.message?.aliases?.some(id => `m:${id}` === cursor.key));
     if (end < 0) throw new HistoryCursorError("History changed. Reload history.");
   }
   const chosen: { key: string; message?: ConversationMessage; activity?: ParticipantActivity }[] = [];
