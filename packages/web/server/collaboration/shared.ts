@@ -80,7 +80,7 @@ const PreparedAttachment = defineDoc<{ attachmentId?: string }>({
 });
 const SdkActivity = defineDoc<{ anchored?: boolean }>({ kind: "dispatch.sdk-activity", version: 1, scope: "task", initial: () => ({}) });
 export const SdkInputEntry = defineEntry<{ threadId: string | null; createdAt: number }>("dispatch.sdk-input");
-const ListeningRequest = defineDoc<{ through?: string; contributionId?: string; publicationOnly?: boolean; imageMessageIds?: string[] }>({
+const ListeningRequest = defineDoc<{ through?: string; contributionId?: string; publicationOnly?: boolean }>({
   kind: "dispatch.listening-request", version: 1, scope: "task", initial: () => ({}),
 });
 type MessageData = {
@@ -536,6 +536,27 @@ export class SharedConversations {
             return candidates.find(item => item.phase === "review" && (!preparation.contributionId || item.id === preparation.contributionId))?.id;
           }, ctx);
           if (reviewing) await this.contributions.admit(binding.roomId, reviewing, ctx);
+          // Bind images to this run's durable inputs only. LiveDoc.run.inputs survive the
+          // generation handoff after each tool round (Pi creates a new GenerationTask),
+          // unlike task-scoped docs; each placed submission entry is the persisted
+          // delivery notification naming its delivered message. Re-derived per request,
+          // so inputs placed at a tool boundary join the binding on the next request.
+          const live = await api.snapshot(LiveDoc, api.conversationId, ctx);
+          const runMessageIds = new Set<string>();
+          if (live?.run?.taskId === api.taskId) {
+            for (const inputId of live.run.inputs) {
+              const record = await this.storage.submission(inputId, ctx);
+              if (!record?.entry) continue;
+              const placed = await this.storage.entry(record.entry, ctx);
+              const deliveredId = placed ? deliveredMessageId(placed.entry.model ?? []) : undefined;
+              if (deliveredId) runMessageIds.add(deliveredId);
+            }
+          } else {
+            // No run owns this generation; fall back to its newest notification rather
+            // than silently dropping that delivered message's images.
+            const deliveredId = deliveredMessageId(request.messages);
+            if (deliveredId) runMessageIds.add(deliveredId);
+          }
           const prepared = await this.harness.commit(async tx => {
             const room = await tx.doc(SharedDoc, binding.roomId!);
             if (room.stopping) throw new Error("The conversation is stopping.");
@@ -547,17 +568,9 @@ export class SharedConversations {
             member.publicationPriority ||= unseen.some(message => message.mentions.includes(member.id));
             const preparation = await tx.doc(ListeningRequest, api.taskId);
             preparation.through = messages.at(-1)?.id;
-            // Bind images to delivered messages and keep them bound for this whole generation:
-            // the notification that started it (its cursor may already have advanced), unseen
-            // messages, and ids bound on earlier requests (tool rounds after consideredThrough moved).
             const hasImages = (message: MessageData) => Boolean(message.images?.length || message.attachments?.some(attachment => attachment.kind === "image"));
-            const imageIds = new Set(preparation.imageMessageIds ?? []);
-            for (const message of unseen) if (hasImages(message)) imageIds.add(message.id);
-            const deliveredId = deliveredMessageId(request.messages);
-            const delivered = deliveredId ? messages.find(message => message.id === deliveredId || message.aliases?.includes(deliveredId)) : undefined;
-            if (delivered && hasImages(delivered)) imageIds.add(delivered.id);
-            preparation.imageMessageIds = [...imageIds];
-            const imageMessages = messages.filter(message => imageIds.has(message.id));
+            const imageMessages = messages.filter(message => hasImages(message)
+              && (runMessageIds.has(message.id) || message.aliases?.some(alias => runMessageIds.has(alias))));
             const candidates = await this.contributions.forReviewer(tx, binding.roomId!, api.conversationId, api.taskId);
             const bound = preparation.contributionId ? (await tx.doc(ContributionsDoc, binding.roomId!)).items[preparation.contributionId] : undefined;
             const candidate = bound ? (bound.phase !== "closed" && bound.reviewer === api.taskId ? bound : undefined) : candidates.find(item => item.phase === "review");
@@ -574,8 +587,8 @@ export class SharedConversations {
             }) };
           }, ctx);
           // Resolved outside the commit; the hook result serves this request only, so the
-          // bytes never become a persisted history entry. Re-resolved on every request of
-          // this generation, which is what keeps images visible across tool rounds.
+          // bytes never become a persisted history entry. Re-derived from run inputs and
+          // re-resolved on every request, which keeps images visible across tool rounds.
           const images = prepared.imageMessages.length ? await this.messageImages(prepared.imageMessages) : [];
           return { messages: [...request.messages, sharedContextMessage(prepared.update, images)] };
         }),
@@ -1582,7 +1595,7 @@ function recentMessages(messages: MessageData[]) {
   return recent;
 }
 
-/** The newest delivery notification in this generation's request history names its delivered message. */
+/** The newest delivery notification among these messages names its delivered message. */
 function deliveredMessageId(messages: readonly { role: string; content: unknown }[]): string | undefined {
   for (let index = messages.length - 1; index >= 0; index--) {
     const message = messages[index]!;
