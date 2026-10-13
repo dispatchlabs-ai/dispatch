@@ -195,10 +195,14 @@ export async function verifyEvaluationFixtureInstance(fixture: EvaluationFixture
   const files: string[] = [];
   const walk = async (dir: string): Promise<void> => {
     for (const entry of await readdir(dir ? join(root, dir) : root, { withFileTypes: true })) {
-      if (entry.name.endsWith(".git")) continue;
       const rel = dir ? `${dir}/${entry.name}` : entry.name;
+      // Symlinks and other non-regular entries are not digestible starting state; reject them
+      // (including .git-named ones) rather than silently omitting state the agent can access.
+      if (!entry.isDirectory() && !entry.isFile())
+        throw new EvaluationError(409, `Evaluation fixture contains an unsupported entry type at ${rel}; only regular files and directories are permitted in verified starting state.`);
+      if (entry.name.endsWith(".git")) continue;
       if (entry.isDirectory()) await walk(rel);
-      else if (entry.isFile()) files.push(rel);
+      else files.push(rel);
     }
   };
   try {
@@ -224,7 +228,7 @@ export async function verifyEvaluationFixtureInstance(fixture: EvaluationFixture
     }
     for (const bare of top.filter(entry => entry.isDirectory() && entry.name.endsWith(".git")).map(entry => `./${entry.name}`).sort())
       lines.push(...(await git([`--git-dir=${join(root, bare.slice(2))}`, "for-each-ref", `--format=ref ${bare} %(refname) %(objectname)`], root)).split("\n").filter(Boolean));
-  } catch { throw new EvaluationError(409, "Evaluation fixture starting state could not be verified; re-provision it before admission."); }
+  } catch (error) { if (error instanceof EvaluationError) throw error; throw new EvaluationError(409, "Evaluation fixture starting state could not be verified; re-provision it before admission."); }
   const digest = createHash("sha256").update((lines.length ? `${lines.join("\n")}\n` : "").split(root).join("<root>")).digest("hex");
   if (digest !== fixture.definitionSha256)
     throw new EvaluationError(409, "Evaluation fixture contents no longer match the pinned definition digest; restore the starting state before admission.");
