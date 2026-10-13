@@ -19,7 +19,7 @@ export function EvaluationFields({ draft, onChange, disabled = false, section, o
     const id = crypto.randomUUID();
     newCaseId.current = id;
     onCaseChange(id); onSectionChange("Cases");
-    onChange({ ...draft, cases: [...draft.cases, { id, name: "", enabled: true, prompt: "", startingConditions: "", inputArtifacts: [], expectedOutcome: "", criterionIds: [], gradingGuidance: "", evaluatorOnly: { referenceAnswer: "", checks: "" } }] });
+    onChange({ ...draft, cases: [...draft.cases, { id, name: "", enabled: true, split: "tuning", prompt: "", startingConditions: "", inputArtifacts: [], expectedOutcome: "", criterionIds: [], gradingGuidance: "", evaluatorOnly: { referenceAnswer: "", checks: "" } }] });
   }
   function text(label: string, value: string, change: (value: string) => void, maxLength = 10000, required = false) {
     return <Field label={label}>{props => <textarea {...props} value={value} required={required} maxLength={maxLength} rows={3} ref={node => { if (node) { node.style.height = "auto"; node.style.height = `${Math.min(node.scrollHeight, 360)}px`; } }} onChange={event => change(event.target.value)} />}</Field>;

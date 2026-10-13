@@ -16,10 +16,14 @@ export type EvaluationArtifactReference = {
   sha256: string;
 }
 
+export type EvaluationCaseSplit = "tuning" | "held_out";
+
 export type EvaluationCase = {
   id: string;
   name: string;
   enabled: boolean;
+  /** Held-out cases stay out of instruction tuning. Legacy stored cases normalize to "tuning" on read. */
+  split: EvaluationCaseSplit;
   prompt: string;
   startingConditions: string;
   inputArtifacts: EvaluationArtifactReference[];
@@ -62,7 +66,19 @@ export type EvaluationProfileResponse = {
   revisions: EvaluationProfileRevision[];
 }
 
-/** Contract for later execution work; this slice does not launch runs or manufacture results. */
+export type EvaluationVariantKind = "baseline" | "candidate";
+/** How much the tested agent could already know about the case. */
+export type EvaluationExposure = "tuning" | "previously_exposed_validation" | "held_out_clean";
+
+/** Server-verified fixture binding for one variant instance. */
+export type EvaluationFixtureBinding = {
+  fixtureId: string;
+  definitionSha256: string;
+  instanceId: string;
+  effectivePath: string;
+  capturedState: string[];
+};
+
 export type EvaluationRun = {
   id: string;
   companyId: string;
@@ -70,6 +86,13 @@ export type EvaluationRun = {
   agentRevision: number;
   profileId: string;
   profileRevision: number;
+  comparisonId: string | null;
+  variant: { kind: EvaluationVariantKind; instructionsSha256: string | null };
+  caseSplit: EvaluationCaseSplit | null;
+  exposure: EvaluationExposure | null;
+  fixture: EvaluationFixtureBinding | null;
+  /** Admitted backend attempt; evidence binds to this identity, not to record ordering. */
+  attempt: { taskId: string | null; roomId: string | null; participantId: string | null; entryBoundary: string | null };
   source:
     | { kind: "standalone"; caseId: string; agentConversationId: string | null }
     | { kind: "real_usage"; agentConversationId: string; roomId: string; submissionIds: string[];
@@ -78,6 +101,9 @@ export type EvaluationRun = {
     skills: { id: string; revision: number }[]; capabilities: { name: string; version: string | null }[];
     environmentReference: string; environmentSha256: string | null };
   status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  /** Server-derived from the admitted attempt's terminal state and committed public-entry
+   * boundary. "unknown" until execution wiring can confirm silence; never infer it client-side. */
+  output: "public_reply" | "no_public_reply" | "unknown";
   requestedBy: string;
   operationId: string;
   createdAt: number;
@@ -110,4 +136,71 @@ export type EvaluationResult = {
     grader: { method: EvaluationGradingMethod; identity: string; version: string; configuration: string } }[];
   agentUsage: EvaluationMeasurements;
   evaluatorUsage: EvaluationMeasurements;
+}
+
+export type EvaluationScriptedMessage = { authorLabel: string; text: string };
+
+export type CreateEvaluationComparisonInput = {
+  operationId: string;
+  profileRevision: number;
+  /** Checked before admission; a mismatch rejects the experiment instead of rebasing it. */
+  expectedAgentRevision: number;
+  caseIds: string[];
+  /** Instruction-only candidate; stored server-side, identified publicly by digest. */
+  candidateInstructions: string;
+  /** Exposure is server-derived from each case's split, and fixture definitions resolve server-side; clients attest neither. */
+  fixtures: Record<string, { fixtureId: string; scriptedMessages: EvaluationScriptedMessage[] }>;
+}
+
+export type CreateEvaluationComparisonResponse = {
+  comparisonId: string;
+  runs: { caseId: string; variant: EvaluationVariantKind; runId: string }[];
+}
+
+export type AppendEvaluationResultInput = {
+  operationId: string;
+  criteria: { criterionId: string; verdict: EvaluationVerdict; reason: string; evidenceReferences: string[] }[];
+  agentUsage?: EvaluationMeasurements;
+  evaluatorUsage?: EvaluationMeasurements;
+}
+
+export type EvaluationEvidenceView = {
+  ref: string;
+  label: string;
+  url: string | null;
+  available: boolean;
+  truncated: boolean;
+}
+
+export type EvaluationGate = "blocked" | "unresolved" | "clear";
+
+export type EvaluationComparisonCaseView = {
+  caseId: string;
+  name: string;
+  split: EvaluationCaseSplit;
+  exposure: EvaluationExposure;
+  criteria: { criterionId: string; description: string; criticalFailure: boolean; gradingMethod: EvaluationGradingMethod }[];
+  runs: Record<EvaluationVariantKind, {
+    run: EvaluationRun;
+    latestResult: EvaluationResult | null;
+    results: EvaluationResult[];
+    evidence: EvaluationEvidenceView[];
+  } | null>;
+  gate: EvaluationGate;
+  complete: boolean;
+  regressions: string[];
+}
+
+export type EvaluationComparisonResponse = {
+  comparison: {
+    id: string;
+    agentDefinitionId: string;
+    agentRevision: number;
+    profileId: string;
+    profileRevision: number;
+    candidateInstructionsSha256: string;
+    createdAt: number;
+    requestedBy: string;
+  };
+  cases: EvaluationComparisonCaseView[];
 }

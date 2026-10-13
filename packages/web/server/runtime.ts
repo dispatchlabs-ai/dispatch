@@ -46,7 +46,7 @@ import { SharedConversations, SharedDoc, PublicEntry, type Member, type PeopleDi
 import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
 import type { AuthPrincipal } from "./auth.js";
 import { ManagementError, detached, grantHistory, managementFields, readGrants, writeGrant, type Grant } from "./agent-grants.js";
-import { parseEvaluationProfile, readEvaluationProfile, readEvaluationProfileRevision, saveEvaluationProfile } from "./evaluations.js";
+import { appendEvaluationResult, createEvaluationComparison, findEvaluationComparisonReplay, parseAppendEvaluationResult, parseCreateEvaluationComparison, parseEvaluationProfile, readEvaluationComparison, readEvaluationProfile, readEvaluationProfileRevision, resolveEvaluationFixtures, saveEvaluationProfile, type FrozenRunConfiguration } from "./evaluations.js";
 import { managementReadSchema, managementSaveSchema } from "./agent-management.js";
 import type { McpConnections } from "./mcp-connections.js";
 
@@ -2128,6 +2128,55 @@ export class DispatchRuntime {
       const agent = latestAgent(await tx.doc(CatalogDoc), scope.companyId, agentId);
       if (!agent) throw new RuntimeError(404, "Agent not found.");
       return saveEvaluationProfile(tx, scope, agentId, agent.archived, input);
+    }, context);
+  }
+
+  async createEvaluationComparison(scope: RuntimeScope, agentId: string, raw: unknown) {
+    const input = parseCreateEvaluationComparison(raw);
+    // A committed creation whose response was lost returns its original receipt before any
+    // fresh-admission prerequisite (fixtures, archived state, agent revision) is rechecked.
+    const replay = await this.harness.commit(async tx => {
+      if (!latestAgent(await tx.doc(CatalogDoc), scope.companyId, agentId)) throw new RuntimeError(404, "Agent not found.");
+      return findEvaluationComparisonReplay(tx, scope, agentId, input);
+    }, context);
+    if (replay) return replay;
+    // Fixture readiness is verified against the operator registry before anything is persisted.
+    const fixtures = await resolveEvaluationFixtures(input);
+    return this.harness.commit(async tx => {
+      const agent = latestAgent(await tx.doc(CatalogDoc), scope.companyId, agentId);
+      if (!agent) throw new RuntimeError(404, "Agent not found.");
+      // Two identical requests can both miss the first lookup; whoever commits second must
+      // still return the committed receipt rather than fail fresh-admission prerequisites.
+      const raced = await findEvaluationComparisonReplay(tx, scope, agentId, input);
+      if (raced) return raced;
+      if (agent.archived) throw new RuntimeError(409, "This agent is archived. Comparisons cannot start.");
+      if (agent.revision !== input.expectedAgentRevision)
+        throw new RuntimeError(409, "The agent has changed since this comparison was prepared. Reload and review the current revision before running.");
+      const configurationFor = (instructions: string): FrozenRunConfiguration => ({
+        runtimeVersion: agent.executionBackend ?? "pi", model: agent.modelId, provider: agent.provider,
+        skills: agent.skills ?? [], capabilities: (agent.capabilities ?? []).map(name => ({ name, version: null })),
+        environmentReference: `agent-revision:${agent.revision}`,
+        environmentSha256: createHash("sha256").update(JSON.stringify([agent.executionBackend ?? "pi", agent.provider, agent.modelId, agent.thinkingLevel, agent.skills ?? [], agent.capabilities ?? [], instructions])).digest("hex"),
+      });
+      return createEvaluationComparison(tx, scope, agentId, input, {
+        fixtures, agentRevision: agent.revision, baselineInstructions: agent.instructions,
+        configuration: { baseline: configurationFor(agent.instructions), candidate: configurationFor(input.candidateInstructions) },
+      });
+    }, context);
+  }
+
+  async evaluationComparison(scope: RuntimeScope, agentId: string, comparisonId: string) {
+    return this.harness.commit(async tx => {
+      if (!latestAgent(await tx.doc(CatalogDoc), scope.companyId, agentId)) throw new RuntimeError(404, "Agent not found.");
+      return readEvaluationComparison(tx, scope, agentId, comparisonId);
+    }, context);
+  }
+
+  async appendEvaluationResult(scope: RuntimeScope, agentId: string, runId: string, raw: unknown) {
+    const input = parseAppendEvaluationResult(raw);
+    return this.harness.commit(async tx => {
+      if (!latestAgent(await tx.doc(CatalogDoc), scope.companyId, agentId)) throw new RuntimeError(404, "Agent not found.");
+      return appendEvaluationResult(tx, scope, agentId, runId, input);
     }, context);
   }
 
