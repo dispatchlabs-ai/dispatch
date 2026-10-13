@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Context } from "@earendil-works/chord";
-import { assertNativeEvaluation, nativeEvaluationPreparation, prepareNativeEvaluation, type NativeEvaluationPreparation } from "../evaluation-bindings.js";
+import { assertNativeEvaluation, EvaluationBindingDoc, nativeEvaluationPreparation, prepareNativeEvaluation, type NativeEvaluationPreparation } from "../evaluation-bindings.js";
 import {
   defineDoc, defineExtension, defineTask,
   type ConversationId, type TaskId, type TaskRuntime, type Tx,
@@ -97,7 +97,8 @@ export function createMuseTask(host: MuseTaskHost) {
         if (record.input.previous) await runtime.waitForTask(record.input.previous, context);
         const scope = scopeFor(record.input, runtime, context, record.state.checkpoint.round);
         const prepared = await host.prepare(scope);
-        const agent = await runtime.agent(context);
+        const binding = await runtime.snapshot(EvaluationBindingDoc, runtime.conversationId, context);
+        const agent = binding?.binding ? await runtime.agent(context) : undefined;
         await runtime.commit(async tx => {
           const binding = await prepareNativeEvaluation(tx, runtime.conversationId, scope.input, "muse-code", prepared, agent);
           if (binding) {
@@ -117,7 +118,7 @@ export function createMuseTask(host: MuseTaskHost) {
       execute: async (record, runtime, context) => {
         const { prepared, invocation, round } = record.state.checkpoint;
         const scope = scopeFor(record.input, runtime, context, round);
-        const agent = await runtime.agent(context);
+        const agent = prepared.evaluation ? await runtime.agent(context) : undefined;
         // Commit intent before external work. A reopened invocation stops at recover, never resends.
         await runtime.commit(async tx => {
           await assertNativeEvaluation(tx, runtime.conversationId, scope.input, "muse-code", prepared, agent);
