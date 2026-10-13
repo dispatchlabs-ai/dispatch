@@ -54,7 +54,7 @@ export function SkillLibraryAccess({ agent, disabled, onBusy, onEditing }: {
     {draft ? <div className="agent-access-form">
       <h3 ref={heading} tabIndex={-1}>{draft.policy ? "Grant create & edit access" : "Revoke library grant"}</h3>
       {draft.policy ? <><div className="agent-access-grid"><Field label="Saves / hour" hint="1–100">{props => <Input {...props} type="number" min={1} max={100} step={1} disabled={locked} value={draft.policy!.maxSavesPerHour} onChange={event => setDraft({ ...draft, policy: { ...draft.policy!, maxSavesPerHour: Number(event.target.value) } })} />}</Field></div>
-      <p className="field-hint">Stays in effect until revoked, including after edits to this agent.</p></> : null}
+      <p className="field-hint">Stays in effect until revoked, including after edits to this agent.</p></> : <p className="field-hint">Revoking this grant does not remove library read access.</p>}
       <Field label="Reason" hint="Required for grant, edit and revocation.">{props => <Input {...props} maxLength={2000} disabled={locked} value={draft.reason} onChange={event => setDraft({ ...draft, reason: event.target.value })} />}</Field>
       {error ? <Notice>{error}</Notice> : null}
       {retry ? <Notice tone="info">Outcome not confirmed. Review latest, then retry the identical request.</Notice> : null}
