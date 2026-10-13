@@ -383,7 +383,10 @@ export async function readEvaluationComparison(tx: Tx, scope: RuntimeScope, agen
         if (row.verdict === "pass" && candidateRows.get(row.criterionId) !== "pass") regressions.push(row.criterionId);
     }
     return { caseId: frozen.caseId, name: frozen.name, split: frozen.split, exposure: frozen.exposure,
-      criteria: frozen.criteria, runs, gates: { baseline: evaluationGateFor(frozen, runs.baseline), candidate: evaluationGateFor(frozen, runs.candidate) },
+      // Deep-clone frozen criteria inside the transaction: raw Chord draft overlays
+      // throw "Cannot use a settled overlay" when read after the commit settles.
+      criteria: JSON.parse(JSON.stringify(frozen.criteria)) as FrozenCase["criteria"],
+      runs, gates: { baseline: evaluationGateFor(frozen, runs.baseline), candidate: evaluationGateFor(frozen, runs.candidate) },
       complete: Boolean(runs.baseline && runs.candidate
         && runs.baseline.latestResult?.gradingStatus === "completed" && runs.candidate.latestResult?.gradingStatus === "completed"),
       regressions };
