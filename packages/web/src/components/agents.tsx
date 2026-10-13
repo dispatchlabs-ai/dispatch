@@ -1,7 +1,7 @@
 import { Link, useSearchParams } from "react-router";
 import { EvaluationExperiments, evaluationUrl } from "./evaluation-experiments";
 import { NamedSecrets } from "./named-secrets";
-import { ArrowRight, Archive, Bot, Pencil } from "lucide-react";
+import { ArrowRight, Archive, Bot, Menu, Pencil } from "lucide-react";
 import { useRef, useState } from "react";
 import type {
   AgentDefinition,
@@ -98,9 +98,10 @@ export function AgentsPage({
   creating,
   onConnectionsSettings,
   onEvaluationGuardChange,
-  evaluationAgent, onEvaluationAgentChange, onEvaluationContextChange, active,
+  evaluationAgent, onEvaluationAgentChange, onEvaluationContextChange, active, onMenu,
 }: {
   active: boolean;
+  onMenu: () => void;
   evaluationAgent: string | null;
   onEvaluationAgentChange: (id: string | null) => void;
   onEvaluationContextChange: (context: React.ReactNode) => void;
@@ -156,7 +157,7 @@ export function AgentsPage({
   );
   return (
     <section className="agent-view">
-      <header className="view-heading agent-heading">
+      {executionOpen ? <header className="eval-compact-header"><Button className="eval-menu" variant="ghost" onClick={onMenu} aria-haspopup="dialog"><Menu size={20} /> Menu</Button><h1>{evaluationParams.get("eval") === "new" ? "New comparison" : evaluationParams.get("eval") === "judge" ? "Human judgment" : evaluationParams.get("eval") === "history" ? "Judgment history" : evaluationParams.get("eval") === "results" ? "Results" : "Compare"}</h1><span>{agent.name} / Evaluations</span></header> : <header className="view-heading agent-heading">
         <div>
           <p className="page-eyebrow">Agents{evaluationOpen ? ` / ${agent.name}` : ""}</p>
           <div className="agent-title-line"><span className="agent-object-icon"><Bot size={30} aria-hidden="true" /></span><h1>{evaluationOpen ? "Evaluations" : agent.name}</h1>{isDefault && !evaluationOpen ? <span className="sidebar-tag">Default</span> : null}</div>
@@ -176,8 +177,8 @@ export function AgentsPage({
             </Button>
           </div>
         ) : null}
-      </header>
-      <nav className="object-section-nav" aria-label="Agent views">
+      </header>}
+      <nav hidden={executionOpen} className="object-section-nav" aria-label="Agent views">
         <Link className="button button-ghost" aria-current={!evaluationOpen ? "page" : undefined} to={`/?section=agents&agent=${encodeURIComponent(agent.id)}`} onClick={event => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0) onEvaluationAgentChange(null); }}>Overview</Link>
         <Link className="button button-ghost evaluation-entry" aria-current={evaluationOpen ? "page" : undefined} to={evaluationUrl(agent.id)}>Evaluations</Link>
       </nav>

@@ -797,7 +797,7 @@ export function Workspace() {
           </Tabs.Panel>)}
           </div>
           {visited.agents ? <div className="workspace-section" hidden={section !== "agents"}>
-            <AgentsPage active={section === "agents"} evaluationAgent={evaluationAgent} onEvaluationAgentChange={id => { setEvaluationAgent(id); setSearchParams({ section: "agents", ...(selectedAgent ? { agent: selectedAgent.id } : {}), ...(id ? { eval: "profile" } : {}) }); }} onEvaluationContextChange={setEvaluationContext} onEvaluationGuardChange={setEvaluationGuard} agent={selectedAgent} editing={editingAgent} config={config} onEditingChange={setEditingAgent}
+            <AgentsPage onMenu={() => setNavigationOpen(true)} active={section === "agents"} evaluationAgent={evaluationAgent} onEvaluationAgentChange={id => { setEvaluationAgent(id); setSearchParams({ section: "agents", ...(selectedAgent ? { agent: selectedAgent.id } : {}), ...(id ? { eval: "profile" } : {}) }); }} onEvaluationContextChange={setEvaluationContext} onEvaluationGuardChange={setEvaluationGuard} agent={selectedAgent} editing={editingAgent} config={config} onEditingChange={setEditingAgent}
               onSaved={finishAgentEdit} onConnectionsSettings={() => selectSection("connections")}
               onCancel={() => requestAgentAction(() => finishAgentEdit())} onEdit={editAgent}
               onStartChat={agentId => chooseAgents(agentId)} creating={creating || createFailed} />
@@ -840,7 +840,7 @@ export function Workspace() {
     <footer className="workspace-status">
       <div className="mobile-workspace-actions">
         <div className="mobile-navigation">
-          <Modal title="Your workspace" description={config.company.name} side="left" open={navigationOpen} onOpenChange={setNavigationOpen} finalFocus={section === "projects" ? () => document.querySelector<HTMLButtonElement>(".projects-mobile-header button") : undefined} trigger={section === "projects" ? undefined : <Button variant="ghost" className="workspace-action">
+          <Modal title="Your workspace" description={config.company.name} side="left" open={navigationOpen} onOpenChange={setNavigationOpen} finalFocus={executionRouteOpen ? () => document.querySelector<HTMLButtonElement>(".eval-menu") : section === "projects" ? () => document.querySelector<HTMLButtonElement>(".projects-mobile-header button") : undefined} trigger={section === "projects" || executionRouteOpen ? undefined : <Button variant="ghost" className="workspace-action">
             <Menu size={21} /> Menu</Button>}>
             <nav className={`mobile-destinations ${section === "projects" ? "projects-destinations" : ""}`} aria-label="Workspace navigation">
               {(["projects", "agents", "chats"] as const).map(destination => <a key={destination} className="button button-ghost" href={`/?${new URLSearchParams(sectionLocation(destination))}`} aria-current={section === destination ? "page" : undefined} onClick={event => navigateSection(event, destination)}>
