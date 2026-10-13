@@ -5,7 +5,7 @@ import { MuseClient, MuseInteractionRequiredError } from "./client.js";
 import { museCommandId, type MuseInvocation, type MusePreparedRun, type MuseRunResult } from "./task.js";
 
 // Increment when the native authorization posture changes; old sessions must start fresh.
-export const MUSE_TRANSPORT_POLICY_REVISION = 2;
+export const MUSE_TRANSPORT_POLICY_REVISION = 3;
 
 type Bridge = { url: string; headers: Record<string, string>; toolNames: string[]; authorize(): Promise<void> };
 type Terminal = { terminal: string; error?: { kind: string } };
@@ -29,7 +29,7 @@ export async function runMuseQuery(input: {
   const allowed = new Set(bridge.toolNames.map(name => `mcp__dispatch__${name}`));
   const client = new MuseClient(process.env.DISPATCH_MUSE_EXECUTABLE ?? "muse", [
     "serve", "--provider", "meta", "--model", prepared.model,
-    "--trust-workspace",
+    "--disable-sandbox", "--trust-workspace",
   ], workspace, nativeMuseEnvironment(), async (_method, params) => {
     signal.throwIfAborted();
     if (params.sessionId !== invocation.sessionId || typeof params.approvalId !== "string") throw new MuseInteractionRequiredError();
@@ -82,7 +82,7 @@ export async function runMuseQuery(input: {
     signal.throwIfAborted();
     await client.request(invocation.resume ? "session/resume" : "session/start", {
       commandId: invocation.sessionCommandId, sessionId: invocation.sessionId,
-      ...(invocation.resume ? { excludeItems: true } : { workspaceRoot: workspace, workspaceRoots: [workspace], modelId: prepared.model, providerId: "meta", approvalMode: "promptUnmatched" }),
+      ...(invocation.resume ? { excludeItems: true } : { workspaceRoot: workspace, workspaceRoots: [workspace], modelId: prepared.model, providerId: "meta", approvalMode: "allowAll" }),
       config: { mcpServers: { dispatch: { transport: "streamableHttp", url: bridge.url, headers: bridge.headers, mode: "required" } } },
     });
     signal.throwIfAborted();
