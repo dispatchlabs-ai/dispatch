@@ -254,6 +254,14 @@ Use **Profile revision** in the context panel (open **Details** on phones) to in
 
 Artifacts are references only, not uploads, verified files or access grants. Each requires a nonblank name (up to 200 characters), reference (2,048) and SHA-256 (exactly 64 lowercase hexadecimal characters). The service stores the supplied hash; it does not fetch or verify the artifact. Evaluator-only labeling is not a separate human permission: company users who can inspect the profile can read that material. Profile access never grants access to referenced private evidence.
 
+#### Author cases without leaking the answer
+
+Keep task-visible prompts, starting conditions and input artifacts separate from expected outcomes, grading guidance and reference answers/checks. Starting conditions should identify resources, permissions and permitted effects, not reveal facts the agent is meant to discover. Sanitized scripted messages can present claims for the agent to investigate; they are fixture evidence, not real participants' actions. Use synthetic secret markers, never live credentials.
+
+Define exactly which evidence each criterion needs. A before/after fixture diff can detect retained changes in captured state, not reverted writes or external effects. A secret scan supports only the channels actually captured and inspected; missing or partial capture is insufficient evidence, not a pass. Tie execution evidence to the evaluated attempt, not timestamps or assumed record-ID ordering. Critical failures block acceptance; missing evidence for a required critical check leaves it unresolved rather than being averaged into a score.
+
+Cases used to tune instructions are not clean held-out evidence. Record prior exposure and keep validation details outside the tested agent's accessible context; a separate directory on the same accessible filesystem is not an access boundary. Saving these descriptions still does not execute cases or produce verdicts.
+
 #### Profile API and limits
 
 Authenticated company-session endpoints:
