@@ -46,7 +46,7 @@ import { Coding } from "./extensions/coding.js";
 import { SharedConversations, SharedDoc, PublicEntry, type Member, type PeopleDirectory, type Person } from "./collaboration/shared.js";
 import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
 import type { AuthPrincipal } from "./auth.js";
-import { ManagementError, advanceSelfGrant, detached, grantHistory, managementFields, readGrants, writeGrant, type Grant } from "./agent-grants.js";
+import { ManagementError, detached, grantHistory, managementFields, readGrants, writeGrant, type Grant } from "./agent-grants.js";
 import { appendEvaluationResult, claimEvaluationRunForAdmission, createEvaluationComparison, findEvaluationAdmissionReceipt, findEvaluationComparisonReplay, parseAppendEvaluationResult, parseCreateEvaluationComparison, parseEvaluationProfile, readEvaluationAdmissionPlan, readEvaluationComparison, readEvaluationProfile, readEvaluationProfileRevision, recordEvaluationAdmission, resolveEvaluationFixtures, saveEvaluationProfile, verifyEvaluationFixtureInstance, type FrozenRunConfiguration } from "./evaluations.js";
 import { assertEvaluationBinding, bindEvaluation, resolveEvaluationBinding } from "./evaluation-bindings.js";
 import { ProjectInstructionsBindingDoc } from "./collaboration/project-instructions.js";
@@ -2744,9 +2744,8 @@ export class DispatchRuntime {
   private requireManagementGrant(catalog: Catalog, actor: ManagementActor, targetId: string, grants: Grant[]) {
     const grant = grants.find(item => item.editorId === actor.definitionId && item.targetId === targetId && item.policy);
     const editor = latestAgent(catalog, actor.companyId, actor.definitionId);
+    // Grants last until revoked; editorRevision only records the revision they were issued against.
     if (!grant?.policy || !editor || editor.archived) throw new ManagementError(403, "No current management grant for this editor and target.");
-    if (grant.policy.editorRevision !== actor.revision || editor.revision !== actor.revision)
-      throw new ManagementError(403, `Grant is pinned to revision ${grant.policy.editorRevision}; current definition is ${editor.revision}, acting instance is ${actor.revision}. ${grant.policy.editorRevision === editor.revision ? "Wait for the acting instance to adopt the current definition revision at a safe idle boundary; this grant is already current." : "Ask a human to renew this grant for the current definition revision; the acting instance must also adopt that revision."}`);
     const target = latestAgent(catalog, actor.companyId, targetId);
     this.requireManagementTarget(target);
     return { grant, target };
@@ -2874,11 +2873,6 @@ export class DispatchRuntime {
       at: now, reason: input.reason, evidence: input.evidence ?? [], fields, grantVersion: grant.version,
       ...(input.restoreRevision ? { restoreRevision: input.restoreRevision } : {}) };
     receipts.receipts.push(outcome);
-    if (target.id === actor.definitionId) {
-      await advanceSelfGrant(tx, grant, next.revision, {
-        definitionId: actor.definitionId, instanceId: String(actor.instanceId), operationId: input.operationId,
-      }, now);
-    }
     return managementReceipt(outcome);
   }
 
@@ -2899,8 +2893,6 @@ export class DispatchRuntime {
     const grant = grants.find(item => item.editorId === actor.definitionId && item.policy);
     const editor = latestAgent(catalog, actor.companyId, actor.definitionId);
     if (!grant?.policy || !editor || editor.archived) throw new ManagementError(403, "No current skill library grant for this editor.");
-    if (grant.policy.editorRevision !== actor.revision || editor.revision !== actor.revision)
-      throw new ManagementError(403, `Grant is pinned to revision ${grant.policy.editorRevision}; current definition is ${editor.revision}, acting instance is ${actor.revision}. ${grant.policy.editorRevision === editor.revision ? "Wait for the acting instance to adopt the current definition revision at a safe idle boundary; this grant is already current." : "Ask a human to renew this grant for the current definition revision; the acting instance must also adopt that revision."}`);
     return grant;
   }
 
@@ -2909,20 +2901,20 @@ export class DispatchRuntime {
     const actor = await this.shared.managementActor(tx, instance);
     // The catalog owner is the backend; workers hold only a projection and have no library mediation yet.
     if (this.worker) throw new ManagementError(503, "Skill library service is unavailable on this worker.");
+    // Every active agent may read its company's library; only creating and editing need a grant.
     const catalog = await tx.doc(CatalogDoc);
-    const grant = this.requireSkillLibraryGrant(catalog, actor, await readSkillLibraryGrants(tx, actor.companyId));
     const records = (catalog.skills ?? []).filter(skill => skill.companyId === actor.companyId);
     if (!input.skillId) {
       const latest = new Map<string, StoredSkill>();
       for (const skill of records) latest.set(skill.id, skill);
       const skills = [...latest.values()].map(skill => ({ id: skill.id, name: skill.name, description: skill.description, revision: skill.revision }));
       return detached({ skills: skills.slice(input.offset ?? 0, (input.offset ?? 0) + 100), total: skills.length,
-        nextOffset: (input.offset ?? 0) + 100 < skills.length ? (input.offset ?? 0) + 100 : null, policy: grant.policy });
+        nextOffset: (input.offset ?? 0) + 100 < skills.length ? (input.offset ?? 0) + 100 : null });
     }
     const selected = input.revision ? records.find(skill => skill.id === input.skillId && skill.revision === input.revision)
       : records.findLast(skill => skill.id === input.skillId);
     if (!selected) throw new ManagementError(404, "Skill revision not found.");
-    return detached({ skill: publicSkill(selected), policy: grant.policy });
+    return detached({ skill: publicSkill(selected) });
   }
 
   private async saveSkillLibrary(tx: Tx, instance: ConversationId, callId: string, raw: unknown) {

@@ -20,7 +20,7 @@ export function skillLibraryTools(operations: {
   const text = () => Type.String({ minLength: 1, maxLength: 200 });
   const revision = () => Type.Integer({ minimum: 1 });
   return [defineTool({
-    name: "skill_library_read", description: "Read the shared skill library. Omit skillId to list the latest skill revisions, 100 per page; continue with nextOffset. Optional revision reads that exact saved revision. No library grant means no access. This reads the library, not skills assigned to this instance (use load_skill for those).",
+    name: "skill_library_read", description: "Read the shared skill library. Omit skillId to list the latest skill revisions, 100 per page; continue with nextOffset. Optional revision reads that exact saved revision. Every agent can read; creating and editing need a separate grant. This reads the library, not skills assigned to this instance (use load_skill for those).",
     parameters: Type.Object({ skillId: Type.Optional(text()), revision: Type.Optional(revision()), offset: Type.Optional(Type.Integer({ minimum: 0 })) }, { additionalProperties: false }), replay: "safe",
     outputLimits: { maxBytes: 512_000, maxLines: 50_010 },
     execute: async (args, api, ctx) => managementToolResult(() => api.commit(tx => operations.read(tx, api.conversationId, args), ctx)),

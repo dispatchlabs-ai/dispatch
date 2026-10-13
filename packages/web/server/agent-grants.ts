@@ -34,20 +34,6 @@ export async function grantHistory(tx: Tx, principal: AuthPrincipal) {
   return detached((await tx.doc(GrantsDoc)).changes.filter(change => change.companyId === principal.companyId));
 }
 
-// Continuity is technical access, not a new approval. Only a successful authorized
-// self-save calls this, on the same commit line as its revision and retry receipt.
-export async function advanceSelfGrant(tx: Tx, prior: Grant, editorRevision: number, actor: { definitionId: string; instanceId: string; operationId: string }, at: number) {
-  const doc = await tx.doc(GrantsDoc);
-  const current = doc.grants.find(grant => grant.companyId === prior.companyId && grant.editorId === actor.definitionId && grant.targetId === actor.definitionId);
-  if (!current?.policy || current.version !== prior.version) throw new ManagementError(409, "The self-grant changed before the save.");
-  const before = detached(current);
-  current.policy.editorRevision = editorRevision;
-  current.version++;
-  doc.changes.push({ companyId: current.companyId, at, source: "self-save", actor,
-    requestId: `self-save:${actor.operationId}`, fingerprint: JSON.stringify([actor, before.version, editorRevision]),
-    reason: "Automatic self-grant continuity after an agent-authored save; not manager approval.", before, after: detached(current) });
-}
-
 /** Only the human-session route calls this writer; no native tool receives it. */
 export async function writeGrant(tx: Tx, principal: AuthPrincipal, raw: unknown, validate: (input: GrantInput) => Promise<void>) {
   if (!principal.sessionId || !principal.userId) throw new ManagementError(403, "Human session required for grant administration.");
