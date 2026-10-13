@@ -30,6 +30,7 @@ export type RuntimeService = Pick<DispatchRuntime,
   | "saveEvaluationProfile"
   | "createEvaluationComparison"
   | "evaluationComparison"
+  | "admitEvaluationRun"
   | "appendEvaluationResult"
   | "addParticipants"
   | "agentConnections"

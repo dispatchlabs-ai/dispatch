@@ -174,6 +174,18 @@ export type EvaluationEvidenceView = {
 
 export type EvaluationGate = "blocked" | "unresolved" | "clear";
 
+/**
+ * Server-derived admission availability for one run, separate from grading gates.
+ * Advisory only: the admission endpoint rechecks every prerequisite. Clients render
+ * this and never derive eligibility from run status or backend names themselves.
+ */
+export type EvaluationAdmissionView = {
+  state: "eligible" | "admitted" | "unavailable";
+  available: boolean;
+  /** Concise reason when unavailable; null when eligible or admitted. */
+  reason: string | null;
+}
+
 export type EvaluationComparisonCaseView = {
   caseId: string;
   name: string;
@@ -185,6 +197,7 @@ export type EvaluationComparisonCaseView = {
     latestResult: EvaluationResult | null;
     results: EvaluationResult[];
     evidence: EvaluationEvidenceView[];
+    admission: EvaluationAdmissionView;
   } | null>;
   /** Authoritative server-derived acceptance gate per variant; clients render, never recompute. */
   gates: Record<EvaluationVariantKind, EvaluationGate>;

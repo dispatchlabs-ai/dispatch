@@ -405,6 +405,7 @@ export function createApp(options: AppOptions) {
   app.post("/api/agents/:id/evaluation", async c => c.json({ profile: await runtime.saveEvaluationProfile(c.get("principal"), c.req.param("id"), await c.req.json()) }));
   app.post("/api/agents/:id/evaluation/comparisons", async c => c.json(await runtime.createEvaluationComparison(c.get("principal"), c.req.param("id"), await c.req.json())));
   app.get("/api/agents/:id/evaluation/comparisons/:comparisonId", async c => c.json(await runtime.evaluationComparison(c.get("principal"), c.req.param("id"), c.req.param("comparisonId"))));
+  app.post("/api/agents/:id/evaluation/runs/:runId/admit", async c => c.json(await runtime.admitEvaluationRun(c.get("principal"), c.req.param("id"), c.req.param("runId"))));
   app.post("/api/agents/:id/evaluation/runs/:runId/results", async c => c.json({ result: await runtime.appendEvaluationResult(c.get("principal"), c.req.param("id"), c.req.param("runId"), await c.req.json()) }));
   app.get("/api/agents/:id/connections", async (c) => c.json({ connections: await runtime.agentConnections(c.get("principal"), c.req.param("id")) }));
   app.post("/api/agents/:id/connections/:connection/reconnect", async (c) => {
