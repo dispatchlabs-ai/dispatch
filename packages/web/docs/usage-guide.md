@@ -18,6 +18,8 @@ The current local development instance uses `http://localhost:5174` (verified Oc
 
 Changes to launcher settings, environment variables, or the MCP manifest still require a manual launcher restart. Stop development before installing changed dependencies.
 
+**Version label after a release merge:** Vite reads `packages/web/package.json` when its configuration loads; a running frontend can retain the old version after the manifest changes. Reload the Vite configuration, then refresh the browser and verify the rendered label and served `VITE_APP_VERSION`. A backend reload or browser refresh alone does not replace Vite's retained value. Do not kill the frontend child to refresh it under `scripts/dev.ts`: a child exit stops both frontend and backend. Coordinate any full launcher restart using the safety guidance below. Built mode instead requires rebuilding and serving the new browser assets.
+
 ### Background development
 
 From the repository root inside `nix develop`, with no existing dev launcher running:
