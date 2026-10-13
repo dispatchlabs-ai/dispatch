@@ -95,7 +95,7 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
     </nav>
     {error ? <Notice>{error}</Notice> : null}
     {view === "new" ? <form onSubmit={event => { event.preventDefault(); void create(); }}>
-      <Notice tone="info"><strong>Trusted local execution. Not sandboxed.</strong><br />Runs can use host tools and files.</Notice>
+      <Notice tone="info"><strong>Trusted local execution. Not sandboxed.</strong><br />Runs can use host tools and files.<br />Execution is not available yet.</Notice>
       {baselineRevision !== agent.revision ? <Notice>Agent revision changed to {agent.revision}. Your baseline remains pinned. <Button variant="secondary" disabled={busy} onClick={() => setBaselineRevision(agent.revision)}>Use current baseline revision</Button></Notice> : null}
       <div className="eval-create-grid"><Field label="Candidate instructions" hint="Unsaved snapshot. Agent unchanged." hintPosition="before">{props => <textarea {...props} required value={candidate} disabled={busy} onChange={event => setCandidate(event.target.value)} rows={12} />}</Field>
       <fieldset disabled={busy} className="eval-manifest"><legend>Expected case × variant manifest</legend>
@@ -107,7 +107,7 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
         </div>)}
       </fieldset></div>
       <details className="eval-baseline"><summary>Baseline r{baselineRevision} · Profile {profile?.profile?.revision == null ? "unavailable" : `r${profile.profile.revision}`}</summary><p>Only candidate instructions differ. Baseline configuration is frozen.</p><Button variant="secondary" disabled={busy} onClick={() => { loadedProfileVersion.current = null; setRefresh(value => value + 1); }}>Refresh profile</Button></details>
-      <Button type="submit" disabled={busy || agent.archived || !selected.length || !profile?.profile || loadedProfileVersion.current !== profileVersion}>{busy ? "Submitting…" : "Run comparison"}</Button>
+      <Button type="submit" disabled={busy || agent.archived || !selected.length || !profile?.profile || loadedProfileVersion.current !== profileVersion}>{busy ? "Creating…" : "Create comparison"}</Button>
       {agent.archived ? <p>Archived agents cannot start new experiments.</p> : null}
     </form> : comparisonId ? <>
       <div className="eval-heading"><Button variant="secondary" disabled={loading} onClick={() => setRefresh(value => value + 1)}>Refresh results</Button></div>
