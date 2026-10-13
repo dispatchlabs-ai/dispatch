@@ -9,7 +9,7 @@ import { Button, Field, Input, Notice, Select, Spinner } from "./ui";
 export function evaluationUrl(agentId: string, view = "profile", extra: Record<string, string> = {}) {
   return `/?${new URLSearchParams({ section: "agents", agent: agentId, eval: view, ...extra })}`;
 }
-const words = (value: string) => value.replaceAll("_", " ");
+const words = (value: string) => { const text = value.replaceAll("_", " "); return text.charAt(0).toUpperCase() + text.slice(1); };
 const exposureLabel = { tuning: "Tuning", previously_exposed_validation: "Previously exposed validation", held_out_clean: "Held-out clean" };
 const variants: EvaluationVariantKind[] = ["baseline", "candidate"];
 function Evidence({ items }: { items: EvaluationEvidenceView[] }) {
@@ -38,6 +38,7 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
   const receipt = useRef<{ fingerprint: string; operationId: string } | null>(null);
   const judgmentDrafts = useRef<Record<string, JudgmentDraft>>({});
   const loadedProfileVersion = useRef<number | null>(null);
+  const hasLoadedProfile = useRef(false);
   const root = `/api/agents/${encodeURIComponent(agent.id)}/evaluation`;
   useEffect(() => {
     if (!active || view !== "new" || loadedProfileVersion.current === profileVersion) return;
@@ -45,12 +46,13 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
     void api<EvaluationProfileResponse>(root).then(value => {
       if (!current) return;
       setProfile(value);
-      if (loadedProfileVersion.current === null) setSelected(value.profile?.cases.filter(item => item.enabled && item.split === "tuning").map(item => item.id) ?? []);
+      if (!hasLoadedProfile.current) setSelected(value.profile?.cases.filter(item => item.enabled && item.split === "tuning").map(item => item.id) ?? []);
       else setSelected(current => current.filter(id => value.profile?.cases.some(item => item.id === id && item.enabled)));
       loadedProfileVersion.current = profileVersion;
+      hasLoadedProfile.current = true;
     }).catch(err => { if (current) setError(errorMessage(err)); });
     return () => { current = false; };
-  }, [api, root, active, view, profileVersion]);
+  }, [api, root, active, view, profileVersion, refresh]);
   useEffect(() => {
     if (!comparisonVisible || !comparisonId) return;
     let current = true;
@@ -65,7 +67,7 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
     return () => clearTimeout(timer);
   }, [comparisonVisible, data, comparisonId, refresh]);
   async function create() {
-    if (!profile?.profile || busy) return;
+    if (!profile?.profile || busy || loadedProfileVersion.current !== profileVersion) return;
     setBusy(true); setError(null);
     try {
       const fixtureInputs: CreateEvaluationComparisonInput["fixtures"] = {};
@@ -92,7 +94,7 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
     </nav>
     {error ? <Notice>{error}</Notice> : null}
     {view === "new" ? <form onSubmit={event => { event.preventDefault(); void create(); }}>
-      <h2>New comparison</h2>
+      <div className="eval-heading"><h2>New comparison</h2><Button variant="secondary" disabled={busy} onClick={() => { loadedProfileVersion.current = null; setRefresh(value => value + 1); }}>Refresh profile</Button></div>
       <Notice tone="info"><strong>Trusted local execution. Not sandboxed.</strong><br />Runs can use host tools and files. An independent fixture is required for each variant.</Notice>
       <p>Baseline revision {baselineRevision} · Profile revision {profile?.profile?.revision ?? "Unavailable"}. Candidate instructions replace baseline instructions only in this experiment; they are not saved or adopted.</p>
       {baselineRevision !== agent.revision ? <Notice>Agent revision changed to {agent.revision}. Your baseline remains pinned. <Button variant="secondary" disabled={busy} onClick={() => setBaselineRevision(agent.revision)}>Use current baseline revision</Button></Notice> : null}
@@ -105,7 +107,7 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
           <p className="field-hint">Baseline: Planned · Candidate: Planned</p></> : null}
         </div>)}
       </fieldset></div>
-      <Button type="submit" disabled={busy || agent.archived || !selected.length || !profile?.profile}>{busy ? "Submitting…" : "Run comparison"}</Button>
+      <Button type="submit" disabled={busy || agent.archived || !selected.length || !profile?.profile || loadedProfileVersion.current !== profileVersion}>{busy ? "Submitting…" : "Run comparison"}</Button>
       {agent.archived ? <p>Archived agents cannot start new experiments.</p> : null}
     </form> : comparisonId ? <>
       <div className="eval-heading"><h2>{view === "judge" ? "Human judgment" : view === "history" ? "Judgment history" : "Compare"}</h2><Button variant="secondary" disabled={loading} onClick={() => setRefresh(value => value + 1)}>Refresh results</Button></div>
