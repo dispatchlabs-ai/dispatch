@@ -18,7 +18,7 @@
 
 ### Shared conversation context
 
-- Make Claude/Muse contribution-review settlement replay-safe, committing the review prompt with its listening cursor so recovery does not reapply an older answer against a newer review round. Exact crash-window behavior remains interactively unverified.
+- Make Claude/Muse contribution-review settlement replay-safe, committing the review prompt with its listening cursor so recovery does not reapply an older answer against a newer review round. The local Claude settle-before-checkpoint crash window passed scoped interactive qualification; Muse/hosted execution and other failure windows remain unqualified.
 - Avoid repeated full-history searches when projecting chat activity and reduce mention-history indexing, preserving aliases, ordering and privacy filtering.
 - Preserve authenticated mention metadata in saved messages and their read projections, including permitted mention-based invitations.
 - Avoid saving a duplicate recent-history snapshot in new delivery notifications; retain fresh request-time context for Pi, Claude SDK and Muse execution without changing recovery cursors or historical inputs.
