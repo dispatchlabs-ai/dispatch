@@ -111,15 +111,16 @@ export function mentionsPage(messages: ConversationMessage[], participantId: str
   const lastReply = new Map<string | null, number>();
   for (const [index, message] of messages.entries()) if (message.authorId === participantId && message.kind === "message") lastReply.set(message.threadId, index);
   const newer = new Set<string>();
+  const threads = new Map<string, string | null>();
   const mentioned = messages.flatMap((message, index) => {
     if (message.kind !== "message" || !message.mentions.includes(participantId)) return [];
     if (index > (lastReply.get(message.threadId) ?? -1)) newer.add(message.id);
+    threads.set(message.id, message.threadId);
     // Compact previews avoid inline images/attachments; preserve only navigation and public attribution.
     return [{ id: message.id, kind: message.kind, authorId: message.authorId, createdAt: message.createdAt,
       threadId: null, mentions: [participantId], text: message.text.slice(0, 280), truncated: message.text.length > 280 }];
   });
   const page = transcriptPage(mentioned, [], { before }, generation);
-  const originals = new Map(messages.map(message => [message.id, message]));
-  return { ...page, messages: page.messages.map(message => ({ ...message, threadId: originals.get(message.id)!.threadId })),
+  return { ...page, messages: page.messages.map(message => ({ ...message, threadId: threads.get(message.id)! })),
     mentionSummary: { total: mentioned.length, newCount: newer.size, newIds: page.messages.filter(message => newer.has(message.id)).map(message => message.id) } };
 }

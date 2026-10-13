@@ -1522,12 +1522,12 @@ export function projectMessages(entries: EntryRecord[], aliases: Record<string, 
   }));
 }
 
-function publishedGeneration(publicIds: ReadonlySet<string>, participantId: string, taskId?: TaskId) {
+function publishedGeneration(publicIds: ReadonlyMap<string, string>, participantId: string, taskId?: TaskId) {
   if (taskId === undefined) return undefined;
   return [`final:${participantId}:${taskId}`, `progress:${participantId}:${taskId}`].find(id => publicIds.has(id));
 }
 
-function publishedReply(publicIds: ReadonlySet<string>, participantId: string, entry: EntryRecord) {
+function publishedReply(publicIds: ReadonlyMap<string, string>, participantId: string, entry: EntryRecord) {
   return publishedGeneration(publicIds, participantId, entry.byTaskId)
     || [`answer:${participantId}:${entry.id}`, `legacy:${entry.id}`].find(id => publicIds.has(id));
 }
@@ -1571,7 +1571,11 @@ function publicLive(live: LiveState): LiveState {
 function isContextBoundary(entry: EntryRecord) { return entry.kind === "pi.reset" || entry.kind === "pi.compaction"; }
 
 export function projectActivityGroups(member: Member, entries: EntryRecord[], messages: ConversationMessage[]): ParticipantActivity[] {
-  const publicIds = new Set(messages.flatMap(message => [message.id, ...(message.aliases ?? [])]));
+  const publicIds = new Map<string, string>();
+  for (const message of messages) for (const id of [message.id, ...(message.aliases ?? [])]) {
+    // Match the first public message, as history's ID/alias lookups do.
+    if (!publicIds.has(id)) publicIds.set(id, message.id);
+  }
   const groups: { id: string; createdAt: number; threadId: string | null; entries: EntryRecord[]; answerId?: string }[] = [];
   let group: typeof groups[number] | undefined;
   for (const entry of entries) {
@@ -1584,7 +1588,7 @@ export function projectActivityGroups(member: Member, entries: EntryRecord[], me
       try {
         const data = JSON.parse(textOf(entry));
         threadId = data.incoming?.threadId ?? null;
-        if (threadId) threadId = messages.find(message => message.id === threadId || message.aliases?.includes(threadId!))?.id ?? threadId;
+        if (threadId) threadId = publicIds.get(threadId) ?? threadId;
       } catch { /* Historical human input. */ }
       group = { id: `${member.id}:${entry.id}`, createdAt: message.timestamp, threadId, entries: [] }; groups.push(group);
     }
@@ -1595,7 +1599,7 @@ export function projectActivityGroups(member: Member, entries: EntryRecord[], me
     group.entries.push(entry);
     if (entry.kind === "pi.assistant" && message?.role === "assistant" && message.stopReason !== "toolUse") {
       const receipt = publishedReply(publicIds, member.id, entry);
-      group.answerId = receipt ? messages.find(item => item.id === receipt || item.aliases?.includes(receipt))?.id : undefined;
+      group.answerId = receipt ? publicIds.get(receipt) : undefined;
     }
   }
   return groups.map(group => ({ id: group.id, participantId: member.id, threadId: group.threadId, createdAt: group.createdAt, ...(group.answerId ? { messageId: group.answerId } : {}), entries: publicActivityEntries(group.entries), live: {}, submissions: [] }));
