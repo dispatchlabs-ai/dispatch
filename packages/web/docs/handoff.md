@@ -345,7 +345,7 @@ Intended outcomes:
 
 Chris authorized coordinated subagent fixes on October 3 after the independent review. Scope covers the accepted UI implementation rules and actionable review findings; proposed session-expiry draft retention and in-place identity re-checks remain separate product/security decisions.
 
-Use token-based CSS for component styling, with shared native-control styles and Base UI interaction primitives. Tailwind remains available to the existing build, but feature components do not mix utility styling with this convention. Preserve the original Dispatch artwork and the brand palette; annotate darker accessible semantic colours beside their tokens.
+**Historical styling direction (superseded October 13):** this package used token-based CSS for component styling, with shared native-control styles and Base UI interaction primitives. Tailwind remained available to the build, but feature components did not mix utility styling with that convention. The database spec's revision 10 styling decision supersedes this approach; see the [current migration record](ui-ux-review.md#styling-migration--october-13-2026). Preserve the original Dispatch artwork and the brand palette; annotate darker accessible semantic colours beside their tokens.
 
 Acceptance criteria:
 

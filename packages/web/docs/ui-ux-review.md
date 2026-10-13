@@ -14,6 +14,58 @@ The current cleanup covers every app screen, not just the reported Projects butt
 
 shadcn/Tailwind does not isolate controls from legacy selectors. The foundation must verify cascade ordering in the built app; migration deletes superseded CSS rather than retaining feature-specific patches. Completion requires every inventoried issue resolved and no component styling left in `styles.css`, or an explicit reason for each remaining rule. No screen is recorded as accepted yet.
 
+### Screen/state coverage — Designer inventory v1
+
+Baseline: `01780b35`. Designer derived this inventory from routes and browser components; it is the coverage boundary, **not a completed audit**. Each listed dialog/drawer and state is included, not just top-level destinations. Baseline status: **B** = captured, **P** = pending. Styling concerns below include audit checks, not only observed defects.
+
+**Acceptance for every row is pending:** no four-viewport Designer acceptance, completed screen source/independent review, or integrated local-delivery receipt is recorded yet. Add reviewed revisions and evidence paths as packages pass; a section pilot must not mark its entire screen migrated.
+
+| ID | Screen / required states | Baseline audit | Styling concerns / checks |
+|---|---|---|---|
+| A01 | Sign in: passkey/password, invalid input, service error | P | Shared fields/buttons, heading/hint hierarchy, full-width controls |
+| A02 | TOTP challenge: entry/error/back | P | auth-code !important exception; code alignment and mobile font |
+| A03 | Enrollment: account/password/factor setup, authenticator, recovery-code handoff | P | Radio/choice rows, code blocks, step heading consistency; no enrollment mutation without scoped data |
+| A04 | Account recovery: recovery choice, code entry, reset and codes | P | Same auth field/error/empty patterns; account changes not authorized for audit |
+| S01 | Workspace shell: rail/sidebar, tabs, empty welcome, loading/error, navigation/details drawers | P | Legacy inverse/active icon variants, touch targets, sidebar headings and resize divider |
+| S02 | Shared confirmation dialogs: discard agent changes / discard unsaved work | P | Dialog title/description/action wrapping, limited 720px height |
+| P01 | Projects collection: empty/list/search/new-project form | P | Collection heading/rows/actions/empty states; shared sidebar consistency |
+| P02 | Project overview: populated/no spec/no chats, references/actions, chat filter/list | P | Confirmed button-link override affects Edit spec/View spec/Open instructions (Astra baseline); desktop/mobile selectors and centering patch |
+| P03 | Project settings: identity/workspace/repositories/environment/default agents/members | P | Field groups and dividers; chip/choice/control consistency; add/remove rows |
+| P04 | Project spec: view/edit/empty/error/conflict-recovery | P | Document header/navigation links; editor/view controls; notices and revision metadata |
+| P05 | Project instructions: view/edit/empty/error/conflict-recovery | P | Same document pattern as spec without borrowed feature classes |
+| P06 | Project import/export: selection, archive preview/errors, confirmation | P | Dialog fields, summary lists, empty notices and action rows |
+| G01 | Agents collection/overview: selected/none/archived, instructions/resources, details | P | Page/section headings, markdown versus application hierarchy, resource empty states |
+| G02 | Agent editor: identity/instructions/model/capabilities/Secrets/Skills/MCP/Agent access/Skill library | B | Peer h2 mismatch 650 vs 400; empty-state 16px foreground vs14px muted; unequal desc/divider rhythm; inline spacing; 1280 footer pressure |
+| G03 | Skills: assigned list/library disclosure, create/edit/delete, preview/missing revision | P | Body-weight skill titles; section pattern; consistent empty/metadata/destructive buttons |
+| G04 | Agent MCP: add/remove connection, tools disclosure, current/existing instance choice | P | Section/header/action consistency; do not merge draft and immediate operations |
+| G05 | Agent access: add/edit/revoke, target and field choices, connections choices, conflict/retry | P | Current body-weight headings/inline spacing; form-grid wrapping and permission rows |
+| G06 | Skill library access: empty/populated/grant/revoke/conflict/retry | P | Same resource heading/description/empty/divider pattern, independent save ownership |
+| G07 | Agent archive and unsaved navigation confirmations | P | Shared modal/notice/destructive hierarchy |
+| E01 | Evaluation profile: criteria/case edit/list/empty and details | P | Native controls/choice rows/section headers; dense action toolbars |
+| E02 | Evaluation compare/setup + start-run confirmation | P | Tables/cards/selectors; action wrapping; no run started during style audit |
+| E03 | Evaluation results/run detail/loading/error | P | Status/empty/metadata consistency; overflow tables and long evidence |
+| E04 | Human judgment and judgment history | P | Rating controls, row actions, details and disabled states |
+| C01 | Chats collection/search/pin/archive/new-chat/rename | P | Rows, action menus, modal pattern and labels |
+| C02 | Chat: empty/populated/streaming/failed/reader states | P | Transcript typography, message actions, activity/notice/empty styling |
+| C03 | Chat composer: attachments/mentions/Send/Stop/retry | P | Intentional send-button variant, icon centering, keyboard/touch sizing |
+| C04 | Chat thread: reading/composer/context drawer | P | Match main-chat pattern while preserving thread ownership |
+| C05 | Chat participants: details/add/remove/invite/instance setup | P | List headings, inline forms, resource/meta/disclosure consistency |
+| C06 | Definition of Done: view/edit/empty/conflict | P | Shared section/empty/editor/actions and checkbox rendering |
+| C07 | Activity/result views: tools/commands/files/usage/error disclosure | P | Dense monospace boundaries, status labels, consistent disclosure controls |
+| C08 | Attachment previews: image/file/unsupported/diff/patch/expanded editor | P | Shared surface/buttons/fallback; scroll containment and readable labels |
+| T01 | Settings: model provider list, connect/update/disconnect dialogs | P | Provider cards borrowed from agent visual classes; nested section controls |
+| T02 | Settings: MCP list/connect/update/disconnect, authorization/result states | P | Shared list/empty/modal/buttons and identity metadata |
+| T03 | Settings: secrets list/create/edit/grants/revoke/errors | P | Shared field/choice/header/empty patterns; never capture values |
+| T04 | Settings: account/security/password/passkeys/TOTP/recovery-code dialogs | P | Shared headings/forms/destructive actions; no factor changes in live audit |
+| T05 | Settings: import/export hub | P | Shared action cards/section hierarchy and empty state |
+| B01 | Agent bundles: export/import/preview, starter catalogue, GitHub source/preview | P | Same modal/list/table/action patterns; no import mutation during audit |
+
+Error, conflict, read-only and account-change states require safe available paths or fixture-backed rendering. This inventory does not authorize changes to real grants, settings or account data; unavailable states remain unverified. Baseline and design evidence live in `.local/designer-ui-migration-306361/`; Projects diagnostic evidence lives in `.local/astra-ui-migration/`. Generated frames establish proposals, not rendered acceptance; use the written token contract where the illustrative rasters differ.
+
+### Remaining global rules
+
+The rule-by-rule exception inventory is pending. The control-specific `.auth-code` `!important` exception must be handled during authentication migration; reduced-motion behavior must be preserved intentionally. Legacy component rules are migration work, not accepted permanent exceptions.
+
 ## Historical review
 
 ## Method and limitations
