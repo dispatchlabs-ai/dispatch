@@ -113,7 +113,7 @@ type NativeScope = { roomId: ConversationId; participantId: string };
 
 /** Capture after host preparation, before external execution. Existing owner/membership authorization remains host-owned. */
 export async function prepareNativeEvaluation(tx: Tx, conversationId: ConversationId, scope: NativeScope,
-  backend: Exclude<EvaluationBackend, "pi">, prepared: NativePrepared, agent: Agent): Promise<EvaluationBinding | null> {
+  backend: Exclude<EvaluationBackend, "pi">, prepared: NativePrepared, agent: Agent | undefined): Promise<EvaluationBinding | null> {
   const binding = await assertEvaluationBinding(tx, conversationId);
   if (!binding) {
     if (prepared.evaluation) throw new Error("Native evaluation preparation has no admitted binding.");
@@ -122,6 +122,8 @@ export async function prepareNativeEvaluation(tx: Tx, conversationId: Conversati
   if (binding.roomId !== scope.roomId || binding.participantId !== scope.participantId || binding.backend !== backend
     || binding.ownerUserId !== prepared.userId || binding.agent.cwd !== prepared.cwd || binding.agent.model.modelId !== prepared.model)
     throw new Error("Native evaluation preparation disagrees with the admitted binding.");
+  // A binding installed after the caller's read cannot silently convert an ordinary turn into an eval.
+  if (!agent) throw new Error("Evaluation binding appeared after native configuration preparation.");
   assertEvaluationAgent(binding, agent);
   return binding;
 }
@@ -141,7 +143,7 @@ export function nativeEvaluationPreparation(binding: EvaluationBinding, systemPr
 
 /** Recheck on every execute phase, including restart and contribution-review continuations. */
 export async function assertNativeEvaluation(tx: Tx, conversationId: ConversationId, scope: NativeScope,
-  backend: Exclude<EvaluationBackend, "pi">, prepared: NativePrepared, agent: Agent): Promise<void> {
+  backend: Exclude<EvaluationBackend, "pi">, prepared: NativePrepared, agent: Agent | undefined): Promise<void> {
   const binding = await prepareNativeEvaluation(tx, conversationId, scope, backend, prepared, agent);
   if (binding && (!prepared.evaluation || binding.runId !== prepared.evaluation.runId
     || prepared.evaluation.systemPromptSha256 !== digest(prepared.systemPrompt)))
