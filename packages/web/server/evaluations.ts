@@ -222,6 +222,7 @@ export async function verifyEvaluationFixtureInstance(fixture: EvaluationFixture
       const symbolic = (await git(["symbolic-ref", "-q", "HEAD"], cwd).catch(() => "")).trim() || "detached";
       lines.push(`repo ${dir} head ${symbolic} ${(await git(["rev-parse", "HEAD"], cwd)).trim()}`);
       for (const line of (await git(["status", "--porcelain=v1", "--untracked-files=all"], cwd)).split("\n").filter(Boolean)) lines.push(`status ${dir} ${line}`);
+      for (const line of (await git(["ls-files", "--stage"], cwd)).split("\n").filter(Boolean)) lines.push(`index ${dir} ${line}`);
       lines.push(...(await git(["for-each-ref", `--format=ref ${dir} %(refname) %(objectname)`], cwd)).split("\n").filter(Boolean));
       for (const line of (await git(["remote", "-v"], cwd)).split("\n").filter(Boolean)) lines.push(`remote ${dir} ${line}`);
       for (const line of (await git(["worktree", "list", "--porcelain"], cwd)).split("\n").filter(item => item.startsWith("worktree "))) lines.push(`worktrees ${dir} ${line}`);
@@ -480,12 +481,18 @@ export async function reconcileEvaluationComparison(tx: Tx, scope: RuntimeScope,
       try {
         const entries: EntryRecord[] = []; let cursor: Cursor | undefined;
         do { const page = await tx.scanEntries({ conversationId: Number(run.attempt.roomId) as ConversationId }, 200, cursor); entries.push(...page.items); cursor = page.next; } while (cursor);
-        const messages = entries.filter(PublicEntry.is).map(entry => entry.data);
-        // Seeded fixture messages are human-authored; participant-authored entries at or
-        // after the seeded prompt (the recorded entry boundary) are the run's output.
-        const promptAt = messages.find(message => message.id === run.attempt.entryBoundary)?.createdAt ?? 0;
-        posted = messages.some(message => message.authorId === run.attempt.participantId && message.createdAt >= promptAt
-          && message.text.trim() && message.text.trim() !== "[[silent]]");
+        const publicEntries = entries.filter(PublicEntry.is);
+        // Output is attributed by the admitted task (byTaskId covers final answers and
+        // explicit posts alike) in committed entry order after the seeded prompt. The
+        // seed entry must exist; a missing boundary or incomplete scan stays unknown.
+        const boundary = publicEntries.findIndex(entry => entry.data.id === run.attempt.entryBoundary);
+        if (boundary >= 0) {
+          const taskId = Number(run.attempt.taskId) as TaskId;
+          posted = publicEntries.slice(boundary + 1).some(entry => entry.byTaskId === taskId
+            && entry.data.authorId === run.attempt.participantId
+            && ((entry.data.text.trim() && entry.data.text.trim() !== "[[silent]]")
+              || (entry.data.attachments?.length ?? 0) > 0 || (entry.data.images?.length ?? 0) > 0));
+        }
       } catch { posted = null; }
     }
     observed.push({ runId: run.id, verified, outcome: task.state.outcome as AttemptOutcome, startedAt, endedAt: typeof task.endedAt === "number" ? task.endedAt : null, posted });
@@ -506,8 +513,8 @@ export async function reconcileEvaluationComparison(tx: Tx, scope: RuntimeScope,
       run.status = "completed";
       if (posted === true) run.output = "public_reply";
       else if (posted === false) run.output = "no_public_reply";
-      else if (!run.coverageLimitations.includes("Public entries could not be read; output disposition is unknown."))
-        run.coverageLimitations.push("Public entries could not be read; output disposition is unknown.");
+      else if (!run.coverageLimitations.includes("Public entries could not be read completely (or the seeded prompt entry was not found); output disposition is unknown."))
+        run.coverageLimitations.push("Public entries could not be read completely (or the seeded prompt entry was not found); output disposition is unknown.");
     } else if (outcome.status === "aborted") {
       run.status = "cancelled";
       run.output = "unknown";

@@ -2196,11 +2196,23 @@ export class DispatchRuntime {
       return { runId, taskId: preflight.run.attempt.taskId, roomId: preflight.run.attempt.roomId, participantId: preflight.run.attempt.participantId, status: preflight.run.status };
     }
     if (!preflight.run.fixture) throw new RuntimeError(409, "Evaluation run has no fixture binding.");
-    // Verify the starting state, not just the location: contents must still match the
-    // pinned definition digest before any real run is admitted against this instance.
-    const verifiedFixturePath = await verifyEvaluationFixtureInstance(preflight.run.fixture);
+    // Authorization precedes filesystem preflight.
+    if (preflight.run.requestedBy !== scope.userId) throw new RuntimeError(403, "Only the user who created this comparison can admit its runs for execution.");
     if (process.env.DISPATCH_MUSE_USER_ID !== scope.userId)
       throw new RuntimeError(409, "Evaluation admission requires the configured Muse runner owner as the admitting user.");
+    // Verify the starting state, not just the location: contents must still match the
+    // pinned definition digest before any real run is admitted against this instance.
+    let verifiedFixturePath: string;
+    try {
+      verifiedFixturePath = await verifyEvaluationFixtureInstance(preflight.run.fixture);
+    } catch (error) {
+      // A concurrent admission may already have committed and started changing the fixture;
+      // return its authorized receipt instead of surfacing the preflight failure.
+      const receipt = await this.harness.commit(async tx => findEvaluationAdmissionReceipt(tx, scope, agentId, runId), context)
+        .catch(() => null);
+      if (receipt) return receipt;
+      throw error;
+    }
     const human = await this.person(scope.companyId, scope.userId);
     return this.harness.commit(async tx => {
       // A concurrent admission may have committed after preflight: return its authorized
