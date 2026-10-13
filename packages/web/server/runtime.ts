@@ -6,7 +6,7 @@ import type { TranscriptQuery } from "../src/shared/contracts.js";
 import { ProjectArchiveStore, ProjectArchivesDoc, archiveDigest, decodeProjectArchive } from "./project-archives.js";
 import { PROJECT_ARCHIVE_MAX_BYTES, type ProjectArchive, type ArchivedChat } from "../src/shared/project-archives.js";
 import { createHash, randomUUID } from "node:crypto";
-import { realpath, stat } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { isAbsolute, join, normalize } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, getSupportedThinkingLevels, type Models } from "@earendil-works/pi-ai/models";
@@ -47,7 +47,7 @@ import { SharedConversations, SharedDoc, PublicEntry, type Member, type PeopleDi
 import { AgentConnections, isMcpExtension, isMcpTool } from "./mcp.js";
 import type { AuthPrincipal } from "./auth.js";
 import { ManagementError, advanceSelfGrant, detached, grantHistory, managementFields, readGrants, writeGrant, type Grant } from "./agent-grants.js";
-import { appendEvaluationResult, claimEvaluationRunForAdmission, createEvaluationComparison, findEvaluationComparisonReplay, parseAppendEvaluationResult, parseCreateEvaluationComparison, parseEvaluationProfile, readEvaluationAdmissionPlan, readEvaluationComparison, readEvaluationProfile, readEvaluationProfileRevision, recordEvaluationAdmission, resolveEvaluationFixtures, saveEvaluationProfile, type FrozenRunConfiguration } from "./evaluations.js";
+import { appendEvaluationResult, claimEvaluationRunForAdmission, createEvaluationComparison, findEvaluationAdmissionReceipt, findEvaluationComparisonReplay, parseAppendEvaluationResult, parseCreateEvaluationComparison, parseEvaluationProfile, readEvaluationAdmissionPlan, readEvaluationComparison, readEvaluationProfile, readEvaluationProfileRevision, recordEvaluationAdmission, resolveEvaluationFixtures, saveEvaluationProfile, verifyEvaluationFixtureInstance, type FrozenRunConfiguration } from "./evaluations.js";
 import { assertEvaluationBinding, bindEvaluation, resolveEvaluationBinding } from "./evaluation-bindings.js";
 import { ProjectInstructionsBindingDoc } from "./collaboration/project-instructions.js";
 import { managementReadSchema, managementSaveSchema } from "./agent-management.js";
@@ -2191,20 +2191,22 @@ export class DispatchRuntime {
       if (!latestAgent(await tx.doc(CatalogDoc), scope.companyId, agentId)) throw new RuntimeError(404, "Agent not found.");
       return readEvaluationAdmissionPlan(tx, scope, agentId, runId);
     }, context);
-    if (preflight.run.attempt.taskId)
+    if (preflight.run.attempt.taskId) {
+      if (preflight.run.requestedBy !== scope.userId) throw new RuntimeError(403, "Only the user who created this comparison can admit its runs for execution.");
       return { runId, taskId: preflight.run.attempt.taskId, roomId: preflight.run.attempt.roomId, participantId: preflight.run.attempt.participantId, status: preflight.run.status };
+    }
     if (!preflight.run.fixture) throw new RuntimeError(409, "Evaluation run has no fixture binding.");
-    let verifiedFixturePath: string;
-    try {
-      verifiedFixturePath = await realpath(preflight.run.fixture.effectivePath);
-      if (!(await stat(verifiedFixturePath)).isDirectory()) throw new Error("not a directory");
-    } catch { throw new RuntimeError(409, "Evaluation fixture directory is unavailable; re-provision it before admission."); }
-    if (verifiedFixturePath !== preflight.run.fixture.effectivePath)
-      throw new RuntimeError(409, "Evaluation fixture path no longer resolves to its verified canonical directory.");
+    // Verify the starting state, not just the location: contents must still match the
+    // pinned definition digest before any real run is admitted against this instance.
+    const verifiedFixturePath = await verifyEvaluationFixtureInstance(preflight.run.fixture);
     if (process.env.DISPATCH_MUSE_USER_ID !== scope.userId)
       throw new RuntimeError(409, "Evaluation admission requires the configured Muse runner owner as the admitting user.");
     const human = await this.person(scope.companyId, scope.userId);
     return this.harness.commit(async tx => {
+      // A concurrent admission may have committed after preflight: return its authorized
+      // receipt before any fresh-admission prerequisite is rechecked.
+      const receipt = await findEvaluationAdmissionReceipt(tx, scope, agentId, runId);
+      if (receipt) return receipt;
       const catalog = await tx.doc(CatalogDoc);
       const plan = await claimEvaluationRunForAdmission(tx, scope, agentId, runId, verifiedFixturePath);
       const pinned = catalog.agents.find(item => item.companyId === scope.companyId && item.id === agentId && item.revision === plan.run.agentRevision);

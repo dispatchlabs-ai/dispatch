@@ -1,7 +1,10 @@
+import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { readFile, realpath, stat } from "node:fs/promises";
-import { sep } from "node:path";
-import { defineDoc, type TaskId, type Tx } from "@earendil-works/pi-durable";
+import { readFile, readdir, realpath, stat } from "node:fs/promises";
+import { join, sep } from "node:path";
+import { promisify } from "node:util";
+import { defineDoc, type ConversationId, type Cursor, type EntryRecord, type TaskId, type Tx } from "@earendil-works/pi-durable";
+import { PublicEntry } from "./collaboration/shared.js";
 import { z } from "zod";
 import type { RuntimeScope } from "../src/shared/contracts.js";
 import type { AppendEvaluationResultInput, CreateEvaluationComparisonInput, EvaluationComparisonCaseView, EvaluationComparisonResponse, EvaluationCriterion, EvaluationExposure, EvaluationFixtureBinding, EvaluationGate, EvaluationMeasurements, EvaluationProfile, EvaluationProfileResponse, EvaluationResult, EvaluationRun, EvaluationVariantKind, SaveEvaluationProfileInput } from "../src/shared/evaluations.js";
@@ -167,6 +170,67 @@ const fixtureRegistrySchema = z.array(z.object({
   }).strict(),
 }).strict()).max(100);
 
+/** Equal or parent/child canonical paths are not independent fixture instances. */
+const fixturePathsOverlap = (a: string, b: string) => a === b || a.startsWith(b + sep) || b.startsWith(a + sep);
+
+const execGit = promisify(execFile);
+
+/**
+ * Recompute a fixture instance's starting-state digest and compare it with the pinned
+ * definition digest. The manifest mirrors the operator fixture builder: per-file content
+ * hashes outside .git internals, plus each repository/worktree's HEAD, porcelain status,
+ * refs, remotes and worktree targets, with the instance root normalized to "<root>" so
+ * equivalent independent instances compare equally. Location alone proves nothing.
+ */
+export async function verifyEvaluationFixtureInstance(fixture: EvaluationFixtureBinding): Promise<string> {
+  let root: string;
+  try {
+    root = await realpath(fixture.effectivePath);
+    if (!(await stat(root)).isDirectory()) throw new Error("not a directory");
+  } catch { throw new EvaluationError(409, "Evaluation fixture directory is unavailable; re-provision it before admission."); }
+  if (root !== fixture.effectivePath)
+    throw new EvaluationError(409, "Evaluation fixture path no longer resolves to its verified canonical directory.");
+  const git = async (args: string[], cwd: string) => (await execGit("git", args, { cwd, maxBuffer: 64 * 1024 * 1024 })).stdout;
+  const lines: string[] = [];
+  const files: string[] = [];
+  const walk = async (dir: string): Promise<void> => {
+    for (const entry of await readdir(dir ? join(root, dir) : root, { withFileTypes: true })) {
+      if (entry.name.endsWith(".git")) continue;
+      const rel = dir ? `${dir}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) await walk(rel);
+      else if (entry.isFile()) files.push(rel);
+    }
+  };
+  try {
+    await walk("");
+    files.sort();
+    for (const file of files) lines.push(`file ${createHash("sha256").update(await readFile(join(root, file))).digest("hex")} ./${file}`);
+    const top = await readdir(root, { withFileTypes: true });
+    const repos: string[] = [];
+    if (top.some(entry => entry.name === ".git")) repos.push(".");
+    for (const entry of top.filter(item => item.isDirectory() && item.name !== ".git")) {
+      const sub = await readdir(join(root, entry.name), { withFileTypes: true });
+      if (sub.some(item => item.name === ".git")) repos.push(`./${entry.name}`);
+    }
+    repos.sort((a, b) => `${a}/.git`.localeCompare(`${b}/.git`));
+    for (const dir of repos) {
+      const cwd = dir === "." ? root : join(root, dir.slice(2));
+      const symbolic = (await git(["symbolic-ref", "-q", "HEAD"], cwd).catch(() => "")).trim() || "detached";
+      lines.push(`repo ${dir} head ${symbolic} ${(await git(["rev-parse", "HEAD"], cwd)).trim()}`);
+      for (const line of (await git(["status", "--porcelain=v1", "--untracked-files=all"], cwd)).split("\n").filter(Boolean)) lines.push(`status ${dir} ${line}`);
+      lines.push(...(await git(["for-each-ref", `--format=ref ${dir} %(refname) %(objectname)`], cwd)).split("\n").filter(Boolean));
+      for (const line of (await git(["remote", "-v"], cwd)).split("\n").filter(Boolean)) lines.push(`remote ${dir} ${line}`);
+      for (const line of (await git(["worktree", "list", "--porcelain"], cwd)).split("\n").filter(item => item.startsWith("worktree "))) lines.push(`worktrees ${dir} ${line}`);
+    }
+    for (const bare of top.filter(entry => entry.isDirectory() && entry.name.endsWith(".git")).map(entry => `./${entry.name}`).sort())
+      lines.push(...(await git([`--git-dir=${join(root, bare.slice(2))}`, "for-each-ref", `--format=ref ${bare} %(refname) %(objectname)`], root)).split("\n").filter(Boolean));
+  } catch { throw new EvaluationError(409, "Evaluation fixture starting state could not be verified; re-provision it before admission."); }
+  const digest = createHash("sha256").update((lines.length ? `${lines.join("\n")}\n` : "").split(root).join("<root>")).digest("hex");
+  if (digest !== fixture.definitionSha256)
+    throw new EvaluationError(409, "Evaluation fixture contents no longer match the pinned definition digest; restore the starting state before admission.");
+  return root;
+}
+
 /** Resolves each selected case to two independently prepared, existing fixture instances. */
 export async function resolveEvaluationFixtures(input: CreateEvaluationComparisonInput): Promise<Record<string, Record<EvaluationVariantKind, EvaluationFixtureBinding>>> {
   const file = process.env.DISPATCH_EVAL_FIXTURES_FILE;
@@ -177,7 +241,6 @@ export async function resolveEvaluationFixtures(input: CreateEvaluationCompariso
   const resolved: Record<string, Record<EvaluationVariantKind, EvaluationFixtureBinding>> = {};
   // Canonical paths across the whole request: aliased or nested instances are not independent.
   const claimed: string[] = [];
-  const overlaps = (a: string, b: string) => a === b || a.startsWith(b + sep) || b.startsWith(a + sep);
   for (const caseId of input.caseIds) {
     const entry = registry.find(item => item.id === input.fixtures[caseId]!.fixtureId);
     if (!entry) throw new EvaluationError(409, `Fixture "${input.fixtures[caseId]!.fixtureId}" is not in the operator-provisioned registry.`);
@@ -187,7 +250,7 @@ export async function resolveEvaluationFixtures(input: CreateEvaluationCompariso
       const info = await stat(instance.path).catch(() => null);
       if (!info?.isDirectory()) throw new EvaluationError(409, `Fixture "${entry.id}" ${variant} instance is not an existing directory: ${instance.path}`);
       const canonical = await realpath(instance.path);
-      if (claimed.some(path => overlaps(path, canonical)))
+      if (claimed.some(path => fixturePathsOverlap(path, canonical)))
         throw new EvaluationError(409, `Fixture "${entry.id}" ${variant} instance overlaps another instance in this comparison: ${instance.path}`);
       claimed.push(canonical);
       bindings[variant] = { fixtureId: entry.id, definitionSha256: entry.definitionSha256, instanceId: instance.instanceId, effectivePath: canonical, capturedState: [...entry.capturedState] };
@@ -340,9 +403,25 @@ export async function claimEvaluationRunForAdmission(tx: Tx, scope: RuntimeScope
     throw new EvaluationError(409, "Evaluation fixture path no longer resolves to its verified canonical directory.");
   const doc = await tx.doc(ComparisonsDoc);
   const claimed = doc.runs.some(item => item.id !== runId && item.attempt.taskId && item.fixture
-    && (item.fixture.instanceId === plan.run.fixture!.instanceId || item.fixture.effectivePath === plan.run.fixture!.effectivePath));
-  if (claimed) throw new EvaluationError(409, "This fixture instance is already claimed by another admitted run.");
+    && (item.fixture.instanceId === plan.run.fixture!.instanceId || fixturePathsOverlap(item.fixture.effectivePath, plan.run.fixture!.effectivePath)));
+  if (claimed) throw new EvaluationError(409, "This fixture instance overlaps an instance already claimed by another admitted run.");
   return plan;
+}
+
+export type EvaluationAdmissionReceipt = { runId: string; taskId: string; roomId: string | null; participantId: string | null; status: EvaluationRun["status"] };
+
+/**
+ * Authorized retry receipt, checked inside the admission transaction before any
+ * fresh-admission prerequisite: a concurrent admission that committed first must return
+ * its original receipt to a retried request, not an "already admitted" failure. Only the
+ * comparison's requesting user receives the receipt.
+ */
+export async function findEvaluationAdmissionReceipt(tx: Tx, scope: RuntimeScope, agentId: string, runId: string): Promise<EvaluationAdmissionReceipt | null> {
+  const plan = await admissionPlan(tx, scope, agentId, runId);
+  if (!plan.run.attempt.taskId) return null;
+  if (plan.run.requestedBy !== scope.userId)
+    throw new EvaluationError(403, "Only the user who created this comparison can admit its runs for execution.");
+  return { runId, taskId: plan.run.attempt.taskId, roomId: plan.run.attempt.roomId, participantId: plan.run.attempt.participantId, status: plan.run.status };
 }
 
 /** Persist the admission receipt in the same transaction that created the participant and task. */
@@ -360,31 +439,50 @@ export async function recordEvaluationAdmission(tx: Tx, scope: RuntimeScope, age
     ...(run.fixture ? [`fixture:${run.fixture.instanceId}@${run.fixture.effectivePath}`] : [])];
 }
 
-type AttemptOutcome = { status: string; result?: { text?: string }; error?: { message?: string } };
+type AttemptOutcome = { status: string; error?: { message?: string } };
 
 /**
- * Fold terminal native-attempt states into run records. Task reads happen before any write
- * (Pi transaction table rules). Interrupted/aborted attempts become explicit terminal states;
- * nothing is replayed or retried here.
+ * Fold terminal native-attempt states into run records. Task and entry reads happen before
+ * any write (Pi transaction table rules). Completion time is the task's durable terminal
+ * timestamp, never the read time. Output disposition comes from public entries the eval
+ * participant actually posted after the seeded prompt — result text proves neither posting
+ * nor silence ([[silent]] may follow a posted reply; an unpublished draft may hold text).
+ * Interrupted/aborted attempts become explicit terminal states; nothing is replayed here.
  */
 export async function reconcileEvaluationComparison(tx: Tx, scope: RuntimeScope, agentId: string, comparisonId: string): Promise<void> {
   const doc = await tx.doc(ComparisonsDoc);
   const pending = doc.runs.filter(item => item.companyId === scope.companyId && item.agentDefinitionId === agentId
     && item.comparisonId === comparisonId && item.status === "running" && item.attempt.taskId);
-  const settled: { runId: string; outcome: AttemptOutcome }[] = [];
+  const settled: { runId: string; outcome: AttemptOutcome; endedAt: number | null; posted: boolean | null }[] = [];
   for (const run of pending) {
     const task = await tx.task(Number(run.attempt.taskId) as TaskId);
-    if (task?.state.status === "terminal") settled.push({ runId: run.id, outcome: task.state.outcome as AttemptOutcome });
+    if (task?.state.status !== "terminal") continue;
+    let posted: boolean | null = null;
+    if (run.attempt.roomId && run.attempt.participantId) {
+      try {
+        const entries: EntryRecord[] = []; let cursor: Cursor | undefined;
+        do { const page = await tx.scanEntries({ conversationId: Number(run.attempt.roomId) as ConversationId }, 200, cursor); entries.push(...page.items); cursor = page.next; } while (cursor);
+        const messages = entries.filter(PublicEntry.is).map(entry => entry.data);
+        // Seeded fixture messages are human-authored; participant-authored entries at or
+        // after the seeded prompt (the recorded entry boundary) are the run's output.
+        const promptAt = messages.find(message => message.id === run.attempt.entryBoundary)?.createdAt ?? 0;
+        posted = messages.some(message => message.authorId === run.attempt.participantId && message.createdAt >= promptAt
+          && message.text.trim() && message.text.trim() !== "[[silent]]");
+      } catch { posted = null; }
+    }
+    settled.push({ runId: run.id, outcome: task.state.outcome as AttemptOutcome, endedAt: typeof task.endedAt === "number" ? task.endedAt : null, posted });
   }
-  for (const { runId, outcome } of settled) {
+  for (const { runId, outcome, endedAt, posted } of settled) {
     const run = doc.runs.find(item => item.id === runId)!;
-    run.finishedAt = Date.now();
+    run.finishedAt = endedAt;
+    if (endedAt === null && !run.coverageLimitations.includes("Durable terminal timestamp unavailable; completion time is unknown."))
+      run.coverageLimitations.push("Durable terminal timestamp unavailable; completion time is unknown.");
     if (outcome.status === "completed") {
       run.status = "completed";
-      const text = outcome.result?.text;
-      if (typeof text === "string") run.output = text.trim() && text.trim() !== "[[silent]]" ? "public_reply" : "no_public_reply";
-      else if (!run.coverageLimitations.includes("Attempt completed without a readable result text; output disposition is unknown."))
-        run.coverageLimitations.push("Attempt completed without a readable result text; output disposition is unknown.");
+      if (posted === true) run.output = "public_reply";
+      else if (posted === false) run.output = "no_public_reply";
+      else if (!run.coverageLimitations.includes("Public entries could not be read; output disposition is unknown."))
+        run.coverageLimitations.push("Public entries could not be read; output disposition is unknown.");
     } else if (outcome.status === "aborted") {
       run.status = "cancelled";
       run.output = "unknown";
