@@ -208,7 +208,13 @@ export async function verifyEvaluationFixtureInstance(fixture: EvaluationFixture
   try {
     await walk("");
     files.sort();
-    for (const file of files) lines.push(`file ${createHash("sha256").update(await readFile(join(root, file))).digest("hex")} ./${file}`);
+    for (const file of files) {
+      // A hard-linked input shares writable bytes with another path (possibly the paired
+      // instance), so equal digests would not prove independent starting state; reject it.
+      if ((await stat(join(root, file))).nlink !== 1)
+        throw new EvaluationError(409, `Evaluation fixture contains a hard-linked file at ${file}; fixture instances must not share writable input bytes.`);
+      lines.push(`file ${createHash("sha256").update(await readFile(join(root, file))).digest("hex")} ./${file}`);
+    }
     const top = await readdir(root, { withFileTypes: true });
     const repos: string[] = [];
     if (top.some(entry => entry.name === ".git")) repos.push(".");
