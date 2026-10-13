@@ -5,7 +5,7 @@ import { claudeThinkingOptions } from "../claude-sdk/thinking.js";
 import { nativeClaudeEnvironment } from "../claude-sdk/transport.js";
 import { createClaudeSdkTask, ClaudeSessionDoc, type ClaudeRunScope, type ClaudeRunResult } from "../claude-sdk/task.js";
 import { sdkToolServer, SdkToolBinding } from "./sdk-tools.js";
-import { transcriptPage } from "../chat-pages.js";
+import { transcriptPage, mentionsPage } from "../chat-pages.js";
 import { sharedContextMessage } from "./prompt-cache.js";
 import type { TranscriptQuery, TranscriptPage, ProjectSpecReadInput, ProjectSpecPage } from "../../src/shared/contracts.js";
 import { createHash, randomUUID } from "node:crypto";
@@ -30,7 +30,7 @@ import { projectChatTools, type ProjectChatsInput, type ProjectChatsResult, type
 import { createDefinitionOfDone, CRITERIA_EXTENSION } from "./definition-of-done.js";
 import { ConversationTurns, TurnsDoc } from "./turns.js";
 import { PublicSummaryDoc, includePublicMessage } from "./summary.js";
-import { resolveAgentMentionLinks } from "./mentions.js";
+import { resolveAgentMentionLinks, participantMentionLinks, projectedMessageMentions } from "./mentions.js";
 import { Contributions, ContributionsDoc, contributionCopy, type Contribution } from "./contributions.js";
 
 const context = BACKGROUND_CONTEXT;
@@ -913,6 +913,7 @@ export class SharedConversations {
         if (alias !== id) (room.messageAliases ??= {})[alias] = id;
       }
       const { attachmentIds = [], ...content } = draft;
+      content.mentions = [...new Set([...draft.mentions, ...participantMentionLinks(content.text, new Set(room.members.map(member => member.id)))])].sort();
       const attachments = await messageAttachments(tx, roomId, item.participantId, attachmentIds);
       if (attachments.length) {
         const records = (await tx.doc(AttachmentsDoc, roomId)).records;
@@ -1175,6 +1176,7 @@ export class SharedConversations {
       normalized.mentions = [...new Set([...normalized.mentions, ...resolved.values()])].sort();
       normalized.text = resolveAgentMentionLinks(normalized.text, resolved);
     }
+    normalized.mentions = [...new Set([...normalized.mentions, ...participantMentionLinks(normalized.text, new Set(room.members.map(member => member.id)))])].sort();
     const message: MessageData = { id: randomUUID(), kind: "message", authorId, createdAt: Date.now(), ...normalized, ...(attachments.length ? { attachments } : {}) };
     room.requests[key] = { hash, messageId: message.id };
     await this.append(tx, roomId, message);
@@ -1393,6 +1395,11 @@ export class SharedConversations {
   private async projectedPage(tx: Tx, roomId: ConversationId, query: TranscriptQuery) {
     const room = await tx.doc(SharedDoc, roomId);
     const messages = await this.publicMessages(roomId, room.messageAliases);
+    if (query.messageId) {
+      const destination = messages.find(message => message.id === query.messageId || message.aliases?.includes(query.messageId!));
+      const root = query.threadId ? messages.find(message => message.id === query.threadId || message.aliases?.includes(query.threadId!)) : undefined;
+      if (!destination || (root?.id ?? query.threadId ?? destination.threadId) !== destination.threadId) throw new CollaborationError(404, "History item unavailable.");
+    }
     const activities: ParticipantActivity[] = [];
     for (const member of room.members) {
       if (!member.conversationId) continue;
@@ -1401,7 +1408,22 @@ export class SharedConversations {
       activities.push(...this.projectedActivities(member, entries, live, messages));
     }
     const page = transcriptPage(messages, activities, query, createHash("sha256").update(JSON.stringify(room.messageAliases ?? {})).digest("hex"));
+    const participantIds = new Set(room.members.map(member => member.id));
+    const membershipKey = JSON.stringify([...participantIds].sort());
+    const originals = new Map(messages.map(message => [message.id, message]));
+    page.messages = page.messages.map(message => ({ ...message, mentions: projectedMessageMentions(originals.get(message.id)!, participantIds, membershipKey) }));
+    if (page.root) page.root = { ...page.root, mentions: projectedMessageMentions(originals.get(page.root.id)!, participantIds, membershipKey) };
     return { room, page };
+  }
+
+  async mentionsPage(tx: Tx, roomId: ConversationId, userId: string, before?: string): Promise<TranscriptPage> {
+    const room = await tx.doc(SharedDoc, roomId);
+    const member = room.members.find(member => member.kind === "human" && member.userId === userId);
+    const messages = await this.publicMessages(roomId, room.messageAliases);
+    const generation = createHash("sha256").update(JSON.stringify([room.messageAliases ?? {}, userId, "mentions"])).digest("hex");
+    const participantIds = new Set(room.members.map(member => member.id));
+    const membershipKey = JSON.stringify([...participantIds].sort());
+    return mentionsPage(messages.map(message => ({ ...message, mentions: projectedMessageMentions(message, participantIds, membershipKey) })), member?.id ?? `human:${userId}`, before, generation);
   }
 
   async page(tx: Tx, roomId: ConversationId, query: TranscriptQuery): Promise<TranscriptPage> {
