@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Agent instances
+
+- Let agents create additional instances in their current chat with optional names and instance-only instructions through `conversation_create_agent_instance`. Preserve actor-bound retries, Stop/removal fences and human-only invitations/removal controls; ordinary agent invitations still reuse active instances.
+
 ### Agent guidance
 
 - Clarify in the shared-conversation prompt that agents are generic and their definitions are used across projects.
