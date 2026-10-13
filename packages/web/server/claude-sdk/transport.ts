@@ -35,7 +35,9 @@ export async function runClaudeQuery(input: QueryInput): Promise<ClaudeRunResult
         model: input.prepared.model,
         thinking: input.prepared.thinking,
         effort: input.prepared.effort,
-        systemPrompt: input.prepared.systemPrompt,
+        // Render the committed adopted sections on each request, including resumed sessions.
+        // The SDK otherwise records a bare-string prompt until compaction on enabled accounts.
+        systemPrompt: { type: "custom", prompt: input.prepared.systemPrompt, snapshot: false },
         ...(input.resume ? { resume: input.sessionId } : { sessionId: input.sessionId }),
         persistSession: true,
         tools: [],
