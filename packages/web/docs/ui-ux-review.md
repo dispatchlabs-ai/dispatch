@@ -4,7 +4,17 @@
 **Revision reviewed:** `main` at `d83f70d57ccd0d592faf8a61843e20424bfd9a85`.
 **Status:** historical review of `d83f70d`, followed by the [WP-006 resolution](#resolution--october-3-2026). Findings below describe the reviewed revision, not the subsequently updated implementation.
 
-The rules derived from these findings belonged to the former specification. This review preserves its original findings; the replacement specification is being drafted.
+The rules derived from these findings belonged to the former specification. Current intent lives in the database; see [spec access](spec.md). This review preserves its original findings.
+
+## Styling migration — October 13, 2026
+
+**Status: authorized; implementation and per-screen acceptance pending.** Database spec revision 10 chooses shadcn's Base UI controls themed with Dispatch tokens. The shared entry point remains `packages/web/src/components/ui.tsx`; [AGENTS.md](../../../AGENTS.md) names the whole-page review requirements. This supersedes the token-based global-CSS direction recorded for G19 below, without changing the historical result.
+
+The current cleanup covers every app screen, not just the reported Projects button-style links and inconsistent agent-editor sections. Designer's screen/state inventory will define coverage. Each migrated screen needs Designer acceptance at 1440×900, 1280×720, 768×1024 and 390×844, Deslop source review, Astra independent review, and delivery to local `main` verified on port 5174. Sanitized captures belong in gitignored `.local/`; record evidence paths and reviewed revisions here, not account-bearing captures.
+
+shadcn/Tailwind does not isolate controls from legacy selectors. The foundation must verify cascade ordering in the built app; migration deletes superseded CSS rather than retaining feature-specific patches. Completion requires every inventoried issue resolved and no component styling left in `styles.css`, or an explicit reason for each remaining rule. No screen is recorded as accepted yet.
+
+## Historical review
 
 ## Method and limitations
 

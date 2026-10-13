@@ -26,7 +26,7 @@ Follow the [testing policy](../../CONTRIBUTING.md#testing-policy) for permitted 
 - [Runtime integration](docs/runtime.md): native Pi ownership, request identity, cancellation, and recovery.
 - [Conversation workers](docs/conversation-workers.md): deployment ownership, lifecycle contracts and qualification boundaries.
 - [AWS deployment module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch): infrastructure, caller example and installation instructions.
-- [UI/UX review](docs/ui-ux-review.md): October 3, 2026 review of `d83f70d` that introduced the spec's UI implementation rules.
+- [UI/UX review](docs/ui-ux-review.md): historical findings and current styling-migration evidence; live requirements remain in the database spec.
 - [Brand asset provenance](src/assets/README.md) and [changelog](CHANGELOG.md).
 - [Repository contribution workflow](../../CONTRIBUTING.md).
 
