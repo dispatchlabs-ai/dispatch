@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-13
+
 ### Agent definitions
 
 - Default a saved agent to Pi when both the save request and prior definition omit the execution backend, while preserving explicit selections and legacy request replay fingerprints.
