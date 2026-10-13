@@ -7,7 +7,7 @@ import { defineDoc, type ConversationId, type Cursor, type EntryRecord, type Tas
 import { PublicEntry } from "./collaboration/shared.js";
 import { z } from "zod";
 import type { RuntimeScope } from "../src/shared/contracts.js";
-import type { AppendEvaluationResultInput, CreateEvaluationComparisonInput, EvaluationComparisonCaseView, EvaluationComparisonResponse, EvaluationCriterion, EvaluationExposure, EvaluationFixtureBinding, EvaluationGate, EvaluationMeasurements, EvaluationProfile, EvaluationProfileResponse, EvaluationResult, EvaluationRun, EvaluationVariantKind, SaveEvaluationProfileInput } from "../src/shared/evaluations.js";
+import type { AppendEvaluationResultInput, CreateEvaluationComparisonInput, EvaluationComparisonCaseView, EvaluationComparisonResponse, EvaluationCriterion, EvaluationEvidenceView, EvaluationExposure, EvaluationFixtureBinding, EvaluationGate, EvaluationMeasurements, EvaluationProfile, EvaluationProfileResponse, EvaluationResult, EvaluationRun, EvaluationVariantKind, SaveEvaluationProfileInput } from "../src/shared/evaluations.js";
 
 export class EvaluationError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -424,7 +424,11 @@ export async function findEvaluationAdmissionReceipt(tx: Tx, scope: RuntimeScope
   return { runId, taskId: plan.run.attempt.taskId, roomId: plan.run.attempt.roomId, participantId: plan.run.attempt.participantId, status: plan.run.status };
 }
 
-/** Persist the admission receipt in the same transaction that created the participant and task. */
+/**
+ * Persist the admission receipt in the same transaction that created the participant and
+ * task. Admission is not task start: the run stays pending with no startedAt until
+ * reconciliation observes the native task's own durable startedAt.
+ */
 export async function recordEvaluationAdmission(tx: Tx, scope: RuntimeScope, agentId: string, runId: string,
   attempt: { taskId: string; roomId: string; participantId: string; entryBoundary: string }, agentConversationId: string): Promise<void> {
   const doc = await tx.doc(ComparisonsDoc);
@@ -433,8 +437,6 @@ export async function recordEvaluationAdmission(tx: Tx, scope: RuntimeScope, age
   if (run.attempt.taskId) throw new EvaluationError(409, "This evaluation run was already admitted.");
   run.attempt = attempt;
   if (run.source.kind === "standalone") run.source.agentConversationId = agentConversationId;
-  run.status = "running";
-  run.startedAt = Date.now();
   run.evidenceReferences = [`eval-chat:${attempt.roomId}`, `eval-task:${attempt.taskId}`,
     ...(run.fixture ? [`fixture:${run.fixture.instanceId}@${run.fixture.effectivePath}`] : [])];
 }
@@ -442,21 +444,33 @@ export async function recordEvaluationAdmission(tx: Tx, scope: RuntimeScope, age
 type AttemptOutcome = { status: string; error?: { message?: string } };
 
 /**
- * Fold terminal native-attempt states into run records. Task and entry reads happen before
- * any write (Pi transaction table rules). Completion time is the task's durable terminal
- * timestamp, never the read time. Output disposition comes from public entries the eval
- * participant actually posted after the seeded prompt — result text proves neither posting
- * nor silence ([[silent]] may follow a posted reply; an unpublished draft may hold text).
- * Interrupted/aborted attempts become explicit terminal states; nothing is replayed here.
+ * Fold native-attempt states into run records, including admitted attempts whose task has
+ * not started yet. Task and entry reads happen before any write (Pi transaction table
+ * rules). Start/completion times are the task's durable startedAt/endedAt, never local
+ * clock readings. A retrieved task is accepted only if it is the expected native Muse
+ * task in the recorded agent conversation. Output disposition comes from public entries
+ * the eval participant actually posted after the seeded prompt — result text proves
+ * neither posting nor silence ([[silent]] may follow a posted reply; an unpublished draft
+ * may hold text). Interrupted/aborted attempts become explicit terminal states; nothing
+ * is replayed here.
  */
 export async function reconcileEvaluationComparison(tx: Tx, scope: RuntimeScope, agentId: string, comparisonId: string): Promise<void> {
   const doc = await tx.doc(ComparisonsDoc);
   const pending = doc.runs.filter(item => item.companyId === scope.companyId && item.agentDefinitionId === agentId
-    && item.comparisonId === comparisonId && item.status === "running" && item.attempt.taskId);
-  const settled: { runId: string; outcome: AttemptOutcome; endedAt: number | null; posted: boolean | null }[] = [];
+    && item.comparisonId === comparisonId && (item.status === "pending" || item.status === "running") && item.attempt.taskId);
+  type Observed = { runId: string; verified: boolean; outcome: AttemptOutcome | null; startedAt: number | null; endedAt: number | null; posted: boolean | null };
+  const observed: Observed[] = [];
   for (const run of pending) {
     const task = await tx.task(Number(run.attempt.taskId) as TaskId);
-    if (task?.state.status !== "terminal") continue;
+    if (!task) continue;
+    const verified = task.kind === "dispatch.muse-run"
+      && run.source.kind === "standalone" && run.source.agentConversationId !== null
+      && String(task.conversationId) === run.source.agentConversationId;
+    const startedAt = typeof task.startedAt === "number" ? task.startedAt : null;
+    if (!verified || task.state.status !== "terminal") {
+      observed.push({ runId: run.id, verified, outcome: null, startedAt: verified ? startedAt : null, endedAt: null, posted: null });
+      continue;
+    }
     let posted: boolean | null = null;
     if (run.attempt.roomId && run.attempt.participantId) {
       try {
@@ -470,10 +484,17 @@ export async function reconcileEvaluationComparison(tx: Tx, scope: RuntimeScope,
           && message.text.trim() && message.text.trim() !== "[[silent]]");
       } catch { posted = null; }
     }
-    settled.push({ runId: run.id, outcome: task.state.outcome as AttemptOutcome, endedAt: typeof task.endedAt === "number" ? task.endedAt : null, posted });
+    observed.push({ runId: run.id, verified, outcome: task.state.outcome as AttemptOutcome, startedAt, endedAt: typeof task.endedAt === "number" ? task.endedAt : null, posted });
   }
-  for (const { runId, outcome, endedAt, posted } of settled) {
+  for (const { runId, verified, outcome, startedAt, endedAt, posted } of observed) {
     const run = doc.runs.find(item => item.id === runId)!;
+    if (!verified) {
+      if (!run.coverageLimitations.includes("Recorded attempt task does not match the expected native task and agent conversation; its outcome was not accepted."))
+        run.coverageLimitations.push("Recorded attempt task does not match the expected native task and agent conversation; its outcome was not accepted.");
+      continue;
+    }
+    if (startedAt !== null && run.startedAt === null) run.startedAt = startedAt;
+    if (!outcome) { if (startedAt !== null) run.status = "running"; continue; }
     run.finishedAt = endedAt;
     if (endedAt === null && !run.coverageLimitations.includes("Durable terminal timestamp unavailable; completion time is unknown."))
       run.coverageLimitations.push("Durable terminal timestamp unavailable; completion time is unknown.");
@@ -516,8 +537,13 @@ export async function appendEvaluationResult(tx: Tx, scope: RuntimeScope, agentI
     if (!allowed.has(row.criterionId)) throw new EvaluationError(409, "Judgments must use the criteria frozen at comparison creation.");
     if ((row.verdict === "pass" || row.verdict === "fail") && row.evidenceReferences.length === 0)
       throw new EvaluationError(409, "Pass and fail verdicts require at least one evidence reference.");
-    for (const ref of row.evidenceReferences)
+    for (const ref of row.evidenceReferences) {
       if (!run.evidenceReferences.includes(ref)) throw new EvaluationError(409, `Evidence reference does not resolve to recorded run evidence: ${ref}`);
+      // A recorded identifier is not an inspectable capture: pass/fail may cite only
+      // evidence that resolves to an authorized, inspectable view (see evidenceView).
+      if ((row.verdict === "pass" || row.verdict === "fail") && !evidenceView(run, ref).available)
+        throw new EvaluationError(409, `Evidence reference is not inspectable and cannot support a pass or fail verdict: ${ref}`);
+    }
   }
   const result: StoredResult = {
     id: randomUUID(), companyId: scope.companyId, runId, createdAt: Date.now(),
@@ -555,6 +581,18 @@ export function evaluationGateFor(frozen: Pick<FrozenCase, "criteria">, entry: {
   return "clear";
 }
 
+/**
+ * Evidence availability grounded in an inspectable capture, not identifier membership.
+ * The eval chat is inspectable through the ordinary chat route (which enforces its own
+ * authorization); recorded task and fixture identifiers have no inspectable view yet, so
+ * they stay unavailable and cannot support a pass/fail verdict.
+ */
+function evidenceView(run: StoredRun, ref: string): EvaluationEvidenceView {
+  if (run.evidenceReferences.includes(ref) && run.attempt.roomId && ref === `eval-chat:${run.attempt.roomId}`)
+    return { ref, label: ref, url: `/?chat=${encodeURIComponent(run.attempt.roomId)}`, available: true, truncated: false };
+  return { ref, label: ref, url: null, available: false, truncated: false };
+}
+
 export async function readEvaluationComparison(tx: Tx, scope: RuntimeScope, agentId: string, comparisonId: string): Promise<EvaluationComparisonResponse> {
   await reconcileEvaluationComparison(tx, scope, agentId, comparisonId);
   const doc = await tx.doc(ComparisonsDoc);
@@ -569,7 +607,7 @@ export async function readEvaluationComparison(tx: Tx, scope: RuntimeScope, agen
       const publicRun = JSON.parse(JSON.stringify(run)) as EvaluationRun;
       const refs = new Set([...run.evidenceReferences, ...results.flatMap(result => result.criteria.flatMap(row => row.evidenceReferences))]);
       return { run: publicRun, latestResult: results.at(-1) ?? null, results,
-        evidence: [...refs].map(ref => ({ ref, label: ref, url: null, available: run.evidenceReferences.includes(ref), truncated: false })) };
+        evidence: [...refs].map(ref => evidenceView(run, ref)) };
     };
     const runs = { baseline: viewFor("baseline"), candidate: viewFor("candidate") };
     const regressions: string[] = [];

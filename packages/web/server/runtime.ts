@@ -2208,6 +2208,11 @@ export class DispatchRuntime {
       const receipt = await findEvaluationAdmissionReceipt(tx, scope, agentId, runId);
       if (receipt) return receipt;
       const catalog = await tx.doc(CatalogDoc);
+      // Fresh admission rechecks current archival state even though execution stays pinned
+      // to the frozen historical revision.
+      const current = latestAgent(catalog, scope.companyId, agentId);
+      if (!current) throw new RuntimeError(404, "Agent not found.");
+      if (current.archived) throw new RuntimeError(409, "This agent is archived; fresh evaluation admission is unavailable.");
       const plan = await claimEvaluationRunForAdmission(tx, scope, agentId, runId, verifiedFixturePath);
       const pinned = catalog.agents.find(item => item.companyId === scope.companyId && item.id === agentId && item.revision === plan.run.agentRevision);
       if (!pinned) throw new RuntimeError(409, "Pinned agent revision is unavailable for admission.");
@@ -2255,7 +2260,8 @@ export class DispatchRuntime {
       });
       await recordEvaluationAdmission(tx, scope, agentId, runId,
         { taskId: String(taskId), roomId: String(room.id), participantId: member.id, entryBoundary: promptId }, String(conversationId));
-      return { runId, taskId: String(taskId), roomId: String(room.id), participantId: member.id, status: "running" as const };
+      // Admitted is not running: execution start is reconciled from the task's startedAt.
+      return { runId, taskId: String(taskId), roomId: String(room.id), participantId: member.id, status: "pending" as const };
     }, context);
   }
 
