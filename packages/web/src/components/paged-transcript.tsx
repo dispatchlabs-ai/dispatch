@@ -161,7 +161,7 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
       if (page.generation !== (snapshot.history?.generation ?? page.generation)) return;
       loadedRevision.current = page.revision ?? requestedRevision;
       setRows(old => before ? merge(incoming, old) : merge(old, incoming));
-      if (before || !rowsRef.current.length) setCursor(page.before);
+      if (before || !rowsRef.current.length) { pageable.current = page.before !== null; setCursor(page.before); }
       if (page.root) { setRoot(page.root); setReplyCount(page.replyCount ?? 0); }
       if (!before && page.publication) reported.current = page.publication;
     } catch (error) { if (alive.current) { loadFailed.current = true; setError(errorMessage(error)); setExpired(error instanceof ApiError && error.code === "HISTORY_CHANGED"); } }
@@ -187,7 +187,7 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
         const incoming = merge([], items(current));
         const tail = retained.at(-1);
         const needsBridge = Boolean(tail && current.history?.before && !incoming.some(item => item.id === tail.id || item.message?.aliases?.includes(tail.id.slice(2))) && (incoming[0]?.at ?? Infinity) >= tail.at);
-        if (!retained.length) setCursor(current.history?.before ?? null);
+        if (!retained.length) { pageable.current = current.history?.before != null; setCursor(current.history?.before ?? null); }
         if (needsBridge) setRefreshing(true);
         const connected = await bridge({ ...current, before: current.history?.before ?? null, generation: current.history?.generation ?? "" }, retained, controller.signal);
         if (controller.signal.aborted) return;
@@ -262,16 +262,28 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
     const scroll = getScrollElement();
     if (!offset || !scroll) { anchor.current = undefined; return; }
     scroll.scrollTop = offset[0] + pending.offset;
-    resizeCorrection.current.frame = requestAnimationFrame(() => {
-      // Let ResizeObserver measurements and the new history controls settle before restoring the anchor.
-      resizeCorrection.current.frame = requestAnimationFrame(() => {
-        const row = list.current?.querySelector<HTMLElement>(`[data-index="${index}"]`);
-        const content = row?.querySelector<HTMLElement>(".conversation-entry") ?? row;
-        if (content) scroll.scrollTop += content.getBoundingClientRect().top - pending.top;
+    let attempts = 0;
+    let settled = 0;
+    const restore = () => {
+      const row = list.current?.querySelector<HTMLElement>(`[data-index="${index}"]`);
+      const content = row?.querySelector<HTMLElement>(".conversation-entry") ?? row;
+      if (content) {
+        const delta = content.getBoundingClientRect().top - pending.top;
+        scroll.scrollTop += delta;
+        settled = Math.abs(delta) < 1 ? settled + 1 : 0;
+      } else {
+        // Newly prepended rows start with estimates. Recompute until the anchor renders.
+        const measured = virtualizer.getOffsetForIndex(index, "start");
+        if (measured) scroll.scrollTop = measured[0] + pending.offset;
+        settled = 0;
+      }
+      if (++attempts < 20 && settled < 2) resizeCorrection.current.frame = requestAnimationFrame(restore);
+      else {
         anchor.current = undefined;
         resizeCorrection.current = { frame: 0, delta: 0 };
-      });
-    });
+      }
+    };
+    resizeCorrection.current.frame = requestAnimationFrame(restore);
   }, [rows, loading, virtualizer, getScrollElement, clearResizeCorrection]);
   const participants = snapshot.participants;
   return <div ref={host} className="paged-transcript">
@@ -280,7 +292,7 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
     {(loading && !cursor) || refreshing ? <Spinner label="Loading history" /> : null}
     {refreshError ? <Notice>{refreshError}<Button variant="secondary" onClick={() => void refresh(true)}>Retry history update</Button></Notice> : null}
     {catchUpError ? <Notice>{catchUpError}<Button variant="secondary" onClick={retryCatchUp}>Retry history update</Button></Notice> : null}
-    {error ? <Notice>{error}<Button variant="secondary" onClick={() => { if (expired) { rowsRef.current = []; setRows([]); setCursor(null); setExpired(false); } void load(expired ? undefined : cursor ?? undefined, true); }}>{expired ? "Reload history" : "Retry"}</Button></Notice> : null}
+    {error ? <Notice>{error}<Button variant="secondary" onClick={() => { if (expired) { rowsRef.current = []; pageable.current = false; setRows([]); setCursor(null); setExpired(false); } void load(expired ? undefined : cursor ?? undefined, true); }}>{expired ? "Reload history" : "Retry"}</Button></Notice> : null}
     <div ref={list} style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}>
       {virtualizer.getVirtualItems().map(row => {
         const item = rows[row.index]!;
