@@ -1387,3 +1387,20 @@ a.button, a.icon-button { text-decoration: none; }
 .evaluation-workspace-content:not([hidden]) { display: flex; flex-direction: column; }
 .evaluation-workspace-content > nav { flex-shrink: 0; }
 .evaluation-workspace-content > .agent-evaluation { flex: 1; min-height: 0; height: auto; }
+
+/* Execution uses compact chrome; the existing navigation modal stays the single menu. */
+.object-section-nav[hidden] { display: none; }
+.eval-compact-header { display: flex; align-items: center; gap: 12px; flex-shrink: 0; padding: 12px 24px; border-bottom: 1px solid var(--color-border); }
+.eval-compact-header h1 { font-size: var(--text-lg); margin: 0; }
+.eval-compact-header > span { margin-left: auto; font-size: var(--text-xs); color: var(--color-muted); }
+.eval-menu { display: none; }
+.eval-experiments > .evaluation-section-links { margin-bottom: 12px; padding-bottom: 8px; }
+.eval-baseline { margin-block: 8px; font-size: var(--text-sm); }
+.eval-baseline > summary { cursor: pointer; }
+@media (max-width: 800px) {
+  .eval-compact-header { padding: 4px 12px; min-height: 52px; flex-wrap: wrap; gap: 8px; }
+  .eval-menu { display: inline-flex; min-height: 44px; padding-inline: 0; }
+  .eval-compact-header h1 { font-size: var(--text-md); }
+  .eval-compact-header > span { display: none; }
+  .eval-experiments { padding-top: 8px; }
+}

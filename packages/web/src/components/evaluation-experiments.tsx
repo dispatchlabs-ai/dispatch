@@ -95,11 +95,10 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
     </nav>
     {error ? <Notice>{error}</Notice> : null}
     {view === "new" ? <form onSubmit={event => { event.preventDefault(); void create(); }}>
-      <div className="eval-heading"><h2>New comparison</h2><Button variant="secondary" disabled={busy} onClick={() => { loadedProfileVersion.current = null; setRefresh(value => value + 1); }}>Refresh profile</Button></div>
-      <Notice tone="info"><strong>Trusted local execution. Not sandboxed.</strong><br />Runs can use host tools and files. An independent fixture is required for each variant.</Notice>
-      <p>Baseline revision {baselineRevision} · Profile revision {profile?.profile?.revision ?? "Unavailable"}. Candidate instructions replace baseline instructions only in this experiment; they are not saved or adopted.</p>
+      <Notice tone="info"><strong>Trusted local execution. Not sandboxed.</strong><br />Runs can use host tools and files.</Notice>
+      <details className="eval-baseline"><summary>Baseline r{baselineRevision} · Profile {profile?.profile?.revision == null ? "unavailable" : `r${profile.profile.revision}`}</summary><p>Only candidate instructions differ. Baseline configuration is frozen.</p><Button variant="secondary" disabled={busy} onClick={() => { loadedProfileVersion.current = null; setRefresh(value => value + 1); }}>Refresh profile</Button></details>
       {baselineRevision !== agent.revision ? <Notice>Agent revision changed to {agent.revision}. Your baseline remains pinned. <Button variant="secondary" disabled={busy} onClick={() => setBaselineRevision(agent.revision)}>Use current baseline revision</Button></Notice> : null}
-      <div className="eval-create-grid"><Field label="Candidate instructions">{props => <textarea {...props} required value={candidate} disabled={busy} onChange={event => setCandidate(event.target.value)} rows={12} />}</Field>
+      <div className="eval-create-grid"><Field label="Candidate instructions" hint="Unsaved snapshot. Agent unchanged." hintPosition="before">{props => <textarea {...props} required value={candidate} disabled={busy} onChange={event => setCandidate(event.target.value)} rows={12} />}</Field>
       <fieldset disabled={busy} className="eval-manifest"><legend>Expected case × variant manifest</legend>
         {!profile ? <Spinner /> : !profile.profile ? <p>No profile configured. Create a profile before running cases.</p> : profile.profile.cases.map(item => <div key={item.id} className="eval-fixture-row">
           <label><input type="checkbox" disabled={!item.enabled} checked={selected.includes(item.id)} onChange={event => setSelected(current => event.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))} /> {item.name}{!item.enabled ? " · Disabled" : ""} · {item.split === "held_out" ? "Held out" : "Tuning"}</label>
@@ -111,7 +110,7 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
       <Button type="submit" disabled={busy || agent.archived || !selected.length || !profile?.profile || loadedProfileVersion.current !== profileVersion}>{busy ? "Submitting…" : "Run comparison"}</Button>
       {agent.archived ? <p>Archived agents cannot start new experiments.</p> : null}
     </form> : comparisonId ? <>
-      <div className="eval-heading"><h2>{view === "judge" ? "Human judgment" : view === "history" ? "Judgment history" : "Compare"}</h2><Button variant="secondary" disabled={loading} onClick={() => setRefresh(value => value + 1)}>Refresh results</Button></div>
+      <div className="eval-heading"><Button variant="secondary" disabled={loading} onClick={() => setRefresh(value => value + 1)}>Refresh results</Button></div>
       {loading && !displayed ? <Spinner /> : null}
       {displayed ? <>
         <p>Baseline revision {displayed.comparison.agentRevision} · Candidate: unsaved instruction snapshot · Profile revision {displayed.comparison.profileRevision}</p>
@@ -128,7 +127,7 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
           </details>)}
         </>}
       </> : !loading ? <Button variant="secondary" onClick={() => setRefresh(value => value + 1)}>Retry loading</Button> : null}
-    </> : <><h2>Results</h2><p>Open a saved comparison, or create a new experiment. Authored profiles are not executed evaluations.</p><form onSubmit={event => { event.preventDefault(); if (openId.trim()) setParams(new URLSearchParams({ section: "agents", agent: agent.id, eval: "compare", comparison: openId.trim() })); }}><Field label="Comparison ID">{props => <Input {...props} required value={openId} onChange={event => setOpenId(event.target.value)} />}</Field><Button type="submit" variant="secondary">Open comparison</Button></form></>}
+    </> : <><p>Open a saved comparison, or create a new experiment. Authored profiles are not executed evaluations.</p><form onSubmit={event => { event.preventDefault(); if (openId.trim()) setParams(new URLSearchParams({ section: "agents", agent: agent.id, eval: "compare", comparison: openId.trim() })); }}><Field label="Comparison ID">{props => <Input {...props} required value={openId} onChange={event => setOpenId(event.target.value)} />}</Field><Button type="submit" variant="secondary">Open comparison</Button></form></>}
   </section>;
 }
 
