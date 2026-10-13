@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { Markdown } from "./markdown";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { ChatSnapshot, ConversationMessage, ParticipantActivity, TranscriptPage } from "../shared/contracts";
+import type { ChatSnapshot, ConversationMessage, ParticipantActivity, PublicationWatermark, TranscriptPage } from "../shared/contracts";
 import { useSession } from "../lib/session";
 import { ApiError, errorMessage } from "../lib/api";
 import { PublicActivity, PublicMessage } from "./shared-conversation";
@@ -103,10 +103,48 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
     }
     return incoming;
   }, [api, base, query]);
+  const seen = useRef<number | undefined>(undefined);
+  const reported = useRef<PublicationWatermark | undefined>(undefined);
+  const catching = useRef<Promise<void> | undefined>(undefined);
+  const catchUpFailed = useRef(false);
+  const [catchUpError, setCatchUpError] = useState<string>();
+  const pageable = useRef(cursor !== null);
+  pageable.current = cursor !== null;
+  // Publications keep draft timestamps, so one can sort into already-loaded rows outside the live page.
+  // Read messages published since the watermark whenever a page reports a newer one outside it.
+  // Catch-up runs alone: history loads and refreshes wait for it, and rerun it when they settle.
+  const catchUp = useCallback((publication?: PublicationWatermark) => {
+    if (publication) reported.current = publication;
+    if (catching.current || catchUpFailed.current || inFlight.current || refreshInFlight.current) return;
+    const run = (async () => {
+      try {
+        while (reported.current) {
+          const { published, outsideLatest } = reported.current;
+          if (seen.current === undefined || outsideLatest < seen.current) { seen.current = Math.max(seen.current ?? 0, published); return; }
+          const page = await api<TranscriptPage>(`${base}/history?${query}publishedAfter=${seen.current}`);
+          if (!alive.current || !page.publication || page.generation !== (snapshot.history?.generation ?? page.generation)) return;
+          const late = items(page);
+          // While older history is still pageable, scrollback brings earlier rows; showing them here
+          // would imply a continuous history. Once the beginning is loaded, every row belongs.
+          const bounded = pageable.current;
+          setRows(old => bounded && old.length ? merge(old, late.filter(item => item.at >= old[0]!.at)) : merge(old, late));
+          seen.current = Math.max(seen.current, page.publication.published);
+          if (page.publication.outsideLatest >= seen.current) reported.current = page.publication;
+        }
+      } catch (error) {
+        // Keep the watermark, so Retry reads the same publications.
+        if (alive.current) { catchUpFailed.current = true; setCatchUpError(errorMessage(error)); }
+      }
+    })();
+    // Assign before clearing: a run with nothing to read settles before this assignment.
+    catching.current = run;
+    void run.finally(() => { if (catching.current === run) catching.current = undefined; });
+  }, [api, base, query, snapshot.history?.generation]);
   const load = useCallback(async (before?: string, retry = false) => {
     if (inFlight.current || loadFailed.current && !retry) return;
     loadFailed.current = false;
     inFlight.current = true;
+    await catching.current;
     const requestedRevision = revision.current;
     setLoading(true); setError(undefined);
     const scroll = getScrollElement();
@@ -125,12 +163,13 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
       setRows(old => before ? merge(incoming, old) : merge(old, incoming));
       if (before || !rowsRef.current.length) setCursor(page.before);
       if (page.root) { setRoot(page.root); setReplyCount(page.replyCount ?? 0); }
+      if (!before && page.publication) reported.current = page.publication;
     } catch (error) { if (alive.current) { loadFailed.current = true; setError(errorMessage(error)); setExpired(error instanceof ApiError && error.code === "HISTORY_CHANGED"); } }
     finally {
       inFlight.current = false;
-      if (alive.current) setLoading(false);
+      if (alive.current) { setLoading(false); catchUp(); }
     }
-  }, [api, base, query, getScrollElement, virtualizer, snapshot.history?.generation, bridge]);
+  }, [api, base, query, getScrollElement, virtualizer, snapshot.history?.generation, bridge, catchUp]);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const refresh = useCallback(async (retry = false) => {
     if (refreshInFlight.current || refreshFailed.current && !retry) return;
@@ -139,6 +178,7 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
     const controller = new AbortController();
     refreshController.current = controller;
     setRefreshError(undefined);
+    await catching.current;
     let retained = rowsRef.current;
     try {
       let current: ChatSnapshot;
@@ -158,12 +198,19 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
       if (!controller.signal.aborted) { refreshFailed.current = true; setRefreshError(errorMessage(error)); }
     } finally {
       refreshInFlight.current = false;
-      if (!controller.signal.aborted) setRefreshing(false);
+      if (!controller.signal.aborted) { setRefreshing(false); catchUp(); }
     }
-  }, [bridge]);
+  }, [bridge, catchUp]);
+  const retryCatchUp = useCallback(() => {
+    catchUpFailed.current = false;
+    setCatchUpError(undefined);
+    catchUp();
+  }, [catchUp]);
   useEffect(() => {
-    if (!threadId) void refresh();
-  }, [snapshot.messages, snapshot.activities, snapshot.history?.before, threadId, refresh]);
+    if (threadId) return;
+    void refresh();
+    catchUp(snapshot.history?.publication);
+  }, [snapshot.messages, snapshot.activities, snapshot.history?.before, snapshot.history?.publication, threadId, refresh, catchUp]);
   useEffect(() => () => refreshController.current?.abort(), []);
   useEffect(() => {
     const scroll = getScrollElement();
@@ -232,6 +279,7 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
     {cursor ? <Button variant="secondary" disabled={loading} onClick={() => void load(cursor, true)}>{loading ? <><Spinner label="Loading history" /> Loading…</> : "Load older"}</Button> : null}
     {(loading && !cursor) || refreshing ? <Spinner label="Loading history" /> : null}
     {refreshError ? <Notice>{refreshError}<Button variant="secondary" onClick={() => void refresh(true)}>Retry history update</Button></Notice> : null}
+    {catchUpError ? <Notice>{catchUpError}<Button variant="secondary" onClick={retryCatchUp}>Retry history update</Button></Notice> : null}
     {error ? <Notice>{error}<Button variant="secondary" onClick={() => { if (expired) { rowsRef.current = []; setRows([]); setCursor(null); setExpired(false); } void load(expired ? undefined : cursor ?? undefined, true); }}>{expired ? "Reload history" : "Retry"}</Button></Notice> : null}
     <div ref={list} style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}>
       {virtualizer.getVirtualItems().map(row => {
