@@ -58,7 +58,10 @@ const runtime = await DispatchRuntime.openConversation({
   workerMcp: workerMcp((operation, input, signal) => backend(`/mcp/${operation}`, input, signal)),
   peopleDirectory: { list: companyId => backend("/people", { companyId }), get: (companyId, userId) => backend("/person", { companyId, userId }) },
   attachmentStore: new RemoteAttachmentStore((operation, input) => backend(`/attachment/${operation}`, input)),
-  workerInvitations: { invite: (actor, requestId, definitionIds) => backend("/invitation", { actor, requestId, definitionIds }) },
+  workerInvitations: {
+    invite: (actor, requestId, definitionIds) => backend("/invitation", { actor, requestId, definitionIds }),
+    createInstance: (actor, input) => backend("/instance", { actor, input }),
+  },
   workerManagement: {
     read: (actor, input) => backend("/management/read", { actor, input }),
     save: (actor, callId, input) => backend("/management/save", { actor, callId, input }),

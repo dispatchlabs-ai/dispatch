@@ -101,8 +101,10 @@ export type WorkerMembershipSnapshot = {
   events: WorkerInvitationEvent[];
 };
 export type WorkerInvitationResult = { membership: WorkerMembershipSnapshot; catalog: WorkerCatalogSnapshot };
+export type WorkerInstanceResult = WorkerInvitationResult & { actorId: string };
 export type WorkerInvitations = {
   invite(actor: WorkerManagementActor, requestId: string, definitionIds: string[]): Promise<WorkerInvitationResult>;
+  createInstance?(actor: WorkerManagementActor, input: CreateAgentInstanceInput): Promise<WorkerInstanceResult>;
 };
 export type ConversationWorkerBootstrap = {
   conversationKey: string; storeId: string; scope: RuntimeScope; input: CreateChatInput;
@@ -418,6 +420,22 @@ export class DispatchRuntime {
         await runtime.applyWorkerCatalog(result.catalog);
         await runtime.applyWorkerMembership(result.membership);
       };
+      if (worker) shared.createInstanceRemote = async (instanceId, input) => {
+        if (!options.workerInvitations?.createInstance) throw new RuntimeError(503, "Backend instance service is unavailable.");
+        const actor = await harness.commit(async tx => {
+          const member = await shared.managementActor(tx, instanceId);
+          if ((await tx.doc(SharedDoc, member.roomId)).stopping) throw new RuntimeError(409, "Conversation is stopping. Retry after Stop finishes.");
+          return runtime.remoteActor(tx, member);
+        }, context);
+        const result = await options.workerInvitations.createInstance(actor, input);
+        // Backend admission survives a lost response; replay reconciles the same instance.
+        await runtime.applyWorkerCatalog(result.catalog);
+        await runtime.applyWorkerMembership(result.membership);
+        const identities = await harness.snapshot(WorkerIdentityDoc, context);
+        const mapping = identities?.mappings[result.actorId];
+        if (!mapping) throw new RuntimeError(409, "Worker instance has not been reconciled.");
+        return mapping.participantId;
+      };
       runtime.archiveStorage = options.projectArchiveStore;
       runtime.readAllProjectUserIds = new Set(options.readAllProjectUserIds ?? []);
       await runtime.bindRuntimeMode();
@@ -731,42 +749,70 @@ export class DispatchRuntime {
     }, context);
   }
 
-  async admitWorkerInstance(scope: RuntimeScope, id: string, input: CreateAgentInstanceInput) {
+  async admitWorkerInstance(scope: RuntimeScope, id: string, input: CreateAgentInstanceInput): Promise<WorkerInstanceResult> {
     if (!this.directoryOnly) throw new RuntimeError(409, "Not a directory runtime.");
-    requireText(input.requestId, "Request ID", 200);
-    requireText(input.agentDefinitionId, "Agent ID", 200);
-    if (input.name !== undefined) requireText(input.name, "Instance name", 100, true);
-    if (input.instructions !== undefined) requireText(input.instructions, "Instance instructions", 50_000, true);
+    this.validateInstanceInput(input);
     const person = await this.person(scope.companyId, scope.userId);
     return this.harness.commit(async tx => {
       await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
       await this.shared.ensureHuman(tx, nativeId(id), person);
-      await this.workerMembership(tx, id);
-      const journal = (await tx.doc(WorkerInstancesDoc)).rooms[id] ??= { requests: {} };
-      const key = JSON.stringify([scope.userId, input.requestId]);
-      const name = input.name?.trim() || undefined;
-      const hash = fingerprint([input.agentDefinitionId, name ?? "", input.instructions ?? ""]);
-      const prior = journal.requests[key];
-      if (prior && prior.fingerprint !== hash) throw requestConflict();
-      let actorId = prior?.actorId;
-      if (!actorId) {
-        const actors = (await tx.doc(WorkerActorsDoc)).actors[id];
-        if (actors.some(actor => actor.definitionId === input.agentDefinitionId && actor.membership === "removing"))
-          throw new RuntimeError(409, "Agent removal is still pending. Retry after cleanup finishes.");
-        const definition = this.findAgent(await tx.doc(CatalogDoc), scope, input.agentDefinitionId);
-        this.validateAgent(definition);
-        const identity = await tx.createConversation({ ownership: { kind: "ownerless" } });
-        actorId = randomUUID();
-        actors.push({ companyId: scope.companyId, definitionId: definition.id, revision: definition.revision,
-          instanceId: identity.id, participantId: actorId, roomId: nativeId(id), configuration: detached(publicAgent(definition)),
-          legacy: false, membership: "active", creation: { ...(name ? { name } : {}), ...(input.instructions ? { instructions: input.instructions } : {}) } });
-        journal.requests[key] = { fingerprint: hash, actorId };
-        const invitations = (await tx.doc(WorkerInvitationsDoc)).rooms[id];
-        invitations.revision++;
-        invitations.events.push({ revision: invitations.revision, authorUserId: scope.userId, names: [name ?? definition.name], at: Date.now() });
-      }
-      return { actorId, membership: await this.workerMembership(tx, id), catalog: await this.workerCatalog(tx, scope.companyId) };
+      return this.admitWorkerInstanceIn(tx, scope.companyId, id, { userId: scope.userId }, input);
     }, context);
+  }
+
+  async admitWorkerAgentInstance(claim: WorkerManagementActor, input: CreateAgentInstanceInput): Promise<WorkerInstanceResult> {
+    this.requireDirectoryActor(claim);
+    this.validateInstanceInput(input);
+    return this.harness.commit(async tx => {
+      const actor = await this.authoritativeWorkerActor(tx, claim);
+      return this.admitWorkerInstanceIn(tx, actor.companyId, claim.conversationKey,
+        { definitionId: actor.definitionId, actorId: actor.participantId }, input);
+    }, context);
+  }
+
+  private validateInstanceInput(input: CreateAgentInstanceInput) {
+    requireText(input.requestId, "Request ID", 200);
+    requireText(input.agentDefinitionId, "Agent ID", 200);
+    if (input.name !== undefined) requireText(input.name, "Instance name", 100, true);
+    if (input.instructions !== undefined) requireText(input.instructions, "Instance instructions", 50_000, true);
+  }
+
+  private async admitWorkerInstanceIn(tx: Tx, companyId: string, id: string,
+    author: { userId: string } | { definitionId: string; actorId: string }, input: CreateAgentInstanceInput): Promise<WorkerInstanceResult> {
+    const room = await tx.doc(SharedDoc, nativeId(id));
+    if (room.companyId !== companyId) throw new RuntimeError(404, "Conversation not found.");
+    await this.workerMembership(tx, id);
+    const journal = (await tx.doc(WorkerInstancesDoc)).rooms[id] ??= { requests: {} };
+    // Keep existing human receipt keys; agent keys use the immutable calling instance.
+    const key = JSON.stringify("userId" in author ? [author.userId, input.requestId] : ["agent", author.actorId, input.requestId]);
+    const name = input.name?.trim() || undefined;
+    const hash = fingerprint([input.agentDefinitionId, name ?? "", input.instructions ?? ""]);
+    const prior = journal.requests[key];
+    if (prior && prior.fingerprint !== hash) throw requestConflict();
+    let actorId = prior?.actorId;
+    if (!actorId) {
+      if (room.stopping) throw new RuntimeError(409, "Conversation is stopping. Retry after Stop finishes.");
+      const actors = (await tx.doc(WorkerActorsDoc)).actors[id];
+      const existing = actors.filter(actor => actor.definitionId === input.agentDefinitionId);
+      if (existing.some(actor => actor.membership === "removing"))
+        throw new RuntimeError(409, "Agent removal is still pending. Retry after cleanup finishes.");
+      if (!("userId" in author) && existing.length && !existing.some(actor => actor.membership === "active"))
+        throw new RuntimeError(403, "Only a human can re-add a removed agent.");
+      const definition = this.findAgent(await tx.doc(CatalogDoc), { companyId }, input.agentDefinitionId);
+      this.validateAgent(definition);
+      const identity = await tx.createConversation({ ownership: { kind: "ownerless" } });
+      actorId = randomUUID();
+      actors.push({ companyId, definitionId: definition.id, revision: definition.revision,
+        instanceId: identity.id, participantId: actorId, roomId: nativeId(id), configuration: detached(publicAgent(definition)),
+        legacy: false, membership: "active", creation: { ...(name ? { name } : {}), ...(input.instructions ? { instructions: input.instructions } : {}) } });
+      journal.requests[key] = { fingerprint: hash, actorId };
+      const invitations = (await tx.doc(WorkerInvitationsDoc)).rooms[id];
+      invitations.revision++;
+      invitations.events.push({ revision: invitations.revision,
+        ...("userId" in author ? { authorUserId: author.userId } : { authorDefinitionId: author.definitionId, authorActorId: author.actorId }),
+        names: [name ?? definition.name], at: Date.now() });
+    }
+    return { actorId, membership: await this.workerMembership(tx, id), catalog: await this.workerCatalog(tx, companyId) };
   }
 
   async removeWorkerParticipant(scope: RuntimeScope, id: string, participantId: string) {
@@ -2072,10 +2118,7 @@ export class DispatchRuntime {
   async createAgentInstance(scope: RuntimeScope, id: string, input: CreateAgentInstanceInput): Promise<CreateAgentInstanceResult> {
     this.requireConversationExecutor();
     if (this.worker) throw new RuntimeError(409, "Worker instance creation must first be admitted by the backend.");
-    requireText(input.requestId, "Request ID", 200);
-    requireText(input.agentDefinitionId, "Agent ID", 200);
-    if (input.name !== undefined) requireText(input.name, "Instance name", 100, true);
-    if (input.instructions !== undefined) requireText(input.instructions, "Instance instructions", 50_000, true);
+    this.validateInstanceInput(input);
     await this.authorize(scope, id);
     const person = await this.person(scope.companyId, scope.userId);
     const createdParticipantId = await this.harness.commit(async tx => {

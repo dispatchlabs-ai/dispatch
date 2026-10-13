@@ -351,6 +351,14 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
     if (!body.actor || body.actor.companyId !== route.companyId || body.actor.conversationKey !== route.conversationId || body.actor.storeId !== route.storeId) return c.json({ error: "Forbidden" }, 403);
     return c.json(await directory.inviteWorkerAgents(body.actor, body.requestId, body.definitionIds));
   }
+  if (operation === "instance") {
+    const body = z.object({ actor: z.custom<WorkerManagementActor>(), input: z.object({
+      requestId: z.string().min(1).max(200), agentDefinitionId: z.string().min(1).max(200),
+      name: z.string().max(100).optional(), instructions: z.string().max(50_000).optional(),
+    }).strict() }).strict().parse(input);
+    if (!body.actor || body.actor.companyId !== route.companyId || body.actor.conversationKey !== route.conversationId || body.actor.storeId !== route.storeId) return c.json({ error: "Forbidden" }, 403);
+    return c.json(await directory.admitWorkerAgentInstance(body.actor, body.input));
+  }
   if (operation === "management/read" || operation === "management/save") {
     const body = z.object({ actor: z.custom<WorkerManagementActor>(), input: z.unknown(), callId: z.string().optional() }).strict().parse(input);
     if (!body.actor || body.actor.companyId !== route.companyId || body.actor.conversationKey !== route.conversationId || body.actor.storeId !== route.storeId) return c.json({ error: "Forbidden" }, 403);
