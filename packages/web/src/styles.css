@@ -1440,3 +1440,10 @@ a.button, a.icon-button { text-decoration: none; }
   .agent-access-connection-choice, .agent-access-delegation summary { min-height: 44px; }
   .agent-access-unavailable { align-items: flex-start; flex-direction: column; }
 }
+
+.eval-admission-confirmation { display: grid; gap: var(--space-3); }
+.eval-admission-actions { display: flex; justify-content: flex-end; gap: var(--space-3); }
+@media (max-width: 560px) {
+  .eval-admission-confirmation { font-size: 16px; }
+  .eval-admission-actions > .button { flex: 1; min-height: 44px; }
+}

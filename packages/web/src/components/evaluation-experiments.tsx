@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { AgentDefinition } from "../shared/contracts";
 import type { AppendEvaluationResultInput, CreateEvaluationComparisonInput, CreateEvaluationComparisonResponse, EvaluationComparisonCaseView, EvaluationComparisonResponse, EvaluationEvidenceView, EvaluationProfileResponse, EvaluationResult, EvaluationVerdict, EvaluationVariantKind } from "../shared/evaluations";
-import { errorMessage } from "../lib/api";
+import { ApiError, errorMessage } from "../lib/api";
 import { useSession } from "../lib/session";
-import { Button, Field, Input, Notice, Select, Spinner } from "./ui";
+import { Button, Field, Input, Modal, Notice, Select, Spinner } from "./ui";
 
 export function evaluationUrl(agentId: string, view = "profile", extra: Record<string, string> = {}) {
   return `/?${new URLSearchParams({ section: "agents", agent: agentId, eval: view, ...extra })}`;
@@ -28,6 +28,8 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const [manualRefresh, setManualRefresh] = useState(0);
+  const [manualRead, setManualRead] = useState(0);
   useEffect(() => { setError(null); }, [view, comparisonId]);
   const [openId, setOpenId] = useState("");
   const [candidate, setCandidate] = useState(agent.instructions);
@@ -58,9 +60,9 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
     if (!comparisonVisible || !comparisonId) return;
     let current = true;
     setLoading(true); setError(null);
-    void api<EvaluationComparisonResponse>(`${root}/comparisons/${encodeURIComponent(comparisonId)}`).then(value => { if (current) setData(value); }).catch(err => { if (current) setError(errorMessage(err)); }).finally(() => { if (current) setLoading(false); });
+    void api<EvaluationComparisonResponse>(`${root}/comparisons/${encodeURIComponent(comparisonId)}`).then(value => { if (current) { setData(value); setManualRead(manualRefresh); } }).catch(err => { if (current) setError(errorMessage(err)); }).finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [api, root, comparisonId, refresh, comparisonVisible]);
+  }, [api, root, comparisonId, refresh, manualRefresh, comparisonVisible]);
   // Refresh committed state only; retries never re-admit inference.
   useEffect(() => {
     if (!comparisonVisible || !data || data.comparison.id !== comparisonId || !data.cases.some(item => variants.some(variant => ["pending", "running"].includes(item.runs[variant]?.run.status ?? "")))) return;
@@ -95,7 +97,7 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
     </nav>
     {error ? <Notice>{error}</Notice> : null}
     {view === "new" ? <form onSubmit={event => { event.preventDefault(); void create(); }}>
-      <Notice tone="info"><strong>Trusted local execution. Not sandboxed.</strong><br />Runs can use host tools and files.<br />Execution is not available yet.</Notice>
+      <Notice tone="info"><strong>Trusted local execution. Not sandboxed.</strong><br />Runs can use host tools and files.<br />Creating a comparison does not start runs.</Notice>
       {baselineRevision !== agent.revision ? <Notice>Agent revision changed to {agent.revision}. Your baseline remains pinned. <Button variant="secondary" disabled={busy} onClick={() => setBaselineRevision(agent.revision)}>Use current baseline revision</Button></Notice> : null}
       <div className="eval-create-grid"><Field label="Candidate instructions" hint="Unsaved snapshot. Agent unchanged." hintPosition="before">{props => <textarea {...props} required value={candidate} disabled={busy} onChange={event => setCandidate(event.target.value)} rows={12} />}</Field>
       <fieldset disabled={busy} className="eval-manifest"><legend>Expected case × variant manifest</legend>
@@ -110,7 +112,7 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
       <Button type="submit" disabled={busy || agent.archived || !selected.length || !profile?.profile || loadedProfileVersion.current !== profileVersion}>{busy ? "Creating…" : "Create comparison"}</Button>
       {agent.archived ? <p>Archived agents cannot start new experiments.</p> : null}
     </form> : comparisonId ? <>
-      <div className="eval-heading"><Button variant="secondary" disabled={loading} onClick={() => setRefresh(value => value + 1)}>Refresh results</Button></div>
+      <div className="eval-heading"><Button variant="secondary" disabled={loading} onClick={() => setManualRefresh(value => value + 1)}>Refresh results</Button></div>
       {loading && !displayed ? <Spinner /> : null}
       {displayed ? <>
         <p>Baseline revision {displayed.comparison.agentRevision} · Candidate: unsaved instruction snapshot · Profile revision {displayed.comparison.profileRevision}</p>
@@ -118,7 +120,7 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
         {view === "judge" ? target?.entry ? <Judgment key={target.entry.run.id} item={target.item} entry={target.entry} root={root} drafts={judgmentDrafts.current} onSaved={() => setRefresh(value => value + 1)} /> : <Notice>Requested run is not available in this comparison.</Notice> : view === "history" ? target?.entry ? <div>{target.entry.results.length ? target.entry.results.map(result => <details key={result.id} open><summary>{new Date(result.createdAt).toLocaleString()} · {words(result.gradingStatus)}</summary><ResultRows result={result} evidence={target.entry!.evidence} criteria={target.item.criteria} /></details>) : <p>No judgments yet.</p>}</div> : <Notice>Requested run is not available in this comparison.</Notice> : <>
           <p className="field-hint">Clear is not an adoption decision. Missing evidence is not a pass.</p>
           {displayed.cases.map(item => <details className="eval-case" key={item.caseId} open={displayed.cases.length === 1 ? true : undefined}><summary><strong>{item.name}</strong><span>{exposureLabel[item.exposure]} · Baseline: {words(item.gates.baseline)} · Candidate: {words(item.gates.candidate)}</span></summary>
-            <div className="eval-pair">{variants.map(variant => <RunSummary key={variant} item={item} variant={variant} agentId={agent.id} comparisonId={comparisonId} />)}</div>
+            <div className="eval-pair">{variants.map(variant => <RunSummary key={item.runs[variant]?.run.id ?? variant} item={item} variant={variant} agentId={agent.id} comparisonId={comparisonId} root={root} manualRead={manualRead} onAdmitted={() => setRefresh(value => value + 1)} />)}</div>
             {item.criteria.map(criterion => <section className="eval-criterion" key={criterion.criterionId}><h3>{criterion.description} {criterion.criticalFailure ? <span className="revision-badge">Critical</span> : null}</h3><div className="eval-pair">{variants.map(variant => {
               const entry = item.runs[variant];
               const row = entry?.latestResult?.criteria.find(value => value.criterionId === criterion.criterionId);
@@ -131,17 +133,71 @@ export function EvaluationExperiments({ agent, active, profileVersion }: { agent
   </section>;
 }
 
-function RunSummary({ item, variant, agentId, comparisonId }: { item: EvaluationComparisonCaseView; variant: EvaluationVariantKind; agentId: string; comparisonId: string }) {
+function RunSummary({ item, variant, agentId, comparisonId, root, manualRead, onAdmitted }: { item: EvaluationComparisonCaseView; variant: EvaluationVariantKind; agentId: string; comparisonId: string; root: string; manualRead: number; onAdmitted: () => void }) {
   const entry = item.runs[variant];
   if (!entry) return <div><h3>{words(variant)}</h3><p>Missing run · Incomplete</p></div>;
   const { run, latestResult } = entry;
   return <div><h3>{words(variant)}</h3><p>Execution: {words(run.status)}</p>{run.status === "completed" ? <p className="field-hint">{run.output === "no_public_reply" ? "No public reply" : run.output === "public_reply" ? "Public reply recorded" : "Output evidence unavailable"}</p> : null}{run.error ? <Notice>{run.error}</Notice> : null}<p>Grading: {latestResult ? words(latestResult.gradingStatus) : "Not evaluated"}</p>{latestResult?.errors.map((error, i) => <p key={i}>{error}</p>)}
-    {run.attempt.roomId ? <Link to={`/?chat=${encodeURIComponent(run.attempt.roomId)}`}>Open eval chat{["pending", "running"].includes(run.status) ? " for Stop" : ""}</Link> : <p className="field-hint">Eval chat not admitted yet.</p>}
+    {run.attempt.roomId ? <Link to={`/?chat=${encodeURIComponent(run.attempt.roomId)}`}>Open eval chat{["pending", "running"].includes(run.status) ? " for Stop" : ""}</Link> : null}
+    <Admission item={item} variant={variant} entry={entry} root={root} manualRead={manualRead} onAdmitted={onAdmitted} />
     <nav className="evaluation-section-links">{["completed", "failed", "cancelled"].includes(run.status) ? <Link to={evaluationUrl(agentId, "judge", { comparison: comparisonId, run: run.id })}>Add human judgment</Link> : null}<Link to={evaluationUrl(agentId, "history", { comparison: comparisonId, run: run.id })}>Judgment history</Link></nav>
     <Evidence items={entry.evidence} />
     <p className="field-hint">Elapsed: {latestResult?.agentUsage.elapsedSeconds == null ? "Unavailable" : `${latestResult.agentUsage.elapsedSeconds}s`} · Agent cost: {latestResult?.agentUsage.costUsd == null ? "Unavailable" : `$${latestResult.agentUsage.costUsd}`} · Evaluator cost: {latestResult?.evaluatorUsage.costUsd == null ? "Unavailable" : `$${latestResult.evaluatorUsage.costUsd}`}</p>
     <details><summary>Coverage limitations</summary>{run.coverageLimitations.length ? <ul>{run.coverageLimitations.map((text, i) => <li key={i}>{text}</li>)}</ul> : <p>No limitations recorded. This does not establish exhaustive coverage.</p>}</details>
   </div>;
+}
+type RunEntry = NonNullable<EvaluationComparisonCaseView["runs"]["baseline"]>;
+function Admission({ item, variant, entry, root, manualRead, onAdmitted }: { item: EvaluationComparisonCaseView; variant: EvaluationVariantKind; entry: RunEntry; root: string; manualRead: number; onAdmitted: () => void }) {
+  const { api } = useSession();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [outcome, setOutcome] = useState<"none" | "recorded" | "uncertain" | "refused">("none");
+  const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
+  const submittedRead = useRef(manualRead);
+  const cancel = useRef<HTMLButtonElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const status = useRef<HTMLParagraphElement>(null);
+  const admission = entry.admission;
+  const eligible = admission?.state === "eligible" && admission.available;
+  const admitted = admission?.state === "admitted" || outcome === "recorded";
+  const otherVariant = variant === "baseline" ? "candidate" : "baseline";
+  const other = item.runs[otherVariant];
+  const counterpart = !other ? "Missing run" : other.admission?.state === "admitted" ? `Admitted · ${words(other.run.status)}` : "Not admitted";
+  useEffect(() => {
+    if (admission?.state === "admitted" || manualRead > submittedRead.current) {
+      setOutcome("none"); setError(null);
+    }
+  }, [admission?.state, manualRead, outcome]);
+  async function start() {
+    if (!eligible || outcome !== "none" || inFlight.current) return;
+    inFlight.current = true; submittedRead.current = manualRead;
+    setBusy(true); setError(null);
+    try {
+      await api(`${root}/runs/${encodeURIComponent(entry.run.id)}/admit`, {});
+      setOutcome("recorded"); setOpen(false); onAdmitted();
+    } catch (err) {
+      const refused = err instanceof ApiError && err.status >= 400 && err.status < 500 && err.code !== "INVALID_RESPONSE";
+      setOutcome(refused ? "refused" : "uncertain"); setError(errorMessage(err)); setOpen(false);
+    } finally { inFlight.current = false; setBusy(false); }
+  }
+  return <>
+    <p ref={status} tabIndex={-1} className="field-hint">{admitted ? "Admitted" : admission?.reason ?? "Not admitted"}</p>
+    {outcome === "uncertain" ? <Notice>Admission uncertain. Refresh results before retrying.</Notice> : outcome === "refused" ? <Notice>{error} Refresh results before retrying.</Notice> : null}
+    {outcome === "recorded" && admission?.state !== "admitted" ? <p className="field-hint">Refresh results to inspect the task state.</p> : null}
+    {eligible && !admitted ? <Button ref={trigger} disabled={busy || outcome !== "none"} onClick={() => setOpen(true)}>Start run</Button> : null}
+    <Modal title="Start run?" open={open} onOpenChange={value => { if (!inFlight.current) setOpen(value); }} initialFocus={cancel} finalFocus={() => trigger.current && !trigger.current.disabled ? trigger.current : status.current}>
+      <div className="eval-admission-confirmation">
+        <p>{item.name}</p><strong>{words(variant)}</strong>
+        <p className="field-hint">Agent r{entry.run.agentRevision} · Profile r{entry.run.profileRevision}</p>
+        {variant === "candidate" ? <p className="field-hint">Unsaved instruction snapshot</p> : null}
+        <p className="field-hint">{words(otherVariant)}: {counterpart}</p>
+        <Notice tone="info"><strong>Trusted local execution. Not sandboxed.</strong><br />Runs can use host tools and files.<br />Interrupted execution may have caused effects and is not automatically retried.</Notice>
+        {!eligible ? <Notice>{admission?.reason ?? "Admission is unavailable."}</Notice> : null}
+        <div className="eval-admission-actions"><Button ref={cancel} variant="secondary" disabled={busy} onClick={() => setOpen(false)}>Cancel</Button><Button disabled={busy || !eligible || outcome !== "none"} onClick={() => void start()}>{busy ? "Starting…" : "Start run"}</Button></div>
+      </div>
+    </Modal>
+  </>;
 }
 function ResultRows({ result, evidence, criteria }: { result: EvaluationResult; evidence: EvaluationEvidenceView[]; criteria: EvaluationComparisonCaseView["criteria"] }) {
   return <>{result.errors.map((error, i) => <p key={i}>{error}</p>)}{result.criteria.map(row => <div key={row.criterionId}><strong>{criteria.find(item => item.criterionId === row.criterionId)?.description ?? row.criterionId} · {words(row.verdict)}</strong><p>{row.reason}</p><p>{row.grader.identity} · {row.grader.method}</p><Evidence items={evidence.filter(item => row.evidenceReferences.includes(item.ref))} /></div>)}</>;

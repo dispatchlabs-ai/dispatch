@@ -48,7 +48,7 @@ export function Field({ label, children, hint, error, hintPosition = "after" }: 
   );
 }
 
-export function Modal({ title, description, children, trigger, open, onOpenChange, side, finalFocus, keepMounted = false }: {
+export function Modal({ title, description, children, trigger, open, onOpenChange, side, initialFocus, finalFocus, keepMounted = false }: {
   title: string;
   description?: string;
   children: ReactNode;
@@ -57,6 +57,7 @@ export function Modal({ title, description, children, trigger, open, onOpenChang
   onOpenChange: (open: boolean) => void;
   side?: "left" | "right";
   keepMounted?: boolean;
+  initialFocus?: ComponentProps<typeof Dialog.Popup>["initialFocus"];
   finalFocus?: ComponentProps<typeof Dialog.Popup>["finalFocus"];
 }) {
   return (
@@ -64,7 +65,7 @@ export function Modal({ title, description, children, trigger, open, onOpenChang
       {trigger ? <Dialog.Trigger render={trigger} /> : null}
       <Dialog.Portal keepMounted={keepMounted}>
         <Dialog.Backdrop className="dialog-overlay" />
-        <Dialog.Popup finalFocus={finalFocus} className={`dialog ${side ? `dialog-drawer dialog-${side}` : "dialog-modal"}`}>
+        <Dialog.Popup initialFocus={initialFocus} finalFocus={finalFocus} className={`dialog ${side ? `dialog-drawer dialog-${side}` : "dialog-modal"}`}>
           <header className="dialog-heading">
             <div>
               <Dialog.Title>{title}</Dialog.Title>
