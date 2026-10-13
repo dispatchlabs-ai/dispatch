@@ -47,6 +47,8 @@ export type RuntimeService = Pick<DispatchRuntime,
   | "listProjects"
   | "listSkills"
   | "managementGrants"
+  | "skillLibraryGrants"
+  | "saveSkillLibraryGrant"
   | "reconnectAgentConnection"
   | "refreshMcpConnections"
   | "renameChat"

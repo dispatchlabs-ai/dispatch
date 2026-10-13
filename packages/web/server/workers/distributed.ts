@@ -354,6 +354,8 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     listSkills: directory.listSkills.bind(directory),
     managementGrants: directory.managementGrants.bind(directory),
     saveManagementGrant: directory.saveManagementGrant.bind(directory),
+    skillLibraryGrants: directory.skillLibraryGrants.bind(directory),
+    saveSkillLibraryGrant: directory.saveSkillLibraryGrant.bind(directory),
     saveSkill: directory.saveSkill.bind(directory),
     getDefaultAgent: directory.getDefaultAgent.bind(directory),
     ...operations,

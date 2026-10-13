@@ -24,6 +24,7 @@ import { ProjectsDoc, requireProjectAccess, type ProjectAction, type SharedProje
 import { ProjectInstructionsBindingDoc, projectInstructionsSection } from "./project-instructions.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata, messageAttachments } from "../attachments.js";
 import { managementTools } from "../agent-management.js";
+import { skillLibraryTools } from "../skill-library.js";
 import { projectChatTools, type ProjectChatsInput, type ProjectChatsResult, type ProjectChatReadInput, type ProjectChatResult } from "../project-chat-context.js";
 import { createDefinitionOfDone, CRITERIA_EXTENSION } from "./definition-of-done.js";
 import { ConversationTurns, TurnsDoc } from "./turns.js";
@@ -121,7 +122,7 @@ export class SharedConversations {
   readonly turns = new ConversationTurns();
   readonly contributions = new Contributions(this.turns);
 
-  constructor(private readonly createAgent: (tx: Tx, roomId: ConversationId, companyId: string, definitionId: string, revision?: number) => Promise<Member>, private readonly attachments: AttachmentStore, management: Parameters<typeof managementTools>[0]) {
+  constructor(private readonly createAgent: (tx: Tx, roomId: ConversationId, companyId: string, definitionId: string, revision?: number) => Promise<Member>, private readonly attachments: AttachmentStore, management: Parameters<typeof managementTools>[0], skillLibrary: Parameters<typeof skillLibraryTools>[0]) {
     this.definitionOfDoneExtension = createDefinitionOfDone(async (tx, instanceId) => {
       const binding = await tx.doc(BindingDoc, instanceId);
       if (!binding.roomId || !binding.participantId) throw new CollaborationError(403, "Agent binding is unavailable.");
@@ -517,7 +518,7 @@ export class SharedConversations {
       },
     });
     this.extension = defineExtension({
-      name: "dispatch-collaboration", tasks: [this.delivery, this.legacyReporter, this.stopTask, this.removeTask, this.turns.wait, this.turns.expirePresence, this.contributions.guard], tools: [projectSpec, history, attachment, attach, post, invite, ...managementTools(management), ...projectChatTools({
+      name: "dispatch-collaboration", tasks: [this.delivery, this.legacyReporter, this.stopTask, this.removeTask, this.turns.wait, this.turns.expirePresence, this.contributions.guard], tools: [projectSpec, history, attachment, attach, post, invite, ...managementTools(management), ...skillLibraryTools(skillLibrary), ...projectChatTools({
         list: (instanceId, input) => {
           if (!this.listProjectChats) throw new CollaborationError(503, "Project chat service is unavailable.");
           return this.listProjectChats(instanceId, input);

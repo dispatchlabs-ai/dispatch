@@ -48,6 +48,8 @@ import type { AuthPrincipal } from "./auth.js";
 import { ManagementError, advanceSelfGrant, detached, grantHistory, managementFields, readGrants, writeGrant, type Grant } from "./agent-grants.js";
 import { appendEvaluationResult, createEvaluationComparison, findEvaluationComparisonReplay, parseAppendEvaluationResult, parseCreateEvaluationComparison, parseEvaluationProfile, readEvaluationComparison, readEvaluationProfile, readEvaluationProfileRevision, resolveEvaluationFixtures, saveEvaluationProfile, type FrozenRunConfiguration } from "./evaluations.js";
 import { managementReadSchema, managementSaveSchema } from "./agent-management.js";
+import { readSkillLibraryGrants, skillLibraryGrantHistory, writeSkillLibraryGrant, type SkillLibraryGrant } from "./skill-library-grants.js";
+import { skillLibraryReadSchema, skillLibrarySaveSchema } from "./skill-library.js";
 import type { McpConnections } from "./mcp-connections.js";
 
 const context = BACKGROUND_CONTEXT;
@@ -134,6 +136,14 @@ type ManagementReceipt = {
 };
 const ManagementReceiptsDoc = defineDoc<{ receipts: ManagementReceipt[] }>({
   kind: "dispatch.agent-management-receipts", version: 1, scope: "session", initial: () => ({ receipts: [] }),
+});
+type SkillLibraryReceipt = {
+  companyId: string; definitionId: string; revision: number; instanceId: string; participantId: string; roomId: string;
+  operationId: string; callId: string; fingerprint: string; skillId: string; beforeRevision: number; afterRevision: number;
+  at: number; reason: string; evidence: string[]; grantVersion: number;
+};
+const SkillLibraryReceiptsDoc = defineDoc<{ receipts: SkillLibraryReceipt[] }>({
+  kind: "dispatch.skill-library-receipts", version: 1, scope: "session", initial: () => ({ receipts: [] }),
 });
 type BundleImportReceipt = {
   companyId: string; userId: string; requestId: string; fingerprint: string;
@@ -271,6 +281,9 @@ export class DispatchRuntime {
       const shared = new SharedConversations((tx, roomId, companyId, definitionId, revision) => runtime.createParticipant(tx, roomId, companyId, definitionId, revision), attachments, {
         read: (tx, instance, input) => runtime.readManagedAgent(tx, instance, input),
         save: (tx, instance, callId, input) => runtime.saveManagedAgent(tx, instance, callId, input),
+      }, {
+        read: (tx, instance, input) => runtime.readSkillLibrary(tx, instance, input),
+        save: (tx, instance, callId, input) => runtime.saveSkillLibrary(tx, instance, callId, input),
       });
       registry.install(worker ? { ...shared.extension, sections: [...shared.extension.sections ?? [], workerWorkspaceSection] } : shared.extension);
       registry.install(shared.definitionOfDoneExtension);
@@ -2718,6 +2731,89 @@ export class DispatchRuntime {
     return managementReceipt(outcome);
   }
 
+  async skillLibraryGrants(principal: AuthPrincipal) {
+    return this.harness.commit(async tx => ({ grants: await readSkillLibraryGrants(tx, principal.companyId), history: await skillLibraryGrantHistory(tx, principal),
+      saves: detached((await tx.doc(SkillLibraryReceiptsDoc)).receipts.filter(item => item.companyId === principal.companyId)) }), context);
+  }
+
+  async saveSkillLibraryGrant(principal: AuthPrincipal, input: unknown) {
+    this.requireCatalogOwner();
+    return this.harness.commit(tx => writeSkillLibraryGrant(tx, principal, input, async input => {
+      const editor = latestAgent(await tx.doc(CatalogDoc), principal.companyId, input.editorId);
+      if (!editor || editor.archived || editor.revision !== input.policy!.editorRevision) throw new ManagementError(409, "Reload the editor revision before granting access.");
+    }), context);
+  }
+
+  private requireSkillLibraryGrant(catalog: Catalog, actor: ManagementActor, grants: SkillLibraryGrant[]) {
+    const grant = grants.find(item => item.editorId === actor.definitionId && item.policy);
+    const editor = latestAgent(catalog, actor.companyId, actor.definitionId);
+    if (!grant?.policy || !editor || editor.archived) throw new ManagementError(403, "No current skill library grant for this editor.");
+    if (grant.policy.editorRevision !== actor.revision || editor.revision !== actor.revision)
+      throw new ManagementError(403, `Grant is pinned to revision ${grant.policy.editorRevision}; current definition is ${editor.revision}, acting instance is ${actor.revision}. Wait for base adoption and explicitly re-grant the current revision.`);
+    return grant;
+  }
+
+  private async readSkillLibrary(tx: Tx, instance: ConversationId, raw: unknown) {
+    const input = skillLibraryReadSchema.parse(raw);
+    const actor = await this.shared.managementActor(tx, instance);
+    // The catalog owner is the backend; workers hold only a projection and have no library mediation yet.
+    if (this.worker) throw new ManagementError(503, "Skill library service is unavailable on this worker.");
+    const catalog = await tx.doc(CatalogDoc);
+    const grant = this.requireSkillLibraryGrant(catalog, actor, await readSkillLibraryGrants(tx, actor.companyId));
+    const records = (catalog.skills ?? []).filter(skill => skill.companyId === actor.companyId);
+    if (!input.skillId) {
+      const latest = new Map<string, StoredSkill>();
+      for (const skill of records) latest.set(skill.id, skill);
+      const skills = [...latest.values()].map(skill => ({ id: skill.id, name: skill.name, description: skill.description, revision: skill.revision }));
+      return detached({ skills: skills.slice(input.offset ?? 0, (input.offset ?? 0) + 100), total: skills.length,
+        nextOffset: (input.offset ?? 0) + 100 < skills.length ? (input.offset ?? 0) + 100 : null, policy: grant.policy });
+    }
+    const selected = input.revision ? records.find(skill => skill.id === input.skillId && skill.revision === input.revision)
+      : records.findLast(skill => skill.id === input.skillId);
+    if (!selected) throw new ManagementError(404, "Skill revision not found.");
+    return detached({ skill: publicSkill(selected), policy: grant.policy });
+  }
+
+  private async saveSkillLibrary(tx: Tx, instance: ConversationId, callId: string, raw: unknown) {
+    const input = skillLibrarySaveSchema.parse(raw);
+    const actor = await this.shared.managementActor(tx, instance);
+    if (this.worker) throw new ManagementError(503, "Skill library service is unavailable on this worker.");
+    const catalog = await tx.doc(CatalogDoc);
+    catalog.skills ??= [];
+    const receipts = await tx.doc(SkillLibraryReceiptsDoc);
+    const fingerprint = JSON.stringify([input.skillId ?? null, input.expectedRevision ?? null, input.reason, input.evidence ?? [], input.name, input.description, input.instructions]);
+    // Durable call identity catches transport replay; operation identity also catches a new call retry.
+    const receipt = receipts.receipts.find(item => item.companyId === actor.companyId && item.instanceId === String(actor.instanceId) &&
+      (item.callId === callId || item.operationId === input.operationId));
+    if (receipt) {
+      if (receipt.fingerprint !== fingerprint || receipt.operationId !== input.operationId || receipt.definitionId !== actor.definitionId)
+        throw new ManagementError(409, "Operation ID was already used with different content.");
+      return skillLibraryReceipt(receipt);
+    }
+    const grant = this.requireSkillLibraryGrant(catalog, actor, await readSkillLibraryGrants(tx, actor.companyId));
+    const policy = grant.policy!;
+    if (policy.action !== "save") throw new ManagementError(403, "This grant permits reads only.");
+    const records = catalog.skills.filter(skill => skill.companyId === actor.companyId);
+    const prior = input.skillId ? records.findLast(skill => skill.id === input.skillId) : undefined;
+    if (input.skillId && !prior) throw new ManagementError(404, "Skill not found.");
+    if (prior && prior.revision !== input.expectedRevision) throw new ManagementError(409, "The skill has changed. Reload before saving.");
+    const now = Date.now();
+    const recent = receipts.receipts.filter(item => item.companyId === actor.companyId && item.definitionId === actor.definitionId && item.at > now - 3_600_000).sort((a, b) => a.at - b.at);
+    if (recent.length >= policy.maxSavesPerHour)
+      throw new ManagementError(429, `The editor's limit of ${policy.maxSavesPerHour} committed saves per hour has been reached. Retry after ${new Date(recent[recent.length - policy.maxSavesPerHour].at + 3_600_000).toISOString()}.`);
+    const skill: StoredSkill = { id: prior?.id ?? randomUUID(), revision: (prior?.revision ?? 0) + 1,
+      name: input.name, description: input.description, instructions: input.instructions,
+      createdAt: prior?.createdAt ?? now, updatedAt: now, companyId: actor.companyId,
+      savedBy: `agent:${actor.definitionId}`, requestId: `skill-library:${input.operationId}`, fingerprint };
+    catalog.skills.push(skill);
+    const outcome: SkillLibraryReceipt = { companyId: actor.companyId, definitionId: actor.definitionId, revision: actor.revision,
+      instanceId: String(actor.instanceId), roomId: String(actor.roomId), participantId: actor.participantId,
+      operationId: input.operationId, callId, fingerprint, skillId: skill.id, beforeRevision: prior?.revision ?? 0, afterRevision: skill.revision,
+      at: now, reason: input.reason, evidence: input.evidence ?? [], grantVersion: grant.version };
+    receipts.receipts.push(outcome);
+    return skillLibraryReceipt(outcome);
+  }
+
   async archiveAgent(scope: RuntimeScope, id: string, expectedRevision: number): Promise<AgentDefinition> {
     this.requireCatalogOwner();
     if (id === DEFAULT_AGENT_ID) throw new RuntimeError(400, "The default agent cannot be archived.");
@@ -3078,6 +3174,11 @@ export class DispatchRuntime {
 function managementReceipt(receipt: ManagementReceipt) {
   const { operationId, targetId, beforeRevision, afterRevision, at, grantVersion } = receipt;
   return { operationId, targetId, beforeRevision, afterRevision, at, grantVersion };
+}
+
+function skillLibraryReceipt(receipt: SkillLibraryReceipt) {
+  const { operationId, skillId, beforeRevision, afterRevision, at, grantVersion } = receipt;
+  return { operationId, skillId, beforeRevision, afterRevision, at, grantVersion };
 }
 
 // Catalog revisions are append-only. Keep archived latest revisions in the lookup;
