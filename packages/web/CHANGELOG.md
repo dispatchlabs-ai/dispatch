@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Chat history
+
+- Preserve loaded scrollback across ordinary publications and reconnect gaps; keep publication aliases from unnecessarily invalidating older-page cursors.
+- Add near-top older-page loading, explicit history retry and independent main/thread **Latest messages** controls.
+- Catch up late-published messages without changing displayed draft timestamps. Activity-only changes outside the recent page still require a published answer for catch-up.
+
 ## [0.4.0] - 2026-10-13
 
 ### Agent definitions
