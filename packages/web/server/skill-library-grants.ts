@@ -8,12 +8,14 @@ export const skillLibraryGrantInputSchema = z.object({
   editorId: id, expectedVersion: z.number().int().nonnegative(), requestId: id,
   reason: z.string().trim().min(1).max(2000),
   policy: z.object({
-    editorRevision: z.number().int().positive(), action: z.enum(["read", "save"]),
+    // Reading needs no grant; earlier read-only grants may remain stored but cannot be newly issued.
+    editorRevision: z.number().int().positive(), action: z.literal("save"),
     maxSavesPerHour: z.number().int().min(1).max(100),
   }).strict().nullable(),
 }).strict();
 export type SkillLibraryGrantInput = z.infer<typeof skillLibraryGrantInputSchema>;
-export type SkillLibraryGrant = { companyId: string; editorId: string; version: number; policy: SkillLibraryGrantInput["policy"] };
+type StoredPolicy = Omit<NonNullable<SkillLibraryGrantInput["policy"]>, "action"> & { action: "read" | "save" };
+export type SkillLibraryGrant = { companyId: string; editorId: string; version: number; policy: StoredPolicy | null };
 type SkillLibraryGrantChange = { companyId: string; userId: string; at: number; requestId: string; fingerprint: string; reason: string; before: SkillLibraryGrant | null; after: SkillLibraryGrant };
 const SkillLibraryGrantsDoc = defineDoc<{ grants: SkillLibraryGrant[]; changes: SkillLibraryGrantChange[] }>({
   kind: "dispatch.skill-library-grants", version: 1, scope: "session", initial: () => ({ grants: [], changes: [] }),

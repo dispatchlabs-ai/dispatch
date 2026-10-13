@@ -2802,20 +2802,20 @@ export class DispatchRuntime {
     const actor = await this.shared.managementActor(tx, instance);
     // The catalog owner is the backend; workers hold only a projection and have no library mediation yet.
     if (this.worker) throw new ManagementError(503, "Skill library service is unavailable on this worker.");
+    // Every active agent may read its company's library; only creating and editing need a grant.
     const catalog = await tx.doc(CatalogDoc);
-    const grant = this.requireSkillLibraryGrant(catalog, actor, await readSkillLibraryGrants(tx, actor.companyId));
     const records = (catalog.skills ?? []).filter(skill => skill.companyId === actor.companyId);
     if (!input.skillId) {
       const latest = new Map<string, StoredSkill>();
       for (const skill of records) latest.set(skill.id, skill);
       const skills = [...latest.values()].map(skill => ({ id: skill.id, name: skill.name, description: skill.description, revision: skill.revision }));
       return detached({ skills: skills.slice(input.offset ?? 0, (input.offset ?? 0) + 100), total: skills.length,
-        nextOffset: (input.offset ?? 0) + 100 < skills.length ? (input.offset ?? 0) + 100 : null, policy: grant.policy });
+        nextOffset: (input.offset ?? 0) + 100 < skills.length ? (input.offset ?? 0) + 100 : null });
     }
     const selected = input.revision ? records.find(skill => skill.id === input.skillId && skill.revision === input.revision)
       : records.findLast(skill => skill.id === input.skillId);
     if (!selected) throw new ManagementError(404, "Skill revision not found.");
-    return detached({ skill: publicSkill(selected), policy: grant.policy });
+    return detached({ skill: publicSkill(selected) });
   }
 
   private async saveSkillLibrary(tx: Tx, instance: ConversationId, callId: string, raw: unknown) {
