@@ -1,4 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { mkdir, open, realpath, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 import { MuseClient, MuseInteractionRequiredError } from "./client.js";
@@ -21,13 +22,25 @@ export async function runMuseQuery(input: {
       error: "Muse Code authorization policy changed. This run cannot continue. Ask the operator to review any earlier work and external effects before starting a new run." };
   }
 
-  // Eval runs root native Muse at the variant fixture so native shell and bridged tools
-  // resolve relative paths identically; ordinary chats keep the isolated session workspace.
-  const workspace = prepared.nativeWorkspace
-    ? resolve(prepared.nativeWorkspace)
-    : resolve(homedir(), ".local", "share", "dispatch", "muse-workspaces", invocation.sessionId);
-  await mkdir(workspace, { recursive: true, mode: 0o700 });
-  await writeFile(join(workspace, "AGENTS.md"), prepared.systemPrompt, { mode: 0o600 });
+  // Only a task preparation backed by a committed evaluation binding can select a fixture.
+  // Ordinary chats retain their existing workspace and instruction-file behavior.
+  let workspace: string;
+  if (prepared.nativeWorkspace !== undefined || prepared.evaluation !== undefined) {
+    try {
+      if (!prepared.evaluation || !prepared.nativeWorkspace || prepared.nativeWorkspace !== prepared.cwd)
+        throw new Error("Evaluation workspace binding is missing.");
+      workspace = await realpath(prepared.nativeWorkspace);
+      if (workspace !== prepared.nativeWorkspace) throw new Error("Evaluation fixture path changed.");
+      await prepareEvaluationInstructions(workspace, prepared);
+    } catch {
+      return { sessionId: invocation.sessionId, text: "", success: false,
+        error: "Evaluation fixture instructions could not be prepared. The fixture root must exist and reserve AGENTS.md for this run; conflicting, linked, or modified files are never overwritten. Inspect the fixture before retrying." };
+    }
+  } else {
+    workspace = resolve(homedir(), ".local", "share", "dispatch", "muse-workspaces", invocation.sessionId);
+    await mkdir(workspace, { recursive: true, mode: 0o700 });
+    await writeFile(join(workspace, "AGENTS.md"), prepared.systemPrompt, { mode: 0o600 });
+  }
   signal.throwIfAborted();
   let turnId = invocation.commandId;
   const allowed = new Set(bridge.toolNames.map(name => `mcp__dispatch__${name}`));
@@ -117,6 +130,32 @@ export async function runMuseQuery(input: {
     unsubscribe();
     await client.close();
   }
+}
+
+/**
+ * Harness preparation, not an agent effect: admission must reserve AGENTS.md and account for
+ * it separately in fixture evidence. Never overwrite fixture content. Exact same-run content
+ * is reusable for a review continuation; a partial write fails closed on later attempts.
+ * This protects the reserved file, not the host from native tools (trusted local execution).
+ */
+async function prepareEvaluationInstructions(workspace: string, prepared: MusePreparedRun): Promise<void> {
+  const path = join(workspace, "AGENTS.md");
+  const content = `<!-- Dispatch evaluation ${prepared.evaluation!.runId}: harness-owned instructions -->\n${prepared.systemPrompt}`;
+  let file;
+  try {
+    file = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    const existing = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    try {
+      const info = await existing.stat();
+      if (!info.isFile() || info.nlink !== 1 || info.size !== Buffer.byteLength(content)
+        || await existing.readFile("utf8") !== content) throw new Error("Evaluation instructions conflict.");
+    } finally { await existing.close(); }
+    return;
+  }
+  try { await file.writeFile(content); await file.sync(); }
+  finally { await file.close(); }
 }
 
 /** Preserve explicit native authentication without forwarding unrelated service/secret variables. */

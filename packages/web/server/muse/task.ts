@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Context } from "@earendil-works/chord";
+import { assertNativeEvaluation, nativeEvaluationPreparation, prepareNativeEvaluation, type NativeEvaluationPreparation } from "../evaluation-bindings.js";
 import {
   defineDoc, defineExtension, defineTask,
   type ConversationId, type TaskId, type TaskRuntime, type Tx,
@@ -24,6 +25,8 @@ export type MusePreparedRun = {
   cwd: string;
   /** Eval-only: native Muse must run rooted here so its shell resolves relative paths like the bridged tools do. Absent keeps the isolated session workspace. */
   nativeWorkspace?: string;
+  /** Present only for a committed eval binding; checked again before every native invocation. */
+  evaluation?: NativeEvaluationPreparation;
   model: string;
   reasoningEffort: MuseReasoningEffort;
   /** Native authorization configuration; absent on checkpoints saved before policy versioning. */
@@ -94,7 +97,15 @@ export function createMuseTask(host: MuseTaskHost) {
         if (record.input.previous) await runtime.waitForTask(record.input.previous, context);
         const scope = scopeFor(record.input, runtime, context, record.state.checkpoint.round);
         const prepared = await host.prepare(scope);
+        const agent = await runtime.agent(context);
         await runtime.commit(async tx => {
+          const binding = await prepareNativeEvaluation(tx, runtime.conversationId, scope.input, "muse-code", prepared, agent);
+          if (binding) {
+            prepared.evaluation = nativeEvaluationPreparation(binding, prepared.systemPrompt);
+            prepared.nativeWorkspace = binding.fixture.effectivePath;
+          } else if (prepared.nativeWorkspace !== undefined) {
+            throw new Error("Native eval workspace requires a committed evaluation binding.");
+          }
           const session = await tx.doc(MuseSessionDoc, runtime.conversationId);
           // A native transcript cannot silently carry another owner's or an obsolete instruction snapshot.
           const resume = Boolean(session.sessionId && session.configuration === configurationKey(prepared));
@@ -106,8 +117,12 @@ export function createMuseTask(host: MuseTaskHost) {
       execute: async (record, runtime, context) => {
         const { prepared, invocation, round } = record.state.checkpoint;
         const scope = scopeFor(record.input, runtime, context, round);
+        const agent = await runtime.agent(context);
         // Commit intent before external work. A reopened invocation stops at recover, never resends.
         await runtime.commit(async tx => {
+          await assertNativeEvaluation(tx, runtime.conversationId, scope.input, "muse-code", prepared, agent);
+          if (prepared.evaluation ? prepared.nativeWorkspace !== prepared.cwd : prepared.nativeWorkspace !== undefined)
+            throw new Error("Native evaluation workspace does not match the admitted preparation.");
           delete (await tx.doc(MuseSessionDoc, runtime.conversationId)).sessionId;
           return { status: "running", checkpoint: { phase: "recover", round, prepared, invocation } };
         }, context);
