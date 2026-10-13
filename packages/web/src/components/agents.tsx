@@ -1,3 +1,5 @@
+import { Link, useSearchParams } from "react-router";
+import { EvaluationExperiments, evaluationUrl } from "./evaluation-experiments";
 import { NamedSecrets } from "./named-secrets";
 import { ArrowRight, Archive, Bot, Pencil } from "lucide-react";
 import { useRef, useState } from "react";
@@ -96,8 +98,9 @@ export function AgentsPage({
   creating,
   onConnectionsSettings,
   onEvaluationGuardChange,
-  evaluationAgent, onEvaluationAgentChange, onEvaluationContextChange,
+  evaluationAgent, onEvaluationAgentChange, onEvaluationContextChange, active,
 }: {
+  active: boolean;
   evaluationAgent: string | null;
   onEvaluationAgentChange: (id: string | null) => void;
   onEvaluationContextChange: (context: React.ReactNode) => void;
@@ -113,7 +116,10 @@ export function AgentsPage({
   creating: boolean;
   onConnectionsSettings: () => void;
 }) {
+  const [evaluationParams] = useSearchParams();
+  const [profileVersion, setProfileVersion] = useState(0);
   const evaluationOpen = !!agent && evaluationAgent === agent.id;
+  const executionOpen = evaluationOpen && !!evaluationParams.get("eval") && evaluationParams.get("eval") !== "profile";
   if (editing)
     return (
       <AgentEditor
@@ -154,7 +160,7 @@ export function AgentsPage({
         <div>
           <p className="page-eyebrow">Agents{evaluationOpen ? ` / ${agent.name}` : ""}</p>
           <div className="agent-title-line"><span className="agent-object-icon"><Bot size={30} aria-hidden="true" /></span><h1>{evaluationOpen ? "Evaluations" : agent.name}</h1>{isDefault && !evaluationOpen ? <span className="sidebar-tag">Default</span> : null}</div>
-          <p>{agent.archived ? "Archived agent" : evaluationOpen ? "Define evaluations · Runs not available yet" : agent.description || "Shared with your company"}</p>
+          <p>{agent.archived ? "Archived agent" : evaluationOpen ? "Profiles, trusted local experiments and human judgments" : agent.description || "Shared with your company"}</p>
         </div>
         {!agent.archived && !evaluationOpen ? (
           <div className="button-row agent-actions">
@@ -172,8 +178,8 @@ export function AgentsPage({
         ) : null}
       </header>
       <nav className="object-section-nav" aria-label="Agent views">
-        <Button variant="ghost" aria-current={!evaluationOpen ? "page" : undefined} onClick={() => onEvaluationAgentChange(null)}>Overview</Button>
-        <Button variant="ghost" className="evaluation-entry" aria-current={evaluationOpen ? "page" : undefined} onClick={() => onEvaluationAgentChange(agent.id)}>Evaluations</Button>
+        <Link className="button button-ghost" aria-current={!evaluationOpen ? "page" : undefined} to={`/?section=agents&agent=${encodeURIComponent(agent.id)}`} onClick={event => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0) onEvaluationAgentChange(null); }}>Overview</Link>
+        <Link className="button button-ghost evaluation-entry" aria-current={evaluationOpen ? "page" : undefined} to={evaluationUrl(agent.id)}>Evaluations</Link>
       </nav>
       <div className={evaluationOpen ? "agent-content evaluation-workspace" : "agent-content"}>
         <div className="agent-content-inner">
@@ -199,9 +205,11 @@ export function AgentsPage({
             </Notice>
           ) : null}
           </div>
-          <div hidden={!evaluationOpen} className="evaluation-workspace-content">
-            <AgentEvaluation active={evaluationOpen} key={`evaluation:${agent.id}`} agentId={agent.id} readOnly={agent.archived} onGuardChange={onEvaluationGuardChange} onContextChange={onEvaluationContextChange} onClose={() => { onEvaluationAgentChange(null); requestAnimationFrame(() => document.querySelector<HTMLElement>(".evaluation-entry")?.focus()); }} />
+          <div hidden={!evaluationOpen || executionOpen} className="evaluation-workspace-content">
+            <nav className="evaluation-section-links" aria-label="Evaluation views"><Link to={evaluationUrl(agent.id, "results")}>Results</Link><Link to={evaluationUrl(agent.id, "new")}>New comparison</Link></nav>
+            <AgentEvaluation onProfileSaved={() => setProfileVersion(value => value + 1)} active={active && evaluationOpen && !executionOpen} key={`evaluation:${agent.id}`} agentId={agent.id} readOnly={agent.archived} onGuardChange={onEvaluationGuardChange} onContextChange={onEvaluationContextChange} onClose={() => { onEvaluationAgentChange(null); requestAnimationFrame(() => document.querySelector<HTMLElement>(".evaluation-entry")?.focus()); }} />
           </div>
+          <EvaluationExperiments key={`experiments:${agent.id}`} agent={agent} active={active && executionOpen} profileVersion={profileVersion} />
         </div>
       </div>
     </section>

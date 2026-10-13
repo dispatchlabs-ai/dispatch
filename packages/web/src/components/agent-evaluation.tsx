@@ -13,8 +13,9 @@ function draftOf(profile: EvaluationProfile | null): EvaluationProfileDraft {
   return structuredClone({ responsibilities, expectedBehavior, prohibitedActions, criteria, cases });
 }
 
-export function AgentEvaluation({ agentId, readOnly, onGuardChange, onClose, onContextChange, active }: {
+export function AgentEvaluation({ agentId, readOnly, onGuardChange, onClose, onContextChange, onProfileSaved, active }: {
   active: boolean;
+  onProfileSaved: () => void;
   onClose: () => void;
   onContextChange: (context: React.ReactNode) => void;
   agentId: string; readOnly: boolean; onGuardChange: (guard: { dirty: boolean; busy: boolean }) => void;
@@ -72,7 +73,7 @@ export function AgentEvaluation({ agentId, readOnly, onGuardChange, onClose, onC
     try {
       const { profile } = await api<{ profile: EvaluationProfile }>(endpoint, input);
       setData({ profile, revisions: [{ revision: profile.revision, updatedAt: profile.updatedAt, savedBy: profile.savedBy, changeReason: profile.changeReason }, ...(data?.revisions ?? [])] });
-      setDraft(null); setReason(""); setHistorical(null); setSaved(true);
+      setDraft(null); setReason(""); setHistorical(null); setSaved(true); onProfileSaved();
     } catch (err) { setError(errorMessage(err)); setConflict(err instanceof ApiError && err.status === 409); }
     finally { setBusy(false); }
   }

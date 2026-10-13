@@ -72,17 +72,21 @@ export function AgentSidebar({
             key={agent.id}
             className={`sidebar-row ${agent.id === selectedAgentId && editing !== "new" ? "selected" : ""}`}
           >
-            <button
-              type="button"
+            <a
+              href={`/?section=agents&agent=${encodeURIComponent(agent.id)}`}
               className="sidebar-select"
-              disabled={busy}
+              aria-disabled={busy || undefined}
               aria-current={
                 agent.id === selectedAgentId && editing !== "new"
                   ? "page"
                   : undefined
               }
               title={agent.name}
-              onClick={() => onSelect(agent.id)}
+              onClick={event => {
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                event.preventDefault();
+                if (!busy) onSelect(agent.id);
+              }}
             >
               <Bot className="agent-library-icon" size={21} aria-hidden="true" /><span>{agent.name}</span>
               {editing === true && agent.id === selectedAgentId ? (
@@ -91,7 +95,7 @@ export function AgentSidebar({
               {agent.id === defaultAgentId ? (
                 <span className="sidebar-tag">Default</span>
               ) : null}
-            </button>
+            </a>
             {!agent.archived ? (
               <div className="sidebar-row-actions">
                 <Menu.Root>

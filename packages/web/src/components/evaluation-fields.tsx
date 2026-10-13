@@ -63,6 +63,7 @@ export function EvaluationFields({ draft, onChange, disabled = false, section, o
         <h3>{item.name || `New case ${index + 1}`}</h3>
         <fieldset className="evaluation-item" aria-label={`Case ${index + 1}`}>
         <Field label="Name">{props => <Input {...props} required maxLength={200} value={item.name} onChange={event => updateCase(item.id, { name: event.target.value })} />}</Field>
+        <Field label="Split" hint="Held out does not certify an unexposed case.">{props => <Select {...props} value={item.split} onChange={event => updateCase(item.id, { split: event.target.value as EvaluationCase["split"] })}><option value="tuning">Tuning</option><option value="held_out">Held out</option></Select>}</Field>
         <div className="evaluation-check-field"><label className="evaluation-check"><input type="checkbox" checked={item.enabled} onChange={event => updateCase(item.id, { enabled: event.target.checked })} />Enabled for future evaluations</label></div>
         {text("Task for the agent", item.prompt, prompt => updateCase(item.id, { prompt }), 20000, true)}
         <details className="evaluation-private"><summary>Starting conditions</summary>{text("Starting conditions", item.startingConditions, startingConditions => updateCase(item.id, { startingConditions }), 20000)}</details>
