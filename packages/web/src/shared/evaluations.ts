@@ -186,7 +186,8 @@ export type EvaluationComparisonCaseView = {
     results: EvaluationResult[];
     evidence: EvaluationEvidenceView[];
   } | null>;
-  gate: EvaluationGate;
+  /** Authoritative server-derived acceptance gate per variant; clients render, never recompute. */
+  gates: Record<EvaluationVariantKind, EvaluationGate>;
   complete: boolean;
   regressions: string[];
 }
