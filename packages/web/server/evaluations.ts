@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { sep } from "node:path";
-import { defineDoc, type Tx } from "@earendil-works/pi-durable";
+import { defineDoc, type TaskId, type Tx } from "@earendil-works/pi-durable";
 import { z } from "zod";
 import type { RuntimeScope } from "../src/shared/contracts.js";
 import type { AppendEvaluationResultInput, CreateEvaluationComparisonInput, EvaluationComparisonCaseView, EvaluationComparisonResponse, EvaluationCriterion, EvaluationExposure, EvaluationFixtureBinding, EvaluationGate, EvaluationMeasurements, EvaluationProfile, EvaluationProfileResponse, EvaluationResult, EvaluationRun, EvaluationVariantKind, SaveEvaluationProfileInput } from "../src/shared/evaluations.js";
@@ -300,6 +300,103 @@ export async function createEvaluationComparison(tx: Tx, scope: RuntimeScope, ag
 
 const terminalRun = (run: EvaluationRun) => run.status === "completed" || run.status === "failed" || run.status === "cancelled";
 
+export type EvaluationAdmissionPlan = {
+  run: StoredRun;
+  candidateInstructions: string;
+  frozenCase: FrozenCase;
+};
+
+function detachedValue<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
+
+async function admissionPlan(tx: Tx, scope: RuntimeScope, agentId: string, runId: string): Promise<EvaluationAdmissionPlan> {
+  const doc = await tx.doc(ComparisonsDoc);
+  const run = doc.runs.find(item => item.companyId === scope.companyId && item.agentDefinitionId === agentId && item.id === runId);
+  if (!run || run.source.kind !== "standalone") throw new EvaluationError(404, "Evaluation run not found.");
+  const comparison = doc.comparisons.find(item => item.companyId === scope.companyId && item.agentDefinitionId === agentId && item.id === run.comparisonId);
+  if (!comparison) throw new EvaluationError(409, "Evaluation run has no retained comparison manifest.");
+  const frozenCase = comparison.cases.find(item => item.caseId === (run.source as { caseId: string }).caseId);
+  if (!frozenCase) throw new EvaluationError(409, "Evaluation run case is missing from its frozen manifest.");
+  return detachedValue({ run, candidateInstructions: comparison.candidateInstructions, frozenCase });
+}
+
+/** Read-only plan for preflight (fixture filesystem verification) before the admission transaction. */
+export async function readEvaluationAdmissionPlan(tx: Tx, scope: RuntimeScope, agentId: string, runId: string): Promise<EvaluationAdmissionPlan> {
+  return admissionPlan(tx, scope, agentId, runId);
+}
+
+/**
+ * Re-verify every admission prerequisite inside the admission transaction. A pending record
+ * grants no entitlement to execute: the requester, pending state and an unclaimed, verified
+ * fixture instance are all rechecked here, in the same commit that creates the attempt.
+ */
+export async function claimEvaluationRunForAdmission(tx: Tx, scope: RuntimeScope, agentId: string, runId: string, verifiedFixturePath: string): Promise<EvaluationAdmissionPlan> {
+  const plan = await admissionPlan(tx, scope, agentId, runId);
+  if (plan.run.requestedBy !== scope.userId)
+    throw new EvaluationError(403, "Only the user who created this comparison can admit its runs for execution.");
+  if (plan.run.attempt.taskId) throw new EvaluationError(409, "This evaluation run was already admitted; inspect its recorded attempt instead of admitting again.");
+  if (plan.run.status !== "pending") throw new EvaluationError(409, `Evaluation run is ${plan.run.status}, not pending.`);
+  if (!plan.run.fixture) throw new EvaluationError(409, "Evaluation run has no fixture binding.");
+  if (plan.run.fixture.effectivePath !== verifiedFixturePath)
+    throw new EvaluationError(409, "Evaluation fixture path no longer resolves to its verified canonical directory.");
+  const doc = await tx.doc(ComparisonsDoc);
+  const claimed = doc.runs.some(item => item.id !== runId && item.attempt.taskId && item.fixture
+    && (item.fixture.instanceId === plan.run.fixture!.instanceId || item.fixture.effectivePath === plan.run.fixture!.effectivePath));
+  if (claimed) throw new EvaluationError(409, "This fixture instance is already claimed by another admitted run.");
+  return plan;
+}
+
+/** Persist the admission receipt in the same transaction that created the participant and task. */
+export async function recordEvaluationAdmission(tx: Tx, scope: RuntimeScope, agentId: string, runId: string,
+  attempt: { taskId: string; roomId: string; participantId: string; entryBoundary: string }, agentConversationId: string): Promise<void> {
+  const doc = await tx.doc(ComparisonsDoc);
+  const run = doc.runs.find(item => item.companyId === scope.companyId && item.agentDefinitionId === agentId && item.id === runId);
+  if (!run) throw new EvaluationError(404, "Evaluation run not found.");
+  if (run.attempt.taskId) throw new EvaluationError(409, "This evaluation run was already admitted.");
+  run.attempt = attempt;
+  if (run.source.kind === "standalone") run.source.agentConversationId = agentConversationId;
+  run.status = "running";
+  run.startedAt = Date.now();
+  run.evidenceReferences = [`eval-chat:${attempt.roomId}`, `eval-task:${attempt.taskId}`,
+    ...(run.fixture ? [`fixture:${run.fixture.instanceId}@${run.fixture.effectivePath}`] : [])];
+}
+
+type AttemptOutcome = { status: string; result?: { text?: string }; error?: { message?: string } };
+
+/**
+ * Fold terminal native-attempt states into run records. Task reads happen before any write
+ * (Pi transaction table rules). Interrupted/aborted attempts become explicit terminal states;
+ * nothing is replayed or retried here.
+ */
+export async function reconcileEvaluationComparison(tx: Tx, scope: RuntimeScope, agentId: string, comparisonId: string): Promise<void> {
+  const doc = await tx.doc(ComparisonsDoc);
+  const pending = doc.runs.filter(item => item.companyId === scope.companyId && item.agentDefinitionId === agentId
+    && item.comparisonId === comparisonId && item.status === "running" && item.attempt.taskId);
+  const settled: { runId: string; outcome: AttemptOutcome }[] = [];
+  for (const run of pending) {
+    const task = await tx.task(Number(run.attempt.taskId) as TaskId);
+    if (task?.state.status === "terminal") settled.push({ runId: run.id, outcome: task.state.outcome as AttemptOutcome });
+  }
+  for (const { runId, outcome } of settled) {
+    const run = doc.runs.find(item => item.id === runId)!;
+    run.finishedAt = Date.now();
+    if (outcome.status === "completed") {
+      run.status = "completed";
+      const text = outcome.result?.text;
+      if (typeof text === "string") run.output = text.trim() && text.trim() !== "[[silent]]" ? "public_reply" : "no_public_reply";
+      else if (!run.coverageLimitations.includes("Attempt completed without a readable result text; output disposition is unknown."))
+        run.coverageLimitations.push("Attempt completed without a readable result text; output disposition is unknown.");
+    } else if (outcome.status === "aborted") {
+      run.status = "cancelled";
+      run.output = "unknown";
+      run.error = "Execution was stopped or interrupted; effects may have occurred. Inspect the eval chat before any deliberate retry.";
+    } else {
+      run.status = "failed";
+      run.output = "unknown";
+      run.error = outcome.error?.message ?? `Attempt ended: ${outcome.status}. Effects may have occurred; inspect the eval chat before any deliberate retry.`;
+    }
+  }
+}
+
 /** Append-only human judgment. Evidence references must resolve to evidence recorded on the run. */
 export async function appendEvaluationResult(tx: Tx, scope: RuntimeScope, agentId: string, runId: string, input: AppendEvaluationResultInput): Promise<EvaluationResult> {
   const doc = await tx.doc(ComparisonsDoc);
@@ -361,6 +458,7 @@ export function evaluationGateFor(frozen: Pick<FrozenCase, "criteria">, entry: {
 }
 
 export async function readEvaluationComparison(tx: Tx, scope: RuntimeScope, agentId: string, comparisonId: string): Promise<EvaluationComparisonResponse> {
+  await reconcileEvaluationComparison(tx, scope, agentId, comparisonId);
   const doc = await tx.doc(ComparisonsDoc);
   const comparison = doc.comparisons.find(item => item.companyId === scope.companyId && item.agentDefinitionId === agentId && item.id === comparisonId);
   if (!comparison) throw new EvaluationError(404, "Evaluation comparison not found.");

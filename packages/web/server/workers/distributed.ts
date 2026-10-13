@@ -344,6 +344,8 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     saveEvaluationProfile: directory.saveEvaluationProfile.bind(directory),
     createEvaluationComparison: directory.createEvaluationComparison.bind(directory),
     evaluationComparison: directory.evaluationComparison.bind(directory),
+    // Directory mode rejects admission explicitly; execution stays on the local runtime in this slice.
+    admitEvaluationRun: directory.admitEvaluationRun.bind(directory),
     appendEvaluationResult: directory.appendEvaluationResult.bind(directory),
     agentConnections: directory.agentConnections.bind(directory),
     createProject: directory.createProject.bind(directory),
