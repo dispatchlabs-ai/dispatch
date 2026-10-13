@@ -2279,8 +2279,15 @@ export class DispatchRuntime {
 
   async evaluationComparison(scope: RuntimeScope, agentId: string, comparisonId: string) {
     return this.harness.commit(async tx => {
-      if (!latestAgent(await tx.doc(CatalogDoc), scope.companyId, agentId)) throw new RuntimeError(404, "Agent not found.");
-      return readEvaluationComparison(tx, scope, agentId, comparisonId);
+      const catalog = await tx.doc(CatalogDoc);
+      const current = latestAgent(catalog, scope.companyId, agentId);
+      if (!current) throw new RuntimeError(404, "Agent not found.");
+      const backendsByRevision: Record<number, string> = {};
+      for (const item of catalog.agents)
+        if (item.companyId === scope.companyId && item.id === agentId) backendsByRevision[item.revision] = item.executionBackend ?? "pi";
+      return readEvaluationComparison(tx, scope, agentId, comparisonId, {
+        supported: !this.worker && !this.directoryOnly, agentArchived: Boolean(current.archived), backendsByRevision,
+      });
     }, context);
   }
 

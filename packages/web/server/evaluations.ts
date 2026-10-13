@@ -7,7 +7,7 @@ import { defineDoc, type ConversationId, type Cursor, type EntryRecord, type Tas
 import { PublicEntry } from "./collaboration/shared.js";
 import { z } from "zod";
 import type { RuntimeScope } from "../src/shared/contracts.js";
-import type { AppendEvaluationResultInput, CreateEvaluationComparisonInput, EvaluationComparisonCaseView, EvaluationComparisonResponse, EvaluationCriterion, EvaluationEvidenceView, EvaluationExposure, EvaluationFixtureBinding, EvaluationGate, EvaluationMeasurements, EvaluationProfile, EvaluationProfileResponse, EvaluationResult, EvaluationRun, EvaluationVariantKind, SaveEvaluationProfileInput } from "../src/shared/evaluations.js";
+import type { AppendEvaluationResultInput, CreateEvaluationComparisonInput, EvaluationAdmissionView, EvaluationComparisonCaseView, EvaluationComparisonResponse, EvaluationCriterion, EvaluationEvidenceView, EvaluationExposure, EvaluationFixtureBinding, EvaluationGate, EvaluationMeasurements, EvaluationProfile, EvaluationProfileResponse, EvaluationResult, EvaluationRun, EvaluationVariantKind, SaveEvaluationProfileInput } from "../src/shared/evaluations.js";
 
 export class EvaluationError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -604,7 +604,39 @@ function evidenceView(run: StoredRun, ref: string): EvaluationEvidenceView {
   return { ref, label: ref, url: null, available: false, truncated: false };
 }
 
-export async function readEvaluationComparison(tx: Tx, scope: RuntimeScope, agentId: string, comparisonId: string): Promise<EvaluationComparisonResponse> {
+/** Runtime facts the read model cannot derive from evaluation records alone. */
+export type EvaluationAdmissionContext = {
+  /** False on worker/directory runtimes, where admission is unsupported in this slice. */
+  supported: boolean;
+  agentArchived: boolean;
+  /** Execution backend per pinned agent revision; a missing revision fails closed. */
+  backendsByRevision: Record<number, string>;
+};
+
+/**
+ * Advisory admission availability, mirroring the admission endpoint's prerequisites
+ * (which remain authoritative and recheck everything, including fixture contents).
+ * Fails closed: any missing capability yields unavailable with a concise reason.
+ */
+function admissionView(run: StoredRun, doc: { runs: StoredRun[] }, scope: RuntimeScope, ctx: EvaluationAdmissionContext): EvaluationAdmissionView {
+  const unavailable = (reason: string): EvaluationAdmissionView => ({ state: "unavailable", available: false, reason });
+  if (run.attempt.taskId) return { state: "admitted", available: false, reason: null };
+  if (!ctx.supported) return unavailable("Execution admission is only available on the local runtime.");
+  if (run.status !== "pending") return unavailable("This run is no longer pending.");
+  if (!run.fixture) return unavailable("No fixture is bound to this run.");
+  if (run.requestedBy !== scope.userId) return unavailable("Only the user who created this comparison can start its runs.");
+  if (process.env.DISPATCH_MUSE_USER_ID !== scope.userId) return unavailable("Admission requires the configured Muse runner owner.");
+  if (ctx.agentArchived) return unavailable("This agent is archived; starting runs is unavailable.");
+  const backend = ctx.backendsByRevision[run.agentRevision];
+  if (!backend) return unavailable("The pinned agent revision is unavailable.");
+  if (backend !== "muse-code") return unavailable("Execution admission does not support this agent's backend yet.");
+  const claimed = doc.runs.some(item => item.id !== run.id && item.attempt.taskId && item.fixture
+    && (item.fixture.instanceId === run.fixture!.instanceId || fixturePathsOverlap(item.fixture.effectivePath, run.fixture!.effectivePath)));
+  if (claimed) return unavailable("This fixture instance is already claimed by an admitted run.");
+  return { state: "eligible", available: true, reason: null };
+}
+
+export async function readEvaluationComparison(tx: Tx, scope: RuntimeScope, agentId: string, comparisonId: string, admissionCtx: EvaluationAdmissionContext): Promise<EvaluationComparisonResponse> {
   await reconcileEvaluationComparison(tx, scope, agentId, comparisonId);
   const doc = await tx.doc(ComparisonsDoc);
   const comparison = doc.comparisons.find(item => item.companyId === scope.companyId && item.agentDefinitionId === agentId && item.id === comparisonId);
@@ -618,7 +650,7 @@ export async function readEvaluationComparison(tx: Tx, scope: RuntimeScope, agen
       const publicRun = JSON.parse(JSON.stringify(run)) as EvaluationRun;
       const refs = new Set([...run.evidenceReferences, ...results.flatMap(result => result.criteria.flatMap(row => row.evidenceReferences))]);
       return { run: publicRun, latestResult: results.at(-1) ?? null, results,
-        evidence: [...refs].map(ref => evidenceView(run, ref)) };
+        evidence: [...refs].map(ref => evidenceView(run, ref)), admission: admissionView(run, doc, scope, admissionCtx) };
     };
     const runs = { baseline: viewFor("baseline"), candidate: viewFor("candidate") };
     const regressions: string[] = [];
