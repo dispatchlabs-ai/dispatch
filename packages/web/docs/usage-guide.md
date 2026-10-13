@@ -514,7 +514,7 @@ API: `POST /api/chats/:id/instances`, JSON `{ requestId, agentDefinitionId, name
 
 Agents can use `conversation_create_agent_instance` in their current chat with `{ agentDefinitionId, name?, instructions? }`. It creates a new instance even when the definition already has an active instance, and returns `{ createdParticipantId }`. Use `conversation_invite_agent` without arguments to discover available definitions; ordinary invitation calls still reuse active instances. The same name and supplement limits apply. The tool supplies its retry identity from the tool call; replay of that call returns the original participant ID rather than creating another sibling. A separate call is a new creation request, not a retry. There is no per-chat instance-count limit; additional active instances can incur provider usage.
 
-Agent-created supplements belong only to the new instance and do not modify the reusable definition or its permissions. Agents cannot invite humans, remove participants or bypass a human's removal. Stop and pending same-definition removal block new creation. Use the returned immutable participant ID for mentions, especially when several instances share a definition.
+Agent-created supplements belong only to the new instance and do not modify the reusable definition or its permissions. Agents cannot invite humans or remove participants. If a definition has historical instances but none active, only a human can re-add it; active siblings may still be duplicated. Stop and pending same-definition removal block new creation. Use the returned immutable participant ID for mentions, especially when several instances share a definition.
 
 ### Removing a conversation agent
 
