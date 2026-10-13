@@ -288,7 +288,7 @@ function Timeline({ snapshot, threadId, activeThreadId, onThread }: { snapshot: 
   const participants = snapshot.participants;
   return <div ref={host} className="paged-transcript">
     {root ? <><PublicMessage message={root} participants={participants} chatId={snapshot.conversation.id} /><p className="thread-reply-count">{replyCount} {replyCount === 1 ? "reply" : "replies"}</p></> : null}
-    {cursor ? <Button variant="secondary" disabled={loading} onClick={() => void load(cursor, true)}>{loading ? <><Spinner label="Loading history" /> Loading…</> : "Load older"}</Button> : null}
+    {cursor ? <Button variant="secondary" className="history-load" disabled={loading} focusableWhenDisabled onClick={() => void load(cursor, true)}>{loading ? <><Spinner label="Loading history" /> Loading…</> : "Load older"}</Button> : null}
     {(loading && !cursor) || refreshing ? <Spinner label="Loading history" /> : null}
     {refreshError ? <Notice>{refreshError}<Button variant="secondary" onClick={() => void refresh(true)}>Retry history update</Button></Notice> : null}
     {catchUpError ? <Notice>{catchUpError}<Button variant="secondary" onClick={retryCatchUp}>Retry history update</Button></Notice> : null}

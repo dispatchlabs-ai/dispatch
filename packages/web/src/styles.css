@@ -1210,6 +1210,7 @@ input::placeholder, textarea::placeholder { opacity: 1; }
 
 /* Virtualized transcript measurements own scroll anchoring, including the thread root. */
 .paged-transcript { overflow-anchor: none; }
+.history-load[data-disabled] { opacity: .5; cursor: not-allowed; }
 
 /* Portable project references share the existing form and control tokens. */
 .project-save-notice { color: var(--color-success); font-size: var(--text-sm); margin-top: var(--space-3); }
