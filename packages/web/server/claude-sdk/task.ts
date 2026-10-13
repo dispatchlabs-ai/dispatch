@@ -55,6 +55,12 @@ export type ClaudeTaskHost = {
   prepare(scope: ClaudeRunScope): Promise<ClaudePreparedRun>;
   /** Reconstruct invocation-bound tools/permissions. Never return credentials for Pi's model provider. */
   options(scope: ClaudeRunScope, prepared: ClaudePreparedRun): Promise<ClaudeRuntimeOptions>;
+  /**
+   * Resolve transient execution content (e.g. image bytes behind durable references) after the
+   * recover intent commit. The returned run is used for this execution only and never checkpointed;
+   * every checkpoint keeps the reference-only prepared value.
+   */
+  executePrompt?(scope: ClaudeRunScope, prepared: ClaudePreparedRun): Promise<ClaudePreparedRun>;
   /** Persist only explicitly selected activity; raw SDK events are not a public transcript. */
   observe?(scope: ClaudeRunScope, message: SDKMessage): Promise<void>;
   /**
@@ -106,7 +112,9 @@ export function createClaudeSdkTask(host: ClaudeTaskHost) {
           delete (await tx.doc(ClaudeSessionDoc, runtime.conversationId)).sessionId;
           return { status: "running", checkpoint: { phase: "recover", round, prepared, sessionId } };
         }, context);
-        const result = await runClaudeQuery({ prepared, sessionId, resume, options, signal: runtime.signal,
+        // Transient resolved content stays out of every checkpoint below, which keep `prepared`.
+        const execution = host.executePrompt ? await host.executePrompt(scope, prepared) : prepared;
+        const result = await runClaudeQuery({ prepared: execution, sessionId, resume, options, signal: runtime.signal,
           observe: message => host.observe?.(scope, message) ?? Promise.resolve(),
           result: async result => {
             await runtime.commit(() => ({ status: "running", checkpoint: { phase: "settle", round, prepared, result } }), context);

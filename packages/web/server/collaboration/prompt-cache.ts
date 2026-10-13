@@ -1,10 +1,11 @@
-import type { Models, UserMessage } from "@earendil-works/pi-ai";
+import type { ImageContent, Models, TextContent, UserMessage } from "@earendil-works/pi-ai";
 
 // Request-local identity distinguishes our suffix from participant-authored text.
 const sharedUpdates = new WeakSet<object>();
 
-export function sharedContextMessage(content: string): UserMessage {
-  const message: UserMessage = { role: "user", content, timestamp: Date.now() };
+/** Transient suffix for one request; extra parts (e.g. resolved images) ride along and are never persisted as history. */
+export function sharedContextMessage(content: string, extra: (ImageContent | TextContent)[] = []): UserMessage {
+  const message: UserMessage = { role: "user", content: extra.length ? [{ type: "text", text: content }, ...extra] : content, timestamp: Date.now() };
   sharedUpdates.add(message);
   return message;
 }
@@ -21,8 +22,8 @@ function cacheSavedHistory(payload: unknown, suffix: string): unknown {
   }
   const { messages } = payload as AnthropicPayload;
   const boundary = messages.findLastIndex(message => message.role === "user" && (
-    message.content === suffix || (Array.isArray(message.content) && message.content.length === 1
-      && message.content[0]?.type === "text" && message.content[0].text === suffix)
+    message.content === suffix || (Array.isArray(message.content)
+      && message.content.some(block => block.type === "text" && block.text === suffix))
   ));
   if (boundary < 0) throw new Error("Shared context suffix is missing from the Anthropic request.");
 
@@ -60,11 +61,12 @@ function cacheSavedHistory(payload: unknown, suffix: string): unknown {
 export function withSharedContextCache(models: Models): Models {
   const streamSimple: Models["streamSimple"] = (model, context, options) => {
     const suffix = context.messages.at(-1);
-    if (model.api !== "anthropic-messages" || !suffix || !sharedUpdates.has(suffix)
-      || suffix.role !== "user" || typeof suffix.content !== "string") {
+    if (model.api !== "anthropic-messages" || !suffix || !sharedUpdates.has(suffix) || suffix.role !== "user") {
       return models.streamSimple(model, context, options);
     }
-    const update = suffix.content;
+    const update = typeof suffix.content === "string" ? suffix.content
+      : suffix.content.find(part => part.type === "text")?.text;
+    if (update === undefined) return models.streamSimple(model, context, options);
     return models.streamSimple(model, context, {
       ...options,
       onPayload: async (payload, resolvedModel) => {
