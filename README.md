@@ -149,6 +149,8 @@ Provider credentials stay on the service and are shared by agents in this instal
 
 ## Keep your work safe
 
+- Use trusted users, agents and tools. Coding tools execute with the service account's filesystem/process access; a project working directory is not a sandbox. Native Muse execution disables its sandbox and approval prompts. Disabling optional Dispatch tools does not confine native Muse access; see [Muse setup](packages/web/docs/usage-guide.md#muse-code-setup).
+- MCP connections can reach private-network services and the service host's loopback interface. Restrict the host's network access when those destinations must remain isolated; see [connection boundaries](packages/web/docs/usage-guide.md#connect-an-mcp-server).
 - Local development listens on your own machine. To serve other machines, use HTTPS and a matching `DISPATCH_ORIGIN`; do not expose a plaintext development server to the network.
 - Source-development state lives in `.local/state/dispatch` by default. Back up the complete state directory, including the authentication database and encryption keys, together.
 - Run only one application owner against a state directory. Stop it before activating a replacement. An older executable alone does not guarantee a safe rollback after state changes.

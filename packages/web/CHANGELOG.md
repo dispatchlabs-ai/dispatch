@@ -5,9 +5,18 @@
 ### Agent definitions
 
 - Default a saved agent to Pi when both the save request and prior definition omit the execution backend, while preserving explicit selections and legacy request replay fingerprints.
+- Add explicit grants for self-target definition edits and managed skills, capabilities and connection delegation, with human grant administration in the agent editor. Definition edits preserve existing grants until human revocation; technical access does not replace per-change manager approval.
+- Let every agent read the company skill library without a grant; creation and editing remain separately grant-controlled. Report rolled-back management and library refusals as tool errors rather than successful results.
+
+### Evaluation comparisons (local pilot)
+
+- Add frozen baseline/candidate comparisons, paired case inspection, evidence availability and append-only judgments attributed to the authenticated account; creating a comparison does not launch work or adopt instructions.
+- Add explicit per-variant Start run confirmation and retry-safe admission for local Muse execution with pinned configuration, verified fixture contents and exclusive fixture-instance claims. Reject non-regular and hard-linked fixture inputs rather than omitting them from verification.
+- Distinguish pending admission, execution completion, confirmed silence and missing output evidence. Critical failures block acceptance; missing required evidence remains unresolved. Hosted execution, automated grading, clean held-out certification and automatic promotion are not included.
 
 ### Shared conversation context
 
+- Preserve authenticated mention metadata in saved messages and their read projections, including permitted mention-based invitations.
 - Avoid saving a duplicate recent-history snapshot in new delivery notifications; retain fresh request-time context for Pi, Claude SDK and Muse execution without changing recovery cursors or historical inputs.
 - Deliver new message images by reference instead of copying base64 bytes into each recipient's input, task admission, and checkpoints. Pi requests resolve the delivered messages' images transiently per request; native Claude SDK and Muse runs resolve them at execute time after the recovery-intent commit, keeping every checkpoint reference-only. Already-admitted inline prompts still execute unchanged, attachment references remain discoverable for later `conversation_attachment` reads, and unloadable images surface as an explicit limitation rather than a silent omission. Historical inline entries are unchanged; explicitly reading an image through a tool still stores that tool result.
 
@@ -29,6 +38,7 @@
 - Keep execution admission, tool receipts, cancellation and contribution publication in stock Pi Durable tasks; preserve the existing Pi runtime by default.
 - Expose committed SDK tool activity and explicit unavailable model-usage accounting. Document query-settlement publication and uncertain interrupted execution without automatic external-effect replay.
 - Qualify local subscription-backed inference, authorized tools, Stop, controlled-restart uncertainty, and saved public readback; hosted execution remains fenced and other platform/auth modes unverified.
+- Supply the current adopted system prompt on resumed SDK requests without reusing the SDK's earlier prompt snapshot. This preserves native session history; changed-prompt delivery remains live-unqualified.
 
 ### Image credential routing
 
