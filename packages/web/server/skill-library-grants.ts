@@ -6,17 +6,18 @@ import type { AuthPrincipal } from "./auth.js";
 const id = z.string().min(1).max(200);
 export const skillLibraryGrantInputSchema = z.object({
   editorId: id, expectedVersion: z.number().int().nonnegative(), requestId: id,
-  reason: z.string().trim().min(1).max(2000),
+  // Legacy fields remain accepted for identical retries of pre-update requests.
+  reason: z.string().trim().max(2000).optional(),
   policy: z.object({
     // Reading needs no grant; earlier read-only grants may remain stored but cannot be newly issued.
     editorRevision: z.number().int().positive(), action: z.literal("save"),
-    maxSavesPerHour: z.number().int().min(1).max(100),
+    maxSavesPerHour: z.number().int().min(1).max(100).optional(),
   }).strict().nullable(),
 }).strict();
 export type SkillLibraryGrantInput = z.infer<typeof skillLibraryGrantInputSchema>;
 type StoredPolicy = Omit<NonNullable<SkillLibraryGrantInput["policy"]>, "action"> & { action: "read" | "save" };
 export type SkillLibraryGrant = { companyId: string; editorId: string; version: number; policy: StoredPolicy | null };
-type SkillLibraryGrantChange = { companyId: string; userId: string; at: number; requestId: string; fingerprint: string; reason: string; before: SkillLibraryGrant | null; after: SkillLibraryGrant };
+type SkillLibraryGrantChange = { companyId: string; userId: string; at: number; requestId: string; fingerprint: string; reason?: string; before: SkillLibraryGrant | null; after: SkillLibraryGrant };
 const SkillLibraryGrantsDoc = defineDoc<{ grants: SkillLibraryGrant[]; changes: SkillLibraryGrantChange[] }>({
   kind: "dispatch.skill-library-grants", version: 1, scope: "session", initial: () => ({ grants: [], changes: [] }),
 });
@@ -44,7 +45,7 @@ export async function writeSkillLibraryGrant(tx: Tx, principal: AuthPrincipal, r
   if ((before?.version ?? 0) !== input.expectedVersion) throw new ManagementError(409, "The grant changed. Reload it before saving.");
   if (input.policy) await validate(input);
   const after: SkillLibraryGrant = { companyId: principal.companyId, editorId: input.editorId, version: input.expectedVersion + 1, policy: input.policy };
-  doc.changes.push({ companyId: principal.companyId, userId: principal.userId, at: Date.now(), requestId: input.requestId, fingerprint, reason: input.reason, before: before ? detached(before) : null, after });
+  doc.changes.push({ companyId: principal.companyId, userId: principal.userId, at: Date.now(), requestId: input.requestId, fingerprint, ...(input.reason === undefined ? {} : { reason: input.reason }), before: before ? detached(before) : null, after });
   if (before) Object.assign(before, after); else doc.grants.push(after);
   return detached(after);
 }

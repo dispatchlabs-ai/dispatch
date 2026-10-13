@@ -8,7 +8,7 @@ import { ApiError, errorMessage } from "../lib/api";
 import { Button, Field, Input, Notice, Select, Spinner } from "./ui";
 
 const fields = [["instructions", "Instructions"], ["provider", "Provider"], ["modelId", "Model"], ["thinkingLevel", "Thinking"], ["skills", "Skills"], ["capabilities", "Capabilities"], ["connections", "Connections"]] as const;
-type Draft = { targetId: string; policy: ManagementPolicy | null; reason: string; version: number };
+type Draft = { targetId: string; policy: ManagementPolicy | null; version: number };
 
 export function AgentGrants({ agent, busy, onBusy }: { agent: AgentDefinition; busy: boolean; onBusy: (busy: boolean) => void }) {
   const state = useAgentGrants(agent.id);
@@ -32,7 +32,7 @@ export function AgentGrants({ agent, busy, onBusy }: { agent: AgentDefinition; b
   const current = state.grants?.find(item => item.targetId === draft?.targetId);
   function open(grant: ManagementGrant | undefined, revoke: boolean, control: HTMLElement) {
     origin.current = control;
-    setDraft({ targetId: grant?.targetId ?? eligible[0]?.id ?? "", version: grant?.version ?? 0, reason: "", policy: revoke ? null : grant?.policy ? { ...grant.policy, fields: [...grant.policy.fields], editorRevision: agent.revision } : { editorRevision: agent.revision, action: "save", fields: ["instructions"], maxSavesPerHour: 5 } });
+    setDraft({ targetId: grant?.targetId ?? eligible[0]?.id ?? "", version: grant?.version ?? 0, policy: revoke ? null : grant?.policy ? { ...grant.policy, fields: [...grant.policy.fields], editorRevision: agent.revision } : { editorRevision: agent.revision, action: "save", fields: ["instructions"] } });
     setError(""); setSuccess(""); setConflict(false); setRetry(null); setReviewed(false);
     requestAnimationFrame(() => formHeading.current?.focus());
   }
@@ -42,8 +42,8 @@ export function AgentGrants({ agent, busy, onBusy }: { agent: AgentDefinition; b
   }
   async function submit() {
     if (!draft || pending || busy || libraryEditing) return;
-    const policy = draft.policy?.action === "read" ? { ...draft.policy, fields: [], approvedConnectionIds: [], maxSavesPerHour: 5 } : draft.policy;
-    const input = retry ?? { editorId: agent.id, targetId: draft.targetId, expectedVersion: draft.version, requestId: crypto.randomUUID(), reason: draft.reason.trim(), policy };
+    const policy = draft.policy?.action === "read" ? { ...draft.policy, fields: [], approvedConnectionIds: [] } : draft.policy;
+    const input = retry ?? { editorId: agent.id, targetId: draft.targetId, expectedVersion: draft.version, requestId: crypto.randomUUID(), policy };
     setReviewed(false); setPending(true); onBusy(true); setError(""); setSuccess("");
     try {
       await state.save(input);
@@ -58,11 +58,10 @@ export function AgentGrants({ agent, busy, onBusy }: { agent: AgentDefinition; b
     } finally { setPending(false); onBusy(false); }
   }
   const locked = busy || libraryEditing || pending || Boolean(retry);
-  const valid = draft && draft.targetId && draft.reason.trim() && draft.reason.length <= 2000 && (!draft.policy || (
+  const valid = draft && draft.targetId && (!draft.policy || (
     !agent.archived && draft.policy.editorRevision === agent.revision && eligible.some(item => item.id === draft.targetId) && (
       draft.policy.action === "read" || (
-        draft.policy.fields.length > 0 && Number.isInteger(draft.policy.maxSavesPerHour) && draft.policy.maxSavesPerHour >= 1 && draft.policy.maxSavesPerHour <= 100 &&
-        (!draft.policy.approvedConnectionIds?.length || (!catalog.error && draft.policy.approvedConnectionIds.every(id => allowedConnection(id, draft.targetId))))
+        draft.policy.fields.length > 0 && (!draft.policy.approvedConnectionIds?.length || (!catalog.error && draft.policy.approvedConnectionIds.every(id => allowedConnection(id, draft.targetId))))
       )
     )
   ));
@@ -94,9 +93,8 @@ export function AgentGrants({ agent, busy, onBusy }: { agent: AgentDefinition; b
         {!catalog.error && catalog.connections && !catalog.connections.some(connection => allowedConnection(connection.id, draft.targetId)) ? <p>No eligible connections. <Link to="/?section=connections" target="_blank" rel="noopener noreferrer">Settings → Connections</Link></p> : null}
         {!draft.policy.approvedConnectionIds?.length ? <p className="field-hint">No new assignments allowed. The agent can keep or remove currently available connections.</p> : null}
       </fieldset> : null}
-      <Field label="Saves / hour" hint="1–100">{props => <Input {...props} type="number" min={1} max={100} step={1} disabled={locked} value={draft.policy!.maxSavesPerHour} onChange={event => setDraft({ ...draft, policy: { ...draft.policy!, maxSavesPerHour: Number(event.target.value) } })} />}</Field></> : null}
       </> : null}
-      <Field label="Reason" hint="Required for grant, edit and revocation.">{props => <Input {...props} maxLength={2000} disabled={locked} value={draft.reason} onChange={event => setDraft({ ...draft, reason: event.target.value })} />}</Field>
+      </> : null}
       {error ? <Notice>{error}</Notice> : null}
       {retry ? <Notice tone="info">The outcome could not be confirmed. Inputs are preserved. Review latest, then retry the identical request.</Notice> : null}
       {conflict || retry ? <><Button type="button" variant="secondary" disabled={pending || state.loading} onClick={() => void state.refresh().then(setReviewed)}>Review latest</Button><p>Latest: {current ? `${describe(current.policy)} · grant version ${current.version}` : "No grant"}. Your draft is unchanged.</p>{conflict ? <Button type="button" variant="secondary" disabled={!reviewed || pending || state.loading || Boolean(state.error)} onClick={() => { setDraft({ ...draft, version: current?.version ?? 0, policy: draft.policy ? { ...draft.policy, editorRevision: agent.revision } : null }); setConflict(false); setError(""); }}>Use latest version with my draft</Button> : null}</> : null}
@@ -107,5 +105,5 @@ export function AgentGrants({ agent, busy, onBusy }: { agent: AgentDefinition; b
 }
 function describe(policy: ManagementPolicy | null) {
   if (!policy) return "Revoked";
-  return policy.action === "read" ? "Read only" : `Edit · ${policy.fields.map(key => fields.find(([field]) => field === key)?.[1]).join(", ") || "No editable fields"} · ${policy.maxSavesPerHour} saves/h`;
+  return policy.action === "read" ? "Read only" : `Edit · ${policy.fields.map(key => fields.find(([field]) => field === key)?.[1]).join(", ") || "No editable fields"}`;
 }

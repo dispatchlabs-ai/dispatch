@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError, errorMessage } from "./api";
 import { useSession } from "./session";
 
-export type SkillLibraryPolicy = { editorRevision: number; action: "read" | "save"; maxSavesPerHour: number };
+export type SkillLibraryPolicy = { editorRevision: number; action: "read" | "save"; maxSavesPerHour?: number };
 export type SkillLibraryGrant = { editorId: string; version: number; policy: SkillLibraryPolicy | null };
-export type SkillLibraryGrantRequest = { editorId: string; expectedVersion: number; requestId: string; reason: string; policy: SkillLibraryPolicy | null };
+export type SkillLibraryGrantRequest = { editorId: string; expectedVersion: number; requestId: string; reason?: string; policy: SkillLibraryPolicy | null };
 
 export function useSkillLibraryGrant(editorId: string) {
   const { api } = useSession();

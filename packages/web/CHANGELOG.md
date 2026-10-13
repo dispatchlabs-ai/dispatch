@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Agent access
+
+- Remove required reasons and hourly save limits from human-configured definition and skill-library grants. Preserve selected targets/fields, revision checks and retry receipts; legacy hourly limits are no longer enforced.
+
 ### Chat history
 
 - Preserve loaded scrollback across ordinary publications and reconnect gaps; keep publication aliases from unnecessarily invalidating older-page cursors.

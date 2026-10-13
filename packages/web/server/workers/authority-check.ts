@@ -27,7 +27,7 @@ try {
   const outsider = await runtime.saveAgent(scope, { ...draft, name: "Not a participant" });
   const target = await runtime.saveAgent(scope, { ...draft, name: "Target" });
   const room = await runtime.createChat(scope, { requestId: "actor-room", agentDefinitionIds: [editor.id] });
-  const policy = { editorRevision: 1, action: "save", fields: ["instructions"], maxSavesPerHour: 10 };
+  const policy = { editorRevision: 1, action: "save", fields: ["instructions"] };
   for (const agent of [editor, outsider]) await runtime.saveManagementGrant(principal, { editorId: agent.id, targetId: target.id, expectedVersion: 0, requestId: `grant-${agent.id}`, reason: "disposable probe", policy });
   const membership = await runtime.directoryWorkerMembership(scope, room.conversation.id);
   const actor = membership.agents.find(agent => agent.definitionId === editor.id)!;

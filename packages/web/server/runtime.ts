@@ -2826,9 +2826,6 @@ export class DispatchRuntime {
     if (input.applyConnectionsToExisting && patch?.connections === undefined) throw new ManagementError(400, "Applying connections to existing instances requires a connections patch or restore.");
     if (fields.some(field => !policy.fields.includes(field as typeof managementFields[number]))) throw new ManagementError(403, "The patch includes a field outside this grant.");
     const now = Date.now();
-    const recent = receipts.receipts.filter(item => item.companyId === actor.companyId && item.definitionId === actor.definitionId && item.at > now - 3_600_000).sort((a, b) => a.at - b.at);
-    if (recent.length >= policy.maxSavesPerHour)
-      throw new ManagementError(429, `The editor's limit of ${policy.maxSavesPerHour} committed saves per hour has been reached. Retry after ${new Date(recent[recent.length - policy.maxSavesPerHour].at + 3_600_000).toISOString()}.`);
     const { capabilities, connections: connectionIds, ...tuning } = patch!;
     const next: StoredAgent = { ...detached(target), ...tuning, revision: target.revision + 1, updatedAt: now };
     for (const selection of tuning.skills ?? []) {
@@ -2941,9 +2938,6 @@ export class DispatchRuntime {
     if (input.skillId && !prior) throw new ManagementError(404, "Skill not found.");
     if (prior && prior.revision !== input.expectedRevision) throw new ManagementError(409, "The skill has changed. Reload before saving.");
     const now = Date.now();
-    const recent = receipts.receipts.filter(item => item.companyId === actor.companyId && item.definitionId === actor.definitionId && item.at > now - 3_600_000).sort((a, b) => a.at - b.at);
-    if (recent.length >= policy.maxSavesPerHour)
-      throw new ManagementError(429, `The editor's limit of ${policy.maxSavesPerHour} committed saves per hour has been reached. Retry after ${new Date(recent[recent.length - policy.maxSavesPerHour].at + 3_600_000).toISOString()}.`);
     const skill: StoredSkill = { id: prior?.id ?? randomUUID(), revision: (prior?.revision ?? 0) + 1,
       name: input.name, description: input.description, instructions: input.instructions,
       createdAt: prior?.createdAt ?? now, updatedAt: now, companyId: actor.companyId,

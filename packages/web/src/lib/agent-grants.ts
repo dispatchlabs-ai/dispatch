@@ -8,7 +8,7 @@ export type ManagementPolicy = {
   editorRevision: number;
   action: "read" | "save";
   fields: ManagementField[];
-  maxSavesPerHour: number;
+  maxSavesPerHour?: number;
   approvedConnectionIds?: string[];
 };
 export type ManagementGrant = {
@@ -23,7 +23,7 @@ export type GrantRequest = {
   targetId: string;
   expectedVersion: number;
   requestId: string;
-  reason: string;
+  reason?: string;
   policy: ManagementPolicy | null;
 };
 
