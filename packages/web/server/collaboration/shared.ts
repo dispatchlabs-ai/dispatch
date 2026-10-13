@@ -7,7 +7,7 @@ import { createClaudeSdkTask, ClaudeSessionDoc, type ClaudeRunScope, type Claude
 import { sdkToolServer, SdkToolBinding } from "./sdk-tools.js";
 import { transcriptPage, mentionsPage } from "../chat-pages.js";
 import { sharedContextMessage } from "./prompt-cache.js";
-import type { TranscriptQuery, TranscriptPage, ProjectSpecReadInput, ProjectSpecPage } from "../../src/shared/contracts.js";
+import type { ChatSnapshot, TranscriptQuery, TranscriptPage, ProjectSpecReadInput, ProjectSpecPage } from "../../src/shared/contracts.js";
 import { createHash, randomUUID } from "node:crypto";
 import { awaitWithContext, BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { copyJson, type Context } from "@earendil-works/chord";
@@ -1454,7 +1454,7 @@ export class SharedConversations {
     return copyJson(page, { omitUndefinedProperties: true }) as unknown as TranscriptPage;
   }
 
-  async presentation(tx: Tx, roomId: ConversationId): Promise<Presentation & { history: { before: string | null; generation: string } }> {
+  async presentation(tx: Tx, roomId: ConversationId): Promise<Presentation & { history: NonNullable<ChatSnapshot["history"]> }> {
     const { room, page } = await this.projectedPage(tx, roomId, {});
     const turns = await tx.doc(TurnsDoc, roomId);
     const participants: ConversationParticipant[] = [];
@@ -1474,7 +1474,7 @@ export class SharedConversations {
       else participants.push({ ...participant, status: Object.values(turns.presence).some(presence => presence.participantId === member.id && presence.until > Date.now()) ? "typing" : "idle" } as ConversationParticipant);
     }
     // Native document drafts are revoked at the end of the enclosing commit.
-    return copyJson({ participants, messages: page.messages, activities: page.activities, history: { before: page.before, generation: page.generation } }, { omitUndefinedProperties: true }) as unknown as Presentation & { history: { before: string | null; generation: string } };
+    return copyJson({ participants, messages: page.messages, activities: page.activities, history: { before: page.before, generation: page.generation, publication: page.publication } }, { omitUndefinedProperties: true }) as unknown as Presentation & { history: NonNullable<ChatSnapshot["history"]> };
   }
 }
 

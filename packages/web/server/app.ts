@@ -277,7 +277,8 @@ export function createApp(options: AppOptions) {
   });
   app.get("/api/chats/:id", async (c) => c.json(await runtime.getChat(c.get("principal"), c.req.param("id"))));
   app.get("/api/chats/:id/history", async c => {
-    const query = z.object({ threadId: z.string().max(300).optional(), before: z.string().max(1000).optional(), mentionsOnly: z.enum(["1"]).optional().transform(value => value === "1"), messageId: z.string().min(1).max(300).optional() }).parse(c.req.query());
+    const query = z.object({ threadId: z.string().max(300).optional(), before: z.string().max(1000).optional(), mentionsOnly: z.enum(["1"]).optional().transform(value => value === "1"), messageId: z.string().min(1).max(300).optional(),
+      publishedAfter: z.coerce.number().int().min(0).optional() }).refine(value => value.publishedAfter === undefined || (!value.before && !value.messageId && !value.mentionsOnly)).parse(c.req.query());
     try { return c.json(await runtime.transcriptPage(c.get("principal"), c.req.param("id"), query)); }
     catch (error) { if (error instanceof HistoryCursorError) return c.json({ error: { code: "HISTORY_CHANGED", message: error.message } }, 409); throw error; }
   });

@@ -65,9 +65,11 @@ export async function readProjectChat(source: ProjectChatSource, roomId: Convers
   // Criteria can be arbitrarily long: keep the result bounded and identify truncation.
   const criteria = source.room.definitionOfDone?.markdown ?? "";
   const criteriaOffset = input.criteriaOffset ?? 0;
+  // The publication watermark serves live browser catch-up, not agents' bounded reads.
+  const { publication: _publication, ...history } = page;
   return { data: { ...base, ...(input.includeActivity ? { activityObservation: "stored" } : {}), conversation: metadata,
     definitionOfDone: { markdown: criteria.slice(criteriaOffset, criteriaOffset + 12000), revision: source.room.definitionOfDone?.revision ?? 0,
       offset: criteriaOffset, textLength: criteria.length, nextOffset: criteriaOffset + 12000 < criteria.length ? criteriaOffset + 12000 : null },
     participants: source.room.members.map(member => ({ id: member.id, kind: member.kind, name: member.name,
-      ...(member.kind === "agent" ? { membership: member.membership ?? "active" } : {}) })), ...page } };
+      ...(member.kind === "agent" ? { membership: member.membership ?? "active" } : {}) })), ...history } };
 }

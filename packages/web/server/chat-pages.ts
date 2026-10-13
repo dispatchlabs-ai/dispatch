@@ -54,22 +54,44 @@ export function transcriptPage(messages: ConversationMessage[], activities: Part
     end = items.findIndex(item => item.key === cursor.key || item.message?.aliases?.some(id => `m:${id}` === cursor.key));
     if (end < 0) throw new HistoryCursorError("History changed. Reload history.");
   }
-  const chosen: { key: string; message?: ConversationMessage; activity?: ParticipantActivity }[] = [];
+  // Only page candidates need truncation, serialization and activity-version hashing.
+  const present = ({ key, at, timelineOrder, message, activity }: typeof items[number]) => ({ key, at,
+    message: message ? { ...messagePreview(message), timelineOrder, replySummary: replies.get(message.id) } : undefined,
+    activity: activity ? { ...activityPreview(activity), timelineOrder } : undefined,
+  });
+  const rows = (chosen: { message?: ConversationMessage; activity?: ParticipantActivity }[]) => ({
+    messages: chosen.flatMap(i => i.message ? [i.message] : []), activities: chosen.flatMap(i => i.activity ? [i.activity] : []) });
+  if (query.publishedAfter !== undefined) {
+    // Publications keep their draft timestamps, so one can sort into history a reader already loaded.
+    // Publication order (message timelineOrder) finds them: return this thread's messages published
+    // at or after the watermark, with their answered activity groups, oldest publication first.
+    const groups = new Map(items.flatMap(item => item.activity?.messageId ? [[item.activity.messageId, item] as const] : []));
+    const late = items.filter(item => item.message && item.timelineOrder >= query.publishedAfter!).sort((a, b) => a.timelineOrder - b.timelineOrder);
+    const chosen: ReturnType<typeof present>[] = [];
+    let size = 1024; let remaining = -1;
+    for (const item of late) {
+      const group = groups.get(item.message!.id);
+      const candidate = group ? [present(item), present(group)] : [present(item)];
+      const length = bytes(candidate);
+      if (chosen.length && (chosen.length + candidate.length > PAGE_ITEMS || size + length > PAGE_BYTES)) { remaining = item.timelineOrder; break; }
+      chosen.push(...candidate); size += length;
+    }
+    // An incomplete response reports its continuation as a newer publication outside the page.
+    return { ...rows(chosen), before: null, threadId: canonical, generation, publication: { published: remaining >= 0 ? remaining : messages.length, outsideLatest: remaining } };
+  }
+  const chosen: ReturnType<typeof present>[] = [];
   let size = root ? bytes(messagePreview(root)) + 1024 : 1024; let index = end - 1;
   for (; index >= 0 && chosen.length < PAGE_ITEMS; index--) {
-    const { key, at, timelineOrder, message, activity } = items[index]!;
-    const summary = message ? replies.get(message.id) : undefined;
-    // Only page candidates need truncation, serialization and activity-version hashing.
-    const item = { key, at,
-      message: message ? { ...messagePreview(message), timelineOrder, replySummary: summary } : undefined,
-      activity: activity ? { ...activityPreview(activity), timelineOrder } : undefined,
-    };
+    const item = present(items[index]!);
     const length = bytes(item);
     if (size + length > PAGE_BYTES) break;
     chosen.unshift(item); size += length;
   }
   const first = chosen[0];
-  return { messages: chosen.flatMap(i => i.message ? [i.message] : []), activities: chosen.flatMap(i => i.activity ? [i.activity] : []), before: index >= 0 && first ? Buffer.from(JSON.stringify({ key: first.key, generation })).toString("base64url") : null, threadId: canonical, generation, ...(root ? { root: messagePreview(root), replyCount: replies.get(root.id)?.count ?? 0 } : {}) };
+  let outsideLatest = -1;
+  for (let i = 0; i <= index; i++) if (items[i]!.message) outsideLatest = Math.max(outsideLatest, items[i]!.timelineOrder);
+  return { ...rows(chosen), before: index >= 0 && first ? Buffer.from(JSON.stringify({ key: first.key, generation })).toString("base64url") : null, threadId: canonical, generation,
+    publication: { published: messages.length, outsideLatest }, ...(root ? { root: messagePreview(root), replyCount: replies.get(root.id)?.count ?? 0 } : {}) };
 }
 
 /** Pair calls/results before paging; no page can manufacture an unmatched tool result. */

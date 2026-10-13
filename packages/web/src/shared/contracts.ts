@@ -27,11 +27,15 @@ export interface ChatSummary {
   error?: string;
 }
 
-export interface TranscriptQuery { threadId?: string | null; before?: string; mentionsOnly?: boolean; messageId?: string }
-export interface TranscriptPage { mentionSummary?: { total: number; newCount: number; newIds: string[] }; revision?: number; generation: string; messages: ConversationMessage[]; activities: ParticipantActivity[]; before: string | null; threadId: string | null; root?: ConversationMessage; replyCount?: number }
+export interface TranscriptQuery { threadId?: string | null; before?: string; mentionsOnly?: boolean; messageId?: string; publishedAfter?: number }
+/** Publication watermark: `published` counts public messages in publication order (message `timelineOrder`).
+ * `outsideLatest` is the newest publication in this thread that sorts outside the returned page, or -1.
+ * A reader whose watermark is at most `outsideLatest` may have missed a late publication; read `publishedAfter`. */
+export interface PublicationWatermark { published: number; outsideLatest: number }
+export interface TranscriptPage { mentionSummary?: { total: number; newCount: number; newIds: string[] }; revision?: number; generation: string; messages: ConversationMessage[]; activities: ParticipantActivity[]; before: string | null; threadId: string | null; root?: ConversationMessage; replyCount?: number; publication?: PublicationWatermark }
 
 export interface ChatSnapshot {
-  history?: { before: string | null; generation: string };
+  history?: { before: string | null; generation: string; publication?: PublicationWatermark };
   definitionOfDone: { markdown: string; revision: number };
   conversation: ChatSummary;
   participants: ConversationParticipant[];
