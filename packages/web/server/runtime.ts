@@ -2639,7 +2639,7 @@ export class DispatchRuntime {
     const editor = latestAgent(catalog, actor.companyId, actor.definitionId);
     if (!grant?.policy || !editor || editor.archived) throw new ManagementError(403, "No current management grant for this editor and target.");
     if (grant.policy.editorRevision !== actor.revision || editor.revision !== actor.revision)
-      throw new ManagementError(403, `Grant is pinned to revision ${grant.policy.editorRevision}; current definition is ${editor.revision}, acting instance is ${actor.revision}. Wait for base adoption and explicitly re-grant the current revision.`);
+      throw new ManagementError(403, `Grant is pinned to revision ${grant.policy.editorRevision}; current definition is ${editor.revision}, acting instance is ${actor.revision}. ${grant.policy.editorRevision === editor.revision ? "Wait for the acting instance to adopt the current definition revision at a safe idle boundary; this grant is already current." : "Ask a human to renew this grant for the current definition revision; the acting instance must also adopt that revision."}`);
     const target = latestAgent(catalog, actor.companyId, targetId);
     this.requireManagementTarget(target);
     return { grant, target };
@@ -2793,7 +2793,7 @@ export class DispatchRuntime {
     const editor = latestAgent(catalog, actor.companyId, actor.definitionId);
     if (!grant?.policy || !editor || editor.archived) throw new ManagementError(403, "No current skill library grant for this editor.");
     if (grant.policy.editorRevision !== actor.revision || editor.revision !== actor.revision)
-      throw new ManagementError(403, `Grant is pinned to revision ${grant.policy.editorRevision}; current definition is ${editor.revision}, acting instance is ${actor.revision}. Wait for base adoption and explicitly re-grant the current revision.`);
+      throw new ManagementError(403, `Grant is pinned to revision ${grant.policy.editorRevision}; current definition is ${editor.revision}, acting instance is ${actor.revision}. ${grant.policy.editorRevision === editor.revision ? "Wait for the acting instance to adopt the current definition revision at a safe idle boundary; this grant is already current." : "Ask a human to renew this grant for the current definition revision; the acting instance must also adopt that revision."}`);
     return grant;
   }
 
