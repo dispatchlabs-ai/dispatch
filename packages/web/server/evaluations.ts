@@ -345,9 +345,9 @@ function publicResult(result: StoredResult): EvaluationResult {
  * Total gate: an observed critical failure blocks first, regardless of row order or grading
  * completeness; anything short of a complete, fully passing critical set is unresolved, never clear.
  */
-export function evaluationGateFor(frozen: Pick<FrozenCase, "criteria">, candidate: { run: EvaluationRun; latestResult: EvaluationResult | null } | null): EvaluationGate {
-  if (!candidate || !terminalRun(candidate.run) || !candidate.latestResult) return "unresolved";
-  const latest = candidate.latestResult;
+export function evaluationGateFor(frozen: Pick<FrozenCase, "criteria">, entry: { run: EvaluationRun; latestResult: EvaluationResult | null } | null): EvaluationGate {
+  if (!entry || !terminalRun(entry.run) || !entry.latestResult) return "unresolved";
+  const latest = entry.latestResult;
   const rows = new Map(latest.criteria.map(row => [row.criterionId, row.verdict]));
   for (const criterion of frozen.criteria)
     if (criterion.criticalFailure && rows.get(criterion.criterionId) === "fail") return "blocked";
@@ -383,7 +383,7 @@ export async function readEvaluationComparison(tx: Tx, scope: RuntimeScope, agen
         if (row.verdict === "pass" && candidateRows.get(row.criterionId) !== "pass") regressions.push(row.criterionId);
     }
     return { caseId: frozen.caseId, name: frozen.name, split: frozen.split, exposure: frozen.exposure,
-      criteria: frozen.criteria, runs, gate: evaluationGateFor(frozen, runs.candidate),
+      criteria: frozen.criteria, runs, gates: { baseline: evaluationGateFor(frozen, runs.baseline), candidate: evaluationGateFor(frozen, runs.candidate) },
       complete: Boolean(runs.baseline && runs.candidate
         && runs.baseline.latestResult?.gradingStatus === "completed" && runs.candidate.latestResult?.gradingStatus === "completed"),
       regressions };
