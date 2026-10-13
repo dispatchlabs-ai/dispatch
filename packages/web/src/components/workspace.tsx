@@ -540,6 +540,7 @@ export function Workspace() {
     if (!open) requestAnimationFrame(() => document.getElementById("main-workspace")?.focus());
   }
   const executionRouteOpen = section === "agents" && !!searchParams.get("eval") && searchParams.get("eval") !== "profile";
+  useEffect(() => { if (executionRouteOpen) setContextOpen(false); }, [executionRouteOpen]);
   const detailsVisible = executionRouteOpen ? false : projectEditorOpen ? false : section === "projects" ? projectDetailsVisible : active.kind === "chat" ? chatDetailsVisible[active.chatId] ?? false : active.kind === "connections" || active.kind === "secrets" || active.kind === "import-export" || active.kind === "model-providers" ? false : otherDetailsVisible;
   const detailsWidth = Math.min(preferredDetailsWidth ?? (active.kind === "chat" ? 440 : 360), detailsMax);
   function setDetailsVisible(visible: boolean) {
@@ -679,7 +680,7 @@ export function Workspace() {
         <IconButton className="sidebar-toggle" label={sidebarVisible ? "Hide sidebar" : "Show sidebar"} aria-expanded={sidebarVisible} aria-controls="workspace-sidebar" onClick={() => setSidebarVisible(value => !value)}>
           <PanelLeft size={19} />
         </IconButton>
-        {!projectEditorOpen && section !== "connections" && section !== "secrets" && section !== "import-export" && section !== "model-providers" ? <IconButton className="details-toggle" label={detailsVisible ? "Hide details" : "Show details"} aria-expanded={detailsVisible} aria-controls="details-column" onClick={() => setDetailsVisible(!detailsVisible)}>
+        {!executionRouteOpen && !projectEditorOpen && section !== "connections" && section !== "secrets" && section !== "import-export" && section !== "model-providers" ? <IconButton className="details-toggle" label={detailsVisible ? "Hide details" : "Show details"} aria-expanded={detailsVisible} aria-controls="details-column" onClick={() => setDetailsVisible(!detailsVisible)}>
           <PanelRight size={19} />
         </IconButton> : null}
       </div>
@@ -855,7 +856,7 @@ export function Workspace() {
             </div>
           </Modal>
         </div>
-        {!projectEditorOpen && active.kind !== "welcome" && active.kind !== "connections" && active.kind !== "import-export" && active.kind !== "model-providers" ? <div className="mobile-context">
+        {!executionRouteOpen && !projectEditorOpen && active.kind !== "welcome" && active.kind !== "connections" && active.kind !== "import-export" && active.kind !== "model-providers" ? <div className="mobile-context">
           <Modal title={active.kind === "chat" ? threads[active.chatId] ? "Thread" : "Participants" : section === "agents" ? editingAgent ? "Draft preview" : "Agent details" : "Details"} description={active.kind === "chat" ? snapshot?.conversation.title || "Active conversation" : section === "agents" ? undefined : "For your current view"} side="right" open={contextOpen} onOpenChange={setContextOpen} trigger={<Button variant="ghost" className="workspace-action">
             <PanelRight size={19} /> Details</Button>}>{supporting(true)}</Modal>
         </div> : null}
