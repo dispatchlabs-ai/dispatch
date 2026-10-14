@@ -80,11 +80,14 @@ export class EcsContainerDriver implements ContainerDriver {
     return { ...spec, id: response.tasks[0].taskArn, state: "unknown" };
   }
   async inspectTask(id: string): Promise<LauncherContainer> {
+    return this.decode(await this.describeTask(id));
+  }
+  private async describeTask(id: string): Promise<Task> {
     this.validateArn(id);
     const response = await this.client.send(new DescribeTasksCommand({ cluster: this.config.cluster, tasks: [id], include: ["TAGS"] }), this.deadline());
     if (response.failures?.length || response.tasks?.length !== 1 || response.tasks[0]?.taskArn !== id)
       throw new LauncherError(503, "ECS task identity unavailable; absence is not retirement evidence.");
-    return this.decode(response.tasks[0]);
+    return response.tasks[0];
   }
   async warmReady(container: LauncherContainer): Promise<boolean> {
     if (!container.warm || container.state !== "running" || !container.address) return false;
@@ -124,8 +127,10 @@ export class EcsContainerDriver implements ContainerDriver {
       } while (nextToken);
     }
     for (const arn of arns) {
-      const task = await this.inspectTask(arn);
-      if (task.state !== "exited") result.push(task);
+      const task = await this.describeTask(arn);
+      // Actual STOPPED is terminal for Fargate; retained diagnostic tasks cannot
+      // execute again. Pending/stopping/unknown tasks still require full identity.
+      if (task.lastStatus !== "STOPPED") result.push(this.decode(task));
     }
     return result;
   }
