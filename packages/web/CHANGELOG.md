@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Offline native SQLite-to-PostgreSQL import into an empty dedicated database, preserving record identities and document history with complete table readback verification.
+
 ### Worker startup
 
 - Share the startup deadline across ECS launch and worker readiness so cold fallback can finish initialization without an extra ten-second cutoff.
