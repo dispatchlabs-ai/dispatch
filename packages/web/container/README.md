@@ -57,6 +57,8 @@ When updating the CLI, review the pinned skill text too. Update the browser mani
 
 On October 14, 2026, interactive qualification passed on native Linux AMD64 and ARM64 with agent-browser 0.38.2 and Chromium 156.0.8078.4: HTTPS navigation, snapshots, form entry/clicks, screenshots with Chinese/Arabic fonts, and VP8 recording. AMD64 used the complete Dispatch image; ARM64 used the identical browser layer without the Nix application closure. This qualifies ARM64 browser tooling, not a full ARM64 Dispatch deployment.
 
+Surton's existing AMD64 Fargate profile (0.5 vCPU, 2 GiB) passed navigation, snapshots, screenshots and a short VP8 recording at `--fps 5`. Default 30 fps recording exceeded agent-browser's encoder backlog limit there, although it passed on the native build hosts. Use a lower recording rate on constrained workers; this observation does not qualify long or animation-heavy recordings.
+
 ## Installation and security boundary
 
 The development worker runs as container root with a writable Ubuntu filesystem, **not privileged mode**. Ordinary work can use `apt-get update && apt-get install -y <package>` without sudo. Ubuntu mirrors are configured for HTTPS to fit existing HTTPS package egress; no HTTP egress expansion is required. Package service-start hooks are suppressed in the recipe; this is not a full init/systemd host.
