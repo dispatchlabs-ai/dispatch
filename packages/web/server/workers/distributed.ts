@@ -137,6 +137,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
   const idleReceipt = z.object({ idle: z.boolean(), attemptId: z.string(), summary: workerSummarySchema.optional() }).strict();
   async function finishIdleRetirement(route: WorkerRoute): Promise<WorkerRoute> {
     if (!route.idleRetirement) return route;
+    let idleConfirmed = route.phase === "retiring";
     const status = await launcher<LauncherStatus>("status");
     const attempt = status.attempts.find(item => item.attemptId === route.attemptId);
     if (status.installationId !== options.installationId || !status.driverReachable || !attempt
@@ -153,6 +154,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
         }
         if (receipt.summary) await routes.updateSummary(route.conversationId, route.attemptId, route.storeId, receipt.summary);
         await routes.retiring(route.conversationId, route.attemptId);
+        idleConfirmed = true;
       }
       await launcher("stop", { attemptId: route.attemptId });
       const after = await launcher<LauncherStatus>("status");
@@ -161,7 +163,10 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
         || retired?.phase !== "stopped" || retired.observed !== "absent") throw new Error("Retirement is not confirmed.");
     }
     await routes.retiring(route.conversationId, route.attemptId);
-    await routes.sleeping(route.conversationId, route.attemptId);
+    // A vanished worker proves termination, not native idleness. Leave that
+    // store eligible for the existing recovery path instead of suppressing it.
+    if (idleConfirmed) await routes.sleeping(route.conversationId, route.attemptId);
+    else await routes.replaceRetired(route.conversationId, route.attemptId, options.configurationRevision);
     activated.delete(route.conversationId);
     return routes.get(route.conversationId)!;
   }
@@ -431,10 +436,18 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
         if (route.idleRetirement) { await finishIdleRetirement(route); return; }
         if (route.phase !== "ready" || minimumIdleMs === 0 || route.idleTimeoutSupported === false) return;
         if (route.idleTimeoutSupported === undefined) {
+          const status = await launcher<LauncherStatus>("status");
+          if (status.installationId !== options.installationId || !status.driverReachable) throw new Error("Worker inventory unavailable.");
+          const attempt = status.attempts.find(item => item.attemptId === route.attemptId);
+          // Historical routes may already have been stopped by an operator.
+          // Only explicit conversation activity should reactivate those stores.
+          if (!attempt || attempt.phase !== "running" || attempt.observed !== "running") return;
+          if (attempt.conversationId !== route.conversationId || attempt.storeId !== route.storeId) throw new Error("Worker inventory identity mismatch.");
+          const address = workerAddress(attempt);
           const ready = await workerRequest<{ roomId: string; conversationId: string; attemptId: string; idleTimeoutSupported?: boolean }>(
-            `http://${route.containerName}:8831`, token(route), "/ready");
+            `http://${address}:8831`, token(route), "/ready");
           if (ready.conversationId !== route.conversationId || ready.attemptId !== route.attemptId) throw new Error("Worker readiness identity mismatch.");
-          route = await routes.ready(route.conversationId, route.attemptId, ready.roomId, route.containerName!, ready.idleTimeoutSupported === true);
+          route = await routes.ready(route.conversationId, route.attemptId, ready.roomId, address, ready.idleTimeoutSupported === true);
           if (!route.idleTimeoutSupported) return;
         }
         // Persist before the RPC: after timeout or owner handover, resume this
