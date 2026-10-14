@@ -4,6 +4,8 @@
 
 ### Worker startup
 
+- Share the startup deadline across ECS launch and worker readiness so cold fallback can finish initialization without an extra ten-second cutoff.
+
 - Add an opt-in single warm spare with durable one-time chat assignment,
   replenishment, observable readiness and drain/sleep integration.
 - Batch ECS task descriptions and reuse their authoritative results during admission; directly inspect journaled tasks missing from discovery. Omit build-only dependency declarations/source maps from runtime artifacts and report worker-ready startup duration without conversation or credential data.
