@@ -80,14 +80,16 @@ export class EcsContainerDriver implements ContainerDriver {
     return { ...spec, id: response.tasks[0].taskArn, state: "unknown" };
   }
   async inspectTask(id: string): Promise<LauncherContainer> {
-    return this.decode(await this.describeTask(id));
+    return this.decode((await this.describeTasks([id]))[0]!);
   }
-  private async describeTask(id: string): Promise<Task> {
-    this.validateArn(id);
-    const response = await this.client.send(new DescribeTasksCommand({ cluster: this.config.cluster, tasks: [id], include: ["TAGS"] }), this.deadline());
-    if (response.failures?.length || response.tasks?.length !== 1 || response.tasks[0]?.taskArn !== id)
+  private async describeTasks(ids: string[]): Promise<Task[]> {
+    for (const id of ids) this.validateArn(id);
+    const response = await this.client.send(new DescribeTasksCommand({ cluster: this.config.cluster, tasks: ids, include: ["TAGS"] }), this.deadline());
+    const tasks = response.tasks ?? [];
+    if (response.failures?.length || tasks.length !== ids.length || new Set(tasks.map(task => task.taskArn)).size !== ids.length
+      || tasks.some(task => !task.taskArn || !ids.includes(task.taskArn)))
       throw new LauncherError(503, "ECS task identity unavailable; absence is not retirement evidence.");
-    return response.tasks[0];
+    return tasks;
   }
   async warmReady(container: LauncherContainer): Promise<boolean> {
     if (!container.warm || container.state !== "running" || !container.address) return false;
@@ -126,11 +128,15 @@ export class EcsContainerDriver implements ContainerDriver {
         if (nextToken) seen.add(nextToken);
       } while (nextToken);
     }
-    for (const arn of arns) {
-      const task = await this.describeTask(arn);
-      // Actual STOPPED is terminal for Fargate; retained diagnostic tasks cannot
-      // execute again. Pending/stopping/unknown tasks still require full identity.
-      if (task.lastStatus !== "STOPPED") result.push(this.decode(task));
+    const ids = [...arns];
+    // DescribeTasks accepts at most 100 IDs per request. Describe every page;
+    // partial results or missing identities still fail the entire inventory.
+    for (let offset = 0; offset < ids.length; offset += 100) {
+      for (const task of await this.describeTasks(ids.slice(offset, offset + 100))) {
+        // Actual STOPPED is terminal for Fargate; retained diagnostic tasks cannot
+        // execute again. Pending/stopping/unknown tasks still require full identity.
+        if (task.lastStatus !== "STOPPED") result.push(this.decode(task));
+      }
     }
     return result;
   }

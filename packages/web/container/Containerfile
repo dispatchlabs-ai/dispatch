@@ -12,9 +12,6 @@ LABEL org.opencontainers.image.title="Dispatch agent worker" \
       org.opencontainers.image.source="https://github.com/dispatchlabs-ai/dispatch" \
       org.opencontainers.image.revision="${SOURCE_REVISION}"
 
-# Never flatten the Nix closure or replace its absolute executable paths.
-COPY --from=dispatch /nix/store /nix/store
-COPY --from=dispatch /bin/dispatch-worker /usr/local/bin/dispatch-worker
 COPY --from=mise /usr/local/bin/mise /usr/local/bin/mise
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -72,6 +69,10 @@ RUN npm ci --prefix /opt/dispatch-browser --omit=dev --ignore-scripts \
     && rm -rf /var/lib/apt/lists/* /root/.npm
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/local/bin/chromium
 
+# Keep tool installation layers reusable across application builds. Never flatten
+# the Nix closure or replace the worker wrapper's absolute executable paths.
+COPY --from=dispatch /nix/store /nix/store
+COPY --from=dispatch /bin/dispatch-worker /usr/local/bin/dispatch-worker
 COPY entrypoint.sh /usr/local/bin/dispatch-agent-entrypoint
 USER 0:0
 WORKDIR /workspace
