@@ -172,7 +172,8 @@ export class WorkerLauncher {
         const digest = createHash("sha256").update(JSON.stringify([this.journal.installationId, request.attemptId])).digest("hex");
         attempt = { ...request, name: `dispatch-worker-${digest.slice(0, 40)}`, phase: "creating" };
         const spare = !this.journal.warmSuspended && this.driver.warmConfigurationRevision === request.configurationRevision
-          ? this.journal.attempts.find(item => item.warm && item.phase === "running" && item.configurationRevision === request.configurationRevision) : undefined;
+          ? this.journal.attempts.find(item => item.warm && item.phase === "running" && item.configurationRevision === request.configurationRevision
+            && item.launchFingerprint === this.driver.launchFingerprint!(this.containerSpec(item))) : undefined;
         const container = spare?.containerId ? await this.driver.inspectTask!(spare.containerId) : undefined;
         if (spare && container && await this.driver.warmReady!(container)) {
           attempt = { ...request, name: spare.name, containerId: spare.containerId, address: spare.address,
@@ -250,7 +251,10 @@ export class WorkerLauncher {
       const revision = this.driver.warmConfigurationRevision;
       if (!this.driver.run || this.journal.drained || this.journal.warmSuspended) return;
       for (const spare of this.journal.attempts.filter(item => item.warm && item.phase !== "stopped")) {
-        if (spare.configurationRevision !== revision || spare.phase === "stopping") { await this.retire(spare); continue; }
+        if (spare.configurationRevision !== revision || spare.phase === "stopping"
+          || (spare.launchFingerprint && spare.launchFingerprint !== this.driver.launchFingerprint!(this.containerSpec(spare)))) {
+          await this.retire(spare); continue;
+        }
         if (spare.containerId && (await this.driver.inspectTask!(spare.containerId)).state === "exited") { await this.retire(spare); continue; }
         await this.advance(spare);
         return;
@@ -282,7 +286,7 @@ export class WorkerLauncher {
     if (attempt.containerId && !container) throw new LauncherError(409, "Previously created container is absent; retire the attempt before replacement.");
     if (!container) {
       this.storage.assertHealthy();
-      await this.driver.create({ ...pickRequest(attempt), installationId: this.journal.installationId, name: attempt.name });
+      await this.driver.create(this.containerSpec(attempt));
       containers = await this.inventory();
       container = this.match(attempt, containers);
       if (!container) throw new LauncherError(503, "Container creation is unresolved; reconcile the same attempt.");
@@ -321,7 +325,7 @@ export class WorkerLauncher {
     }
     if (!attempt.containerId) {
       if (attempt.phase !== "creating") throw new LauncherError(503, "Launch outcome unresolved; do not repeat RunTask.");
-      const spec = { ...pickRequest(attempt), installationId: this.journal.installationId, name: attempt.name, ...(attempt.warm ? { warm: true } : {}) };
+      const spec = this.containerSpec(attempt);
       attempt = { ...attempt, phase: "starting", launchFingerprint: this.driver.launchFingerprint(spec) };
       await this.update(attempt);
       this.storage.assertHealthy();
@@ -426,6 +430,10 @@ export class WorkerLauncher {
     if (!container.warm || !sameRequest(container, attempt.warmOrigin) || container.name !== attempt.name || container.id !== attempt.containerId)
       throw new LauncherError(503, "Warm task identity mismatch.");
     return { ...container, ...pickRequest(attempt), warm: false };
+  }
+
+  private containerSpec(attempt: LaunchAttempt): ContainerSpec {
+    return { ...pickRequest(attempt), installationId: this.journal.installationId, name: attempt.name, ...(attempt.warm ? { warm: true } : {}) };
   }
 
   private match(attempt: LaunchAttempt, containers: LauncherContainer[]): LauncherContainer | undefined {

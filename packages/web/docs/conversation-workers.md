@@ -72,7 +72,8 @@ never allocates a second executor. Existing attempts retain their ordinary stop,
 tombstone and confirmed-termination requirements.
 
 Controller retirement leaves the spare alive for the successor owner. A changed
-configuration revision or disabled option retires unassigned capacity; assigned
+configuration revision, immutable launch fingerprint (including task definition),
+or disabled option retires unassigned capacity; assigned
 workers remain intact. Installation drain suppresses replenishment and retires
 all tasks. Planned sleep first durably suspends replenishment and retires spares, then performs the
 existing conversation-idleness checks; a busy refusal leaves capacity suspended
