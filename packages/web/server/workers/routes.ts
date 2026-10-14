@@ -10,7 +10,9 @@ const routeSchema = z.object({
   nativeRoomId: z.string().optional(), containerName: z.string().optional(),
   scope: z.custom<RuntimeScope>(value => typeof value === "object" && value !== null),
   input: z.custom<CreateChatInput>(value => typeof value === "object" && value !== null),
-  phase: z.enum(["pending", "ready", "retiring"]),
+  phase: z.enum(["pending", "ready", "retiring", "sleeping"]),
+  idleTimeoutSupported: z.boolean().optional(),
+  idleRetirement: z.object({ minimumIdleMs: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) }).strict().optional(),
   summary: storedWorkerSummarySchema.optional(),
 }).strict();
 export type WorkerRoute = z.infer<typeof routeSchema>;
@@ -56,16 +58,42 @@ export class WorkerRoutes {
       return this.decode(conversationId, proposed);
     });
   }
-  ready(conversationId: string, attemptId: string, nativeRoomId: string, containerName: string): Promise<WorkerRoute> {
+  ready(conversationId: string, attemptId: string, nativeRoomId: string, containerName: string, idleTimeoutSupported = false): Promise<WorkerRoute> {
     return this.change(conversationId, current => {
       const route = this.requireAttempt(current, attemptId);
-      if (route.phase === "retiring") throw new Error("Worker is retiring.");
+      if (route.phase === "retiring" || route.phase === "sleeping") throw new Error("Worker is retiring.");
       if (route.nativeRoomId && route.nativeRoomId !== nativeRoomId) throw new Error("Worker room binding changed.");
-      return { ...route, nativeRoomId, containerName, phase: "ready" };
+      return { ...route, nativeRoomId, containerName, phase: "ready", idleTimeoutSupported };
     });
   }
   async retiring(conversationId: string, attemptId: string): Promise<void> {
     await this.change(conversationId, current => ({ ...this.requireAttempt(current, attemptId), phase: "retiring" }));
+  }
+  async beginIdleRetirement(conversationId: string, attemptId: string, minimumIdleMs: number): Promise<void> {
+    await this.change(conversationId, current => {
+      const route = this.requireAttempt(current, attemptId);
+      if (route.phase !== "ready" || !route.idleTimeoutSupported) throw new Error("Worker does not support timed retirement.");
+      return { ...route, idleRetirement: { minimumIdleMs } };
+    });
+  }
+  async cancelIdleRetirement(conversationId: string, attemptId: string): Promise<void> {
+    await this.change(conversationId, current => {
+      const route = { ...this.requireAttempt(current, attemptId) };
+      if (route.phase !== "ready") throw new Error("Worker retirement cannot be cancelled.");
+      delete route.idleRetirement;
+      return route;
+    });
+  }
+  /** The caller has independently confirmed that this exact attempt cannot execute. */
+  async sleeping(conversationId: string, attemptId: string): Promise<void> {
+    await this.change(conversationId, current => {
+      const route = this.requireAttempt(current, attemptId);
+      if (route.phase !== "retiring" || !route.idleRetirement) throw new Error("Idle retirement is not recorded.");
+      const next: WorkerRoute = { ...route, phase: "sleeping" };
+      delete next.idleRetirement;
+      delete next.containerName;
+      return next;
+    });
   }
   /** Invoke only after fresh launcher evidence confirms irreversible retirement. */
   replaceRetired(conversationId: string, oldAttemptId: string, configurationRevision: string): Promise<WorkerRoute> {
@@ -74,6 +102,8 @@ export class WorkerRoutes {
       if (route.phase !== "retiring") throw new Error("Persist retirement intent before replacement.");
       const next: WorkerRoute = { ...route, configurationRevision, attemptId: randomUUID(), phase: "pending" };
       delete next.containerName;
+      delete next.idleTimeoutSupported;
+      delete next.idleRetirement;
       return next;
     });
   }
@@ -84,7 +114,7 @@ export class WorkerRoutes {
     const value = workerSummarySchema.parse(input);
     await this.change(conversationId, current => {
       const route = this.requireAttempt(current, attemptId);
-      if (route.storeId !== storeId || route.phase === "retiring") throw new Error("Stale worker summary binding.");
+      if (route.storeId !== storeId || route.phase === "retiring" || route.phase === "sleeping") throw new Error("Stale worker summary binding.");
       const previous = route.summary;
       if (previous && value.revision < previous.value.revision) throw new Error("Stale worker summary revision.");
       if (previous && value.revision === previous.value.revision) {
@@ -100,8 +130,8 @@ export class WorkerRoutes {
     const route = this.get(conversationId);
     if (!route?.summary) return undefined;
     const receivedAt = this.summaryReceivedAt.get(conversationId);
-    return { value: route.summary.value, stale: route.phase === "retiring" || route.summary.attemptId !== route.attemptId
-      || receivedAt === undefined || performance.now() - receivedAt >= 10_000 };
+    return { value: route.summary.value, stale: route.summary.attemptId !== route.attemptId || (route.phase === "sleeping" && route.summary.value.status === "running") || (route.phase !== "sleeping"
+      && (route.phase === "retiring" || receivedAt === undefined || performance.now() - receivedAt >= 10_000)) };
   }
   close(): Promise<void> { return this.db.close(); }
   private requireAttempt(route: WorkerRoute | undefined, attemptId: string) {

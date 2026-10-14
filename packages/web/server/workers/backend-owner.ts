@@ -43,6 +43,7 @@ export async function openBackendOwner() {
 const filename = process.env.DISPATCH_BACKEND_WORKERS_CONFIG_FILE;
 if (!filename) throw new Error("DISPATCH_BACKEND_WORKERS_CONFIG_FILE is required.");
 const workerConfig = z.object({
+  workerIdleTimeoutMs: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(600_000),
   providerStoreConfigFile: z.string().startsWith("/").optional(),
   authStoreConfigFile: z.string().startsWith("/").optional(),
   mcpStoreConfigFile: z.string().startsWith("/").optional(),
@@ -216,7 +217,7 @@ app.use("/internal/workers/*", bodyLimit({ maxSize: ATTACHMENT_RPC_MAX_BYTES, on
 app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
   const currentRoute = () => {
     const route = routes.get(c.req.param("conversation"));
-    if (!route || route.attemptId !== c.req.param("attempt") || route.phase === "retiring" || !tokenMatches(workerToken(workerKey, workerConfig.installationId, route), c.req.header("Authorization")))
+    if (!route || route.attemptId !== c.req.param("attempt") || route.phase === "retiring" || route.phase === "sleeping" || !tokenMatches(workerToken(workerKey, workerConfig.installationId, route), c.req.header("Authorization")))
       throw new RuntimeError(403, "Forbidden");
     return route;
   };
@@ -449,6 +450,7 @@ let shutdown: Promise<void> | undefined;
 let teardownStarted = false;
 function close(retireOnly = false, beforeSupportClose?: () => Promise<void>): Promise<void> {
   closing = true;
+  clearInterval(idleTimer);
   plannedQuiescence = false;
   return shutdown ??= operatorTransition(async () => {
     // Persist admission closure and join worker effects before releasing owners.
@@ -496,6 +498,15 @@ function resourcesReady() {
 }
 function ready() { return admission.admitting && resourcesReady(); }
 function healthReady() { return ready() || (plannedQuiescence && resourcesHealthy()); }
+let idleSweep: Promise<void> | undefined;
+const idleTimer = setInterval(() => {
+  if (idleSweep || !ready()) return;
+  idleSweep = admission.run(() => runtime.retireInactiveWorkers(workerConfig.workerIdleTimeoutMs)).catch(() => {
+    console.warn("Idle worker retirement incomplete; the next sweep will reconcile the recorded attempts.");
+  }).finally(() => { idleSweep = undefined; });
+}, 30_000);
+idleTimer.unref();
+startupCleanup.push(async () => { clearInterval(idleTimer); await idleSweep; });
 return { app, tls, host: config.host, port: config.port,
   close: () => close(), retire: (beforeSupportClose?: () => Promise<void>) => close(true, beforeSupportClose), ready, healthReady, supportReady: resourcesReady,
 };

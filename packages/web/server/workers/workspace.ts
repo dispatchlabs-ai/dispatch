@@ -38,7 +38,7 @@ export async function prepareWorkerWorkspace(harness: Harness, stateDir: string,
         : "This conversation uses a fresh, disposable worker workspace. Its files are not durably snapshotted.",
       "PostgreSQL retains conversation and tool history, not a complete filesystem journal. A committed tool result does not mean its old output file still exists. Do not blindly repeat completed tools or paid/external effects.",
       "Inspect the remote Git branch and durable tool history, recover pushed source, reconstruct missing unpushed work when appropriate, verify the result, then continue. Published artifacts remain in S3. Report what cannot be recovered.",
-      "Commit and push useful progress frequently. A local commit alone will not survive worker replacement. Do not claim filesystem restoration or exactly-once external execution.",
+      "Idle workers may shut down automatically between turns. Commit and push useful progress frequently and publish required artifacts before finishing a turn. A local commit alone will not survive worker replacement. Do not claim filesystem restoration or exactly-once external execution.",
     ].join("\n\n");
   }, BACKGROUND_CONTEXT);
 }

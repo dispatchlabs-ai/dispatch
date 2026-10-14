@@ -86,9 +86,67 @@ evidence. Source/type/build checks do not establish live claim, replenishment,
 restart recovery, sleep or latency acceptance; record those observations in the
 installation's deployment receipt.
 
-## Idle sleep contract — October 10, 2026
+## Automatic conversation-worker retirement — October 14, 2026
 
-Source `1114256` implements explicit operator sleep, not an automatic idle timer.
+The backend checks assigned workers every 30 seconds. Its `workerIdleTimeoutMs`
+setting defaults to **600000** (ten minutes); **0** disables new automatic
+retirements while still reconciling previously recorded ones. The Terraform module's
+optional `worker_idle_timeout_seconds` supplies this setting in seconds. The
+unassigned warm spare, backend, launcher and database remain running. This changes
+conversation compute cost, not the installation's fixed or idle database costs.
+
+The worker measures time since native state changed using a process-local monotonic
+clock; a process restart starts a fresh grace period. Read-only chat polling and
+summary heartbeats do not reset it. Before retiring, it seals and joins RPC/summary
+admission, checks every native task and unsettled submission plus pending local
+reconciliation/reporting, and closes only after the full idle interval. Active,
+waiting, blocked, background and queued work cannot be cancelled to create idleness.
+
+Retirement is ordered with that conversation's RPCs, while other conversations and
+worker support callbacks stay available. The backend records the exact attempt and
+idle decision before requesting closure. A busy refusal removes that intent; an
+uncertain response retains it for reconciliation by the next sweep or explicit
+conversation action. The launcher must confirm irreversible termination before
+the route becomes sleeping or a fresh attempt opens the retained store. A timeout
+alone never authorizes a replacement, and uncertain user mutations are not replayed.
+
+An already-open chat keeps its last public snapshot and authenticated stream while
+sleeping; background polling does not restart compute. Explicitly opening/reloading
+the chat, reading additional history or taking a conversation action can start a
+fresh worker. Authorization is rechecked while the stream sleeps and before every
+new action. Sleeping list entries retain their final observed status instead of
+reporting a missing heartbeat as an execution failure.
+
+Workspace files remain disposable under the existing cloud workspace policy.
+Agents must commit and push useful work and publish required artifacts before
+finishing. Database history and S3 attachments survive retirement; local-only files,
+installed packages and unpushed commits do not. This adds no workspace snapshot or
+forced Git publication mechanism.
+
+Deploy compatible backend and worker images together. Existing older workers do
+not advertise timed-retirement support and are left running; replace them through
+the existing safe lifecycle after their work is preserved. Newly launched compatible
+workers use the timer. Retain a compatible backend after its routing journal records
+the new idle-retirement/sleeping fields; do not remove journal entries to downgrade.
+Type/build and runtime acceptance are recorded separately in the task's delivery
+record; this contract alone is not evidence of an AWS rollout or measured savings.
+
+Interactive qualification on October 14 used the Nix-built AMD64 image
+`sha256:7d2aa0dfa80a82387911a17a0e834e1bf559824c55ec78c68f8149a70b9ea0a4`
+in an isolated Docker stack on M4 Max, with PostgreSQL 17.6 and a shortened
+15-second timeout. An open human-only chat reached a persisted sleeping route and
+zero running conversation containers; its next message used a different attempt
+and retained both messages. A real Claude Haiku tool call running `sleep 90` stayed
+on the same running worker beyond the threshold and returned successfully. This
+qualifies ordinary idle/resume and active-tool refusal in that environment. Lost
+responses, owner handover during retirement, queued/background-task variants and
+AWS retirement remain separate acceptance cases; no automated application tests
+were added or run.
+
+## Installation idle sleep contract — October 10, 2026
+
+Source `1114256` introduced explicit installation sleep. Automatic conversation
+retirement above leaves the installation awake; full sleep remains an operator action.
 The [canonical sleep/wake contract](idle-sleep.md) owns eligibility, busy/unknown
 refusal, retained support callbacks, partial retirement/reopening, planned-quiescence
 health and clean-close/wake boundaries. Existing `/internal/drain` cancels work and

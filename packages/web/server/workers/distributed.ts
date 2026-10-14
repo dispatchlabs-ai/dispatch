@@ -11,7 +11,7 @@ import type { ChatSnapshot, RuntimeScope, CreateAgentInstanceResult } from "../.
 import { WorkerRoutes, type WorkerRoute } from "./routes.js";
 import { workerToken } from "./identity.js";
 import { decodeAttachmentBytes } from "./attachments.js";
-import { mergeWorkerSummary } from "./summaries.js";
+import { mergeWorkerSummary, workerSummarySchema } from "./summaries.js";
 import type { Attachment } from "../../src/shared/contracts.js";
 import { workerRequest } from "./transport.js";
 import type { LaunchAttempt, LauncherStatus } from "./launcher.js";
@@ -26,10 +26,21 @@ export type DistributedRuntime = RuntimeService & {
   deferCatalogReconciliation(companyId: string): void;
   runWorkerTransition<T>(operation: () => Promise<T>): Promise<T>;
   retireIdleWorkers(): Promise<boolean>;
+  retireInactiveWorkers(minimumIdleMs: number): Promise<void>;
 };
 export function distributedRuntime(options: DistributedOptions): DistributedRuntime {
   const { directory, routes } = options;
   const launching = new Map<string, Promise<WorkerRoute>>();
+  const conversationTails = new Map<string, Promise<void>>();
+  // Order retirement against that conversation's RPCs without blocking other chats
+  // or the authenticated callbacks required by native execution and shutdown.
+  function conversationOperation<T>(id: string, operation: () => Promise<T>): Promise<T> {
+    const result = (conversationTails.get(id) ?? Promise.resolve()).then(operation);
+    const tail = result.then(() => {}, () => {});
+    conversationTails.set(id, tail);
+    void tail.then(() => { if (conversationTails.get(id) === tail) conversationTails.delete(id); });
+    return result;
+  }
   // A warm address is a transport hint, never authorization or a retirement fence.
   // Restart and failed RPCs require the existing launcher reconciliation path again.
   const activated = new Map<string, string>();
@@ -76,9 +87,9 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
       const origin = `http://${address}:8831`;
       while (performance.now() < deadline) {
         try {
-          const ready = await workerRequest<{ roomId: string; conversationId: string; attemptId: string }>(origin, token(route), "/ready", undefined, undefined, remaining());
+          const ready = await workerRequest<{ roomId: string; conversationId: string; attemptId: string; idleTimeoutSupported?: boolean }>(origin, token(route), "/ready", undefined, undefined, remaining());
           if (ready.conversationId !== route.conversationId || ready.attemptId !== route.attemptId) throw new Error("Worker readiness identity mismatch.");
-          const active = await routes.ready(route.conversationId, route.attemptId, ready.roomId, address);
+          const active = await routes.ready(route.conversationId, route.attemptId, ready.roomId, address, ready.idleTimeoutSupported === true);
           activated.set(active.conversationId, active.attemptId);
           return active;
         } catch (error) {
@@ -95,7 +106,10 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
   function call<T>(scope: RuntimeScope, id: string, method: string, input?: unknown): Promise<T> {
     return policyRead(() => callNow<T>(scope, id, method, input));
   }
-  async function callNow<T>(scope: RuntimeScope, id: string, method: string, input?: unknown): Promise<T> {
+  function callNow<T>(scope: RuntimeScope, id: string, method: string, input?: unknown): Promise<T> {
+    return conversationOperation(id, () => callWorker<T>(scope, id, method, input));
+  }
+  async function callWorker<T>(scope: RuntimeScope, id: string, method: string, input?: unknown): Promise<T> {
     // This projection checks current project/membership access without constructing
     // and discarding a directory transcript. The policy lease covers RPC completion.
     const membership = await directory.directoryWorkerMembership(scope, id);
@@ -105,6 +119,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
       route = await routes.ensure(id, bootstrap.scope, bootstrap.input, options.configurationRevision);
     }
     if (route.companyId !== scope.companyId) throw new RuntimeError(503, "Conversation worker unavailable.");
+    if (route.idleRetirement) route = await finishIdleRetirement(route);
     const active = await activate(route);
     const catalog = await directory.exportWorkerCatalog(scope.companyId);
     try {
@@ -118,6 +133,37 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
       // attempt; replacement still requires confirmed irreversible retirement.
       throw error;
     }
+  }
+  const idleReceipt = z.object({ idle: z.boolean(), attemptId: z.string(), summary: workerSummarySchema.optional() }).strict();
+  async function finishIdleRetirement(route: WorkerRoute): Promise<WorkerRoute> {
+    if (!route.idleRetirement) return route;
+    const status = await launcher<LauncherStatus>("status");
+    const attempt = status.attempts.find(item => item.attemptId === route.attemptId);
+    if (status.installationId !== options.installationId || !status.driverReachable || !attempt
+      || attempt.conversationId !== route.conversationId || attempt.storeId !== route.storeId)
+      throw new RuntimeError(503, "Idle worker retirement requires reconciliation.");
+    if (attempt.phase !== "stopped" || attempt.observed !== "absent") {
+      if (route.phase === "ready" && attempt.observed !== "absent" && attempt.observed !== "exited") {
+        const receipt = idleReceipt.parse(await workerRequest(`http://${workerAddress(attempt)}:8831`, token(route),
+          "/idle-retire", route.idleRetirement, undefined, options.launcherTimeoutMs));
+        if (receipt.attemptId !== route.attemptId) throw new Error("Worker retirement identity mismatch.");
+        if (!receipt.idle) {
+          await routes.cancelIdleRetirement(route.conversationId, route.attemptId);
+          return routes.get(route.conversationId)!;
+        }
+        if (receipt.summary) await routes.updateSummary(route.conversationId, route.attemptId, route.storeId, receipt.summary);
+        await routes.retiring(route.conversationId, route.attemptId);
+      }
+      await launcher("stop", { attemptId: route.attemptId });
+      const after = await launcher<LauncherStatus>("status");
+      const retired = after.attempts.find(item => item.attemptId === route.attemptId);
+      if (after.installationId !== options.installationId || !after.driverReachable
+        || retired?.phase !== "stopped" || retired.observed !== "absent") throw new Error("Retirement is not confirmed.");
+    }
+    await routes.retiring(route.conversationId, route.attemptId);
+    await routes.sleeping(route.conversationId, route.attemptId);
+    activated.delete(route.conversationId);
+    return routes.get(route.conversationId)!;
   }
   async function acknowledgePolicy(companyId?: string, requireRevocationFence = true, conversationIds?: ReadonlySet<string>) {
     const targets = routes.list().filter(route => (!companyId || route.companyId === companyId) && (!conversationIds || conversationIds.has(route.conversationId)));
@@ -308,7 +354,15 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
             try {
               while (!stopped) {
                 await delay(500); if (stopped) break;
-                const next = await options.runBackground(async () => snapshot(await call<ChatSnapshot>(scope, id, "getChat"), id));
+                const next = await options.runBackground(() => policyRead(() => conversationOperation(id, async () => {
+                  await directory.directoryWorkerMembership(scope, id);
+                  const route = routes.get(id);
+                  // Keep the existing stream and its last public snapshot without
+                  // waking compute. Explicit reads/actions still activate normally.
+                  if (route?.phase === "sleeping" || route?.idleRetirement) return undefined;
+                  return snapshot(await callWorker<ChatSnapshot>(scope, id, "getChat"), id);
+                })));
+                if (!next) continue;
                 const encoded = JSON.stringify(next);
                 if (encoded !== previous && !stopped) {
                   await options.runBackground(() => policyRead(async () => {
@@ -369,8 +423,31 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     ...operations,
     deferCatalogReconciliation,
     runWorkerTransition: policyChange,
+    async retireInactiveWorkers(minimumIdleMs) {
+      const candidates = routes.list().filter(route => route.idleRetirement || (minimumIdleMs > 0 && route.phase === "ready"));
+      const results = await Promise.allSettled(candidates.map(candidate => policyRead(() => conversationOperation(candidate.conversationId, async () => {
+        let route = routes.get(candidate.conversationId)!;
+        if (route.attemptId !== candidate.attemptId) return;
+        if (route.idleRetirement) { await finishIdleRetirement(route); return; }
+        if (route.phase !== "ready" || minimumIdleMs === 0 || route.idleTimeoutSupported === false) return;
+        if (route.idleTimeoutSupported === undefined) {
+          const ready = await workerRequest<{ roomId: string; conversationId: string; attemptId: string; idleTimeoutSupported?: boolean }>(
+            `http://${route.containerName}:8831`, token(route), "/ready");
+          if (ready.conversationId !== route.conversationId || ready.attemptId !== route.attemptId) throw new Error("Worker readiness identity mismatch.");
+          route = await routes.ready(route.conversationId, route.attemptId, ready.roomId, route.containerName!, ready.idleTimeoutSupported === true);
+          if (!route.idleTimeoutSupported) return;
+        }
+        // Persist before the RPC: after timeout or owner handover, resume this
+        // exact retirement decision before admitting another conversation action.
+        await routes.beginIdleRetirement(route.conversationId, route.attemptId, minimumIdleMs);
+        await finishIdleRetirement(routes.get(route.conversationId)!);
+      }))));
+      const failures = results.filter(result => result.status === "rejected").map(result => result.reason);
+      if (failures.length) throw new AggregateError(failures, "Some idle worker retirements remain unresolved.");
+    },
     async retireIdleWorkers() {
       // Backend admission must already be sealed and joined. Support callbacks stay open.
+      for (const route of routes.list()) if (route.idleRetirement) await finishIdleRetirement(route);
       await launcher("suspend-warm", {});
       const before = await launcher<LauncherStatus>("status");
       if (before.installationId !== options.installationId || !before.driverReachable
@@ -379,7 +456,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
         const route = routes.get(attempt.conversationId);
         if (!route || route.phase !== "ready" || route.attemptId !== attempt.attemptId || route.storeId !== attempt.storeId)
           throw new Error("Worker route is unresolved.");
-        const result = z.object({ idle: z.boolean(), attemptId: z.string() }).strict().parse(await workerRequest(
+        const result = idleReceipt.parse(await workerRequest(
           `http://${workerAddress(attempt)}:8831`, token(route), "/idle-retire", {}, undefined, options.launcherTimeoutMs,
         ));
         if (result.attemptId !== attempt.attemptId) throw new Error("Worker retirement identity mismatch.");
