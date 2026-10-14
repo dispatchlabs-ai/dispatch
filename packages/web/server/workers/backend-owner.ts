@@ -43,7 +43,7 @@ export async function openBackendOwner() {
 const filename = process.env.DISPATCH_BACKEND_WORKERS_CONFIG_FILE;
 if (!filename) throw new Error("DISPATCH_BACKEND_WORKERS_CONFIG_FILE is required.");
 const workerConfig = z.object({
-  workerIdleTimeoutMs: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(600_000),
+  workerIdleTimeoutMs: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(3_600_000),
   providerStoreConfigFile: z.string().startsWith("/").optional(),
   authStoreConfigFile: z.string().startsWith("/").optional(),
   mcpStoreConfigFile: z.string().startsWith("/").optional(),

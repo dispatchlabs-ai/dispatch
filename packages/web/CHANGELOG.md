@@ -4,7 +4,7 @@
 
 ### Worker lifecycle
 
-- Retire assigned conversation workers after ten minutes of native inactivity by default, with a configurable timeout and safe refusal while tasks, submissions or reconciliation remain pending. Preserve warm spare capacity, durable history and open chat streams; resume the same conversation on its next explicit read or action only after confirmed old-worker termination.
+- Retire assigned conversation workers after sixty minutes of native inactivity by default, with a configurable timeout and safe refusal while tasks, submissions or reconciliation remain pending. Preserve warm spare capacity, durable history and open chat streams; resume the same conversation on its next explicit read or action only after confirmed old-worker termination.
 
 ## [0.5.0] - 2026-10-14
 

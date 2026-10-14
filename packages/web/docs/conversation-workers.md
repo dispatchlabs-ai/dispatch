@@ -89,11 +89,15 @@ installation's deployment receipt.
 ## Automatic conversation-worker retirement — October 14, 2026
 
 The backend checks assigned workers every 30 seconds. Its `workerIdleTimeoutMs`
-setting defaults to **600000** (ten minutes); **0** disables new automatic
+setting defaults to **3600000** (sixty minutes); **0** disables new automatic
 retirements while still reconciling previously recorded ones. The Terraform module's
 optional `worker_idle_timeout_seconds` supplies this setting in seconds. The
 unassigned warm spare, backend, launcher and database remain running. This changes
 conversation compute cost, not the installation's fixed or idle database costs.
+
+The initial ten-minute default was superseded by Chris's sixty-minute requirement
+on October 14, 2026. Existing installations with an explicit timeout retain that
+configured value until their deployment inputs are updated.
 
 The worker measures time since native state changed using a process-local monotonic
 clock; a process restart starts a fresh grace period. Read-only chat polling and
