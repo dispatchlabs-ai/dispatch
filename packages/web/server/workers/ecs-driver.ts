@@ -5,6 +5,7 @@ import { ECSClient, DescribeTasksCommand, ListTasksCommand, RunTaskCommand, Stop
 import { z } from "zod";
 import { fromHttp } from "@aws-sdk/credential-provider-http";
 import { LauncherError, type ContainerDriver, type ContainerSpec, type LauncherContainer } from "./launcher.js";
+import { workerRequest } from "./transport.js";
 
 const text = z.string().min(1).max(200);
 const configSchema = z.object({
@@ -17,12 +18,13 @@ const configSchema = z.object({
   capacityProvider: z.enum(["FARGATE", "FARGATE_SPOT"]).default("FARGATE"),
   assignPublicIp: z.boolean().default(false),
   configurationRevision: text, platformVersion: z.string().regex(/^\d+\.\d+\.\d+$/).default("1.4.0"),
+  warmSpare: z.boolean().default(false),
   requestTimeoutMs: z.number().int().min(1000).max(120_000).default(30_000),
   retirementTimeoutMs: z.number().int().min(1000).max(900_000).default(180_000),
 }).strict();
 export type EcsDriverOptions = z.input<typeof configSchema>;
 const prefix = "dispatch:";
-const reserved = ["DISPATCH_INSTALLATION_ID", "DISPATCH_WORKER_ATTEMPT_ID", "DISPATCH_CONVERSATION_ID", "DISPATCH_POSTGRES_STORE_ID", "DISPATCH_WORKER_CONFIGURATION_REVISION", "DISPATCH_WORKER_TOKEN"];
+const reserved = ["DISPATCH_INSTALLATION_ID", "DISPATCH_WORKER_ATTEMPT_ID", "DISPATCH_CONVERSATION_ID", "DISPATCH_POSTGRES_STORE_ID", "DISPATCH_WORKER_CONFIGURATION_REVISION", "DISPATCH_WORKER_TOKEN", "DISPATCH_WORKER_WARM"];
 
 /** Standalone Fargate tasks, NOT desired-count services. No transparent SDK retries.
  * RunTask can execute before its response arrives. The launcher owns the durable
@@ -31,6 +33,7 @@ const reserved = ["DISPATCH_INSTALLATION_ID", "DISPATCH_WORKER_ATTEMPT_ID", "DIS
 export class EcsContainerDriver implements ContainerDriver {
   private readonly config: z.output<typeof configSchema>;
   private readonly client: ECSClient;
+  get warmConfigurationRevision() { return this.config.warmSpare ? this.config.configurationRevision : undefined; }
   constructor(options: EcsDriverOptions, private readonly workerEnvironment: (spec: ContainerSpec) => Record<string, string>) {
     this.config = configSchema.parse(options);
     if (reserved.some(key => key in this.config.environment)) throw new Error("Operator environment cannot override worker identity.");
@@ -44,9 +47,11 @@ export class EcsContainerDriver implements ContainerDriver {
     const environment = { ...this.config.environment, ...this.workerEnvironment(spec),
       DISPATCH_INSTALLATION_ID: spec.installationId, DISPATCH_WORKER_ATTEMPT_ID: spec.attemptId,
       DISPATCH_CONVERSATION_ID: spec.conversationId, DISPATCH_POSTGRES_STORE_ID: spec.storeId,
-      DISPATCH_WORKER_CONFIGURATION_REVISION: spec.configurationRevision };
+      DISPATCH_WORKER_CONFIGURATION_REVISION: spec.configurationRevision,
+      ...(spec.warm ? { DISPATCH_WORKER_WARM: "1" } : {}) };
     const tags = Object.entries({ installationId: spec.installationId, attemptId: spec.attemptId,
-      conversationId: spec.conversationId, storeId: spec.storeId, configurationRevision: spec.configurationRevision, name: spec.name })
+      conversationId: spec.conversationId, storeId: spec.storeId, configurationRevision: spec.configurationRevision, name: spec.name,
+      ...(spec.warm ? { warm: "1" } : {}) })
       .map(([key, value]) => ({ key: prefix + key, value }));
     return {
       cluster: this.config.cluster, taskDefinition: this.config.taskDefinition,
@@ -80,6 +85,28 @@ export class EcsContainerDriver implements ContainerDriver {
     if (response.failures?.length || response.tasks?.length !== 1 || response.tasks[0]?.taskArn !== id)
       throw new LauncherError(503, "ECS task identity unavailable; absence is not retirement evidence.");
     return this.decode(response.tasks[0]);
+  }
+  async warmReady(container: LauncherContainer): Promise<boolean> {
+    if (!container.warm || container.state !== "running" || !container.address) return false;
+    try {
+      const state = await workerRequest<{ warmId: string; available: boolean }>(`http://${container.address}:8831`,
+        this.workerEnvironment(container).DISPATCH_WORKER_TOKEN!, "/warm", undefined, undefined, 2000);
+      return state.warmId === container.attemptId && state.available === true;
+    } catch { return false; }
+  }
+  async assignWarm(container: LauncherContainer, request: import("./launcher.js").LaunchRequest): Promise<void> {
+    if (!container.warm || !container.address || container.state !== "running") throw new LauncherError(503, "Warm worker is not running.");
+    const origin = `http://${container.address}:8831`;
+    const token = this.workerEnvironment({ ...container, ...request }).DISPATCH_WORKER_TOKEN!;
+    // A lost assignment response or controller restart may find the final listener already running.
+    try {
+      const ready = await workerRequest<{ attemptId: string; conversationId: string }>(origin, token, "/ready", undefined, undefined, 2000);
+      if (ready.attemptId !== request.attemptId || ready.conversationId !== request.conversationId) throw new LauncherError(503, "Assigned worker identity mismatch.");
+      return;
+    } catch (error) { if (error instanceof LauncherError) throw error; }
+    const response = await workerRequest<{ warmId: string; attemptId: string }>(origin,
+      this.workerEnvironment(container).DISPATCH_WORKER_TOKEN!, "/assign", { ...request, token }, undefined, 5000);
+    if (response.warmId !== container.attemptId || response.attemptId !== request.attemptId) throw new LauncherError(503, "Warm assignment identity mismatch.");
   }
   async list(installationId: string): Promise<LauncherContainer[]> {
     if (installationId !== this.config.installationId) throw new Error("Installation mismatch.");
@@ -127,6 +154,7 @@ export class EcsContainerDriver implements ContainerDriver {
     const state = task.lastStatus === "STOPPED" ? "exited" : task.lastStatus === "RUNNING" ? "running" : "unknown";
     return { id: task.taskArn!, installationId, attemptId: value("attemptId"), conversationId: value("conversationId"),
       storeId: value("storeId"), configurationRevision: value("configurationRevision"), name: value("name"), state,
+      ...(values.get(prefix + "warm") === "1" ? { warm: true } : {}),
       ...(address ? { address } : {}) };
   }
   private validateArn(id: string) {

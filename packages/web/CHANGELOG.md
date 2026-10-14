@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### ECS startup
+
+- Add an opt-in single warm spare with durable one-time chat assignment,
+  replenishment, observable readiness and drain/sleep integration.
+
 ### Ubuntu worker tooling
 
 - Include pinned agent-browser 0.38.2, Chromium, browser libraries/fonts and FFmpeg in the Ubuntu worker image. Install at build time and keep the browser independent of project Node/mise selection.

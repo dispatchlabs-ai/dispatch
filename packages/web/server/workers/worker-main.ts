@@ -21,7 +21,9 @@ import { tokenMatches } from "./identity.js";
 import { validateBackendCa, workerRequest } from "./transport.js";
 import type { AuthCheck, AuthResult } from "@earendil-works/pi-ai";
 import type { RuntimeScope, SendMessageInput, AddParticipantsInput, UpdateChatInput } from "../../src/shared/contracts.js";
+import { awaitWarmAssignment } from "./warm-worker.js";
 
+await awaitWarmAssignment();
 const env = z.object({
   DISPATCH_BACKEND_CA_PEM: z.string().optional(),
   DISPATCH_BACKEND_INTERNAL_URL: z.url(), DISPATCH_WORKER_TOKEN: z.string().min(43),

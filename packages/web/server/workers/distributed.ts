@@ -365,6 +365,7 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     runWorkerTransition: policyChange,
     async retireIdleWorkers() {
       // Backend admission must already be sealed and joined. Support callbacks stay open.
+      await launcher("suspend-warm", {});
       const before = await launcher<LauncherStatus>("status");
       if (before.installationId !== options.installationId || !before.driverReachable
         || before.unresolvedAttempts.length || before.orphanContainerIds.length) throw new Error("Worker inventory is unresolved.");

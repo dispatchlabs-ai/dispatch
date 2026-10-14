@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { z } from "zod";
 import { EcsContainerDriver } from "./ecs-driver.js";
 import { DockerContainerDriver } from "./docker-driver.js";
-import { WorkerLauncher } from "./launcher.js";
+import { WorkerLauncher, type ContainerDriver } from "./launcher.js";
 import { createLauncherControl } from "./control.js";
 import { validateBackendCa } from "./transport.js";
 import { workerToken } from "./identity.js";
@@ -32,7 +32,7 @@ const workerEnvironment = (spec: import("./launcher.js").ContainerSpec) => ({
   DISPATCH_WORKER_TOKEN: workerToken(workerKey, config.installationId, spec),
   ...(backendCa === undefined ? {} : { DISPATCH_BACKEND_CA_PEM: backendCa }),
 });
-const driver = config.driverType === "ecs"
+const driver: ContainerDriver = config.driverType === "ecs"
   ? new EcsContainerDriver({ ...config.driver, installationId: config.installationId } as ConstructorParameters<typeof EcsContainerDriver>[0], workerEnvironment)
   : new DockerContainerDriver({ ...config.driver, installationId: config.installationId } as ConstructorParameters<typeof DockerContainerDriver>[0], workerEnvironment);
 if (config.driverType === "ecs" && !config.postgres) throw new Error("ECS launcher requires PostgreSQL journal persistence.");
@@ -41,6 +41,17 @@ const launcher = config.postgres
   ? await WorkerLauncher.openPostgres({ connectionString: (await readFile(config.postgres.urlFile, "utf8")).trim(), ca: config.postgres.caFile === undefined ? undefined : await readFile(config.postgres.caFile, "utf8"), installationId: config.installationId, driver, recoverOwnerId: config.postgres.recoverOwnerId })
   : await WorkerLauncher.open({ stateDir: config.stateDir!, installationId: config.installationId, driver });
 const app = createLauncherControl(launcher, token);
-return { app, host: config.host, port: config.port, retire: () => launcher.close(),
-  ready: () => launcher.ready(), close: () => launcher.close() };
+let maintaining = false;
+const maintain = () => {
+  if (maintaining) return;
+  maintaining = true;
+  void launcher.maintainWarmSpare().catch(() => console.warn("Warm spare reconciliation incomplete; retrying reconciliation."))
+    .finally(() => { maintaining = false; });
+};
+const timer = config.driverType === "ecs" ? setInterval(maintain, 5000) : undefined;
+timer?.unref();
+if (timer) maintain();
+const close = () => { clearInterval(timer); return launcher.close(); };
+return { app, host: config.host, port: config.port, retire: close,
+  ready: () => launcher.ready(), close };
 }
