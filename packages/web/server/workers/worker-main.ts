@@ -166,7 +166,9 @@ app.onError((error, c) => {
   const status = known && [400, 403, 404, 409, 410, 413].includes(error.status) ? error.status as 400 | 403 | 404 | 409 | 410 | 413 : error instanceof z.ZodError ? 400 : 503;
   return c.json({ error: "Worker operation failed" }, status);
 });
-const server = serve({ fetch: app.fetch, hostname: "0.0.0.0", port: 8831 });
+const server = serve({ fetch: app.fetch, hostname: "0.0.0.0", port: 8831 }, () => {
+  console.info(JSON.stringify({ event: "worker.ready", startup_ms: Math.round(process.uptime() * 1000) }));
+});
 let closing = false;
 let runtimeClosed = false;
 let idleRetirement: Promise<boolean> | undefined;

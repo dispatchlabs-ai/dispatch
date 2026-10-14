@@ -12,9 +12,6 @@ LABEL org.opencontainers.image.title="Dispatch agent worker" \
       org.opencontainers.image.source="https://github.com/dispatchlabs-ai/dispatch" \
       org.opencontainers.image.revision="${SOURCE_REVISION}"
 
-# Never flatten the Nix closure or replace its absolute executable paths.
-COPY --from=dispatch /nix/store /nix/store
-COPY --from=dispatch /bin/dispatch-worker /usr/local/bin/dispatch-worker
 COPY --from=mise /usr/local/bin/mise /usr/local/bin/mise
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -54,6 +51,28 @@ RUN mkdir -p "$HOME" /workspace /tmp \
     && npm --version \
     && chmod 1777 /tmp
 
+# Install the browser while building, not during a conversation. Playwright pins
+# Chromium for both AMD64 and ARM64, bypassing agent-browser's ARM64 installer guard.
+COPY browser/package.json browser/package-lock.json /opt/dispatch-browser/
+RUN npm ci --prefix /opt/dispatch-browser --omit=dev --ignore-scripts \
+    && PLAYWRIGHT_BROWSERS_PATH=/opt/dispatch-browser/browsers \
+      node /opt/dispatch-browser/node_modules/playwright-core/cli.js install --with-deps --no-shell chromium \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg libnss3-tools \
+    && chmod 755 "/opt/dispatch-browser/node_modules/agent-browser/bin/agent-browser-linux-$(node -p process.arch)" \
+    && ln -s "/opt/dispatch-browser/node_modules/agent-browser/bin/agent-browser-linux-$(node -p process.arch)" /usr/local/bin/agent-browser \
+    && find /opt/dispatch-browser/node_modules/agent-browser/bin -type f \
+      -name 'agent-browser-*' ! -name "agent-browser-linux-$(node -p process.arch)" -delete \
+    && PLAYWRIGHT_BROWSERS_PATH=/opt/dispatch-browser/browsers node -e \
+      'require("fs").symlinkSync(require("/opt/dispatch-browser/node_modules/playwright-core").chromium.executablePath(), "/usr/local/bin/chromium")' \
+    && agent-browser --version \
+    && chromium --version \
+    && rm -rf /var/lib/apt/lists/* /root/.npm
+ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/local/bin/chromium
+
+# Keep tool installation layers reusable across application builds. Never flatten
+# the Nix closure or replace the worker wrapper's absolute executable paths.
+COPY --from=dispatch /nix/store /nix/store
+COPY --from=dispatch /bin/dispatch-worker /usr/local/bin/dispatch-worker
 COPY entrypoint.sh /usr/local/bin/dispatch-agent-entrypoint
 USER 0:0
 WORKDIR /workspace

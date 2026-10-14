@@ -45,6 +45,10 @@ buildNpmPackage {
     cp package.json "$app/"
     cp packages/web/package.json "$app/packages/web/"
     cp -R node_modules "$app/"
+    # Compilation is complete; declarations and source maps are not runtime
+    # inputs. Omitting them also reduces per-file metadata in lazy OCI images.
+    find "$app/node_modules" -type f \
+      \( -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' \) -delete
     cp -R packages/web/build "$app/packages/web/"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-web" \
       --add-flags "$app/packages/web/build/service/server/index.js"
