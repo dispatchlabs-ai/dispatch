@@ -59,7 +59,7 @@ set -o pipefail
 docker save "dispatch-agent:${SOURCE_REVISION}-amd64" | gzip -n > "$WORKER_ARCHIVE"
 ```
 
-Record apt package inventory: Ubuntu assembly is not fully bit-reproducible. **Build once, verify, then promote those exact bytes**, not a fresh rebuild for each publication channel. Record whether image archives are Docker-save or OCI layout; loader instructions must match. Local image IDs/config digests/archive hashes are not registry manifest digests.
+Record apt package inventory: Ubuntu assembly is not fully bit-reproducible. **Build once, verify, then promote those exact bytes**, not a fresh rebuild for each publication channel. Record whether image archives are Docker-save or OCI layout; loader instructions must match. Local image IDs/config digests/archive hashes are not registry manifest digests. Docker import can normalize image configuration and change its identifier; if the loaded ID differs, compare the ordered filesystem-layer digests and runtime configuration with the archive before using it, and retain both identities in the receipt.
 
 ## 3. Verify the actual artifacts
 
