@@ -352,9 +352,10 @@ export class WorkerLauncher {
       if (!this.driver.inspectTask) throw new LauncherError(503, "Task inspection unavailable.");
       for (const attempt of this.journal.attempts) {
         if (attempt.phase === "stopped" || !attempt.containerId) continue;
-        const observed = await this.driver.inspectTask(attempt.containerId);
-        const index = inventory.findIndex(item => item.id === attempt.containerId);
-        if (index < 0) inventory.push(observed); else inventory[index] = observed;
+        // The driver's inventory already describes returned IDs authoritatively.
+        // Inspect missing journaled IDs because ListTasks is eventually consistent.
+        if (!inventory.some(item => item.id === attempt.containerId))
+          inventory.push(await this.driver.inspectTask(attempt.containerId));
       }
     }
     const containers = z.array(containerSchema).parse(inventory);
