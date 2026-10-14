@@ -24,6 +24,7 @@ Follow the [testing policy](../../CONTRIBUTING.md#testing-policy) for permitted 
 - [Implementation handoff](docs/handoff.md): work packages, source/build evidence, and unverified outcomes.
 - [Usage guide](docs/usage-guide.md): startup, account/model configuration, API, state, and troubleshooting.
 - [Runtime integration](docs/runtime.md): native Pi ownership, request identity, cancellation, and recovery.
+- [GitHub integration design](docs/github-integration.md): agreed implementation plan, App/credential contracts and acceptance boundaries; not supported usage.
 - [Conversation workers](docs/conversation-workers.md): deployment ownership, lifecycle contracts and qualification boundaries.
 - [AWS deployment module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch): infrastructure, caller example and installation instructions.
 - [UI/UX review](docs/ui-ux-review.md): historical findings and current styling-migration evidence; live requirements remain in the database spec.
