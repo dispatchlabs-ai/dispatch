@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Worker startup
+
+- Exclude authoritatively stopped Fargate tasks from active inventory before decoding ownership tags. Retained completed diagnostics no longer block new-chat admission; active or uncertain tasks and explicit retirement still require complete identity checks.
+
 ### Ubuntu worker tooling
 
 - Include pinned agent-browser 0.38.2, Chromium, browser libraries/fonts and FFmpeg in the Ubuntu worker image. Install at build time and keep the browser independent of project Node/mise selection.
