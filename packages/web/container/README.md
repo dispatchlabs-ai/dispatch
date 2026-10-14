@@ -31,6 +31,28 @@ or a Nix build requirement. The module's explicit publisher retains shared hashe
 assets and immutable index prefixes; building locally neither uploads S3 objects
 nor switches CloudFront. Public artifacts remain gated on the open-source release.
 
+## Lazy loading on Fargate
+
+Publish a [SOCI v2 index](https://github.com/awslabs/soci-snapshotter/blob/v0.16.1/docs/cli-usage.md) for the finished worker image and any large sidecar images. Fargate Linux platform 1.4.0 discovers the index through the published OCI image index. Keep every referenced manifest and blob in the same regional ECR repository. Pin the converted image-index digest in the installation inputs; pinning the original child manifest bypasses the added SOCI artifact.
+
+The following conversion was qualified with SOCI 0.16.1 and ORAS 1.3.4. Obtain the official release binaries for the build host and verify their published SHA256 checksums. SOCI runs on Linux; its standalone mode needs no containerd daemon or privileged container. Export the finished image as an **OCI** archive (for example, Docker Buildx's `type=oci` output, or `docker save` with Docker's containerd image store), preserving gzip-compressed layers. Legacy Docker archives are not this input format.
+
+```sh
+# Run on Linux, or in a temporary Linux container with only this build directory mounted.
+soci convert --standalone --platform linux/amd64 \
+  --span-size 16777216 --format oci-dir worker.oci.tar worker-soci
+
+# Run with an existing registry login; do not put credentials in this recipe.
+digest=$(jq -r '.manifests[0].digest' worker-soci/index.json)
+oras cp --from-oci-layout "worker-soci@$digest" "$ECR_REPOSITORY:$IMMUTABLE_TAG"
+```
+
+Repeat for the collector and select its converted digest through the module's `worker_tracing_collector_image` input. Record the source image digest, resulting index digest, platform, tool versions and span size with the deployment receipt. The 16 MiB span size reduces index metadata compared with the 4 MiB default; it is a measured packaging choice, not a universal optimum. No experimental xattr or prefetch flags are required by this recipe.
+
+[Verify lazy loading](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html#lazy-loading) inside a newly launched task: the metadata endpoint's `Snapshotter` must be `soci` for each intended container. Record ECS creation, pull and start timestamps, then separately measure the real application's new-chat request through readiness and an agent reply. Image-pull duration and ECS `RUNNING` do not establish application readiness; a warm assignment is a different measurement. SOCI cannot remove Fargate provisioning time.
+
+Use the services/diagnostic cluster for disposable probes, with no conversation credentials. The dedicated worker cluster is an ownership boundary: an unrecognized active task deliberately blocks admission. Stop and confirm termination of each probe, then deregister its temporary task definition. Never turn a diagnostic task into an application worker by inventing conversation tags.
+
 ## Tools and project runtimes
 
 The recipe includes Bash/GNU tools, Git/SSH client, ripgrep, curl/wget, jq, archives, certificates, Python/venv/pip, C/C++ compilers, make, CMake/Ninja/pkg-config/autotools and common native-development libraries. Mise and a separate project Node are pinned in the recipe. Dispatch's own launcher does not use mise shims.
