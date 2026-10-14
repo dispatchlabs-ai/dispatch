@@ -4,6 +4,9 @@
 
 ### Worker startup
 
+- Add an opt-in single warm spare with durable one-time chat assignment,
+  replenishment, observable readiness and drain/sleep integration.
+
 - Exclude authoritatively stopped Fargate tasks from active inventory before decoding ownership tags. Retained completed diagnostics no longer block new-chat admission; active or uncertain tasks and explicit retirement still require complete identity checks.
 
 ## [0.4.0] - 2026-10-13

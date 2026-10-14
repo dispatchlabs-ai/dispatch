@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -12,11 +12,12 @@ export const launchRequestSchema = z.object({
 }).strict();
 export type LaunchRequest = z.infer<typeof launchRequestSchema>;
 
-export type ContainerSpec = LaunchRequest & { installationId: string; name: string };
+export type ContainerSpec = LaunchRequest & { installationId: string; name: string; warm?: boolean };
 const containerSchema = launchRequestSchema.extend({
   id: identity, name: identity, installationId: identity,
   state: z.enum(["created", "running", "exited", "unknown"]),
   address: z.string().optional(),
+  warm: z.boolean().optional(),
 }).strict();
 export type LauncherContainer = z.infer<typeof containerSchema>;
 
@@ -43,16 +44,22 @@ export interface ContainerDriver {
   run?(spec: ContainerSpec, fingerprint: string): Promise<LauncherContainer>;
   /** Required with run: absence is an error, not termination evidence. */
   inspectTask?(containerId: string): Promise<LauncherContainer>;
+  warmConfigurationRevision?: string;
+  warmReady?(container: LauncherContainer): Promise<boolean>;
+  assignWarm?(container: LauncherContainer, request: LaunchRequest): Promise<void>;
 }
 
 const attemptSchema = launchRequestSchema.extend({
   name: identity, containerId: identity.optional(), address: z.string().optional(), launchFingerprint: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   phase: z.enum(["creating", "starting", "running", "stopping", "stopped"]),
+  warm: z.boolean().optional(),
+  warmOrigin: launchRequestSchema.optional(),
 });
 export type LaunchAttempt = z.infer<typeof attemptSchema>;
 const journalSchema = z.object({
   version: z.literal(1), installationId: identity, drained: z.boolean(), attempts: z.array(attemptSchema),
   stoppedAttemptIds: z.array(identity),
+  warmSuspended: z.boolean().optional(),
 }).strict();
 type Journal = z.infer<typeof journalSchema>;
 
@@ -72,6 +79,7 @@ export type LauncherStatus = {
   attempts: Array<LaunchAttempt & { observed: LauncherContainer["state"] | "absent" | "unknown" }>;
   unresolvedAttempts: string[];
   orphanContainerIds: string[];
+  warmSpare?: { enabled: boolean; suspended: boolean; ready: boolean; attemptId?: string };
 };
 
 export class LauncherError extends Error {
@@ -134,9 +142,12 @@ export class WorkerLauncher {
   undrain(): Promise<LauncherStatus> {
     return this.serial(async () => {
       const status = await this.readStatus();
-      if (!this.journal.drained) return status;
+      if (!this.journal.drained) {
+        if (this.journal.warmSuspended) await this.save({ ...this.journal, warmSuspended: false });
+        return status;
+      }
       if (!status.drainComplete) throw new LauncherError(409, "Resolve all attempts and containers before enabling admission.");
-      await this.save({ ...this.journal, drained: false });
+      await this.save({ ...this.journal, drained: false, ...(this.journal.warmSuspended ? { warmSuspended: false } : {}) });
       return this.readStatus();
     });
   }
@@ -160,7 +171,15 @@ export class WorkerLauncher {
           throw new LauncherError(503, "Reconcile unresolved launcher state before admitting a new worker.");
         const digest = createHash("sha256").update(JSON.stringify([this.journal.installationId, request.attemptId])).digest("hex");
         attempt = { ...request, name: `dispatch-worker-${digest.slice(0, 40)}`, phase: "creating" };
-        await this.save({ ...this.journal, attempts: [...this.journal.attempts, attempt] });
+        const spare = !this.journal.warmSuspended && this.driver.warmConfigurationRevision === request.configurationRevision
+          ? this.journal.attempts.find(item => item.warm && item.phase === "running" && item.configurationRevision === request.configurationRevision) : undefined;
+        const container = spare?.containerId ? await this.driver.inspectTask!(spare.containerId) : undefined;
+        if (spare && container && await this.driver.warmReady!(container)) {
+          attempt = { ...request, name: spare.name, containerId: spare.containerId, address: spare.address,
+            phase: "starting", launchFingerprint: spare.launchFingerprint, warmOrigin: pickRequest(spare) };
+          // Transfer the sole physical task to this immutable attempt before assignment.
+          await this.save({ ...this.journal, attempts: this.journal.attempts.map(item => item === spare ? attempt! : item) });
+        } else await this.save({ ...this.journal, attempts: [...this.journal.attempts, attempt] });
       }
       return this.advance(attempt);
     });
@@ -217,6 +236,36 @@ export class WorkerLauncher {
 
   status(): Promise<LauncherStatus> { return this.serial(() => this.readStatus()); }
 
+  /** Planned sleep stops spare capacity without cancelling conversation work. */
+  suspendWarmSpare(): Promise<void> {
+    return this.serial(async () => {
+      await this.save({ ...this.journal, warmSuspended: true });
+      for (const spare of this.journal.attempts.filter(item => item.warm && item.phase !== "stopped")) await this.retire(spare);
+    });
+  }
+
+  /** One spare is capacity, not an executor. Admission drain suppresses replenishment. */
+  maintainWarmSpare(): Promise<void> {
+    return this.serial(async () => {
+      const revision = this.driver.warmConfigurationRevision;
+      if (!this.driver.run || this.journal.drained || this.journal.warmSuspended) return;
+      for (const spare of this.journal.attempts.filter(item => item.warm && item.phase !== "stopped")) {
+        if (spare.configurationRevision !== revision || spare.phase === "stopping") { await this.retire(spare); continue; }
+        if (spare.containerId && (await this.driver.inspectTask!(spare.containerId)).state === "exited") { await this.retire(spare); continue; }
+        await this.advance(spare);
+        return;
+      }
+      if (!revision) return;
+      const status = await this.readStatus();
+      if (!status.driverReachable || status.orphanContainerIds.length || this.journal.attempts.some(item => item.phase !== "stopped" && item.phase !== "creating" && !item.containerId)) return;
+      const id = `warm-${randomUUID()}`;
+      const spare: LaunchAttempt = { attemptId: id, conversationId: id, storeId: id, configurationRevision: revision,
+        name: `dispatch-${id}`, warm: true, phase: "creating" };
+      await this.save({ ...this.journal, attempts: [...this.journal.attempts, spare] });
+      await this.advance(spare);
+    });
+  }
+
   /** Close the controller only. Workers survive; callers must explicitly drain for a stack shutdown. */
   close(): Promise<void> {
     if (!this.closePromise) {
@@ -272,7 +321,7 @@ export class WorkerLauncher {
     }
     if (!attempt.containerId) {
       if (attempt.phase !== "creating") throw new LauncherError(503, "Launch outcome unresolved; do not repeat RunTask.");
-      const spec = { ...pickRequest(attempt), installationId: this.journal.installationId, name: attempt.name };
+      const spec = { ...pickRequest(attempt), installationId: this.journal.installationId, name: attempt.name, ...(attempt.warm ? { warm: true } : {}) };
       attempt = { ...attempt, phase: "starting", launchFingerprint: this.driver.launchFingerprint(spec) };
       await this.update(attempt);
       this.storage.assertHealthy();
@@ -282,7 +331,8 @@ export class WorkerLauncher {
       attempt = { ...attempt, containerId: container.id };
       await this.update(attempt);
     }
-    const container = await this.driver.inspectTask(attempt.containerId!);
+    const physical = await this.driver.inspectTask(attempt.containerId!);
+    const container = this.logicalContainer(attempt, physical);
     if (!sameRequest(container, attempt) || container.name !== attempt.name || container.id !== attempt.containerId || container.installationId !== this.journal.installationId)
       throw new LauncherError(503, "Task inspection identity mismatch.");
     if (container.state === "exited") throw new LauncherError(409, "Task exited; explicit retirement is required.");
@@ -294,6 +344,11 @@ export class WorkerLauncher {
       }
       return structuredClone(attempt);
     }
+    if (attempt.warmOrigin) {
+      this.storage.assertHealthy();
+      await this.driver.assignWarm!(physical, pickRequest(attempt));
+    }
+    if (attempt.phase === "running" && attempt.address === container.address) return structuredClone(attempt);
     attempt = { ...attempt, phase: "running", address: container.address };
     await this.update(attempt);
     return structuredClone(attempt);
@@ -357,10 +412,20 @@ export class WorkerLauncher {
         if (index < 0) inventory.push(observed); else inventory[index] = observed;
       }
     }
-    const containers = z.array(containerSchema).parse(inventory);
+    const containers = z.array(containerSchema).parse(inventory).map(container => {
+      const attempt = this.journal.attempts.find(item => item.containerId === container.id);
+      return attempt ? this.logicalContainer(attempt, container) : container;
+    });
     if (containers.some(container => container.installationId !== this.journal.installationId) || new Set(containers.map(container => container.id)).size !== containers.length)
       throw new LauncherError(503, "Invalid installation container inventory.");
     return containers;
+  }
+
+  private logicalContainer(attempt: LaunchAttempt, container: LauncherContainer): LauncherContainer {
+    if (!attempt.warmOrigin) return container;
+    if (!container.warm || !sameRequest(container, attempt.warmOrigin) || container.name !== attempt.name || container.id !== attempt.containerId)
+      throw new LauncherError(503, "Warm task identity mismatch.");
+    return { ...container, ...pickRequest(attempt), warm: false };
   }
 
   private match(attempt: LaunchAttempt, containers: LauncherContainer[]): LauncherContainer | undefined {
@@ -384,11 +449,16 @@ export class WorkerLauncher {
       return { ...attempt, observed };
     });
     const orphanContainerIds = containers.filter(container => !this.journal.attempts.some(attempt => sameRequest(attempt, container) && attempt.name === container.name && (!attempt.containerId || attempt.containerId === container.id))).map(container => container.id);
+    const spare = attempts.find(attempt => attempt.warm && attempt.phase !== "stopped");
+    const spareContainer = spare && containers.find(container => container.id === spare.containerId);
+    const warmReady = Boolean(spare?.phase === "running" && spareContainer && await this.driver.warmReady?.(spareContainer));
     return {
       installationId: this.journal.installationId, drained: this.journal.drained, driverReachable,
       drainComplete: this.journal.drained && driverReachable && !containers.length && !unresolved.size && this.journal.attempts.every(attempt => attempt.phase === "stopped"),
       activeWorkers: containers.filter(container => container.state === "running" || container.state === "unknown"),
       containers, attempts, unresolvedAttempts: [...unresolved], orphanContainerIds,
+      warmSpare: { enabled: Boolean(this.driver.warmConfigurationRevision), suspended: this.journal.drained || Boolean(this.journal.warmSuspended), ready: warmReady,
+        ...(spare ? { attemptId: spare.attemptId } : {}) },
     };
   }
 

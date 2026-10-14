@@ -46,6 +46,45 @@ This rehearsal is ECS-shaped, not evidence of scalable ECS operation. Routing jo
 
 A single launcher serializes installation lifecycle mutations. Its own exclusive ownership and durable journal must survive restart. Docker restart policies for dynamic workers must not compete with this state machine. Database advisory locks supplement, not replace, process termination. Container termination cannot cancel an external request already accepted elsewhere; exactly-once external effects are not promised.
 
+## Optional ECS warm spare — October 14, 2026
+
+The ECS driver accepts `warmSpare: true` (default false). Its single launcher owner
+maintains one unassigned task at the pinned configuration revision, reconciling
+every five seconds. The process loads the application modules and listens privately
+on port 8831 without opening a conversation store. A scoped credential permits
+only readiness and one-time assignment; no store credentials or launcher signing
+key are delivered to the spare.
+
+On ensure, a ready spare is transferred to the immutable conversation attempt in
+the existing durable launcher journal **before** assignment is sent. Its physical
+ECS task ARN and original tags stay unchanged; `warmOrigin` in the journal maps
+that identity to the assigned attempt. Matching assignment retries are safe;
+different assignments conflict. Once assigned, the process follows ordinary
+conversation bootstrap and never becomes a spare again. The pool replenishes on
+the next reconciliation tick. Chats arriving while capacity is starting take the
+ordinary cold-launch path; one ready spare is a target, not a burst guarantee.
+
+Launcher status includes `warmSpare.enabled`, `suspended`, `ready` and the spare
+attempt ID when present. A running ECS task is not sufficient: `ready` probes the
+authenticated unassigned listener. Lost launch outcomes retain the existing
+no-blind-RunTask-retry rule. Assignment uncertainty reconciles the same task; it
+never allocates a second executor. Existing attempts retain their ordinary stop,
+tombstone and confirmed-termination requirements.
+
+Controller retirement leaves the spare alive for the successor owner. A changed
+configuration revision or disabled option retires unassigned capacity; assigned
+workers remain intact. Installation drain suppresses replenishment and retires
+all tasks. Planned sleep first durably suspends replenishment and retires spares, then performs the
+existing conversation-idleness checks; a busy refusal leaves capacity suspended
+until explicit undrain. Wake clears the suspension. Retain compatible launcher
+images while warm records exist; do not delete journals to downgrade.
+
+The AWS module owns the option, private launcher-to-worker TCP 8831 rules and
+worker sizing. The caller owns its additional running cost and deployment
+evidence. Source/type/build checks do not establish live claim, replenishment,
+restart recovery, sleep or latency acceptance; record those observations in the
+installation's deployment receipt.
+
 ## Idle sleep contract — October 10, 2026
 
 Source `1114256` implements explicit operator sleep, not an automatic idle timer.

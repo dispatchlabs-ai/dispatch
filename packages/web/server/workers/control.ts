@@ -35,6 +35,7 @@ export function createLauncherControl(launcher: WorkerLauncher, token: string) {
   app.post("/v1/ensure", async c => c.json(await launcher.ensure(launchRequestSchema.parse(await c.req.json()))));
   app.post("/v1/reconcile", async c => c.json(await launcher.reconcile(attempt.parse(await c.req.json()).attemptId)));
   app.post("/v1/stop", async c => c.json(await launcher.stop(attempt.parse(await c.req.json()).attemptId)));
+  app.post("/v1/suspend-warm", async c => { await launcher.suspendWarmSpare(); return c.json({ suspended: true }); });
   app.post("/v1/drain", async c => { await launcher.drain(); return c.json(await launcher.status()); });
   app.post("/v1/undrain", async c => { await launcher.undrain(); return c.json(await launcher.status()); });
   return app;

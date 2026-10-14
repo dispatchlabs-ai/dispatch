@@ -39,7 +39,9 @@ Health is not evidence of idleness or a successful sleep operation.
   is not recovery for an uncertain worker close or stop.
 
 The backend persists its admission barrier and joins admitted application/background
-requests. It rejects unresolved launch attempts and orphan inventory rather than
+requests. It first durably suspends warm-spare replenishment and retires unassigned
+capacity, which owns no conversation work. Explicit undrain clears that suspension,
+including after a busy refusal. It rejects unresolved conversation launch attempts and orphan inventory rather than
 cancelling them. Each current ready worker receives an attempt-authenticated
 `POST /idle-retire` with `{}`. The worker seals and joins its own RPC/summary admission,
 then uses stock Pi Durable **1.0.4** `harness.inspect()` to check all live tasks and
