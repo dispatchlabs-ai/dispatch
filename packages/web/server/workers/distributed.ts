@@ -56,7 +56,9 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     if (route.phase === "ready" && route.containerName && activated.get(route.conversationId) === route.attemptId) return route;
     const existing = launching.get(route.conversationId); if (existing) return existing;
     const work = (async () => {
-      const status = await launcher<LauncherStatus>("status");
+      const deadline = performance.now() + (options.launcherTimeoutMs ?? 300_000);
+      const remaining = () => Math.max(1, Math.ceil(deadline - performance.now()));
+      const status = await launcher<LauncherStatus>("status", undefined, remaining());
       if (status.drained || !status.driverReachable) throw new RuntimeError(503, "Worker admission unavailable.");
       const previous = status.attempts.find(attempt => attempt.attemptId === route.attemptId);
       if (previous?.phase === "stopped" && previous.observed === "absent") {
@@ -67,19 +69,23 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
       const attempt = await awaitWorkerLaunch(
         timeout => launcher<LaunchAttempt>("ensure", request, timeout),
         timeout => launcher<LaunchAttempt>("reconcile", { attemptId: request.attemptId }, timeout),
-        request, options.launcherTimeoutMs ?? 300_000,
+        request, remaining(),
       );
       if (attempt.phase !== "running") throw new RuntimeError(503, "Conversation worker requires reconciliation.");
       const address = workerAddress(attempt);
       const origin = `http://${address}:8831`;
-      for (let i = 0; i < 40; i++) {
+      while (performance.now() < deadline) {
         try {
-          const ready = await workerRequest<{ roomId: string; conversationId: string; attemptId: string }>(origin, token(route), "/ready");
+          const ready = await workerRequest<{ roomId: string; conversationId: string; attemptId: string }>(origin, token(route), "/ready", undefined, undefined, remaining());
           if (ready.conversationId !== route.conversationId || ready.attemptId !== route.attemptId) throw new Error("Worker readiness identity mismatch.");
           const active = await routes.ready(route.conversationId, route.attemptId, ready.roomId, address);
           activated.set(active.conversationId, active.attemptId);
           return active;
-        } catch (error) { if (i === 39) throw error; await delay(250); }
+        } catch (error) {
+          if (!(error instanceof RuntimeError) || error.status !== 503) throw error;
+          if (performance.now() >= deadline) throw error;
+          await delay(Math.min(250, remaining()));
+        }
       }
       throw new RuntimeError(503, "Worker did not become ready.");
     })();
