@@ -235,6 +235,7 @@ export class DispatchRuntime {
   private boundRoomId?: string;
   private archiveStorage?: Pick<ProjectArchiveStore, "save" | "read">;
   private membershipTail: Promise<unknown> = Promise.resolve();
+  private workerActivityAt = performance.now();
 
   private constructor(harness: Harness, private readonly storage: Storage, models: Models, owner: Awaited<ReturnType<typeof acquireRuntimeOwner>>, registry: Registry, shared: SharedConversations, connections: AgentConnections, private readonly workspaceDir: string, private readonly attachments: AttachmentStore, peopleDirectory?: PeopleDirectory) {
     this.connections = connections;
@@ -247,7 +248,13 @@ export class DispatchRuntime {
     this.models = models;
     this.registry = registry;
     this.owner = owner;
-    harness.subscribeCommits((publication) => { this.commitRevision = publication.seq; });
+    harness.subscribeCommits((publication) => {
+      this.commitRevision = publication.seq;
+      // Reads and summary heartbeats do not keep an otherwise idle worker alive.
+      // Native task/submission and document changes include background execution.
+      if (this.worker && publication.changes.some(change => (change.type !== "document" && change.type !== "document.copy")
+        || change.record.kind !== WorkerSummaryReceiptDoc.definition.kind)) this.workerActivityAt = performance.now();
+    });
   }
 
   static open(options: RuntimeOptions) { return this.openInternal(options); }
@@ -2976,11 +2983,15 @@ export class DispatchRuntime {
   /** Caller has sealed and joined every worker RPC before asking to retire.
    * A UI summary or waitForIdle() omits background work and cannot authorize this.
    */
-  async closeWorkerIfIdle(): Promise<boolean> {
+  async closeWorkerIfIdle(minimumIdleMs = 0): Promise<boolean> {
     if (!this.worker || !this.healthy) throw new Error("Worker is not available for idle retirement.");
     const inspection = await this.harness.inspect(context);
     if (inspection.tasks.length || inspection.submissions.length || this.upgradeDrain || this.participantReportDrain
-      || this.upgradeCatalogDirty || this.upgradeRooms.size || this.participantReportDirty) return false;
+      || this.upgradeCatalogDirty || this.upgradeRooms.size || this.participantReportDirty) {
+      this.workerActivityAt = performance.now();
+      return false;
+    }
+    if (performance.now() - this.workerActivityAt < minimumIdleMs) return false;
     // close() seals local reconciliation synchronously, before its first await.
     await this.close();
     return true;

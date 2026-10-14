@@ -22,6 +22,7 @@ import { validateBackendCa, workerRequest } from "./transport.js";
 import type { AuthCheck, AuthResult } from "@earendil-works/pi-ai";
 import type { RuntimeScope, SendMessageInput, AddParticipantsInput, UpdateChatInput } from "../../src/shared/contracts.js";
 import { awaitWarmAssignment } from "./warm-worker.js";
+import type { WorkerSummary } from "./summaries.js";
 
 await awaitWarmAssignment();
 const env = z.object({
@@ -79,15 +80,15 @@ app.use("*", async (c, next) => {
 });
 // Outside ordinary RPC admission: this command must join, not wait on itself.
 app.post("/idle-retire", bodyLimit({ maxSize: 1024 }), async c => {
-  z.object({}).strict().parse(await c.req.json());
-  return c.json({ idle: await retireIfIdle(), attemptId: env.DISPATCH_WORKER_ATTEMPT_ID });
+  const { minimumIdleMs } = z.object({ minimumIdleMs: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0) }).strict().parse(await c.req.json());
+  return c.json({ idle: await retireIfIdle(minimumIdleMs), attemptId: env.DISPATCH_WORKER_ATTEMPT_ID, summary: retiredSummary });
 });
 app.use("*", async (c, next) => {
   if (!admission.admitting) return c.json({ error: "Worker is closing" }, 503);
   await admission.run(next);
 });
 app.use("*", bodyLimit({ maxSize: ATTACHMENT_RPC_MAX_BYTES, onError: c => c.json({ error: "Request too large" }, 413) }));
-app.get("/ready", c => c.json({ roomId, conversationId: env.DISPATCH_CONVERSATION_ID, attemptId: env.DISPATCH_WORKER_ATTEMPT_ID }));
+app.get("/ready", c => c.json({ roomId, conversationId: env.DISPATCH_CONVERSATION_ID, attemptId: env.DISPATCH_WORKER_ATTEMPT_ID, idleTimeoutSupported: true }));
 const rpcSchema = z.object({
   scope: z.object({ companyId: z.string(), userId: z.string() }).strict(),
   method: z.enum(["removeParticipant", "workerInstanceResult", "exportProjectArchive", "transcriptPage", "publicDetail", "saveDefinitionOfDone", "getChat", "submit", "submitAndGetChat", "composing", "addParticipants", "stop", "updateChat", "renameChat", "authorizeAttachmentUpload", "uploadAttachment", "downloadAttachment"]),
@@ -171,6 +172,7 @@ const server = serve({ fetch: app.fetch, hostname: "0.0.0.0", port: 8831 }, () =
 });
 let closing = false;
 let runtimeClosed = false;
+let retiredSummary: WorkerSummary | undefined;
 let idleRetirement: Promise<boolean> | undefined;
 let shutdown: Promise<void> | undefined;
 let summaryPending: Promise<void> | undefined;
@@ -187,13 +189,14 @@ function publishSummary() {
 const summaryTimer = setInterval(publishSummary, 1_000);
 summaryTimer.unref();
 publishSummary();
-function retireIfIdle(): Promise<boolean> {
+function retireIfIdle(minimumIdleMs: number): Promise<boolean> {
   if (runtimeClosed) return Promise.resolve(true);
   if (closing) return Promise.reject(new Error("Worker shutdown is already in progress."));
   return idleRetirement ??= (async () => {
     await admission.quiesce();
-    if (!await runtime.closeWorkerIfIdle()) {
-      // A busy refusal restores worker RPCs; backend admission stays operator-sealed.
+    const summary = await runtime.workerSummary();
+    if (!await runtime.closeWorkerIfIdle(minimumIdleMs)) {
+      // A busy refusal restores RPC admission for the same worker attempt.
       if (!closing) await admission.resume();
       return false;
     }
@@ -201,6 +204,7 @@ function retireIfIdle(): Promise<boolean> {
     clearInterval(summaryTimer);
     cleanupSessionResources();
     runtimeClosed = true;
+    retiredSummary = summary;
     // Retain the authenticated listener until the launcher confirms ECS retirement.
     return true;
   })().catch(error => {

@@ -1,7 +1,9 @@
 # Operator idle sleep and cold wake
 
-This is an explicit operator path for the distributed PostgreSQL/conversation-worker
-installation, not an automatic inactivity timer or browser-triggered wake service.
+This is the explicit operator path for sleeping the entire distributed
+PostgreSQL/conversation-worker installation. [Automatic conversation retirement](conversation-workers.md#automatic-conversation-worker-retirement--october-14-2026)
+separately stops inactive assigned workers while leaving controllers and warm spare
+capacity available. It does not provide installation sleep or browser-triggered wake.
 Source/type/build acceptance does not qualify live sleep, Aurora pause, billing or
 cold-start latency. The standalone Terraform module owns IAM-authorized orchestration,
 task networking and Aurora settings. Do not overlap sleep, wake or deployment operations.
@@ -44,7 +46,7 @@ capacity, which owns no conversation work. Explicit undrain clears that suspensi
 including after a busy refusal. It rejects unresolved conversation launch attempts and orphan inventory rather than
 cancelling them. Each current ready worker receives an attempt-authenticated
 `POST /idle-retire` with `{}`. The worker seals and joins its own RPC/summary admission,
-then uses stock Pi Durable **1.0.4** `harness.inspect()` to check all live tasks and
+then uses stock Pi Durable's `harness.inspect()` to check all live tasks and
 unsettled submissions. `waitForIdle()` excludes background tasks; UI summaries and
 browser absence are not shutdown authority. Local upgrade and participant-report
 activity also blocks idle retirement.
@@ -100,4 +102,5 @@ TypeScript/application builds, Apple Silicon Nix build, flake evaluation (zero r
 checks; Linux omitted) and whitespace/source review passed for this slice. No new runtime tests or AWS operations are
 part of this slice. Busy/background refusal, concurrent admission, lost responses,
 partial retirement, clean reopen, actual Aurora pause/resume and total wake latency
-remain live qualification gaps. Automatic retirement between turns is not implemented.
+remain live qualification gaps for that historical slice. Automatic retirement
+between turns has its separate contract and acceptance evidence linked above.

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Worker lifecycle
+
+- Backport automatic idle conversation-worker retirement from `1d11107` onto the deployed 0.4.0 warm-spare source. Default to ten minutes of native inactivity, preserve active work and retained history, and keep sleeping browser streams from waking compute.
+
 ### Worker startup
 
 - Share the startup deadline across ECS launch and worker readiness so cold fallback can finish initialization without an extra ten-second cutoff.
