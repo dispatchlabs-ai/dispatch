@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Ubuntu worker tooling
+
+- Include pinned agent-browser 0.38.2, Chromium, browser libraries/fonts and FFmpeg in the Ubuntu worker image. Install at build time and keep the browser independent of project Node/mise selection.
+
 ### Agent instances
 
 - Let agents create additional instances in their current chat with optional names and instance-only instructions through `conversation_create_agent_instance`. Preserve actor-bound retries, Stop/removal fences and human-only invitations/removal controls; ordinary agent invitations still reuse active instances.
