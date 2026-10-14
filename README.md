@@ -12,9 +12,9 @@ Dispatch is built on [Pi Durable](https://github.com/earendil-works/pi): Pi owns
 | --- | --- |
 | **Apple Silicon Mac** — one machine for development | Use the [portable Mac package](#apple-silicon-mac). It includes its runtime; no Nix or Homebrew is needed to run it. |
 | **Windows with WSL2** — containers on your desktop | Use the [WSL2 container installation](#windows-with-wsl2), with Docker Engine and Compose inside Ubuntu. |
-| **AWS** — your own infrastructure and ECR | Follow the [terraform-aws-dispatch module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) for Terraform/OpenTofu setup. Application archives are staged for [0.5.0 publication](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.5.0); complete AWS installation remains unqualified. |
+| **AWS** — your own infrastructure and ECR | Follow the [terraform-aws-dispatch module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) for Terraform/OpenTofu setup. Application archives are [available in 0.5.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.5.0); complete AWS installation remains unqualified. |
 
-**Dispatch 0.5.0 release candidate is prepared; publication is pending.** The 0.5.0 download links below are staged instructions and are not live yet. The release includes portable Mac, Linux/AMD64 controller, Ubuntu worker and frontend archives. Artifact/build checks and scoped presentation verification are documented in the [0.5.0 verification record](packages/web/docs/usage-guide.md#050-release-verification). Installation, enrollment/model use, recovery, Windows/WSL2, AWS/hosted workers, retained-state upgrades and backup restoration have not been qualified for these new bytes. Earlier releases' checks do not qualify 0.5.0. No separate Pi installation is needed.
+**[Dispatch 0.5.0 is available](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.5.0)**. All uploaded digests match the staged archives; anonymous Mac/frontend/checksum downloads and every asset URL are verified. The release includes portable Mac, Linux/AMD64 controller, Ubuntu worker and frontend archives. Artifact/build checks and scoped presentation verification are documented in the [0.5.0 verification record](packages/web/docs/usage-guide.md#050-release-verification). Installation, enrollment/model use, recovery, Windows/WSL2, AWS/hosted workers, retained-state upgrades and backup restoration have not been qualified for these new bytes. Earlier releases' checks do not qualify 0.5.0. No separate Pi installation is needed.
 
 ## Apple Silicon Mac
 
@@ -74,7 +74,19 @@ cp .env.example .env
 
 The archive records `dispatch-web:839d7b113049`, with the full release revision in its image labels. Set `DISPATCH_IMAGE=dispatch-web:839d7b113049` in `.env`. The immutable v0.5.0 environment example still has a comment describing 0.4.0; use this inspected tag. The example on `main` points to the current instructions. This is a local tag, not a registry digest; the verified archive checksum identifies the downloaded bytes. Keep `DISPATCH_PORT=3001` unless it is already in use.
 
-The Ubuntu worker is a separate release archive; the desktop Compose file does not start it. GHCR publication of 0.5.0 is pending credential refresh. Published 0.4.0 registry images remain available through their historical release, but are not 0.5.0.
+**Registry alternative:** skip the controller archive download/load steps, but download the matching Compose and environment files linked above. Copy `.env.example` to `.env`, then set:
+
+```dotenv
+DISPATCH_IMAGE=ghcr.io/dispatchlabs-ai/dispatch:0.5.0@sha256:8908b28986fc8f9235e829df04c741944c567ce19cbff635cd1567b5e0e71450
+```
+
+Pull the pinned controller without signing in:
+
+```sh
+docker compose pull
+```
+
+Then follow the same first-account and foreground-startup steps below. The Ubuntu worker is published separately as `ghcr.io/dispatchlabs-ai/dispatch-worker:0.5.0@sha256:5a2ad192bbeb3dfdf603a710a5a8679aa828272dc94aa017013df50c2e29286f`; the desktop Compose file does not start it. Both digest pulls were verified anonymously, with filesystem layers and runtime configuration matching the audited artifacts. Worker conversations and hosted AWS operation remain unverified for 0.5.0.
 
 For the first account, while the controller is still stopped, run this from the same Compose directory (replace the example email and name):
 
