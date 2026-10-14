@@ -67,6 +67,20 @@ npm ci
 
 Mise configuration and hooks can execute project code: review/trust the selected configuration explicitly rather than automatically trusting arbitrary repositories. Other runtime versions can be installed during work; the shipped image does not preinstall every Node, Python, Go, Java, Rust, Ruby or .NET version. Exact architecture/version/native-library combinations require qualification. Keep runtime requirements in `mise.toml` (and `mise.lock` where used), alongside existing package-manager lockfiles. Ubuntu's externally managed Python should use a project venv rather than forcing global pip installation.
 
+## Browser tooling
+
+The Ubuntu recipe installs `agent-browser` 0.38.2, Chromium, its Ubuntu libraries/fonts, and FFmpeg during the build. The [browser lockfile](browser/package-lock.json) pins the CLI and Playwright 1.64.1, which selects Chromium builds for both Linux AMD64 and ARM64. Playwright is used to install the browser; agent-browser runs its native binary. No browser download, npm install or package-manager operation is needed when a conversation starts. The extra headless-shell download and other platforms' CLI binaries are omitted.
+
+`agent-browser` and `chromium` are in `/usr/local/bin`. `AGENT_BROWSER_EXECUTABLE_PATH` selects the packaged Chromium under `/opt/dispatch-browser`; project mise/Node changes do not replace either executable. Do not mount over that directory. Agent-browser 0.38.2's installer rejects Linux ARM64 even though Google's current Chrome for Testing feed supplies that architecture. The pinned Playwright installer avoids this stale guard and Ubuntu's Chromium Snap dependency. See the [current Google browser feed](https://googlechromelabs.github.io/chrome-for-testing/), [agent-browser installer source](https://github.com/vercel-labs/agent-browser/blob/v0.38.2/cli/src/install.rs) and [custom executable setting](https://agent-browser.dev/installation).
+
+Use the assigned Agent browser skill, Files and commands capability, and a unique session for each agent/run. For an authorized target, use `agent-browser --session <unique-name> open <url>`, then `snapshot`/`screenshot`, and `close` that same session. Installing the tools grants no new permissions or access. The Ubuntu worker's existing root/container boundary remains in effect; agent-browser automatically selects Chrome's container launch flags. Browser processes share the conversation worker's authority and are not an additional isolation boundary.
+
+When updating the CLI, review the pinned skill text too. Update the browser manifest/lockfile together, rebuild, and verify navigation, snapshots, screenshots and recording in the actual image. Record architecture, CLI/Chromium versions, image identity and remaining coverage in the task or release receipt. Native host browser checks do not qualify the container.
+
+On October 14, 2026, interactive qualification passed on native Linux AMD64 and ARM64 with agent-browser 0.38.2 and Chromium 156.0.8078.4: HTTPS navigation, snapshots, form entry/clicks, screenshots with Chinese/Arabic fonts, and VP8 recording. AMD64 used the complete Dispatch image; ARM64 used the identical browser layer without the Nix application closure. This qualifies ARM64 browser tooling, not a full ARM64 Dispatch deployment.
+
+Surton's existing AMD64 Fargate profile (0.5 vCPU, 2 GiB) passed navigation, snapshots, screenshots and a short VP8 recording at `--fps 5`. Default 30 fps recording exceeded agent-browser's encoder backlog limit there, although it passed on the native build hosts. Use a lower recording rate on constrained workers; this observation does not qualify long or animation-heavy recordings.
+
 ## Installation and security boundary
 
 The development worker runs as container root with a writable Ubuntu filesystem, **not privileged mode**. Ordinary work can use `apt-get update && apt-get install -y <package>` without sudo. Ubuntu mirrors are configured for HTTPS to fit existing HTTPS package egress; no HTTP egress expansion is required. Package service-start hooks are suppressed in the recipe; this is not a full init/systemd host.
