@@ -2,9 +2,11 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-14
+
 ### Added
 
-- Offline native SQLite-to-PostgreSQL import into an empty dedicated database, preserving record identities and document history with complete table readback verification.
+- Offline import of idle schema-v1 native Pi SQLite state into an empty dedicated PostgreSQL database, preserving record identities and document history with complete table readback verification. Authentication, provider/connection databases, keys, attachments and workspaces must be preserved separately.
 
 ### Worker startup
 
@@ -12,6 +14,7 @@
 
 - Add an opt-in single warm spare with durable one-time chat assignment,
   replenishment, observable readiness and drain/sleep integration.
+- Replace unassigned warm capacity when its launch configuration changes. Warm journal records require a compatible launcher; older strict readers cannot consume the new fields. Preserve journals rather than deleting them to downgrade.
 - Batch ECS task descriptions and reuse their authoritative results during admission; directly inspect journaled tasks missing from discovery. Omit build-only dependency declarations/source maps from runtime artifacts and report worker-ready startup duration without conversation or credential data.
 - Exclude authoritatively stopped Fargate tasks from active inventory before decoding ownership tags. Retained completed diagnostics no longer block new-chat admission; active or uncertain tasks and explicit retirement still require complete identity checks.
 
@@ -40,6 +43,11 @@
 - Preserve loaded scrollback across ordinary publications and reconnect gaps; keep publication aliases from unnecessarily invalidating older-page cursors.
 - Add near-top older-page loading, explicit history retry and independent main/thread **Latest messages** controls; retain keyboard focus on the older-page control while loading.
 - Catch up late-published messages without changing displayed draft timestamps. Activity-only changes outside the recent page still require a published answer for catch-up.
+- Existing history cursors may require **Reload history** once after upgrading; stored history is preserved.
+
+### GitHub integration planning
+
+- Publish the reviewed GitHub App implementation plan and UI contracts. GitHub connection, credential issuance and worker Git operations remain future implementation work.
 
 ## [0.4.0] - 2026-10-13
 
