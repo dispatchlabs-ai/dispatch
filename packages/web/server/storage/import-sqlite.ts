@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { Client, types } from "pg";
+import { verifiedPostgresConfig } from "./postgres/tls.js";
+import { verifyWorkerAccess } from "./postgres/worker-access.js";
 import { migrateWithinTransaction } from "./postgres/migrations.js";
 
 // Offline administration only. This never opens a Harness or alters the source.
@@ -15,10 +17,10 @@ const layouts = {
 } as const;
 
 /** Import an idle schema-v1 snapshot into an empty dedicated PostgreSQL database. */
-export async function importSqlite(filename: string, connectionString: string, storeId: string) {
+export async function importSqlite(filename: string, connectionString: string, storeId: string, options: { ca?: string; access?: "worker" } = {}) {
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(storeId)) throw new Error("Invalid store ID");
   const source = new DatabaseSync(filename, { readOnly: true });
-  const target = new Client({ connectionString, application_name: "dispatch-offline-import", types: {
+  const target = new Client({ ...(options.ca ? verifiedPostgresConfig(connectionString, options.ca) : { connectionString }), application_name: "dispatch-offline-import", types: {
     getTypeParser(oid, format) {
       if (oid === 20 && format !== "binary") return (value: string) => {
         const n = Number(value);
@@ -49,11 +51,17 @@ export async function importSqlite(filename: string, connectionString: string, s
     const key = createHash("sha256").update(`dispatch-pi-store:${storeId}`).digest().readBigInt64BE().toString();
     const lock = await target.query("SELECT pg_try_advisory_xact_lock($1::bigint) AS acquired", [key]);
     if (!lock.rows[0]?.acquired) throw new Error("Target store has an owner");
-    await migrateWithinTransaction(target);
-    // Migration is a new-database operation, never an append or replacement.
-    await target.query("LOCK TABLE dispatch_pi.durable_metadata IN ACCESS EXCLUSIVE MODE");
-    if ((await target.query("SELECT 1 FROM dispatch_pi.durable_metadata LIMIT 1")).rowCount) throw new Error("Target database already contains a store");
-    await target.query("INSERT INTO dispatch_pi.durable_metadata VALUES ($1,$2,$3)", [storeId,nextId,nextSeq]);
+    let existing = false;
+    if (options.access === "worker") {
+      await verifyWorkerAccess(target, storeId);
+      existing = !!(await target.query("SELECT 1 FROM dispatch_pi.durable_metadata WHERE store_id=$1", [storeId])).rowCount;
+    } else {
+      await migrateWithinTransaction(target);
+      // The original mode remains a new-database operation, never an append or replacement.
+      await target.query("LOCK TABLE dispatch_pi.durable_metadata IN ACCESS EXCLUSIVE MODE");
+      if ((await target.query("SELECT 1 FROM dispatch_pi.durable_metadata LIMIT 1")).rowCount) throw new Error("Target database already contains a store");
+    }
+    if (!existing) await target.query("INSERT INTO dispatch_pi.durable_metadata VALUES ($1,$2,$3)", [storeId,nextId,nextSeq]);
     for (const [table, columns] of Object.entries(layouts)) {
       const actualColumns = source.prepare(`PRAGMA table_info(${table})`).all().map(row => row.name);
       if (JSON.stringify(actualColumns) !== JSON.stringify(columns)) throw new Error(`Unexpected columns in ${table}`);
@@ -67,7 +75,7 @@ export async function importSqlite(filename: string, connectionString: string, s
         const values = batch.flat();
         const width = columns.length + 1;
         const placeholders = batch.map((_, i) => `(${Array.from({length:width}, (_,j) => `$${i*width+j+1}`).join(",")})`).join(",");
-        await target.query(`INSERT INTO dispatch_pi.${table} (store_id,${fields}) VALUES ${placeholders}`, values);
+        if (!existing) await target.query(`INSERT INTO dispatch_pi.${table} (store_id,${fields}) VALUES ${placeholders}`, values);
         batch = [];
       };
       for (const row of source.prepare(`SELECT ${fields} FROM ${table} ORDER BY ${order}`).iterate()) {

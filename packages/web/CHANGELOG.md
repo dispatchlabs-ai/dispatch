@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Archived chat migration
+
+- Add offline preparation and verified publication of idle native chats into isolated PostgreSQL worker stores, including attachments and per-user archive preferences. Preserve existing destination data and publish directory entries only after store verification.
+
 ### GitHub App access
 
 - Connect existing GitHub App installations through a backend credential service, select project repositories, and explicitly grant agents Read or Write access in the browser.

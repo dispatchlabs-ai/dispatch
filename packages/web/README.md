@@ -32,3 +32,5 @@ Follow the [testing policy](../../CONTRIBUTING.md#testing-policy) for permitted 
 - [Repository contribution workflow](../../CONTRIBUTING.md).
 
 Browser code belongs in `src/`; the application service is in `server/`. Package-specific build configuration and the Nix recipe stay here; shared workspace scripts, manifests, and locks live at the repository root. Existing `test/` placeholders do not authorize adding tests while the current policy is active.
+
+For operator-only copying of settled chats into a worker deployment, see [archived chat migration](docs/archived-chat-migration.md).

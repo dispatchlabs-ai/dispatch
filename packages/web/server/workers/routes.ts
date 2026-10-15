@@ -58,6 +58,16 @@ export class WorkerRoutes {
       return this.decode(conversationId, proposed);
     });
   }
+  /** Offline import only. The caller holds directory ownership and verified a new idle store. */
+  importSleeping(input: WorkerRoute): Promise<WorkerRoute> {
+    const proposed = routeSchema.parse(structuredClone(input));
+    if (proposed.phase !== "sleeping" || !proposed.nativeRoomId || proposed.containerName || proposed.idleRetirement)
+      throw new Error("Imported route must name an idle native room without an executor.");
+    return this.change(proposed.conversationId, existing => {
+      if (existing && JSON.stringify(existing) !== JSON.stringify(proposed)) throw new Error("Imported route identity already exists.");
+      return existing ?? proposed;
+    });
+  }
   ready(conversationId: string, attemptId: string, nativeRoomId: string, containerName: string, idleTimeoutSupported = false): Promise<WorkerRoute> {
     return this.change(conversationId, current => {
       const route = this.requireAttempt(current, attemptId);
