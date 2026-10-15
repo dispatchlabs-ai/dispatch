@@ -1168,7 +1168,7 @@ export class SharedConversations {
     room.replyHistoryVersion = 1;
   }
 
-  async post(tx: Tx, roomId: ConversationId, authorId: string, input: SendMessageInput): Promise<ConversationMessage> {
+  private async preparePost(tx: Tx, roomId: ConversationId, authorId: string, input: SendMessageInput) {
     if (!input.text.trim() && !input.attachmentIds?.length) throw new CollaborationError(400, "Message must not be empty.");
     const room = await tx.doc(SharedDoc, roomId);
     const author = requireActiveMember(room, authorId);
@@ -1190,11 +1190,11 @@ export class SharedConversations {
       const reserved = fingerprints.fingerprints[oldKey];
       if ((oldSubmission && !reserved) || (reserved && (reserved !== oldHash || normalized.threadId || normalized.mentions.length || ids.length || agentMentions.length))) throw new CollaborationError(409, "This older request cannot be reused with this input. Use a new request ID.");
       // A withdrawn native input may have no transcript entry; acknowledge its existing receipt without admitting it again.
-      if (oldSubmission) return messages.find(message => message.id === (room.legacyQueued?.[String(oldSubmission.id)] ?? `legacy:${oldSubmission.entry}`)) ?? { id: `legacy-request:${oldSubmission.id}`, kind: "message", authorId, text: input.text, createdAt: 0, threadId: null, mentions: [] };
+      if (oldSubmission) return { posted: true, message: messages.find(message => message.id === (room.legacyQueued?.[String(oldSubmission.id)] ?? `legacy:${oldSubmission.entry}`)) ?? { id: `legacy-request:${oldSubmission.id}`, kind: "message", authorId, text: input.text, createdAt: 0, threadId: null, mentions: [] } } as const;
     }
     if (prior) {
       if (prior.hash !== hash) throw new CollaborationError(409, "This request ID was already used with different content.");
-      return messages.find(message => message.id === prior.messageId || message.aliases?.includes(prior.messageId!))!;
+      return { posted: true, message: messages.find(message => message.id === prior.messageId || message.aliases?.includes(prior.messageId!))! } as const;
     }
     if (room.stopping) throw new CollaborationError(409, "Conversation is stopping. Retry after Stop finishes.");
     // Keep the original request fingerprint, but accept a saved draft targeting a reconciled duplicate.
@@ -1203,11 +1203,27 @@ export class SharedConversations {
     await this.validateMentions(tx, room, normalized.mentions);
     if (ids.length && author.kind !== "human") throw new CollaborationError(400, "Only uploaders may attach files.");
     const attachments = await messageAttachments(tx, roomId, author.userId!, ids);
+    if (agentMentions.length && author.kind !== "human") throw new CollaborationError(400, "Use conversation_invite_agent to invite agents.");
+    if (agentMentions.some(id => room.members.filter(member => member.agentDefinitionId === id && activeMember(member)).length > 1))
+      throw new CollaborationError(409, "Several instances match this agent. Choose a specific participant to mention.");
+    return { posted: false, room, normalized, agentMentions, attachments, key, hash } as const;
+  }
+
+  /** Validate before the directory admits mention invitations; receipt replay must not re-add agents. */
+  async validatePost(tx: Tx, roomId: ConversationId, authorId: string, input: SendMessageInput) {
+    return { posted: (await this.preparePost(tx, roomId, authorId, input)).posted };
+  }
+
+  async post(tx: Tx, roomId: ConversationId, authorId: string, input: SendMessageInput): Promise<ConversationMessage> {
+    const prepared = await this.preparePost(tx, roomId, authorId, input);
+    if (prepared.posted) return prepared.message;
+    const { room, normalized, agentMentions, attachments, key, hash } = prepared;
     if (agentMentions.length) {
-      if (author.kind !== "human") throw new CollaborationError(400, "Use conversation_invite_agent to invite agents.");
-      await this.invite(tx, roomId, authorId, { requestId: `message:${input.requestId}`, agentDefinitionIds: agentMentions }, []);
+      // A worker may only resolve participants already admitted by the backend.
+      if (!this.inviteRemote) await this.invite(tx, roomId, authorId, { requestId: `message:${input.requestId}`, agentDefinitionIds: agentMentions }, []);
       const resolved = new Map(agentMentions.map(definitionId => {
         const members = room.members.filter(member => member.agentDefinitionId === definitionId && activeMember(member));
+        if (!members.length) throw new CollaborationError(409, "Mentioned agent has not been admitted to this conversation. Retry the message.");
         if (members.length !== 1) throw new CollaborationError(409, "Several instances match this agent. Choose a specific participant to mention.");
         return [`agent-definition:${definitionId}`, members[0].id];
       }));

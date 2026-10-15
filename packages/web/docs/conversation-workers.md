@@ -86,6 +86,28 @@ evidence. Source/type/build checks do not establish live claim, replenishment,
 restart recovery, sleep or latency acceptance; record those observations in the
 installation's deployment receipt.
 
+## Mention invitations — October 15, 2026
+
+Human sends containing agent-definition mentions now validate the worker's message
+input and prior receipt before the backend admits the corresponding invitation.
+The invitation uses a stable, message-scoped request ID. The subsequent worker RPC
+reconciles backend membership before posting with the original message fingerprint.
+A completed message retry skips invitation admission, including after its mentioned
+agent has been removed. Invalid threads, attachments, participant mentions and
+currently ambiguous definitions are rejected before adding participants.
+
+Workers resolve those mentions against admitted participants and never create an
+unregistered local instance. Native single-runtime mode retains its transactional
+invite-on-send path. Directory admission and worker publication remain separate
+commits: an admitted invitation survives a failed send and its unchanged retry
+reuses the receipt. This is not a cross-store transaction or automatic resend.
+
+The controller and worker must both include this change; older workers reject the
+new validation RPC. Existing unregistered participants require a separately
+reviewed identity-preserving repair; the code does not infer backend authority from
+worker-local identities. Source/type/build checks are recorded with the change.
+The new distributed send path has not yet been qualified in a deployed browser.
+
 ## Automatic conversation-worker retirement — October 14, 2026
 
 The backend checks assigned workers every 30 seconds. Its `workerIdleTimeoutMs`

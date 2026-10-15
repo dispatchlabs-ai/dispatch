@@ -2129,6 +2129,19 @@ export class DispatchRuntime {
     return { attachment, bytes: await this.attachments.read(attachment) };
   }
 
+  async validateSubmit(scope: RuntimeScope, id: string, input: SendMessageInput) {
+    this.requireConversationExecutor();
+    requireText(input.requestId, "Request ID", 200);
+    requireText(input.text, "Message", 100_000, Boolean(input.attachmentIds?.length));
+    await this.authorize(scope, id);
+    const person = await this.person(scope.companyId, scope.userId);
+    return this.harness.commit(async tx => {
+      await this.shared.authorize(tx, scope, nativeId(id), "participate", this.readAll(scope));
+      await this.shared.ensureHuman(tx, nativeId(id), person);
+      return this.shared.validatePost(tx, nativeId(id), `human:${scope.userId}`, input);
+    }, context);
+  }
+
   async submit(scope: RuntimeScope, id: string, input: SendMessageInput) {
     this.requireConversationExecutor();
     requireText(input.requestId, "Request ID", 200);

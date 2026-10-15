@@ -98,7 +98,7 @@ app.use("*", bodyLimit({ maxSize: ATTACHMENT_RPC_MAX_BYTES, onError: c => c.json
 app.get("/ready", c => c.json({ roomId, conversationId: env.DISPATCH_CONVERSATION_ID, attemptId: env.DISPATCH_WORKER_ATTEMPT_ID, idleTimeoutSupported: true }));
 const rpcSchema = z.object({
   scope: z.object({ companyId: z.string(), userId: z.string() }).strict(),
-  method: z.enum(["removeParticipant", "workerInstanceResult", "exportProjectArchive", "transcriptPage", "publicDetail", "saveDefinitionOfDone", "getChat", "submit", "submitAndGetChat", "composing", "addParticipants", "stop", "updateChat", "renameChat", "authorizeAttachmentUpload", "uploadAttachment", "downloadAttachment"]),
+  method: z.enum(["removeParticipant", "workerInstanceResult", "exportProjectArchive", "transcriptPage", "publicDetail", "saveDefinitionOfDone", "getChat", "validateSubmit", "submit", "submitAndGetChat", "composing", "addParticipants", "stop", "updateChat", "renameChat", "authorizeAttachmentUpload", "uploadAttachment", "downloadAttachment"]),
   input: z.unknown().optional(), catalog: z.custom<WorkerCatalogSnapshot>(),
   membership: z.custom<import("../runtime.js").WorkerMembershipSnapshot>(),
 }).strict();
@@ -158,6 +158,7 @@ app.post("/rpc", async c => {
       result = await runtime.saveDefinitionOfDone(scope, roomId, value); break;
     }
     case "getChat": result = await runtime.getChat(scope, roomId); break;
+    case "validateSubmit": result = await runtime.validateSubmit(scope, roomId, input as SendMessageInput); break;
     case "submit": result = await runtime.submit(scope, roomId, input as SendMessageInput); break;
     case "submitAndGetChat": result = await runtime.submitAndGetChat(scope, roomId, input as SendMessageInput); break;
     case "composing": result = await runtime.composing(scope, roomId, input as {clientId: string; sequence: number; active: boolean}); break;

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Mention invitations
+
+- Register agents added by human mentions in the backend participant registry before posting to a conversation worker. Reuse the existing invitation receipts and preserve message retries, so later membership changes do not fail with an unregistered participant.
+
 ### Archived chat migration
 
 - Add offline preparation and verified publication of idle native chats into isolated PostgreSQL worker stores, including attachments and per-user archive preferences. Preserve existing destination data and publish directory entries only after store verification.

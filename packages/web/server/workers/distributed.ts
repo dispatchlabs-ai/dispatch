@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { HistoryCursorError } from "../chat-pages.js";
 import { decodeProjectArchive } from "../project-archives.js";
@@ -7,7 +8,7 @@ import { isIPv4 } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { DispatchRuntime, RuntimeError } from "../runtime.js";
 import type { RuntimeService } from "../runtime-service.js";
-import type { ChatSnapshot, RuntimeScope, CreateAgentInstanceResult } from "../../src/shared/contracts.js";
+import type { ChatSnapshot, RuntimeScope, CreateAgentInstanceResult, SendMessageInput } from "../../src/shared/contracts.js";
 import { WorkerRoutes, type WorkerRoute } from "./routes.js";
 import { workerToken } from "./identity.js";
 import { decodeAttachmentBytes } from "./attachments.js";
@@ -133,6 +134,18 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
       // attempt; replacement still requires confirmed irreversible retirement.
       throw error;
     }
+  }
+  function submit<T>(scope: RuntimeScope, id: string, method: "submit" | "submitAndGetChat", input: SendMessageInput): Promise<T> {
+    if (!input.agentMentions?.length) return call(scope, id, method, input);
+    return policyRead(() => conversationOperation(id, async () => {
+      const { posted } = await callWorker<{ posted: boolean }>(scope, id, "validateSubmit", input);
+      if (!posted) await directory.inviteWorkerParticipants(scope, id, {
+        requestId: `message:${createHash("sha256").update(input.requestId).digest("hex")}`,
+        agentDefinitionIds: input.agentMentions,
+      });
+      // Refresh membership before delivery. Keep the original input for the message receipt.
+      return callWorker<T>(scope, id, method, input);
+    }));
   }
   const idleReceipt = z.object({ idle: z.boolean(), attemptId: z.string(), summary: workerSummarySchema.optional() }).strict();
   async function finishIdleRetirement(route: WorkerRoute): Promise<WorkerRoute> {
@@ -316,8 +329,8 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
     async publicDetail(scope, id, kind, itemId) { return call(scope, id, "publicDetail", { kind, itemId }); },
     async saveDefinitionOfDone(scope, id, input) { return snapshot(await call<ChatSnapshot>(scope, id, "saveDefinitionOfDone", input), id); },
     async getChat(scope, id) { return snapshot(await call<ChatSnapshot>(scope, id, "getChat"), id); },
-    async submit(scope, id, input) { return call(scope, id, "submit", input); },
-    async submitAndGetChat(scope, id, input) { return snapshot(await call<ChatSnapshot>(scope, id, "submitAndGetChat", input), id); },
+    async submit(scope, id, input) { return submit(scope, id, "submit", input); },
+    async submitAndGetChat(scope, id, input) { return snapshot(await submit<ChatSnapshot>(scope, id, "submitAndGetChat", input), id); },
     async composing(scope, id, input) { return call(scope, id, "composing", input); },
     async createAgentInstance(scope, id, input) {
       return policyRead(async () => {
