@@ -5,6 +5,10 @@ import type { DispatchRuntime } from "./runtime.js";
  * does not authorize forwarding caller-provided scope over an untrusted network.
  */
 export type RuntimeService = Pick<DispatchRuntime,
+  | "githubStatus"
+  | "githubAccounts"
+  | "githubRepositories"
+  | "githubWrite"
   | "importProjectArchive"
   | "exportProjectArchive"
   | "getProjectArchive"

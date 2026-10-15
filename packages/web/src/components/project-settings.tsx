@@ -5,6 +5,7 @@ import { projectSourcesSchema } from "../shared/project-sources";
 import { ApiError, errorMessage } from "../lib/api";
 import { useSession } from "../lib/session";
 import { Button, Field, Input, Notice, Select, Spinner } from "./ui";
+import { ProjectGitHub } from "./github-access";
 
 export type ProjectEditing = {
   input: SaveProjectInput;
@@ -90,8 +91,10 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
       {!project.canManage ? <Notice>Management permission removed. Draft retained.</Notice> : null}
       {editing.error ? <Notice>{editing.error}{editing.conflict ? " Draft retained. Discard to load current settings." : " Draft retained. Retry to save."}</Notice> : null}
       <Field label="Project name">{props => <Input {...props} value={editing.input.name} maxLength={100} required disabled={disabled} onChange={event => update({ name: event.target.value })} />}</Field>
+      <ProjectGitHub projectId={project.id} agents={agents} editable={Boolean(project.canManage && !editing.busy)} />
       <fieldset className="agent-form-section project-repositories" disabled={disabled}>
-        <legend>Repositories</legend>
+        <legend>Repository references</legend>
+        <p className="field-hint">Reference metadata only. Use GitHub access above to authorize private repositories.</p>
         {repositories.map((repository, index) => <div className="project-repository" key={repository.id}>
           <div className="project-repository-fields">
             <Field label="Repository URL" error={fieldError(`repositories.${index}.url`)}>{props => <Input {...props} aria-label={`Repository ${index + 1} URL`} value={repository.url} required maxLength={4096} autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="https://github.com/owner/repo" onBlur={() => {
@@ -143,6 +146,7 @@ export function ProjectSettings({ project, agents, editing, onEditingChange, onS
       {showHeader ? <header className="context-header"><h2>Project details</h2></header> : null}
       <div className="project-details-body">
       <div className="project-sharing"><Users size={24} aria-hidden="true" /><div><strong>Shared project</strong><p>Full history · Shared chats</p></div></div>
+      <ProjectGitHub projectId={project.id} agents={agents} editable={false} />
       {error ? <Notice>People could not be loaded. {error} <Button variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></Notice> : null}
       {!people && !error ? <Spinner label="Loading people" /> : null}
       <section className="project-detail-group"><h3>Members</h3>

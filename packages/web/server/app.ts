@@ -366,6 +366,14 @@ export function createApp(options: AppOptions) {
     });
   });
   app.post("/api/bundles/starters/developer", async c => c.json(createDeveloperStarter(await c.req.json())));
+  app.get("/api/github", async c => c.json(await runtime.githubStatus(c.get("principal"))));
+  app.get("/api/github/accounts", async c => c.json(await runtime.githubAccounts(c.get("principal"))));
+  app.get("/api/projects/:id/github", async c => c.json(await runtime.githubStatus(c.get("principal"), c.req.param("id"))));
+  app.get("/api/projects/:id/github/repositories", async c => {
+    const input = z.object({ connectionId: z.string().min(1), page: z.coerce.number().int().positive().default(1) }).parse(c.req.query());
+    return c.json(await runtime.githubRepositories(c.get("principal"), c.req.param("id"), input.connectionId, input.page));
+  });
+  app.post("/api/github/access", async c => c.json(await runtime.githubWrite(c.get("principal"), await c.req.json())));
   app.get("/api/bundles/github", async c => c.json({ installations: await runtime.listGitHubBundles(c.get("principal")) }));
   app.post("/api/bundles/github/preview", async c => {
     const input = z.object({ source: githubSourceSchema, installationId: z.string().uuid().optional() }).strict().parse(await c.req.json());

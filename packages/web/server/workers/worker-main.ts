@@ -48,6 +48,10 @@ const runtime = await DispatchRuntime.openConversation({
   stateDir: "/workspace/state", workspaceDir: "/workspace", companyId: bootstrap.scope.companyId,
   piStorage: bootstrap.storage, models,
   workerParticipants: { report: report => backend("/participants/report", report) },
+  workerGitHub: (actor, bindingId, operation, signal) => {
+    if (new URL(env.DISPATCH_BACKEND_INTERNAL_URL).protocol !== "https:") throw new RuntimeError(503, "GitHub credentials require encrypted backend transport.");
+    return backend("/github", { actor, bindingId, operation }, signal);
+  },
   workerSecrets: (actor, secretId, signal) => {
     if (new URL(env.DISPATCH_BACKEND_INTERNAL_URL).protocol !== "https:") throw new RuntimeError(503, "Secrets require encrypted backend transport.");
     return backend("/secrets", { actor, secretId }, signal);

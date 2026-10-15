@@ -1,6 +1,10 @@
 import { RuntimeError } from "./runtime-error.js";
 import { museProvider } from "./muse/models.js";
 import { createAgentSecrets } from "./extensions/agent-secrets.js";
+import { createAgentGitHub } from "./extensions/github.js";
+import { GitHubAccess } from "./github/access.js";
+import type { GitHubBrokerClient } from "./github/client.js";
+import type { GitHubCredential, GitHubGrantedRepository, GitHubOperation } from "../src/shared/github-access.js";
 import { withSharedContextCache } from "./collaboration/prompt-cache.js";
 import type { TranscriptQuery } from "../src/shared/contracts.js";
 import { ProjectArchiveStore, ProjectArchivesDoc, archiveDigest, decodeProjectArchive } from "./project-archives.js";
@@ -60,7 +64,7 @@ export const DEFAULT_AGENT_ID = "developer";
 const IMAGE_GENERATION_SKILL_ID = "d6f5a67d-5c7b-4813-910f-b29d97d29cd1";
 // Fixed application selections, not a plugin registry. Markers preserve historical capability recognition.
 const capabilityDefinitions: { id: NonNullable<AgentDefinition["capabilities"]>[number]; marker: string; extensions: string[]; tools: string[] }[] = [
-  { id: "files-and-commands", marker: CodingTools.name, extensions: [Coding.name, CodingTools.name, "dispatch-agent-secrets"], tools: ["read", "write", "edit", "bash", "secrets_list", "git_clone"] },
+  { id: "files-and-commands", marker: CodingTools.name, extensions: [Coding.name, CodingTools.name, "dispatch-agent-secrets", "dispatch-github"], tools: ["read", "write", "edit", "bash", "secrets_list", "git_clone", "github_repositories", "github_git"] },
   { id: "image-generation", marker: "dispatch-image-gen", extensions: ["dispatch-image-gen"], tools: ["generate_image"] },
   { id: "edit-definition-of-done", marker: "dispatch-definition-of-done", extensions: ["dispatch-definition-of-done"], tools: ["conversation_definition_of_done"] },
   { id: "web-reading", marker: "dispatch-web-read", extensions: ["dispatch-web-read"], tools: ["web_read"] },
@@ -195,6 +199,8 @@ export type RuntimeOptions = {
   runMcpBackground?: <T>(operation: () => Promise<T>) => Promise<T>;
   workerManagement?: WorkerManagement;
   workerSecrets?: (actor: WorkerManagementActor, secretId?: string, signal?: AbortSignal) => Promise<{ secrets: { id: string; name: string }[] } | { value: string }>;
+  githubBroker?: GitHubBrokerClient;
+  workerGitHub?: (actor: WorkerManagementActor, bindingId?: string, operation?: GitHubOperation, signal?: AbortSignal) => Promise<{ repositories: GitHubGrantedRepository[] } | GitHubCredential>;
   workerSearch?: (actor: WorkerManagementActor, query: Parameters<import("./web/types.js").WebBackend["search"]>[0], signal?: AbortSignal) => ReturnType<import("./web/types.js").WebBackend["search"]>;
   workerMcp?: WorkerMcp;
   workerInvitations?: WorkerInvitations;
@@ -226,6 +232,7 @@ export class DispatchRuntime {
   private peopleDirectory?: PeopleDirectory;
   private connections: AgentConnections;
   private managed?: McpConnections;
+  private github!: GitHubAccess;
   private readAllProjectUserIds = new Set<string>();
   private directoryOnly = false;
   private worker?: ConversationWorkerBootstrap;
@@ -344,6 +351,19 @@ export class DispatchRuntime {
           return result.value;
         },
       }));
+      registry.install(createAgentGitHub({ resolve: async (instanceId, bindingId, operation, signal) => {
+        signal?.throwIfAborted();
+        if (worker) {
+          if (!options.workerGitHub) throw new RuntimeError(503, "GitHub credential mediation is unavailable.");
+          const actor = await runtime.harness.commit(async tx => {
+            const actor = await shared.managementActor(tx, instanceId);
+            await runtime.githubActor(tx, actor);
+            return runtime.remoteActor(tx, actor);
+          }, context);
+          return options.workerGitHub(actor, bindingId, operation, signal);
+        }
+        return runtime.github.agentAccess(async tx => runtime.githubActor(tx, await shared.managementActor(tx, instanceId)), bindingId, operation, signal);
+      } }));
       const web = createWebResearch(createWebBackend(), {
         authorize: async (instanceId, capability, signal) => Boolean(await authorizeWeb(instanceId, capability, signal)),
         search: async (instanceId, query, signal) => {
@@ -373,6 +393,11 @@ export class DispatchRuntime {
       openedHarness = harness;
       runtime = new DispatchRuntime(harness, storage, models, owner, registry, shared, connections, options.workspaceDir, attachments, options.peopleDirectory);
       runtime.managed = options.mcpConnections;
+      runtime.github = new GitHubAccess(operation => harness.commit(operation, context), options.githubBroker,
+        async (tx, companyId, definitionId) => {
+          const definition = latestAgent(await tx.doc(CatalogDoc), companyId, definitionId);
+          return Boolean(definition && !definition.archived);
+        }, scope => runtime.readAll(scope));
       runtime.directoryOnly = options.directoryOnly ?? false;
       runtime.worker = worker;
       runtime.workerManagement = options.workerManagement;
@@ -545,6 +570,15 @@ export class DispatchRuntime {
           if (!agent.extensions?.includes(CodingTools.name) || agent.extensions.includes("dispatch-agent-secrets")) continue;
           catalog.agents.push({ ...agent, extensions: [...agent.extensions, "dispatch-agent-secrets"],
             tools: [...new Set([...(agent.tools ?? []), "secrets_list", "git_clone"])],
+            revision: agent.revision + 1, updatedAt: Date.now() });
+        }
+      }, context);
+      await runtime.harness.commit(async tx => {
+        const catalog = await tx.doc(CatalogDoc);
+        for (const agent of latestAgents(catalog, options.companyId).values()) {
+          if (!agent.extensions?.includes(CodingTools.name) || agent.extensions.includes("dispatch-github")) continue;
+          catalog.agents.push({ ...agent, extensions: [...agent.extensions, "dispatch-github"],
+            tools: [...new Set([...(agent.tools ?? []), "github_repositories", "github_git"])],
             revision: agent.revision + 1, updatedAt: Date.now() });
         }
       }, context);
@@ -1208,6 +1242,23 @@ export class DispatchRuntime {
       return { companyId: actor.companyId, definitionId: actor.definitionId };
     }, context);
   }
+
+  private async githubActor(tx: Tx, actor: ManagementActor) {
+    const definition = latestAgent(await tx.doc(CatalogDoc), actor.companyId, actor.definitionId);
+    if (!definition || definition.archived || !agentCapabilities(actor.configuration).includes("files-and-commands"))
+      throw new RuntimeError(403, "GitHub tools are not enabled for this acting agent revision.");
+    return { companyId: actor.companyId, definitionId: actor.definitionId, projectId: await this.agentProjectIn(tx, actor) };
+  }
+
+  async workerGitHubAccess(claim: WorkerManagementActor, bindingId?: string, operation?: GitHubOperation, signal?: AbortSignal) {
+    this.requireDirectoryActor(claim);
+    return this.github.agentAccess(async tx => this.githubActor(tx, await this.authoritativeWorkerActor(tx, claim)), bindingId, operation, signal);
+  }
+
+  githubStatus(scope: RuntimeScope, projectId?: string) { return this.github.status(scope, projectId); }
+  githubAccounts(scope: RuntimeScope) { return this.github.availableAccounts(scope); }
+  githubRepositories(scope: RuntimeScope, projectId: string, connectionId: string, page: number) { return this.github.repositories(scope, projectId, connectionId, page); }
+  githubWrite(scope: RuntimeScope, input: unknown) { return this.github.write(scope, input); }
 
   async readWorkerProjectSpec(claim: WorkerManagementActor, input: ProjectSpecReadInput): Promise<ProjectSpecPage> {
     this.requireDirectoryActor(claim);

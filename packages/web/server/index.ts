@@ -11,6 +11,7 @@ import { DEFAULT_AGENT_ID, DispatchRuntime } from "./runtime.js";
 import { McpConnections } from "./mcp-connections.js";
 import { LocalCredentialStore } from "./storage/local-provider-credentials.js";
 import { ProviderSetup } from "./provider-setup.js";
+import { GitHubBrokerClient } from "./github/client.js";
 
 const config = readConfig();
 if (config.containerLoopbackHttp) {
@@ -31,6 +32,7 @@ const mcpConnections = new McpConnections(join(config.stateDir, "connections.sql
 const runtime = await DispatchRuntime.open({
   stateDir: join(config.stateDir, "runtime"), companyId: config.companyId, models: provider.models,
   readAllProjectUserIds: config.readAllProjectUserIds,
+  githubBroker: await GitHubBrokerClient.open(config.githubConfigFile),
   piStorage: config.piStorage,
   connectionsFile: config.connectionsFile, workspaceDir: config.workspaceDir,
   mcpConnections,

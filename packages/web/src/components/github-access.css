@@ -1,0 +1,9 @@
+.github-access .connection-heading { align-items: flex-start; gap: .75rem; flex-wrap: wrap; }
+.github-access .connection-heading h2,
+.github-access .connection-heading h4 { min-width: 0; overflow-wrap: anywhere; margin: 0; }
+.github-access p { overflow-wrap: anywhere; }
+.github-access .button-row { flex-wrap: wrap; }
+.github-access .notice { overflow-wrap: anywhere; }
+.github-project { margin-block: 1rem; }
+.github-grant { padding-block: .75rem; border-top: 1px solid var(--color-border); }
+.github-dialog { padding: 1.25rem; }

@@ -1,4 +1,47 @@
-# GitHub App integration design
+# GitHub App access
+
+## Existing Apps — October 15 implementation
+
+Chris requested reuse of the existing GitHub Apps on the Dispatch server, including separate installations for multiple organizations. The implementation now uses the central credential-service path described below. It supersedes the October 14 choice to start with newly registered deployment-owned private Apps. The older registration/OAuth proposal remains recorded under **Historical October 14 design**; those setup screens are not implemented.
+
+**Qualification is in progress.** Source/type/build checks do not establish deployed Git behavior. The delivery record will identify the checked revisions and observed outcomes.
+
+An operator configures `dispatch-github-broker` with existing App private-key files and an independent allowlist of App/installation/account IDs for each deployment credential. Keys stay in the credential service. Dispatch backends receive only their own broker credential; workers receive one-repository installation tokens with Contents read or write and Metadata read. Tokens never inherit the App's broader permissions. The broker rechecks installation identity, suspension and permissions, and proves repository membership with an explicitly scoped token.
+
+`DISPATCH_GITHUB_CONFIG_FILE` selects a backend-only JSON file:
+
+```json
+{
+  "url": "https://github-access.example.com",
+  "tokenFile": "/run/dispatch/github-broker-token",
+  "companyId": "example",
+  "managerUserIds": ["authenticated-user-id"]
+}
+```
+
+Use a restricted regular token file owned by the backend UID with mode `0600`. The AWS module's optional `application.github` renders this configuration and delivers a Secrets Manager reference only to the backend. It does not distribute an App key, broker credential or new secret to the launcher/workers. Omission leaves GitHub unconfigured.
+
+### Operator setup and connection management
+
+Run the credential service separately from agents with `DISPATCH_GITHUB_BROKER_CONFIG_FILE` pointing to its operator-owned configuration. Each `apps` record has an App `id` and restricted `keyFile`; each `clients` record has a `name`, restricted `tokenFile`, and allowed `installations` records (`id`, `appId`, `installationId`, `accountId`). An installation `id` is a stable deployment-facing binding, not caller authority to choose an arbitrary GitHub installation. Do not reuse a binding ID for a different App/account/installation.
+
+The service binds to loopback behind a trusted HTTPS reverse proxy. It has no browser session or public setup callback. Possession of its App key and an operator-established client mapping authorize the configured installations; all connection reads are checked against GitHub. Only the authenticated Dispatch user IDs in `managerUserIds` may connect/disconnect company installations in **Settings → GitHub**. GitHub's own installation settings remain provider-owned links.
+
+The Nix application includes `dispatch-github-broker`. For a host with Node.js 24 or 25, build the app from a clean committed revision, then run `npx tsx scripts/package-github-broker.ts --output /path/broker.tar.gz` inside `nix develop`. The archive contains the compiled broker, its pinned production dependencies, licenses and source provenance; run `node server/github/broker.js`. Keep the archive checksum and source revision with deployment evidence.
+
+### Project repositories and Git operations
+
+Project managers connect repositories and save Read/Write agent grants under **Project settings → GitHub access**. These saves are independent of the ordinary project draft. Connecting an organization or repository grants no agent access by itself. Repository reference URLs remain metadata only. Removing a binding revokes its grants; the confirmation displays the current grant count and rejects a changed revision. Disconnect retains current bindings/grants but stops subsequent mediated operations. Reconnect verifies the same installation; it cannot restore a revoked grant or deleted binding.
+
+The Files and commands capability supplies `github_repositories` and `github_git`. Current actor membership, project binding, exact applied/pinned capability and current grants are checked for every operation, then checked again after token acquisition. A read grant cannot push. Worker route/attempt authentication fences credential responses. Latest definitions gain the tools through a new revision; historical definitions and snapshots remain intact.
+
+`github_git` supports clone, fetch, push and remote-ref inspection. Use the saved `bindingId`, never a secret value or caller-supplied remote URL. Local status/diff/branch/commit/merge/rebase use ordinary shell Git. Fetch updates the returned `refs/remotes/dispatch/...` ref for local merging. Credentialed fetch/push use a clean temporary bare Git directory and canonical authorized HTTPS URL; editable checkout configuration, hooks, URL rewrites, extra headers and proxies do not control credentialed execution. Clone configures the resolved App bot commit identity. Include the returned agent-instance trailer in commits; this is attribution, not a GitHub Verified badge.
+
+Push resolves one local commit OID and one full branch/tag destination, records an uncertain native Pi intent before execution, and marks success only after Git reports success. It never forces or deletes refs. Use `github_repositories` to find receipts and `github_git` inspection to compare the current remote ref with an interrupted intent. A differing ref does not prove that the earlier push never succeeded. Workflows permission is never issued; pushes changing GitHub workflow files may be rejected. Unpushed worker-local work can be lost when a worker is replaced.
+
+GitHub access policy is separate native session state. It is not exported as portable project credentials or automatically restored by importing a project archive. Cloned files and already-issued/in-flight operations are not undone by revocation. The credential service is not process isolation for agents sharing an OS identity/workspace.
+
+## Historical October 14 design
 
 **October 14, 2026 — implementation plan, not supported usage.** This chat covers planning only; building and deploying the feature need a separate agreed completion target. This note consolidates the investigation and decisions made by Claude and Astra under Chris's delegation. Official project intent remains in the [database spec](spec.md); this document is supporting technical detail, not a competing spec or authorization to provision infrastructure. GitHub App connection, credential issuance and end-to-end ECS Git operation have not been verified.
 

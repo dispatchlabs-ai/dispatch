@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### GitHub App access
+
+- Connect existing GitHub App installations through a backend credential service, select project repositories, and explicitly grant agents Read or Write access in the browser.
+- Mediate private clone, fetch, push and remote inspection with repository-scoped installation tokens, current grant checks, isolated Git configuration and durable uncertain-push receipts. Keep App keys out of deployment backends and workers.
+
 ### Worker lifecycle
 
 - Retire assigned conversation workers after sixty minutes of native inactivity by default, with a configurable timeout and safe refusal while tasks, submissions or reconciliation remain pending. Preserve warm spare capacity, durable history and open chat streams; resume the same conversation on its next explicit read or action only after confirmed old-worker termination.

@@ -14,11 +14,11 @@ export interface AgentSecretAccess {
 }
 
 const text = (message: string, isError = false) => ({ content: [{ type: "text" as const, text: message }], ...(isError ? { isError: true as const } : {}) });
-const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+export const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 class InputError extends Error {}
 
 /** Deliberately only GitHub HTTPS, without credentials, redirects, query strings or Git option syntax. */
-function repositoryUrl(value: string) {
+export function repositoryUrl(value: string) {
   const match = /^https:\/\/github\.com\/([A-Za-z0-9_-]+)\/([A-Za-z0-9_.-]+)$/.exec(value);
   if (!match) throw new InputError("Use a GitHub HTTPS repository URL without credentials, query parameters, or a trailing slash.");
   const repository = match[2].replace(/\.git$/, "");
@@ -26,7 +26,7 @@ function repositoryUrl(value: string) {
   return `https://github.com/${match[1]}/${repository}.git`;
 }
 
-async function destinationPath(workspace: string, destination: string) {
+export async function destinationPath(workspace: string, destination: string) {
   if (isAbsolute(destination) || destination.split(/[\\/]/).includes("..") || /[\x00-\x1f\x7f]/.test(destination))
     throw new InputError("Destination must be a new workspace-relative directory without '..'.");
   const root = await realpath(workspace);
@@ -44,7 +44,7 @@ async function destinationPath(workspace: string, destination: string) {
 }
 
 /** A per-operation socket: the token is held in memory, never in a helper file or environment. */
-async function credentialServer(socketPath: string, repository: string, token: string) {
+export async function credentialServer(socketPath: string, repository: string, token: string) {
   const sockets = new Set<Socket>();
   const server = createServer(socket => {
     sockets.add(socket);

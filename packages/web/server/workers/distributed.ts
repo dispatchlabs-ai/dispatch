@@ -392,6 +392,10 @@ export function distributedRuntime(options: DistributedOptions): DistributedRunt
   // Every application method is classified explicitly. New runtime APIs must select
   // catalog authority or conversation execution here rather than silently falling through.
   return {
+    githubStatus: directory.githubStatus.bind(directory),
+    githubAccounts: directory.githubAccounts.bind(directory),
+    githubRepositories: directory.githubRepositories.bind(directory),
+    githubWrite: (scope, input) => policyChange(() => directory.githubWrite(scope, input)),
     importProjectArchive: directory.importProjectArchive.bind(directory),
     getProjectArchive: directory.getProjectArchive.bind(directory),
     getProjectInstructions: directory.getProjectInstructions.bind(directory),

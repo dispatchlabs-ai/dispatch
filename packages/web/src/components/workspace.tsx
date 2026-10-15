@@ -3,6 +3,7 @@ import type { CriteriaDraft } from "./definition-of-done";
 import { ProjectArchiveImport } from "./project-archives";
 import { ImportExportPage } from "./import-export";
 import { SecretsPage } from "./secrets";
+import { GitHubPage } from "./github-access";
 import { ModelProvidersPage } from "./model-providers";
 import { BundlesDialog } from "./bundles";
 import { emptyAttachments } from "../lib/attachments";
@@ -36,7 +37,7 @@ import { McpConnectionsPage } from "./mcp-connections";
 import { Button, IconButton, Modal, Notice, Spinner } from "./ui";
 
 type WorkspaceTab = { id: string; kind: "chat"; chatId: string } | { id: string; kind: "project"; projectId: string } | { id: string; kind: "welcome" };
-type WorkspaceSection = "projects" | "chats" | "agents" | "security" | "connections" | "secrets" | "import-export" | "model-providers";
+type WorkspaceSection = "projects" | "chats" | "agents" | "security" | "connections" | "secrets" | "github" | "import-export" | "model-providers";
 const welcomeTab: WorkspaceTab = { id: "welcome", kind: "welcome" };
 const appVersion = import.meta.env.VITE_APP_VERSION;
 
@@ -54,7 +55,7 @@ function initialSection(params: URLSearchParams): WorkspaceSection {
   if (params.has("chat")) return "chats";
   if (params.has("project")) return "projects";
   const section = params.get("section");
-  return section === "projects" || section === "agents" || section === "security" || section === "model-providers" || section === "import-export" || section === "secrets" || section === "connections" ? section : "chats";
+  return section === "projects" || section === "agents" || section === "security" || section === "model-providers" || section === "import-export" || section === "secrets" || section === "connections" || section === "github" ? section : "chats";
 }
 
 export function Workspace() {
@@ -62,7 +63,7 @@ export function Workspace() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [criteriaDrafts, setCriteriaDrafts] = useState<Record<string, CriteriaDraft | undefined>>({});
   const [section, setSection] = useState<WorkspaceSection>(() => initialSection(searchParams));
-  const [visited, setVisited] = useState({ "model-providers": searchParams.get("section") === "model-providers", "import-export": searchParams.get("section") === "import-export", agents: searchParams.get("section") === "agents", security: searchParams.get("section") === "security", secrets: searchParams.get("section") === "secrets", connections: searchParams.get("section") === "connections" });
+  const [visited, setVisited] = useState({ "model-providers": searchParams.get("section") === "model-providers", "import-export": searchParams.get("section") === "import-export", agents: searchParams.get("section") === "agents", security: searchParams.get("section") === "security", secrets: searchParams.get("section") === "secrets", github: searchParams.get("section") === "github", connections: searchParams.get("section") === "connections" });
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(() => searchParams.get("agent"));
   const [evaluationAgent, setEvaluationAgent] = useState<string | null>(() => searchParams.get("eval") ? searchParams.get("agent") : null);
   const [evaluationContext, setEvaluationContext] = useState<React.ReactNode>(null);
@@ -523,9 +524,9 @@ export function Workspace() {
     requestAnimationFrame(() => document.getElementById("main-workspace")?.focus());
   }
 
-  const settingsSection = section === "security" || section === "connections" || section === "secrets" || section === "import-export" || section === "model-providers";
+  const settingsSection = section === "security" || section === "connections" || section === "secrets" || section === "github" || section === "import-export" || section === "model-providers";
   const selectedAgent = selectedAgentId ? agents.find(agent => agent.id === selectedAgentId) : agents.find(agent => agent.id === config?.defaultAgentId);
-  const active: WorkspaceTab | { id: string; kind: "agents" | "security" | "connections" | "secrets" | "import-export" | "model-providers" } = section === "chats" || section === "projects" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
+  const active: WorkspaceTab | { id: string; kind: "agents" | "security" | "connections" | "secrets" | "github" | "import-export" | "model-providers" } = section === "chats" || section === "projects" ? tabs.find(tab => tab.id === activeId) || welcomeTab : { id: section, kind: section };
   const projectEditorOpen = active.kind === "project" && searchParams.get("view") === "settings";
   const projectSpecOpen = active.kind === "project" && searchParams.get("view") === "spec";
   const projectInstructionsOpen = active.kind === "project" && searchParams.get("view") === "instructions";
@@ -596,7 +597,7 @@ export function Workspace() {
       setContextOpen(false);
       requestAnimationFrame(() => document.getElementById(`participants-${active.chatId}`)?.focus());
     }} showHeader={!inDrawer}
-    /> : <ContextPanel kind={active.kind === "connections" || active.kind === "secrets" || active.kind === "import-export" || active.kind === "model-providers" ? "security" : active.kind} />;
+    /> : <ContextPanel kind={active.kind === "connections" || active.kind === "secrets" || active.kind === "github" || active.kind === "import-export" || active.kind === "model-providers" ? "security" : active.kind} />;
   const selectChat = (chatId: string) => activate({ id: `chat:${chatId}`, kind: "chat", chatId });
   const conversations = <ConversationSidebar chats={chats} projects={projects}
     activeChatId={active.kind === "chat" ? active.chatId : undefined} activeProjectId={active.kind === "project" ? active.projectId : undefined}
@@ -641,6 +642,7 @@ export function Workspace() {
         <a className="button button-ghost" href="/?section=model-providers" aria-current={section === "model-providers" ? "page" : undefined} onClick={event => navigateSection(event, "model-providers")}>Model providers</a>
         <a className="button button-ghost" href="/?section=connections" aria-current={section === "connections" ? "page" : undefined} onClick={event => navigateSection(event, "connections")}>Connections</a>
         <a className="button button-ghost" href="/?section=secrets" aria-current={section === "secrets" ? "page" : undefined} onClick={event => navigateSection(event, "secrets")}>Secrets</a>
+        <a className="button button-ghost" href="/?section=github" aria-current={section === "github" ? "page" : undefined} onClick={event => navigateSection(event, "github")}>GitHub</a>
         <a className="button button-ghost" href="/?section=import-export" aria-current={section === "import-export" ? "page" : undefined} onClick={event => navigateSection(event, "import-export")}>Import &amp; export</a>
         <a className="button button-ghost" href="/?section=security" aria-current={section === "security" ? "page" : undefined} onClick={event => navigateSection(event, "security")}>Account and security</a>
         {section === "security" ? [['passkeys', 'Passkeys'], ['password', 'Password & authenticator'], ['sessions', 'Active sessions']].map(([id, label]) => <Button key={id} variant="ghost" onClick={() => {
@@ -805,6 +807,7 @@ export function Workspace() {
           {visited["import-export"] ? <div className="workspace-section" hidden={section !== "import-export"}><ImportExportPage projects={projects} chats={chats} onImport={() => setImportingProject(true)} /></div> : null}
           {visited["model-providers"] ? <div className="workspace-section" hidden={section !== "model-providers"}><ModelProvidersPage active={section === "model-providers"} onChanged={refreshModelConfig} /></div> : null}
           {visited.secrets ? <div className="workspace-section" hidden={section !== "secrets"}><SecretsPage /></div> : null}
+          {visited.github ? <div className="workspace-section" hidden={section !== "github"}><GitHubPage /></div> : null}
           {visited.connections ? <div className="workspace-section" hidden={section !== "connections"}><McpConnectionsPage /></div> : null}
           {visited.security ? <div className="workspace-section" hidden={section !== "security"}><SecurityPage /></div> : null}
         </main>

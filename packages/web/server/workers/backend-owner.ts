@@ -38,6 +38,7 @@ import { WriteAdmission } from "./admission.js";
 import { projectChatsSchema, projectChatReadSchema } from "../project-chat-context.js";
 import { readWorkerProjectChat } from "./project-chat-reader.js";
 import { HistoryCursorError } from "../chat-pages.js";
+import { GitHubBrokerClient } from "../github/client.js";
 
 export async function openBackendOwner() {
 const filename = process.env.DISPATCH_BACKEND_WORKERS_CONFIG_FILE;
@@ -143,6 +144,7 @@ startupCleanup.push(async () => { await providerSetup?.close(); });
 const directory = await DispatchRuntime.open({
   connectMcpOnOpen: false, runMcpBackground: operation => support.run(operation), stateDir: join(config.stateDir, "runtime"), companyId: config.companyId, models: provider.models, directoryOnly: true,
   projectArchiveStore: archives,
+  githubBroker: await GitHubBrokerClient.open(config.githubConfigFile),
   piStorage: directoryStorage, workspaceDir: config.workspaceDir, connectionsFile: config.connectionsFile, mcpConnections: connections,
   provider: provider.provider, modelId: provider.modelId, thinkingLevel: provider.thinkingLevel, readAllProjectUserIds: config.readAllProjectUserIds,
   peopleDirectory: { list: async companyId => auth.listCompanyPeople(companyId), get: async (companyId, userId) => auth.getCompanyPerson(companyId, userId) },
@@ -237,6 +239,22 @@ app.all("/internal/workers/:conversation/:attempt/:operation{.+}", async c => {
     assertCurrent();
     return c.json(result ?? { accepted: true });
   }
+  if (operation === "github") return c.json(await mcpPolicy.call(async () => {
+    const request = z.object({
+      actor: z.custom<import("../runtime.js").WorkerManagementActor>(value => typeof value === "object" && value !== null),
+      bindingId: z.string().uuid().optional(), operation: z.enum(["clone", "fetch", "push", "inspect"]).optional(),
+    }).strict().parse(input);
+    const { actor } = request;
+    if (actor.companyId !== route.companyId || actor.conversationKey !== route.conversationId || actor.storeId !== route.storeId)
+      throw new RuntimeError(403, "GitHub actor is outside the authenticated worker route.");
+    if (Boolean(request.bindingId) !== Boolean(request.operation)) throw new RuntimeError(400, "Repository and operation are required together.");
+    assertCurrent();
+    const result = await directory.workerGitHubAccess(actor, request.bindingId, request.operation, c.req.raw.signal);
+    assertCurrent();
+    c.req.raw.signal.throwIfAborted();
+    c.header("Cache-Control", "no-store");
+    return result;
+  }));
   if (operation === "secrets") return c.json(await mcpPolicy.call(async () => {
     const request = z.object({
       actor: z.custom<import("../runtime.js").WorkerManagementActor>(value => typeof value === "object" && value !== null),
