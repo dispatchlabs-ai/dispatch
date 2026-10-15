@@ -40,6 +40,18 @@ export async function openModels(
   models.registerNativeProvider(codexImageProvider());
   models.registerNativeProvider(openaiApiProvider());
   models.registerNativeProvider(museProvider());
+  // Keep Pi's Fireworks catalog and credentials while its bundled catalog catches up.
+  models.registerProvider("fireworks", { models: [
+    ...models.getAllModels("fireworks").filter(model => model.id !== "accounts/fireworks/models/muse-spark-open"),
+    {
+      id: "accounts/fireworks/models/muse-spark-open", name: "Muse Spark Open",
+      api: "openai-completions", baseUrl: "https://api.fireworks.ai/inference/v1",
+      reasoning: true, input: ["text", "image"], contextWindow: 1048576, maxTokens: 32768,
+      thinkingLevelMap: { off: null, minimal: null, low: "low", medium: "medium", high: "high", xhigh: "xhigh", max: null },
+      cost: { input: 1.25, output: 4.25, cacheRead: 0.15, cacheWrite: 0 },
+      compat: { supportsStore: false, supportsDeveloperRole: false, supportsReasoningEffort: true },
+    },
+  ] });
   const thinkingLevel = (environment.DISPATCH_THINKING ?? defaults.defaultThinkingLevel ?? "off") as ThinkingLevel;
   return {
     models, provider, modelId, thinkingLevel,

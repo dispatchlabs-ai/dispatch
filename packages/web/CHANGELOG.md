@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fireworks models
+
+- Add Meta Muse Spark Open with text/image input and low through extra-high reasoning, retaining the existing Fireworks models and credentials. Use a 32,768-token response budget within its 1,048,576-token context.
+
 ### API model connections
 
 - Add an independent OpenAI API connection and model choices alongside the existing OpenAI connection, preserving its credentials and agent selections. Use Pi's native OpenAI requests, authentication and catalog.
