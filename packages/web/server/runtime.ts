@@ -26,14 +26,14 @@ import { PostgresStorage } from "./storage/postgres/storage.js";
 import { openPiStorage, type PiStorageConfig } from "./storage/open.js";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
-import type { ProjectInstructionsDocument, SaveProjectInstructionsInput, CreateAgentInstanceInput, CreateAgentInstanceResult, AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, ProjectSpecDocument, ProjectMarkdownDocument, SaveProjectMarkdownInput, ImportProjectMarkdownInput, ProjectSpecReadInput, ProjectSpecPage, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
+import type { ProjectInstructionsDocument, SaveProjectInstructionsInput, CreateAgentInstanceInput, CreateAgentInstanceResult, AddParticipantsInput, CompanyPerson, SendMessageInput, AgentDefinition, AgentDraft, ChatSnapshot, ChatSummary, CreateChatInput, CreateProjectInput, Project, ProjectSpecDocument, ProjectMarkdownDocument, SaveProjectMarkdownInput, ProjectSpecSaveResult, ImportProjectMarkdownInput, ProjectSpecReadInput, ProjectSpecPage, RuntimeScope, SaveAgentInput, UpdateChatInput, ManagedConnection, SkillDefinition, SaveSkillInput, SaveProjectInput } from "../src/shared/contracts.js";
 import type { BundleExportInput, BundleImportResult, BundlePreview, PortableBundle, PortableAgent, PortableSkill } from "../src/shared/bundles.js";
 import type { GitHubInstallation, GitHubBundleSource, GitHubBundlePreview, GitHubBundleApplyInput, GitHubBundleApplyResult } from "../src/shared/github-bundles.js";
 import { isManagedConnection } from "../src/shared/contracts.js";
 import { AttachmentsDoc, AttachmentStore, AttachmentError, attachmentMetadata } from "./attachments.js";
 import { acquireRuntimeOwner } from "./runtime-owner.js";
 import { projectSourcesSchema } from "../src/shared/project-sources.js";
-import { ProjectMarkdownDoc, readProjectMarkdown, saveProjectMarkdown, replayProjectMarkdown, markdownHash, projectMarkdownPage } from "./project-markdown.js";
+import { ProjectMarkdownDoc, readProjectMarkdown, saveProjectMarkdown, saveAgentProjectMarkdown, replayProjectMarkdown, markdownHash, projectMarkdownPage } from "./project-markdown.js";
 import { readProjectInstructions, saveProjectInstructions } from "./project-instructions.js";
 import { ProjectsDoc, projectAccess, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
 import { projectChatsSchema, chatSourceUrl, type ProjectChatsInput, type ProjectChatsResult, type ProjectChatMetadata, type ProjectChatReadInput, type ProjectChatResult } from "./project-chat-context.js";
@@ -206,6 +206,7 @@ export type RuntimeOptions = {
   workerMcp?: WorkerMcp;
   workerInvitations?: WorkerInvitations;
   workerProjectSpec?: (actor: WorkerManagementActor, input: ProjectSpecReadInput) => Promise<ProjectSpecPage>;
+  workerProjectSpecSave?: (actor: WorkerManagementActor, input: SaveProjectMarkdownInput) => Promise<ProjectSpecSaveResult>;
   workerProjectChats?: {
     list(actor: WorkerManagementActor, input: ProjectChatsInput): Promise<ProjectChatsResult>;
     read(actor: WorkerManagementActor, input: ProjectChatReadInput): Promise<ProjectChatResult>;
@@ -415,6 +416,14 @@ export class DispatchRuntime {
           const room = await tx.doc(SharedDoc, actor.roomId);
           return projectMarkdownPage(tx, actor.companyId, room.sharedProjectId, input);
         }, context);
+      };
+      shared.saveProjectSpec = async (instanceId, input) => {
+        if (worker) {
+          if (!options.workerProjectSpecSave) throw new RuntimeError(503, "Project spec saving is unavailable.");
+          const actor = await harness.commit(async tx => runtime.remoteActor(tx, await shared.managementActor(tx, instanceId)), context);
+          return options.workerProjectSpecSave(actor, input);
+        }
+        return harness.commit(async tx => runtime.saveAgentProjectSpec(tx, await shared.managementActor(tx, instanceId), input), context);
       };
       shared.listProjectChats = async (instanceId, input) => {
         if (worker) {
@@ -1269,6 +1278,18 @@ export class DispatchRuntime {
       if (room.companyId !== actor.companyId) throw new RuntimeError(403, "Project spec access is unavailable.");
       return projectMarkdownPage(tx, actor.companyId, room.sharedProjectId, input);
     }, context);
+  }
+
+  async saveWorkerProjectSpec(claim: WorkerManagementActor, input: SaveProjectMarkdownInput): Promise<ProjectSpecSaveResult> {
+    this.requireDirectoryActor(claim);
+    return this.harness.commit(async tx => this.saveAgentProjectSpec(tx, await this.authoritativeWorkerActor(tx, claim), input), context);
+  }
+
+  private async saveAgentProjectSpec(tx: Tx, actor: ManagementActor, input: SaveProjectMarkdownInput): Promise<ProjectSpecSaveResult> {
+    const projectId = await this.agentProjectIn(tx, actor);
+    if (!projectId) throw new RuntimeError(400, "This chat has no project spec to save.");
+    const saved = await saveAgentProjectMarkdown(tx, actor.companyId, projectId, actor.participantId, input);
+    return { projectId, revision: saved.revision, contentHash: saved.contentHash, savedAt: saved.savedAt, savedBy: saved.savedBy };
   }
 
   async listWorkerProjectChats(claim: WorkerManagementActor, raw: unknown): Promise<ProjectChatsResult> {

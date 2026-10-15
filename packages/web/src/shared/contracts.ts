@@ -263,6 +263,7 @@ export type ProjectMarkdownDocument = {
 export type ProjectSpecReadInput = { revision?: number; offset?: number };
 export type ProjectSpecPage = { projectId: string | null; revision: number; content: string; contentHash?: string; offset: number; textLength: number; nextOffset: number | null; initialized: boolean; legacyImportRequired?: boolean };
 export type SaveProjectMarkdownInput = { requestId: string; expectedRevision: number; content: string };
+export type ProjectSpecSaveResult = Pick<ProjectMarkdownDocument, "projectId" | "revision" | "contentHash" | "savedAt" | "savedBy">;
 export type ImportProjectMarkdownInput = { requestId: string; expectedProjectRevision: number; sourceVersion: string; contentHash: string };
 
 export type ProjectMember = { userId: string; role: "manager" | "member" };

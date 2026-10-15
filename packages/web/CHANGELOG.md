@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Agent spec saves
+
+- Add `conversation_project_spec_save` for human-directed edits to the current chat's project spec, using existing revision checks, instance attribution and safe retry receipts in native and hosted runtimes.
+
 ### Mention invitations
 
 - Register agents added by human mentions in the backend participant registry before posting to a conversation worker. Reuse the existing invitation receipts and preserve message retries, so later membership changes do not fail with an unregistered participant.

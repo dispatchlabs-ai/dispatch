@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { defineDoc, type Tx } from "@earendil-works/pi-durable";
 import type { RuntimeScope, ProjectSpecImport, ProjectMarkdownDocument, SaveProjectMarkdownInput, ProjectSpecPage, ProjectSpecReadInput } from "../src/shared/contracts.js";
-import { ProjectsDoc, requireProjectAccess } from "./project-access.js";
+import { ProjectsDoc, requireProjectAccess, type SharedProjectRecord } from "./project-access.js";
 import { ProjectSpecError, SPEC_MAX_BYTES } from "./project-spec.js";
 
 export type SpecImportProvenance = ProjectSpecImport;
@@ -46,8 +46,12 @@ export function markdownFingerprint(operation: "save" | "import", input: SavePro
 /** Check permission before every receipt replay. Return the recorded revision, never a newer head. */
 export async function replayProjectMarkdown(tx: Tx, scope: RuntimeScope, id: string, requestId: string, fingerprint: string): Promise<ProjectMarkdownRevision | undefined> {
   await requireProjectAccess(tx, scope, id, "manage");
+  return replayRevision(tx, id, requestKey(scope, id, requestId), fingerprint);
+}
+
+async function replayRevision(tx: Tx, id: string, key: string, fingerprint: string) {
   const doc = await tx.doc(ProjectMarkdownDoc);
-  const prior = doc.requests[requestKey(scope, id, requestId)];
+  const prior = doc.requests[key];
   if (!prior) return;
   if (prior.fingerprint !== fingerprint) throw new ProjectSpecError(409, "Request ID was already used for a different spec change.");
   const revision = doc.revisions[id]?.find(item => item.revision === prior.revision);
@@ -57,12 +61,25 @@ export async function replayProjectMarkdown(tx: Tx, scope: RuntimeScope, id: str
 
 /** All access, conflict, append and receipt mutations belong to the caller's one native commit. */
 export async function saveProjectMarkdown(tx: Tx, scope: RuntimeScope, id: string, input: SaveProjectMarkdownInput, migration?: { provenance: SpecImportProvenance; expectedProjectRevision: number; fingerprint: string }): Promise<ProjectMarkdownRevision> {
+  const project = await requireProjectAccess(tx, scope, id, "manage");
+  return writeProjectMarkdown(tx, project, scope.userId, requestKey(scope, id, input.requestId), input, migration);
+}
+
+/** The runtime resolves the project and authorizes active agent membership before calling. */
+export async function saveAgentProjectMarkdown(tx: Tx, companyId: string, id: string, participantId: string, input: SaveProjectMarkdownInput) {
+  const project = (await tx.doc(ProjectsDoc)).projects[id];
+  if (!project || project.companyId !== companyId) throw new ProjectSpecError(404, "Project not found.");
+  return writeProjectMarkdown(tx, project, `agent:${participantId}`, JSON.stringify([companyId, "agent", participantId, id, input.requestId]), input);
+}
+
+async function writeProjectMarkdown(tx: Tx, project: SharedProjectRecord, savedBy: string, key: string, input: SaveProjectMarkdownInput,
+  migration?: { provenance: SpecImportProvenance; expectedProjectRevision: number; fingerprint: string }): Promise<ProjectMarkdownRevision> {
+  const id = project.id;
   validateMarkdown(input.content);
   if (!input.requestId || input.requestId.length > 200 || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0) throw new ProjectSpecError(400, "Invalid spec save request.");
   const fingerprint = migration?.fingerprint ?? markdownFingerprint("save", input);
-  const replay = await replayProjectMarkdown(tx, scope, id, input.requestId, fingerprint);
+  const replay = await replayRevision(tx, id, key, fingerprint);
   if (replay) return replay;
-  const project = await requireProjectAccess(tx, scope, id, "manage");
   const doc = await tx.doc(ProjectMarkdownDoc);
   const revisions = doc.revisions[id] ?? [];
   const head = revisions.at(-1)?.revision ?? 0;
@@ -75,11 +92,11 @@ export async function saveProjectMarkdown(tx: Tx, scope: RuntimeScope, id: strin
   }
   const saved: ProjectMarkdownRevision = {
     projectId: id, revision: head + 1, content: input.content, contentHash: markdownHash(input.content),
-    savedAt: Date.now(), savedBy: scope.userId, ...(migration ? { importedFrom: migration.provenance } : {}),
+    savedAt: Date.now(), savedBy, ...(migration ? { importedFrom: migration.provenance } : {}),
   };
   doc.revisions[id] = [...revisions, saved];
   project.specRevision = saved.revision;
-  doc.requests[requestKey(scope, id, input.requestId)] = { fingerprint, projectId: id, revision: saved.revision };
+  doc.requests[key] = { fingerprint, projectId: id, revision: saved.revision };
   if (migration) { delete project.spec; project.revision += 1; project.updatedAt = saved.savedAt; }
   return revisionCopy(saved);
 }

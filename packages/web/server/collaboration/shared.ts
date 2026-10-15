@@ -7,7 +7,7 @@ import { createClaudeSdkTask, ClaudeSessionDoc, type ClaudeRunScope, type Claude
 import { sdkToolServer, SdkToolBinding } from "./sdk-tools.js";
 import { transcriptPage, mentionsPage } from "../chat-pages.js";
 import { sharedContextMessage } from "./prompt-cache.js";
-import type { ChatSnapshot, TranscriptQuery, TranscriptPage, ProjectSpecReadInput, ProjectSpecPage } from "../../src/shared/contracts.js";
+import type { ChatSnapshot, TranscriptQuery, TranscriptPage, ProjectSpecReadInput, ProjectSpecPage, SaveProjectMarkdownInput, ProjectSpecSaveResult } from "../../src/shared/contracts.js";
 import { createHash, randomUUID } from "node:crypto";
 import { awaitWithContext, BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { copyJson, type Context } from "@earendil-works/chord";
@@ -390,6 +390,16 @@ export class SharedConversations {
         return reply(await this.readProjectSpec(api.conversationId, args));
       },
     });
+    const saveProjectSpec = defineTool({
+      name: "conversation_project_spec_save",
+      description: "Save a human-authorized change to this chat's project spec. Read the complete current spec first; preserve unrelated content. Supply the full Markdown, expectedRevision and a stable requestId. Retry uncertain saves with identical arguments and the same requestId. On conflict, read and reconcile before a new request. No project selector; saves are attributed to your instance. Saving does not authorize implementation or start work.",
+      parameters: Type.Object({ content: Type.String({ maxLength: 512 * 1024 }), expectedRevision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER - 1 }), requestId: Type.String({ minLength: 1, maxLength: 200 }) }, { additionalProperties: false }),
+      replay: "safe",
+      execute: async (input, api) => {
+        if (!this.saveProjectSpec) throw new CollaborationError(503, "Project spec service is unavailable.");
+        return reply(await this.saveProjectSpec(api.conversationId, input));
+      },
+    });
     const history = defineTool({
       name: "conversation_history", description: "Read the shared public conversation, including all history before you joined. Results preserve author identities. Use the returned next offset to continue; older history remains available after context compaction. For a long message, use messageId and textOffset to read the entire text in chunks.",
       parameters: Type.Object({ offset: Type.Optional(Type.Integer({ minimum: 0 })), limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })), messageId: Type.Optional(Type.String()), textOffset: Type.Optional(Type.Integer({ minimum: 0 })) }), replay: "safe",
@@ -537,7 +547,7 @@ export class SharedConversations {
       },
     });
     this.extension = defineExtension({
-      name: "dispatch-collaboration", tasks: [this.delivery, this.legacyReporter, this.stopTask, this.removeTask, this.turns.wait, this.turns.expirePresence, this.contributions.guard], tools: [projectSpec, history, attachment, attach, post, invite, createInstance, ...managementTools(management), ...skillLibraryTools(skillLibrary), ...projectChatTools({
+      name: "dispatch-collaboration", tasks: [this.delivery, this.legacyReporter, this.stopTask, this.removeTask, this.turns.wait, this.turns.expirePresence, this.contributions.guard], tools: [projectSpec, saveProjectSpec, history, attachment, attach, post, invite, createInstance, ...managementTools(management), ...skillLibraryTools(skillLibrary), ...projectChatTools({
         list: (instanceId, input) => {
           if (!this.listProjectChats) throw new CollaborationError(503, "Project chat service is unavailable.");
           return this.listProjectChats(instanceId, input);
@@ -851,6 +861,7 @@ export class SharedConversations {
   }
 
   readProjectSpec?: (instanceId: ConversationId, input: ProjectSpecReadInput) => Promise<ProjectSpecPage>;
+  saveProjectSpec?: (instanceId: ConversationId, input: SaveProjectMarkdownInput) => Promise<ProjectSpecSaveResult>;
 
   listProjectChats?: (instanceId: ConversationId, input: ProjectChatsInput) => Promise<ProjectChatsResult>;
   readProjectChat?: (instanceId: ConversationId, input: ProjectChatReadInput) => Promise<ProjectChatResult>;

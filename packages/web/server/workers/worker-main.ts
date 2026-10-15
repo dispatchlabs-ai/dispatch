@@ -57,6 +57,7 @@ const runtime = await DispatchRuntime.openConversation({
     return backend("/secrets", { actor, secretId }, signal);
   },
   workerProjectSpec: (actor, input) => backend("/project-spec", { actor, input }),
+  workerProjectSpecSave: (actor, input) => backend("/project-spec/save", { actor, input }),
   workerProjectChats: {
     list: (actor, input) => backend("/project-chats", { actor, input }),
     read: (actor, input) => backend("/project-chat-read", { actor, input }),

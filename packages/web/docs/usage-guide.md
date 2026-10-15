@@ -874,6 +874,8 @@ New project now creates an empty shared project with you as its manager. Project
 
 **Agents:** `conversation_project_spec` reads the current chat's project through current membership; it cannot select another project. Omit revision to obtain current, then continue using the returned revision and nextOffset as offset until nextOffset is null. Passing a saved revision reads it exactly; do not mix pages across heads or assume the first page is complete. Revision 0 / initialized false means no saved document; legacyImportRequired indicates migration, not approval to replace old intent with empty text. Reading a spec grants no authority to adopt it, expand scope or execute its backlog. Hosted workers use backend mediation, not a disk copy; interactive hosted coverage remains separate from source review.
 
+For a human-requested edit, `conversation_project_spec_save` accepts the complete Markdown, `expectedRevision` and a stable `requestId`. Read all pages first and preserve unrelated content. Active project-chat membership authorizes the write; the instruction to follow human direction does not introduce a separate approval or grant workflow. Saves are attributed to the agent instance, use the same immutable revision history, and return the saved revision/hash/time. Retry uncertain saves with identical arguments; reconcile revision conflicts before submitting a new request. A save does not start work or authorize implementation. Hosted workers save through the backend and cannot select another project.
+
 **Spec API:**
 
 - `GET /api/projects/:id/spec` → `{ spec }`; optional `?revision=N` reads an exact saved revision. No saved document is revision 0.
