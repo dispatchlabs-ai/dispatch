@@ -588,6 +588,7 @@ function AgentEditor({
               <summary><strong>Model</strong><span>{model?.name || draft.modelId || "Not configured"} · {thinkingLabel(draft.thinkingLevel)} thinking</span></summary>
             <fieldset disabled={busy} className="agent-form-section">
               <legend className="sr-only">Model settings</legend>
+              {config.modelCatalogWarnings?.map(warning => <Notice key={warning}>{warning}</Notice>)}
               <Field label="Runtime" hint={native ? `Runs the native ${backend === "muse-code" ? "Muse Code" : "Claude Code"} runtime.` : undefined}>
                 {props => <Select {...props} value={backend} onChange={event => changeRuntime(event.target.value as ExecutionBackend)}>
                   <option value="pi">Pi</option>

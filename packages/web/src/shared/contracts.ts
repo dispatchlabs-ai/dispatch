@@ -340,6 +340,7 @@ export interface ApplicationConfig {
   /** Known SDK models, independent of Pi credential readiness; not a login-status assertion. */
   sdkModels?: ModelOption[];
   providerReady: boolean;
+  modelCatalogWarnings?: string[];
 }
 
 export interface ApiErrorResponse {

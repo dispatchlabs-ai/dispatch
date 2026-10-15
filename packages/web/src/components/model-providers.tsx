@@ -202,7 +202,7 @@ export function ModelProvidersPage({ active, onChanged }: { active: boolean; onC
   }
   const resumeProvider = data?.providers.find(provider => provider.id === data.attempt?.providerId);
   return <section className="agent-view connections-page model-providers-page">
-    <header className="view-heading"><h1>Model providers</h1><Button variant="ghost" disabled={loading || Boolean(editing) || disconnecting} onClick={reload}><RefreshCw /> Reload</Button></header>
+    <header className="view-heading"><h1>Model providers</h1><Button variant="ghost" disabled={loading || Boolean(editing) || disconnecting} onClick={() => { reload(); onChanged(); }}><RefreshCw /> Reload</Button></header>
     <div className="agent-content"><div className="connections-page-inner">
       <p className="field-hint">Shared with workspace agents</p>
       {error ? <Notice>{error}</Notice> : null}

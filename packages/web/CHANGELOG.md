@@ -2,9 +2,10 @@
 
 ## [Unreleased]
 
-### Fireworks models
+### Live model discovery
 
-- Add Meta Muse Spark Open with text/image input and low through extra-high reasoning, retaining the existing Fireworks models and credentials. Use a 32,768-token response budget within its 1,048,576-token context.
+- Refresh connected model catalogs when loading configuration and reloading provider settings. Use Fireworks’ authenticated live model list for new choices, retaining cached choices with a visible warning if refresh fails.
+- Discover new Fireworks models without rebuilding Dispatch; retain Pi request metadata and add verified Muse Spark Open reasoning settings. Conversation workers refresh their catalogs before using newly discovered models.
 
 ### API model connections
 

@@ -718,6 +718,8 @@ export class DispatchRuntime {
       }
       return { sourceId: binding.sourceId, revision: binding.catalogRevision, fingerprint: binding.catalogFingerprint };
     }, context);
+    const missingProviders = [...new Set(snapshot.agents.filter(agent => !this.models.getModel(agent.provider, agent.modelId)).map(agent => agent.provider))];
+    if (missingProviders.length) await this.models.refresh({ providers: missingProviders, allowNetwork: true, signal: AbortSignal.timeout(15_000) });
     this.readAllProjectUserIds = new Set(snapshot.readAllProjectUserIds);
     return receipt;
   }
