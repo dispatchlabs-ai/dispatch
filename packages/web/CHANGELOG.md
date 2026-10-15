@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fireworks models
+
+- Add Meta Muse Spark Open with text/image input and low through extra-high reasoning, retaining the existing Fireworks models and credentials. Use a 32,768-token response budget within its 1,048,576-token context.
+
 ### Agent spec saves
 
 - Add `conversation_project_spec_save` for human-directed edits to the current chat's project spec, using existing revision checks, instance attribution and safe retry receipts in native and hosted runtimes.
