@@ -1,4 +1,4 @@
-export type SetupProviderId = "openai" | "openai-api" | "openai-codex" | "anthropic" | "fireworks";
+export type SetupProviderId = "openai" | "openai-api" | "openai-codex" | "anthropic" | "fireworks" | "google" | "xai" | "mistral" | "meta";
 export type ProviderStatus = {
   id: SetupProviderId; name: string; methods: ("oauth" | "api_key")[];
   state: "not_connected" | "key_saved" | "authorized" | "reconnect_required" | "externally_managed" | "unavailable";

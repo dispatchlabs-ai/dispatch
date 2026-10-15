@@ -10,6 +10,10 @@ const definitions = [
   { id: "openai-codex", name: "Codex images", methods: ["oauth"] },
   { id: "anthropic", name: "Anthropic API", methods: ["api_key"] },
   { id: "fireworks", name: "Fireworks", methods: ["api_key"] },
+  { id: "google", name: "Google Gemini API", methods: ["api_key"] },
+  { id: "xai", name: "xAI API", methods: ["api_key"] },
+  { id: "mistral", name: "Mistral API", methods: ["api_key"] },
+  { id: "meta", name: "Meta API", methods: ["api_key"] },
 ] as const;
 export class ProviderSetupError extends Error {
   constructor(readonly status: 400 | 404 | 409 | 503, message: string) { super(message); }
