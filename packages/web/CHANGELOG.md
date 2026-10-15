@@ -5,6 +5,7 @@
 ### Archived chat migration
 
 - Add offline preparation and verified publication of idle native chats into isolated PostgreSQL worker stores, including attachments and per-user archive preferences. Preserve existing destination data and publish directory entries only after store verification.
+- Initialize never-launched imports with pending routes and the current deployment configuration so their first explicit open can start normally.
 
 ### GitHub App access
 

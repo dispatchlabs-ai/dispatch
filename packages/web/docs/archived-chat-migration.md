@@ -1,6 +1,6 @@
 # Copy archived native chats into a worker deployment
 
-The operator tooling copies an idle project from a schema-v1 native Pi snapshot into an existing directory/worker deployment. Each selected chat gets a separate worker store and a sleeping route. Directory publication archives every copied chat for all accounts present in the destination company. Existing chats, project settings, authentication and grants remain unchanged.
+The operator tooling copies an idle project from a schema-v1 native Pi snapshot into an existing directory/worker deployment. Each selected chat gets a separate worker store and a pending route with no executor. Directory publication archives every copied chat for all accounts present in the destination company. Existing chats, project settings, authentication and grants remain unchanged.
 
 This is an offline administration procedure, not a browser import or a whole-installation replacement. The backend must be stopped cleanly during publication. Opening an imported chat later follows normal worker startup behavior; archive preferences hide chats but do not prohibit explicit reads or future work.
 
@@ -27,7 +27,7 @@ Stage the prepared output in the destination's private S3 artifact bucket under 
 1. Serialize with other maintenance, record the current backend definition and worker inventory, stop the backend and confirm its clean exit.
 2. The publisher takes native directory ownership, verifies company/account/project identities and rejects numeric or template namespace collisions. It saves private directory and route snapshots in the batch prefix.
 3. Provision each new restricted worker role, import the matching snapshot, and compare every native table and allocator against readback. Existing stores are accepted only when they exactly match the snapshot. Verify each S3 attachment by reading it back.
-4. Insert sleeping routes, then atomically append directory metadata, participant journals and the batch receipt. Verify changed documents and that unrelated directory documents remain identical.
+4. Insert pending routes using `configurationRevision` from the current deployment, then atomically append directory metadata, participant journals and the batch receipt. A never-launched import must not use `sleeping`, which assumes a retired launcher attempt exists. Verify changed documents and that unrelated directory documents remain identical.
 5. Confirm the operator has exited, restore the backend, check health and archive visibility for destination users, and inspect representative histories and attachments through the normal application.
 
 Publication does not launch workers or submit jobs. Cross-database publication is intentionally ordered: prepared stores and routes may exist before their chats become visible. If interrupted, retain the same batch and retry after confirmed operator retirement. The same plan verifies existing stores without replacing them; a changed plan or conflicting data is rejected. A committed directory receipt marks completed publication. Preserve receipts and snapshots for recovery; do not delete native records or reset owner latches to bypass a failure.

@@ -287,7 +287,7 @@ export async function prepareNativeChatTransfer(sourceDirectory: string, inspect
         await storage.commit(writes, BACKGROUND_CONTEXT);
         const attemptId = deterministicUuid(config.batchId, `attempt:${roomId}`);
         const route: WorkerRoute = { conversationId: directoryId, companyId: inspection.company, storeId, attemptId,
-          configurationRevision: inspection.config.configurationRevision, nativeRoomId: String(roomId), scope, input, phase: "sleeping",
+          configurationRevision: inspection.config.configurationRevision, nativeRoomId: String(roomId), scope, input, phase: "pending",
           summary: { attemptId, value: { revision: 0, updatedAt: Math.max(chat.createdAt, summary.updatedAt ?? 0), status: "idle", suggestedTitle: chat.displayTitle.slice(0, 80) } } };
         const directoryRoom = object<SharedState>(room); directoryRoom.members = directoryRoom.members.filter(m => m.kind === "human");
         directoryRoom.deliveries = []; directoryRoom.requests = {}; delete directoryRoom.stopping; delete directoryRoom.legacyQueued;

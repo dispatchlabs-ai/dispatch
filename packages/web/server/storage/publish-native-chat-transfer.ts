@@ -14,7 +14,7 @@ import { contentDigest, stableFingerprint, requiredDocument, type TransferPlan, 
 type Options = {
   directory: { connectionString: string; storeId: string }; workersConnectionString: string;
   authConnectionString: string; routingConnectionString: string; ca: string;
-  companyId: string; installationId: string; credentialKey: string;
+  companyId: string; installationId: string; credentialKey: string; configurationRevision: string;
   artifacts: { bucket: string; region: string; prefix: string }; stagingPrefix: string; temporaryDirectory: string;
 };
 const context = BACKGROUND_CONTEXT;
@@ -26,6 +26,7 @@ function requireValue(condition: unknown, message: string): asserts condition { 
 export async function publishNativeChatTransfer(plan: TransferPlan, options: Options, progress: (value: unknown) => void) {
   requireValue(plan.format === "dispatch-archived-native-transfer" && plan.version === 1, "Unsupported transfer plan");
   requireValue(options.companyId === plan.targetCompany && options.directory.storeId === plan.targetDirectoryStoreId, "Wrong destination");
+  requireValue(options.configurationRevision.trim().length > 0, "Current deployment configuration revision is required");
   const planHash = stableFingerprint(plan);
   const s3 = new S3Client({ region: options.artifacts.region, maxAttempts: 1 });
   const clients: Client[] = [];
@@ -114,7 +115,7 @@ export async function publishNativeChatTransfer(plan: TransferPlan, options: Opt
       const id = await storage.mintId<DocumentId>(); requireValue(!ids.includes(id), "Document allocation collision");
       writes.push({ type: "document.create", record: { id, kind: "dispatch.shared-conversation", history: "latest", fork: "initial", scope: { kind: "conversation", conversationId: Number(chat.directoryId) as ConversationId } },
         content: { kind: "base", version: 1, value: chat.directoryRoom as unknown as JsonObject } });
-      await routes.importSleeping(chat.route);
+      await routes.importPending({ ...chat.route, phase: "pending", configurationRevision: options.configurationRevision });
     }
     const receiptId = await storage.mintId<DocumentId>(); requireValue(!ids.includes(receiptId), "Receipt allocation collision");
     writes.push({ type: "document.create", record: { id: receiptId, kind: "dispatch.archived-chat-import", scope: { kind: "session" } },
