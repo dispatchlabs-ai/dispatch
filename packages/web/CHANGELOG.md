@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### API model connections
+
+- Add an independent OpenAI API connection and model choices alongside the existing OpenAI connection, preserving its credentials and agent selections. Use Pi's native OpenAI requests, authentication and catalog.
+- Rename the Claude provider card to Anthropic API to make its API-key billing explicit; retain existing credentials and the separate Claude Agent SDK runtime.
+
 ### GitHub App access
 
 - Connect existing GitHub App installations through a backend credential service, select project repositories, and explicitly grant agents Read or Write access in the browser.

@@ -6,8 +6,9 @@ import type { ProviderLogin, ProviderStatus, SetupProviderId } from "../src/shar
 
 const definitions = [
   { id: "openai", name: "OpenAI", methods: ["oauth", "api_key"] },
+  { id: "openai-api", name: "OpenAI API", methods: ["api_key"] },
   { id: "openai-codex", name: "Codex images", methods: ["oauth"] },
-  { id: "anthropic", name: "Claude", methods: ["api_key"] },
+  { id: "anthropic", name: "Anthropic API", methods: ["api_key"] },
   { id: "fireworks", name: "Fireworks", methods: ["api_key"] },
 ] as const;
 export class ProviderSetupError extends Error {
