@@ -4,6 +4,7 @@ import { Writable } from "node:stream";
 import { parseArgs } from "node:util";
 import type { AuthEvent, AuthPrompt } from "@earendil-works/pi-ai";
 import { openConfiguredProviderCredentials, readProviderCredentialConfig } from "./storage/provider-credential-config.js";
+import { openaiApiProvider } from "./openai-api-provider.js";
 
 const help = `Stopped-backend provider authorization (operator credential authority)
 
@@ -132,6 +133,7 @@ async function main() {
     line(`Credential maintenance owner: ${store.ownerId}`);
     stop.signal.throwIfAborted();
     const models = await ModelRuntime.create({ credentials: store, modelsPath: null, refreshOnCreate: false, allowModelNetwork: false });
+    models.registerNativeProvider(openaiApiProvider());
     if (command === "list") {
       console.log(JSON.stringify({ credentials: await models.listCredentials(), note: "Stored metadata only; not a token-validity or pending-intent check." }));
     } else if (command === "logout") {

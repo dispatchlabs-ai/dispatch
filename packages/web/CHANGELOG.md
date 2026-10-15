@@ -6,6 +6,11 @@
 
 - Register agents added by human mentions in the backend participant registry before posting to a conversation worker. Reuse the existing invitation receipts and preserve message retries, so later membership changes do not fail with an unregistered participant.
 
+### API model connections
+
+- Add an independent OpenAI API connection and model choices alongside the existing OpenAI connection, preserving its credentials and agent selections. Use Pi's native OpenAI requests, authentication and catalog.
+- Rename the Claude provider card to Anthropic API to make its API-key billing explicit; retain existing credentials and the separate Claude Agent SDK runtime.
+
 ### Archived chat migration
 
 - Add offline preparation and verified publication of idle native chats into isolated PostgreSQL worker stores, including attachments and per-user archive preferences. Preserve existing destination data and publish directory entries only after store verification.

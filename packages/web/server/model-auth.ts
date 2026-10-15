@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { codexImageProvider } from "./codex-image-provider.js";
+import { openaiApiProvider } from "./openai-api-provider.js";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { z } from "zod";
 import type { AgentDraft, ModelOption, ThinkingLevel } from "../src/shared/contracts.js";
@@ -37,6 +38,7 @@ export async function openModels(
     modelsPath: join(agentDir, "models.json"), allowModelNetwork: false, refreshOnCreate,
   });
   models.registerNativeProvider(codexImageProvider());
+  models.registerNativeProvider(openaiApiProvider());
   models.registerNativeProvider(museProvider());
   const thinkingLevel = (environment.DISPATCH_THINKING ?? defaults.defaultThinkingLevel ?? "off") as ThinkingLevel;
   return {

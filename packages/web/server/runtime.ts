@@ -15,6 +15,7 @@ import { isAbsolute, join, normalize } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, getSupportedThinkingLevels, type Models } from "@earendil-works/pi-ai/models";
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
+import { openaiApiProvider } from "./openai-api-provider.js";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import { AgentDoc, configure, createRegistry, defineDoc, Harness, InboxDoc, LiveDoc, type CommitPublication, type ConversationId, type HarnessSettings, type Registry, type RegistryReader, type Storage, type Tx, type EntryRecord, type Cursor } from "@earendil-works/pi-durable";
 import { WorkerActorsDoc, WorkerInstancesDoc, WorkerIdentityDoc, workerParticipantReportSchema, type BackendWorkerActor, type WorkerParticipantReport } from "./workers/participant-identity.js";
@@ -3458,6 +3459,7 @@ function latestAgents(catalog: Catalog, companyId: string) {
 function productionModels() {
   const models = createModels();
   models.setProvider(openaiProvider());
+  models.setProvider(openaiApiProvider());
   models.setProvider(anthropicProvider());
   models.setProvider(museProvider());
   return models;

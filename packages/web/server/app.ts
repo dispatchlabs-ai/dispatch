@@ -129,7 +129,7 @@ export function createApp(options: AppOptions) {
     c.set("principal", principal);
     await next();
   });
-  const providerId = z.enum(["openai", "openai-codex", "anthropic", "fireworks"]);
+  const providerId = z.enum(["openai", "openai-api", "openai-codex", "anthropic", "fireworks"]);
   const providerSetup = () => {
     if (!options.providerSetup) throw new ProviderSetupError(503, "Provider setup is not configured on this installation.");
     return options.providerSetup;
