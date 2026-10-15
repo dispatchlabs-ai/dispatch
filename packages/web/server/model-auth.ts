@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { codexImageProvider } from "./codex-image-provider.js";
 import { openaiApiProvider } from "./openai-api-provider.js";
+import { liveFireworksProvider } from "./fireworks-provider.js";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { z } from "zod";
 import type { AgentDraft, ModelOption, ThinkingLevel } from "../src/shared/contracts.js";
@@ -40,22 +41,12 @@ export async function openModels(
   models.registerNativeProvider(codexImageProvider());
   models.registerNativeProvider(openaiApiProvider());
   models.registerNativeProvider(museProvider());
-  // Keep Pi's Fireworks catalog and credentials while its bundled catalog catches up.
-  models.registerProvider("fireworks", { models: [
-    ...models.getAllModels("fireworks").filter(model => model.id !== "accounts/fireworks/models/muse-spark-open"),
-    {
-      id: "accounts/fireworks/models/muse-spark-open", name: "Muse Spark Open",
-      api: "openai-completions", baseUrl: "https://api.fireworks.ai/inference/v1",
-      reasoning: true, input: ["text", "image"], contextWindow: 1048576, maxTokens: 32768,
-      thinkingLevelMap: { off: null, minimal: null, low: "low", medium: "medium", high: "high", xhigh: "xhigh", max: null },
-      cost: { input: 1.25, output: 4.25, cacheRead: 0.15, cacheWrite: 0 },
-      compat: { supportsStore: false, supportsDeveloperRole: false, supportsReasoningEffort: true },
-    },
-  ] });
+  models.registerNativeProvider(liveFireworksProvider());
   const thinkingLevel = (environment.DISPATCH_THINKING ?? defaults.defaultThinkingLevel ?? "off") as ThinkingLevel;
   return {
     models, provider, modelId, thinkingLevel,
     async configuration(defaultAgent: Pick<AgentDraft, "provider" | "modelId">) {
+      const refreshed = await models.refresh({ allowNetwork: true, signal: AbortSignal.timeout(15_000) });
       const model = defaultAgent.provider === "openai-codex" ? undefined : models.getModel(defaultAgent.provider, defaultAgent.modelId);
       // A pending/invalid credential must not prevent opening Settings to repair
       // it. Pi's global enumeration rejects if any provider's auth check fails.
@@ -65,6 +56,10 @@ export async function openModels(
       }))).flat();
       const choices = !model || available.some((item) => item.provider === model.provider && item.id === model.id) ? available : [model, ...available];
       return {
+        modelCatalogWarnings: [
+          ...[...refreshed.errors.keys()].map(id => `${models.getProvider(id)?.name ?? id} models could not refresh; showing cached choices.`),
+          ...(refreshed.aborted ? ["Model refresh timed out; showing cached choices."] : []),
+        ],
         sdkModels: models.getModels().filter(item => (item.provider === "anthropic" || item.provider === "muse-code")).map((item): ModelOption => ({ provider: item.provider, id: item.id, name: item.name, reasoning: item.reasoning, thinkingLevels: [...getSupportedThinkingLevels(item)] })),
         models: choices.map((item): ModelOption => ({ provider: item.provider, id: item.id, name: item.name, reasoning: item.reasoning, thinkingLevels: [...getSupportedThinkingLevels(item)] })),
         providerReady: available.some(item => item.provider === defaultAgent.provider),

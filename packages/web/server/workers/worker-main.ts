@@ -44,6 +44,7 @@ const providers = await openModels({ DISPATCH_PI_AGENT_DIR: "/workspace/provider
 const models = workerModels(providers.models.getProviders(),
   (provider, signal) => backend<AuthResult | undefined>("/model-auth", { provider }, signal),
   (provider, signal) => backend<AuthCheck | undefined>("/model-auth-check", { provider }, signal));
+await models.refresh({ providers: [...new Set(bootstrap.catalog.agents.map(agent => agent.provider))], allowNetwork: true, signal: AbortSignal.timeout(15_000) });
 const runtime = await DispatchRuntime.openConversation({
   stateDir: "/workspace/state", workspaceDir: "/workspace", companyId: bootstrap.scope.companyId,
   piStorage: bootstrap.storage, models,
