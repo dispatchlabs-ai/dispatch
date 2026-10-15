@@ -17,6 +17,7 @@
 
 ### API model connections
 
+- Add API-key setup for Google Gemini, xAI, Mistral and Meta. Include Gemini 4 Argon and Muse Wonder alongside Pi's existing catalogs, with Argon's supported thinking levels.
 - Add an independent OpenAI API connection and model choices alongside the existing OpenAI connection, preserving its credentials and agent selections. Use Pi's native OpenAI requests, authentication and catalog.
 - Rename the Claude provider card to Anthropic API to make its API-key billing explicit; retain existing credentials and the separate Claude Agent SDK runtime.
 
