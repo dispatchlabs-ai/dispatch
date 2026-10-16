@@ -6,6 +6,7 @@
 
 - Let Pi agents batch passive discussion while explicitly waiting for named results, with durable deadlines and receipts. Human direction, mentions, blockers, corrections, criteria changes and unavailable participants release the wait; Stop cancels it.
 - Keep independent work and public history available. Result signals take effect only after publication; unsupported execution backends retain ordinary delivery.
+- Refresh application-owned collaboration tools when a hosted worker reopens retained participants, so existing chats can use new wait tools without changing agent definitions.
 
 ### Live model discovery
 
