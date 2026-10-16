@@ -237,14 +237,6 @@ export class WorkerLauncher {
 
   status(): Promise<LauncherStatus> { return this.serial(() => this.readStatus()); }
 
-  /** Planned sleep stops spare capacity without cancelling conversation work. */
-  suspendWarmSpare(): Promise<void> {
-    return this.serial(async () => {
-      await this.save({ ...this.journal, warmSuspended: true });
-      for (const spare of this.journal.attempts.filter(item => item.warm && item.phase !== "stopped")) await this.retire(spare);
-    });
-  }
-
   /** One spare is capacity, not an executor. Admission drain suppresses replenishment. */
   maintainWarmSpare(): Promise<void> {
     return this.serial(async () => {

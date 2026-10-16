@@ -75,15 +75,14 @@ Controller retirement leaves the spare alive for the successor owner. A changed
 configuration revision, immutable launch fingerprint (including task definition),
 or disabled option retires unassigned capacity; assigned
 workers remain intact. Installation drain suppresses replenishment and retires
-all tasks. Planned sleep first durably suspends replenishment and retires spares, then performs the
-existing conversation-idleness checks; a busy refusal leaves capacity suspended
-until explicit undrain. Wake clears the suspension. Retain compatible launcher
-images while warm records exist; do not delete journals to downgrade.
+all tasks. Explicit activation resumes admission and replenishment, including
+clearing suspension recorded by older installation-sleep implementations. Retain
+compatible launcher images while warm records exist; do not delete journals to downgrade.
 
 The AWS module owns the option, private launcher-to-worker TCP 8831 rules and
 worker sizing. The caller owns its additional running cost and deployment
 evidence. Source/type/build checks do not establish live claim, replenishment,
-restart recovery, sleep or latency acceptance; record those observations in the
+restart recovery or latency acceptance; record those observations in the
 installation's deployment receipt.
 
 ## Mention invitations — October 15, 2026
@@ -169,16 +168,14 @@ responses, owner handover during retirement, queued/background-task variants and
 AWS retirement remain separate acceptance cases; no automated application tests
 were added or run.
 
-## Installation idle sleep contract — October 10, 2026
+## Installation lifecycle
 
-Source `1114256` introduced explicit installation sleep. Automatic conversation
-retirement above leaves the installation awake; full sleep remains an operator action.
-The [canonical sleep/wake contract](idle-sleep.md) owns eligibility, busy/unknown
-refusal, retained support callbacks, partial retirement/reopening, planned-quiescence
-health and clean-close/wake boundaries. Existing `/internal/drain` cancels work and
-is not this idle gate; health or `waitForIdle()` alone does not prove idleness.
-The module owns selected-network orchestration/receipts and cost estimates. Source,
-build and mock acceptance do not establish live pause, wake latency or savings.
+Whole-installation sleep was retired on October 16, 2026. The former sleep gate
+and its sleep/wake runbook are removed; ordinary releases do not depend on that
+gate. Automatic conversation-worker retirement leaves controllers and warm
+capacity available. Normal activation, controller handover, drain and graceful
+shutdown retain their existing contracts. `/internal/drain` cancels native work;
+it is not an idle-only replacement for the removed feature.
 
 ## ECS follow-up plan (proposed, not deployed)
 

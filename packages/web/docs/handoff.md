@@ -2592,3 +2592,20 @@ Keyboard follow-up: Developer exercised Tab, Enter and Space in a separate owned
 Developer exercised the running canonical checkout through agent-browser 0.38.2 on localhost:5174 in disposable chat `309878`. An existing Developer agent created two further instances of its own definition, **Instance Alpha** and **Instance Beta**, returning distinct participant IDs; the participant count grew from two to four. Participant details showed Alpha’s requested **Instance instructions** separately from **Base instructions**. A subsequent human prompt elicited the distinct exact replies `ALPHA-INSTANCE-309878` and `BETA-INSTANCE-309878` under the corresponding instance names, demonstrating real Pi delivery of the two supplements. Browser reload retained four participants and both replies. An unavailable-definition creation attempt was reported as rejected; a subsequent ordinary ensure-existing invitation succeeded, with the participant count remaining four. Private receipt: `.local/agent-instance-acceptance-3b069-309111/README.md`. No account/settings/grant or definition edits were made for acceptance; the disposable chat is retained.
 
 Integrated Nix-shell `npm run check`, Apple Silicon `nix flake check`, `nix build`, and whitespace checks passed; no automated tests were added or run. Deslop reviewed both local and worker paths without blocking findings. Claude and Muse independently confirmed the new tool in their actual tool lists, but creation through those transports was not exercised. Actor authorization, native/backend retry receipts and removal/Stop fences are source-reviewed, not live rejection/replay or crash-recovery qualification. Hosted backend/worker creation, lost-response replay and other-system builds remain unverified.
+
+
+## Whole-installation sleep removed — October 16, 2026
+
+Chris retired the installation sleep/wake procedure after the 0.6.0 rollout
+exposed its interaction with controller handover. Remove `/internal/sleep`, its
+all-worker retirement path, sleep-only readiness and warm-spare suspension, and
+the release runbook dependency. Ordinary activation, controller handover,
+graceful shutdown/drain and automatic timed conversation-worker retirement
+remain supported. Earlier sleep trial notes in this history are superseded.
+
+Nix-shell `npm run check`, Apple Silicon `nix build` and `nix flake check`,
+source/deslop review and whitespace checks passed. The first Nix attempts ran
+out of disk space; removal of this task's regenerable dependencies allowed the
+builds to complete. Linux systems were omitted from the native flake check; no
+automated application tests or live rollout were run. This source change does
+not update the published 0.6.0 artifacts or deployed Surton installation.

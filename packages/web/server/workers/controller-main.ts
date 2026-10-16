@@ -17,8 +17,6 @@ import { tokenMatches } from "./identity.js";
 
 export type ControllerOwner = {
   app: Hono; supportReady?(): boolean | Promise<boolean>; ready(): boolean | Promise<boolean>;
-  /** Explicit healthy operator quiescence; never used to admit application requests. */
-  healthReady?(): boolean | Promise<boolean>;
   retire(beforeSupportClose?: () => Promise<void>): Promise<void>;
 };
 const schema = z.object({
@@ -115,7 +113,7 @@ export async function serveRollingController(role: "backend" | "launcher", openO
   }
   async function ready() {
     if (stopping || !rendezvous.healthy || !gate.available) return false;
-    if (owner && activated && !retired && !gate.holding) return owner.healthReady?.() ?? owner.ready();
+    if (owner && activated && !retired && !gate.holding) return owner.ready();
     if (!gate.waitingAvailable) return false;
     // The old task retains a bounded waiting path while a verified successor opens.
     if (activated && transfer && performance.now() - transferStarted < 30_000) return true;
@@ -161,7 +159,7 @@ export async function serveRollingController(role: "backend" | "launcher", openO
       || request.headers.get(hopHeader) !== rendezvous.identity.instanceId)) return c.text("Forbidden", 403);
     const workerSupport = role === "backend" && c.req.path.startsWith("/internal/workers/");
     const dispatchGate = workerSupport ? supportGate : gate;
-    const maintenance = ["/internal/undrain", "/internal/drain", "/internal/sleep", "/internal/status"].includes(c.req.path);
+    const maintenance = ["/internal/undrain", "/internal/drain", "/internal/status"].includes(c.req.path);
     if (owner && !retired && !dispatchGate.holding && (await localAvailable(workerSupport) || maintenance)) {
       const accepted = dispatchGate.tryRun(request, async value => owner!.app.fetch(value));
       if (accepted) return accepted;

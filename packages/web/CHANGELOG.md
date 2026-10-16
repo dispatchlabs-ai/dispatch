@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Installation lifecycle
+
+- Remove the whole-installation sleep endpoint and its release procedure, including sleep-only readiness and warm-spare suspension. Normal activation, controller handover, graceful shutdown and timed conversation-worker retirement remain available.
+
 ## [0.6.0] - 2026-10-16
 
 ### Explicit dependency waits
@@ -219,7 +223,7 @@
 
 ### operator idle sleep
 
-- Add a non-cancelling operator sleep gate using sealed admission, native live/background work inspection and confirmed worker retirement. Busy workers keep support callbacks and reopen RPC admission; uncertain outcomes remain fail-closed. See [idle sleep](docs/idle-sleep.md) for partial refusal, recovery and live-qualification limits.
+- Add a non-cancelling operator sleep gate using sealed admission, native live/background work inspection and confirmed worker retirement. Busy workers keep support callbacks and reopen RPC admission; uncertain outcomes remain fail-closed. This whole-installation feature was removed after 0.6.0; see the Unreleased entry.
 - Allow typed ECS public-IP assignment for outbound task networking and extend initial PostgreSQL connection deadlines to 60 seconds for cold resume, without transaction retries or relaxed ownership fencing.
 
 ### Single composer Send/Stop action
