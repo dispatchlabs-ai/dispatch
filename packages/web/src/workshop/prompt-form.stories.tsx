@@ -29,7 +29,7 @@ function PromptFormPreview({
         title={
           disabled ? "Unavailable" : running ? "Generating" : "Write a message"
         }
-        description="Enter sends. Shift+Enter adds a line. While generating, a new draft makes Send available again."
+        description="Paste an image or use the paperclip to add files and photos. Enter sends; Shift+Enter adds a line."
       >
         <UI.PromptForm
           value={value}
@@ -54,6 +54,7 @@ function PromptFormPreview({
                 id: crypto.randomUUID(),
                 name: file.name,
                 detail: `Local preview · ${Math.max(1, Math.ceil(file.size / 1024))} KB`,
+                file,
               })),
             ])
           }
@@ -119,6 +120,14 @@ export const UploadFailure: Story = {
 export const Disabled: Story = {
   args: {
     initialValue: "A draft kept while messaging is unavailable.",
+    initialAttachments: [
+      {
+        id: "brief",
+        name: "design-brief.md",
+        detail: "Markdown · 4 KB",
+        state: "error",
+      },
+    ],
     disabled: true,
   },
 };

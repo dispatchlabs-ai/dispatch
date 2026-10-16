@@ -402,6 +402,7 @@ function ChatPreview({ scenario = "conversation" }: { scenario?: Scenario }) {
                     id: crypto.randomUUID(),
                     name: file.name,
                     detail: `Local preview · ${Math.max(1, Math.ceil(file.size / 1024))} KB`,
+                    file,
                   })),
                 ])
               }

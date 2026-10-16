@@ -68,10 +68,21 @@ export function Dialog({
 export const Menu = MenuPrimitive.Root;
 export const MenuTrigger = MenuPrimitive.Trigger;
 
-export function MenuContent({ children }: { children: ReactNode }) {
+export function MenuContent({
+  children,
+  side,
+  align = "end",
+}: {
+  children: ReactNode;
+} & Pick<MenuPrimitive.Positioner.Props, "side" | "align">) {
   return (
     <MenuPrimitive.Portal>
-      <MenuPrimitive.Positioner sideOffset={6} align="end" className="z-50">
+      <MenuPrimitive.Positioner
+        side={side}
+        sideOffset={6}
+        align={align}
+        className="z-50"
+      >
         <MenuPrimitive.Popup className="min-w-44 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md outline-none">
           {children}
         </MenuPrimitive.Popup>

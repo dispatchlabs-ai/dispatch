@@ -1,7 +1,7 @@
 // Adapted from shadcn-ui/chatbot-template/components/prompt-form.tsx.
 // Source revision, local adaptations and MIT license are recorded in NOTICE.md.
-import { ArrowUp, Paperclip, Square } from "lucide-react";
-import { useRef, type ReactNode } from "react";
+import { ArrowUp, FilePlus, ImagePlus, Paperclip, Square } from "lucide-react";
+import { useRef, type ChangeEvent, type ReactNode } from "react";
 import { AttachmentChip, type ComposerAttachment } from "./chat-patterns";
 import {
   InputGroup,
@@ -9,6 +9,7 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "./input-group";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "./overlays";
 
 // Dispatch allows another message during work; draft and transport ownership stay with the caller.
 export function PromptForm({
@@ -36,7 +37,8 @@ export function PromptForm({
   onRetryAttachment?: (id: string) => void;
   leading?: ReactNode;
 }) {
-  const input = useRef<HTMLInputElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const photoInput = useRef<HTMLInputElement>(null);
   const hasDraft = Boolean(value.trim() || attachments.length);
   const sendable =
     hasDraft &&
@@ -44,6 +46,13 @@ export function PromptForm({
     attachments.every(
       (attachment) => !attachment.state || attachment.state === "ready",
     );
+
+  function addSelectedFiles(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.currentTarget.files ?? []);
+    if (files.length && !disabled) onFiles?.(files);
+    event.currentTarget.value = "";
+  }
+
   return (
     <form
       onSubmit={(event) => {
@@ -59,6 +68,7 @@ export function PromptForm({
               <AttachmentChip
                 key={attachment.id}
                 attachment={attachment}
+                disabled={disabled}
                 onRemove={
                   onRemoveAttachment
                     ? () => onRemoveAttachment(attachment.id)
@@ -79,6 +89,12 @@ export function PromptForm({
           value={value}
           disabled={disabled}
           onChange={(event) => onValueChange(event.target.value)}
+          onPaste={(event) => {
+            const files = Array.from(event.clipboardData.files);
+            if (!onFiles || disabled || !files.length) return;
+            event.preventDefault();
+            onFiles(files);
+          }}
           className="min-h-24 max-h-60 px-4 py-4"
           onKeyDown={(event) => {
             if (
@@ -95,24 +111,47 @@ export function PromptForm({
           {onFiles ? (
             <>
               <input
-                ref={input}
+                ref={fileInput}
                 type="file"
                 multiple
                 hidden
-                aria-label="Choose attachments"
-                onChange={(event) => {
-                  onFiles(Array.from(event.currentTarget.files ?? []));
-                  event.currentTarget.value = "";
-                }}
-              />
-              <InputGroupButton
-                size="icon-sm"
-                aria-label="Attach files"
                 disabled={disabled}
-                onClick={() => input.current?.click()}
-              >
-                <Paperclip />
-              </InputGroupButton>
+                aria-label="Choose files"
+                onChange={addSelectedFiles}
+              />
+              <input
+                ref={photoInput}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                disabled={disabled}
+                aria-label="Choose photos"
+                onChange={addSelectedFiles}
+              />
+              <Menu>
+                <MenuTrigger
+                  disabled={disabled}
+                  render={
+                    <InputGroupButton
+                      size="icon-sm"
+                      aria-label="Add attachments"
+                    />
+                  }
+                >
+                  <Paperclip />
+                </MenuTrigger>
+                <MenuContent side="top" align="start">
+                  <MenuItem onClick={() => fileInput.current?.click()}>
+                    <FilePlus className="size-4" />
+                    Add files
+                  </MenuItem>
+                  <MenuItem onClick={() => photoInput.current?.click()}>
+                    <ImagePlus className="size-4" />
+                    Add photos
+                  </MenuItem>
+                </MenuContent>
+              </Menu>
             </>
           ) : null}
           {leading}

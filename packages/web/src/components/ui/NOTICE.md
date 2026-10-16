@@ -32,6 +32,8 @@ control in place of the template's model gateway selector. It allows Send during
 work when a draft is present and shows Stop when the draft is empty. Its actions
 retain Dispatch's 40 px desktop and 44 px coarse-pointer targets, with a full
 circular radius and the same primary color in Ready and Generating states.
+Image paste and separate file/photo pickers feed the caller's attachment handler;
+local raster-image thumbnails are owned by the shared attachment chip.
 The original `ChatComposer` public name remains an alias.
 
 ## Boundaries and updates

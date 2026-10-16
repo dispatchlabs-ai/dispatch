@@ -8,6 +8,7 @@
 
 ### Component workshop
 
+- Support image paste, separate file/photo pickers and local image thumbnails in the shared prompt form and Chat preview.
 - Give the template-derived prompt form its own component and review stories; restore circular Send and Stop actions with matching primary colors, shared with the Chat preview.
 - Add a local Storybook with shared controls, product patterns, a screen coverage map, and interactive Chat and Agent Editor examples using synthetic data.
 - Adapt MIT-licensed source from the shadcn chatbot template, including messages, bubbles, traces, input groups and Typeset, using Dispatch tokens. Keep Message Scroller and Questionnaire qualification visible as experiments before production migration.

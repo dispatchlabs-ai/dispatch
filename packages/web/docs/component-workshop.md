@@ -24,8 +24,8 @@ Start with **Screens → Chat → Conversation** and **Screens → Agent editor 
 Editable**. Their sidebar variants cover empty, failure and read-only states.
 Sending, stopping, reconnecting, attachment retry/removal, resource assignment,
 field validation and saving are local preview interactions. Changes reset on
-reload. A chosen attachment contributes only its name and size; its bytes are not
-read or uploaded.
+reload. Selected and pasted files remain in the tab; supported images are decoded
+locally for thumbnails. Nothing is uploaded.
 
 Foundations show color, typography, spacing and reading styles. Controls show
 form fields, buttons, dialogs, menus, tabs and feedback. Patterns combine them into
@@ -76,6 +76,16 @@ Send/Stop actions, attachments and optional leading control. `UI.ChatComposer`
 remains an alias to that same component. Enter sends; Shift+Enter inserts a line;
 IME composition does not submit. A draft can be sent while an agent is working,
 and an empty draft reveals Stop. Pending or failed attachments block sending.
+
+The paperclip opens **Add files** and **Add photos**. Both use native multi-file
+pickers; the photo picker requests `image/*`, so photo-library and camera choices
+depend on the browser and device. Pasting files or images into the message field
+uses the same `onFiles` callback; ordinary text paste remains ordinary text.
+Callers own validation, upload limits, progress and retry. The picker filter is
+a chooser hint, not validation. Supplying the optional `file` on a
+`UI.ComposerAttachment` enables local PNG, JPEG, GIF and WebP thumbnails; other
+formats or unreadable images retain the file icon and filename. Preview object
+URLs are released when the file changes or its attachment leaves the form.
 
 `src/tokens.css` contains the existing Dispatch palette and scale.
 `src/components/ui/library.css` maps shadcn semantic tokens and reading presets.
@@ -144,3 +154,21 @@ The desktop actions measured 40 × 40 px with a full circular radius. TypeScript
 application and static Storybook builds passed. The extraction retains the IME
 guard; physical IME and mobile-keyboard interaction remain unverified. No
 automated tests were added or run.
+
+### Attachments follow-up · October 16, 2026
+
+Image paste, plain-text paste, multiple files, the image-only picker, removal and
+reselection of the same image were exercised in the built-in Chromium browser.
+PNG previews decoded locally; an unreadable PNG retained its file icon and name.
+Keyboard menu navigation, image-only Send, sending an image during generation,
+Stop, failed-attachment retry and disabled attachment controls passed. Browser
+console errors were empty. Source review confirmed object-URL cleanup and kept
+validation/upload ownership with callers.
+
+The standalone prompt form and Chat composition were reviewed with image
+attachments at 1440×900, 1280×720, 768×1024 and 390×844. TypeScript, application
+and static Storybook builds passed. Physical iPhone/Android photo-library and
+camera pickers, touch gestures and mobile keyboards remain unverified. These
+checks use local synthetic files; they do not exercise a production upload.
+Evidence is retained in `.local/workshop/prompt-attachments/`. No automated tests
+were added or run.

@@ -6,7 +6,7 @@ import {
   Terminal,
   X,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Markdown } from "../markdown";
 import type { MentionParticipant } from "../../lib/mentions";
 import { Button } from "./button";
@@ -136,16 +136,47 @@ export interface ComposerAttachment {
   name: string;
   detail: string;
   state?: "ready" | "uploading" | "error";
+  file?: File;
+}
+
+function AttachmentPreview({ file }: { file?: File }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (
+      !file ||
+      !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.type)
+    ) {
+      setUrl(null);
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setUrl(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [file]);
+
+  return url ? (
+    <img
+      src={url}
+      alt=""
+      className="size-10 shrink-0 rounded-md bg-muted object-contain"
+      onError={() => setUrl(null)}
+    />
+  ) : (
+    <FileText aria-hidden="true" className="size-4 shrink-0 text-primary" />
+  );
 }
 
 export function AttachmentChip({
   attachment,
   onRemove,
   onRetry,
+  disabled = false,
 }: {
   attachment: ComposerAttachment;
   onRemove?: () => void;
   onRetry?: () => void;
+  disabled?: boolean;
 }) {
   return (
     <div
@@ -160,7 +191,7 @@ export function AttachmentChip({
           className="size-4 shrink-0 animate-spin text-muted-foreground"
         />
       ) : (
-        <FileText aria-hidden="true" className="size-4 shrink-0 text-primary" />
+        <AttachmentPreview file={attachment.file} />
       )}
       <div className="min-w-0">
         <p className="truncate text-xs font-medium" title={attachment.name}>
@@ -183,6 +214,7 @@ export function AttachmentChip({
           size="icon-sm"
           aria-label={`Retry ${attachment.name}`}
           onClick={onRetry}
+          disabled={disabled}
         >
           <RotateCcw />
         </Button>
@@ -193,6 +225,7 @@ export function AttachmentChip({
           size="icon-sm"
           aria-label={`Remove ${attachment.name}`}
           onClick={onRemove}
+          disabled={disabled}
         >
           <X />
         </Button>
