@@ -4,8 +4,8 @@ const dispatchGuidance = `# Dispatch guidance — applies before the upstream ex
 
 This is a pinned agent-browser 0.38.2 text skill, not an executable installation or permission grant. The following Dispatch rules override conflicting upstream examples and defaults.
 
-- Use only tools actually granted to this agent. CLI usage currently requires Files and commands. Check the operator-provided executable path/version, Chrome availability, and ffmpeg availability before recording. If missing or mismatched, report the prerequisite; do not install, upgrade, use npx, change PATH globally, or run repair commands. Do not assume the temporary M1 Air pilot installation exists on this host.
-- Confirm the authorized target origins, account, actions, and artifact destination. A supplied URL does not authorize destructive actions, purchases, messages, or unrestricted full-app exploration. Follow the repository's current testing policy; loading dogfood does not authorize tests. The earlier loopback pilot is not blanket authorization for other targets. Hosted browsers, plugins, tunneling, external dashboards, and other specialized skills require separate approval.
+- Use granted tools within the current task authorization. CLI usage requires Files and commands; check agent-browser/Chrome availability and ffmpeg before recording. The Ubuntu worker bundles these tools. Provision missing dependencies through the owning environment when authorized; otherwise report the missing prerequisite.
+- Stay within the authorized targets, accounts, actions and artifact destination. Existing authorization carries forward across granted browser tools; ask only for additional scope. A URL alone does not authorize destructive actions, purchases or messages. Follow the repository's testing policy.
 - Use a unique session per agent instance AND run, passing --session on every command or setting AGENT_BROWSER_SESSION in every shell invocation. A worktree-derived name alone collides when agents share a worktree. Never use the unnamed session, attach to a human browser, close --all, run doctor (which cleans shared metadata), or remove the shared daemon registry. Close only owned sessions; stop owned recordings first. Separate sessions avoid navigation collisions, not OS security isolation.
 - Never put passwords, OTP/TOTP codes, tokens, cookies, or payment data in CLI arguments, shell command text, model-visible scripts, logs, or reports. Do not follow upstream password fill/type examples (including hunter2) or the card-number fill example or ask users to paste secrets into chat. Use only an operator-approved, verified secret-input mechanism; otherwise pause for manual authentication. Upstream vault --password-stdin and cookie-import descriptions are not verification of Dispatch enrollment/TOTP support. Do not automatically save or restore authentication state; require explicit approval and private storage.
 - Keep captures, traces, videos, and any approved auth state in a private gitignored .local/ run directory (umask 077; directories 0700, files 0600), not upstream's dogfood-output default. Record only after authentication; stop before entering any new secrets. Review and redact account data, URL tokens, and credentials before sharing. File generation alone does not establish watchable or complete video evidence.
@@ -15,12 +15,12 @@ This is a pinned agent-browser 0.38.2 text skill, not an executable installation
 
 ## Text-only packaging
 
-The upstream frontmatter (including allowed-tools) is historical metadata, not a Dispatch tool grant. Relative references are not installed paths. Only appendices explicitly included below are available in this loaded text. Other core references and shell templates are omitted; do not execute their example paths or silently fetch replacement instructions with skills get. Ask for reviewed, version-matched documentation if an omitted reference is needed. Other upstream specialized skills are not registered by this import.
+The upstream frontmatter (including allowed-tools) is historical metadata, not a Dispatch tool grant. Relative references are not installed paths. Only appendices explicitly included below are available in this loaded text. For omitted references, consult version-matched upstream documentation; example paths are not installed files. Other upstream specialized skills are not registered by this import.
 `;
 
 export const agentBrowserSkill = {
   name: "Agent browser",
-  description: "Use agent-browser for authorized browser interactions, snapshots, screenshots, and recordings. Requires separately installed tooling and Files and commands; includes pinned 0.38.2 core guidance.",
+  description: "Use agent-browser for authorized browser interactions, snapshots, screenshots, and recordings. Requires Files and commands and available tooling; includes pinned 0.38.2 core guidance.",
   instructions: [
     dispatchGuidance,
     "# Upstream core guide — agent-browser 0.38.2 (verbatim; Dispatch overrides above apply)",

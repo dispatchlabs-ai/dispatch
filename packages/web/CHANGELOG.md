@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Guidance
+
+- Remove obsolete drain/archive and browser-pilot restrictions, scope checks to changed inputs, and keep customer deployment records in caller repositories.
+
 ### Installation lifecycle
 
 - Remove the whole-installation sleep endpoint and its release procedure, including sleep-only readiness and warm-spare suspension. Normal activation, controller handover, graceful shutdown and timed conversation-worker retirement remain available.

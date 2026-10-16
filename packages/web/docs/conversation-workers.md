@@ -10,8 +10,7 @@ The existing runtime combines catalog and conversation mutations in Pi transacti
 
 **Rolling-deployment scope change, October 9, 2026; deployed, native replacements observed:**
 Chris authorized safe controller overlap. The original single-owner rehearsal and
-ordered installation-drain procedure below remain historical/current fallback
-contracts, not a rule that all HTTP processes must stop for every future update.
+ordered installation-drain procedure below are historical rehearsal evidence.
 Instance retirement must be separate from explicit installation-wide drain and
 must not retire conversation workers. Readiness must represent the ability to serve
 through functioning ownership; merely listening or passing liveness is insufficient.
@@ -27,7 +26,7 @@ Private authenticated control API; no public ingress. Only launcher has Docker a
 - Inspect an attempt: returns observed created/running/stopped/unknown state and container identity, not merely desired state. Unknown and unreachable block replacement.
 - Stop an attempt: persist stop intent before acting; disable automatic restart, stop/kill as required and confirm termination before reporting stopped. Late ensure retries must not revive a stopped attempt; retain a terminal tombstone.
 - Drain installation: persist admission-disabled state, reject new launches, stop all known attempts and reconcile installation-labeled containers. Return complete only when none can execute; launcher restart preserves drain state. Unreachable Docker is not successful drain.
-- Status: installation identity, admission/drain state, active workers, outstanding attempts and unresolved operations, available through authenticated local access for upgrade/backup gating. Explicit authenticated undrain after the operator completes the change. Changed-stack activation requires confirmed drain and remains drained pending verification; unchanged reapplication must not interrupt workers.
+- Status: installation identity, admission/drain state, active workers, outstanding attempts and unresolved operations, available through authenticated local access. Explicit maintenance drain requires authenticated undrain after verification; ordinary rolling updates use controller handover without installation-wide drain.
 - Backup additionally requires backend write quiescence: reject new mutations and drain admitted auth/catalog/connection writes before capturing their state. Launcher drain alone cannot establish a consistent application backup.
 
 Application drain ordering is:
@@ -36,11 +35,11 @@ Application drain ordering is:
 2. Drain and confirm retirement of workers while model-auth, artifact and management support callbacks remain available.
 3. Quiesce remaining backend support requests before reporting backup readiness.
 
-Blocking support callbacks before worker close can turn unfinished work into service errors. Backend restart requires fresh drain verification; persisted admission closure alone is not proof of quiescence. A fresh authenticated status receipt must include `drained: true`, `drainComplete: true`, `backendQuiesced: true`, zero active workers/unresolved attempts and matching installation identity. See the [installer drain contract](https://github.com/dispatchlabs-ai/terraform-local-dispatch-workers/blob/5e9af3e/docs/drain-contract.md). Scoped restored/ARM64 drain and maintained cold-resume checks passed below; full live external-OAuth writer quiescence remains unverified.
+Blocking support callbacks before worker close can turn unfinished work into service errors. Before a consistent backup, verify fresh quiescence: persisted admission closure alone is insufficient. Status must include `drained: true`, `drainComplete: true`, `backendQuiesced: true`, zero active workers/unresolved attempts and matching installation identity. Full live external-OAuth writer quiescence remains unverified.
 
 Deployment shutdown calls `Harness.close()` through runtime close, not the user-facing Stop operation (which deliberately cancels work). This preserves unfinished durable work for recovery; the scoped deployed Docker SIGKILL recovery check below passed, while host failure and broader recovery qualification remain open. Container termination must still be confirmed separately before replacement. Launcher `close()` closes the controller only; it does not retire workers.
 
-**Chat archival — accepted October 9, implementation pending:**  Preserve retained history/state and prevent observation or restore alone from relaunching the worker. This is an explicit per-chat cancellation action, distinct from deployment shutdown's preservation of unfinished work; shared services and other chats remain running.
+Archive changes a person's chat visibility and preserves history and ongoing work. Use Stop for cancellation.
 
 This rehearsal is ECS-shaped, not evidence of scalable ECS operation. Routing journals and exclusive ownership locks are currently local to a single backend/launcher; replicated control planes require shared coordination and fencing, not merely substituting ECS API calls for Docker. AWS networking/IAM, task failover and load qualification remain separate follow-up work.
 

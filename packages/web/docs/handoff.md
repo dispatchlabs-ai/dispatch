@@ -2608,4 +2608,4 @@ source/deslop review and whitespace checks passed. The first Nix attempts ran
 out of disk space; removal of this task's regenerable dependencies allowed the
 builds to complete. Linux systems were omitted from the native flake check; no
 automated application tests or live rollout were run. This source change does
-not update the published 0.6.0 artifacts or deployed Surton installation.
+not update the published 0.6.0 artifacts or existing installations.
