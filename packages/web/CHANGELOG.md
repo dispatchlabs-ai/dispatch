@@ -2,9 +2,11 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-16
+
 ### Explicit dependency waits
 
-- Let Pi agents batch passive discussion while explicitly waiting for named results, with durable deadlines and receipts. Human direction, mentions, blockers, corrections, criteria changes and unavailable participants release the wait; Stop cancels it.
+- Let Pi agents batch passive discussion while explicitly waiting for named results, with durable deadlines and receipts. Human direction, mentions, explicit blockers and corrections, criteria changes and unavailable participants release the wait; Stop cancels it. Unmarked corrections are reviewed at the deadline.
 - Keep independent work and public history available. Result signals take effect only after publication; unsupported execution backends retain ordinary delivery.
 - Refresh application-owned collaboration tools when a hosted worker reopens retained participants, so existing chats can use new wait tools without changing agent definitions.
 
@@ -40,6 +42,10 @@
 ### Worker lifecycle
 
 - Retire assigned conversation workers after sixty minutes of native inactivity by default, with a configurable timeout and safe refusal while tasks, submissions or reconciliation remain pending. Preserve warm spare capacity, durable history and open chat streams; resume the same conversation on its next explicit read or action only after confirmed old-worker termination.
+
+### Upgrade compatibility
+
+- Upgrade hosted controllers and conversation workers together: mention-based agent invitations require the new worker protocol. Preserve routing journals and compatible images; older releases cannot read idle-retirement records.
 
 ## [0.5.0] - 2026-10-14
 
