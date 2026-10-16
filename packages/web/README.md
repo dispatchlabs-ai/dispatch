@@ -28,6 +28,7 @@ Follow the [testing policy](../../CONTRIBUTING.md#testing-policy) for permitted 
 - [Conversation workers](docs/conversation-workers.md): deployment ownership, lifecycle contracts and qualification boundaries.
 - [AWS deployment module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch): infrastructure, caller example and installation instructions.
 - [UI/UX review](docs/ui-ux-review.md): historical findings and current styling-migration evidence; live requirements remain in the database spec.
+- [Component workshop](docs/component-workshop.md): run the shared component catalog, inspect template provenance, and review candidate Chat and Agent Editor layouts before migration.
 - [Brand asset provenance](src/assets/README.md) and [changelog](CHANGELOG.md).
 - [Repository contribution workflow](../../CONTRIBUTING.md).
 

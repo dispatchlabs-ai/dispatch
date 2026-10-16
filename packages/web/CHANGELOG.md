@@ -6,6 +6,12 @@
 
 - Remove obsolete drain/archive and browser-pilot restrictions, scope checks to changed inputs, and keep customer deployment records in caller repositories.
 
+### Component workshop
+
+- Add a local Storybook with shared controls, product patterns, a screen coverage map, and interactive Chat and Agent Editor examples using synthetic data.
+- Adapt MIT-licensed source from the shadcn chatbot template, including messages, bubbles, traces, input groups and Typeset, using Dispatch tokens. Keep Message Scroller and Questionnaire qualification visible as experiments before production migration.
+- Preserve the existing application controls and runtime while exposing candidate components through the shared UI facade.
+
 ### Installation lifecycle
 
 - Remove the whole-installation sleep endpoint and its release procedure, including sleep-only readiness and warm-spare suspension. Normal activation, controller handover, graceful shutdown and timed conversation-worker retirement remain available.

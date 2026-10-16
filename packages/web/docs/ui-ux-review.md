@@ -6,6 +6,20 @@
 
 The rules derived from these findings belonged to the former specification. Current intent lives in the database; see [spec access](spec.md). This review preserves its original findings.
 
+## Component workshop — October 16, 2026
+
+The [component workshop](component-workshop.md) implements the newly authorized
+review stage before broad screen migration: shared controls adapted from the
+pinned shadcn chatbot template, Dispatch patterns, synthetic Chat and Agent Editor
+compositions, and a filterable coverage map. The guide records the performed
+checks and remaining qualification work. The template's license and source
+adaptations are retained beside the components.
+
+This is candidate-library evidence. No production screen in the inventory below
+is newly accepted by this work, and the prior migration findings remain open.
+The workshop layers legacy CSS below the candidate styles; the application keeps
+its existing cascade until an authorized screen migration verifies that change.
+
 ## Styling migration — October 13, 2026
 
 **Status: authorized; implementation and per-screen acceptance pending.** Database spec revision 10 chooses shadcn's Base UI controls themed with Dispatch tokens. The shared entry point remains `packages/web/src/components/ui.tsx`; [AGENTS.md](../../../AGENTS.md) names the whole-page review requirements. This supersedes the token-based global-CSS direction recorded for G19 below, without changing the historical result.

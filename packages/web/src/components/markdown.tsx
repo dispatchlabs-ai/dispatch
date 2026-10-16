@@ -2,9 +2,9 @@ import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { mentionId, type MentionParticipant } from "../lib/mentions";
 
-export function Markdown({ children, mentions = [] }: { children: string; mentions?: MentionParticipant[] }) {
+export function Markdown({ children, mentions = [], className = "markdown" }: { children: string; mentions?: MentionParticipant[]; className?: string }) {
   return (
-    <div className="markdown">
+    <div className={className}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         urlTransform={(url, key) => key === "href" && mentionId(url) ? url : defaultUrlTransform(url)}

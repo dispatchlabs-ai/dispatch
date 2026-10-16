@@ -1,0 +1,21 @@
+@layer theme, base, legacy, components, utilities;
+@import "tailwindcss" source("../");
+@import "tw-animate-css";
+@import "../tokens.css";
+@import "../legacy.css" layer(legacy);
+@import "../components/ui/library.css";
+
+/* The workshop exercises the legacy cascade below the candidate components.
+   The application retains its original unlayered legacy import until screen review. */
+@layer base {
+  body {
+    min-width: 320px;
+    background: var(--color-background);
+  }
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}

@@ -16,7 +16,9 @@
     "check": "npm run typecheck && npm run build",
     "start": "tsx scripts/start.ts",
     "auth": "tsx scripts/auth.ts",
-    "release": "tsx scripts/release.ts"
+    "release": "tsx scripts/release.ts",
+    "workshop": "npm run workshop --workspace @dispatch/web",
+    "build:workshop": "npm run build:workshop --workspace @dispatch/web"
   },
   "type": "module"
 }

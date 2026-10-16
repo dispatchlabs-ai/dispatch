@@ -79,3 +79,6 @@ export function Modal({ title, description, children, trigger, open, onOpenChang
     </Dialog.Root>
   );
 }
+
+// Candidate shadcn components share this entry point; existing exports remain during review.
+export * as UI from "./ui/index";

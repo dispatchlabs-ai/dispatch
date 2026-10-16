@@ -1,0 +1,50 @@
+@import "./typeset.css";
+
+/* Semantic shadcn tokens map to the existing Dispatch palette. */
+@theme inline {
+  --color-primary: var(--color-navy);
+  --color-primary-foreground: var(--color-surface);
+  --color-secondary: var(--color-navy-soft);
+  --color-secondary-foreground: var(--color-navy);
+  --color-muted: var(--color-surface-raised);
+  --color-muted-foreground: #53647b;
+  --color-card: var(--color-surface);
+  --color-card-foreground: var(--color-foreground);
+  --color-popover: var(--color-surface);
+  --color-popover-foreground: var(--color-foreground);
+  --color-accent: var(--color-aqua-soft);
+  --color-accent-foreground: var(--color-navy);
+  --color-input: var(--color-control-border);
+  --color-destructive: var(--color-danger);
+  --color-ring: var(--focus);
+  --font-heading: var(--font-sans);
+}
+
+:root {
+  --primary: var(--color-navy);
+  --secondary: var(--color-navy-soft);
+  --foreground: var(--color-foreground);
+  --typeset-font-body: var(--font-sans);
+  --typeset-font-heading: var(--font-sans);
+  --typeset-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.typeset-chat {
+  --typeset-size: 15px;
+  --typeset-leading: 1.7;
+  --typeset-flow: 1em;
+}
+
+.typeset-document {
+  --typeset-size: 15px;
+  --typeset-leading: 1.75;
+  --typeset-flow: 1.25em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot] {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

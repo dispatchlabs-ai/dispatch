@@ -14,6 +14,8 @@ buildNpmPackage {
       ../../../package-lock.json
       ../../../scripts
       ../package.json
+      ../.storybook
+      ../public
       ../react-router.config.ts
       ../vite.config.ts
       ../tsconfig.json
@@ -27,13 +29,16 @@ buildNpmPackage {
     ];
   };
 
-  npmDepsHash = "sha256-iWz8lFTN4jlsaa/rlzshQJSW2Y2BDiGtOMZ30bCVEYk=";
+  npmDepsHash = "sha256-9ecUEvwwXbroRfL5vrHKC/Kqd3+yij+G9KDBUW6aae4=";
   npmBuildScript = "build";
 
   doCheck = true;
   checkPhase = ''
     runHook preCheck
     npm run typecheck
+    npm run build:workshop
+    # The workshop is checked here but is a local development surface.
+    rm -r packages/web/build/workshop
     runHook postCheck
   '';
 

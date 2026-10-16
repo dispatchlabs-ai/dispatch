@@ -1,5 +1,10 @@
 {
-  "include": ["src/**/*", ".react-router/types/**/*", "*.ts"],
+  "include": [
+    "src/**/*",
+    ".react-router/types/**/*",
+    "*.ts",
+    ".storybook/**/*"
+  ],
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "types": ["node", "vite/client"],
