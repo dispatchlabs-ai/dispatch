@@ -1,10 +1,11 @@
 import { copyJson, type Context } from "@earendil-works/chord";
 import { defineDoc, defineTask, GenerationTask, LiveDoc, type ConversationId, type Cursor, type EntryId, type EntryRecord, type Harness, type SubmissionId, type TaskId, type Tx } from "@earendil-works/pi-durable";
 import { ConversationTurns, humansComposing, TurnsDoc } from "./turns.js";
+import type { Attention } from "./waiting.js";
 
 export type ContributionDraft = {
   text: string; images?: { mimeType: string; data: string }[]; attachmentIds?: string[];
-  threadId: string | null; mentions: string[]; createdAt: number;
+  threadId: string | null; mentions: string[]; attention?: Attention; createdAt: number;
 };
 type Boundary = { kind: "final" | "tools"; from: TaskId; after: EntryId; marker?: string; assistant?: EntryId; results?: EntryId[] };
 export type Contribution = {

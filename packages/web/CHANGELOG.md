@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Explicit dependency waits
+
+- Let Pi agents batch passive discussion while explicitly waiting for named results, with durable deadlines and receipts. Human direction, mentions, blockers, corrections, criteria changes and unavailable participants release the wait; Stop cancels it.
+- Keep independent work and public history available. Result signals take effect only after publication; unsupported execution backends retain ordinary delivery.
+
 ### Live model discovery
 
 - Refresh connected model catalogs when loading configuration and reloading provider settings. Use Fireworks’ authenticated live model list for new choices, retaining cached choices with a visible warning if refresh fails.
