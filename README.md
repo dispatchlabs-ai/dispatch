@@ -12,30 +12,30 @@ Dispatch is built on [Pi Durable](https://github.com/earendil-works/pi): Pi owns
 | --- | --- |
 | **Apple Silicon Mac** — one machine for development | Use the [portable Mac package](#apple-silicon-mac). It includes its runtime; no Nix or Homebrew is needed to run it. |
 | **Windows with WSL2** — containers on your desktop | Use the [WSL2 container installation](#windows-with-wsl2), with Docker Engine and Compose inside Ubuntu. |
-| **AWS** — your own infrastructure and ECR | Follow the [terraform-aws-dispatch module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) for Terraform/OpenTofu setup. Application archives are [available in 0.5.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.5.0); complete AWS installation remains unqualified. |
+| **AWS** — your own infrastructure and ECR | Follow the [terraform-aws-dispatch module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) for Terraform/OpenTofu setup. Application archives are [available in 0.6.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.6.0); complete AWS installation remains unqualified. |
 
-**[Dispatch 0.5.0 is available](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.5.0)**. All uploaded digests match the staged archives; anonymous Mac/frontend/checksum downloads and every asset URL are verified. The release includes portable Mac, Linux/AMD64 controller, Ubuntu worker and frontend archives. Artifact/build checks and scoped presentation verification are documented in the [0.5.0 verification record](packages/web/docs/usage-guide.md#050-release-verification). Installation, enrollment/model use, recovery, Windows/WSL2, AWS/hosted workers, retained-state upgrades and backup restoration have not been qualified for these new bytes. Earlier releases' checks do not qualify 0.5.0. No separate Pi installation is needed.
+**[Dispatch 0.6.0 is available](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.6.0)**. All uploaded digests match the staged archives; anonymous Mac/frontend/checksum downloads and every asset URL are verified. The release includes portable Mac, Linux/AMD64 controller, Ubuntu worker and frontend archives. The [0.6.0 verification record](packages/web/docs/usage-guide.md#060-release-verification) covers artifact/build checks, presentation and a scoped AWS rollout with real Pi model/tool execution, invitations and dependency waits. Fresh installation/enrollment, Windows/WSL2, general recovery, broader retained-state upgrades and backup restoration remain unqualified. Earlier releases' checks do not qualify 0.6.0. No separate Pi installation is needed.
 
 ## Apple Silicon Mac
 
-The portable package includes Node and Dispatch. Download it from the official [0.5.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.5.0), or run these commands in Terminal from a dedicated download directory:
+The portable package includes Node and Dispatch. Download it from the official [0.6.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.6.0), or run these commands in Terminal from a dedicated download directory:
 
 ```sh
-curl -fL -O https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.5.0/dispatch-0.5.0-darwin-arm64.tar.gz
-curl -fL -O https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.5.0/SHA256SUMS
+curl -fL -O https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.6.0/dispatch-0.6.0-darwin-arm64.tar.gz
+curl -fL -O https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.6.0/SHA256SUMS
 ```
 
 Verify the archive before extracting it:
 
 ```sh
-awk '$2 == "dispatch-0.5.0-darwin-arm64.tar.gz"' SHA256SUMS | shasum -a 256 -c -
+awk '$2 == "dispatch-0.6.0-darwin-arm64.tar.gz"' SHA256SUMS | shasum -a 256 -c -
 ```
 
-This checks only the Mac archive; you do not need the Windows or AWS artifacts listed in the same checksum file. Proceed only if it prints `dispatch-0.5.0-darwin-arm64.tar.gz: OK`. Obtain both files through the trusted maintainer/release channel: the checksum checks integrity, not publisher identity by itself.
+This checks only the Mac archive; you do not need the Windows or AWS artifacts listed in the same checksum file. Proceed only if it prints `dispatch-0.6.0-darwin-arm64.tar.gz: OK`. Obtain both files through the trusted maintainer/release channel: the checksum checks integrity, not publisher identity by itself.
 
 ```sh
-tar -xzf dispatch-0.5.0-darwin-arm64.tar.gz
-cd dispatch-0.5.0-darwin-arm64
+tar -xzf dispatch-0.6.0-darwin-arm64.tar.gz
+cd dispatch-0.6.0-darwin-arm64
 ./bin/dispatch version
 ./bin/dispatch invite --email you@example.com --name "Your Name"
 ./bin/dispatch
@@ -57,27 +57,27 @@ The archive and checksum file are in `result/`. Building requires Nix; running t
 
 The earlier 0.2.0 controller was checked with **Ubuntu on WSL2, Docker Engine 29.1.3 and Compose 2.40.3**, opening the app in Windows Edge. Docker Desktop is a different service lifecycle and has not been separately qualified.
 
-The [0.5.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.5.0) contains the Linux/AMD64 controller archive. Use the checksum-verified download; it does not require rebuilding. Use a dedicated directory inside Ubuntu, not an existing deployment directory.
+The [0.6.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.6.0) contains the Linux/AMD64 controller archive. Use the checksum-verified download; it does not require rebuilding. Use a dedicated directory inside Ubuntu, not an existing deployment directory.
 
-Download `dispatch-controller-839d7b11-amd64.tar.gz` and `SHA256SUMS` from that release. Also download the matching [Compose file](https://raw.githubusercontent.com/dispatchlabs-ai/dispatch/v0.5.0/compose.yaml) and [environment example](https://raw.githubusercontent.com/dispatchlabs-ai/dispatch/v0.5.0/.env.example), saving them as `compose.yaml` and `.env.example`. From an Ubuntu WSL terminal in that directory:
+Download `dispatch-controller-3ae15d54-amd64.tar.gz` and `SHA256SUMS` from that release. Also download the matching [Compose file](https://raw.githubusercontent.com/dispatchlabs-ai/dispatch/v0.6.0/compose.yaml) and [environment example](https://raw.githubusercontent.com/dispatchlabs-ai/dispatch/v0.6.0/.env.example), saving them as `compose.yaml` and `.env.example`. From an Ubuntu WSL terminal in that directory:
 
 ```sh
-awk '$2 == "dispatch-controller-839d7b11-amd64.tar.gz"' SHA256SUMS | sha256sum -c -
+awk '$2 == "dispatch-controller-3ae15d54-amd64.tar.gz"' SHA256SUMS | sha256sum -c -
 ```
 
-Require `dispatch-controller-839d7b11-amd64.tar.gz: OK` before loading it. Obtain the archive and checksum through the official release channel; checksums verify integrity, not independent publisher identity.
+Require `dispatch-controller-3ae15d54-amd64.tar.gz: OK` before loading it. Obtain the archive and checksum through the official release channel; checksums verify integrity, not independent publisher identity.
 
 ```sh
-docker load -i dispatch-controller-839d7b11-amd64.tar.gz
+docker load -i dispatch-controller-3ae15d54-amd64.tar.gz
 cp .env.example .env
 ```
 
-The archive records `dispatch-web:839d7b113049`, with the full release revision in its image labels. Set `DISPATCH_IMAGE=dispatch-web:839d7b113049` in `.env`. The immutable v0.5.0 environment example still has a comment describing 0.4.0; use this inspected tag. The example on `main` points to the current instructions. This is a local tag, not a registry digest; the verified archive checksum identifies the downloaded bytes. Keep `DISPATCH_PORT=3001` unless it is already in use.
+The archive records `dispatch-web:3ae15d54507d`, with the full release revision in its image labels. Set `DISPATCH_IMAGE=dispatch-web:3ae15d54507d` in `.env`. This is a local tag, not a registry digest; the verified archive checksum identifies the downloaded bytes. Keep `DISPATCH_PORT=3001` unless it is already in use.
 
 **Registry alternative:** skip the controller archive download/load steps, but download the matching Compose and environment files linked above. Copy `.env.example` to `.env`, then set:
 
 ```dotenv
-DISPATCH_IMAGE=ghcr.io/dispatchlabs-ai/dispatch:0.5.0@sha256:8908b28986fc8f9235e829df04c741944c567ce19cbff635cd1567b5e0e71450
+DISPATCH_IMAGE=ghcr.io/dispatchlabs-ai/dispatch:0.6.0@sha256:0db6646fe69c8164b7537002ba22cfc7167611ad5b9250ccb0059193568b939b
 ```
 
 Pull the pinned controller without signing in:
@@ -86,7 +86,7 @@ Pull the pinned controller without signing in:
 docker compose pull
 ```
 
-Then follow the same first-account and foreground-startup steps below. The Ubuntu worker is published separately as `ghcr.io/dispatchlabs-ai/dispatch-worker:0.5.0@sha256:5a2ad192bbeb3dfdf603a710a5a8679aa828272dc94aa017013df50c2e29286f`; the desktop Compose file does not start it. Both digest pulls were verified anonymously, with filesystem layers and runtime configuration matching the audited artifacts. Worker conversations and hosted AWS operation remain unverified for 0.5.0.
+Then follow the same first-account and foreground-startup steps below. The Ubuntu worker is published separately as `ghcr.io/dispatchlabs-ai/dispatch-worker:0.6.0@sha256:aa81fb7c6beae529e403e09444883d066a3520467a9f027bc76c510418cccbde`; the desktop Compose file does not start it. Both digest pulls were verified anonymously, with filesystem layers and runtime configuration matching the audited artifacts. A scoped AWS rollout passed worker conversation checks; see the [verification limits](packages/web/docs/usage-guide.md#060-release-verification).
 
 For the first account, while the controller is still stopped, run this from the same Compose directory (replace the example email and name):
 
@@ -104,7 +104,7 @@ Open the printed enrollment link in your Windows browser to create the account a
 
 Compose publishes only on host loopback and preserves state/workspace in the `dispatch-data` named volume. Keep the same Compose directory/project identity when restarting or replacing the image. Do not use `docker compose down -v` for an upgrade: it deletes the data volume. Do not mount your Windows or Linux home directory into the agent workspace.
 
-The earlier published 0.3.0 controller passed isolated Windows 11/Ubuntu 24.04 WSL2 startup, enrollment/sign-in, a real model response and saved-state persistence after an idle restart. The interactive check used Chrome on M1 through a tunnel with a virtual passkey—not Windows Edge or a physical passkey device; see [qualification and limits](packages/web/docs/usage-guide.md#030-windowswsl2-qualification). There is no default account or public signup. These were 0.3.0 fresh-install checks, not 0.5.0 qualification; upgrading retained state from an earlier version and restoring a backup are not yet verified.
+The earlier published 0.3.0 controller passed isolated Windows 11/Ubuntu 24.04 WSL2 startup, enrollment/sign-in, a real model response and saved-state persistence after an idle restart. The interactive check used Chrome on M1 through a tunnel with a virtual passkey—not Windows Edge or a physical passkey device; see [qualification and limits](packages/web/docs/usage-guide.md#030-windowswsl2-qualification). There is no default account or public signup. These were 0.3.0 fresh-install checks, not 0.6.0 qualification; upgrading retained state from an earlier version and restoring a backup are not yet verified.
 
 ## Run from source
 

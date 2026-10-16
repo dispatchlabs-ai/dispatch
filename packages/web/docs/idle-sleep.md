@@ -66,6 +66,24 @@ maintenance drain**, not a substitute for this eligibility gate.
 
 ## Release every database owner
 
+For a coordinated controller/worker version upgrade, keep the idle gate closed
+and prevent automatic service replacement while stopping the old controller owners
+gracefully. Confirm clean ownership release as well as task termination; an
+uncertain store close retains ownership records and requires recovery before a
+new owner can start. Apply the matching images, start the launcher before the
+backend, then explicitly undrain through the new backend's authenticated private
+maintenance endpoint, verifying its task identity. Ordinary public readiness may
+remain closed until undrain. This stopped-owner sequence is source-reviewed; the
+complete sequence has not yet been qualified in a hosted rollout.
+
+Automatic rolling activation requires the previous owner's ordinary readiness and
+refuses an intentionally quiesced backend, even when its maintenance health probe
+is healthy. Updating the launcher while that old backend remains active can also
+reject new worker launches because their configuration revisions differ. Do not
+treat an infrastructure apply or an undrain acknowledgement as proof that both new
+controller owners are active; verify their task identities and deployment
+completion before application acceptance.
+
 After a successful sleep response, orchestration must verify current drained/quiesced
 status, gracefully stop the backend and confirm its termination, then stop the launcher
 and confirm termination. This releases directory/routing/auth/provider/MCP stores,
