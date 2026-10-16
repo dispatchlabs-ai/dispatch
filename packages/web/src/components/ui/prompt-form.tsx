@@ -120,7 +120,7 @@ export function PromptForm({
           {running && !hasDraft ? (
             <InputGroupButton
               size="icon-sm"
-              variant="outline"
+              variant="default"
               className="rounded-full"
               aria-label="Stop generating"
               disabled={disabled}

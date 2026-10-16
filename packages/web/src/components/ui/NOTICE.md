@@ -31,7 +31,8 @@ The prompt form adds caller-controlled drafts, attachments and an optional leadi
 control in place of the template's model gateway selector. It allows Send during
 work when a draft is present and shows Stop when the draft is empty. Its actions
 retain Dispatch's 40 px desktop and 44 px coarse-pointer targets, with a full
-circular radius. The original `ChatComposer` public name remains an alias.
+circular radius and the same primary color in Ready and Generating states.
+The original `ChatComposer` public name remains an alias.
 
 ## Boundaries and updates
 
