@@ -29,8 +29,11 @@ read or uploaded.
 
 Foundations show color, typography, spacing and reading styles. Controls show
 form fields, buttons, dialogs, menus, tabs and feedback. Patterns combine them into
-settings sections, resources, message activity and a composer. Experiments expose
-Message Scroller and Questionnaire separately. **Start here → Coverage** records
+settings sections, resources and message activity. **Prompt form** reviews the
+template-derived prompt box independently, including ready, empty, generating,
+attachment, failed-upload and disabled states. Its circular actions are shared
+with the Chat preview. Experiments expose Message Scroller and Questionnaire
+separately. **Start here → Coverage** records
 which patterns could serve each screen and what still needs design or validation.
 An available example is not a migrated or accepted production screen.
 
@@ -66,6 +69,13 @@ Implementations live under `src/components/ui/`; `src/components/ui.tsx` exports
 the `UI` namespace alongside its unchanged legacy API. Components own presentation
 and accessibility; callers own data, permissions, persistence and async actions.
 Stories import the same components, rather than maintaining a second preview UI.
+
+`UI.PromptForm` lives in `src/components/ui/prompt-form.tsx` and adapts the
+template's `PromptForm` and input-group parts. Its caller supplies the draft,
+Send/Stop actions, attachments and optional leading control. `UI.ChatComposer`
+remains an alias to that same component. Enter sends; Shift+Enter inserts a line;
+IME composition does not submit. A draft can be sent while an agent is working,
+and an empty draft reveals Stop. Pending or failed attachments block sending.
 
 `src/tokens.css` contains the existing Dispatch palette and scale.
 `src/components/ui/library.css` maps shadcn semantic tokens and reading presets.
@@ -123,3 +133,14 @@ Sanitized captures and command receipts are retained in the task worktree's
 gitignored `.local/workshop/`. No automated tests were added or run. Chris's
 component-system review and the existing per-screen production acceptance process
 remain open; this package accepts no migrated production screen.
+
+### Prompt form follow-up · October 16, 2026
+
+The standalone prompt form and its Chat composition were reviewed at all four
+required viewport sizes after restoring circular Send/Stop controls. Interactive
+checks covered Send, Stop, a new draft while generating, Enter, Shift+Enter,
+empty-submit prevention, failed-attachment retry/removal and disabled controls.
+The desktop actions measured 40 × 40 px with a full circular radius. TypeScript,
+application and static Storybook builds passed. The extraction retains the IME
+guard; physical IME and mobile-keyboard interaction remain unverified. No
+automated tests were added or run.

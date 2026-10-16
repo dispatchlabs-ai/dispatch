@@ -18,6 +18,7 @@ const preview: Preview = {
           "Start here",
           "Foundations",
           "Controls",
+          "Prompt form",
           "Patterns",
           "Screens",
           "Experiments",

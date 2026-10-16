@@ -10,7 +10,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { UI } from "../components/ui";
-import type { ComposerAttachment } from "../components/ui/chat-patterns";
 import { ScreenShell } from "./frame";
 
 type Scenario = "conversation" | "empty" | "streaming" | "error" | "reader";
@@ -112,7 +111,7 @@ function ChatPreview({ scenario = "conversation" }: { scenario?: Scenario }) {
   const [stream, setStream] = useState("");
   const [error, setError] = useState(scenario === "error");
   const [agent, setAgent] = useState<string | null>("researcher");
-  const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
+  const [attachments, setAttachments] = useState<UI.ComposerAttachment[]>([]);
   const [feedback, setFeedback] = useState("");
   const reader = scenario === "reader";
 
@@ -385,7 +384,7 @@ function ChatPreview({ scenario = "conversation" }: { scenario?: Scenario }) {
               participation.
             </p>
           ) : (
-            <UI.ChatComposer
+            <UI.PromptForm
               value={draft}
               onValueChange={setDraft}
               running={running}

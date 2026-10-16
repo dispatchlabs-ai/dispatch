@@ -15,8 +15,9 @@ The following files originate in upstream `components/ui/`:
 - `bubble.tsx`, `message.tsx`, `trace.tsx`, `input-group.tsx`,
   `message-scroller.tsx`, `questionnaire.tsx`.
 
-`typeset.css` comes from upstream `app/typeset.css`. The composer layout in
-`chat-patterns.tsx` adapts upstream `components/prompt-form.tsx`.
+`typeset.css` comes from upstream `app/typeset.css`. `prompt-form.tsx` adapts
+upstream `components/prompt-form.tsx`, composing the template's input group,
+textarea, addon row and circular Send/Stop buttons as a standalone `PromptForm`.
 
 Local adaptations replace Next.js aliases and client directives, map the visual
 tokens to Dispatch, adjust control sizes and radii, add coarse-pointer targets,
@@ -26,8 +27,11 @@ The scroller omits the template's application-specific scrollfade helpers.
 Dispatch owns `form-controls.tsx`, `overlays.tsx`, `patterns.tsx`,
 `chat-patterns.tsx`, the barrel, utilities and semantic token mapping. They compose
 the adapted source with Base UI and the existing Dispatch Markdown renderer.
-The composer is controlled by its caller; it allows Send during work when a draft
-is present and shows Stop when the draft is empty.
+The prompt form adds caller-controlled drafts, attachments and an optional leading
+control in place of the template's model gateway selector. It allows Send during
+work when a draft is present and shows Stop when the draft is empty. Its actions
+retain Dispatch's 40 px desktop and 44 px coarse-pointer targets, with a full
+circular radius. The original `ChatComposer` public name remains an alias.
 
 ## Boundaries and updates
 
