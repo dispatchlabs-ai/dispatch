@@ -131,6 +131,12 @@ Main and thread composers publish only `{ clientId, sequence, active }` to the m
 
 ## Explicit dependency waits
 
+When a hosted worker opens its bound room, it refreshes the application-owned
+collaboration tool selection for retained participants before resuming native
+work. Existing model, instructions, capabilities and working directory remain
+the saved participant configuration; new collaboration tools are available
+without revising reusable agent definitions.
+
 Pi agents can call `conversation_wait` only after their independent authorized work is exhausted. They declare unique dependency IDs, the owning active participant IDs, descriptions and a review interval (60 seconds by default, at most five minutes). `conversation_post` accepts `attention: { kind: "result", dependencyId }`, `blocker` or `correction`. A result is credited only to its declared participant and only after its public contribution commits. Passive progress remains in the complete public log; it does not trigger another waiting-agent model request. Unclear dependencies and Claude SDK/Muse execution retain ordinary delivery.
 
 The room-owned `dispatch.dependency-waits` document retains the declaration, observed boundary, named result receipts, fixed review deadline and wake reason. A native `dispatch.wait-for-dependencies` child gates the next Pi request; Pi owns its cancellation and recovery. The gate runs before fresh context preparation, holds no speaking reservation and never pauses other agents. Pending contribution review runs first so waiting cannot strand an unpublished post. Waiting is shown as Listening; it does not mean the assignment is complete or the worker is idle.
