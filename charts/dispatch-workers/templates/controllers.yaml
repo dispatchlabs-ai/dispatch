@@ -1,0 +1,93 @@
+{{- if .Values.application.enabled }}
+{{- range $role := list "backend" "launcher" }}
+{{- $options := index $.Values $role }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}
+  labels:
+    {{- include "dispatch-workers.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $role }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name | quote }}
+      app.kubernetes.io/component: {{ $role }}
+  template:
+    metadata:
+      labels:
+        {{- include "dispatch-workers.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $role }}
+      annotations:
+        checksum/config: {{ include (printf "dispatch-workers.%sFiles" $role) $ | sha256sum }}
+    spec:
+      serviceAccountName: {{ $.Release.Name }}-{{ $role }}
+      automountServiceAccountToken: {{ eq $role "launcher" }}
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: {{ $.Values.terminationGracePeriodSeconds }}
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      nodeSelector:
+        kubernetes.io/os: linux
+      # Node uncertainty must not create another owner on a different node.
+      tolerations:
+        - {key: node.kubernetes.io/not-ready, operator: Exists, effect: NoExecute}
+        - {key: node.kubernetes.io/unreachable, operator: Exists, effect: NoExecute}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: {{ $role }}
+          image: {{ printf "%s@%s" (index $.Values.images $role).repository (index $.Values.images $role).digest | quote }}
+          imagePullPolicy: {{ $.Values.imagePullPolicy }}
+          args: [dispatch-bootstrap, {{ $role }}]
+          ports:
+            - name: {{ if eq $role "backend" }}https{{ else }}http{{ end }}
+              containerPort: {{ if eq $role "backend" }}3001{{ else }}8830{{ end }}
+          env:
+            {{- include "dispatch-workers.environment" (dict "root" $ "role" $role) | nindent 12 }}
+          resources:
+            {{- toYaml $options.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          # Readiness does not restart a controller or recover retained owners.
+          readinessProbe:
+            httpGet:
+              path: /internal/ready
+              port: {{ if eq $role "backend" }}https{{ else }}http{{ end }}
+              scheme: {{ if eq $role "backend" }}HTTPS{{ else }}HTTP{{ end }}
+            periodSeconds: 10
+            timeoutSeconds: 3
+          volumeMounts:
+            - {name: state, mountPath: /data}
+            - {name: workspace, mountPath: /workspace}
+            - {name: temporary, mountPath: /tmp}
+            {{- if eq $role "backend" }}
+            - {name: artifacts, mountPath: /artifacts}
+            {{- end }}
+      volumes:
+        - name: state
+          emptyDir: {sizeLimit: {{ $options.stateSizeLimit | quote }}}
+        - name: workspace
+          emptyDir: {sizeLimit: {{ $options.workspaceSizeLimit | quote }}}
+        - name: temporary
+          emptyDir: {sizeLimit: {{ $options.tmpSizeLimit | quote }}}
+        {{- if eq $role "backend" }}
+        - name: artifacts
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-artifacts" $.Release.Name) $.Values.artifacts.existingClaim }}
+        {{- end }}
+{{- end }}
+{{- end }}

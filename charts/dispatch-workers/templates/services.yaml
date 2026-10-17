@@ -1,0 +1,18 @@
+{{- range $role := list "backend" "launcher" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}
+  labels:
+    {{- include "dispatch-workers.labels" $ | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ $.Release.Name | quote }}
+    app.kubernetes.io/component: {{ $role }}
+  ports:
+    - name: {{ if eq $role "backend" }}https{{ else }}http{{ end }}
+      port: {{ if eq $role "backend" }}3001{{ else }}8830{{ end }}
+      targetPort: {{ if eq $role "backend" }}https{{ else }}http{{ end }}
+{{- end }}

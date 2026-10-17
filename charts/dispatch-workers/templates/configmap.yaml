@@ -1,0 +1,19 @@
+{{- include "dispatch-workers.validate" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    {{- include "dispatch-workers.labels" . | nindent 4 }}
+data:
+  {{- $files := merge (include "dispatch-workers.backendFiles" . | fromJson) (include "dispatch-workers.launcherFiles" . | fromJson) }}
+  {{- range $name, $content := $files }}
+  {{ $name }}: {{ $content | quote }}
+  {{- end }}
+  {{- if .Values.postgres.host }}
+  {{- $stores := dict }}
+  {{- range $store := list "auth" "provider" "catalog" "directory" "routing" "launcher" "workers" }}
+  {{- $_ := set $stores $store (printf "/tmp/dispatch-bootstrap/%s-db-url" $store) }}
+  {{- end }}
+  database-init.json: {{ toJson (dict "installationId" .Values.installationId "host" .Values.postgres.host "port" .Values.postgres.port "adminSecretFile" "/tmp/dispatch-bootstrap/postgres-admin.json" "caFile" "/tmp/dispatch-bootstrap/database-ca.pem" "stores" $stores) | quote }}
+  {{- end }}

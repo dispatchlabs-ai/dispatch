@@ -1,0 +1,136 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-default-deny
+  labels:
+    {{- include "dispatch-workers.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-backend
+  labels:
+    {{- include "dispatch-workers.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      app.kubernetes.io/component: backend
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: dispatch-worker
+              app.kubernetes.io/component: conversation-worker
+      ports:
+        - {port: 3001, protocol: TCP}
+    {{- if .Values.networkPolicy.ingressCidrs }}
+    - from:
+        {{- range .Values.networkPolicy.ingressCidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - {port: 3001, protocol: TCP}
+    {{- end }}
+  egress:
+    {{- include "dispatch-workers.dnsEgress" . | nindent 4 }}
+    {{- include "dispatch-workers.databaseEgress" . | nindent 4 }}
+    {{- include "dispatch-workers.publicEgress" . | nindent 4 }}
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: dispatch-worker
+              app.kubernetes.io/component: conversation-worker
+      ports:
+        - {port: 8831, protocol: TCP}
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name | quote }}
+              app.kubernetes.io/component: launcher
+      ports:
+        - {port: 8830, protocol: TCP}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-launcher
+  labels:
+    {{- include "dispatch-workers.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      app.kubernetes.io/component: launcher
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name | quote }}
+              app.kubernetes.io/component: backend
+      ports:
+        - {port: 8830, protocol: TCP}
+  egress:
+    {{- include "dispatch-workers.dnsEgress" . | nindent 4 }}
+    {{- include "dispatch-workers.databaseEgress" . | nindent 4 }}
+    - to:
+        {{- range .Values.networkPolicy.apiServerCidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - {port: 443, protocol: TCP}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-workers
+  labels:
+    {{- include "dispatch-workers.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dispatch-worker
+      app.kubernetes.io/component: conversation-worker
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name | quote }}
+              app.kubernetes.io/component: backend
+      ports:
+        - {port: 8831, protocol: TCP}
+  egress:
+    {{- include "dispatch-workers.dnsEgress" . | nindent 4 }}
+    {{- include "dispatch-workers.databaseEgress" . | nindent 4 }}
+    {{- include "dispatch-workers.publicEgress" . | nindent 4 }}
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name | quote }}
+              app.kubernetes.io/component: backend
+      ports:
+        - {port: 3001, protocol: TCP}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-operator
+  labels:
+    {{- include "dispatch-workers.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      app.kubernetes.io/component: operator
+  policyTypes: [Ingress, Egress]
+  egress:
+    {{- include "dispatch-workers.dnsEgress" . | nindent 4 }}
+    {{- include "dispatch-workers.databaseEgress" . | nindent 4 }}

@@ -1,0 +1,17 @@
+{{- if not .Values.artifacts.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-artifacts
+  labels:
+    {{- include "dispatch-workers.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    {{- toYaml .Values.artifacts.accessModes | nindent 4 }}
+  storageClassName: {{ .Values.artifacts.storageClass | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.artifacts.size | quote }}
+{{- end }}

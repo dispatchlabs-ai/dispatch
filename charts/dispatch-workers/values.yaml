@@ -1,0 +1,78 @@
+application:
+  # Prepare storage/configuration first; initialize fresh databases before enabling.
+  enabled: false
+installationId: ""
+origin: ""
+company:
+  id: ""
+  name: ""
+configurationRevision: ""
+images:
+  backend:
+    repository: ghcr.io/dispatchlabs-ai/dispatch
+    digest: ""
+  launcher:
+    repository: ghcr.io/dispatchlabs-ai/dispatch
+    digest: ""
+  worker:
+    repository: ghcr.io/dispatchlabs-ai/dispatch
+    digest: ""
+imagePullPolicy: IfNotPresent
+imagePullSecrets: []
+secrets:
+  backend: ""
+  launcher: ""
+  backendTls: ""
+trust:
+  databaseCaPem: ""
+  backendCaPem: ""
+postgres:
+  # Optional public endpoint metadata for the separate initializer Job.
+  host: ""
+  port: 5432
+artifacts:
+  existingClaim: ""
+  storageClass: ""
+  size: 20Gi
+  # Requires a qualified POSIX filesystem with hardlinks and directory fsync.
+  accessModes: [ReadWriteOncePod]
+backend:
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "1", memory: 1Gi}
+  stateSizeLimit: 1Gi
+  workspaceSizeLimit: 1Gi
+  tmpSizeLimit: 1Gi
+launcher:
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+  stateSizeLimit: 256Mi
+  workspaceSizeLimit: 256Mi
+  tmpSizeLimit: 256Mi
+worker:
+  serviceAccountName: dispatch-worker
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "1", memory: 1Gi}
+  workspaceSizeLimit: 4Gi
+  tmpSizeLimit: 1Gi
+  stopGraceSeconds: 120
+  requestTimeoutMs: 10000
+  retirementTimeoutMs: 180000
+terminationGracePeriodSeconds: 180
+ingress:
+  enabled: false
+  className: ""
+  hostname: ""
+  annotations: {}
+  tls: []
+  # The platform must put its /internal deny route before the application route.
+  internalDenyPaths: []
+networkPolicy:
+  # Exact load-balancer/node source ranges, database ranges and API destinations.
+  ingressCidrs: []
+  databaseCidrs: []
+  apiServerCidrs: []
+  # Add a platform's NodeLocal DNS address here when it bypasses CoreDNS Pods.
+  dnsCidrs: []

@@ -1,0 +1,30 @@
+{{- if .Values.ingress.enabled }}
+{{- if not .Values.ingress.internalDenyPaths -}}
+{{- fail "Set ingress.internalDenyPaths to the controller's deny routes for /internal and /internal/*" -}}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "dispatch-workers.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ required "Set ingress.className" .Values.ingress.className | quote }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - host: {{ required "Set ingress.hostname" .Values.ingress.hostname | quote }}
+      http:
+        paths:
+          {{- toYaml .Values.ingress.internalDenyPaths | nindent 10 }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-backend
+                port: {name: https}
+{{- end }}
