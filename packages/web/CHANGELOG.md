@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Kubernetes installation experiment
+
+- Add an unpublished shared Helm chart for the existing standalone application. It uses one runtime process, digest-pinned images, retained RWOP storage, restricted Pod privileges/networking, caller-owned ingress deny paths and explicit enrollment while the application is stopped. Distributed worker Pods, HA and automatic node-loss recovery are not provided by this first milestone.
+
 ### Guidance
 
 - Remove obsolete drain/archive and browser-pilot restrictions, scope checks to changed inputs, and keep customer deployment records in caller repositories.

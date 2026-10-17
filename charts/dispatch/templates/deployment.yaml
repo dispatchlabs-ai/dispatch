@@ -1,0 +1,94 @@
+{{- if .Values.application.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "dispatch.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        {{- include "dispatch.labels" . | nindent 8 }}
+        app.kubernetes.io/component: web
+      annotations:
+        checksum/config: {{ include "dispatch.environment" . | sha256sum }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 180
+      nodeSelector:
+        kubernetes.io/os: linux
+        kubernetes.io/arch: amd64
+      # Do not evict/restart this singleton elsewhere on an unreachable node.
+      # The operator must positively stop/fence its old executor before recovery.
+      tolerations:
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoExecute
+        - key: node.kubernetes.io/unreachable
+          operator: Exists
+          effect: NoExecute
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dispatch
+          image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3001
+          env:
+            {{- include "dispatch.environment" . | nindent 12 }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: temporary
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-data
+        - name: temporary
+          emptyDir:
+            sizeLimit: 1Gi
+{{- end }}

@@ -1,0 +1,32 @@
+# Experimental standalone mode: exactly one application owner, not distributed workers.
+application:
+  enabled: true
+origin: ""
+company:
+  id: dispatch-kubernetes
+  name: Dispatch Kubernetes
+image:
+  repository: ghcr.io/dispatchlabs-ai/dispatch
+  digest: sha256:0db6646fe69c8164b7537002ba22cfc7167611ad5b9250ccb0059193568b939b
+  pullPolicy: IfNotPresent
+persistence:
+  storageClass: ""
+  size: 20Gi
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+ingress:
+  enabled: false
+  className: ""
+  hostname: ""
+  annotations: {}
+  # Platform-specific deny/routing backends before the application catch-all.
+  additionalPaths: []
+  tls: []
+networkPolicy:
+  # Explicit internal load-balancer/node CIDRs, not a public-client access grant.
+  ingressCidrs: []
