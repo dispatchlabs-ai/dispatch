@@ -76,6 +76,8 @@ web installation.
 An agent folder contains `agent.md` (instructions and model frontmatter) and
 `agent.ts` (a `defineAgent` export). Definitions are trusted application code.
 They can install native Pi extensions; no tools are granted by default.
+The `model.thinking` value accepts Pi's `off`, `minimal`, `low`, `medium`, `high`,
+`xhigh`, and `max` levels. The chosen provider/model must support the selected level.
 `factory.yaml` lists scheduled `agents`. Manual definitions remain available
 for conversations. Interval schedules skip missed slots after an overdue turn;
 continuous schedules wait their configured delay after each result.

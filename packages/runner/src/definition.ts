@@ -26,7 +26,7 @@ export type LoadedAgent = AgentDefinition & {
   id: string;
   instructions: string;
   description: string;
-  model: { provider: string; id: string; thinking: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" };
+  model: { provider: string; id: string; thinking: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" };
   fingerprint: string;
   handoffAgent?: LoadedAgent;
 };
@@ -84,7 +84,7 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
   if (!meta || typeof meta.description !== "string" || !meta.description.trim()
     || typeof meta.model?.provider !== "string" || !meta.model.provider.trim()
     || typeof meta.model?.id !== "string" || !meta.model.id.trim()
-    || !["off", "minimal", "low", "medium", "high", "xhigh"].includes(meta.model?.thinking)
+    || !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(meta.model?.thinking)
     || !match[2].trim()) {
     throw new Error(`${id}/agent.md requires description, model.provider, model.id, model.thinking, and instructions.`);
   }
