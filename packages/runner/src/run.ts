@@ -20,6 +20,8 @@ export type RunOptions = {
   names?: string[];
   demo?: boolean;
   updateDefinitions?: boolean;
+  /** Skip automatic recovery/schedules when inspecting saved conversations. */
+  resume?: boolean;
   initialize?: ChatInitializer;
   adapters?: Adapter[];
   /** Attach domain workflows to the same host before adapters begin receiving. */
@@ -55,12 +57,13 @@ export async function run(options: RunOptions = {}) {
         root, stateRoot: resolve(options.stateRoot ?? resolve(root, ".state")),
         models: options.models, demo: options.demo ?? false, names: options.names,
         updateDefinitions: options.updateDefinitions, initialize: options.initialize,
+        resume: options.resume,
         extensions, replySink,
       });
     }
     await options.beforeStart?.(service);
     for (const adapter of adapters) await adapter.start(service);
-    for (const host of service.hosts.values()) host.harness.resume();
+    if (options.resume !== false) for (const host of service.hosts.values()) host.harness.resume();
     return { runner, service, adapters, close };
   } catch (error) {
     await close().catch(closeError => console.error("Runner cleanup failed:", closeError));

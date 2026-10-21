@@ -3,6 +3,7 @@ import type { LoadedAgent } from "./definition.js";
 import { createCoding } from "./coding.js";
 import { createHandoffs } from "./handoff.js";
 import type { ReplySink } from "./replies.js";
+import { skillExtension, skillInstructions } from "./skills.js";
 
 export type AgentSetup = { configuration: AgentChange; installed: Extension[]; delegate?: AgentSetup };
 
@@ -12,6 +13,7 @@ export function createConfiguration(codingExtension: ReturnType<typeof createCod
   ): Promise<AgentSetup> {
     const extensions: Extension[] = [...(agent.extensions ?? [])];
     const installed: Extension[] = [];
+    if (agent.skillCatalog?.length) extensions.push(skillExtension(agent.id, agent.skillCatalog));
     let delegate: AgentSetup | undefined;
     const model = demo ? { provider: "faux", modelId: "faux-1" } : { provider: agent.model.provider, modelId: agent.model.id };
     if (agent.coding) extensions.push(...(await codingExtension(agent.root, directory)).extensions);
@@ -31,7 +33,7 @@ export function createConfiguration(codingExtension: ReturnType<typeof createCod
     extensions.push(...adapters);
     installed.push(...extensions);
     return {
-      configuration: { model, thinkingLevel: agent.model.thinking, instructions: agent.instructions, extensions },
+      configuration: { model, thinkingLevel: agent.model.thinking, instructions: agent.instructions + skillInstructions(agent.skillCatalog ?? []), extensions },
       installed, ...(delegate ? { delegate } : {}),
     };
   }

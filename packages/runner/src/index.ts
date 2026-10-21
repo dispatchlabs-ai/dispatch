@@ -8,6 +8,10 @@ import { createChats } from "./chat.js";
 import type { LoadedAgent } from "./definition.js";
 
 export * from "./definition.js";
+export { loadSkills } from "./skills.js";
+export type { Skill } from "./skills.js";
+export { chatInTerminal } from "./terminal.js";
+export type { TerminalOptions } from "./terminal.js";
 export type { AgentHost, OpenOptions, RunnerState, StatusFile } from "./runtime.js";
 export type { AgentSetup } from "./configuration.js";
 export type { Chat, ChatInitializer, ChatMessage, ChatService, ChatSnapshot } from "./chat.js";

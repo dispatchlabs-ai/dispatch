@@ -68,6 +68,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     static async open(options: {
       root: string; stateRoot: string; demo: boolean; names?: string[]; extensions?: Extension[];
       replySink?: ReplySink; updateDefinitions?: boolean; models: Models; initialize?: ChatInitializer;
+      resume?: boolean;
     }) {
       const names = options.names?.length ? options.names :
         (await catalog(options.root)).filter(entry => entry.runnable).map(entry => entry.id);
@@ -88,6 +89,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
         if (failure?.status === "rejected") throw failure.reason;
         const enabled = await enabledAgents(options.root);
         for (const agent of agents) {
+          if (options.resume === false) continue;
           const host = service.host(agent.id);
           // This also recovers admitted chat/Slack work, even without a new input.
           host.harness.resume();

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Extension } from "@earendil-works/pi-durable";
 import { parse } from "yaml";
+import { loadSkills, type Skill } from "./skills.js";
 
 export type Trigger =
   | { mode: "manual" }
@@ -18,6 +19,8 @@ export type AgentDefinition = {
   extensions?: Extension[];
   /** Native coding tools, with a private checkout selected by the agent. */
   coding?: boolean;
+  /** Discover company skills and this agent's own skills. Opt-in for existing stores. */
+  skills?: boolean;
   handoff?: { target: string; progressEveryMs: number };
 };
 
@@ -28,6 +31,7 @@ export type LoadedAgent = AgentDefinition & {
   description: string;
   model: { provider: string; id: string; thinking: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" };
   fingerprint: string;
+  skillCatalog?: Skill[];
   handoffAgent?: LoadedAgent;
 };
 
@@ -51,6 +55,7 @@ export function defineAgent(definition: AgentDefinition): AgentDefinition {
     throw new Error("runImmediately must be a boolean.");
   }
   if (definition.coding !== undefined && typeof definition.coding !== "boolean") throw new Error("coding must be a boolean.");
+  if (definition.skills !== undefined && typeof definition.skills !== "boolean") throw new Error("skills must be a boolean.");
   if (definition.handoff && (!agentName.test(definition.handoff.target)
     || !Number.isSafeInteger(definition.handoff.progressEveryMs) || definition.handoff.progressEveryMs <= 0)) {
     throw new Error("A handoff needs a target agent and a positive progressEveryMs.");
@@ -91,12 +96,15 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
   // An agent module is trusted application code, loaded once per process.
   const module = await import(pathToFileURL(join(folder, "agent.ts")).href);
   const definition = defineAgent(module.default);
+  const skillCatalog = definition.skills ? await loadSkills(root, id) : [];
   const handoffAgent = definition.handoff
     ? await loadAgent(root, definition.handoff.target, [...ancestors, id]) : undefined;
   return {
     ...definition, root, id, instructions: match[2].trim(), description: meta.description, model: meta.model,
     ...(handoffAgent ? { handoffAgent } : {}),
-    fingerprint: createHash("sha256").update(markdown).update(code).update(handoffAgent?.fingerprint ?? "").digest("hex"),
+    ...(definition.skills ? { skillCatalog } : {}),
+    fingerprint: createHash("sha256").update(markdown).update(code).update(handoffAgent?.fingerprint ?? "")
+      .update(skillCatalog.length ? JSON.stringify(skillCatalog.map(({ id, revision }) => ({ id, revision }))) : "").digest("hex"),
   };
 }
 

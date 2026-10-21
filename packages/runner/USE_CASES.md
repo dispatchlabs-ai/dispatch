@@ -10,7 +10,13 @@
   workflows while giving discussions their own configured tools and instructions.
 - **RUN-005 — Delegate privately:** keep each conversation's helper and progress
   separate, preserving the existing native ownership and recovery model.
+- **RUN-006 — Use scoped skills:** opt into company and agent-specific skill
+  discovery, load instructions/resources on demand and retain revision evidence.
+- **RUN-007 — Chat in a terminal:** stream turns directly through the local
+  service, resume named conversations and suspend work safely on process exit.
 
 The first extraction supports Node, SQLite and trusted company definitions.
-Hosted Dispatch Web adoption, remote storage, portable coding isolation, registry
-publication and broad installation qualification remain separate work.
+Hosted Dispatch Web adoption, remote storage, portable coding isolation, npm
+registry publication and broad installation qualification remain separate work.
+Runner source snapshots can be installed from public GitHub release archives;
+their exact tag, source revision and lockfile integrity identify the bytes.
