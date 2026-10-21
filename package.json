@@ -23,5 +23,11 @@
     "workshop": "npm run workshop --workspace @dispatch/web",
     "build:workshop": "npm run build:workshop --workspace @dispatch/web"
   },
-  "type": "module"
+  "type": "module",
+  "overrides": {
+    "@earendil-works/pi-coding-agent@1.1.0": {
+      "@earendil-works/chord": "1.1.0",
+      "@earendil-works/pi-codemode": "1.1.0"
+    }
+  }
 }
