@@ -29,6 +29,9 @@ native Pi clients can use the same employee identity. Responses currently requir
 a native OpenAI Responses or OpenAI Codex connection. Other providers remain
 available through Pi transport. Requests preserve native Responses items,
 structured-output options and tool events through Pi's provider hooks.
+The [live qualification record](docs/employee-access.md#qualification) covers
+employee sign-in and access controls, native Pi, API/OAuth Responses and a direct
+Codex CLI coding task, with the remaining client limits stated explicitly.
 
 A historical [Codex desktop probe](docs/codex-probe.md) demonstrates local
 ChatGPT Mac app inference through this gateway. A subsequent

@@ -3,8 +3,9 @@
 Employees use the public HTTPS gateway without AWS credentials or a workstation
 bridge. Operators retain provider credentials in Secrets Manager. Native Pi and
 Responses clients share identity, grants, revocation and usage accounting.
-This is source-alpha functionality; qualify the actual client and provider before
-rollout. The earlier [desktop probe](codex-probe.md) is a separate experiment.
+This is source-alpha functionality with the [scoped live checks](#qualification)
+below. Qualify the actual client and provider before rollout. The earlier
+[desktop probe](codex-probe.md) is a separate experiment.
 
 ## Installation and first sign-in
 
@@ -86,6 +87,11 @@ Restart the client, verify its selected provider, and correlate a real tool
 conversation with gateway receipts. See OpenAI's
 [gateway setup](https://learn.chatgpt.com/docs/enterprise/connect-to-a-gateway)
 and [compatibility requirements](https://learn.chatgpt.com/docs/enterprise/gateway-compatibility).
+
+The qualified CLI version reports a model-catalog refresh warning for the
+OpenAI-style `/v1/models` response and falls back to its bundled metadata for
+the recognized alias. The warning did not prevent inference or tool execution;
+it does not establish discovery support for arbitrary model aliases.
 
 ## Responses contract
 
@@ -261,3 +267,33 @@ unknown model pricing, provider discounts, subscription charges and interrupted
 requests can differ from the estimate. Inspect unpriced/pending receipts and the
 provider bill separately. No concurrency cap or automatic provider fallback is
 introduced by a spending policy.
+
+## Qualification
+
+Manual live checks on October 21, 2026 covered a Linux amd64 gateway and macOS
+clients. The final runtime was [6847226](https://github.com/dispatchlabs-ai/dispatch/commit/6847226ff469c57682ee845a0ee036f35a7ed8ce).
+Google Workspace sign-in, refresh rotation and replay denial, native
+Pi inference, Responses SSE/function-tool continuation, JSON structured output,
+and an explicit Codex OAuth Responses request succeeded. The sign-in success
+page, manual-code page and cancellation page were reviewed at desktop, tablet
+and phone viewport sizes. Manual code exchange and replay rejection also passed.
+
+Codex CLI `0.163.0-alpha.10.2` completed a coding task directly over HTTPS using
+the employee token helper: it inspected a file, edited it, ran shell verification
+and returned a final answer. Gateway receipts attributed the inference to the
+employee and client. The CLI connected directly to the public gateway origin.
+
+Scoped keys, current-grant enforcement, revision conflicts, credential revocation
+and employee disable/reenable were exercised. Both ingress replicas logged
+denials for already-issued credentials. Employee warning/block policies and
+company policy creation/removal were checked; temporary limits and keys were
+removed afterward.
+Disconnecting a Responses stream cancelled that request and produced an
+accounted `aborted` receipt with unpriced usage.
+
+These checks do not qualify every model, client or optional provider parameter.
+Desktop app titles/restart on the employee endpoint, encrypted reasoning replay,
+images, compaction, long sessions, broad failure/load behavior and regional
+restore remain unqualified.
+The earlier desktop adapter results have their own scope and do not establish
+those outcomes for this endpoint.
