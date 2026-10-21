@@ -10,8 +10,10 @@ import { parseConfig } from "./config.js";
 import { SecretsCredentialStore } from "./credentials.js";
 import { EcsOwnership } from "./ownership.js";
 import { createGatewayServer } from "./server.js";
+import { accessCommand } from "./access-cli.js";
 
 async function main() {
+  if (process.argv[2] === "auth") { await accessCommand(process.argv.slice(3)); return; }
   const [command = "serve", path = process.env.DISPATCH_GATEWAY_CONFIG, connectionId] = process.argv.slice(2);
   if (!path) throw new Error("Usage: dispatch-inference-gateway serve CONFIG | login CONFIG CONNECTION");
   let contents: string;

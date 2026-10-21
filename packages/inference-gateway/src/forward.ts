@@ -7,7 +7,7 @@ export async function forward(request: IncomingMessage, response: ServerResponse
   if (request.headers["x-dispatch-peer"]) throw new HttpError(503, "provider_owner_unavailable");
   const upstream = httpRequest({
     hostname: address, port, path, method: request.method, signal,
-    headers: { authorization: request.headers.authorization!, "x-dispatch-peer": "1", ...(body ? { "content-type": "application/json", "content-length": body.length } : {}) },
+    headers: { authorization: request.headers.authorization!, "x-dispatch-peer": "1", ...(typeof request.headers.session_id === "string" ? { session_id: request.headers.session_id } : {}), ...(body ? { "content-type": "application/json", "content-length": body.length } : {}) },
   });
   const received = new Promise<IncomingMessage>((resolve, reject) => {
     upstream.once("response", resolve);
@@ -22,6 +22,7 @@ export async function forward(request: IncomingMessage, response: ServerResponse
     "content-type": result.headers["content-type"] ?? "application/json",
     "cache-control": "no-store",
     ...(result.headers["x-request-id"] ? { "x-request-id": result.headers["x-request-id"] } : {}),
+    ...Object.fromEntries(["x-dispatch-connection", "x-dispatch-model", "x-dispatch-budget-warning"].flatMap((name) => result.headers[name] ? [[name, result.headers[name]!]] : [])),
   });
   response.flushHeaders();
   await pipeline(result, response, { signal });

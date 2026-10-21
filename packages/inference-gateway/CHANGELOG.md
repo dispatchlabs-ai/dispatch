@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Add direct HTTPS Responses streaming/JSON and model discovery through native Pi provider hooks, retaining tools, reasoning items, structured-output requests and explicit route metadata.
+- Add Google Workspace employee sign-in, renewable CLI/SDK credentials, scoped client keys and revision-checked administration with per-request revocation across replicas.
+- Attribute Pi and Responses requests to employee/client/company totals in DynamoDB, with recoverable usage receipts and optional monthly warning/block policies. No spending limits are enabled by default.
+
 - Sanitize public documentation and examples; replace the public Git history with a fresh snapshot and withdraw earlier tags/releases. Preserve private engineering records separately.
 
 - Add a package use-case inventory covering current workload access and approved Responses, employee sign-in, scoped client credentials and usage-control additions.

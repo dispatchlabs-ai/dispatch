@@ -3,10 +3,11 @@ import type { DeferredHandle } from "@earendil-works/pi-ai";
 import { z } from "zod";
 import { HttpError, type GatewayConfig, type Principal } from "./config.js";
 import { audienceHeader, identityBody, identityHost } from "./identity.js";
+import type { AccessStore } from "./access-store.js";
 const proofSchema = z.object({ headers: z.record(z.string(), z.string()) }).strict();
 
 export class GatewayAuth {
-  constructor(private readonly config: GatewayConfig, private readonly key: Buffer) {
+  constructor(private readonly config: GatewayConfig, private readonly key: Buffer, private readonly access?: AccessStore) {
     if (key.length !== 32) throw new Error("The session signing secret must contain 32 bytes");
   }
 
@@ -44,19 +45,29 @@ export class GatewayAuth {
 
   private sign(body: string): string { return createHmac("sha256", this.key).update(`session:${body}`).digest("base64url"); }
 
-  verify(authorization: string | undefined): Principal {
+  session(principal: string, credentialId: string, expiresAt: number) {
+    const body = Buffer.from(JSON.stringify({ sub: principal, sid: credentialId, aud: this.config.audience, exp: expiresAt })).toString("base64url");
+    return { token: `${body}.${this.sign(body)}`, expiresAt };
+  }
+
+  async verify(authorization: string | undefined): Promise<Principal> {
+    if (authorization?.startsWith("Bearer dgk_") && this.access) return (await this.access.bearer(authorization.slice(7))).principal;
     const token = authorization?.match(/^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/)?.[1];
     if (!token) throw new HttpError(401, "unauthorized");
     const [body, signature] = token.split(".");
     const expected = Buffer.from(this.sign(body));
     const actual = Buffer.from(signature);
     if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw new HttpError(401, "unauthorized");
-    let claim: { sub?: unknown; aud?: unknown; exp?: unknown };
+    let claim: { sub?: unknown; sid?: unknown; aud?: unknown; exp?: unknown };
     try { claim = JSON.parse(Buffer.from(body, "base64url").toString()); } catch { throw new HttpError(401, "unauthorized"); }
     if (claim.aud !== this.config.audience || typeof claim.exp !== "number" || claim.exp <= Date.now()) throw new HttpError(401, "unauthorized");
+    if (claim.sid !== undefined) {
+      if (!this.access || typeof claim.sub !== "string" || typeof claim.sid !== "string") throw new HttpError(401, "unauthorized");
+      return (await this.access.credential(claim.sub, claim.sid, "session")).principal;
+    }
     const principal = this.config.principals.find((item) => item.id === claim.sub);
     if (!principal) throw new HttpError(403, "principal_not_allowed");
-    return principal;
+    return { ...principal, kind: "aws", clientId: principal.id };
   }
 
   seal(handle: DeferredHandle, principal: string, connection: string): DeferredHandle {

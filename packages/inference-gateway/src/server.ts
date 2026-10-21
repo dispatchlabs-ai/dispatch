@@ -1,14 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer } from "node:http";
 import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 import { type AssistantMessageEvent, type ClassifierContext, type ClassifierModel, type Context, type DeferredHandle, type ImageModel, type ImagesContext, type Model, type Provider } from "@earendil-works/pi-ai";
 import { z } from "zod";
 import type { EcsOwnership } from "./ownership.js";
 import { forward } from "./forward.js";
 import { GatewayAuth } from "./auth.js";
-import { HttpError, parseConfig } from "./config.js";
+import { HttpError, parseConfig, permitted } from "./config.js";
 import { catalog, connectionModel, createConnections, nativeContext, publicMessage, requestOptions, type Connection } from "./engine.js";
+import { GatewayAccess } from "./access.js";
+import { AccessStore, tokenHash } from "./access-store.js";
+import { json, readBody, readJson } from "./http.js";
+import { responsesRequest, serveResponses, supportsResponses } from "./responses.js";
+import { RequestUsage } from "./usage.js";
 
 const requestSchema = z.object({
   model: z.string().min(1),
@@ -18,28 +23,6 @@ const requestSchema = z.object({
 }).strict();
 const contextSchema = z.object({ messages: z.array(z.object({ role: z.enum(["system", "user", "assistant", "toolResult"]) }).passthrough()) }).passthrough();
 const handleSchema = z.object({ id: z.string(), provider: z.string(), modelId: z.string(), api: z.string() }).passthrough();
-
-async function readBody(request: IncomingMessage): Promise<Buffer> {
-  if (!request.headers["content-type"]?.startsWith("application/json")) throw new HttpError(415, "json_required");
-  const chunks: Buffer[] = [];
-  let length = 0;
-  for await (const chunk of request) {
-    length += chunk.length;
-    if (length > 32 * 1024 * 1024) throw new HttpError(413, "request_too_large");
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
-}
-
-async function readJson(request: IncomingMessage): Promise<unknown> {
-  const body = await readBody(request);
-  try { return JSON.parse(body.toString()); } catch { throw new HttpError(400, "invalid_json"); }
-}
-
-function json(response: ServerResponse, status: number, value: unknown) {
-  response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
-  response.end(JSON.stringify(value));
-}
 
 function compactEvent(event: AssistantMessageEvent): Record<string, unknown> {
   if (event.type === "done" || event.type === "error") throw new Error("Terminal events need public metadata");
@@ -61,7 +44,9 @@ export async function createGatewayServer(configuration: unknown, extraProviders
   const secrets = new SecretsManagerClient({ region: config.region });
   const signing = await secrets.send(new GetSecretValueCommand({ SecretId: config.sessionSecretId }));
   if (!/^[a-f0-9]{64}$/.test(signing.SecretString ?? "")) throw new Error("Invalid session signing secret");
-  const auth = new GatewayAuth(config, Buffer.from(signing.SecretString!, "hex"));
+  const accessStore = config.access ? new AccessStore(config) : undefined;
+  const auth = new GatewayAuth(config, Buffer.from(signing.SecretString!, "hex"), accessStore);
+  const access = accessStore ? new GatewayAccess(config, accessStore, auth, secrets) : undefined;
   const pendingCredentials = new Set<Promise<unknown>>();
   const pendingRequests = new Set<Promise<unknown>>();
   const connections = new Map<string, Connection>();
@@ -78,13 +63,17 @@ export async function createGatewayServer(configuration: unknown, extraProviders
     response.on("close", () => { if (!response.writableFinished) controller.abort(); });
     request.on("aborted", () => controller.abort());
     const pending = (async () => {
-      const path = new URL(request.url ?? "/", "http://gateway.invalid").pathname;
+      const url = new URL(request.url ?? "/", "http://gateway.invalid");
+      const path = url.pathname;
       if (request.method === "GET" && path === "/healthz") { json(response, 200, { status: "ok" }); return; }
       if (request.method === "POST" && path === "/v1/auth/aws") { json(response, 200, await auth.exchange(await readJson(request), controller.signal)); return; }
-      const principal = auth.verify(request.headers.authorization);
-      const isCatalog = request.method === "GET" && path === "/v1/catalog";
+      if (await access?.publicRoute(request, response, url, controller.signal)) return;
+      const principal = await auth.verify(request.headers.authorization);
+      if (await access?.authenticatedRoute(request, response, url, principal)) return;
+      const isCatalog = request.method === "GET" && ["/v1/catalog", "/v1/models"].includes(path);
+      const isResponses = request.method === "POST" && path === "/v1/responses";
       const match = /^\/v1\/connections\/([a-z0-9][a-z0-9_-]*)\/(messages|operations)$/.exec(path);
-      if (!isCatalog && (request.method !== "POST" || !match)) throw new HttpError(404, "not_found");
+      if (!isCatalog && !isResponses && (request.method !== "POST" || !match)) throw new HttpError(404, "not_found");
       if (ownership) {
         const target = ownership.route();
         if (!target.local) {
@@ -95,7 +84,20 @@ export async function createGatewayServer(configuration: unknown, extraProviders
         await initialize();
         ownership.route();
       }
-      if (isCatalog) { json(response, 200, await catalog(connections, principal, config.audience)); return; }
+      if (isCatalog) {
+        const available = await catalog(connections, principal, config.audience);
+        const routes = available.connections.flatMap((connection) => connection.models.filter((model) => (model.type === undefined || model.type === "chat") && supportsResponses(model.api)).map((model) => ({ id: `${connection.id}/${model.id}`, object: "model", created: 0, owned_by: connection.id })));
+        const aliases = Object.entries(config.responsesAliases).filter(([, route]) => permitted(principal, route.connection, route.model) && routes.some((model) => model.id === `${route.connection}/${route.model}`)).map(([id, route]) => ({ id, object: "model", created: 0, owned_by: route.connection }));
+        json(response, 200, path === "/v1/catalog" ? available : { object: "list", data: [...aliases, ...routes] });
+        return;
+      }
+      if (isResponses) {
+        const resolved = responsesRequest(await readJson(request), connections, principal, config.responsesAliases);
+        const accounting = new RequestUsage(accessStore, requestId, principal, resolved.connectionId, resolved.model.id, "responses");
+        const warnings = await accounting.admit(principal);
+        await serveResponses(request, response, resolved, principal, requestId, controller, accounting, warnings);
+        return;
+      }
       if (!match) throw new HttpError(404, "not_found");
       const parsed = requestSchema.safeParse(await readJson(request));
       if (!parsed.success) throw new HttpError(400, "invalid_request");
@@ -105,50 +107,56 @@ export async function createGatewayServer(configuration: unknown, extraProviders
       const type = body.operation === "generateImages" ? "image" : body.operation === "classify" ? "classifier" : "chat";
       const { connection, model } = connectionModel(connections, principal, match[1], body.model, type);
       const options = requestOptions(body.options, principal, match[1], controller.signal);
-      const startedAt = Date.now();
-      const audit = (status: string, usage?: unknown) => process.stdout.write(`${JSON.stringify({ requestId, principal: principal.id, connection: match[1], model: model.id, operation: body.operation, status, durationMs: Date.now() - startedAt, ...(usage ? { usage } : {}) })}\n`);
-
-      if (body.operation === "generateImages" || body.operation === "classify") {
-        const result = body.operation === "generateImages"
-          ? await connection.models.generateImages(model as ImageModel<string>, body.context as ImagesContext, options)
-          : await connection.models.classify(model as ClassifierModel<string>, body.context as ClassifierContext, options);
-        const { errorMessage: _errorMessage, ...safe } = result;
-        if ("diagnostics" in safe) delete safe.diagnostics;
-        json(response, 200, { ...safe, provider: match[1], ...(_errorMessage ? { errorMessage: `Provider request failed (request ${requestId})` } : {}) });
-        audit(_errorMessage ? "error" : "done");
-        return;
-      }
-      let stream;
-      if (body.operation === "fetchDeferred" || body.operation === "cancelDeferred") {
-        const parsedHandle = handleSchema.safeParse(body.handle);
-        if (!parsedHandle.success) throw new HttpError(400, "invalid_deferred_handle");
-        const handle = auth.unseal(parsedHandle.data as DeferredHandle, principal.id, match[1], model.id);
-        if (body.operation === "cancelDeferred") {
-          await connection.models.cancelDeferred(model as Model<string>, handle, options);
-          json(response, 200, { cancelled: true }); audit("cancelled"); return;
-        }
-        stream = connection.models.streamDeferred(model as Model<string>, handle, options);
-      } else {
-        if (!contextSchema.safeParse(body.context).success) throw new HttpError(400, "invalid_context");
-        const context = nativeContext(body.context as Context, connection);
-        stream = body.operation === "stream" ? connection.models.stream(model as Model<string>, context, options) : connection.models.streamSimple(model as Model<string>, context, options);
-      }
-      response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", "x-accel-buffering": "no" });
-      response.flushHeaders();
-      const heartbeat = setInterval(() => { if (!response.writableNeedDrain) response.write(": heartbeat\n\n"); }, 15_000);
+      const accounting = new RequestUsage(accessStore, requestId, principal, match[1], model.id, body.operation);
+      const warnings = await accounting.admit(principal, !["fetchDeferred", "cancelDeferred"].includes(body.operation));
+      if (warnings.length) response.setHeader("x-dispatch-budget-warning", warnings.join(","));
       try {
-        for await (const event of stream) {
-          controller.signal.throwIfAborted();
-          let wire: Record<string, unknown>;
-          if (event.type === "done" || event.type === "error") {
-            const message = publicMessage(event.type === "done" ? event.message : event.error, principal, match[1], auth, requestId);
-            wire = { type: event.type, reason: event.reason, usage: message.usage, responseId: message.responseId, providerThinkingLevel: message.providerThinkingLevel, errorMessage: message.errorMessage, message };
-            audit(event.type === "done" ? event.reason : "error", message.usage);
-          } else wire = compactEvent(event);
-          if (!response.write(`data: ${JSON.stringify(wire)}\n\n`)) await once(response, "drain", { signal: controller.signal });
+        if (body.operation === "generateImages" || body.operation === "classify") {
+          const result = body.operation === "generateImages"
+            ? await connection.models.generateImages(model as ImageModel<string>, body.context as ImagesContext, options)
+            : await connection.models.classify(model as ClassifierModel<string>, body.context as ClassifierContext, options);
+          const { errorMessage: _errorMessage, ...safe } = result;
+          if ("diagnostics" in safe) delete safe.diagnostics;
+          await accounting.finish(_errorMessage ? "error" : "done", result.usage);
+          json(response, 200, { ...safe, provider: match[1], ...(_errorMessage ? { errorMessage: `Provider request failed (request ${requestId})` } : {}) });
+          return;
         }
-        response.end();
-      } finally { clearInterval(heartbeat); controller.abort(); }
+        let stream;
+        let deferredUsageKey: string | undefined;
+        if (body.operation === "fetchDeferred" || body.operation === "cancelDeferred") {
+          const parsedHandle = handleSchema.safeParse(body.handle);
+          if (!parsedHandle.success) throw new HttpError(400, "invalid_deferred_handle");
+          const handle = auth.unseal(parsedHandle.data as DeferredHandle, principal.id, match[1], model.id);
+          deferredUsageKey = tokenHash(`${principal.id}:${match[1]}:${model.id}:${handle.id}`);
+          if (body.operation === "cancelDeferred") {
+            await connection.models.cancelDeferred(model as Model<string>, handle, options);
+            await accounting.finish("cancelled"); json(response, 200, { cancelled: true }); return;
+          }
+          stream = connection.models.streamDeferred(model as Model<string>, handle, options);
+        } else {
+          if (!contextSchema.safeParse(body.context).success) throw new HttpError(400, "invalid_context");
+          const context = nativeContext(body.context as Context, connection);
+          stream = body.operation === "stream" ? connection.models.stream(model as Model<string>, context, options) : connection.models.streamSimple(model as Model<string>, context, options);
+        }
+        response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", "x-accel-buffering": "no" });
+        response.flushHeaders();
+        const heartbeat = setInterval(() => { if (!response.writableNeedDrain) response.write(": heartbeat\n\n"); }, 15_000);
+        try {
+          for await (const event of stream) {
+            controller.signal.throwIfAborted();
+            let wire: Record<string, unknown>;
+            if (event.type === "done" || event.type === "error") {
+              const message = publicMessage(event.type === "done" ? event.message : event.error, principal, match[1], auth, requestId);
+              wire = { type: event.type, reason: event.reason, usage: message.usage, responseId: message.responseId, providerThinkingLevel: message.providerThinkingLevel, errorMessage: message.errorMessage, message };
+              const native = event.type === "done" ? event.message : event.error;
+              const billingKey = deferredUsageKey ?? (native.deferred ? tokenHash(`${principal.id}:${match[1]}:${model.id}:${native.deferred.id}`) : undefined);
+              await accounting.finish(event.type === "done" ? event.reason : "error", native.stopReason === "deferred" ? undefined : message.usage, native.stopReason === "deferred" ? undefined : billingKey);
+            } else wire = compactEvent(event);
+            if (!response.write(`data: ${JSON.stringify(wire)}\n\n`)) await once(response, "drain", { signal: controller.signal });
+          }
+          response.end();
+        } finally { clearInterval(heartbeat); controller.abort(); }
+      } finally { await accounting.finish(controller.signal.aborted ? "aborted" : "error"); }
     })().catch((error: unknown) => {
       const status = error instanceof HttpError ? error.status : 502;
       const code = error instanceof HttpError ? error.code : controller.signal.aborted ? "request_aborted" : "gateway_request_failed";
@@ -169,6 +177,7 @@ export async function createGatewayServer(configuration: unknown, extraProviders
     // Native Pi may continue a refresh after its caller disconnects.
     while (pendingCredentials.size) await Promise.allSettled([...pendingCredentials]);
     secrets.destroy();
+    accessStore?.close();
   })();
   server.on("close", () => { void closeCredentials(); });
   return { server, config, connections, closeCredentials };
