@@ -8,7 +8,9 @@ export async function accessCommand(args: string[]) {
   if (!url || !["login", "token", "logout", "request", "admin"].includes(command)) throw new Error("Usage: auth login|token|logout URL | auth request|admin URL METHOD /v1/PATH [JSON_FILE]");
   const origin = gatewayOrigin(url);
   if (command === "login") {
-    const credential = await employeeLogin(origin, rest[0] ?? "Gateway CLI");
+    const names = rest.filter((value) => value !== "--no-browser");
+    if (names.length > 1) throw new Error("Usage: auth login URL [CLIENT_NAME] [--no-browser]");
+    const credential = await employeeLogin(origin, names[0] ?? "Gateway CLI", undefined, undefined, !rest.includes("--no-browser"));
     process.stdout.write(`${JSON.stringify({ signedIn: true, credential })}\n`); return;
   }
   if (command === "logout") { await employeeLogout(origin); process.stdout.write("Signed out.\n"); return; }

@@ -529,6 +529,7 @@ components:
         service_tier: { type: string }
         truncation: { enum: [auto, disabled] }
         metadata: { type: object, additionalProperties: { type: string } }
+        client_metadata: { type: object, additionalProperties: { type: string }, description: Accepted client telemetry; discarded before provider inference and never used for authorization }
         prompt_cache_key: { type: string, description: Namespaced by employee and client identity }
         prompt_cache_retention: { type: string }
         safety_identifier: { type: string, description: Replaced by a gateway-derived identity hash }

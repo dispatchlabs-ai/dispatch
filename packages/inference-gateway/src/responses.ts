@@ -21,7 +21,8 @@ const requestSchema = z.object({
   text: z.record(z.string(), z.unknown()).optional(), include: z.array(z.string()).optional(),
   max_output_tokens: z.number().int().positive().optional(), temperature: z.number().optional(), top_p: z.number().optional(),
   service_tier: z.string().optional(), truncation: z.enum(["auto", "disabled"]).optional(),
-  metadata: z.record(z.string(), z.string()).optional(), prompt_cache_key: z.string().optional(), prompt_cache_retention: z.string().optional(),
+  metadata: z.record(z.string(), z.string()).optional(), client_metadata: z.record(z.string(), z.string()).optional(),
+  prompt_cache_key: z.string().optional(), prompt_cache_retention: z.string().optional(),
   safety_identifier: z.string().optional(), stream_options: z.record(z.string(), z.unknown()).optional(),
 }).strict();
 type Event = { type: string; response?: Record<string, unknown>; [key: string]: unknown };
@@ -99,7 +100,8 @@ export async function serveResponses(request: IncomingMessage, response: ServerR
       signal, transport: "sse", sessionId, maxRetries: 0,
       fetch: async (input, init) => { const upstream = await fetch(input, init); providerStatus = upstream.status; return upstream; },
       onPayload: (native) => ({ ...(native as Record<string, unknown>), ...body, model: model.id, input: body.input, stream: true, store: false, background: false,
-        previous_response_id: undefined, prompt_cache_key: sessionId, safety_identifier: tokenHash(principal.id) }),
+        // Codex client telemetry is not a provider inference option or an authorization input.
+        client_metadata: undefined, previous_response_id: undefined, prompt_cache_key: sessionId, safety_identifier: tokenHash(principal.id) }),
       onResponse: (upstream) => { providerStatus = upstream.status; },
       onProviderStreamEvent: async (value) => {
         if (!value || typeof value !== "object" || !("type" in value) || typeof value.type !== "string") throw new Error("Invalid provider event");

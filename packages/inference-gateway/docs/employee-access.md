@@ -21,6 +21,8 @@ The first command opens Google sign-in and receives a one-time code on a random
 loopback port. It prints the authorization URL if opening the browser is
 unavailable. Use a browser on the same machine as the CLI. Successful sign-in
 prints credential metadata; `/v1/me` returns your identity and current grants.
+Add `--no-browser` to choose the browser yourself. A login is bound to the first
+browser that opens its URL; start a new login to switch browsers.
 On Windows, open the printed URL manually. Windows has not been qualified.
 
 Access tokens last up to ten minutes. The thirty-day session refresh credential
@@ -109,6 +111,8 @@ structured-output options and SSE events cross the gateway without a second
 provider implementation. The client executes tools and replays full conversation
 items with their results on the next request. The gateway never runs those tools.
 Actual model support still depends on the chosen provider/account.
+Codex's `client_metadata` telemetry field is accepted and discarded; it does not
+affect authorization or enter the provider request or usage records.
 
 The endpoint is stateless: stored responses, `previous_response_id`, item
 references, provider-hosted file IDs, background requests, hosted tools, remote

@@ -60,7 +60,7 @@ export function employeeGatewayAuthorization(url: string, path = employeeCredent
 }
 
 /** Browser login uses a one-time code and PKCE; access and refresh tokens never enter a URL. */
-export async function employeeLogin(url: string, clientName: string, path = employeeCredentialPath(url), notify = (url: string) => process.stderr.write(`Open this address to sign in:\n${url}\n`)) {
+export async function employeeLogin(url: string, clientName: string, path = employeeCredentialPath(url), notify = (url: string) => process.stderr.write(`Open this address to sign in:\n${url}\n`), openBrowser = true) {
   const origin = gatewayOrigin(url);
   const verifier = randomBytes(32).toString("base64url");
   let expectedFlow: string | undefined;
@@ -88,7 +88,7 @@ export async function employeeLogin(url: string, clientName: string, path = empl
     expectedFlow = start.flow;
     notify(start.authorizationUrl);
     const opener = process.platform === "darwin" ? "open" : process.platform === "win32" ? undefined : "xdg-open";
-    if (opener) { const child = spawn(opener, [start.authorizationUrl], { stdio: "ignore" }); child.on("error", () => {}); child.unref(); }
+    if (openBrowser && opener) { const child = spawn(opener, [start.authorizationUrl], { stdio: "ignore" }); child.on("error", () => {}); child.unref(); }
     const code = await received;
     const session = sessionSchema.parse(await authenticationRequest(origin, "/v1/auth/token", { flow: start.flow, code, codeVerifier: verifier }));
     await locked(path, async (assertLock) => { assertLock(); await save(path, origin, session); });
