@@ -17,7 +17,7 @@ export { UserCredentials, CredentialError } from "./credentials.js";
 export type { CredentialProvider, CredentialStatus } from "./credentials.js";
 export { credentialCommand, promptForSecret } from "./credential-cli.js";
 export { withPrivateProviderErrors } from "./private-provider-errors.js";
-export type { AgentHost, OpenOptions, RunnerState, StatusFile } from "./runtime.js";
+export type { AgentHost, OpenOptions, RunnerState, StatusFile, StartOptions } from "./runtime.js";
 export type { AgentSetup } from "./configuration.js";
 export type { Chat, ChatInitializer, ChatMessage, ChatService, ChatSnapshot } from "./chat.js";
 export type { ReplyDestination, ReplySink } from "./replies.js";

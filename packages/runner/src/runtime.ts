@@ -27,8 +27,9 @@ import { readFile, realpath, rename, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { Models } from "@earendil-works/pi-ai/models";
+import { Type } from "@earendil-works/pi-ai";
 import {
-  AssistantEntry, configure, createRegistry, defineDoc, defineExtension, defineTask, Harness,
+  AssistantEntry, configure, createRegistry, defineDoc, defineExtension, defineTask, defineTool, Harness,
   type Conversation, type ConversationId, type Cursor, type Extension, type HarnessOptions, type Storage, type TaskId,
 } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
@@ -49,12 +50,16 @@ export type RunnerState = {
   hostExtensions?: string[];
   cwd?: string | null;
   loopId: number | null;
+  conversationId?: number;
   completed: number;
-  phase: "idle" | "waiting" | "running" | "done" | "failed" | "aborted";
+  phase: "idle" | "waiting" | "running" | "paused" | "done" | "failed" | "aborted";
   nextAt: number | null;
   last: { at: number; submissionId: number; answer: string } | null;
   error: string | null;
+  pauseReason?: string | null;
 };
+
+export type StartOptions = { conversationId?: ConversationId; input?: string };
 
 export function createRuntime(namespace: string, agentConfiguration: ReturnType<typeof createConfiguration>["agentConfiguration"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"], codingEnvironment: ReturnType<typeof createCoding>["codingEnvironment"]) {
   const RunnerDoc = defineDoc<RunnerState>({
@@ -65,7 +70,28 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
     }),
   });
 
-  type LoopInput = { trigger: Trigger; input: string; once: boolean; firstAt: number };
+  const LoopControl = defineDoc<{ reason: string | null }>({
+    kind: `${namespace}.loop-control`, version: 1, scope: "conversation", history: "latest", fork: "initial",
+    initial: () => ({ reason: null }),
+  });
+  const pauseLoop = defineTool({
+    name: "pause_loop",
+    description: "Pause continuous work after your final response only when a missing decision or access prevents all useful progress, or the user asks you to stop. Explain the concrete blocker and needed input. A completed work pass is not a reason to pause.",
+    parameters: Type.Object({ reason: Type.String({ minLength: 1 }) }),
+    replay: "safe",
+    async execute({ reason }, api, ctx) {
+      const paused = await api.commit(async tx => {
+        const state = await tx.doc(RunnerDoc);
+        const task = state.loopId ? await tx.task(state.loopId as TaskId) : undefined;
+        if (!task || task.state.status === "terminal" || task.conversationId !== api.conversationId) return false;
+        (await tx.doc(LoopControl, api.conversationId)).reason = reason;
+        return true;
+      }, ctx);
+      return { output: [{ type: "text", text: paused ? "The loop will pause after your final response. State what input is needed." : "This conversation has no active loop." }] };
+    },
+  });
+
+  type LoopInput = { trigger: Trigger; input: string; initialInput?: string; once: boolean; firstAt: number };
   type Checkpoint =
     | { phase: "sleep"; iteration: number; at: number }
     | { phase: "run"; iteration: number; at: number };
@@ -92,8 +118,9 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
         if (!conversation) throw new Error("Agent conversation disappeared.");
         // Replaying this phase after a crash retrieves the already-admitted input.
         const submission = await conversation.submit({
-          type: "input", content: task.input.input,
+          type: "input", content: checkpoint.iteration === 0 ? task.input.initialInput ?? task.input.input : task.input.input,
           requestId: `loop:${task.id}:${checkpoint.iteration}`,
+          whenBusy: "followUp",
         }, ctx);
         const settled = await submission.wait(ctx);
         if (settled.status !== "done" || settled.type !== "input") {
@@ -112,15 +139,18 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
         if (!answer || answer.role !== "assistant") throw new Error("Completed input has no assistant answer.");
         const text = answer.content.flatMap((part) => part.type === "text" ? [part.text] : []).join("\n");
         const now = runtime.now();
-        const nextAt = task.input.once ? null : nextDeadline(task.input.trigger, checkpoint.at, now);
         await runtime.commit(async (tx) => {
+          const pauseReason = (await tx.doc(LoopControl, runtime.conversationId)).reason;
+          const finished = task.input.once || !!pauseReason;
+          const nextAt = finished ? null : nextDeadline(task.input.trigger, checkpoint.at, now);
           const state = await tx.doc(RunnerDoc);
           state.completed++;
           state.last = { at: now, submissionId: submission.id, answer: text };
-          state.phase = task.input.once ? "done" : "waiting";
+          state.phase = pauseReason ? "paused" : task.input.once ? "done" : "waiting";
+          state.pauseReason = pauseReason;
           state.nextAt = nextAt;
           state.error = null;
-          return task.input.once
+          return finished
             ? { status: "terminal", outcome: { status: "completed", result: null } }
             : { status: "running", checkpoint: { phase: "sleep", iteration: checkpoint.iteration + 1, at: nextAt! } };
         }, ctx);
@@ -177,7 +207,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
     const project = (state: RunnerState, hostRunning: boolean) => {
       const snapshot: StatusFile = {
         agent: agent.id, pid: process.pid, hostRunning,
-        updatedAt: new Date().toISOString(), conversationId: root.id, state: copy(state),
+        updatedAt: new Date().toISOString(), conversationId: state.conversationId ?? root.id, state: copy(state),
       };
       projection = projection.then(async () => {
         const temp = join(directory, "status.json.tmp");
@@ -192,7 +222,8 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
     try {
       await privateStateFiles(directory);
       const registry = createRegistry();
-      const loopExtension = defineExtension({ name: `${namespace}.runner`, tasks: [AgentLoop] });
+      const loopExtension = defineExtension({ name: `${namespace}.runner`, tasks: [AgentLoop],
+        tools: agent.trigger.mode === "continuous" ? [pauseLoop] : [], });
       const setup = await agentConfiguration(
         agent, directory, execution === "demo", [loopExtension, ...(options.extensions ?? [])], options.replySink, cwd,
       );
@@ -286,33 +317,47 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       };
       return {
         harness: activeHarness, conversation: root, configuration, state, close,
-        async start(once = false): Promise<TaskId<null>> {
+        async start(once = false, options: StartOptions = {}): Promise<TaskId<null>> {
           if (compromised) throw compromised;
           if (!once && agent.trigger.mode === "manual") throw new Error(`${agent.id} is manual. Use run instead of start.`);
           const saved = await state();
+          const conversation = options.conversationId
+            ? await activeHarness.conversation(options.conversationId, context) : root;
+          if (!conversation) throw new Error("The selected loop conversation is missing.");
+          if (options.input !== undefined && !options.input.trim()) throw new Error("A loop goal must be nonempty.");
           const prior = saved.loopId ? await activeHarness.getTask(saved.loopId as TaskId<null>, context) : undefined;
           if (prior && prior.state.status !== "terminal") {
+            if (prior.conversationId !== conversation.id) throw new Error(`${agent.id} already has a loop in another conversation.`);
+            if (options.input !== undefined && options.input !== (prior.input as LoopInput).initialInput) {
+              throw new Error("This loop already has a saved goal. Resume without a new prompt.");
+            }
             if ((prior.input as LoopInput).once !== once) {
               throw new Error(`${agent.id} has unfinished ${((prior.input as LoopInput).once) ? "one-shot" : "continuous/scheduled"} work. Resume with the same command.`);
             }
             activeHarness.resume();
             return prior.id;
           }
+          if (saved.phase === "paused" && !options.input) throw new Error(`Work is paused: ${saved.pauseReason}. Supply the missing input to resume.`);
+          const initialInput = options.input ?? (prior?.conversationId === conversation.id
+            ? (prior.input as LoopInput).initialInput : undefined);
           // A terminal failure needs an explicit new start/run. Reset the active
           // model context so a prior provider-error entry cannot poison the retry.
           if (prior?.state.status === "terminal" && prior.state.outcome.status !== "completed") {
-            await root.reset(`Previous iteration failed. Last completed result:\n${saved.last?.answer ?? "(none)"}`, context);
+            await conversation.reset(`Previous iteration failed. Assigned goal:\n${initialInput ?? agent.input}\n\nLast completed result:\n${saved.last?.answer ?? "(none)"}`, context);
           }
           const firstAt = now() + (!once && agent.trigger.mode === "interval" && agent.trigger.runImmediately === false ? agent.trigger.everyMs : 0);
-          const id = await root.commit(async (tx) => {
+          const id = await conversation.commit(async (tx) => {
+            (await tx.doc(LoopControl, conversation.id)).reason = null;
             const id = await tx.createTask(AgentLoop, {
-              trigger: agent.trigger, input: agent.input, once, firstAt,
+              trigger: agent.trigger, input: agent.input, ...(initialInput ? { initialInput } : {}), once, firstAt,
             }, { ownership: { kind: "conversation" }, background: true });
             const state = await tx.doc(RunnerDoc);
             state.loopId = id;
+            state.conversationId = conversation.id;
             state.phase = "waiting";
             state.nextAt = firstAt;
             state.error = null;
+            state.pauseReason = null;
             return id;
           }, context);
           activeHarness.resume();
@@ -348,6 +393,6 @@ export type AgentHost = {
   configuration: AgentSetup["configuration"];
   state(): Promise<RunnerState>;
   close(): Promise<void>;
-  start(once?: boolean): Promise<TaskId<null>>;
+  start(once?: boolean, options?: StartOptions): Promise<TaskId<null>>;
   wait(id: TaskId<null>): Promise<RunnerState>;
 };

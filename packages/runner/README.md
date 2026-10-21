@@ -91,7 +91,9 @@ web installation.
 
 An agent folder contains `agent.md` (instructions and model frontmatter) and
 `agent.ts` (a `defineAgent` export). Definitions are trusted application code.
-They can install native Pi extensions; no tools are granted by default.
+They can install native Pi extensions. Continuous definitions also receive
+`pause_loop` to report a blocking need for user input; file and shell tools remain
+explicit grants.
 The `model.thinking` value accepts Pi's `off`, `minimal`, `low`, `medium`, `high`,
 `xhigh`, and `max` levels. The chosen provider/model must support the selected level.
 `factory.yaml` lists scheduled `agents`. Manual definitions remain available
@@ -126,6 +128,28 @@ inference. `newChat` creates a fresh session and prints its key. Interactive
 commands are `/new`, `/history` and `/quit`; Ctrl-C suspends unfinished work and
 exits with status 130. A turn failure rejects the function for the caller to
 report with a nonzero exit status. Model credentials remain the host's choice.
+Terminal clients do not start the schedules listed in `factory.yaml`; use `run`
+for the scheduled service.
+
+For a definition with a `continuous` trigger, pass `continuous: true` and an
+initial `prompt` to keep working in the named terminal conversation. The initial
+prompt is saved in the native loop task; later iterations use the definition's
+`input` in that same conversation. A final response completes one pass and starts
+the next after the configured delay. There is no fixed pass count. Native task
+checkpoints and request IDs preserve admitted work across restarts.
+
+Ctrl-C suspends the loop. Reopen with the same session and working directory,
+`continuous: true`, and no new prompt to resume it. A different prompt is rejected
+while the saved loop is active, and single-turn mode cannot silently resume that
+loop. If the agent calls `pause_loop({ reason })`, it finishes its current response
+and saves a `paused` status with that reason. Supply the needed input as a new
+`prompt` to resume. Pausing is explicit; ordinary prose is never parsed as a stop
+signal. The agent's instructions determine what constitutes a genuine blocker.
+
+Applications can use the same mechanism directly through
+`host.start(false, { conversationId, input })`; `host.wait(id)` resolves when the
+loop pauses and rejects on a failed or aborted task. The existing one-loop-per-host
+schedule state and native SQLite ownership are unchanged.
 
 Terminal output renders C0/C1 control characters and DEL as visible `\xNN`
 escapes, except for tabs and newlines. This also covers controls split across

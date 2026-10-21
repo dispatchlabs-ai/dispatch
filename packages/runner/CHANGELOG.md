@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Run continuous terminal work in the selected named conversation, retaining the
+  initial goal and native loop checkpoints across restarts. Each final answer
+  advances to the next pass; `pause_loop` records an explicit blocker. Preserve
+  suspended work and reject accidental single-turn or different-session reuse.
+
 - Supply repository `AGENTS.md` instructions to every directory-defined role and
   refresh target-repository guidance before model requests. Add an explicit saved
   working directory and native foreground delegation to named agents.

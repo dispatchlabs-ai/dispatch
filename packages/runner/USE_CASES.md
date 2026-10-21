@@ -17,6 +17,9 @@
   discovery, load instructions/resources on demand and retain revision evidence.
 - **RUN-007 — Chat in a terminal:** stream turns directly through the local
   service, resume named conversations and suspend work safely on process exit.
+  Keep a continuous agent working in that conversation across completed passes,
+  suspend and recover its native loop, and resume an explicit blocker pause with
+  the needed user input.
   Display untrusted terminal controls as visible escapes, including streaming
   chunks and saved history, without changing stored conversation content.
 - **RUN-008 — Use host-owned credentials:** configure a native store or trusted

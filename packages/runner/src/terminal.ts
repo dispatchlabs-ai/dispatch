@@ -10,6 +10,8 @@ export type TerminalOptions = RunOptions & {
   prompt?: string;
   newChat?: boolean;
   history?: boolean;
+  /** Keep a continuous agent working in this named conversation until paused or interrupted. */
+  continuous?: boolean;
 };
 
 async function showHistory(service: ChatService, chat: Chat) {
@@ -20,7 +22,8 @@ async function showHistory(service: ChatService, chat: Chat) {
 
 /** A local terminal is another client of the same durable conversation service. */
 export async function chatInTerminal(options: TerminalOptions): Promise<void> {
-  const app = await run({ ...options, names: [options.agent], resume: !options.history })
+  if (options.continuous && options.history) throw new Error("Choose continuous work or history.");
+  const app = await run({ ...options, names: [options.agent], resume: false })
     .catch((error: unknown) => { throw terminalError(error); });
   const controller = new AbortController();
   let input: ReturnType<typeof createInterface> | undefined;
@@ -33,8 +36,15 @@ export async function chatInTerminal(options: TerminalOptions): Promise<void> {
     const diagnostics = process.stderr;
     diagnostics.write(terminalText(`Conversation: ${chat.id} (session: ${key})${options.demo ? " [scripted demo]" : ""}\n`));
     if (options.history) { await showHistory(app.service, chat); return; }
+    if (!options.continuous) {
+      const host = app.service.host(chat.agent);
+      const saved = await host.state();
+      const task = saved.loopId ? await host.harness.getTask(saved.loopId as import("@earendil-works/pi-durable").TaskId, context) : undefined;
+      if (task && task.state.status !== "terminal") throw new Error("A saved loop is still active. Resume in continuous mode instead of starting a separate terminal turn.");
+      host.harness.resume();
+    }
 
-    const submit = async (text: string) => {
+    const observe = async (action: () => Promise<void>) => {
       controller.signal.throwIfAborted();
       const previous = new Set((await app.service.snapshot(chat.id)).messages.map(message => message.id));
       let partial = "";
@@ -65,20 +75,32 @@ export async function chatInTerminal(options: TerminalOptions): Promise<void> {
       });
       try {
         controller.signal.throwIfAborted();
-        const answer = async () => {
-          const { submissionId } = await app.service.submit(chat.id, text, randomUUID(), "followUp", "cli");
-          const submission = await app.service.host(chat.agent).harness.submission(submissionId, context);
-          if (!submission) throw new Error("Submitted turn is missing.");
-          return submission.wait(context);
-        };
-        const receipt = await Promise.race([answer(), interrupted]);
-        if (receipt.status !== "done") throw new Error(generationError ?? `Turn did not complete: ${receipt.reason}. Use --history for details.`);
+        await Promise.race([action(), interrupted]);
       } finally {
         controller.signal.removeEventListener("abort", cancel);
         await watch.stop();
       }
       if (generationError) throw new Error(generationError);
     };
+
+    const submit = (text: string) => observe(async () => {
+      const { submissionId } = await app.service.submit(chat.id, text, randomUUID(), "followUp", "cli");
+      const submission = await app.service.host(chat.agent).harness.submission(submissionId, context);
+      if (!submission) throw new Error("Submitted turn is missing.");
+      const receipt = await submission.wait(context);
+      if (receipt.status !== "done") throw new Error(`Turn did not complete: ${receipt.reason}. Use --history for details.`);
+    });
+
+    if (options.continuous) {
+      diagnostics.write("Continuous work. Each completed pass starts the next. Ctrl-C saves and suspends the loop.\n");
+      await observe(async () => {
+        const { host, conversation } = await app.service.resolve(chat.id);
+        const loop = await host.start(false, { conversationId: conversation.id, input: options.prompt });
+        const state = await host.wait(loop);
+        if (state.phase === "paused") diagnostics.write(terminalText(`Paused: ${state.pauseReason}\n`));
+      });
+      return;
+    }
 
     if (options.prompt !== undefined) { await submit(options.prompt); return; }
     diagnostics.write("Commands: /new, /history, /quit. Ctrl-C saves and suspends unfinished work.\n");
