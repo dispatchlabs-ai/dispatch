@@ -16,6 +16,8 @@ export type Adapter = { prepare(options: { root: string; runner: Runner }): Prom
 export type RunOptions = {
   root?: string;
   stateRoot?: string;
+  /** Explicit local working directory for native tools and repository instructions. */
+  cwd?: string;
   runner?: Runner;
   models?: Models;
   names?: string[];
@@ -59,6 +61,7 @@ export async function run(options: RunOptions = {}) {
         models: options.models, demo: options.demo ?? false, names: options.names,
         updateDefinitions: options.updateDefinitions, initialize: options.initialize,
         resume: options.resume,
+        cwd: options.cwd,
         extensions, replySink,
       });
     }

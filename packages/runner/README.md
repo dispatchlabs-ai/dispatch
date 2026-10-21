@@ -167,6 +167,36 @@ results retain the exact read content and revision. `loadSkills(root, agent)` an
 contents are loaded into process memory at startup and disclosed to the model
 on demand, rather than hot-reloaded under a saved definition.
 
+## Repository instructions and delegation
+
+`loadAgent` supplies every role with its own `agent.md` body and the applicable
+root-to-agent-directory `AGENTS.md` chain. Those source revisions contribute to
+the definition fingerprint, including delegated roles. Without Git, the company
+root is the boundary. Missing instruction files are allowed.
+Shared agent-behavior rules follow the agent across assignments; contributor
+commands and paths stay scoped to their source repository. Role bodies are
+explicitly labeled with their `agents/<name>/agent.md` source.
+
+Pass `cwd` to `run`, `ChatService.open` or `openAgent` to select a trusted local
+checkout. Every generation also loads that checkout's root-to-working-directory
+`AGENTS.md` chain, including child conversations. Nested instructions outside that
+chain must be read before entering their scope. Target guidance refreshes before
+each model request; company/role guidance follows definition update rules.
+The working directory is saved and must match when reopening the store.
+
+An agent can declare `delegates: ["worker"]` to expose the `delegate` tool. Each
+call creates a native task-owned foreground conversation using the named agent's
+own instructions, model and tools. Parallel calls can run concurrently. A stable
+submission ID and task ownership preserve the child across interrupted tool
+replay; results return to the parent. Assign bounded work and disjoint files when
+several children edit one checkout. There is no separate orchestrator or automatic
+acceptance gate.
+
+Agents must explicitly grant file/shell tools, for example `CodingTools` from
+`@earendil-works/pi-durable/tools`. With `cwd`, those tools use the local account's
+access. This is a working-directory choice, not a filesystem sandbox; the existing
+`coding: true` adapter retains its own environment and restrictions.
+
 ## Persistence and boundaries
 
 `createRunner({ namespace })` derives native document/task identities. Keep the

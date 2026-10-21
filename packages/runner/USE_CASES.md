@@ -23,6 +23,9 @@
   vault helper, resolve API keys directly into Pi, inspect only source metadata,
   and explicitly select session/environment compatibility without plaintext
   fallback. This does not supply isolation for untrusted code or OAuth storage.
+- **RUN-009 — Work in a repository:** supply each agent with repository instructions
+  and its own role instructions, select a saved working directory, and delegate
+  bounded assignments to named agents with native ownership and recovery.
 
 The first extraction supports Node, SQLite and trusted company definitions.
 Hosted Dispatch Web adoption, remote storage, portable coding isolation, npm

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Supply repository `AGENTS.md` instructions to every directory-defined role and
+  refresh target-repository guidance before model requests. Add an explicit saved
+  working directory and native foreground delegation to named agents.
+
 - Run natively on Windows with automatic private state/configuration ACLs and
   built-in Credential Manager access. Use the same terminal workflow without
   WSL, administrator privileges or an additional native runtime. Strip helper

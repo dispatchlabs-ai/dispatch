@@ -8,6 +8,7 @@ import { createChats } from "./chat.js";
 import type { LoadedAgent } from "./definition.js";
 
 export * from "./definition.js";
+export { loadRepositoryInstructions } from "./instructions.js";
 export { loadSkills } from "./skills.js";
 export type { Skill } from "./skills.js";
 export { chatInTerminal } from "./terminal.js";

@@ -70,6 +70,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       root: string; stateRoot: string; demo: boolean; names?: string[]; extensions?: Extension[];
       replySink?: ReplySink; updateDefinitions?: boolean; models: Models; initialize?: ChatInitializer;
       resume?: boolean;
+      cwd?: string;
     }) {
       const stateRoot = resolve(options.stateRoot);
       const names = options.names?.length ? options.names :
@@ -85,6 +86,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
             agent, directory: join(stateRoot, agent.id), models,
             execution: options.demo ? "demo" : "live", extensions: options.extensions,
             replySink: options.replySink, updateDefinitions: options.updateDefinitions,
+            cwd: options.cwd,
           });
           service.hosts.set(agent.id, host);
         }));

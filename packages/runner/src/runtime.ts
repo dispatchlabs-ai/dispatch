@@ -1,6 +1,8 @@
 export type OpenOptions = {
   agent: LoadedAgent;
   directory: string;
+  /** Trusted local checkout. Tools run with the host user's filesystem access. */
+  cwd?: string;
   models: Models;
   execution?: "live" | "demo";
   settings?: HarnessOptions["settings"];
@@ -21,7 +23,7 @@ export type StatusFile = {
   conversationId: number; state: RunnerState;
 };
 
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile, realpath, rename, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { Models } from "@earendil-works/pi-ai/models";
@@ -30,6 +32,7 @@ import {
   type Conversation, type ConversationId, type Cursor, type Extension, type HarnessOptions, type Storage, type TaskId,
 } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
+import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import lockfile from "proper-lockfile";
 import { nextDeadline, type LoadedAgent, type Trigger } from "./definition.js";
 import { createConfiguration, type AgentSetup } from "./configuration.js";
@@ -44,6 +47,7 @@ export type RunnerState = {
   fingerprint: string;
   execution: string;
   hostExtensions?: string[];
+  cwd?: string | null;
   loopId: number | null;
   completed: number;
   phase: "idle" | "waiting" | "running" | "done" | "failed" | "aborted";
@@ -146,6 +150,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
   async function openAgent(options: OpenOptions): Promise<AgentHost> {
     const { agent, models } = options;
     const directory = resolve(options.directory);
+    const cwd = options.cwd ? await realpath(resolve(options.cwd)) : undefined;
     const execution = options.execution ?? "live";
     const now = options.now ?? Date.now;
     await privateStateDirectory(directory);
@@ -189,19 +194,24 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       const registry = createRegistry();
       const loopExtension = defineExtension({ name: `${namespace}.runner`, tasks: [AgentLoop] });
       const setup = await agentConfiguration(
-        agent, directory, execution === "demo", [loopExtension, ...(options.extensions ?? [])], options.replySink,
+        agent, directory, execution === "demo", [loopExtension, ...(options.extensions ?? [])], options.replySink, cwd,
       );
       const { configuration, installed } = setup;
       for (const extension of new Map([...installed, ...(options.registryExtensions ?? [])].map(extension => [extension.name, extension])).values()) registry.install(extension);
       storage = await openNodeSqliteStorage(join(directory, "session.sqlite"));
       harness = await Harness.open(storage, {
-        models, registry, now, settings: options.settings, env: codingEnvironment,
+        models, registry, now, settings: options.settings,
+        env: async (target, ctx) => await codingEnvironment(target, ctx) ??
+          (cwd ? new NodeExecutionEnv({ cwd: target.cwd ?? cwd }) : undefined),
         onReport: (error) => reportError(`[${agent.id}] Pi Durable:`, error),
       }, context);
       root = await harness.root(context, {
         agent: configuration,
       });
       const existing = await harness.snapshot(RunnerDoc, context);
+      if (existing?.fingerprint && (existing.cwd ?? null) !== (cwd ?? null)) {
+        throw new Error("The saved agent belongs to a different working directory. Use the original --cwd or a separate --state-dir.");
+      }
       const hostExtensions = [...(options.extensions ?? []), ...(options.registryExtensions ?? [])].map(extension => extension.name);
       const missing = existing?.hostExtensions?.filter(name => !hostExtensions.includes(name)) ?? [];
       if (missing.length) {
@@ -244,6 +254,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
         const state = await tx.doc(RunnerDoc);
         state.fingerprint = agent.fingerprint;
         state.execution = execution;
+        state.cwd = cwd ?? null;
         state.hostExtensions = hostExtensions;
       }, context);
       const watch = await harness.watchDoc(RunnerDoc, context);

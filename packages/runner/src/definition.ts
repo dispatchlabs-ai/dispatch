@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Extension } from "@earendil-works/pi-durable";
 import { parse } from "yaml";
 import { loadSkills, type Skill } from "./skills.js";
+import { formatRepositoryInstructions, loadRepositoryInstructions, type RepositoryInstruction } from "./instructions.js";
 
 export type Trigger =
   | { mode: "manual" }
@@ -21,6 +22,8 @@ export type AgentDefinition = {
   coding?: boolean;
   /** Discover company skills and this agent's own skills. Opt-in for existing stores. */
   skills?: boolean;
+  /** Named agents available for native foreground delegation. */
+  delegates?: string[];
   handoff?: { target: string; progressEveryMs: number };
 };
 
@@ -33,6 +36,8 @@ export type LoadedAgent = AgentDefinition & {
   fingerprint: string;
   skillCatalog?: Skill[];
   handoffAgent?: LoadedAgent;
+  delegateAgents?: LoadedAgent[];
+  repositoryInstructions: RepositoryInstruction[];
 };
 
 export const agentName = /^[a-z][a-z0-9-]*$/;
@@ -41,6 +46,8 @@ export function defineAgent(definition: AgentDefinition): AgentDefinition {
   if (!definition || typeof definition.input !== "string" || !definition.input.trim()) {
     throw new Error("An agent needs a nonempty input.");
   }
+  if (definition.delegates && (!Array.isArray(definition.delegates) || definition.delegates.some(id => !agentName.test(id))
+    || new Set(definition.delegates).size !== definition.delegates.length)) throw new Error("Delegates must be unique agent names.");
   const trigger = definition.trigger;
   if (!trigger || !["manual", "continuous", "interval"].includes(trigger.mode)) {
     throw new Error("Trigger mode must be manual, continuous, or interval.");
@@ -74,7 +81,7 @@ export async function catalog(root: string): Promise<{ id: string; runnable: boo
 
 export async function loadAgent(root: string, id: string, ancestors: string[] = []): Promise<LoadedAgent> {
   if (!agentName.test(id)) throw new Error(`Invalid agent name: ${id}`);
-  if (ancestors.includes(id)) throw new Error(`Circular handoff: ${[...ancestors, id].join(" → ")}`);
+  if (ancestors.includes(id)) throw new Error(`Circular agent dependency: ${[...ancestors, id].join(" → ")}`);
   const folder = join(root, "agents", id);
   const [markdown, code] = await Promise.all([
     readFile(join(folder, "agent.md"), "utf8"),
@@ -97,13 +104,22 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
   const module = await import(pathToFileURL(join(folder, "agent.ts")).href);
   const definition = defineAgent(module.default);
   const skillCatalog = definition.skills ? await loadSkills(root, id) : [];
+  const repositoryInstructions = await loadRepositoryInstructions(folder, root);
   const handoffAgent = definition.handoff
     ? await loadAgent(root, definition.handoff.target, [...ancestors, id]) : undefined;
+  const delegateAgents = definition.delegates?.length
+    ? await Promise.all(definition.delegates.map(name => loadAgent(root, name, [...ancestors, id]))) : undefined;
+  const instructions = [formatRepositoryInstructions(repositoryInstructions, "agent"),
+    `# Role instructions from agents/${id}/agent.md\n${match[2].trim()}`].filter(Boolean).join("\n\n");
   return {
-    ...definition, root, id, instructions: match[2].trim(), description: meta.description, model: meta.model,
+    ...definition, root, id, instructions,
+    repositoryInstructions, description: meta.description, model: meta.model,
     ...(handoffAgent ? { handoffAgent } : {}),
+    ...(delegateAgents ? { delegateAgents } : {}),
     ...(definition.skills ? { skillCatalog } : {}),
-    fingerprint: createHash("sha256").update(markdown).update(code).update(handoffAgent?.fingerprint ?? "")
+    fingerprint: createHash("sha256").update(markdown).update(code).update(instructions).update(handoffAgent?.fingerprint ?? "")
+      .update(JSON.stringify(repositoryInstructions.map(({ path, revision }) => ({ path: relative(root, path), revision }))))
+      .update(JSON.stringify(delegateAgents?.map(agent => agent.fingerprint) ?? []))
       .update(skillCatalog.length ? JSON.stringify(skillCatalog.map(({ id, revision }) => ({ id, revision }))) : "").digest("hex"),
   };
 }
