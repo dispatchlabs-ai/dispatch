@@ -62,7 +62,8 @@ When bots share a channel, list the other bots' Slack user IDs in
 bot is also mentioned. An assistant used inside other bots' threads can select
 `threadReplies: started`: its own top-level mention threads and published report
 threads accept ordinary replies, while questions in other threads require a
-fresh mention. DMs always accept follow-ups. Thread ownership is retained across
+fresh mention. Each top-level DM starts a conversation; replies in its thread
+continue that conversation without another mention. Thread ownership is retained across
 restart; human mentions do not count as peer-bot addressing. The default `all`
 keeps accepting unmentioned replies in every registered thread.
 New mention and DM conversations include `origin.slack` with `teamId`,
