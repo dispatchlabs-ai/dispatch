@@ -21,8 +21,8 @@ export type StatusFile = {
   conversationId: number; state: RunnerState;
 };
 
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readFile, rename, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { Models } from "@earendil-works/pi-ai/models";
 import {
@@ -36,6 +36,8 @@ import { createConfiguration, type AgentSetup } from "./configuration.js";
 import { createHandoffs } from "./handoff.js";
 import { createCoding } from "./coding.js";
 import type { ReplySink } from "./replies.js";
+import { privateStateDirectory, privateStateFiles } from "./private-state.js";
+import { reportError } from "./terminal-output.js";
 
 const context = BACKGROUND_CONTEXT;
 export type RunnerState = {
@@ -142,10 +144,11 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
   }
 
   async function openAgent(options: OpenOptions): Promise<AgentHost> {
-    const { agent, directory, models } = options;
+    const { agent, models } = options;
+    const directory = resolve(options.directory);
     const execution = options.execution ?? "live";
     const now = options.now ?? Date.now;
-    await mkdir(directory, { recursive: true });
+    await privateStateDirectory(directory);
     let compromised: Error | undefined;
     let harness: Harness | undefined;
     let storage: Storage | undefined;
@@ -177,11 +180,12 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
         await rename(temp, join(directory, "status.json"));
         options.onStatus?.(snapshot.state);
       }).catch((error: unknown) => {
-        if (!projectionError) console.error(`[${agent.id}] Could not publish a status snapshot:`, error);
+        if (!projectionError) reportError(`[${agent.id}] Could not publish a status snapshot:`, error);
         projectionError = error;
       });
     };
     try {
+      await privateStateFiles(directory);
       const registry = createRegistry();
       const loopExtension = defineExtension({ name: `${namespace}.runner`, tasks: [AgentLoop] });
       const setup = await agentConfiguration(
@@ -192,7 +196,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       storage = await openNodeSqliteStorage(join(directory, "session.sqlite"));
       harness = await Harness.open(storage, {
         models, registry, now, settings: options.settings, env: codingEnvironment,
-        onReport: (error) => console.error(`[${agent.id}] Pi Durable:`, error),
+        onReport: (error) => reportError(`[${agent.id}] Pi Durable:`, error),
       }, context);
       root = await harness.root(context, {
         agent: configuration,

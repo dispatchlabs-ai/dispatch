@@ -4,6 +4,7 @@ import type { Extension } from "@earendil-works/pi-durable";
 import { createRunner, type Runner } from "./index.js";
 import type { ChatService, ChatInitializer } from "./chat.js";
 import type { ReplySink } from "./replies.js";
+import { reportError } from "./terminal-output.js";
 
 export type PreparedAdapter = {
   extension: Extension;
@@ -66,7 +67,7 @@ export async function run(options: RunOptions = {}) {
     if (options.resume !== false) for (const host of service.hosts.values()) host.harness.resume();
     return { runner, service, adapters, close };
   } catch (error) {
-    await close().catch(closeError => console.error("Runner cleanup failed:", closeError));
+    await close().catch(closeError => reportError("Runner cleanup failed:", closeError));
     throw error;
   }
 }

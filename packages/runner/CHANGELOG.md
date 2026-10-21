@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- Secure new and existing conversation directories with owner-only POSIX modes
+  before opening SQLite, including databases, sidecars and status files. Reject
+  unsafe file links and ownership; native Windows storage now fails closed until
+  ACL enforcement is available (use Linux/WSL or macOS).
+- Render terminal control characters as visible escapes in streaming responses,
+  completed answers, history, diagnostics and returned errors. Preserve the
+  original conversation text in storage and keep ordinary Unicode, tabs and
+  newlines readable.
+
 - Withhold raw chat-provider error details before durable storage while preserving
   Pi retry and context-overflow categories.
 

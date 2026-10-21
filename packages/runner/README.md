@@ -11,14 +11,14 @@ complete terminal example with an integrity-pinned public runner archive.
 For source builds, pack a reviewed revision as below. See the
 [use cases](USE_CASES.md) and [changes](CHANGELOG.md).
 
-The `runner-v0.6.0-alpha.1` GitHub prerelease is a runner-only source snapshot,
+The `runner-v0.6.0-alpha.3` GitHub prerelease is a runner-only source snapshot,
 not a release or deployment of Dispatch Web. Its notes identify the exact source
 commit and archive checksum. The archive retains the repository's 0.6.0 package
 version; its tag and npm lockfile integrity distinguish the snapshot. Install it
 without checking an archive into your own repository:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/runner-v0.6.0-alpha.1/dispatch-runner-0.6.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/runner-v0.6.0-alpha.3/dispatch-runner-0.6.0.tgz
 ```
 
 Keep the resulting lockfile. Snapshot updates use a new immutable tag and URL;
@@ -127,6 +127,11 @@ commands are `/new`, `/history` and `/quit`; Ctrl-C suspends unfinished work and
 exits with status 130. A turn failure rejects the function for the caller to
 report with a nonzero exit status. Model credentials remain the host's choice.
 
+Terminal output renders C0/C1 control characters and DEL as visible `\xNN`
+escapes, except for tabs and newlines. This also covers controls split across
+streaming chunks, saved history, tool diagnostics and returned error messages.
+The stored text is unchanged; other clients must apply their own display policy.
+
 Use separate state roots for demo and live execution. The scaffold supplies
 argument parsing, two direct providers and a clearly labeled scripted example;
 the runner does not embed a provider credential or require an inference gateway.
@@ -175,6 +180,17 @@ code is not transitively hashed.
 Closing suspends unfinished native work; reopening with compatible definitions
 and adapters resumes it. State directories hold private transcripts and tools'
 results. Back up the complete store; do not copy a live SQLite file in isolation.
+On POSIX systems, startup sets the state root and each agent directory to `0700`,
+and the database, existing SQLite sidecars and status files to `0600` before
+opening storage. SQLite creates new sidecars inside the private agent directory.
+Existing history is retained. State paths must be owned by the launching account;
+symlinked state directories/files, hard-linked files and special files are
+rejected. Startup stops if private modes cannot be established. Keep ancestor
+directories under trusted control and review any extra filesystem ACLs separately.
+Native Windows storage is unavailable until ACL enforcement is implemented;
+use a Linux filesystem in WSL or run on Linux/macOS. These permissions do not
+isolate trusted code running as the same account or protect earlier backups.
+
 A directory lock enforces Pi SQLite's single-owner contract without limiting
 independent native tasks. Status JSON is an observation, not durable authority.
 

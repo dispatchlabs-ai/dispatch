@@ -7,7 +7,7 @@ export type ChatSnapshot = {
 
 export type ChatInitializer = (tx: Tx, chat: Chat, host: Pick<AgentHost, "configuration">) => Promise<void>;
 import { isDeepStrictEqual } from "node:util";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import {
   configure, defineDoc, type ConversationId, type ConversationView, type Cursor,
@@ -18,6 +18,7 @@ import type { Models } from "@earendil-works/pi-ai/models";
 import { createRuntime, type AgentHost } from "./runtime.js";
 import type { ReplySink } from "./replies.js";
 import { createHandoffs } from "./handoff.js";
+import { privateStateDirectory } from "./private-state.js";
 
 export const context = BACKGROUND_CONTEXT;
 export type Chat = {
@@ -70,6 +71,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       replySink?: ReplySink; updateDefinitions?: boolean; models: Models; initialize?: ChatInitializer;
       resume?: boolean;
     }) {
+      const stateRoot = resolve(options.stateRoot);
       const names = options.names?.length ? options.names :
         (await catalog(options.root)).filter(entry => entry.runnable).map(entry => entry.id);
       const agents = await Promise.all(names.map(name => loadAgent(options.root, name)));
@@ -77,9 +79,10 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       const models = options.models;
       if (!options.demo && agents.some(agent => !models.getProvider(agent.model.provider))) throw new Error("Register every agent's provider in the supplied Models catalog.");
       try {
+        await privateStateDirectory(stateRoot);
         const results = await Promise.allSettled(agents.map(async agent => {
           const host = await openAgent({
-            agent, directory: join(options.stateRoot, agent.id), models,
+            agent, directory: join(stateRoot, agent.id), models,
             execution: options.demo ? "demo" : "live", extensions: options.extensions,
             replySink: options.replySink, updateDefinitions: options.updateDefinitions,
           });
