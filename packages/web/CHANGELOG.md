@@ -4,6 +4,11 @@
 
 - Sanitize public documentation and examples; replace the public Git history with a fresh snapshot and withdraw earlier tags/releases. Preserve private engineering records separately.
 
+### Browser reconnection
+
+- Reopen chat streams automatically after temporary service/network failures, including HTTP 503 and failed initial state reads, while preserving the mounted composer and unsent draft.
+- Back off repeated failures, refresh the stream's snapshot before applying deltas, and stop retries on access loss or when leaving the chat.
+
 ### Portable conversation workers
 
 - Add opt-in backend-owned Pi storage and outbound HTTPS commands so entire conversation workers can run without PostgreSQL credentials or inbound worker ports.

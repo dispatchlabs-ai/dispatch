@@ -114,6 +114,47 @@ ECS warm-spare assignment or preservation of an uncommitted workspace. Confirmat
 retirement remains mandatory. Provider outage, sustained load, multi-tenant adversarial isolation,
 all tool integrations and broad browser/device acceptance were not qualified by this experiment.
 The specific crash and replacement observations do not establish exactly-once external effects.
-The browser was reloaded after backend restart/handover to restore its live stream. A reconnect
-attempt that received HTTP 503 remained at “Reconnecting”; this run therefore establishes durable
-worker recovery, not seamless browser reconnection through an unavailable backend.
+In this initial provider run, the browser was reloaded after backend restart/handover to restore
+its live stream. A reconnect attempt that received HTTP 503 remained at “Reconnecting”; that run
+therefore established durable worker recovery, not automatic browser reconnection. The separate
+[browser follow-up](#browser-reconnection-follow-up) below repairs and qualifies that client path.
+
+## Browser reconnection follow-up
+
+On October 21, the browser failure was reproduced against an isolated local Dispatch service
+with synthetic authentication, SQLite state and a people-only chat. The pre-fix chat component
+was byte-identical to public source snapshot `7175747`. A loopback
+proxy interrupted the event stream and returned HTTP 503; after restoration, the original client
+remained at “Reconnecting” and made no further stream request.
+
+The client had relied on native `EventSource` retry. A non-200 response permanently closes that
+object under the [HTML processing model](https://html.spec.whatwg.org/multipage/server-sent-events.html#processing-model).
+The error handler updated the notice and fetched state once, but never created a new stream.
+
+The repaired client owns reconnection with a one-to-ten-second exponential delay. Each attempt
+refetches authorized chat state and creates a fresh stream with its own snapshot/delta baseline.
+It retains the mounted composer, cancels pending recovery on navigation/unmount, and stops on
+terminal access errors. It does not replay commands, change workers or reload the page.
+
+Interactive browser observations:
+
+- Repeated stream-only 503 responses recovered automatically; a message saved during the outage
+  appeared once, and a later message arrived through the restored live stream. The unsent draft,
+  composer focus and caret offset were unchanged.
+- Killing the isolated backend, observing repeated failed state reads, then restarting it restored
+  the same open chat automatically. A fresh chat view whose initial state fetch received repeated
+  503 responses also recovered without a refresh.
+- Leaving a reconnecting chat stopped its read/stream attempts; returning opened a fresh stream
+  and retained the draft. Injected 403 and 404 responses cleared protected history and stopped
+  automatic retries. Real session revocation returned the browser to sign-in both with a live
+  stream and while reconnecting; retries stopped after sign-out.
+- Whole-page reconnecting/loading/recovered states were reviewed at 1440×900, 1280×720,
+  768×1024 and 390×844, with no horizontal page overflow. These are browser viewport checks,
+  not qualification on physical phones or every browser engine.
+
+TypeScript and build checks passed with `nix develop --command npm run check`. No automated
+tests were added or run under the repository policy. Captures and fault/request observations
+are retained in the task worktree's gitignored `.local/browser-reconnect/`. This follow-up used
+the real local app without model execution; it does not repeat ECS/exe.dev qualification or
+establish seamless recovery for every provider outage. Existing installations require a later
+release/update to receive the repaired browser assets.

@@ -48,59 +48,89 @@ export function ChatPanel({ focusComposer, onComposerFocused, agents, active: vi
     if (!visible) return;
     const controller = new AbortController();
     let stream: EventSource | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let retryDelay = 1_000;
     let active = true;
-    let delivered: ChatSnapshot | undefined;
-    onConnection(chatId, "connecting");
-    setLoadError(null);
-    api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}`, undefined, controller.signal).then(initial => {
+    const path = `/api/chats/${encodeURIComponent(chatId)}`;
+
+    function closeStream() {
+      stream?.close();
+      stream = null;
+    }
+    function reconnect() {
+      closeStream();
+      if (!active || retryTimer !== undefined) return;
+      onConnection(chatId, "reconnecting");
+      retryTimer = setTimeout(() => {
+        retryTimer = undefined;
+        void connect();
+      }, retryDelay);
+      retryDelay = Math.min(retryDelay * 2, 10_000);
+    }
+    function failed(error: unknown) {
       if (!active) return;
-      onSnapshot(initial);
-      stream = new EventSource(`/api/chats/${encodeURIComponent(chatId)}/events`);
-      stream.addEventListener("snapshot", event => {
-        if (!active) return;
-        try {
-          const next = JSON.parse((event as MessageEvent<string>).data) as ChatSnapshot;
-          if (next.conversation.id !== chatId) return;
-          delivered = next;
-          onSnapshot(next);
-          onConnection(chatId, "connected");
-          setLoadError(null);
-        } catch {
-          setLoadError("An update could not be read. Reconnect to restore the chat.");
-          onConnection(chatId, "error");
-        }
-      });
-      stream.addEventListener("delta", event => {
-        if (!active) return;
-        try {
-          if (!delivered) throw new Error("Missing initial snapshot");
-          delivered = applyChatDelta(delivered, JSON.parse((event as MessageEvent<string>).data) as ChatDelta);
-          onSnapshot(delivered);
-        } catch {
-          stream?.close();
-          setAttempt(value => value + 1);
-        }
-      });
-      stream.addEventListener("session-ended", () => {
-        stream?.close();
-        if (!active) return;
-        void refreshSession().catch(() => { });
-      });
-      stream.onerror = () => {
-        if (!active) return;
-        onConnection(chatId, "reconnecting");
-        void api<ChatSnapshot>(`/api/chats/${encodeURIComponent(chatId)}`, undefined, controller.signal).then(next => { if (active) onSnapshot(next); }).catch(error => {
-          if (active && error instanceof ApiError && [403, 404].includes(error.status)) { stream?.close(); onAccessLost(chatId); setLoadError("Chat unavailable or access removed."); }
-        });
-        void refreshSession().catch(() => { });
-      };
-    }).catch(error => {
-      if (!active) return;
+      if (!(error instanceof ApiError) || error.status >= 500 || [0, 408, 429].includes(error.status)) {
+        reconnect();
+        return;
+      }
       if (error instanceof ApiError && [403, 404].includes(error.status)) onAccessLost(chatId);
       setLoadError(errorMessage(error));
       onConnection(chatId, "error");
-    });
-    return () => { active = false; controller.abort(); stream?.close(); };
+    }
+    async function connect() {
+      try {
+        const initial = await api<ChatSnapshot>(path, undefined, controller.signal);
+        if (!active) return;
+        onSnapshot(initial);
+        const source = new EventSource(`${path}/events`);
+        stream = source;
+        let delivered: ChatSnapshot | undefined;
+        source.addEventListener("snapshot", event => {
+          if (!active || stream !== source) return;
+          try {
+            const next = JSON.parse((event as MessageEvent<string>).data) as ChatSnapshot;
+            if (next.conversation.id !== chatId) return;
+            delivered = next;
+            onSnapshot(next);
+            retryDelay = 1_000;
+            onConnection(chatId, "connected");
+            setLoadError(null);
+          } catch {
+            closeStream();
+            setLoadError("An update could not be read. Reconnect to restore the chat.");
+            onConnection(chatId, "error");
+          }
+        });
+        source.addEventListener("delta", event => {
+          if (!active || stream !== source) return;
+          try {
+            if (!delivered) throw new Error("Missing initial snapshot");
+            delivered = applyChatDelta(delivered, JSON.parse((event as MessageEvent<string>).data) as ChatDelta);
+            onSnapshot(delivered);
+          } catch {
+            reconnect();
+          }
+        });
+        source.addEventListener("session-ended", () => {
+          if (!active || stream !== source) return;
+          closeStream();
+          // A factor change can replace the cookie before the old stream ends.
+          void refreshSession().then(reconnect, failed);
+        });
+        source.onerror = () => {
+          if (!active || stream !== source) return;
+          // HTTP errors such as 503 close EventSource permanently; native retry stops.
+          reconnect();
+          void refreshSession().catch(() => { });
+        };
+      } catch (error) {
+        failed(error);
+      }
+    }
+    onConnection(chatId, "connecting");
+    setLoadError(null);
+    void connect();
+    return () => { active = false; controller.abort(); closeStream(); clearTimeout(retryTimer); };
   }, [visible, chatId, attempt, api, refreshSession, onSnapshot, onConnection, onAccessLost]);
 
   useLayoutEffect(() => {
