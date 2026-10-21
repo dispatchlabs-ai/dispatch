@@ -14,6 +14,10 @@
   discovery, load instructions/resources on demand and retain revision evidence.
 - **RUN-007 — Chat in a terminal:** stream turns directly through the local
   service, resume named conversations and suspend work safely on process exit.
+- **RUN-008 — Use host-owned credentials:** configure a native store or trusted
+  vault helper, resolve API keys directly into Pi, inspect only source metadata,
+  and explicitly select session/environment compatibility without plaintext
+  fallback. This does not supply isolation for untrusted code or OAuth storage.
 
 The first extraction supports Node, SQLite and trusted company definitions.
 Hosted Dispatch Web adoption, remote storage, portable coding isolation, npm

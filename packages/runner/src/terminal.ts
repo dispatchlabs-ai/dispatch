@@ -70,7 +70,7 @@ export async function chatInTerminal(options: TerminalOptions): Promise<void> {
           return submission.wait(context);
         };
         const receipt = await Promise.race([answer(), interrupted]);
-        if (receipt.status !== "done") throw new Error(`Turn did not complete: ${receipt.reason}`);
+        if (receipt.status !== "done") throw new Error(generationError ?? `Turn did not complete: ${receipt.reason}. Use --history for details.`);
       } finally {
         controller.signal.removeEventListener("abort", cancel);
         await watch.stop();

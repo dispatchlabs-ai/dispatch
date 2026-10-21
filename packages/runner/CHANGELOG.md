@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Withhold raw chat-provider error details before durable storage while preserving
+  Pi retry and context-overflow categories.
+
+- Add optional host-owned API-key sources and terminal setup: native stores,
+  external vault helpers, session-only input and explicit environment use.
+  Source metadata stays outside the project, and native/helper failures do not
+  fall back to plaintext. Helpers resolve on demand; OAuth storage is separate.
+
 - Add opt-in company and agent skill catalogs with on-demand text reads, scoped
   IDs, startup snapshots and definition/content revision tracking.
 - Add a direct streaming terminal client with named persistent conversations,

@@ -19,6 +19,7 @@
     "README.md",
     "USE_CASES.md",
     "CHANGELOG.md",
+    "docs",
     "LICENSE"
   ],
   "scripts": {
@@ -34,7 +35,10 @@
   },
   "devDependencies": {
     "@types/node": "24.19.1",
-    "typescript": "6.0.3",
-    "@types/proper-lockfile": "4.1.4"
+    "@types/proper-lockfile": "4.1.4",
+    "typescript": "6.0.3"
+  },
+  "optionalDependencies": {
+    "@napi-rs/keyring": "2.1.2"
   }
 }

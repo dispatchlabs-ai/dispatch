@@ -131,6 +131,15 @@ Use separate state roots for demo and live execution. The scaffold supplies
 argument parsing, two direct providers and a clearly labeled scripted example;
 the runner does not embed a provider credential or require an inference gateway.
 
+## Local provider credentials
+
+`UserCredentials.open({ root, providers })` supplies optional host-owned API-key
+sources for Pi models: native OS storage, an existing vault helper, session-only
+input and explicit environment compatibility. `credentialCommand` supplies setup,
+metadata-only status, resolution checking and removal. No plaintext fallback or
+automatic `.env` loading is provided. See [credential handling](docs/credentials.md)
+for configuration, public methods, failure recovery and trust boundaries.
+
 ## Company and agent skills
 
 Set `skills: true` in `defineAgent` to enable a read-only skill catalog. Existing
