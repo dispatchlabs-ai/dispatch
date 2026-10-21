@@ -2,10 +2,11 @@
 
 The inference gateway provides centrally managed model connections while keeping
 provider credentials on the trusted service. This inventory records actor goals
-for development and behavior preservation. IGW-001–IGW-009 describe implemented
-capabilities; IGW-010–IGW-014 are approved additions awaiting implementation.
+for development and behavior preservation. IGW-001–IGW-014 have source
+implementations; source presence does not establish deployment or client qualification.
 Setup, contracts and verification limits remain in the [README](README.md),
 [HTTP contract](docs/openapi.yaml), [ECS guide](docs/ecs.md) and
+[employee access guide](docs/employee-access.md) and historical
 [experimental Codex qualification](docs/codex-coding-qualification.md).
 The browser workspace has its own [Dispatch inventory](../web/USE_CASES.md).
 
@@ -33,10 +34,15 @@ agent execution or conversation databases.
 - **IGW-008 — Diagnose inference and account for usage.** An operator correlates a request with its caller identity, connection, model, status and reported usage without recording prompt/response content or credential values.
 - **IGW-009 — Operate and replace the gateway.** An operator deploys compatible images and configuration, drains or replaces tasks and recovers provider service while preserving credentials and exclusive provider ownership.
 
-## 4. Employee and client access — approved additions
+## 4. Employee and client access
 
 - **IGW-010 — Use a Responses-compatible client directly.** A person configures a compatible client, including local Codex, to use the gateway's public HTTPS Responses endpoint for streaming inference, tools and conversation continuation, without another workstation or an SSH bridge.
 - **IGW-011 — Sign in as an employee.** An employee signs in through the organization's Google Workspace identity and obtains renewable, individual gateway credentials for authorized clients while upstream provider credentials remain central.
 - **IGW-012 — Authenticate other compatible clients.** A person or operator provisions a scoped, individually owned gateway API key for a client where interactive employee sign-in is impractical; the client receives no upstream provider credential.
 - **IGW-013 — Manage employee and client access.** An administrator grants or removes access and revokes employee sessions or client credentials consistently across gateway replicas, including already issued credentials.
 - **IGW-014 — Attribute and control company-funded usage.** An administrator attributes inference usage to employees or client identities and applies configured spending controls across supported interfaces.
+
+Employee and company spending limits are optional and unset by default. Direct
+Responses currently supports native OpenAI Responses/OpenAI Codex connections;
+the Pi interface remains available for other configured providers. See the
+employee guide for stateless continuation, revocation and cost-estimate boundaries.

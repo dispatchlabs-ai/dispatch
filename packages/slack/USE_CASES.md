@@ -8,6 +8,9 @@
   retain its thread binding and backfill existing roots without rerunning work.
 - **SLK-004 — Recover delivery:** deduplicate incoming event copies and resume
   native turn/reply tasks after restart, with explicit at-least-once posting.
+- **SLK-005 — Share a workspace:** allow an agent in invited channels and DMs;
+  direct explicit mentions to the intended bot and keep another bot's threads
+  from becoming competing automatic conversations.
 
 Slack app creation, workspace invitations, company policy and business research
 belong to administrators or company definitions. The package does not infer those

@@ -2,11 +2,12 @@
 
 Run Pi inference in a trusted account while agents keep their native Pi Durable
 execution, tools and recovery. Provider API keys and OAuth credentials remain in
-the gateway's AWS Secrets Manager. Workloads receive a short-lived gateway token
-scoped to their configured connections and models.
+the gateway's AWS Secrets Manager. AWS workloads and Google Workspace employees
+use individual gateway credentials scoped to their connections and models.
 
-The [use-case inventory](USE_CASES.md) distinguishes current workload capabilities
-from approved additions for direct Responses clients and employee access.
+The [use-case inventory](USE_CASES.md) covers workload inference, direct Responses
+clients, employee access and usage controls. The
+[employee and Responses guide](docs/employee-access.md) explains setup and limits.
 
 **Source alpha:** build from this repository with Node 22.19 or newer (the
 repository development shell uses Node 24). The package is not published to npm.
@@ -22,12 +23,20 @@ providers use the same configuration; a programmatic server may register custom
 Pi providers. An inference provider's presence in the catalog does not prove
 that a particular account can use every model.
 
-A temporary [Codex desktop probe](docs/codex-probe.md) demonstrates local
+The service exposes `/v1/responses` and `/v1/models` directly over its public
+HTTPS origin. Responses clients use a renewable employee token or scoped API key;
+native Pi clients can use the same employee identity. Responses currently requires
+a native OpenAI Responses or OpenAI Codex connection. Other providers remain
+available through Pi transport. Requests preserve native Responses items,
+structured-output options and tool events through Pi's provider hooks.
+
+A historical [Codex desktop probe](docs/codex-probe.md) demonstrates local
 ChatGPT Mac app inference through this gateway. A subsequent
 [coding qualification](docs/codex-coding-qualification.md) verified native shell
 and edit tools, follow-up work and resume after app restart. The loopback
-Responses adapter remains experimental: automatic task titles fail, and broader
-protocol compatibility and employee authentication remain separate work.
+Responses adapter remains experimental and is separate from the direct endpoint:
+automatic task titles failed in that experiment. Do not infer current desktop
+qualification from that earlier adapter's result.
 
 ## Workload client
 
@@ -98,7 +107,8 @@ connection requests and ancillary operations require authorization. Grants are
 exact model IDs or `*`; no grant means no access. Use `"grants": { "*": ["*"] }`
 to allow all available models on every configured connection, including future
 connections. An explicit connection entry overrides that default; an empty array
-denies that connection. AWS identity authentication remains required. The server
+denies that connection. Every inference request requires an authorized AWS,
+employee-session or API-key identity. The server
 resolves models from its own catalog and never accepts a client-provided endpoint, model object,
 credential, provider environment or header override. Workload session IDs are
 namespaced by principal and connection.
@@ -111,7 +121,9 @@ Client `onPayload`, `onResponse` and stream observers inspect the gateway
 protocol; executable callbacks and custom fetch implementations never run in
 the server. Provider HTTP diagnostics and raw provider error text are not
 returned. The service logs request IDs, principal, connection, model, operation,
-status and usage, without prompts, outputs or credentials. Requests are bounded
+status and usage, without prompts, outputs or credentials. When `access` storage
+is configured, requests and monthly employee/client/company totals are durable.
+Optional monthly spending policies default to absent. Requests are bounded
 to 32 MiB; there is no gateway concurrency limit.
 
 Ambient credential lookup is disabled by default. Providers requiring AWS/GCP
@@ -160,7 +172,8 @@ configuration, credential enrollment and the service unit. Gateway upgrades do
 not change Pi Durable execution or migrate agent state.
 
 The [versioned HTTP contract](docs/openapi.yaml) describes the wire operations.
-The SDK is the ordinary workload interface. The local `login` command is
+The SDK is the ordinary workload interface. `auth login` enrolls an employee
+client, and `auth token` supplies a renewable bearer token. The local `login` command is
 explicit credential-store administration and needs Secrets Manager write access.
 Restart the gateway after enrolling a connection or changing configuration.
 Fireworks uses its authenticated live model list at startup and each catalog

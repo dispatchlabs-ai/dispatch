@@ -51,6 +51,25 @@ omitting it allows human channel members. Direct messages are disabled unless
 `directMessagesAgent` is explicitly configured. Do not run competing consumers
 for one Slack app: Slack may deliver an event to any of its Socket Mode connections.
 
+To allow a single agent in any channel where its bot has been invited, set
+`channels: { "*": helper }`. Explicit channel routes take precedence; this does
+not join channels or expand the bot's Slack permissions. Set
+`directMessagesAgent: helper` and subscribe to `message.im` with `im:history`
+to accept DMs from workspace members.
+
+When bots share a channel, list the other bots' Slack user IDs in
+`peerBotUserIds`. Messages explicitly mentioning a peer are ignored unless this
+bot is also mentioned. An assistant used inside other bots' threads can select
+`threadReplies: started`: its own top-level mention threads and published report
+threads accept ordinary replies, while questions in other threads require a
+fresh mention. Each top-level DM starts a conversation; replies in its thread
+continue that conversation without another mention. Thread ownership is retained across
+restart; human mentions do not count as peer-bot addressing. The default `all`
+keeps accepting unmentioned replies in every registered thread.
+New mention and DM conversations include `origin.slack` with `teamId`,
+`channelId` and `threadTs` for a company initializer. Existing report origins
+are preserved.
+
 ## Publish a report with a discussion
 
 Retain the adapter returned by `slack()` and use its `publish` method after the
@@ -74,8 +93,11 @@ bindings for existing report receipts without reposting or rerunning reviews.
 Incoming copies of `message` and `app_mention` and Slack retries share a native
 admission key. Acknowledgement follows durable admission; inference runs after
 acknowledgement. Native tasks retain queued input and outgoing reply progress.
-Model output is escaped while streaming; final replies use plain text to prevent
-unwanted Slack mention expansion.
+User mentions render through Slack's native user elements in final replies and
+mention syntax while streaming, so readers see member names rather than raw IDs.
+Other control syntax, including broadcast tags, stays literal. Partly generated
+mentions wait for completion before streaming, and delivery chunks keep complete
+mentions together. No directory lookup or `users:read` permission is required.
 
 Slack delivery is at least once. A crash after Slack accepts a post but before
 its local receipt/binding is committed can duplicate it. Delivery metadata and

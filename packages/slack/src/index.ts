@@ -7,11 +7,16 @@ import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
 import { AssistantEntry, LiveDoc, defineDoc, defineExtension, defineTask, type LiveState } from "@earendil-works/pi-durable";
 import { context, type ChatService, type Runner, type ReplySink } from "@dispatch/runner";
+import { fallbackText, replyBlocks, replyChunk, streamText } from "./text.js";
 
 export type SlackConfig = {
   teamId: string; channels: Record<string, string>; directMessagesAgent?: string;
   allowedUsers?: string[]; botTokenEnv?: string; appTokenEnv?: string; credentialsEnv?: string;
   displayName?: string;
+  /** Ignore messages addressed to a peer bot unless this bot is also mentioned. */
+  peerBotUserIds?: string[];
+  /** With "started", require mentions inside threads started for another bot. */
+  threadReplies?: "all" | "started";
 };
 type SlackInput = { text: string; key: string; channel: string; thread: string; user: string; replyText?: string };
 type Delivery = { phase: "answer" } | {
@@ -25,11 +30,6 @@ function retryDelay(error: unknown) {
 
 function slackError(error: unknown) {
   return (error as { data?: { error?: string } })?.data?.error;
-}
-
-// Slack parses mentions in Markdown streams. Escape control syntax in model text.
-function streamText(text: string) {
-  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 export type Report = { agent: string; channel: string; thread?: string; text: string; key: string; origin: import("@earendil-works/pi-durable").JsonObject; title?: string };
@@ -62,7 +62,10 @@ export async function prepareSlack(root: string, runner: Runner, options: {
   const factory = options.config ? undefined : parse(await readFile(join(root, "factory.yaml"), "utf8"));
   const config = options.config ?? (options.connection ? factory?.slack?.connections?.[options.connection] : factory?.slack) as SlackConfig | undefined;
   if (!config?.teamId || !config.channels || typeof config.channels !== "object" || Array.isArray(config.channels)
-    || Object.values(config.channels).some(agent => typeof agent !== "string")) {
+    || Object.values(config.channels).some(agent => typeof agent !== "string")
+    || (config.threadReplies !== undefined && !["all", "started"].includes(config.threadReplies))
+    || (config.peerBotUserIds !== undefined && (!Array.isArray(config.peerBotUserIds)
+      || config.peerBotUserIds.some(id => typeof id !== "string" || !/^[UW][A-Z0-9]+$/.test(id))))) {
     throw new Error("Configure the Slack connection's teamId and channels in factory.yaml.");
   }
   let credentials = options.credentials;
@@ -77,6 +80,10 @@ export async function prepareSlack(root: string, runner: Runner, options: {
 const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
   kind: `${namespace}.slack-inbox`, version: 1, scope: "session", initial: () => ({ tasks: {} }),
 });
+  const ThreadReplies = defineDoc<{ byKey: Record<string, boolean> }>({
+    kind: `${namespace}.slack-thread-replies`, version: 1, scope: "session", initial: () => ({ byKey: {} }),
+  });
+  const channelAgent = (channel: string) => config.channels[channel] ?? config.channels["*"];
 
   const client = new WebClient(botToken, {
     retryConfig: { retries: 0 }, rejectRateLimitedCalls: true,
@@ -132,7 +139,7 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
           const text = streamText(raw);
           if (!text.startsWith(sent) || text === sent || runtime.now() < retryAt) return;
           // The native watcher coalesces updates while this request runs.
-          const delta = text.slice(sent.length, sent.length + 12_000);
+          const delta = replyChunk(text, sent.length, 12_000);
           try {
             await client.chat.appendStream({
               channel: task.input.channel, ts: stream, chunks: [{ type: "markdown_text", text: delta }],
@@ -169,7 +176,7 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
         const checkpoint = task.state.checkpoint;
         await runtime.sleep(checkpoint.retryAt, ctx);
         // Slack can truncate oversized messages. Persist progress between chunks.
-        const text = checkpoint.text.slice(checkpoint.offset, checkpoint.offset + 2900);
+        const text = replyChunk(checkpoint.text, checkpoint.offset);
         const hash = createHash("sha256").update(`${task.input.key}:${checkpoint.offset}`).digest("hex");
         try {
           if (checkpoint.stream && checkpoint.offset === 0) {
@@ -184,14 +191,15 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
             // Replace partials with the committed answer, also after a restart
             // or model retry. Repeating this update does not duplicate text.
             await client.chat.update({
-              channel: task.input.channel, ts: checkpoint.stream, text,
-              blocks: [{ type: "section", text: { type: "plain_text", text } }],
+              channel: task.input.channel, ts: checkpoint.stream, text: fallbackText(text),
+              blocks: replyBlocks(text),
               metadata: { event_type: `${namespace}_agent_reply`, event_payload: { delivery: hash } },
               parse: "none", link_names: false,
             });
           } else {
             await client.chat.postMessage({
-              channel: task.input.channel, thread_ts: task.input.thread, text,
+              channel: task.input.channel, thread_ts: task.input.thread, text: fallbackText(text),
+              blocks: replyBlocks(text),
               metadata: { event_type: `${namespace}_agent_reply`, event_payload: { delivery: hash } },
               unfurl_links: false, unfurl_media: false, mrkdwn: false, parse: "none",
             });
@@ -221,7 +229,7 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
     });
   };
   const bindThread = async (service: ChatService, report: Omit<Report, "text" | "key"> & { thread: string; verify?: boolean }) => {
-    if (config.channels[report.channel] !== report.agent) throw new Error("The report agent must match the configured channel route.");
+    if (channelAgent(report.channel) !== report.agent) throw new Error("The report agent must match the configured channel route.");
     const existing = await service.find(report.agent, threadKey(config.teamId, report.channel, report.thread));
     if (report.verify && !existing) {
       while (true) {
@@ -241,7 +249,7 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
   return {
     bindThread,
     async publish(service: ChatService, report: Report) {
-      if (config.channels[report.channel] !== report.agent) throw new Error("The report agent must match the configured channel route.");
+      if (channelAgent(report.channel) !== report.agent) throw new Error("The report agent must match the configured channel route.");
       const hash = createHash("sha256").update(report.key).digest("hex");
       const message = {
         channel: report.channel, ...(report.thread ? { thread_ts: report.thread } : {}),
@@ -266,16 +274,25 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
             || event.subtype || event.bot_id || !event.user || event.user === bot || !event.text
             || (config.allowedUsers && !config.allowedUsers.includes(event.user))) { await ack(); return; }
           const direct = event.channel_type === "im";
-          const agent = direct ? config.directMessagesAgent : config.channels[event.channel];
+          const mentioned = event.type === "app_mention" || event.text.includes(`<@${bot}>`);
+          if (!direct && !mentioned && config.peerBotUserIds?.some(id => event.text.includes(`<@${id}>`))) {
+            await ack(); return;
+          }
+          const agent = direct ? config.directMessagesAgent : channelAgent(event.channel);
           if (!agent) { await ack(); return; }
           const host = service.host(agent);
           const thread = event.thread_ts ?? event.ts;
           const key = threadKey(body.team_id, event.channel, thread);
           let existing = await service.find(agent, key);
+          let ownThread = config.threadReplies === "started"
+            ? (await host.harness.snapshot(ThreadReplies, context))?.byKey[key] : undefined;
+          if (!event.thread_ts) ownThread = true;
           // A report may be visible before its post response and binding commit.
           // Reconcile that root from our own metadata before admitting a reply.
-          if (!existing && event.thread_ts) {
+          if (event.thread_ts && (!existing || (config.threadReplies === "started" && ownThread === undefined))) {
             const root = await client.conversations.replies({ channel: event.channel, ts: thread, limit: 1, include_all_metadata: true });
+            const first = root.messages?.find(message => message.ts === thread);
+            ownThread = first?.user === bot || first?.text?.includes(`<@${bot}>`) === true;
             const message = root.messages?.find(message => message.ts === thread && message.user === bot);
             const metadata = message?.metadata;
             const payload = metadata?.event_payload as Record<string, unknown> | undefined;
@@ -286,17 +303,20 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
                 typeof payload.title === "string" ? payload.title : "Report discussion", origin as Report["origin"]);
             }
           }
-          const mentioned = event.type === "app_mention" || event.text.includes(`<@${bot}>`);
           if (!direct && !mentioned && !existing) { await ack(); return; }
+          if (!direct && !mentioned && config.threadReplies === "started" && !ownThread) { await ack(); return; }
           const text = event.text.replaceAll(`<@${bot}>`, "").trim();
           if (!text) { await ack(); return; }
-          const chat = await service.create(agent, "slack", key, text);
+          const chat = existing ?? await service.create(agent, "slack", key, text, {
+            slack: { teamId: body.team_id, channelId: event.channel, threadTs: thread },
+          });
           const { conversation } = await service.resolve(chat.id);
           // Dedup both Slack redelivery and app_mention/message copies.
           const eventKey = `slack:${body.team_id}:${event.channel}:${event.ts}`;
           await conversation.commit(async tx => {
             const inbox = await tx.doc(SlackInbox);
             if (inbox.tasks[eventKey]) return;
+            if (config.threadReplies === "started") (await tx.doc(ThreadReplies)).byKey[key] = ownThread ?? false;
             inbox.tasks[eventKey] = await tx.createTask(turn, {
               key: eventKey, text, channel: event.channel, thread, user: event.user,
             }, { ownership: { kind: "conversation" }, background: true });
