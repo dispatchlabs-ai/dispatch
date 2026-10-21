@@ -106,6 +106,10 @@ service, database, model requests, artifacts, registry, logging and transfer cha
 hosting costs and final provider invoices were not measured here. The evidence supports trying
 the existing pool for suitable small workloads, not a blanket cheaper-provider conclusion.
 
+The later [shared-pool capacity experiment](exe-worker-capacity.md) measures concurrent workers
+and defined tool workloads on the existing pool. It adds capacity evidence without changing the
+cost scope or treating the VM-count allowance as independently reserved CPU and memory.
+
 ## Boundaries
 
 This is an opt-in first slice with one selected execution provider per installation. There is no

@@ -151,3 +151,8 @@ assumptions and unverified boundaries. The protocol remains opt-in; this experim
 migrate an existing installation or establish a general reliability or cost advantage.
 Installation-specific resource identities and cleanup receipts belong to the operator's
 infrastructure repository.
+
+The separate [shared-pool capacity experiment](exe-worker-capacity.md) measures resident-worker
+memory, real model/tool concurrency, fixed CPU workloads and memory pressure on a 2-vCPU/4-GiB
+exe.dev pool. Its observed counts depend on the workload and exclude backend/database hosting
+inside that pool; they are not application concurrency limits.

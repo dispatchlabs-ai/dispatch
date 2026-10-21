@@ -2,11 +2,11 @@
 
 ## [Unreleased]
 
+- Sanitize public documentation and examples; replace the public Git history with a fresh snapshot and withdraw earlier tags/releases. Preserve private engineering records separately.
+
 ### Web runtime dependency isolation
 
 - Keep Pi Coding Agent 1.1 on its matching Chord and codemode dependencies alongside the standalone runner's Pi 1.3 dependencies. This restores web/backend and conversation-worker startup after installing the combined workspace.
-
-- Sanitize public documentation and examples; replace the public Git history with a fresh snapshot and withdraw earlier tags/releases. Preserve private engineering records separately.
 
 ### Browser reconnection
 
@@ -15,6 +15,7 @@
 
 ### Portable conversation workers
 
+- Record shared-pool capacity observations for light, CPU-bound and memory-bound worker workloads, including cold-start and out-of-memory limits.
 - Add opt-in backend-owned Pi storage and outbound HTTPS commands so entire conversation workers can run without PostgreSQL credentials or inbound worker ports.
 - Preserve atomic writes and lost-response retries with persisted process sessions and mutation receipts; retain confirmed retirement before replacement.
 - Add an exe.dev driver using a pinned VM's Docker daemon and immutable container identities, alongside ECS and local Docker; require a completed provider drain before switching execution locations.
