@@ -2,8 +2,9 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 try {
-    [Console]::InputEncoding = New-Object System.Text.UTF8Encoding($false)
-    [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+    $utf8 = [System.Text.UTF8Encoding]::new($false, $true)
+    $reader = [System.IO.StreamReader]::new([Console]::OpenStandardInput(), $utf8, $false)
+    $writer = [System.IO.StreamWriter]::new([Console]::OpenStandardOutput(), $utf8)
 
     # Compile only fixed code, before reading the secret from the private pipe.
     # CREDENTIALW layout and API contract: https://learn.microsoft.com/windows/win32/api/wincred/
@@ -119,14 +120,17 @@ public static class DispatchWindowsCredentials {
 }
 '@
 
-    $request = Microsoft.PowerShell.Utility\ConvertFrom-Json -InputObject ([Console]::In.ReadToEnd())
+    $request = Microsoft.PowerShell.Utility\ConvertFrom-Json -InputObject ($reader.ReadToEnd())
     $result = switch ($request.operation) {
         'read' { [DispatchWindowsCredentials]::Read($request.target) }
         'write' { [DispatchWindowsCredentials]::Write($request.target, $request.account, $request.value); $true }
         'delete' { [DispatchWindowsCredentials]::Delete($request.target) }
         default { throw 'Invalid credential operation.' }
     }
-    [Console]::Out.Write((Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $result -Compress))
+    # PowerShell 5.1 emits nothing for a null input, so encode missing entries explicitly.
+    $json = if ($null -eq $result) { 'null' } else { Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $result -Compress }
+    $writer.Write($json)
+    $writer.Flush()
 } catch {
     [Console]::Error.WriteLine('Windows Credential Manager operation failed.')
     exit 1
