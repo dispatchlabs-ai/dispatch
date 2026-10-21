@@ -59,6 +59,7 @@ function main() {
   const workspacePatterns: string[] = manifest.workspaces;
   const packages = globSync(workspacePatterns.map(pattern => `${pattern}/package.json`), { cwd: root }).sort();
   if (!packages.length) throw new Error("No workspace packages found.");
+  const workspaceNames = new Set(packages.map(path => readJson(path).name));
   const updates = new Map<string, string>();
   const lock = readJson("package-lock.json");
   if (lock.version !== current) throw new Error("Root lockfile version is not in lockstep.");
@@ -66,10 +67,18 @@ function main() {
     const pkg = readJson(path);
     if (pkg.version !== current) throw new Error(`${path} is not in lockstep with ${current}.`);
     pkg.version = next;
+    for (const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
+      for (const [name, version] of Object.entries(pkg[field] ?? {})) {
+        if (workspaceNames.has(name) && version === current) pkg[field][name] = next;
+      }
+    }
     const key = path === "package.json" ? "" : relative(root, resolve(root, dirname(path)));
     if (path !== "packages/web/capabilities/package.json") {
       if (lock.packages[key]?.version !== current) throw new Error(`Lockfile version mismatch: ${path}`);
       lock.packages[key].version = next;
+      for (const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
+        if (pkg[field]) lock.packages[key][field] = pkg[field];
+      }
     }
     updates.set(path, `${JSON.stringify(pkg, null, 2)}\n`);
   }

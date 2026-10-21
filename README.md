@@ -11,6 +11,13 @@ For agents running in another account, the source-alpha
 and OAuth refresh credentials in a trusted gateway while workloads authenticate
 with their AWS roles. It is a separate package with its own setup and qualification boundaries.
 
+For company agents that run independently of the browser,
+[Dispatch Runner](packages/runner/README.md) loads agent directories and owns
+native schedules and conversations. The optional
+[Slack package](packages/slack/README.md) connects shared threads and report
+discussions. These source-alpha packages are installed as locally packed
+dependencies.
+
 ## Distribution status
 
 This repository is a pre-1.0 source distribution. On October 21, 2026 its public

@@ -11,3 +11,7 @@ result-*
 
 # Generated images and run records can contain private prompts and paths.
 /imagegen/
+
+# Compiled workspace libraries are packed from source, not committed.
+packages/runner/dist/
+packages/slack/dist/

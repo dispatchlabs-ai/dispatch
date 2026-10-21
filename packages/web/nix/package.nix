@@ -13,6 +13,12 @@ buildNpmPackage {
       ../../../package.json
       ../../../package-lock.json
       ../../../scripts
+      ../../runner/package.json
+      ../../runner/tsconfig.json
+      ../../runner/src
+      ../../slack/package.json
+      ../../slack/tsconfig.json
+      ../../slack/src
       ../../inference-gateway/package.json
       ../../inference-gateway/tsconfig.json
       ../../inference-gateway/src
@@ -32,7 +38,7 @@ buildNpmPackage {
     ];
   };
 
-  npmDepsHash = "sha256-bP7N7A7RqW40glQ4jRbkFkjzpJvKQz6ehslEUgs74Z4=";
+  npmDepsHash = "sha256-CUL+Y2iCQLsLG0FqQ/dFDHQuI+WrUQxC0x3wL8+d0ho=";
   npmBuildScript = "build";
 
   doCheck = true;
@@ -53,6 +59,9 @@ buildNpmPackage {
     cp package.json "$app/"
     cp packages/web/package.json "$app/packages/web/"
     cp -R node_modules "$app/"
+    if test -d packages/web/node_modules; then
+      cp -R packages/web/node_modules "$app/packages/web/"
+    fi
     mkdir -p "$app/packages/inference-gateway"
     cp packages/inference-gateway/package.json "$app/packages/inference-gateway/"
     cp -R packages/inference-gateway/dist "$app/packages/inference-gateway/"
@@ -61,6 +70,14 @@ buildNpmPackage {
     fi
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-inference-gateway" \
       --add-flags "$app/packages/inference-gateway/dist/cli.js"
+    for package in runner slack; do
+      mkdir -p "$app/packages/$package"
+      cp packages/$package/package.json "$app/packages/$package/"
+      cp -R packages/$package/dist "$app/packages/$package/"
+      if test -d packages/$package/node_modules; then
+        cp -R packages/$package/node_modules "$app/packages/$package/"
+      fi
+    done
     # Compilation is complete; declarations and source maps are not runtime
     # inputs. Omitting them also reduces per-file metadata in lazy OCI images.
     find "$app/node_modules" -type f \
