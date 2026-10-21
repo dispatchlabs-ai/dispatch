@@ -1,6 +1,7 @@
 import { constants } from "node:fs";
 import { mkdir, open, type FileHandle } from "node:fs/promises";
 import { join } from "node:path";
+import { privateWindowsPaths } from "./windows-permissions.js";
 
 async function restrict(handle: FileHandle, directory: boolean): Promise<void> {
   const info = await handle.stat();
@@ -17,7 +18,8 @@ async function restrict(handle: FileHandle, directory: boolean): Promise<void> {
 /** Only the owning account may traverse state, including while SQLite creates sidecars. */
 export async function privateStateDirectory(directory: string): Promise<void> {
   if (process.platform === "win32") {
-    throw new Error("Private runner state requires POSIX file permissions. Use Linux/WSL or macOS.");
+    await privateWindowsPaths([{ path: directory, directory: true, create: true }]);
+    return;
   }
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const handle = await open(directory, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
@@ -26,7 +28,12 @@ export async function privateStateDirectory(directory: string): Promise<void> {
 
 /** Called under the session's owner lock, before SQLite opens or recovers any files. */
 export async function privateStateFiles(directory: string): Promise<void> {
-  for (const name of ["session.sqlite", "session.sqlite-wal", "session.sqlite-shm", "session.sqlite-journal", "status.json", "status.json.tmp"]) {
+  const names = ["session.sqlite", "session.sqlite-wal", "session.sqlite-shm", "session.sqlite-journal", "status.json", "status.json.tmp"];
+  if (process.platform === "win32") {
+    await privateWindowsPaths(names.map(name => ({ path: join(directory, name), directory: false, create: name === "session.sqlite" })));
+    return;
+  }
+  for (const name of names) {
     const create = name === "session.sqlite";
     let handle: FileHandle;
     try {

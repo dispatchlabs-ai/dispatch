@@ -4,8 +4,9 @@
   continuous or interval work without a browser or customer-specific service.
 - **RUN-002 — Recover work:** preserve native tasks, conversations and submissions
   across restarts, with one owner per SQLite session and stable native identities.
-  Secure new and existing stores with owner-only POSIX permissions before opening
-  them; reject unsafe paths or unsupported permission enforcement.
+  Secure new and existing stores with owner-only POSIX permissions or native
+  Windows ACLs before opening them; reject unsafe paths or unsupported permission
+  enforcement without asking users to configure permissions themselves.
 - **RUN-003 — Share conversations:** admit idempotent turns, inspect history and
   streaming state, and bind external thread keys to application-supplied origins.
 - **RUN-004 — Attach domain workflows:** share a host with specialized native

@@ -2,10 +2,15 @@
 
 ## [Unreleased]
 
+- Run natively on Windows with automatic private state/configuration ACLs and
+  built-in Credential Manager access. Use the same terminal workflow without
+  WSL, administrator privileges or an additional native runtime. Strip helper
+  credential environment variables case-insensitively on Windows.
+
 - Secure new and existing conversation directories with owner-only POSIX modes
   before opening SQLite, including databases, sidecars and status files. Reject
-  unsafe file links and ownership; native Windows storage now fails closed until
-  ACL enforcement is available (use Linux/WSL or macOS).
+  unsafe file links and ownership. The subsequent Windows implementation above
+  replaces the initial Windows rejection.
 - Render terminal control characters as visible escapes in streaming responses,
   completed answers, history, diagnostics and returned errors. Preserve the
   original conversation text in storage and keep ordinary Unicode, tabs and

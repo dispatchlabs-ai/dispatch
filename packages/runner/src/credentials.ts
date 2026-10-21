@@ -7,6 +7,8 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import lockfile from "proper-lockfile";
 import type { AuthContext, AuthOperationOptions, Credential, CredentialStore } from "@earendil-works/pi-ai";
+import { privateWindowsPaths } from "./windows-permissions.js";
+import { WindowsCredentialEntry } from "./windows-credentials.js";
 
 export type CredentialProvider = { id: string; origin: string; environmentVariable: string };
 type Source = { kind: "keychain"; account: string } | { kind: "helper"; executable: string; args: string[] } | { kind: "environment" };
@@ -96,6 +98,10 @@ export class UserCredentials {
     try {
       await this.safePath(dirname(this.configPath), true);
       await this.safePath(this.configPath, false);
+      if (process.platform === "win32") await privateWindowsPaths([
+        { path: dirname(this.configPath), directory: true, verify: true },
+        { path: this.configPath, directory: false, verify: true },
+      ]);
       const file = await open(this.configPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
       let value: unknown;
       try { value = JSON.parse(await file.readFile("utf8")); } finally { await file.close(); }
@@ -119,7 +125,11 @@ export class UserCredentials {
   }
 
   private async locked<T>(action: (profile: Profile) => Promise<T>): Promise<T> {
-    await mkdir(dirname(this.configPath), { recursive: true, mode: 0o700 });
+    if (process.platform === "win32") {
+      await privateWindowsPaths([{ path: dirname(this.configPath), directory: true, create: true }]);
+    } else {
+      await mkdir(dirname(this.configPath), { recursive: true, mode: 0o700 });
+    }
     await this.safePath(dirname(this.configPath), true);
     let release: () => Promise<void>;
     try { release = await lockfile.lock(this.configPath, { realpath: false }); }
@@ -133,6 +143,7 @@ export class UserCredentials {
     try {
       const file = await open(temporary, "wx", 0o600);
       try { await file.writeFile(`${JSON.stringify(profile, null, 2)}\n`); await file.sync(); } finally { await file.close(); }
+      if (process.platform === "win32") await privateWindowsPaths([{ path: temporary, directory: false }]);
       await rename(temporary, this.configPath);
       committed = true;
     } finally { if (!committed) await rm(temporary, { force: true }); }
@@ -147,6 +158,7 @@ export class UserCredentials {
 
   private async entry(account: string) {
     try {
+      if (process.platform === "win32") return new WindowsCredentialEntry(this.service, account);
       const { AsyncEntry } = await import("@napi-rs/keyring");
       return new AsyncEntry(this.service, account, { linux: { store: "secret-service" } });
     } catch { throw new CredentialError("KEYCHAIN_UNAVAILABLE", "The native credential store is unavailable. Install/unlock a supported store, configure a helper, or explicitly use session-only input."); }
@@ -189,8 +201,9 @@ export class UserCredentials {
     try {
       if (!isAbsolute(source.executable) || inside(this.root, await realpath(source.executable))) throw new Error("Untrusted helper location");
       const env = { ...process.env };
-      for (const provider of this.providers.values()) delete env[provider.environmentVariable];
-      delete env.NODE_OPTIONS;
+      const normalize = (name: string) => process.platform === "win32" ? name.toUpperCase() : name;
+      const privateNames = new Set(["NODE_OPTIONS", ...[...this.providers.values()].map(provider => provider.environmentVariable)].map(normalize));
+      for (const name of Object.keys(env)) if (privateNames.has(normalize(name))) delete env[name];
       const result = await promisify(execFile)(source.executable, source.args, {
         shell: false, cwd: homedir(), env, encoding: "utf8", timeout: 60_000, maxBuffer: 1024 * 1024, signal: options?.signal,
       });

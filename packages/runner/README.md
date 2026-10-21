@@ -11,14 +11,14 @@ complete terminal example with an integrity-pinned public runner archive.
 For source builds, pack a reviewed revision as below. See the
 [use cases](USE_CASES.md) and [changes](CHANGELOG.md).
 
-The `runner-v0.6.0-alpha.3` GitHub prerelease is a runner-only source snapshot,
+The `runner-v0.6.0-alpha.4` GitHub prerelease is a runner-only source snapshot,
 not a release or deployment of Dispatch Web. Its notes identify the exact source
 commit and archive checksum. The archive retains the repository's 0.6.0 package
 version; its tag and npm lockfile integrity distinguish the snapshot. Install it
 without checking an archive into your own repository:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/runner-v0.6.0-alpha.3/dispatch-runner-0.6.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/runner-v0.6.0-alpha.4/dispatch-runner-0.6.0.tgz
 ```
 
 Keep the resulting lockfile. Snapshot updates use a new immutable tag and URL;
@@ -187,9 +187,15 @@ Existing history is retained. State paths must be owned by the launching account
 symlinked state directories/files, hard-linked files and special files are
 rejected. Startup stops if private modes cannot be established. Keep ancestor
 directories under trusted control and review any extra filesystem ACLs separately.
-Native Windows storage is unavailable until ACL enforcement is implemented;
-use a Linux filesystem in WSL or run on Linux/macOS. These permissions do not
-isolate trusted code running as the same account or protect earlier backups.
+On Windows, startup automatically establishes and verifies a protected DACL
+granting the current user full control, with private inheritance for newly
+created files. Windows PowerShell supplies the built-in API bridge; no elevated
+launch or extra SDK is needed. State must live on a local ACL-capable Windows
+volume, normally NTFS. Junctions/reparse points, hard links, foreign ownership
+and ambiguous trailing-dot/space components are rejected. These permissions do
+not isolate trusted code running as the same account, privileged administrators
+or earlier backups. See [Windows storage](docs/windows.md) for implementation
+boundaries and qualification.
 
 A directory lock enforces Pi SQLite's single-owner contract without limiting
 independent native tasks. Status JSON is an observation, not durable authority.

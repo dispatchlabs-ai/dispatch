@@ -73,11 +73,18 @@ those integrations. The scaffold applies it to both chat providers.
 ## Native storage and host configuration
 
 The optional MIT dependency `@napi-rs/keyring` is pinned to 2.1.2 and loaded only
-when native operations are requested. It supports macOS Keychain, Windows
-Credential Manager and Linux Secret Service. Linux entries explicitly require
+for native macOS Keychain or Linux Secret Service operations. Linux entries require
 `secret-service`; the dependency's automatic keyutils fallback is disabled.
 Missing binaries, absent/unavailable stores and locked entries produce errors.
 No plaintext secret file is created as a fallback.
+
+Windows calls its built-in Credential Manager APIs through a packaged Windows
+PowerShell bridge, without loading the optional addon or requiring a Visual C++
+redistributable. Values travel through private process pipes, never command
+arguments, environment variables or temporary files. The generic credential
+persists for the current user across processes; its target and UTF-16LE format
+match the earlier adapter. Windows limits the stored blob to 2560 bytes. Normal
+interactive logons have a credential set; network-only logons may not.
 
 Profiles live in `$XDG_CONFIG_HOME/dispatch/credentials` (default
 `~/.config/dispatch/credentials`) or `%APPDATA%\Dispatch\credentials` on Windows.
@@ -86,7 +93,9 @@ The canonical project path's SHA-256 scopes its profile and native service.
 Copies or moved checkouts require separate setup. Metadata is written atomically
 under a per-profile file lock. POSIX configuration directories/files must be
 user-owned and private (0700/0600); symlinks and project-contained paths are
-rejected. Windows relies on the user's profile ACLs.
+rejected. Windows creates private owner-only ACLs for the directory and metadata
+files and verifies them before loading sources. Configuration must be on a local
+ACL-capable volume. See [Windows storage](windows.md).
 
 Profile JSON contains source metadata, never resolved keys. Treat helper metadata
 as executable authority: protect the directory and configure it through trusted
@@ -98,7 +107,7 @@ skills or repository files. Native credential accounts use generated IDs.
 `credentialCommand` implements `login PROVIDER [--stdin]`,
 `helper PROVIDER /absolute/program ARGS`, `status [PROVIDER] [--json]`,
 `check PROVIDER` and `logout PROVIDER`. The first-class
-[scaffold guide](https://github.com/dispatchlabs-ai/agent-scaffold/blob/main/docs/credentials.md)
+[scaffold guide](https://github.com/dispatchlabs-ai/agent-scaffold/blob/main/examples/dispatch/docs/credentials.md)
 shows the user workflow. `promptForSecret` reads hidden terminal input and restores
 terminal state on completion/cancellation. The explicit `--stdin` setup option
 accepts a trusted secret-manager pipe; keys must not be command arguments.
