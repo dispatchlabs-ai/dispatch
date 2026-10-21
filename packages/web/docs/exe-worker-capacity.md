@@ -69,9 +69,9 @@ for the defined additional working set in both the agent-driven and fixed-comman
 
 A single additional worker took 22.4 seconds. Creating two more workers in parallel took up to
 52.7 seconds; the next batches of four took 158 and 237 seconds. The last batch, reaching sixteen,
-ran past roughly five minutes: one create response and its first reconciliation read timed out.
-The existing chat was subsequently read successfully in 0.302 seconds, without replaying its
-creation or making a duplicate.
+ran for roughly five minutes: one create request returned an unreadable response, and its first
+reconciliation read timed out. The existing chat was subsequently read successfully in 0.302
+seconds, without replaying its creation or making a duplicate.
 
 The driver performs repeated sequential remote inventory/identity checks, and admission is
 serialized. These timings include that control work and worker initialization. They are not
