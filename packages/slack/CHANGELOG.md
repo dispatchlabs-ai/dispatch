@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Save incoming messages before Slack thread lookups, retry lookups durably,
+  and preserve admission order within each thread across restarts. Retain
+  existing deduplication keys when upgrading the inbox.
+- Recover deleted stream messages by posting the completed answer as an ordinary
+  thread reply, and admit human replies sent with "Also send to channel".
+
 - Allow wildcard channel routes, explicit peer-bot addressing, and mention-only
   participation in threads started for another bot, preserving ordinary replies
   in the bot's own threads and DMs.

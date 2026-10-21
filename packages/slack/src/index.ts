@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { parse } from "yaml";
 import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
-import { AssistantEntry, LiveDoc, defineDoc, defineExtension, defineTask, type LiveState } from "@earendil-works/pi-durable";
+import { awaitWithContext, withAbortSignal } from "@earendil-works/chord/context";
+import { AssistantEntry, LiveDoc, defineDoc, defineExtension, defineTask, type LiveState, type TaskId } from "@earendil-works/pi-durable";
 import { context, type ChatService, type Runner, type ReplySink } from "@dispatch/runner";
 import { fallbackText, replyBlocks, replyChunk, streamText } from "./text.js";
 
@@ -19,6 +20,10 @@ export type SlackConfig = {
   threadReplies?: "all" | "started";
 };
 type SlackInput = { text: string; key: string; channel: string; thread: string; user: string; replyText?: string };
+type Incoming = SlackInput & {
+  agent: string; direct: boolean; mentioned: boolean; threaded: boolean;
+  parentUser: string | null; previous: number | null;
+};
 type Delivery = { phase: "answer" } | {
   phase: "deliver"; text: string; offset: number; retryAt: number; stream: string | null;
 };
@@ -77,9 +82,10 @@ export async function prepareSlack(root: string, runner: Runner, options: {
   const botToken = process.env[config.botTokenEnv ?? "SLACK_BOT_TOKEN"] ?? credentials?.botToken;
   const appToken = process.env[config.appTokenEnv ?? "SLACK_APP_TOKEN"] ?? credentials?.appToken;
   if (!botToken || !appToken) throw new Error("Slack requires its bot and app tokens in the configured environment.");
-const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
-  kind: `${namespace}.slack-inbox`, version: 1, scope: "session", initial: () => ({ tasks: {} }),
-});
+  const SlackInbox = defineDoc<{ tasks: Record<string, number>; threads: Record<string, number> }>({
+    kind: `${namespace}.slack-inbox`, version: 2, scope: "session", initial: () => ({ tasks: {}, threads: {} }),
+    migrate: value => ({ tasks: value.tasks as Record<string, number>, threads: {} }),
+  });
   const ThreadReplies = defineDoc<{ byKey: Record<string, boolean> }>({
     kind: `${namespace}.slack-thread-replies`, version: 1, scope: "session", initial: () => ({ byKey: {} }),
   });
@@ -93,6 +99,8 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
   if (identity.team_id !== config.teamId || !identity.user_id) throw new Error("Slack token does not belong to the configured workspace.");
   const socket = new SocketModeClient({ appToken });
   const bot = identity.user_id;
+  let startService!: (service: ChatService) => void;
+  const ready = new Promise<ChatService>(resolve => { startService = resolve; });
   const turn = defineTask<SlackInput, Delivery, null>({
     name: `${namespace}.slack-turn`, version: 1,
     initial: input => input.replyText === undefined ? { phase: "answer" } : {
@@ -206,6 +214,13 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
           }
         } catch (error) {
           if (runtime.signal.aborted) throw error;
+          if (checkpoint.stream && checkpoint.offset === 0 && slackError(error) === "message_not_found") {
+            // A deleted stream cannot be repaired by retrying its timestamp.
+            await runtime.commit(() => ({
+              status: "running", checkpoint: { ...checkpoint, stream: null, retryAt: 0 },
+            }), ctx);
+            return;
+          }
           runtime.report(new Error(`Slack delivery pending for ${task.input.key}: ${error instanceof Error ? error.message : "request failed"}`));
           await runtime.commit(() => ({
             status: "running", checkpoint: { ...checkpoint, retryAt: runtime.now() + retryDelay(error) },
@@ -222,7 +237,76 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
       await runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx);
     },
   });
-  const extension = defineExtension({ name: `${namespace}.slack`, tasks: [turn] });
+  const incoming = defineTask<Incoming, { phase: "admit"; retryAt: number }, null>({
+    name: `${namespace}.slack-incoming`, version: 1,
+    initial: () => ({ phase: "admit", retryAt: 0 }),
+    phases: {
+      async admit(task, runtime, ctx) {
+        // Recovery can start before the host attaches its ChatService.
+        const service = await awaitWithContext(ready, withAbortSignal(runtime.signal, ctx));
+        const input = task.input;
+        if (input.previous !== null) await runtime.waitForTask(input.previous as TaskId<null>, ctx);
+        await runtime.sleep(task.state.checkpoint.retryAt, ctx);
+        const host = service.host(input.agent);
+        const key = threadKey(config.teamId, input.channel, input.thread);
+        let existing = await service.find(input.agent, key);
+        let ownThread = config.threadReplies === "started"
+          ? (await host.harness.snapshot(ThreadReplies, ctx))?.byKey[key] : undefined;
+        if (!input.threaded) ownThread = true;
+        // Only our reports can create an unmentioned discussion in an unknown
+        // thread. A preceding mention has now finished binding its conversation.
+        if (!input.direct && !input.mentioned && !existing && input.parentUser !== null && input.parentUser !== bot) {
+          await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), ctx);
+          return;
+        }
+        if (input.threaded && (!existing || (config.threadReplies === "started" && ownThread === undefined))) {
+          let root;
+          try {
+            root = await client.conversations.replies({ channel: input.channel, ts: input.thread, limit: 1, include_all_metadata: true });
+          } catch (error) {
+            if (runtime.signal.aborted) throw error;
+            const code = slackError(error);
+            const message = `Slack thread lookup failed for ${input.key}: ${code ?? "request failed"}`;
+            runtime.report(new Error(message));
+            await runtime.commit(() => code === "thread_not_found" || code === "message_not_found"
+              ? { status: "terminal", outcome: { status: "failed", error: { message } } }
+              : { status: "running", checkpoint: { phase: "admit", retryAt: runtime.now() + retryDelay(error) } }, ctx);
+            return;
+          }
+          const first = root.messages?.find(message => message.ts === input.thread);
+          ownThread = first?.user === bot || first?.text?.includes(`<@${bot}>`) === true;
+          const metadata = first?.user === bot ? first.metadata : undefined;
+          const payload = metadata?.event_payload as Record<string, unknown> | undefined;
+          if (metadata?.event_type === `${namespace}_agent_report` && payload?.agent === input.agent && typeof payload.origin === "string") {
+            const origin: unknown = JSON.parse(payload.origin);
+            if (!origin || typeof origin !== "object" || Array.isArray(origin)) throw new Error("Invalid report origin.");
+            existing = await service.create(input.agent, "slack", key,
+              typeof payload.title === "string" ? payload.title : "Report discussion", origin as Report["origin"]);
+          }
+        }
+        if (!input.direct && !input.mentioned && (!existing || (config.threadReplies === "started" && !ownThread))) {
+          await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), ctx);
+          return;
+        }
+        const chat = existing ?? await service.create(input.agent, "slack", key, input.text, {
+          slack: { teamId: config.teamId, channelId: input.channel, threadTs: input.thread },
+        });
+        const { conversation } = await service.resolve(chat.id);
+        // Transfer admission to the turn and finish this task in one commit.
+        await runtime.commit(async tx => {
+          if (config.threadReplies === "started") (await tx.doc(ThreadReplies)).byKey[key] = ownThread ?? false;
+          (await tx.doc(SlackInbox)).tasks[input.key] = await tx.createTask(turn, {
+            key: input.key, text: input.text, channel: input.channel, thread: input.thread, user: input.user,
+          }, { conversationId: conversation.id, ownership: { kind: "conversation" }, background: true });
+          return { status: "terminal", outcome: { status: "completed", result: null } };
+        }, ctx);
+      },
+    },
+    async abort(_task, runtime, ctx) {
+      await runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx);
+    },
+  });
+  const extension = defineExtension({ name: `${namespace}.slack`, tasks: [turn, incoming] });
   const queueReply: ReplySink = async (tx, conversationId, destination, text, key) => {
     await tx.createTask(turn, { ...destination, text, replyText: text, key }, {
       conversationId, ownership: { kind: "conversation" }, background: true,
@@ -267,14 +351,17 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
     connected: () => socket.websocket?.isActive() ?? false,
     async start(service: ChatService) {
       for (const agent of [...Object.values(config.channels), ...(config.directMessagesAgent ? [config.directMessagesAgent] : [])]) service.host(agent);
+      startService(service);
       socket.on("slack_event", async ({ body, ack }) => {
         try {
           const event = body.event;
           if (body.team_id !== config.teamId || !event || !["message", "app_mention"].includes(event.type)
-            || event.subtype || event.bot_id || !event.user || event.user === bot || !event.text
+            || (event.subtype !== undefined && event.subtype !== "thread_broadcast")
+            || event.bot_id || !event.user || event.user === bot || !event.text
             || (config.allowedUsers && !config.allowedUsers.includes(event.user))) { await ack(); return; }
           const direct = event.channel_type === "im";
           const mentioned = event.type === "app_mention" || event.text.includes(`<@${bot}>`);
+          if (!direct && !mentioned && !event.thread_ts) { await ack(); return; }
           if (!direct && !mentioned && config.peerBotUserIds?.some(id => event.text.includes(`<@${id}>`))) {
             await ack(); return;
           }
@@ -283,45 +370,25 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
           const host = service.host(agent);
           const thread = event.thread_ts ?? event.ts;
           const key = threadKey(body.team_id, event.channel, thread);
-          let existing = await service.find(agent, key);
-          let ownThread = config.threadReplies === "started"
-            ? (await host.harness.snapshot(ThreadReplies, context))?.byKey[key] : undefined;
-          if (!event.thread_ts) ownThread = true;
-          // A report may be visible before its post response and binding commit.
-          // Reconcile that root from our own metadata before admitting a reply.
-          if (event.thread_ts && (!existing || (config.threadReplies === "started" && ownThread === undefined))) {
-            const root = await client.conversations.replies({ channel: event.channel, ts: thread, limit: 1, include_all_metadata: true });
-            const first = root.messages?.find(message => message.ts === thread);
-            ownThread = first?.user === bot || first?.text?.includes(`<@${bot}>`) === true;
-            const message = root.messages?.find(message => message.ts === thread && message.user === bot);
-            const metadata = message?.metadata;
-            const payload = metadata?.event_payload as Record<string, unknown> | undefined;
-            if (metadata?.event_type === `${namespace}_agent_report` && payload?.agent === agent && typeof payload.origin === "string") {
-              const origin: unknown = JSON.parse(payload.origin);
-              if (!origin || typeof origin !== "object" || Array.isArray(origin)) throw new Error("Invalid report origin.");
-              existing = await service.create(agent, "slack", key,
-                typeof payload.title === "string" ? payload.title : "Report discussion", origin as Report["origin"]);
-            }
-          }
-          if (!direct && !mentioned && !existing) { await ack(); return; }
-          if (!direct && !mentioned && config.threadReplies === "started" && !ownThread) { await ack(); return; }
+          const existing = await service.find(agent, key);
+          const parentUser = event.parent_user_id ?? event.root?.user ?? null;
           const text = event.text.replaceAll(`<@${bot}>`, "").trim();
           if (!text) { await ack(); return; }
-          const chat = existing ?? await service.create(agent, "slack", key, text, {
-            slack: { teamId: body.team_id, channelId: event.channel, threadTs: thread },
-          });
-          const { conversation } = await service.resolve(chat.id);
           // Dedup both Slack redelivery and app_mention/message copies.
           const eventKey = `slack:${body.team_id}:${event.channel}:${event.ts}`;
-          await conversation.commit(async tx => {
+          await host.conversation.commit(async tx => {
             const inbox = await tx.doc(SlackInbox);
             if (inbox.tasks[eventKey]) return;
-            if (config.threadReplies === "started") (await tx.doc(ThreadReplies)).byKey[key] = ownThread ?? false;
-            inbox.tasks[eventKey] = await tx.createTask(turn, {
+            const previous = inbox.threads[key] ?? null;
+            if (!direct && !mentioned && !existing && previous === null && parentUser !== null && parentUser !== bot) return;
+            const id = await tx.createTask(incoming, {
               key: eventKey, text, channel: event.channel, thread, user: event.user,
+              agent, direct, mentioned, threaded: Boolean(event.thread_ts), parentUser, previous,
             }, { ownership: { kind: "conversation" }, background: true });
+            inbox.tasks[eventKey] = id;
+            inbox.threads[key] = id;
           }, context);
-          // Acknowledge only after native durable admission, before inference.
+          // Acknowledgement waits only for local storage, never a Slack API call.
           await ack();
           host.harness.resume();
         } catch (error) {

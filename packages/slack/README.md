@@ -43,9 +43,10 @@ const app = await run({ models, adapters: [slack({ connection: "example" })] });
 for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => void app.close());
 ```
 
-Top-level mentions start a thread. Replies in known threads continue one shared
-conversation across human members, with their Slack IDs attributed in model
-input. Unrelated channel chatter, bot messages, edits and unconfigured channels
+Top-level mentions start a thread. Replies in known threads, including replies
+sent with "Also send to channel", continue one shared conversation across human
+members, with their Slack IDs attributed in model input. Unrelated channel
+chatter, bot messages, edits and unconfigured channels
 are ignored. `allowedUsers` is optional and limits a connection when present;
 omitting it allows human channel members. Direct messages are disabled unless
 `directMessagesAgent` is explicitly configured. Do not run competing consumers
@@ -91,8 +92,13 @@ creation transaction. Preserve the receipt in the domain workflow. On startup,
 bindings for existing report receipts without reposting or rerunning reviews.
 
 Incoming copies of `message` and `app_mention` and Slack retries share a native
-admission key. Acknowledgement follows durable admission; inference runs after
-acknowledgement. Native tasks retain queued input and outgoing reply progress.
+admission key. Acknowledgement follows local durable admission and does not wait
+for thread lookup or inference. Native tasks retain incoming messages, retry
+thread lookups using Slack's retry delay, and preserve admission order within
+each thread across restarts. A deleted thread leaves a recorded failed admission.
+Known unrelated threads are filtered without a Slack API request when the event
+identifies their parent author. Existing admission keys survive the inbox upgrade.
+Native tasks also retain outgoing reply progress.
 User mentions render through Slack's native user elements in final replies and
 mention syntax while streaming, so readers see member names rather than raw IDs.
 Other control syntax, including broadcast tags, stays literal. Partly generated
@@ -103,4 +109,6 @@ Slack delivery is at least once. A crash after Slack accepts a post but before
 its local receipt/binding is committed can duplicate it. Delivery metadata and
 stable report IDs aid reconciliation, but are not a transactional guarantee.
 Streaming failure preserves the final reply, which retries through the native
-outbox. The package imposes no global inference concurrency limit.
+outbox. If a stream message was deleted, delivery clears its saved timestamp and
+posts the completed answer as an ordinary thread reply. The package imposes no
+global inference concurrency limit.
