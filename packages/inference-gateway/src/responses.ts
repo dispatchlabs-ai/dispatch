@@ -99,9 +99,12 @@ export async function serveResponses(request: IncomingMessage, response: ServerR
     const stream = connection.models.stream(model, { messages: [] }, {
       signal, transport: "sse", sessionId, maxRetries: 0,
       fetch: async (input, init) => { const upstream = await fetch(input, init); providerStatus = upstream.status; return upstream; },
-      onPayload: (native) => ({ ...(native as Record<string, unknown>), ...body, model: model.id, input: body.input, stream: true, store: false, background: false,
+      onPayload: (native) => ({ ...(native as Record<string, unknown>), ...body, model: model.id,
+        input: typeof body.input === "string" ? [{ role: "user", content: [{ type: "input_text", text: body.input }] }] : body.input,
+        stream: true, store: false, background: undefined,
         // Codex client telemetry is not a provider inference option or an authorization input.
-        client_metadata: undefined, previous_response_id: undefined, prompt_cache_key: sessionId, safety_identifier: tokenHash(principal.id) }),
+        client_metadata: undefined, previous_response_id: undefined, prompt_cache_key: sessionId,
+        safety_identifier: model.api === "openai-responses" ? tokenHash(principal.id) : undefined }),
       onResponse: (upstream) => { providerStatus = upstream.status; },
       onProviderStreamEvent: async (value) => {
         if (!value || typeof value !== "object" || !("type" in value) || typeof value.type !== "string") throw new Error("Invalid provider event");

@@ -532,7 +532,7 @@ components:
         client_metadata: { type: object, additionalProperties: { type: string }, description: Accepted client telemetry; discarded before provider inference and never used for authorization }
         prompt_cache_key: { type: string, description: Namespaced by employee and client identity }
         prompt_cache_retention: { type: string }
-        safety_identifier: { type: string, description: Replaced by a gateway-derived identity hash }
+        safety_identifier: { type: string, description: Replaced by a gateway-derived identity hash for OpenAI API routes; omitted for Codex OAuth }
         stream_options: { type: object }
     Inference:
       type: object
