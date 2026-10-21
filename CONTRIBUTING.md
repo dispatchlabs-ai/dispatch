@@ -2,6 +2,10 @@
 
 Dispatch Web has a local browser/service implementation with authentication, native Pi Durable chat, named agents, and a branded responsive workspace. Work within the current authorized task and the check policy below.
 
+Read [OSS.md](OSS.md) for the public standards covering every package, including
+privacy, portable setup, attribution and release claims. This guide owns the
+development commands, checks and publication workflow.
+
 ## Testing policy
 
 Do not add or run automated tests. This does not apply to AI agents using `agent-browser` for interactive verification of authorized work; no separate testing-policy exception is needed. Source review, TypeScript checks and builds remain permitted. Future coverage should prioritize stable end-to-end and API behavior, not implementation details or coverage counts. Builds do not establish runtime correctness; record dated observations and unverified outcomes in the task report or relevant linked supporting document.
@@ -26,6 +30,7 @@ Use `npm run auth -- invite --email person@example.com --name "Person"` to provi
 | --- | --- |
 | Root `README.md` | Project overview and package links |
 | Root `AGENTS.md` | Concise repository-wide agent instructions |
+| Root `OSS.md` | Public development and release standards, including privacy review |
 | Root `CONTRIBUTING.md` | Shared development and contribution workflow |
 | `.pi/prompts/` | Reusable development prompts listed below |
 | `.pi/skills/` | Focused browser-testing and release procedures |
@@ -82,12 +87,10 @@ Use `/deslop` after implementing a work package; rerun affected checks only if t
 
 ## Public information boundary
 
-Keep company/customer names, account and request identifiers, deployment hosts,
-personal paths, authenticated captures, transcripts and credentials outside this
-public repository and its release artifacts. Use synthetic examples and retain
-installation evidence in private operator records. Check image content as well
-as text; a secret scanner alone does not identify private operational details.
-Preserve license notices and public author attribution.
+Follow the [public information boundary in OSS.md](OSS.md#public-information-boundary)
+before every commit, push or release, including review of outgoing history,
+commit messages, images and artifact contents. Keep installation evidence in
+private records and publish synthetic examples or sanitized summaries.
 
 The public history was reset on October 21, 2026. Start new work from a fresh
 clone. Do not merge or push branches from the retired history; transfer reviewed,
@@ -98,7 +101,7 @@ assets were withdrawn rather than moved to different source.
 
 Run `npm run check` inside `nix develop` for TypeScript changes. Run `nix build` and `nix flake check` when packaging, dependencies or Nix inputs change, and for release artifacts. Documentation-only edits need diff and affected-link review. Build each required artifact once and reuse it across verification and deployment; repeat checks only after relevant changes or failures. There is no functional test suite under the current zero-tests rule. AI-agent interactive verification using `agent-browser` is permitted under the [testing policy](#testing-policy).
 
-Also run `git diff --check` (and `git diff --cached --check` after staging), inspect the full diff, and verify changed local documentation links. Documentation checks do not verify application behavior.
+Also run `git diff --check` (and `git diff --cached --check` after staging), inspect the full diff, and verify changed local documentation links. Complete the [public-information review](OSS.md#public-information-boundary) before committing or publishing. Documentation checks do not verify application behavior.
 
 Use a task branch and worktree for concurrent work; edit canonical `main` only with exclusive checkout ownership. Before publication, fetch the latest remote target and reconcile changes; rerun checks affected by that integration. Commit only task changes, push normally to `main` unless the task requires a PR, and verify the published commit. Preserve existing edits and unpublished work; reconcile them with their owner rather than resetting or overwriting them.
 
