@@ -19,9 +19,6 @@ buildNpmPackage {
       ../../slack/package.json
       ../../slack/tsconfig.json
       ../../slack/src
-      ../../inference-gateway/package.json
-      ../../inference-gateway/tsconfig.json
-      ../../inference-gateway/src
       ../package.json
       ../.storybook
       ../public
@@ -38,7 +35,7 @@ buildNpmPackage {
     ];
   };
 
-  npmDepsHash = "sha256-OzbVXnzJzPSZv3A3Od0P3YlrnRDHLMI5adNshl47vIw=";
+  npmDepsHash = "sha256-ht+HyPSG7HwHVSbdHp5f7FZHXb2SG8ClysQTOe3wg88=";
   npmBuildScript = "build";
 
   doCheck = true;
@@ -62,14 +59,6 @@ buildNpmPackage {
     if test -d packages/web/node_modules; then
       cp -R packages/web/node_modules "$app/packages/web/"
     fi
-    mkdir -p "$app/packages/inference-gateway"
-    cp packages/inference-gateway/package.json "$app/packages/inference-gateway/"
-    cp -R packages/inference-gateway/dist "$app/packages/inference-gateway/"
-    if test -d packages/inference-gateway/node_modules; then
-      cp -R packages/inference-gateway/node_modules "$app/packages/inference-gateway/"
-    fi
-    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-inference-gateway" \
-      --add-flags "$app/packages/inference-gateway/dist/cli.js"
     for package in runner slack; do
       mkdir -p "$app/packages/$package"
       cp packages/$package/package.json "$app/packages/$package/"

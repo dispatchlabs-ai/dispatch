@@ -47,9 +47,9 @@ path. Native shells inherit the service account's authority; a working directory
 is not a sandbox.
 
 The [runtime guide](runtime.md) describes Pi, Claude and Muse ownership,
-continuation, interruption and qualification limits. The separate
-[inference gateway](../../inference-gateway/README.md) retains provider credentials
-outside client workloads and documents its own acceptance boundaries.
+continuation, interruption and qualification limits. The separately maintained
+inference gateway retains provider credentials outside client workloads; it is
+no longer distributed from this repository.
 
 ## Projects and specifications
 

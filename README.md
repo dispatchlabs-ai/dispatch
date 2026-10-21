@@ -6,11 +6,6 @@ Dispatch brings shared conversations, named agents, project tools and background
 
 Dispatch is built on [Pi Durable](https://github.com/earendil-works/pi): Pi owns agent execution and recovery; Dispatch adds sign-in, collaboration and the browser experience.
 
-For agents running in another account, the source-alpha
-[inference gateway](packages/inference-gateway/README.md) keeps provider API keys
-and OAuth refresh credentials in a trusted gateway while workloads authenticate
-with their AWS roles. It is a separate package with its own setup and qualification boundaries.
-
 For company agents that run independently of the browser,
 [Dispatch Runner](packages/runner/README.md) loads agent directories and owns
 native schedules and conversations. The optional
@@ -99,7 +94,6 @@ Run these from the repository's Nix shell. They check types and builds, not end-
 ## Learn more
 
 - [Dispatch use cases](packages/web/USE_CASES.md) — browser workspace goals and approved additions
-- [Inference gateway use cases](packages/inference-gateway/USE_CASES.md) — shared inference, workload access and approved employee/client additions
 - [Web package](packages/web/README.md) — implementation and documentation index
 - [Usage guide](packages/web/docs/usage-guide.md) — detailed setup and operation
 - [Changelog](packages/web/CHANGELOG.md) — changes and release history

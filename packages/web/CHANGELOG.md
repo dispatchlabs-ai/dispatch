@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Remove the independently maintained inference gateway from the workspace and application distribution.
+
 - Sanitize public documentation and examples; replace the public Git history with a fresh snapshot and withdraw earlier tags/releases. Preserve private engineering records separately.
 
 ### Web runtime dependency isolation
