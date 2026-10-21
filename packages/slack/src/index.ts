@@ -7,6 +7,7 @@ import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
 import { AssistantEntry, LiveDoc, defineDoc, defineExtension, defineTask, type LiveState } from "@earendil-works/pi-durable";
 import { context, type ChatService, type Runner, type ReplySink } from "@dispatch/runner";
+import { fallbackText, replyBlocks, replyChunk, streamText } from "./text.js";
 
 export type SlackConfig = {
   teamId: string; channels: Record<string, string>; directMessagesAgent?: string;
@@ -25,11 +26,6 @@ function retryDelay(error: unknown) {
 
 function slackError(error: unknown) {
   return (error as { data?: { error?: string } })?.data?.error;
-}
-
-// Slack parses mentions in Markdown streams. Escape control syntax in model text.
-function streamText(text: string) {
-  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 export type Report = { agent: string; channel: string; thread?: string; text: string; key: string; origin: import("@earendil-works/pi-durable").JsonObject; title?: string };
@@ -132,7 +128,7 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
           const text = streamText(raw);
           if (!text.startsWith(sent) || text === sent || runtime.now() < retryAt) return;
           // The native watcher coalesces updates while this request runs.
-          const delta = text.slice(sent.length, sent.length + 12_000);
+          const delta = replyChunk(text, sent.length, 12_000);
           try {
             await client.chat.appendStream({
               channel: task.input.channel, ts: stream, chunks: [{ type: "markdown_text", text: delta }],
@@ -169,7 +165,7 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
         const checkpoint = task.state.checkpoint;
         await runtime.sleep(checkpoint.retryAt, ctx);
         // Slack can truncate oversized messages. Persist progress between chunks.
-        const text = checkpoint.text.slice(checkpoint.offset, checkpoint.offset + 2900);
+        const text = replyChunk(checkpoint.text, checkpoint.offset);
         const hash = createHash("sha256").update(`${task.input.key}:${checkpoint.offset}`).digest("hex");
         try {
           if (checkpoint.stream && checkpoint.offset === 0) {
@@ -184,14 +180,15 @@ const SlackInbox = defineDoc<{ tasks: Record<string, number> }>({
             // Replace partials with the committed answer, also after a restart
             // or model retry. Repeating this update does not duplicate text.
             await client.chat.update({
-              channel: task.input.channel, ts: checkpoint.stream, text,
-              blocks: [{ type: "section", text: { type: "plain_text", text } }],
+              channel: task.input.channel, ts: checkpoint.stream, text: fallbackText(text),
+              blocks: replyBlocks(text),
               metadata: { event_type: `${namespace}_agent_reply`, event_payload: { delivery: hash } },
               parse: "none", link_names: false,
             });
           } else {
             await client.chat.postMessage({
-              channel: task.input.channel, thread_ts: task.input.thread, text,
+              channel: task.input.channel, thread_ts: task.input.thread, text: fallbackText(text),
+              blocks: replyBlocks(text),
               metadata: { event_type: `${namespace}_agent_reply`, event_payload: { delivery: hash } },
               unfurl_links: false, unfurl_media: false, mrkdwn: false, parse: "none",
             });

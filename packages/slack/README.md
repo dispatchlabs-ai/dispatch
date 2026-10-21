@@ -74,8 +74,11 @@ bindings for existing report receipts without reposting or rerunning reviews.
 Incoming copies of `message` and `app_mention` and Slack retries share a native
 admission key. Acknowledgement follows durable admission; inference runs after
 acknowledgement. Native tasks retain queued input and outgoing reply progress.
-Model output is escaped while streaming; final replies use plain text to prevent
-unwanted Slack mention expansion.
+User mentions render through Slack's native user elements in final replies and
+mention syntax while streaming, so readers see member names rather than raw IDs.
+Other control syntax, including broadcast tags, stays literal. Partly generated
+mentions wait for completion before streaming, and delivery chunks keep complete
+mentions together. No directory lookup or `users:read` permission is required.
 
 Slack delivery is at least once. A crash after Slack accepts a post but before
 its local receipt/binding is committed can duplicate it. Delivery metadata and
