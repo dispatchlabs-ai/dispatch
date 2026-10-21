@@ -1,0 +1,12 @@
+**
+!package.json
+!package-lock.json
+!packages
+!packages/web
+!packages/web/package.json
+!packages/inference-gateway
+!packages/inference-gateway/package.json
+!packages/inference-gateway/tsconfig.json
+!packages/inference-gateway/src
+!packages/inference-gateway/src/**
+!LICENSE

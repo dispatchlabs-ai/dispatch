@@ -1,0 +1,100 @@
+{ lib, buildNpmPackage, nodejs_24, makeWrapper }:
+
+buildNpmPackage {
+  pname = "dispatch-web";
+  version = (builtins.fromJSON (builtins.readFile ../package.json)).version;
+  nodejs = nodejs_24;
+  nativeBuildInputs = [ makeWrapper ];
+
+  src = lib.fileset.toSource {
+    root = ../../..;
+    fileset = lib.fileset.unions [
+      ../../../LICENSE
+      ../../../package.json
+      ../../../package-lock.json
+      ../../../scripts
+      ../../inference-gateway/package.json
+      ../../inference-gateway/tsconfig.json
+      ../../inference-gateway/src
+      ../package.json
+      ../.storybook
+      ../public
+      ../react-router.config.ts
+      ../vite.config.ts
+      ../tsconfig.json
+      ../tsconfig.server.json
+      ../tsconfig.tooling.json
+      ../tsconfig.capabilities.json
+      ../capabilities/package.json
+      ../capabilities/README.md
+      ../src
+      ../server
+    ];
+  };
+
+  npmDepsHash = "sha256-bP7N7A7RqW40glQ4jRbkFkjzpJvKQz6ehslEUgs74Z4=";
+  npmBuildScript = "build";
+
+  doCheck = true;
+  checkPhase = ''
+    runHook preCheck
+    npm run typecheck
+    npm run build:workshop
+    # The workshop is checked here but is a local development surface.
+    rm -r packages/web/build/workshop
+    runHook postCheck
+  '';
+
+  installPhase = ''
+    runHook preInstall
+    npm prune --omit=dev --ignore-scripts
+    app="$out/lib/dispatch-web"
+    mkdir -p "$app/packages/web" "$out/bin"
+    cp package.json "$app/"
+    cp packages/web/package.json "$app/packages/web/"
+    cp -R node_modules "$app/"
+    mkdir -p "$app/packages/inference-gateway"
+    cp packages/inference-gateway/package.json "$app/packages/inference-gateway/"
+    cp -R packages/inference-gateway/dist "$app/packages/inference-gateway/"
+    if test -d packages/inference-gateway/node_modules; then
+      cp -R packages/inference-gateway/node_modules "$app/packages/inference-gateway/"
+    fi
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-inference-gateway" \
+      --add-flags "$app/packages/inference-gateway/dist/cli.js"
+    # Compilation is complete; declarations and source maps are not runtime
+    # inputs. Omitting them also reduces per-file metadata in lazy OCI images.
+    find "$app/node_modules" -type f \
+      \( -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' \) -delete
+    cp -R packages/web/build "$app/packages/web/"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-web" \
+      --add-flags "$app/packages/web/build/service/server/index.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-auth" \
+      --add-flags "$app/packages/web/build/service/server/auth-cli.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-github-broker" \
+      --add-flags "$app/packages/web/build/service/server/github/broker.js"
+    test -f "$app/packages/web/build/service/server/workers/bootstrap-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-bootstrap" \
+      --add-flags "$app/packages/web/build/service/server/workers/bootstrap-main.js"
+    test -f "$app/packages/web/build/service/server/workers/database-init-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-database-init" \
+      --add-flags "$app/packages/web/build/service/server/workers/database-init-main.js"
+    test -f "$app/packages/web/build/service/server/workers/backend-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-backend" \
+      --add-flags "$app/packages/web/build/service/server/workers/backend-main.js"
+    test -f "$app/packages/web/build/service/server/workers/control-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-launcher" \
+      --add-flags "$app/packages/web/build/service/server/workers/control-main.js"
+    test -f "$app/packages/web/build/service/server/workers/worker-main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-worker" \
+      --add-flags "$app/packages/web/build/service/server/workers/worker-main.js"
+    mkdir -p "$out/share/dispatch-web"
+    cp LICENSE "$app/LICENSE"
+    cp LICENSE "$out/share/dispatch-web/LICENSE"
+    cp -R packages/web/capabilities "$out/share/dispatch-web/capabilities"
+    cp packages/web/server/storage/postgres/NOTICE "$out/share/dispatch-web/postgres-storage-NOTICE"
+    mkdir -p "$out/share/dispatch-web/agent-browser"
+    cp packages/web/server/skills/agent-browser/{LICENSE,NOTICE} "$out/share/dispatch-web/agent-browser/"
+    ln -s "$app/packages/web/build/client" "$out/share/dispatch-web/client"
+    runHook postInstall
+  '';
+}

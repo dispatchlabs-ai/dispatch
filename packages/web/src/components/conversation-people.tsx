@@ -1,0 +1,55 @@
+import { BookOpen, Bot, Check, CodeXml, Compass, Sparkles, UserRound } from "lucide-react";
+import { useState } from "react";
+import type { AgentDefinition } from "../shared/contracts";
+import { SidebarSearch } from "./sidebar-search";
+import { Button, Field, Input, Modal, Notice, Spinner } from "./ui";
+
+export function ParticipantAvatar({ kind, name }: { kind: "human" | "agent"; name: string }) {
+  const words = name.trim().split(/\s+/);
+  const initials = (words.length > 1 ? words.map(part => part[0]).slice(0, 2).join("") : name.trim().slice(0, 2)).toUpperCase();
+  const identity = Array.from(name).reduce((hash, character) => (hash * 31 + character.charCodeAt(0)) >>> 0, 0) % 5;
+  const AgentIcon = [Compass, Sparkles, BookOpen, Bot, CodeXml][identity];
+  return <span className={`participant-avatar participant-${kind}`} data-identity={identity} aria-hidden="true">{kind === "agent" ? <><AgentIcon size={20} /><span className="agent-avatar-initials">{initials}</span></> : initials ? initials.slice(0, 1) : <UserRound size={20} />}</span>;
+}
+
+export function AgentChoices({ agents, selected, onChange, disabled = false, joinedDefinitionIds = [] }: {
+  agents: AgentDefinition[]; selected: string[]; onChange: (ids: string[]) => void; disabled?: boolean; joinedDefinitionIds?: string[];
+}) {
+  const [search, setSearch] = useState("");
+  const available = agents.filter(agent => !agent.archived && `${agent.name} ${agent.description}`.toLowerCase().includes(search.toLowerCase()));
+  return <div className="participant-choices">
+    <SidebarSearch label="Find an agent" value={search} onChange={setSearch} />
+    <div className="participant-choice-list">
+      {available.map(agent => {
+        const joined = joinedDefinitionIds.includes(agent.id);
+        const identity = <><ParticipantAvatar kind="agent" name={agent.name} /><span className="participant-choice-copy"><strong>{agent.name}</strong><span>{agent.description || "Company agent"}</span></span></>;
+        return joined ? <div className="participant-choice" key={agent.id}>{identity}<span className="status-badge">Already here</span></div> : <label className={`participant-choice ${selected.includes(agent.id) ? "selected" : ""}`} key={agent.id}>
+          {identity}
+          <input type="checkbox" checked={selected.includes(agent.id)} disabled={disabled} onChange={event => onChange(event.target.checked ? [...selected, agent.id] : selected.filter(id => id !== agent.id))} />
+          <span className="participant-check" aria-hidden="true">{selected.includes(agent.id) ? <Check size={16} /> : null}</span>
+        </label>;
+      })}
+      {!available.length ? <p className="collection-empty">{search ? "No agents match your search." : "No agents are available."}</p> : null}
+    </div>
+  </div>;
+}
+
+export function NewConversationDialog({ agents, initialAgentIds, projectName, busy, error, onClose, onCreate }: {
+  agents: AgentDefinition[]; initialAgentIds: string[]; projectName?: string; busy: boolean; error?: string | null;
+  onClose: () => void; onCreate: (agentIds: string[], title?: string) => void;
+}) {
+  const [selected, setSelected] = useState(initialAgentIds);
+  const [name, setName] = useState("");
+  return <Modal title="New chat" description={projectName ? `Project: ${projectName}` : "Without a project"} open onOpenChange={open => { if (!open && !busy) onClose(); }}>
+    <div className="conversation-picker">
+      <Field label="Name (optional)" hint="Leave blank to name it from the first message.">{props => <Input {...props} value={name} onChange={event => setName(event.target.value)} maxLength={200} disabled={busy} placeholder="Chat name" />}</Field>
+      <p>Choose agents to start with. You can add people and agents later.</p>
+      <AgentChoices agents={agents} selected={selected} onChange={setSelected} disabled={busy} />
+      {error ? <Notice>{error}</Notice> : null}
+      <footer className="picker-actions"><span>{selected.length} {selected.length === 1 ? "agent" : "agents"} selected</span><div className="button-row">
+        <Button variant="secondary" disabled={busy} onClick={onClose}>Cancel</Button>
+        <Button disabled={busy} onClick={() => onCreate(selected, name.trim() || undefined)}>{busy ? <Spinner /> : null} Start chat</Button>
+      </div></footer>
+    </div>
+  </Modal>;
+}

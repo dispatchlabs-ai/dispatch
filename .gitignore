@@ -1,0 +1,13 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+node_modules/
+.react-router/
+build/
+result
+result-*
+.local/
+
+# Generated images and run records can contain private prompts and paths.
+/imagegen/

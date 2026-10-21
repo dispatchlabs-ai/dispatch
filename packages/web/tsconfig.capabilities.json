@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.server.json",
+  "compilerOptions": {
+    "rootDir": "server",
+    "outDir": "capabilities/build",
+    "declaration": true,
+    "noEmitOnError": true
+  },
+  "include": [
+    "server/extensions/coding.ts",
+    "server/extensions/skills.ts",
+    "server/extensions/web.ts",
+    "server/extensions/image-gen.ts"
+  ]
+}

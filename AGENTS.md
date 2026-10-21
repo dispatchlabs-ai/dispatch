@@ -1,0 +1,16 @@
+# Repository guidance
+
+- Use the startup and check commands in [CONTRIBUTING.md](CONTRIBUTING.md).
+- Follow the [testing policy](CONTRIBUTING.md#testing-policy): do not add or run automated tests. AI-agent interactive verification using `agent-browser` is permitted; use source review, TypeScript and build checks too. Future coverage prioritizes stable end-to-end and API behavior.
+- Before changing behavior, read current authoritative project intent and relevant affected-package documentation. Historical handoffs are supporting evidence, not a second product specification.
+- Dispatch Web project intent lives only in the database. Use `conversation_project_spec` for this chat's project; read the returned revision and continue with that revision/nextOffset until complete. The repo [spec-access pointer](packages/web/docs/spec.md) is not a requirements body, export or editing source. Reading intent does not authorize its backlog.
+- Before changing browser UI, read relevant repo-local UI guidance and review records. Report requirements you did not meet or check as deviations or unverified; never describe them as done.
+- Build UI from `packages/web/src/components/ui.tsx` per the spec's styling rule. Changes to that rule or path update the spec and this file together.
+- Review UI rendered, as a whole page, at 1440×900, 1280×720, 768×1024 and 390×844, compared with neighbouring sections. Sign in per project instructions or ask for captures; an unperformed review leaves the task incomplete. Keep captures in the gitignored `.local/`, and never commit ones that show account data. Still images do not verify keyboard, touch, or recovery flows.
+- Follow [CONTRIBUTING.md](CONTRIBUTING.md) for checks and publication. Develop in isolated worktrees and deliver to the task's authorized target; local browser delivery applies only to local development tasks. Complete and verify the current task before starting further work.
+- Use the [agent workflow index](CONTRIBUTING.md#agent-workflows) to find reusable prompts and procedures. Read only those relevant to the current task; agents outside Pi can follow the same Markdown files directly.
+- Before completing an implementation package, apply the behavior-preserving review in [.pi/prompts/deslop.md](.pi/prompts/deslop.md). AI agents may use `agent-browser` for interactive verification of authorized work without a testing-policy exception.
+- For a release request, start with [.pi/skills/release.md](.pi/skills/release.md), the canonical build/verify/publish runbook. The initial request authorizes the ordinary release workflow through publication and documentation; do not ask again at each step. No previous release chat or private `.local/` script is required. Report action-specific access blockers and continue unblocked channels; do not deploy to live installations as a side effect.
+- Keep specifications, handoffs, usage guides, changelogs, and code with their owning package. Root files contain repository-wide guidance and tooling.
+- Record checks and outstanding acceptance evidence in the task report or relevant linked supporting document; do not create a separate validation plan.
+- Keep draft decisions and unresolved contracts explicitly labeled. Use stock Pi Durable's public interfaces and preserve its ownership of durable execution and recovery.

@@ -1,0 +1,54 @@
+# Handoff to Claude: agent definition design review
+
+**Historical review request, October 6, 2026.** The maintainer requested an independent opinion on the original design, before implementation approval. The revised editor was subsequently approved and implemented in [WP-030](handoff.md#agents-and-evaluations), with generic connection setup corrected in [WP-031](handoff.md#tools-and-connections). The implementation descriptions and review instructions below preserve that earlier baseline; they are not current editor/base-adoption contracts.
+
+## Read and inspect these first
+
+The original review used two matching illustrations. The editor illustration was retired during the documentation reset; the technical mapping below remains available.
+
+1. [Pi Durable field mapping](assets/agent-definition-2026-10-06/02-pi-durable-mapping.png): how those fields relate to saved configuration, registered executable code, and runtime state.
+2. [Detailed design and storage reference](agent-definition-design.md): the precise mapping, current/proposed distinctions, and links to inspected implementation sources. Treat this text and the source as the authority when an illustration simplifies a detail.
+
+These design files live under `packages/web/docs/`.
+
+## What led to this design
+
+The design separates reusable agent expertise from project-specific assignments. Recovery Engineer, Archivist and Evidence Reviewer are illustrative roles.
+
+The proposal separates reusable expertise, working method, capabilities, knowledge, identity, and execution choices from one project's goal, inputs, output location, collaborators, and constraints. A definition can serve many projects; a participant selects a particular saved revision. Home Photos is an example assignment, not a restriction on the product or on the reusable agent.
+
+The maintainer specifically wanted to understand whether each UI field becomes extension code or saved data and, for SQLite data, where it lives. The mapping graphic answers that technical question; it is an explanatory companion, not a proposed end-user product screen.
+
+## Current implementation versus proposal
+
+The current editor saves name, description, instructions, provider/model, and thinking level. The runtime has revisioned definitions, extension/tool names, per-conversation agent configuration, and operator-managed MCP connections. New definition revisions apply to newly created participants; do not assume an edit silently changes existing instances.
+
+The additional capability controls, knowledge/procedure/memory choices, runner selection, workflow picker, qualification controls, and richer project assignment are proposals. Example recovery extensions, tools, storage identities, and readiness checks are illustrative, not installed capabilities. Current projects organize conversations by name; they do not implement the pictured assignment contract. The mockup's surrounding navigation is also illustrative and does not authorize changes to the established app navigation.
+
+The implementation evidence uses stock Pi Durable **1.0.1**:
+
+- `dispatch.catalog` holds Dispatch's reusable definition revisions. Each instantiated agent has a native conversation and `pi.agent` configuration. Participant metadata pins the definition ID and revision.
+- In `<stateDir>/pi.sqlite`, `documents` supplies document identity/address metadata. Configured values are reconstructed from `document_revisions.content` base values and later deltas. `documents.record` is metadata, not the configured values. There is no native `agents` SQL table.
+- Saved extension and tool names select registered executable implementations. Prompt sections, hooks, wrappers, tools, tasks, and the host's `ExecutionEnv` still require code. A selected field alone does not implement retrieval, memory, scheduling, access enforcement, or recovery.
+- Proposed `profile`, `dispatch.assignment`, and `dispatch.qualification` names belong to Dispatch; they are not built-in Pi types or accepted schemas. Their detailed contracts remain open.
+- Native durable task state/checkpoints are different from definition configuration and ordinary conversation history. External-job reconciliation belongs in the implementation. Credentials and large source/recovered artifacts remain in their owning systems; documents can hold references. A working directory is not a sandbox.
+
+## Screen work already completed
+
+We previously compared Dispatch's conversation view with Slack and implemented the approved [main-conversation and open-thread refinements](conversation-layout-refinements.md). That work established shared alignment, denser messages, contextual actions, visible reply summaries, distinct agent identities, readable tool disclosures, separate main/thread composers, and an optional right context panel. [WP-028](handoff.md#ui-and-conversations) records the actual desktop, narrower-desktop, and 390 px browser observations and their limits.
+
+Use those existing screens as visual and interaction context. The new editor proposal uses the same general Dispatch navy/aqua palette, Inter typography, rail/sidebar/content structure, and right context area. It has not had responsive or interactive acceptance review. Generated desktop imagery is not proof of keyboard, phone, focus, save/error, or recovery behavior.
+
+Optional local actual captures are in the canonical checkout's ignored `.local/conversation-refinement/2026-10-06/` directory, especially `after-main.png` and `after-thread.png`. Keep account-bearing captures out of Git.
+
+## Review requested
+
+Please give the maintainer your own judgment, including disagreements with this proposal. Evaluate the images themselves as well as the explanation:
+
+- Is the reusable definition versus project assignment distinction clear? Does the screen support the order in which someone would actually create and use an agent?
+- Are the layout, density, hierarchy, terminology, and defaults suitable for someone defining useful agents without understanding Pi internals? What deserves progressive disclosure, a different screen, or removal?
+- Are saving a revision, assigning an agent, readiness checking, and handling unsaved edits clear enough? Identify ambiguous states or actions rather than assuming their behavior.
+- Does the proposal accurately respect Pi Durable's ownership of execution and state? Identify places where the UI could imply behavior or guarantees that selected configuration cannot provide.
+- What should be kept, what are the most consequential problems, and what is the smallest coherent next design step? Include narrow-screen and accessibility implications, distinguishing visible problems from untested concerns.
+
+Start with a concise overall verdict, then prioritize concrete findings and recommendations. Refer to the numbered groups where helpful. State that you opened both images, and say explicitly if either could not be inspected. Separate established facts, design opinions, and unresolved contracts. Propose changes for review; do not modify code, launch implementation, or run tests. Retain the review with the relevant design discussion.

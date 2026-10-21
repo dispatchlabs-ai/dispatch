@@ -1,0 +1,80 @@
+# Dispatch is built by Nix for TARGETPLATFORM before this image is assembled.
+# Release builds supply digest-pinned OCI references for all three inputs.
+ARG DISPATCH_IMAGE
+ARG UBUNTU_IMAGE=ubuntu:24.04
+ARG MISE_IMAGE=ghcr.io/jdx/mise:2026.10.4
+FROM ${DISPATCH_IMAGE} AS dispatch
+FROM ${MISE_IMAGE} AS mise
+FROM ${UBUNTU_IMAGE}
+
+COPY --from=mise /usr/local/bin/mise /usr/local/bin/mise
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      bash ca-certificates curl wget git openssh-client ripgrep jq \
+      coreutils findutils grep sed gawk diffutils patch file less procps \
+      tar gzip bzip2 xz-utils zip unzip zstd \
+      build-essential cmake ninja-build pkg-config autoconf automake libtool \
+      python3 python3-venv python3-pip python-is-python3 \
+      libssl-dev libffi-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
+      liblzma-dev libyaml-dev libgdbm-dev libncurses-dev uuid-dev \
+      libicu74 libstdc++6 libunwind8 \
+    && find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) \
+      -exec sed -i 's|http://|https://|g' {} + \
+    && rm -rf /var/lib/apt/lists/* \
+    && printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d \
+    && chmod 755 /usr/sbin/policy-rc.d
+
+# Project commands use mise shims even in /bin/bash -c (no login/rc hooks).
+# Dispatch's wrapper uses its own absolute Nix Node path, never these shims.
+ENV HOME=/root \
+    MISE_DATA_DIR=/root/.local/share/mise \
+    MISE_CONFIG_DIR=/root/.config/mise \
+    MISE_CACHE_DIR=/root/.cache/mise \
+    PATH=/root/.local/share/mise/shims:/usr/local/share/mise/shims:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    LANG=C.UTF-8 \
+    DISPATCH_WORKSPACE_DIR=/workspace \
+    DISPATCH_DATA_DIR=/workspace/state \
+    NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
+# A pinned common project Node avoids coupling project npm to Dispatch's Node.
+RUN mkdir -p "$HOME" /workspace /tmp \
+    && mise install --system node@24.9.0 \
+    && mise use --global node@24.9.0 \
+    && mise reshim \
+    && node --version \
+    && npm --version \
+    && chmod 1777 /tmp
+
+# Install the browser while building, not during a conversation. Playwright pins
+# Chromium for both AMD64 and ARM64, bypassing agent-browser's ARM64 installer guard.
+COPY browser/package.json browser/package-lock.json /opt/dispatch-browser/
+RUN npm ci --prefix /opt/dispatch-browser --omit=dev --ignore-scripts \
+    && PLAYWRIGHT_BROWSERS_PATH=/opt/dispatch-browser/browsers \
+      node /opt/dispatch-browser/node_modules/playwright-core/cli.js install --with-deps --no-shell chromium \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg libnss3-tools \
+    && chmod 755 "/opt/dispatch-browser/node_modules/agent-browser/bin/agent-browser-linux-$(node -p process.arch)" \
+    && ln -s "/opt/dispatch-browser/node_modules/agent-browser/bin/agent-browser-linux-$(node -p process.arch)" /usr/local/bin/agent-browser \
+    && find /opt/dispatch-browser/node_modules/agent-browser/bin -type f \
+      -name 'agent-browser-*' ! -name "agent-browser-linux-$(node -p process.arch)" -delete \
+    && PLAYWRIGHT_BROWSERS_PATH=/opt/dispatch-browser/browsers node -e \
+      'require("fs").symlinkSync(require("/opt/dispatch-browser/node_modules/playwright-core").chromium.executablePath(), "/usr/local/bin/chromium")' \
+    && agent-browser --version \
+    && chromium --version \
+    && rm -rf /var/lib/apt/lists/* /root/.npm
+ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/local/bin/chromium
+
+# Keep tool installation layers reusable across application builds. Never flatten
+# the Nix closure or replace the worker wrapper's absolute executable paths.
+COPY --from=dispatch /nix/store /nix/store
+COPY --from=dispatch /bin/dispatch-worker /usr/local/bin/dispatch-worker
+COPY entrypoint.sh /usr/local/bin/dispatch-agent-entrypoint
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.title="Dispatch agent worker" \
+      org.opencontainers.image.source="https://github.com/dispatchlabs-ai/dispatch" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+USER 0:0
+WORKDIR /workspace
+ENTRYPOINT ["/usr/local/bin/dispatch-agent-entrypoint"]
+CMD ["/usr/local/bin/dispatch-worker"]
+EXPOSE 8831

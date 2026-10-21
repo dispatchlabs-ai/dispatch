@@ -1,0 +1,25 @@
+{
+  "name": "dispatch",
+  "version": "0.6.0",
+  "private": true,
+  "workspaces": [
+    "packages/web",
+    "packages/inference-gateway"
+  ],
+  "engines": {
+    "node": ">=24 <26"
+  },
+  "scripts": {
+    "dev": "tsx scripts/dev.ts",
+    "build": "npm run build --workspaces",
+    "preview": "tsx scripts/start.ts",
+    "typecheck": "npm run typecheck --workspaces",
+    "check": "npm run typecheck && npm run build",
+    "start": "tsx scripts/start.ts",
+    "auth": "tsx scripts/auth.ts",
+    "release": "tsx scripts/release.ts",
+    "workshop": "npm run workshop --workspace @dispatch/web",
+    "build:workshop": "npm run build:workshop --workspace @dispatch/web"
+  },
+  "type": "module"
+}

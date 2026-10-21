@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "ES2023", "lib": ["ES2023", "DOM"], "module": "NodeNext", "moduleResolution": "NodeNext",
+    "rootDir": ".", "outDir": "build/service", "types": ["node"], "strict": true,
+    "esModuleInterop": true, "skipLibCheck": true, "verbatimModuleSyntax": true,
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["server/**/*.ts", "src/shared/**/*.ts"]
+}

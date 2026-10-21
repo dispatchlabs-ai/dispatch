@@ -1,0 +1,986 @@
+// Adapted from @earendil-works/pi-durable 1.1.0 (MIT); see NOTICE.
+import type { Context, JsonValue } from "@earendil-works/chord";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { apply, type Op } from "@earendil-works/chord/delta";
+import { createHash } from "node:crypto";
+import { StorageRejected } from "@earendil-works/pi-durable";
+
+import type {
+  ConversationId,
+  ConversationQuery,
+  ConversationRecord,
+  Cursor,
+  DocumentAddress,
+  DocumentContent,
+  DocumentCreate,
+  DocumentId,
+  DocumentPoint,
+  DocumentQuery,
+  DocumentRecord,
+  EntryId,
+  EntryQuery,
+  EntryRecord,
+  Id,
+  JsonObject,
+  Page,
+  ScanOrder,
+  Seq,
+  Storage,
+  StorageWrite,
+  StoredDocument,
+  SubmissionId,
+  SubmissionQuery,
+  SubmissionRecord,
+  TaskId,
+  TaskQuery,
+  TaskRecord,
+} from "@earendil-works/pi-durable";
+import { PostgresDatabase, type PostgresExecutor, type PostgresValue, type PostgresStorageOptions } from "./database.js";
+// Erased Pi brands are applied only at the storage allocation/decoding boundary.
+const idFromNumber = <I extends Id<string>>(value: number): I => value as I;
+const seqFromNumber = (value: number): Seq => value as Seq;
+
+type StoredTask = TaskRecord<JsonValue, JsonValue, JsonValue>;
+type TableName = "conversation" | "entry" | "task" | "submission" | "document";
+type RecordIdRow = { readonly record_type: TableName };
+type JsonRow = { readonly record: string };
+type EntryJsonRow = { readonly record: string; readonly commit_seq: number };
+type RevisionRow = {
+  readonly seq: number;
+  readonly kind: DocumentContent["kind"];
+  readonly version: number;
+  readonly content: string;
+};
+type IdRow = { readonly id: number };
+type MetadataRow = { readonly next_seq: string };
+type DocumentAction = {
+  create?: DocumentCreate;
+  copy?: Extract<StorageWrite, { readonly type: "document.copy" }>["source"];
+  content?: DocumentContent;
+  retire: boolean;
+};
+type ScopeColumns = {
+  readonly scopeKind: DocumentRecord["scope"]["kind"];
+  readonly ownerId: number;
+};
+
+export class RemoteStorageConflict extends Error {}
+
+const parseJson = <T>(value: string): T => JSON.parse(value) as T;
+const encodeJson = (value: unknown): string => JSON.stringify(value) as string;
+// JSON-encoded TEXT preserves embedded NULs and lone UTF-16 surrogates (unlike PostgreSQL jsonb).
+const encodeIndexedString = (value: string): string => JSON.stringify(value);
+
+const cursorId = <I extends Id<string>>(cursor: Cursor | undefined): I | undefined => {
+  const after = cursor?.after;
+  if (after === undefined) return undefined;
+  if (typeof after !== "number" || !Number.isSafeInteger(after)) throw new TypeError("Invalid storage cursor");
+  return idFromNumber<I>(after);
+};
+
+const scanStart = (requested: ScanOrder | undefined, cursor: Cursor | undefined, fallback: ScanOrder): { order: ScanOrder; after: number | undefined } => {
+  if (requested !== undefined && requested !== "ascending" && requested !== "descending") {
+    throw new TypeError(`Invalid scan order: ${String(requested)}`);
+  }
+  if (cursor === undefined) return { order: requested ?? fallback, after: undefined };
+  const { after, order: stored } = cursor;
+  if (typeof after !== "number" || !Number.isSafeInteger(after)
+    || (stored !== undefined && stored !== "ascending" && stored !== "descending")) {
+    throw new TypeError("Invalid storage cursor");
+  }
+  const order = stored ?? fallback;
+  if (requested !== undefined && requested !== order) {
+    throw new TypeError(`The cursor continues a ${order} scan; the query asks for ${requested}`);
+  }
+  return { order, after };
+};
+
+const scanSql = (start: ReturnType<typeof scanStart>) => start.order === "ascending"
+  ? { clause: "id > ?", param: start.after ?? -1, direction: "ASC" }
+  : { clause: "id < ?", param: start.after ?? Number.MAX_SAFE_INTEGER, direction: "DESC" };
+
+const page = <T extends { readonly id: Id<string> }>(values: readonly T[], limit: number, order: ScanOrder = "ascending"): Page<T, Cursor> => {
+  const items = values.slice(0, limit);
+  if (values.length <= limit) return { items };
+  return { items, next: { after: items.at(-1)!.id, order } };
+};
+
+const scopeColumns = (scope: DocumentRecord["scope"]): ScopeColumns => {
+  switch (scope.kind) {
+    case "session":
+      return { scopeKind: "session", ownerId: 0 };
+    case "conversation":
+      return { scopeKind: "conversation", ownerId: scope.conversationId };
+    case "task":
+      return { scopeKind: "task", ownerId: scope.taskId };
+  }
+};
+
+const addressParts = (address: DocumentAddress | DocumentCreate | DocumentRecord) => {
+  const scope = scopeColumns(address.scope);
+  return {
+    kind: encodeIndexedString(address.kind),
+    ...scope,
+    family: address.key === undefined ? 0 : 1,
+    keyValue: encodeIndexedString(address.key ?? ""),
+  };
+};
+
+const addressKey = (address: DocumentAddress | DocumentCreate | DocumentRecord): string => {
+  const parts = addressParts(address);
+  return JSON.stringify([parts.kind, parts.scopeKind, parts.ownerId, parts.family, parts.keyValue]);
+};
+
+const isAliveAt = (record: DocumentRecord, at: DocumentPoint): boolean => {
+  if (at === "current") return record.retiredAt === undefined;
+  return record.createdAt <= at && (record.retiredAt === undefined || at < record.retiredAt);
+};
+
+const isCurrentOnly = (record: DocumentRecord): boolean =>
+  record.scope.kind !== "conversation" || record.history === "latest";
+
+const writeId = (write: StorageWrite): Id<string> | undefined => {
+  switch (write.type) {
+    case "conversation":
+    case "entry":
+    case "task":
+    case "submission":
+      return write.value.id;
+    case "document.create":
+    case "document.copy":
+      return write.record.id;
+    case "document.change":
+    case "document.retire":
+      return undefined;
+  }
+};
+
+/** PostgreSQL implementation of Pi Durable 1.1.0 public Storage. See NOTICE for upstream attribution. */
+export class PostgresStorage implements Storage {
+  private closed = false;
+  private closing: Promise<void> | undefined;
+
+  private constructor(private readonly db: PostgresDatabase) {}
+  get healthy(): boolean { return this.db.healthy; }
+
+  /** Open one logically isolated store over its own non-reconnecting connection. */
+  static async open(options: PostgresStorageOptions): Promise<PostgresStorage> {
+    return new PostgresStorage(await PostgresDatabase.open(options));
+  }
+
+  /**
+   * Read existing history without taking the store-owner lock or starting a Harness.
+   * All reads share one repeatable-read, read-only SQL snapshot. The callback must
+   * finish its reads before returning; the storage is closed on success or failure.
+   * Authorization and public/private projection remain the caller's responsibility.
+   */
+  static async readSnapshot<T>(options: PostgresStorageOptions, read: (storage: Storage) => Promise<T>): Promise<T> {
+    const storage = new PostgresStorage(await PostgresDatabase.openReadSnapshot(options));
+    try { return await read(storage); }
+    finally { await storage.close(BACKGROUND_CONTEXT); }
+  }
+
+  async commit(writes: readonly StorageWrite[], _context: Context): Promise<Seq> {
+    this.assertWritable();
+    const documentActions = this.prepareDocumentActions(writes);
+    const candidateNextId = this.candidateNextId(writes);
+    return this.db.transaction(transaction => this.commitWithin(transaction, writes, documentActions, candidateNextId));
+  }
+
+  private async commitWithin(transaction: PostgresExecutor, writes: readonly StorageWrite[], documentActions: Map<DocumentId, DocumentAction>, candidateNextId: number): Promise<Seq> {
+    const metadata = await transaction.get<MetadataRow>(
+      "SELECT next_seq::text AS next_seq FROM dispatch_pi.durable_metadata WHERE store_id = $1",
+    );
+    if (metadata === undefined) throw new Error("Durable PostgreSQL metadata is missing");
+    const nextSeq = Number(metadata.next_seq);
+    if (!Number.isSafeInteger(nextSeq)) throw new Error("Commit sequence space is exhausted");
+    const committedSeq = seqFromNumber(nextSeq);
+    await this.checkGlobalIds(transaction, writes);
+    await this.checkDocumentActions(transaction, documentActions);
+    for (const write of writes) await this.applyTableWrite(transaction, write, committedSeq);
+    await this.applyDocumentActions(transaction, documentActions, committedSeq);
+    await transaction.run(
+      "UPDATE dispatch_pi.durable_metadata SET next_id = GREATEST(next_id, ?::bigint), next_seq = ? WHERE store_id = $1",
+      candidateNextId,
+      committedSeq + 1,
+    );
+    return committedSeq;
+  }
+
+  async mintId<I extends Id<string>>(): Promise<I> {
+    this.assertWritable();
+    return this.db.transaction(transaction => this.mintWithin<I>(transaction));
+  }
+
+  private async mintWithin<I extends Id<string>>(transaction: PostgresExecutor): Promise<I> {
+    const row = await transaction.get<{ id: number }>(
+      `UPDATE dispatch_pi.durable_metadata SET next_id = next_id + 1
+       WHERE store_id = $1 AND next_id <= 9007199254740991 RETURNING next_id - 1 AS id`,
+    );
+    if (!row) throw new Error("ID space is exhausted");
+    return idFromNumber<I>(row.id);
+  }
+
+  /** Backend-only remote ownership. The route authority has already confirmed retirement
+   * before changing attemptId; a different process cannot reopen the same attempt. */
+  async claimRemoteSession(attemptId: string, sessionId: string, assertCurrent: () => void): Promise<void> {
+    this.assertWritable();
+    await this.db.transaction(async transaction => {
+      assertCurrent();
+      const previous = await transaction.get<{ attempt_id: string; session_id: string }>(
+        "SELECT attempt_id, session_id FROM dispatch_worker.storage_sessions WHERE store_id = $1");
+      if (previous?.attempt_id === attemptId) {
+        if (previous.session_id !== sessionId) throw new RemoteStorageConflict("Worker attempt already belongs to another process.");
+        return;
+      }
+      await transaction.run(`INSERT INTO dispatch_worker.storage_sessions (store_id, attempt_id, session_id)
+        VALUES ($1, ?, ?) ON CONFLICT (store_id) DO UPDATE SET attempt_id = EXCLUDED.attempt_id,
+        session_id = EXCLUDED.session_id, closed = false, sequence = 0, request_hash = NULL, result = NULL`, attemptId, sessionId);
+    });
+  }
+
+  async assertRemoteSession(attemptId: string, sessionId: string): Promise<void> {
+    const row = await this.db.get<{ allowed: boolean }>(`SELECT attempt_id = ? AND session_id = ? AND NOT closed AS allowed
+      FROM dispatch_worker.storage_sessions WHERE store_id = $1`, attemptId, sessionId);
+    if (!row?.allowed) throw new RemoteStorageConflict("Remote storage session is unavailable.");
+  }
+
+  /** Persist the receipt in the SAME transaction as the mutation. The client orders
+   * mutations and retains one sequence until acknowledged, so one receipt suffices. */
+  async remoteMutation(request: { attemptId: string; sessionId: string; sequence: number;
+    method: "commit" | "mintId" | "close"; writes?: readonly StorageWrite[] }, assertCurrent: () => void): Promise<number | null> {
+    this.assertWritable();
+    const hash = createHash("sha256").update(JSON.stringify(request)).digest("hex");
+    return this.db.transaction(async transaction => {
+      assertCurrent();
+      const row = await transaction.get<{ attempt_id: string; session_id: string; closed: boolean;
+        sequence: number; request_hash: string | null; result: string | null }>(
+        "SELECT attempt_id, session_id, closed, sequence, request_hash, result FROM dispatch_worker.storage_sessions WHERE store_id = $1");
+      if (!row || row.attempt_id !== request.attemptId || row.session_id !== request.sessionId)
+        throw new RemoteStorageConflict("Remote storage ownership changed.");
+      if (row.sequence === request.sequence && row.request_hash === hash) return JSON.parse(row.result!) as number | null;
+      if (row.closed || request.sequence !== row.sequence + 1) throw new RemoteStorageConflict("Remote storage mutation is out of order.");
+      const writes = request.writes ?? [];
+      const result = request.method === "commit"
+        ? await this.commitWithin(transaction, writes, this.prepareDocumentActions(writes), this.candidateNextId(writes))
+        : request.method === "mintId" ? await this.mintWithin(transaction) : null;
+      await transaction.run(`UPDATE dispatch_worker.storage_sessions SET sequence = ?, request_hash = ?, result = ?, closed = ?::boolean
+        WHERE store_id = $1`, request.sequence, hash, JSON.stringify(result), String(request.method === "close"));
+      return result;
+    });
+  }
+
+  async conversation(id: ConversationId, _context: Context): Promise<ConversationRecord | undefined> {
+    this.assertOpen();
+    const row = await this.db.get<JsonRow>("SELECT record FROM dispatch_pi.conversations WHERE store_id = $1 AND id = ?", id);
+    return row === undefined ? undefined : parseJson<ConversationRecord>(row.record);
+  }
+
+  async scanConversations(
+    query: ConversationQuery,
+    limit: number,
+    cursor: Cursor | undefined,
+    _context: Context,
+  ): Promise<Page<ConversationRecord, Cursor>> {
+    this.assertOpen();
+    const start = scanStart(query.order, cursor, "ascending");
+    const scan = scanSql(start);
+    const clauses = [scan.clause];
+    const params: PostgresValue[] = [scan.param];
+    if (query.ownerConversationId !== undefined) {
+      clauses.push("owner_conversation_id = ?");
+      params.push(query.ownerConversationId);
+    }
+    if (query.ownerTaskId !== undefined) {
+      clauses.push("owner_task_id = ?");
+      params.push(query.ownerTaskId);
+    }
+    params.push(limit + 1);
+    const rows = await this.db.all<JsonRow>(
+      `SELECT record FROM dispatch_pi.conversations WHERE store_id = $1 AND ${clauses.join(" AND ")} ORDER BY id ${scan.direction} LIMIT ?`,
+      ...params,
+    );
+    return page(
+      rows.map((row) => parseJson<ConversationRecord>(row.record)),
+      limit,
+      start.order,
+    );
+  }
+
+  entry(id: EntryId, context: Context): Promise<{ readonly entry: EntryRecord; readonly commitSeq: Seq } | undefined>;
+  entry(
+    conversationId: ConversationId,
+    id: EntryId,
+    context: Context,
+  ): Promise<{ readonly entry: EntryRecord; readonly commitSeq: Seq } | undefined>;
+  entry(
+    idOrConversationId: EntryId | ConversationId,
+    idOrContext: EntryId | Context,
+    context?: Context,
+  ): Promise<{ readonly entry: EntryRecord; readonly commitSeq: Seq } | undefined> {
+    this.assertOpen();
+    return this.db.transaction(tx => this.readEntry(tx, idOrConversationId, idOrContext, context));
+  }
+
+  findLatestHeadMarker(
+    conversationId: ConversationId,
+    atOrBeforeEntryId: EntryId | undefined,
+    _context: Context,
+  ): Promise<(EntryRecord & { readonly head: EntryId }) | undefined> {
+    this.assertOpen();
+    return this.db.transaction(tx => this.readLatestHeadMarker(tx, conversationId, atOrBeforeEntryId));
+  }
+
+  scanEntries(
+    query: EntryQuery,
+    limit: number,
+    cursor: Cursor | undefined,
+    _context: Context,
+  ): Promise<Page<EntryRecord, Cursor>> {
+    this.assertOpen();
+    return this.db.transaction(tx => this.readEntries(tx, query, limit, cursor));
+  }
+
+  private async readEntry(
+    executor: PostgresExecutor,
+    idOrConversationId: EntryId | ConversationId,
+    idOrContext: EntryId | Context,
+    context?: Context,
+  ): Promise<{ readonly entry: EntryRecord; readonly commitSeq: Seq } | undefined> {
+    const id =
+      context === undefined
+        ? idFromNumber<EntryId>(idOrConversationId)
+        : typeof idOrContext === "number"
+          ? idFromNumber<EntryId>(idOrContext)
+          : undefined;
+    if (id === undefined) throw new TypeError("Storage.entry() requires an entry ID");
+    let conversation: ConversationRecord | undefined;
+    if (context !== undefined) {
+      const conversationId = idFromNumber<ConversationId>(idOrConversationId);
+      conversation = await this.readConversation(executor, conversationId);
+      if (conversation === undefined) throw new Error(`Unknown conversation: ${conversationId}`);
+    }
+    const row = await executor.get<EntryJsonRow>("SELECT record, commit_seq FROM dispatch_pi.entries WHERE store_id = $1 AND id = ?", id);
+    if (row === undefined) return undefined;
+    const entry = parseJson<EntryRecord>(row.record);
+    if (conversation !== undefined) {
+      let upperEntryId = Number.POSITIVE_INFINITY;
+      while (conversation.id !== entry.conversationId) {
+        if (conversation.parent === undefined) return undefined;
+        upperEntryId = Math.min(upperEntryId, conversation.parent.at);
+        conversation = (await this.readConversation(executor, conversation.parent.conversationId))!;
+      }
+      if (entry.id > upperEntryId) return undefined;
+    }
+    return { entry, commitSeq: seqFromNumber(row.commit_seq) };
+  }
+
+  private async readLatestHeadMarker(
+    executor: PostgresExecutor,
+    conversationId: ConversationId,
+    atOrBeforeEntryId: EntryId | undefined,
+  ): Promise<(EntryRecord & { readonly head: EntryId }) | undefined> {
+    let conversation = await this.readConversation(executor, conversationId);
+    if (conversation === undefined) throw new Error(`Unknown conversation: ${conversationId}`);
+    let upper: number | undefined = atOrBeforeEntryId;
+    while (true) {
+      const row =
+        upper === undefined
+          ? await executor.get<JsonRow>(
+              "SELECT record FROM dispatch_pi.entries WHERE store_id = $1 AND conversation_id = ? AND head IS NOT NULL ORDER BY id DESC LIMIT 1",
+              conversation.id,
+            )
+          : await executor.get<JsonRow>(
+              "SELECT record FROM dispatch_pi.entries WHERE store_id = $1 AND conversation_id = ? AND head IS NOT NULL AND id <= ? ORDER BY id DESC LIMIT 1",
+              conversation.id,
+              upper,
+            );
+      if (row !== undefined) return parseJson<EntryRecord & { readonly head: EntryId }>(row.record);
+      if (conversation.parent === undefined) return undefined;
+      upper = upper === undefined ? conversation.parent.at : Math.min(upper, conversation.parent.at);
+      conversation = (await this.readConversation(executor, conversation.parent.conversationId))!;
+    }
+  }
+
+  private async readEntries(
+    executor: PostgresExecutor,
+    query: EntryQuery,
+    limit: number,
+    cursor: Cursor | undefined,
+  ): Promise<Page<EntryRecord, Cursor>> {
+    const { order, after } = scanStart(query.order, cursor, "descending");
+    if (order === "ascending") return this.readEntriesAscending(executor, query, limit, after);
+    let conversation = await this.readConversation(executor, query.conversationId);
+    if (conversation === undefined) throw new Error(`Unknown conversation: ${query.conversationId}`);
+    let upper: number | undefined = query.maxEntryId;
+    if (after !== undefined) upper = Math.min(upper ?? Number.MAX_SAFE_INTEGER, after - 1);
+    const values: EntryRecord[] = [];
+    while (true) {
+      const clauses = ["conversation_id = ?"];
+      const params: PostgresValue[] = [conversation.id];
+      if (query.minEntryId !== undefined) {
+        clauses.push("id >= ?");
+        params.push(query.minEntryId);
+      }
+      if (upper !== undefined) {
+        clauses.push("id <= ?");
+        params.push(upper);
+      }
+      params.push(limit + 1 - values.length);
+      const rows = await executor.all<JsonRow>(
+        `SELECT record FROM dispatch_pi.entries WHERE store_id = $1 AND ${clauses.join(" AND ")} ORDER BY id DESC LIMIT ?`,
+        ...params,
+      );
+      values.push(...rows.map((row) => parseJson<EntryRecord>(row.record)));
+      if (values.length > limit || conversation.parent === undefined) break;
+      upper = upper === undefined ? conversation.parent.at : Math.min(upper, conversation.parent.at);
+      if (query.minEntryId !== undefined && upper < query.minEntryId) break;
+      conversation = (await this.readConversation(executor, conversation.parent.conversationId))!;
+    }
+    return page(values, limit, "descending");
+  }
+
+  /** Traverse inherited fork segments oldest first, preserving every fork cutoff. */
+  private async readEntriesAscending(executor: PostgresExecutor, query: EntryQuery, limit: number, after: number | undefined): Promise<Page<EntryRecord, Cursor>> {
+    const segments: { conversationId: ConversationId; upper: number | undefined }[] = [];
+    let conversation = await this.readConversation(executor, query.conversationId);
+    if (conversation === undefined) throw new Error(`Unknown conversation: ${query.conversationId}`);
+    let upper: number | undefined = query.maxEntryId;
+    while (true) {
+      segments.push({ conversationId: conversation.id, upper });
+      if (conversation.parent === undefined) break;
+      upper = upper === undefined ? conversation.parent.at : Math.min(upper, conversation.parent.at);
+      if (query.minEntryId !== undefined && upper < query.minEntryId) break;
+      conversation = (await this.readConversation(executor, conversation.parent.conversationId))!;
+    }
+    let lower: number | undefined = query.minEntryId;
+    if (after !== undefined) lower = Math.max(lower ?? after + 1, after + 1);
+    const values: EntryRecord[] = [];
+    for (const segment of segments.reverse()) {
+      const clauses = ["conversation_id = ?"];
+      const params: PostgresValue[] = [segment.conversationId];
+      if (lower !== undefined) {
+        clauses.push("id >= ?");
+        params.push(lower);
+      }
+      if (segment.upper !== undefined) {
+        clauses.push("id <= ?");
+        params.push(segment.upper);
+      }
+      params.push(limit + 1 - values.length);
+      const rows = await executor.all<JsonRow>(
+        `SELECT record FROM dispatch_pi.entries WHERE store_id = $1 AND ${clauses.join(" AND ")} ORDER BY id ASC LIMIT ?`,
+        ...params,
+      );
+      values.push(...rows.map(row => parseJson<EntryRecord>(row.record)));
+      if (values.length > limit) break;
+    }
+    return page(values, limit, "ascending");
+  }
+
+  async task(id: TaskId, _context: Context): Promise<StoredTask | undefined> {
+    this.assertOpen();
+    const row = await this.db.get<JsonRow>("SELECT record FROM dispatch_pi.tasks WHERE store_id = $1 AND id = ?", id);
+    return row === undefined ? undefined : parseJson<StoredTask>(row.record);
+  }
+
+  async scanTasks(
+    query: TaskQuery,
+    limit: number,
+    cursor: Cursor | undefined,
+    _context: Context,
+  ): Promise<Page<StoredTask, Cursor>> {
+    this.assertOpen();
+    const start = scanStart(query.order, cursor, "ascending");
+    const scan = scanSql(start);
+    const clauses = [scan.clause];
+    const params: PostgresValue[] = [scan.param];
+    if (query.conversationId !== undefined) {
+      clauses.push("conversation_id = ?");
+      params.push(query.conversationId);
+    }
+    if (query.kind !== undefined) {
+      clauses.push("kind = ?");
+      params.push(encodeIndexedString(query.kind));
+    }
+    if (query.status !== undefined) {
+      clauses.push("status = ?");
+      params.push(query.status);
+    }
+    if (query.abortRequested !== undefined) {
+      clauses.push("abort_requested = ?");
+      params.push(query.abortRequested ? 1 : 0);
+    }
+    if (query.background !== undefined) {
+      clauses.push("background = ?");
+      params.push(query.background ? 1 : 0);
+    }
+    params.push(limit + 1);
+    const rows = await this.db.all<JsonRow>(
+      `SELECT record FROM dispatch_pi.tasks WHERE store_id = $1 AND ${clauses.join(" AND ")} ORDER BY id ${scan.direction} LIMIT ?`,
+      ...params,
+    );
+    return page(
+      rows.map((row) => parseJson<StoredTask>(row.record)),
+      limit,
+      start.order,
+    );
+  }
+
+  async submission(id: SubmissionId, _context: Context): Promise<SubmissionRecord | undefined> {
+    this.assertOpen();
+    const row = await this.db.get<JsonRow>("SELECT record FROM dispatch_pi.submissions WHERE store_id = $1 AND id = ?", id);
+    return row === undefined ? undefined : parseJson<SubmissionRecord>(row.record);
+  }
+
+  async scanSubmissions(
+    query: SubmissionQuery,
+    limit: number,
+    cursor: Cursor | undefined,
+    _context: Context,
+  ): Promise<Page<SubmissionRecord, Cursor>> {
+    this.assertOpen();
+    const start = scanStart(query.order, cursor, "ascending");
+    const scan = scanSql(start);
+    const clauses = [scan.clause];
+    const params: PostgresValue[] = [scan.param];
+    if (query.conversationId !== undefined) {
+      clauses.push("conversation_id = ?");
+      params.push(query.conversationId);
+    }
+    if (query.status !== undefined) {
+      clauses.push("status = ?");
+      params.push(query.status);
+    }
+    params.push(limit + 1);
+    const rows = await this.db.all<JsonRow>(
+      `SELECT record FROM dispatch_pi.submissions WHERE store_id = $1 AND ${clauses.join(" AND ")} ORDER BY id ${scan.direction} LIMIT ?`,
+      ...params,
+    );
+    return page(
+      rows.map((row) => parseJson<SubmissionRecord>(row.record)),
+      limit,
+      start.order,
+    );
+  }
+
+  async submissionByRequest(
+    conversationId: ConversationId,
+    requestId: string,
+    _context: Context,
+  ): Promise<SubmissionRecord | undefined> {
+    this.assertOpen();
+    const row = await this.db.get<JsonRow>(
+      "SELECT record FROM dispatch_pi.submissions WHERE store_id = $1 AND conversation_id = ? AND request_id = ?",
+      conversationId,
+      encodeIndexedString(requestId),
+    );
+    return row === undefined ? undefined : parseJson<SubmissionRecord>(row.record);
+  }
+
+  async findDocument(
+    address: DocumentAddress,
+    at: DocumentPoint,
+    _context: Context,
+  ): Promise<DocumentRecord | undefined> {
+    this.assertOpen();
+    const parts = addressParts(address);
+    const sql =
+      at === "current"
+        ? `SELECT record FROM dispatch_pi.documents
+          WHERE store_id = $1 AND kind = ? AND scope_kind = ? AND owner_id = ? AND family = ? AND key_value = ?
+          AND retired_at IS NULL ORDER BY created_at DESC LIMIT 1`
+        : `SELECT record FROM dispatch_pi.documents
+          WHERE store_id = $1 AND kind = ? AND scope_kind = ? AND owner_id = ? AND family = ? AND key_value = ?
+          AND created_at <= ? AND (retired_at IS NULL OR retired_at > ?)
+          ORDER BY created_at DESC LIMIT 1`;
+    const params: PostgresValue[] = [parts.kind, parts.scopeKind, parts.ownerId, parts.family, parts.keyValue];
+    if (at !== "current") params.push(at, at);
+    const row = await this.db.get<JsonRow>(sql, ...params);
+    return row === undefined ? undefined : parseJson<DocumentRecord>(row.record);
+  }
+
+  async document(id: DocumentId, at: DocumentPoint, _context: Context): Promise<StoredDocument | undefined> {
+    this.assertOpen();
+    // The record and revision queries must observe one committed state; a commit between them can replace the base.
+    return this.db.transaction((transaction) => this.materializeDocument(transaction, id, at));
+  }
+
+  async scanDocuments(
+    query: DocumentQuery,
+    limit: number,
+    cursor: Cursor | undefined,
+    _context: Context,
+  ): Promise<Page<DocumentRecord, Cursor>> {
+    this.assertOpen();
+    const scope = scopeColumns(query.scope);
+    const clauses = ["scope_kind = ?", "owner_id = ?", "id > ?"];
+    const params: PostgresValue[] = [scope.scopeKind, scope.ownerId, cursorId(cursor) ?? -1];
+    if (query.kind !== undefined) {
+      clauses.push("kind = ?");
+      params.push(encodeIndexedString(query.kind));
+    }
+    if (query.at === "current") {
+      clauses.push("retired_at IS NULL");
+    } else {
+      clauses.push("created_at <= ?", "(retired_at IS NULL OR retired_at > ?)");
+      params.push(query.at, query.at);
+    }
+    params.push(limit + 1);
+    const rows = await this.db.all<JsonRow>(
+      `SELECT record FROM dispatch_pi.documents WHERE store_id = $1 AND ${clauses.join(" AND ")} ORDER BY id LIMIT ?`,
+      ...params,
+    );
+    return page(
+      rows.map((row) => parseJson<DocumentRecord>(row.record)),
+      limit,
+    );
+  }
+
+  close(_context: Context): Promise<void> {
+    if (this.closing === undefined) {
+      this.closed = true;
+      this.closing = this.db.close();
+    }
+    return this.closing;
+  }
+
+  private async readConversation(executor: PostgresExecutor, id: ConversationId): Promise<ConversationRecord | undefined> {
+    const row = await executor.get<JsonRow>("SELECT record FROM dispatch_pi.conversations WHERE store_id = $1 AND id = ?", id);
+    return row === undefined ? undefined : parseJson<ConversationRecord>(row.record);
+  }
+
+  private async materializeDocument(
+    executor: PostgresExecutor,
+    id: DocumentId,
+    at: DocumentPoint,
+  ): Promise<StoredDocument | undefined> {
+    const row = await executor.get<JsonRow>("SELECT record FROM dispatch_pi.documents WHERE store_id = $1 AND id = ?", id);
+    if (row === undefined) return undefined;
+    const record = parseJson<DocumentRecord>(row.record);
+    if (at !== "current" && isCurrentOnly(record)) {
+      throw new Error(`Document ${id} does not retain historical content`);
+    }
+    if (!isAliveAt(record, at)) return undefined;
+    const upper = at === "current" ? Number.MAX_SAFE_INTEGER : at;
+    const base = await executor.get<RevisionRow>(
+      `SELECT seq, kind, version, content FROM dispatch_pi.document_revisions
+        WHERE store_id = $1 AND document_id = ? AND kind = 'base' AND seq <= ? ORDER BY seq DESC LIMIT 1`,
+      id,
+      upper,
+    );
+    if (base === undefined) throw new Error(`Document ${id} is missing a required base`);
+    let value = parseJson<JsonObject>(base.content);
+    const tail = await executor.all<RevisionRow>(
+      `SELECT seq, kind, version, content FROM dispatch_pi.document_revisions
+        WHERE store_id = $1 AND document_id = ? AND seq > ? AND seq <= ? ORDER BY seq`,
+      id,
+      base.seq,
+      upper,
+    );
+    for (const revision of tail) {
+      if (revision.kind !== "delta" || revision.version !== base.version) {
+        throw new Error(`Document ${id} crosses a stored version boundary without a base`);
+      }
+      value = apply(value, parseJson<readonly Op[]>(revision.content)) as JsonObject;
+    }
+    return { record, version: base.version, value, deltasSinceBase: tail.length };
+  }
+
+  private candidateNextId(writes: readonly StorageWrite[]): number {
+    let nextId = 2;
+    for (const write of writes) {
+      const id = writeId(write);
+      if (id !== undefined) nextId = Math.max(nextId, id + 1);
+    }
+    return nextId;
+  }
+
+  private async checkGlobalIds(executor: PostgresExecutor, writes: readonly StorageWrite[]): Promise<void> {
+    const claimed = new Map<Id<string>, TableName>();
+    for (const write of writes) {
+      if (write.type === "document.change" || write.type === "document.retire") continue;
+      const document = write.type === "document.create" || write.type === "document.copy";
+      const table: TableName = document ? "document" : write.type;
+      const id = document ? write.record.id : write.value.id;
+      const existing = (await executor.get<RecordIdRow>("SELECT record_type FROM dispatch_pi.record_ids WHERE store_id = $1 AND id = ?", id))
+        ?.record_type;
+      const earlier = claimed.get(id);
+      if (table === "conversation" || table === "entry" || table === "document") {
+        if (existing !== undefined) throw new Error(`ID ${id} already belongs to ${existing}`);
+        if (earlier !== undefined) throw new Error(`ID ${id} is written more than once`);
+      } else {
+        if (existing !== undefined && existing !== table)
+          throw new Error(`ID ${id} already belongs to ${existing}`);
+        if (earlier !== undefined && earlier !== table) throw new Error(`ID ${id} is written as two record types`);
+      }
+      claimed.set(id, table);
+    }
+  }
+
+  private prepareDocumentActions(writes: readonly StorageWrite[]): Map<DocumentId, DocumentAction> {
+    const actions = new Map<DocumentId, DocumentAction>();
+    for (const write of writes) {
+      if (
+        write.type !== "document.create" &&
+        write.type !== "document.copy" &&
+        write.type !== "document.change" &&
+        write.type !== "document.retire"
+      ) {
+        continue;
+      }
+      const id = write.type === "document.create" || write.type === "document.copy" ? write.record.id : write.id;
+      let action = actions.get(id);
+      if (action === undefined) {
+        action = { retire: false };
+        actions.set(id, action);
+      }
+      switch (write.type) {
+        case "document.create":
+          if (action.create !== undefined || action.content !== undefined || action.copy !== undefined) {
+            throw new Error(`Document ${id} has more than one content command`);
+          }
+          action.create = write.record;
+          action.content = write.content;
+          break;
+        case "document.copy":
+          if (action.create !== undefined || action.content !== undefined || action.copy !== undefined) {
+            throw new Error(`Document ${id} has more than one content command`);
+          }
+          action.create = write.record;
+          action.copy = write.source;
+          break;
+        case "document.change":
+          if (action.content !== undefined || action.copy !== undefined) {
+            throw new Error(`Document ${id} has more than one content command`);
+          }
+          action.content = write.content;
+          break;
+        case "document.retire":
+          if (action.retire) throw new Error(`Document ${id} is retired more than once`);
+          action.retire = true;
+          break;
+      }
+    }
+    return actions;
+  }
+
+  private async checkDocumentActions(
+    executor: PostgresExecutor,
+    actions: ReadonlyMap<DocumentId, DocumentAction>,
+  ): Promise<void> {
+    const liveCounts = new Map<string, number>();
+    for (const [id, action] of actions) {
+      if (action.copy !== undefined && actions.has(action.copy.id)) {
+        throw new StorageRejected(`Document copy ${id} source is changed in the copy batch`);
+      }
+      const row = await executor.get<JsonRow>("SELECT record FROM dispatch_pi.documents WHERE store_id = $1 AND id = ?", id);
+      const existing = row === undefined ? undefined : parseJson<DocumentRecord>(row.record);
+      if (action.create === undefined && existing === undefined) throw new Error(`Unknown document: ${id}`);
+      if (action.create !== undefined && existing !== undefined) throw new Error(`Document ${id} already exists`);
+      if (existing?.retiredAt !== undefined) throw new Error(`Document ${id} is retired`);
+      if (action.content?.kind === "delta") {
+        const previous = await executor.get<{ readonly version: number }>(
+          "SELECT version FROM dispatch_pi.document_revisions WHERE store_id = $1 AND document_id = ? ORDER BY seq DESC LIMIT 1",
+          id,
+        );
+        if (previous === undefined) throw new Error(`Document ${id} delta has no base`);
+        if (previous.version !== action.content.version) {
+          throw new Error(`Document ${id} version transition requires a base`);
+        }
+      }
+      const record = action.create ?? existing!;
+      const key = addressKey(record);
+      let live = liveCounts.get(key);
+      if (live === undefined) live = (await this.currentDocumentId(executor, record)) === undefined ? 0 : 1;
+      if (action.retire && existing !== undefined) live--;
+      if (action.create !== undefined && !action.retire) live++;
+      liveCounts.set(key, live);
+    }
+    for (const live of liveCounts.values()) {
+      if (live > 1) throw new Error("Document address already has a current incarnation");
+    }
+  }
+
+  private async currentDocumentId(
+    executor: PostgresExecutor,
+    address: DocumentAddress | DocumentCreate | DocumentRecord,
+  ): Promise<DocumentId | undefined> {
+    const parts = addressParts(address);
+    const id = (
+      await executor.get<IdRow>(
+        `SELECT id FROM dispatch_pi.documents
+        WHERE store_id = $1 AND kind = ? AND scope_kind = ? AND owner_id = ? AND family = ? AND key_value = ? AND retired_at IS NULL
+        LIMIT 1`,
+        parts.kind,
+        parts.scopeKind,
+        parts.ownerId,
+        parts.family,
+        parts.keyValue,
+      )
+    )?.id;
+    return id === undefined ? undefined : idFromNumber<DocumentId>(id);
+  }
+
+  private async applyTableWrite(executor: PostgresExecutor, write: StorageWrite, seq: Seq): Promise<void> {
+    switch (write.type) {
+      case "conversation":
+        await this.claimId(executor, write.value.id, "conversation");
+        await executor.run(
+          "INSERT INTO dispatch_pi.conversations (store_id, id, owner_conversation_id, owner_task_id, record) VALUES ($1, ?, ?, ?, ?)",
+          write.value.id,
+          write.value.owner?.conversationId ?? null,
+          write.value.owner?.taskId ?? null,
+          encodeJson(write.value),
+        );
+        break;
+      case "entry":
+        await this.claimId(executor, write.value.id, "entry");
+        await executor.run(
+          "INSERT INTO dispatch_pi.entries (store_id, id, conversation_id, head, commit_seq, record) VALUES ($1, ?, ?, ?, ?, ?)",
+          write.value.id,
+          write.value.conversationId,
+          write.value.head ?? null,
+          seq,
+          encodeJson(write.value),
+        );
+        break;
+      case "task":
+        await this.claimId(executor, write.value.id, "task");
+        await executor.run(
+          `INSERT INTO dispatch_pi.tasks (store_id, id, conversation_id, kind, status, abort_requested, background, record)
+            VALUES ($1, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(store_id, id) DO UPDATE SET conversation_id = excluded.conversation_id, kind = excluded.kind,
+            status = excluded.status, abort_requested = excluded.abort_requested,
+            background = excluded.background, record = excluded.record`,
+          write.value.id,
+          write.value.conversationId,
+          encodeIndexedString(write.value.kind),
+          write.value.state.status,
+          write.value.abortRequested ? 1 : 0,
+          write.value.background ? 1 : 0,
+          encodeJson(write.value),
+        );
+        break;
+      case "submission":
+        await this.claimId(executor, write.value.id, "submission");
+        await executor.run(
+          `INSERT INTO dispatch_pi.submissions (store_id, id, conversation_id, request_id, status, record) VALUES ($1, ?, ?, ?, ?, ?)
+            ON CONFLICT(store_id, id) DO UPDATE SET conversation_id = excluded.conversation_id,
+            request_id = excluded.request_id, status = excluded.status, record = excluded.record`,
+          write.value.id,
+          write.value.conversationId,
+          write.value.requestId === undefined ? null : encodeIndexedString(write.value.requestId),
+          write.value.status,
+          encodeJson(write.value),
+        );
+        break;
+      case "document.create":
+      case "document.copy":
+      case "document.change":
+      case "document.retire":
+        break;
+    }
+  }
+
+  private async claimId(executor: PostgresExecutor, id: Id<string>, table: TableName): Promise<void> {
+    await executor.run("INSERT INTO dispatch_pi.record_ids (store_id, id, record_type) VALUES ($1, ?, ?) ON CONFLICT (store_id, id) DO NOTHING", id, table);
+  }
+
+  private async applyDocumentActions(
+    executor: PostgresExecutor,
+    actions: ReadonlyMap<DocumentId, DocumentAction>,
+    seq: Seq,
+  ): Promise<void> {
+    for (const [id, action] of actions) {
+      let content = action.content;
+      if (action.copy !== undefined) {
+        try {
+          const stored = await this.materializeDocument(executor, action.copy.id, action.copy.at);
+          if (stored === undefined) throw new Error(`Fork source document ${action.copy.id} cannot be read`);
+          const create = action.create!;
+          if (
+            stored.record.scope.kind !== "conversation" ||
+            create.scope.kind !== "conversation" ||
+            stored.record.kind !== create.kind ||
+            stored.record.key !== create.key ||
+            stored.record.history !== create.history ||
+            stored.record.fork !== create.fork
+          ) {
+            throw new Error(`Fork source document ${action.copy.id} does not match the copied record`);
+          }
+          content = { kind: "base", version: stored.version, value: stored.value };
+        } catch (error) {
+          if (error instanceof StorageRejected) throw error;
+          throw new StorageRejected(`Document copy ${id} was rejected`, { cause: error });
+        }
+      }
+      let record: DocumentRecord;
+      if (action.create !== undefined) {
+        record = {
+          ...action.create,
+          createdAt: seq,
+          ...(action.retire ? { retiredAt: seq } : {}),
+        };
+        const parts = addressParts(record);
+        await this.claimId(executor, id, "document");
+        await executor.run(
+          `INSERT INTO dispatch_pi.documents
+            (store_id, id, kind, family, key_value, scope_kind, owner_id, created_at, retired_at, record)
+            VALUES ($1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          id,
+          parts.kind,
+          parts.family,
+          parts.keyValue,
+          parts.scopeKind,
+          parts.ownerId,
+          seq,
+          action.retire ? seq : null,
+          encodeJson(record),
+        );
+      } else {
+        const row = (await executor.get<JsonRow>("SELECT record FROM dispatch_pi.documents WHERE store_id = $1 AND id = ?", id))!;
+        record = parseJson<DocumentRecord>(row.record);
+      }
+
+      if (content !== undefined) {
+        if (content.kind === "base" && isCurrentOnly(record)) {
+          await executor.run("DELETE FROM dispatch_pi.document_revisions WHERE store_id = $1 AND document_id = ?", id);
+        }
+        const encodedContent = content.kind === "base" ? encodeJson(content.value) : encodeJson(content.ops);
+        await executor.run(
+          "INSERT INTO dispatch_pi.document_revisions (store_id, document_id, seq, kind, version, content) VALUES ($1, ?, ?, ?, ?, ?)",
+          id,
+          seq,
+          content.kind,
+          content.version,
+          encodedContent,
+        );
+      }
+
+      if (action.retire) {
+        if (action.create === undefined) {
+          record = { ...record, retiredAt: seq };
+          await executor.run(
+            "UPDATE dispatch_pi.documents SET retired_at = ?, record = ? WHERE store_id = $1 AND id = ?",
+            seq,
+            encodeJson(record),
+            id,
+          );
+        }
+        if (isCurrentOnly(record)) {
+          await executor.run("DELETE FROM dispatch_pi.document_revisions WHERE store_id = $1 AND document_id = ?", id);
+        }
+      }
+    }
+  }
+
+  private assertWritable(): void {
+    this.assertOpen();
+    if (this.db.readOnly) throw new Error("PostgreSQL history snapshot is read-only.");
+  }
+
+  private assertOpen(): void {
+    if (this.closed) throw new Error("PostgresStorage is closed");
+  }
+}
