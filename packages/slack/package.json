@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/slack",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Slack transport for Dispatch Runner",
   "license": "MIT",
@@ -36,7 +36,7 @@
     "typescript": "6.0.3"
   },
   "peerDependencies": {
-    "@dispatch/runner": "0.6.0",
+    "@dispatch/runner": "0.7.0",
     "@earendil-works/pi-durable": "1.3.0",
     "@earendil-works/chord": "1.3.0"
   }

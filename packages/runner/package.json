@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/runner",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Standalone Pi Durable company agents",
   "license": "MIT",

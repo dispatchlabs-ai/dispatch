@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-22
+
 - Require patched Node 22.23.4+, 24.22.1+, or 26.12.1+ within those major
   versions; end-of-life Node 25 is no longer supported.
 

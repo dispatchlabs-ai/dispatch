@@ -2,12 +2,16 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-22
+
 ### Runtime security
 
 - Package Node 24.22.1 with the October 21 security fixes in the server, portable
   Mac archive and Ubuntu worker tooling. Patch shared Brotli and c-ares in Nix
   builds, and select OpenSSL 3.6.5. Source installs now require Node 24.22.1+
   within the Node 24 line; end-of-life Node 25 is no longer supported.
+
+### Distribution
 
 - Remove the independently maintained inference gateway from the workspace and application distribution.
 
