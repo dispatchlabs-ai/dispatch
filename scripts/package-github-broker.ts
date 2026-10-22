@@ -22,8 +22,8 @@ try {
     await cp(join(root, "node_modules", name), join(staging, "node_modules", name), { recursive: true, dereference: true });
   await cp(join(root, "LICENSE"), join(staging, "LICENSE"));
   const web = JSON.parse(await readFile(join(root, "packages/web/package.json"), "utf8"));
-  await writeFile(join(staging, "package.json"), JSON.stringify({ name: "dispatch-github-broker", version: web.version, private: true, type: "module", engines: { node: ">=24 <26" } }, null, 2) + "\n");
-  await writeFile(join(staging, "provenance.json"), JSON.stringify({ sourceRevision: revision, version: web.version, runtime: "Node.js >=24 <26", source: "https://github.com/dispatchlabs-ai/dispatch" }, null, 2) + "\n");
+  await writeFile(join(staging, "package.json"), JSON.stringify({ name: "dispatch-github-broker", version: web.version, private: true, type: "module", engines: { node: ">=24.22.1 <25" } }, null, 2) + "\n");
+  await writeFile(join(staging, "provenance.json"), JSON.stringify({ sourceRevision: revision, version: web.version, runtime: "Node.js >=24.22.1 <25", source: "https://github.com/dispatchlabs-ai/dispatch" }, null, 2) + "\n");
   const output = resolve(values.output);
   await mkdir(dirname(output), { recursive: true });
   execFileSync("tar", ["-czf", output, "-C", staging, "."]);

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Require patched Node 22.23.4+, 24.22.1+, or 26.12.1+ within those major
+  versions; end-of-life Node 25 is no longer supported.
+
 - Save incoming messages before Slack thread lookups, retry lookups durably,
   and preserve admission order within each thread across restarts. Retain
   existing deduplication keys when upgrading the inbox.

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Require patched Node 22.23.4+, 24.22.1+, or 26.12.1+ within those major
+  versions; end-of-life Node 25 is no longer supported.
+
 - Run continuous terminal work in the selected named conversation, retaining the
   initial goal and native loop checkpoints across restarts. Each final answer
   advances to the next pass; `pause_loop` records an explicit blocker. Preserve

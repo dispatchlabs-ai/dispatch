@@ -7,7 +7,7 @@ let
   node = fetchurl {
     url = "https://nodejs.org/dist/v${nodeVersion}/node-v${nodeVersion}-darwin-arm64.tar.gz";
     # From nodejs.org SHASUMS256.txt. A nixpkgs Node update must refresh this pin.
-    sha256 = "bed7eea5325e1108f32ce5228ddd6a5f0f08a499ee42aa7442aea583702f6057";
+    sha256 = "89c682593d76cd44233fa53b1563264e7de9cbb189cad169135c5b4fadfbc0a7";
   };
   name = "dispatch-${web.version}-darwin-arm64";
 in runCommand name {

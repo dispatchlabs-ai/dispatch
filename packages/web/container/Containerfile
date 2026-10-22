@@ -39,8 +39,8 @@ ENV HOME=/root \
 
 # A pinned common project Node avoids coupling project npm to Dispatch's Node.
 RUN mkdir -p "$HOME" /workspace /tmp \
-    && mise install --system node@24.9.0 \
-    && mise use --global node@24.9.0 \
+    && mise install --system node@24.22.1 \
+    && mise use --global node@24.22.1 \
     && mise reshim \
     && node --version \
     && npm --version \

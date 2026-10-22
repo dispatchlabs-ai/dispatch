@@ -27,7 +27,7 @@ Run the credential service separately from agents with `DISPATCH_GITHUB_BROKER_C
 
 The service binds to loopback behind a trusted HTTPS reverse proxy. It has no browser session or public setup callback. Possession of its App key and an operator-established client mapping authorize the configured installations; all connection reads are checked against GitHub. Only the authenticated Dispatch user IDs in `managerUserIds` may connect/disconnect company installations in **Settings → GitHub**. GitHub's own installation settings remain provider-owned links.
 
-The Nix application includes `dispatch-github-broker`. For a host with Node.js 24 or 25, build the app from a clean committed revision, then run `npx tsx scripts/package-github-broker.ts --output /path/broker.tar.gz` inside `nix develop`. The archive contains the compiled broker, its pinned production dependencies, licenses and source provenance; run `node server/github/broker.js`. Keep the archive checksum and source revision with deployment evidence.
+The Nix application includes `dispatch-github-broker`. For a host with Node.js 24.22.1 or later in the Node 24 line, build the app from a clean committed revision, then run `npx tsx scripts/package-github-broker.ts --output /path/broker.tar.gz` inside `nix develop`. The archive contains the compiled broker, its pinned production dependencies, licenses and source provenance; run `node server/github/broker.js`. Keep the archive checksum and source revision with deployment evidence.
 
 ### Project repositories and Git operations
 
