@@ -2,6 +2,7 @@ import { ExternalLink, FileText, Terminal, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { UI } from "./controls";
 import type { Activity, Task, Document } from "../shared/contracts";
+import { MessageContent, ToolResult } from "./Content";
 
 export type Selection =
   | { kind: "activity"; value: Activity }
@@ -169,7 +170,7 @@ function DetailPanel({ selection, close, historical, resizer }: DetailsProps) {
                         ? "Matching result · recorded later"
                         : "Result"}
                     </h4>
-                    <Code value={selection.value.tool.result} />
+                    <ToolResult activity={selection.value} />
                   </>
                 )}
                 {selection.value.tool.missing && (
@@ -200,7 +201,7 @@ function DetailPanel({ selection, close, historical, resizer }: DetailsProps) {
                   ? "Context boundary"
                   : "Saved content"}
               </h3>
-              <div className="prose-content">{selection.value.text}</div>
+              <MessageContent text={selection.value.text} />
             </section>
           )}
           <p className="hint">

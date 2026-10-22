@@ -81,6 +81,14 @@ changing an agent.
 
 Timeline follows durable commit order and shows timestamps only when recorded.
 Conversation shows saved transcript messages, calls/results, and context boundaries.
+Messages render Markdown, including lists, tables, and fenced code. Tool events
+start as compact rows with previews; click a row or focus it and press Enter/Space
+to expand its arguments or result. JSON text envelopes display their decoded text
+with line breaks and indentation; additional fields remain under a disclosure.
+Other structured results use indented JSON. Code lines scroll horizontally inside
+their panel. **Inspect entry** opens the formatted detail and original redacted
+native record. Playback opens the selected tool row without merging separate call
+and result events.
 Entries load in pages of 500. **Load earlier events** extends the loaded history;
 search and playback cover loaded events, not the entire database. Tool calls and
 results are paired within the same conversation, including across loaded pages.
@@ -110,8 +118,9 @@ be corrected and reconnected normally. Missing files are never created. Unsuppor
 storage versions are reported and never migrated. An unavailable result may be
 outside the loaded page, still pending, or absent from retained evidence.
 
-Content is plain text or structured data, never evaluated HTML, scripts, terminal
-commands, or arbitrary SQL. Opening a recorded HTTP(S) link requires an explicit
+Content renders as safe Markdown, text, or structured data, never evaluated HTML,
+scripts, terminal commands, or arbitrary SQL. Remote images are shown as references
+without fetching their bytes. Opening a recorded HTTP(S) link requires an explicit
 external-browser confirmation. Provider state, known secret fields, encrypted
 thinking signatures, and image bytes are excluded or redacted. This is not complete
 secret detection; do not publish raw records or screenshots without review.
@@ -138,6 +147,19 @@ there is no automated test suite under repository policy.
 | OBS-006–OBS-010 | Parent/children, waiting workflow, attempt and failure records, native tools and live slot, transcript, generic documents. | Custom workflow-specific phase diagrams are not provided. |
 | OBS-011–OBS-014 | Completed live-host history and process-free synthetic records; playback, step/speed/scrub; paused snapshot with new commits; long paginated history; database disconnect/reconnect retaining playback selection. | No exact historical frame or process-liveness reconstruction. |
 | OBS-015, OBS-017 | Four rendered sizes, light/dark layouts, keyboard controls, narrow detail drawer, Electron isolation and plain-text presentation. macOS app packaging and launch. | Windows/Linux native execution, installers, touch hardware and formal screen-reader/contrast audit unqualified. |
+
+The October 22 conversation-rendering update was checked against a real
+SSM-connected SQLite transcript in the packaged macOS app: a JSON-wrapped
+repository result displayed as multiline source with its saved line numbers.
+Existing named connection settings survived the app update unchanged.
+An isolated interactive rendering preview covered Markdown lists/tables/code,
+JSON envelope metadata, invalid JSON and literal backslashes, error/truncation
+labels, light/dark themes, keyboard disclosure and code scrolling, call/result
+playback, and the narrow detail drawer. Layouts were reviewed at 1440×900,
+1280×720, 768×1024, and 390×844.
+HTML remained literal text and image references created no image elements.
+Workspace type/build checks, the Nix build, and flake checks passed on macOS
+Apple Silicon. No automated tests were added or run.
 
 The original mockups remain [design references](design/README.md). Qualification
 uses the real app and synthetic/private data; operational captures are not public

@@ -29,6 +29,7 @@ import { UI } from "./controls";
 import { ConnectionDialog } from "./ConnectionDialog";
 import { Structure } from "./Structure";
 import { PaneResizer } from "./PaneResizer";
+import { TranscriptEntry } from "./TranscriptEntry";
 import { reconcileActivities } from "../shared/activities";
 import { Badge, Details, time, type Selection } from "./Details";
 import type {
@@ -420,7 +421,7 @@ export function App() {
       const target = event.target as HTMLElement;
       if (
         target.closest(
-          "input,textarea,select,button,[contenteditable=true],[role=separator],[role=tab],[role=dialog]",
+          "input,textarea,select,button,summary,pre,.table-scroll,[contenteditable=true],[role=separator],[role=tab],[role=dialog]",
         ) ||
         event.metaKey ||
         event.ctrlKey ||
@@ -967,38 +968,12 @@ export function App() {
                         exact model context.
                       </p>
                       {events.map((item) => (
-                        <article
-                          key={item.id}
-                          data-event-id={item.id}
-                          className={`transcript-entry ${item.role === "user" ? "user-entry" : ""} ${item.category === "boundary" ? "boundary-entry" : ""}`}
-                        >
-                          <header>
-                            <span>
-                              {item.role === "user"
-                                ? "You"
-                                : item.category === "tool"
-                                  ? `${item.title} · ${item.tool?.phase === "call" ? "called" : "result"}`
-                                  : item.category === "boundary"
-                                    ? "Context boundary"
-                                    : "Assistant / saved record"}
-                            </span>
-                            <small>
-                              Conversation {item.conversationId} ·{" "}
-                              {item.at
-                                ? time(item.at)
-                                : `Commit ${item.sequence}`}
-                            </small>
-                          </header>
-                          <div className="prose-content">{item.text}</div>
-                          <UI.Button
-                            variant="link"
-                            size="sm"
-                            onClick={() => selectActivity(item)}
-                          >
-                            Inspect entry {item.entryId}
-                            <ArrowRight size={13} />
-                          </UI.Button>
-                        </article>
+                        <TranscriptEntry
+                          key={`${connectionId}:${item.id}`}
+                          item={item}
+                          active={!following && item.id === activeEventId}
+                          inspect={() => selectActivity(item)}
+                        />
                       ))}
                       {!events.length && (
                         <p className="empty-inline">

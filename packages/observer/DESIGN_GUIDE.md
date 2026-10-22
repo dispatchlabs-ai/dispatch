@@ -136,6 +136,19 @@ source/store/native identity internally; store-local integers are not global IDs
 - Tool inspection separates **Arguments**, **Result**, **Error**, and available
   timing. Match model calls and results using recorded call identity. Mark
   truncated/redacted/unavailable fields individually, and preserve multiline text.
+- Conversation messages render Markdown paragraphs, headings, lists, tables,
+  inline code, and code blocks. Tool calls and results remain separate events
+  in recorded order, initially collapsed with a short preview. Expanding a result
+  decodes valid JSON text envelopes, preserves indentation and line numbers,
+  and exposes other envelope fields separately. Unrecognized structured output
+  uses indented JSON. Long code lines scroll within their own panel.
+- Selecting a tool event during playback opens its transcript row. A call row
+  shows its arguments; later results keep their own event. The inspector retains
+  the labeled matching result and the original redacted native entry. Formatting
+  never changes the saved records or playback boundaries.
+- Markdown cannot execute HTML or load remote images. Image references and HTTP(S)
+  links use the existing deliberate external-open confirmation; unsupported links
+  remain text.
 - Workflow adapters may identify stages, deterministic tasks, retries, artifacts,
   and current/final phase from known domain documents. The generic view must remain
   useful without an adapter. Never interpret arbitrary JSON fields as universal

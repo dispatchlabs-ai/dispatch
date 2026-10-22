@@ -29,7 +29,7 @@ proof of platform qualification.
 | OBS-007 | Follow delegation. | Expand recorded parent/child conversation and task relationships, select a child, and inspect its assignment, conversation, tools, and outcome. Waiting parents and working children remain distinguishable. Missing or cross-store links are labeled; similar names or timestamps do not establish a relationship. |
 | OBS-008 | Inspect a tool call. | Show the retained tool name, arguments, result, duration, error, and native identity when available. Match calls to results by recorded identity. Distinguish an in-progress call, a recorded failure, truncated output, redacted content, and a result that was not retained. |
 | OBS-009 | Inspect a workflow. | Show recorded deterministic steps as well as agent work, current/final phase, child activity, attempts, outcomes, and retained artifacts. Separate a failed attempt from a later successful workflow. Custom workflow documents can enrich the view without being required to inspect ordinary Pi records. |
-| OBS-010 | Read the relevant conversation. | Move from an activity or child to its saved transcript, with retained fork/reset/compaction boundaries explained. The transcript is what was saved; it is not presented as the exact provider request or as a full record of private model reasoning. |
+| OBS-010 | Read the relevant conversation. | Move from an activity or child to its saved transcript, with formatted Markdown messages, expandable tool calls/results, readable multiline output, and retained fork/reset/compaction boundaries. Native records remain inspectable. The transcript is what was saved; it is not presented as the exact provider request or as a full record of private model reasoning. |
 
 ## Inspect retained history
 
