@@ -13,6 +13,9 @@
 
 ### Distribution
 
+- Include the vendored agent-browser license and notices, and capability version
+  metadata, in the portable Mac archive.
+
 - Remove the independently maintained inference gateway from the workspace and application distribution.
 
 - Sanitize public documentation and examples; replace the public Git history with a fresh snapshot and withdraw earlier tags/releases. Preserve private engineering records separately.

@@ -17,7 +17,10 @@ in runCommand name {
   mkdir -p "$root/bin" "$root/lib" "$root/libexec/node/bin" node
   cp -R ${web}/lib/dispatch-web "$root/lib/dispatch-web"
   chmod -R u+w "$root"
-  cp ${web}/share/dispatch-web/capabilities/../postgres-storage-NOTICE "$root/lib/dispatch-web/postgres-storage-NOTICE"
+  cp ${web}/share/dispatch-web/postgres-storage-NOTICE "$root/lib/dispatch-web/postgres-storage-NOTICE"
+  mkdir -p "$root/share/dispatch-web/agent-browser" "$root/share/dispatch-web/capabilities"
+  cp ${web}/share/dispatch-web/agent-browser/{LICENSE,NOTICE} "$root/share/dispatch-web/agent-browser/"
+  cp ${web}/share/dispatch-web/capabilities/package.json "$root/share/dispatch-web/capabilities/"
   tar -xzf ${node} -C node --strip-components=1
   install -m 0755 node/bin/node "$root/libexec/node/bin/node"
   cp node/LICENSE "$root/libexec/node/LICENSE"
