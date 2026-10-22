@@ -13,6 +13,11 @@ native schedules and conversations. The optional
 discussions. These source-alpha packages are installed as locally packed
 dependencies.
 
+[Dispatch Observer](packages/observer/README.md) is the design-stage desktop
+package for inspecting those agents through SQLite or Postgres, locally or over
+a remote connection. Its use cases, design guide, and reference mockups describe
+live activity and recorded playback; an executable app is not available yet.
+
 ## Distribution status
 
 This repository is a pre-1.0 source distribution. On October 21, 2026 its public
@@ -95,6 +100,7 @@ Run these from the repository's Nix shell. They check types and builds, not end-
 
 - [Dispatch use cases](packages/web/USE_CASES.md) — browser workspace goals and approved additions
 - [Web package](packages/web/README.md) — implementation and documentation index
+- [Observer design](packages/observer/README.md) — desktop inspection use cases and visual references
 - [Usage guide](packages/web/docs/usage-guide.md) — detailed setup and operation
 - [Changelog](packages/web/CHANGELOG.md) — changes and release history
 - [Security policy](SECURITY.md) — private vulnerability reporting and execution trust boundaries

@@ -1,0 +1,16 @@
+{
+  "name": "@dispatch/observer",
+  "version": "0.6.0",
+  "private": true,
+  "description": "Design foundation for the Dispatch Observer desktop app",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "README.md",
+    "USE_CASES.md",
+    "DESIGN_GUIDE.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "docs/design"
+  ]
+}
