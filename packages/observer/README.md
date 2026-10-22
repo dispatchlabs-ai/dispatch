@@ -1,57 +1,85 @@
 # Dispatch Observer
 
-A desktop view into what Pi Durable agents are doing: conversations, tool calls,
-subagents, workflows, and recorded activity you can step through.
+A local Electron app for following Pi Durable agents and stepping through their
+saved activity. Inspect conversations, tool calls and results, child agents,
+native tasks, and workflow documents in one read-only workspace.
 
-**Status: design-stage package.** This package contains the agreed use cases,
-design guide, and three ImageGen reference mockups. It has no executable Electron
-app, database connectors, remote helper, or installers yet. The screenshots show
-synthetic data and are design references, not captures of implemented behavior.
+**Implemented, October 22, 2026.** The macOS Apple Silicon build has been exercised
+with local SQLite, direct/TLS Postgres, Postgres over SSH, and remote SQLite over
+SSH and AWS SSM. Windows/Linux desktop execution and Postgres over SSM remain
+unqualified. This is an unsigned development app, not a signed installer release.
 
-The intended application runs locally on macOS, Windows, and Linux. Add a local
-SQLite database, a Postgres connection, or a remote source reached through SSH or
-AWS SSM. The same interface then shows live work and retained history. A separately
-hosted observer service is optional, not a prerequisite.
+## Try it
 
-## Start with the design
+From the repository root, using the [shared Node 24 toolchain](../../CONTRIBUTING.md):
 
-Open [the live activity mockup](docs/design/01-live-activity.png), then read the
-[use cases](USE_CASES.md) and [design guide](DESIGN_GUIDE.md). Together they define
-what an implementation must support and how the interface should behave.
+```sh
+nix develop
+npm ci
+npm run build -w @dispatch/observer
+npm run sample -w @dispatch/observer
+npm run start -w @dispatch/observer
+```
 
-| Reference | Purpose |
-| --- | --- |
-| [Live activity](docs/design/01-live-activity.png) | Follow an agent, its children, and the selected tool call. |
-| [Workflow playback](docs/design/02-workflow-playback.png) | Inspect a completed workflow and step through retained events. |
-| [Add a connection](docs/design/03-add-connection.png) | Choose SQLite or Postgres and configure an optional tunnel. |
-| [Generation record](docs/design/README.md) | Image provenance, exact prompts, and visual review limits. |
-| [Changelog](CHANGELOG.md) | Package changes and availability. |
+Choose **Add connection → SQLite**, browse to
+`packages/observer/.local/sample.sqlite`, then **Save & connect**. The synthetic
+workspace has a coordinator, two children, a waiting workflow, a failed attempt,
+and a retained tool slot. No model provider or agent process is started. The
+sample command refuses to replace an existing file; pass a different destination
+with `npm run sample -w @dispatch/observer -- /path/to/new-sample.sqlite`.
 
-![Dispatch Observer live activity design](docs/design/01-live-activity.png)
+For real work, select an existing Pi SQLite file or configure a Postgres logical
+store. Add SSH or AWS Session Manager when needed. Use **Timeline** to select an
+event, then play, step, scrub, or return to **Live**. The connection guide covers
+credentials, prerequisites, troubleshooting, and the limits of saved evidence.
 
-## Read-only by design
+## Build a desktop app
 
-Pi Durable remains responsible for execution, checkpoints, and recovery. Observer
-reads existing state; opening a source never starts a Harness, takes its execution
-lock, runs a tool, or resumes an agent. Playback changes only the local view.
+```sh
+npm run build -w @dispatch/observer
+npm run package -w @dispatch/observer
+```
 
-Remote SQLite requires a reader beside the database. A tunnel transports that
-reader's responses; it does not turn a SQLite file into a network database.
-Postgres can be read directly, with each selected logical store kept distinct.
-The [storage boundary](DESIGN_GUIDE.md#storage-and-process-boundaries) explains
-the intended implementation and the existing code it can draw from.
+The packager produces an app for the current host under `packages/observer/out/`.
+On Apple Silicon macOS, open
+`out/Dispatch Observer-darwin-arm64/Dispatch Observer.app`. It contains the reader,
+renderer, fonts, and third-party notices; Node is bundled with Electron. Remote
+SQLite hosts separately need Node.js 22.13+.
 
-## Package development
+Packaging does not sign, notarize, install a system service, or configure updates.
+It packages the current `dist/` output, so build first. For development,
+`npm run dev -w @dispatch/observer` rebuilds and launches the app. Root
+`npm run check` includes Observer; follow the repository's no-automated-tests
+policy and its required Nix checks for dependency or packaging changes.
 
-The manifest reserves `@dispatch/observer` and packages these design assets. It is
-not yet in the root npm workspace list: there is no application to build or type
-check. When executable implementation begins, register it with the root workspace,
-lockstep release tooling, lockfile, and relevant build definitions. Do not add
-placeholder build commands that report success without building an application.
+## Guides
 
-Follow [the repository contribution guide](../../CONTRIBUTING.md) and
-[open-source standards](../../OSS.md). This stage uses documentation/link review,
-image inspection, and package-content review; it establishes no runtime or
-platform qualification.
+- [Usage and qualification](docs/usage-guide.md): local/remote connections,
+  playback, security boundaries, and dated acceptance evidence.
+- [Use cases](USE_CASES.md): stable `OBS-` goals and implementation coverage.
+- [Design guide](DESIGN_GUIDE.md): interaction rules, appearance, and record fidelity.
+- [Design references](docs/design/README.md): original ImageGen concepts and provenance.
+- [Changelog](CHANGELOG.md): package availability and changes.
 
-MIT licensed; see [LICENSE](LICENSE).
+The reference images are synthetic design mockups, not runtime screenshots.
+
+## Read-only boundary
+
+Observer does not open a Harness, acquire Pi's execution ownership, run tools,
+resume tasks, or migrate agent databases. It reads short SQLite or Postgres
+snapshots. Playback changes only the local view. SQLite on another machine is
+read beside the database through a temporary helper; a database file is never
+mounted over a network. Existing agents need no instrumentation or migration.
+
+Database access is operator access. It does not recreate a chat application's
+end-user permissions. Known credential fields and provider documents are excluded
+or redacted, but arbitrary saved text can contain sensitive material. Give each
+connection only the database access it needs.
+
+An agent can help configure the app using this prompt:
+
+> Read `packages/observer/docs/usage-guide.md`, build Dispatch Observer, and help
+> me open my existing Pi Durable store. Use its read-only connection flow, preserve
+> the agent's state and credentials, and report the connection and playback results.
+
+MIT licensed; see [LICENSE](LICENSE) and [bundled license sources](licenses/README.md).

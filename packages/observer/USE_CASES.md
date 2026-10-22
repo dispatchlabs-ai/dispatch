@@ -4,10 +4,12 @@ Dispatch Observer is intended for a person operating Pi Durable agents who needs
 to understand current work and inspect what happened afterward. Its desktop UI
 works against the agents' existing stores, wherever those stores live.
 
-**All use cases below are accepted design targets, not implemented features.**
-This package currently contains specifications and reference images only. Stable
-`OBS-` identifiers connect future implementation and qualification evidence to
-these goals; they are not a ticket backlog or a claim that work has shipped.
+**Implementation status, October 22, 2026:** the Electron app implements the
+inspection, connection, and playback flows below. macOS has interactive evidence;
+Windows/Linux desktop execution and Postgres over SSM remain unqualified. See
+[dated qualification and limits](docs/usage-guide.md#compatibility-and-qualification)
+for the evidence against these stable identifiers. A source implementation is not
+proof of platform qualification.
 
 ## Connect to existing state
 
@@ -62,5 +64,4 @@ these goals; they are not a ticket backlog or a claim that work has shipped.
   path. A recorded artifact reference alone does not make its bytes available.
 
 See [DESIGN_GUIDE.md](DESIGN_GUIDE.md) for interaction rules, record fidelity,
-connection lifecycle, visual tokens, and the qualification expected of a future
-implementation.
+connection lifecycle, visual tokens, and the implementation’s qualification requirements.

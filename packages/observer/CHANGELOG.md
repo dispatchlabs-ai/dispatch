@@ -6,5 +6,9 @@
   read-only Pi Durable inspection through SQLite, Postgres, SSH, and AWS SSM.
 - Add three ImageGen design references for live activity, workflow playback,
   and connection setup, with synthetic data and reproducible prompt records.
-- Reserve the package manifest; executable desktop implementation and platform
-  qualification remain future work.
+- Implement the Electron desktop app with SQLite/Postgres readers, SSH/SSM
+  transports, protected saved connections, native hierarchy/task/document
+  inspection, and retained-event playback with live following and pagination.
+- Package an unsigned macOS app with bundled dependency notices; register the
+  workspace and Nix build inputs. Document qualified paths and outstanding
+  Windows/Linux and Postgres-over-SSM checks.

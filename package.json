@@ -5,7 +5,8 @@
   "workspaces": [
     "packages/web",
     "packages/runner",
-    "packages/slack"
+    "packages/slack",
+    "packages/observer"
   ],
   "engines": {
     "node": ">=24 <26"

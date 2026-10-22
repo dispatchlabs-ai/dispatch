@@ -5,10 +5,11 @@ agents while they work and afterward. Start with the activity that matters to a
 person: who is working, what they are doing, what they are waiting for, and what
 the recorded evidence says happened.
 
-**Design stage, October 22, 2026.** This guide and the [use cases](USE_CASES.md)
-define the intended product. The [reference images](docs/design/README.md) use
-synthetic data. No desktop executable, connector, helper, or platform build has
-been implemented or qualified by this package.
+**Implemented design, October 22, 2026.** This guide and the [use cases](USE_CASES.md)
+define the product. The Electron implementation now supplies the local/remote
+readers and inspection/playback UI. The [usage guide](docs/usage-guide.md) records
+qualified paths and remaining platform limits. The [reference images](docs/design/README.md)
+remain the original synthetic ImageGen concepts, not runtime captures.
 
 ## Product direction
 
@@ -240,7 +241,7 @@ Web UI nor makes its component migration part of Observer implementation.
 
 ## Storage and process boundaries
 
-The intended arrangement is:
+The implementation uses this arrangement:
 
 ```text
 Electron renderer: navigation, hierarchy, timeline, transcript, inspector
@@ -307,11 +308,12 @@ not require preserving every ephemeral frame or re-executing historical actions.
 
 ## Implementation and qualification
 
-Keep the implementation in this package. Start with one useful vertical slice:
-open a supported local SQLite store, inspect a retained conversation/task/tool,
-and step between its recorded events without mutation. Add Postgres, live refresh,
-and remote transports against the same interaction model. This sequence does not
-remove the accepted connection modes from the product scope.
+The implementation stays in this package and imports shared UI primitives through
+`packages/web/src/components/ui.tsx`. It reads versioned storage records without
+importing Web startup or Pi’s execution runtime. The background service owns
+connection lifetimes; the renderer receives redacted projections. The generic
+workflow view presents native task phase/attempt fields and retained documents;
+it does not invent a universal phase strip for arbitrary agent extensions.
 
 Before describing a use case as implemented, record dated evidence against its
 `OBS-` identifier. Qualify read-only behavior beside an active owner, disconnected
@@ -324,7 +326,7 @@ Follow [CONTRIBUTING.md](../../CONTRIBUTING.md): no automated tests under the cu
 repository policy; source/type/build checks and permitted interactive verification
 remain applicable. Do not treat an ImageGen mockup as a rendered application check.
 Signed installers, auto-updates, a hosted viewer, and migration of existing agent
-deployments are not delivered by this design package.
+deployments are not delivered by this implementation.
 
 ## References
 
