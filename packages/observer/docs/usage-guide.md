@@ -127,9 +127,12 @@ secret detection; do not publish raw records or screenshots without review.
 
 ## Compatibility and qualification
 
-The reader supports stock Pi Durable SQLite schema 1 as used by 1.1–1.3, and
-Dispatch's `dispatch_pi` Postgres schema 1. The shared schema number does not promise
-compatibility with future versions. Custom entry/document kinds retain a generic
+The reader supports stock Pi Durable SQLite schema 1 as used by 1.1–1.3,
+schema 2 as used by 1.4, and Dispatch's `dispatch_pi` Postgres schema 1.
+The sample generator uses Pi Durable 1.4.0 and creates schema 2. The reader
+never opens Pi's storage writer or migrates an existing database.
+These schema versions do not establish compatibility with future Pi releases.
+Custom entry/document kinds retain a generic
 record view. Documents are reconstructed from their latest retained base and deltas;
 retired contents that no longer exist are marked unavailable. Runner's storage
 choice and existing deployments are unchanged.
@@ -141,12 +144,20 @@ there is no automated test suite under repository policy.
 
 | Use cases | Observed evidence | Limits |
 | --- | --- | --- |
-| OBS-001, OBS-016 | Existing local Pi records and synthetic schema-1 data; missing/unsupported input handling; native file selection. | Other SQLite/runtime versions need qualification. |
+| OBS-001, OBS-016 | Existing local Pi records and synthetic schema-1 data; missing/unsupported input handling; native file selection. | These October 22 observations predate schema-2 support. |
 | OBS-002, OBS-005 | Direct Postgres with a SELECT identity and store-specific RLS; only the allowed store appeared. Invalid TLS trust was rejected; a trusted CA succeeded. Saved encrypted password reopened successfully after app restart. | Windows/Linux credential stores unqualified. |
 | OBS-003, OBS-004 | TLS Postgres over SSH; SQLite over SSH and SSM on a live Linux agent host. Remote cleanup verified after close. | Postgres over SSM and Windows remote shells unqualified. |
 | OBS-006–OBS-010 | Parent/children, waiting workflow, attempt and failure records, native tools and live slot, transcript, generic documents. | Custom workflow-specific phase diagrams are not provided. |
 | OBS-011–OBS-014 | Completed live-host history and process-free synthetic records; playback, step/speed/scrub; paused snapshot with new commits; long paginated history; database disconnect/reconnect retaining playback selection. | No exact historical frame or process-liveness reconstruction. |
 | OBS-015, OBS-017 | Four rendered sizes, light/dark layouts, keyboard controls, narrow detail drawer, Electron isolation and plain-text presentation. macOS app packaging and launch. | Windows/Linux native execution, installers, touch hardware and formal screen-reader/contrast audit unqualified. |
+
+On October 23, 2026, a fresh workspace install resolved Pi Durable and Chord
+to 1.4.0. The sample command generated a schema-2 database, and the isolated
+macOS app connected to it and displayed its three conversations, three tasks,
+and two documents, including a decoded workflow document. The database's
+SHA-256 checksum was unchanged after observation. Workspace TypeScript/build
+checks and the native Nix build passed. This does not extend the earlier
+remote-transport or Windows/Linux qualification to schema 2.
 
 The October 22 conversation-rendering update was checked against a real
 SSM-connected SQLite transcript in the packaged macOS app: a JSON-wrapped

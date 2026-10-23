@@ -42,7 +42,7 @@ export class Source {
         return {
           stores: [],
           message:
-            "SQLite schema 1 is readable. No execution owner was opened.",
+            "The SQLite database is readable. No execution owner was opened.",
         };
       }
       const pg = connection.postgres;

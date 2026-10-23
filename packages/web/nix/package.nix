@@ -45,7 +45,7 @@ buildNpmPackage {
     ];
   };
 
-  npmDepsHash = "sha256-EdQaAmN3r1Ho+GgcYyeJOgjhq10veh6ykja6Nt1B88M=";
+  npmDepsHash = "sha256-SLneJLJt8FmMlROy85hAtoJtmS93ymVcOpxDgyFjpN4=";
   # The workspace compiles Observer here; its platform runtime is packaged separately.
   ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
   npmBuildScript = "build";

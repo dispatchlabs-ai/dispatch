@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Update Chord and the Pi Durable sample dependency to 1.4.0, removing
+  Observer's remaining 1.3.0 dependency copies. Read Pi 1.4's
+  SQLite schema 2 alongside schema 1 without migrating existing databases;
+  refresh the bundled Chord license notice.
+
 - Render conversation messages as Markdown and tool calls/results as expandable
   rows. Decode JSON text envelopes into multiline output, preserve code layout,
   format other JSON, and keep native records available in the inspector.

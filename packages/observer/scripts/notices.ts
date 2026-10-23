@@ -43,8 +43,8 @@ export async function writeNotices(builds: Metafile[]) {
       /^(?:licen[cs]e|copying|notice)(?:\.|$)/i.test(name),
     );
     let upstream =
-      manifest.name === "@earendil-works/chord" && manifest.version === "1.3.0"
-        ? await readFile("licenses/chord-1.3.0.txt", "utf8")
+      manifest.name === "@earendil-works/chord" && manifest.version === "1.4.0"
+        ? await readFile("licenses/chord-1.4.0.txt", "utf8")
         : undefined;
     if (!files.length && !upstream) {
       const readme = (await readdir(directory)).find((name) =>

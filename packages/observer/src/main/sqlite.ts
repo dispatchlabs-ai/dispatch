@@ -14,9 +14,9 @@ export async function readSqlite(path: string, request: RawReadRequest) {
     const schema = table
       ? db.prepare("SELECT version FROM durable_schema WHERE singleton=1").get()
       : undefined;
-    if (schema?.version !== 1)
+    if (schema?.version !== 1 && schema?.version !== 2)
       throw new Error(
-        "Unsupported SQLite schema. Observer reads Pi Durable schema 1 (1.1–1.3); it never migrates a database.",
+        "Unsupported SQLite schema. Observer reads Pi Durable schemas 1 and 2 (1.1–1.4); it never migrates a database.",
       );
     return await readRecords(
       {
