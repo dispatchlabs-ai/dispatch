@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Preserve Markdown formatting when finalizing streamed replies and when posting
+  completed replies without a stream, instead of displaying formatting markers
+  as literal text.
+
 - Match the runner's Pi Durable/Chord 1.4.0 peers. Keep document changes as deltas
   and use durable sleeps for admission and delivery retries without changing
   saved checkpoint shapes or at-least-once delivery semantics. Upgrade both

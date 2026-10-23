@@ -101,8 +101,12 @@ each thread across restarts. A deleted thread leaves a recorded failed admission
 Known unrelated threads are filtered without a Slack API request when the event
 identifies their parent author. Existing admission keys survive the inbox upgrade.
 Native tasks also retain outgoing reply progress.
-User mentions render through Slack's native user elements in final replies and
-mention syntax while streaming, so readers see member names rather than raw IDs.
+Final replies use Slack's Markdown blocks, matching the Markdown sent while
+streaming, so bold text, inline code and source links retain their formatting.
+Final messages split at complete Markdown blocks where possible. A block too
+large for one message is delivered in literal text chunks, preserving its source
+instead of interpreting broken code fences or links in separate messages.
+User mentions retain Slack's mention syntax in streamed and final replies.
 Other control syntax, including broadcast tags, stays literal. Partly generated
 mentions wait for completion before streaming, and delivery chunks keep complete
 mentions together. No directory lookup or `users:read` permission is required.

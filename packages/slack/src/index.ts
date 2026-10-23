@@ -149,7 +149,7 @@ export async function prepareSlack(root: string, runner: Runner, options: {
           const text = streamText(raw);
           if (!text.startsWith(sent) || text === sent || runtime.now() < retryAt) return;
           // The native watcher coalesces updates while this request runs.
-          const delta = replyChunk(text, sent.length, 12_000);
+          const delta = replyChunk(text, sent.length, 12_000, false);
           try {
             await client.chat.appendStream({
               channel: task.input.channel, ts: stream, chunks: [{ type: "markdown_text", text: delta }],
@@ -204,14 +204,14 @@ export async function prepareSlack(root: string, runner: Runner, options: {
             // or model retry. Repeating this update does not duplicate text.
             await client.chat.update({
               channel: task.input.channel, ts: checkpoint.stream, text: fallbackText(text),
-              blocks: replyBlocks(text),
+              blocks: replyBlocks(text, checkpoint.text, checkpoint.offset),
               metadata: { event_type: `${namespace}_agent_reply`, event_payload: { delivery: hash } },
               parse: "none", link_names: false,
             });
           } else {
             await client.chat.postMessage({
               channel: task.input.channel, thread_ts: task.input.thread, text: fallbackText(text),
-              blocks: replyBlocks(text),
+              blocks: replyBlocks(text, checkpoint.text, checkpoint.offset),
               metadata: { event_type: `${namespace}_agent_reply`, event_payload: { delivery: hash } },
               unfurl_links: false, unfurl_media: false, mrkdwn: false, parse: "none",
             });
