@@ -30,8 +30,12 @@
   and its own role instructions, select a saved working directory, and delegate
   bounded assignments to named agents with native ownership and recovery.
 
-The first extraction supports Node, SQLite and trusted company definitions.
-Hosted Dispatch Web adoption, remote storage, portable coding isolation, npm
+- **RUN-010 — Choose storage:** supply an application-owned Pi Storage factory,
+  including the optional remote SQLite service, while retaining local status
+  projections, ownership checks and the default local SQLite path.
+
+The extraction supports Node, SQLite and trusted company definitions.
+Hosted Dispatch Web adoption, portable coding isolation, npm
 registry publication and broad installation qualification remain separate work.
 Runner source snapshots can be installed from public GitHub release archives;
 their exact tag, source revision and lockfile integrity identify the bytes.

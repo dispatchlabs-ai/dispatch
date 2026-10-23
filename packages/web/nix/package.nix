@@ -16,6 +16,9 @@ buildNpmPackage {
       ../../runner/package.json
       ../../runner/tsconfig.json
       ../../runner/src
+      ../../remote/package.json
+      ../../remote/tsconfig.json
+      ../../remote/src
       ../../slack/package.json
       ../../slack/tsconfig.json
       ../../slack/src
@@ -42,7 +45,7 @@ buildNpmPackage {
     ];
   };
 
-  npmDepsHash = "sha256-jLD17qR/r7tDL/5vekYFdjYY5aM+iyHP8Ll7ehB4BWc=";
+  npmDepsHash = "sha256-EdQaAmN3r1Ho+GgcYyeJOgjhq10veh6ykja6Nt1B88M=";
   # The workspace compiles Observer here; its platform runtime is packaged separately.
   ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
   npmBuildScript = "build";
@@ -68,7 +71,7 @@ buildNpmPackage {
     if test -d packages/web/node_modules; then
       cp -R packages/web/node_modules "$app/packages/web/"
     fi
-    for package in runner slack observer; do
+    for package in runner remote slack observer; do
       mkdir -p "$app/packages/$package"
       cp packages/$package/package.json "$app/packages/$package/"
       cp -R packages/$package/dist "$app/packages/$package/"

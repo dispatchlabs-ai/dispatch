@@ -1,0 +1,24 @@
+{
+  "name": "@dispatch/remote",
+  "version": "0.6.0",
+  "private": true,
+  "description": "Relay transport and optional remote SQLite storage for Pi Durable runners",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=24 <26" },
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist", "README.md", "USE_CASES.md", "CHANGELOG.md", "docs", "LICENSE"],
+  "scripts": { "build": "tsc", "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@earendil-works/chord": "1.4.0",
+    "@earendil-works/pi-durable": "1.4.0",
+    "proper-lockfile": "4.1.2",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "@types/proper-lockfile": "4.1.4",
+    "@types/ws": "8.18.1",
+    "typescript": "6.0.3"
+  }
+}

@@ -1,5 +1,10 @@
 # Dispatch Runner
 
+Applications can supply a `storage(agent)` factory to `run`, `ChatService.open`
+or `openAgent`. The host owns and closes the returned Pi Durable Storage.
+The default remains local SQLite. See [remote SQLite](https://github.com/dispatchlabs-ai/dispatch/blob/main/packages/remote/README.md)
+for the optional relay service and its single-owner recovery boundary.
+
 `@dispatch/runner` runs directory-defined company agents with stock Pi Durable
 1.4.0. It loads trusted definitions, owns each SQLite session, schedules native
 tasks and exposes persistent shared conversations without a web server.

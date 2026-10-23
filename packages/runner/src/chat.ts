@@ -15,7 +15,7 @@ import {
 } from "@earendil-works/pi-durable";
 import { catalog, enabledAgents, loadAgent, type LoadedAgent } from "./definition.js";
 import type { Models } from "@earendil-works/pi-ai/models";
-import { createRuntime, type AgentHost } from "./runtime.js";
+import { createRuntime, type AgentHost, type StorageFactory, type OpenOptions } from "./runtime.js";
 import type { ReplySink } from "./replies.js";
 import { createHandoffs } from "./handoff.js";
 import { privateStateDirectory } from "./private-state.js";
@@ -23,7 +23,7 @@ import { privateStateDirectory } from "./private-state.js";
 export const context = BACKGROUND_CONTEXT;
 export type Chat = {
   id: string; agent: string; conversationId: number; title: string;
-  source: "cli" | "web" | "slack"; createdAt: string; origin?: JsonObject;
+  source: "cli" | "web" | "slack" | "phone"; createdAt: string; origin?: JsonObject;
 };
 export function createChats(namespace: string, openAgent: ReturnType<typeof createRuntime>["openAgent"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"]) {
   const Chats = defineDoc<{
@@ -72,6 +72,8 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       replySink?: ReplySink; updateDefinitions?: boolean; models: Models; initialize?: ChatInitializer;
       resume?: boolean;
       cwd?: string;
+      storage?: StorageFactory;
+      settings?: OpenOptions["settings"];
     }) {
       const stateRoot = resolve(options.stateRoot);
       const names = options.names?.length ? options.names :
@@ -87,7 +89,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
             agent, directory: join(stateRoot, agent.id), models,
             execution: options.demo ? "demo" : "live", extensions: options.extensions,
             replySink: options.replySink, updateDefinitions: options.updateDefinitions,
-            cwd: options.cwd,
+            cwd: options.cwd, storage: options.storage, settings: options.settings,
           });
           service.hosts.set(agent.id, host);
         }));

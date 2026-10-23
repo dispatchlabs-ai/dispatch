@@ -13,6 +13,10 @@ native schedules and conversations. The optional
 discussions. These source-alpha packages are installed as locally packed
 dependencies.
 
+[Dispatch Remote](packages/remote/README.md) supplies optional relay routing and
+remote SQLite storage for standalone runners. The storage host owns the files;
+models and tools execute on the runner. See its guide for ownership and recovery.
+
 [Dispatch Observer](packages/observer/README.md) is the read-only Electron desktop
 package for inspecting those agents through SQLite or Postgres, locally or over
 a remote connection. It provides live following, saved-event playback, native

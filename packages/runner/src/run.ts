@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import type { Models } from "@earendil-works/pi-ai/models";
+import type { StorageFactory } from "./runtime.js";
 import type { Extension } from "@earendil-works/pi-durable";
 import { createRunner, type Runner } from "./index.js";
 import type { ChatService, ChatInitializer } from "./chat.js";
@@ -14,6 +15,7 @@ export type PreparedAdapter = {
 };
 export type Adapter = { prepare(options: { root: string; runner: Runner }): Promise<PreparedAdapter> };
 export type RunOptions = {
+  storage?: StorageFactory;
   root?: string;
   stateRoot?: string;
   /** Explicit local working directory for native tools and repository instructions. */
@@ -61,7 +63,7 @@ export async function run(options: RunOptions = {}) {
         models: options.models, demo: options.demo ?? false, names: options.names,
         updateDefinitions: options.updateDefinitions, initialize: options.initialize,
         resume: options.resume,
-        cwd: options.cwd,
+        cwd: options.cwd, storage: options.storage,
         extensions, replySink,
       });
     }

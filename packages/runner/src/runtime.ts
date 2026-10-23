@@ -16,8 +16,11 @@ export type OpenOptions = {
   updateDefinitions?: boolean;
   /** Return true after preserving or migrating an application-owned configuration. */
   updateConversation?: (tx: import("@earendil-works/pi-durable").Tx, id: ConversationId, setup: AgentSetup) => Promise<boolean>;
+  /** The factory transfers ownership to this host. Keep each logical store single-owner. */
+  storage?: StorageFactory;
 };
 
+export type StorageFactory = (agent: LoadedAgent) => Promise<Storage>;
 export type StatusFile = {
   agent: string; pid: number; hostRunning: boolean; updatedAt: string;
   conversationId: number; state: RunnerState;
@@ -224,7 +227,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       });
     };
     try {
-      await privateStateFiles(directory);
+      await privateStateFiles(directory, !options.storage);
       const registry = createRegistry();
       const loopExtension = defineExtension({ name: `${namespace}.runner`, tasks: [AgentLoop],
         tools: agent.trigger.mode === "continuous" ? [pauseLoop] : [], });
@@ -233,7 +236,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       );
       const { configuration, installed } = setup;
       for (const extension of new Map([...installed, ...(options.registryExtensions ?? [])].map(extension => [extension.name, extension])).values()) registry.install(extension);
-      storage = await openNodeSqliteStorage(join(directory, "session.sqlite"));
+      storage = options.storage ? await options.storage(agent) : await openNodeSqliteStorage(join(directory, "session.sqlite"));
       harness = await Harness.open(storage, {
         models, registry, now, settings: options.settings,
         env: async (target, ctx) => await codingEnvironment(target, ctx) ??

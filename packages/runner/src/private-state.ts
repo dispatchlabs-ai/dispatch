@@ -27,8 +27,8 @@ export async function privateStateDirectory(directory: string): Promise<void> {
 }
 
 /** Called under the session's owner lock, before SQLite opens or recovers any files. */
-export async function privateStateFiles(directory: string): Promise<void> {
-  const names = ["session.sqlite", "session.sqlite-wal", "session.sqlite-shm", "session.sqlite-journal", "status.json", "status.json.tmp"];
+export async function privateStateFiles(directory: string, sqlite = true): Promise<void> {
+  const names = [...(sqlite ? ["session.sqlite", "session.sqlite-wal", "session.sqlite-shm", "session.sqlite-journal"] : []), "status.json", "status.json.tmp"];
   if (process.platform === "win32") {
     await privateWindowsPaths(names.map(name => ({ path: join(directory, name), directory: false, create: name === "session.sqlite" })));
     return;

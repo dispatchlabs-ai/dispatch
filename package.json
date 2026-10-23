@@ -5,6 +5,7 @@
   "workspaces": [
     "packages/web",
     "packages/runner",
+    "packages/remote",
     "packages/slack",
     "packages/observer"
   ],
