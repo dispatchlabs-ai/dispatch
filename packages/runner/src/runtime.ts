@@ -64,6 +64,7 @@ export type StartOptions = { conversationId?: ConversationId; input?: string };
 export function createRuntime(namespace: string, agentConfiguration: ReturnType<typeof createConfiguration>["agentConfiguration"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"], codingEnvironment: ReturnType<typeof createCoding>["codingEnvironment"]) {
   const RunnerDoc = defineDoc<RunnerState>({
     kind: `${namespace}.runner`, version: 1, scope: "session",
+    checkpointWhen: () => false,
     initial: () => ({
       fingerprint: "", execution: "", loopId: null, completed: 0,
       phase: "idle", nextAt: null, last: null, error: null,
@@ -72,6 +73,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
 
   const LoopControl = defineDoc<{ reason: string | null }>({
     kind: `${namespace}.loop-control`, version: 1, scope: "conversation", history: "latest", fork: "initial",
+    checkpointWhen: () => false,
     initial: () => ({ reason: null }),
   });
   const pauseLoop = defineTool({
@@ -96,15 +98,17 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
     | { phase: "sleep"; iteration: number; at: number }
     | { phase: "run"; iteration: number; at: number };
 
-  // Use the published 1.3.0 API: sleep() itself is an in-memory wait, so its
-  // absolute deadline is in the committed checkpoint before the wait begins.
+  // Keep the existing checkpoint shape so suspended 1.3 work can resume.
+  // A future deadline ends this phase asleep; re-entry continues when it is due.
   const AgentLoop = defineTask<LoopInput, Checkpoint, null>({
     name: `${namespace}.agent-loop`, version: 1,
     initial: (input) => ({ phase: "sleep", iteration: 0, at: input.firstAt }),
     phases: {
       async sleep(task, runtime, ctx) {
         const checkpoint = task.state.checkpoint;
-        await runtime.sleep(checkpoint.at, ctx);
+        if (checkpoint.at > runtime.now()) {
+          return runtime.sleepUntil(checkpoint.at, checkpoint, ctx);
+        }
         await runtime.commit(async (tx) => {
           const state = await tx.doc(RunnerDoc);
           state.phase = "running";

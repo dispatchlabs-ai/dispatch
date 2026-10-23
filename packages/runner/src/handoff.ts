@@ -17,6 +17,7 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
     reported: number[]; summary: string; result: string;
   }>({
     kind: `${namespace}.handoffs`, version: 1, scope: "conversation", history: "latest", fork: "initial",
+    checkpointWhen: () => false,
     initial: () => ({ child: null, monitor: null, jobs: {}, reported: [], summary: "", result: "" }),
   });
   const textOf = (message?: AssistantMessage) =>
@@ -93,7 +94,9 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
       phases: {
         async check(task, runtime, context) {
           const checkpoint = task.state.checkpoint;
-          await runtime.sleep(checkpoint.at, context);
+          if (checkpoint.at > runtime.now()) {
+            return runtime.sleepUntil(checkpoint.at, checkpoint, context);
+          }
           const state = await runtime.snapshot(Handoffs, runtime.conversationId, context);
           const jobs = Object.values(state?.jobs ?? {}).filter(job => job.status === "working");
           if (!jobs.length || !state?.child) {
@@ -204,7 +207,7 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
             taskId, question, status: "working", ...(data?.slack ? { destination: data.slack } : {}),
           };
           if (state.monitor === null) {
-            state.monitor = await tx.createTask(monitor, { firstAt: Date.now() + options.progressEveryMs }, background);
+            state.monitor = await tx.createTask(monitor, { firstAt: api.now() + options.progressEveryMs }, background);
           }
           return { child: state.child, taskId, acknowledged };
         }, context);

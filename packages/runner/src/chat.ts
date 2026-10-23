@@ -30,6 +30,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     byId: Record<string, Chat>; keys: Record<string, string>;
   }>({
     kind: `${namespace}.chats`, version: 1, scope: "session",
+    checkpointWhen: () => false,
     initial: () => ({ byId: {}, keys: {} }),
   });
 

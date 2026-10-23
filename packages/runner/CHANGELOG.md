@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Upgrade the runner's Chord, Pi AI and Pi Durable dependencies to 1.4.0.
+  Declare explicit delta-only document checkpoint policies and use native durable
+  sleeps for schedules and handoff progress, preserving existing checkpoint shapes.
+  Opening SQLite upgrades its schema to version 2; back up closed stores before
+  upgrading because Pi 1.3.0 cannot reopen them. Published alpha.4 is unchanged.
+
 - Run continuous terminal work in the selected named conversation, retaining the
   initial goal and native loop checkpoints across restarts. Each final answer
   advances to the next pass; `pause_loop` records an explicit blocker. Preserve

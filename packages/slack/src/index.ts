@@ -84,10 +84,12 @@ export async function prepareSlack(root: string, runner: Runner, options: {
   if (!botToken || !appToken) throw new Error("Slack requires its bot and app tokens in the configured environment.");
   const SlackInbox = defineDoc<{ tasks: Record<string, number>; threads: Record<string, number> }>({
     kind: `${namespace}.slack-inbox`, version: 2, scope: "session", initial: () => ({ tasks: {}, threads: {} }),
+    checkpointWhen: () => false,
     migrate: value => ({ tasks: value.tasks as Record<string, number>, threads: {} }),
   });
   const ThreadReplies = defineDoc<{ byKey: Record<string, boolean> }>({
     kind: `${namespace}.slack-thread-replies`, version: 1, scope: "session", initial: () => ({ byKey: {} }),
+    checkpointWhen: () => false,
   });
   const channelAgent = (channel: string) => config.channels[channel] ?? config.channels["*"];
 
@@ -182,7 +184,9 @@ export async function prepareSlack(root: string, runner: Runner, options: {
       },
       async deliver(task, runtime, ctx) {
         const checkpoint = task.state.checkpoint;
-        await runtime.sleep(checkpoint.retryAt, ctx);
+        if (checkpoint.retryAt > runtime.now()) {
+          return runtime.sleepUntil(checkpoint.retryAt, checkpoint, ctx);
+        }
         // Slack can truncate oversized messages. Persist progress between chunks.
         const text = replyChunk(checkpoint.text, checkpoint.offset);
         const hash = createHash("sha256").update(`${task.input.key}:${checkpoint.offset}`).digest("hex");
@@ -246,7 +250,10 @@ export async function prepareSlack(root: string, runner: Runner, options: {
         const service = await awaitWithContext(ready, withAbortSignal(runtime.signal, ctx));
         const input = task.input;
         if (input.previous !== null) await runtime.waitForTask(input.previous as TaskId<null>, ctx);
-        await runtime.sleep(task.state.checkpoint.retryAt, ctx);
+        const checkpoint = task.state.checkpoint;
+        if (checkpoint.retryAt > runtime.now()) {
+          return runtime.sleepUntil(checkpoint.retryAt, checkpoint, ctx);
+        }
         const host = service.host(input.agent);
         const key = threadKey(config.teamId, input.channel, input.thread);
         let existing = await service.find(input.agent, key);

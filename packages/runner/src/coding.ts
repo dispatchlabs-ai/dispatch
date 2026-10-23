@@ -16,6 +16,7 @@ type Checkout = { path: string; repository: string; branch: string; gitDir: stri
 export function createCoding(namespace: string, workspacePrefix = "agent") {
   const Workspace = defineDoc<{ selected: string | null; checkouts: Record<string, Checkout> }>({
     kind: `${namespace}.workspace`, version: 1, scope: "conversation", history: "latest", fork: "initial",
+    checkpointWhen: () => false,
     initial: () => ({ selected: null, checkouts: {} }),
   });
   const execute = promisify(execFile);

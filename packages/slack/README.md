@@ -13,7 +13,9 @@ See [use cases](USE_CASES.md) and [changes](CHANGELOG.md).
 ## Configure
 
 Install both packed packages in a private company repository. Use the same exact
-Pi Durable version as the runner. Add a connection to `factory.yaml`:
+Pi Durable version as the runner (1.4.0 for current source). Upgrade both packages
+together and follow the runner's [state upgrade precautions](../runner/README.md#persistence-and-boundaries)
+before opening an existing store. Add a connection to `factory.yaml`:
 
 ```yaml
 agents: []

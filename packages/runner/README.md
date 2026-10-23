@@ -1,7 +1,7 @@
 # Dispatch Runner
 
 `@dispatch/runner` runs directory-defined company agents with stock Pi Durable
-1.3.0. It loads trusted definitions, owns each SQLite session, schedules native
+1.4.0. It loads trusted definitions, owns each SQLite session, schedules native
 tasks and exposes persistent shared conversations without a web server.
 
 This is a source-alpha package. Its current 0.6.0 manifest follows the repository
@@ -11,8 +11,9 @@ complete terminal example with an integrity-pinned public runner archive.
 For source builds, pack a reviewed revision as below. See the
 [use cases](USE_CASES.md) and [changes](CHANGELOG.md).
 
-The `runner-v0.6.0-alpha.4` GitHub prerelease is a runner-only source snapshot,
-not a release or deployment of Dispatch Web. Its notes identify the exact source
+The `runner-v0.6.0-alpha.4` GitHub prerelease is a runner-only source snapshot
+using Pi 1.3.0, not the 1.4.0 source build described here and not a release or
+deployment of Dispatch Web. Its notes identify the exact source
 commit and archive checksum. The archive retains the repository's 0.6.0 package
 version; its tag and npm lockfile integrity distinguish the snapshot. Install it
 without checking an archive into your own repository:
@@ -230,6 +231,18 @@ Markdown, TypeScript, opted-in skill resources and delegated definition bytes. A
 handoff children; applications with pinned domain configurations use the
 `updateConversation(tx, id, setup)` callback to preserve or migrate their profiles before changing those definitions. Imported tool
 code is not transitively hashed.
+
+Source builds now use Pi 1.4.0. Before upgrading, stop the owner and back up
+its complete state directory. Opening SQLite automatically migrates it to schema
+version 2; Pi 1.3.0 (including alpha.4) cannot reopen that migrated store. Use a
+separate state directory to try the upgrade. To roll back, restore the closed
+pre-upgrade backup, not the migrated database. No existing deployment is upgraded
+by publishing this source change.
+
+Runner documents keep their existing scopes, versions and delta-only policy
+(`checkpointWhen: () => false`). Schedule and progress-monitor checkpoints keep
+their shapes; future deadlines now use native durable sleeps, holding no running
+invocation while waiting. The Harness owns wake-up and recovery.
 
 Closing suspends unfinished native work; reopening with compatible definitions
 and adapters resumes it. State directories hold private transcripts and tools'

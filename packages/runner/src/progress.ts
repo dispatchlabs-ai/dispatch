@@ -4,6 +4,7 @@ import { defineDoc, defineExtension, defineTool } from "@earendil-works/pi-durab
 export function createProgress(namespace: string) {
   const Progress = defineDoc<{ summary: string; sequence: number }>({
     kind: `${namespace}.progress`, version: 1, scope: "conversation", history: "latest", fork: "initial",
+    checkpointWhen: () => false,
     initial: () => ({ summary: "", sequence: 0 }),
   });
 
