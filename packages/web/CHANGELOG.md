@@ -6,9 +6,12 @@
 
 - Sanitize public documentation and examples; replace the public Git history with a fresh snapshot and withdraw earlier tags/releases. Preserve private engineering records separately.
 
-### Web runtime dependency isolation
+### Pi 1.4 runtime alignment
 
-- Keep Pi Coding Agent 1.1 on its matching Chord and codemode dependencies alongside the standalone runner's Pi 1.3 dependencies. This restores web/backend and conversation-worker startup after installing the combined workspace.
+- Align Web, Runner, Remote, Slack and Observer on Pi 1.4.0 and remove the former Web 1.1 dependency overrides.
+- Preserve document identities and delta-only storage; use native durable sleeps for collaboration waits and include sleeping tasks in shutdown and activity checks.
+- Migrate PostgreSQL task statuses to schema 2, accept schema 1 and 2 for read-only imports, and adopt the native tool-result and fatal storage-error contracts.
+- Stop owners and retain a complete pre-upgrade backup before opening existing stores; migrated schema-2 stores cannot be reopened by Pi 1.3.
 
 ### Browser reconnection
 

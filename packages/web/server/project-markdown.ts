@@ -18,6 +18,7 @@ export const ProjectMarkdownDoc = defineDoc<{
   revisions: Record<string, ProjectMarkdownRevision[]>;
   requests: Record<string, { fingerprint: string; projectId: string; revision: number }>;
 }>({
+  checkpointWhen: () => false,
   kind: "dispatch.project-markdown", version: 1, scope: "session",
   initial: () => ({ revisions: {}, requests: {} }),
 });

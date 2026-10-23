@@ -10,6 +10,7 @@ const inputSchema = z.union([
   z.object({ markdown: z.string().max(20_000), expectedRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 1), operationId: z.string().min(1).max(200) }).strict(),
 ]);
 const Receipts = defineDoc<{ operations: Record<string, { fingerprint: string; result: Criteria; participantId: string; callId: string; savedAt: number }> }>({
+  checkpointWhen: () => false,
   kind: "dispatch.criteria-edits", version: 1, scope: "conversation", history: "latest", fork: "initial", initial: () => ({ operations: {} }),
 });
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -51,7 +52,7 @@ export function createDefinitionOfDone(authorize: (tx: Tx, instanceId: Conversat
         receipts.operations[key] = { fingerprint, result: next, participantId, callId: `${api.taskId}:${api.callId}`, savedAt: Date.now() };
         return detached(next);
       }, ctx);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+      return { output: [{ type: "text" as const, text: JSON.stringify(result) }] };
     },
   });
   return defineExtension({ name: CRITERIA_EXTENSION, tools: [tool] });

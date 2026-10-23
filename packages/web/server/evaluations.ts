@@ -57,6 +57,7 @@ export function parseEvaluationRevision(input: unknown): number {
 type StoredProfile = EvaluationProfile & { requestId: string; fingerprint: string };
 // Schema version is not the content revision. Explicit immutable records preserve author history and retry receipts.
 const ProfilesDoc = defineDoc<{ records: StoredProfile[] }>({
+  checkpointWhen: () => false,
   kind: "dispatch.evaluation-profiles", version: 1, scope: "session", initial: () => ({ records: [] }),
 });
 
@@ -286,6 +287,7 @@ type StoredComparison = {
 type StoredRun = EvaluationRun;
 type StoredResult = EvaluationResult & { operationId: string; fingerprint: string; agentDefinitionId: string };
 const ComparisonsDoc = defineDoc<{ comparisons: StoredComparison[]; runs: StoredRun[]; results: StoredResult[] }>({
+  checkpointWhen: () => false,
   kind: "dispatch.evaluation-comparisons", version: 1, scope: "session",
   initial: () => ({ comparisons: [], runs: [], results: [] }),
 });

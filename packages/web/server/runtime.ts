@@ -127,18 +127,23 @@ type WorkerBinding = {
   roomId?: string; sourceId: string; catalogRevision: number; catalogFingerprint: string;
 };
 const RuntimeModeDoc = defineDoc<{ mode?: "native" | "directory" | "conversation"; worker?: WorkerBinding }>({
+  checkpointWhen: () => false,
   kind: "dispatch.runtime-mode", version: 1, scope: "session", initial: () => ({}),
 });
 const WorkerInvitationsDoc = defineDoc<{ rooms: Record<string, { revision: number; mcpSelections?: boolean; instances?: boolean; requests: Record<string, string>; events: WorkerInvitationEvent[] }> }>({
+  checkpointWhen: () => false,
   kind: "dispatch.worker-invitations", version: 1, scope: "session", initial: () => ({ rooms: {} }),
 });
 const WorkerMembershipReceiptDoc = defineDoc<{ revision: number; fingerprint: string }>({
+  checkpointWhen: () => false,
   kind: "dispatch.worker-membership-receipt", version: 1, scope: "session", initial: () => ({ revision: 0, fingerprint: "" }),
 });
 const WorkerSummaryReceiptDoc = defineDoc<{ revision: number; fingerprint: string }>({
+  checkpointWhen: () => false,
   kind: "dispatch.worker-summary-receipt", version: 1, scope: "session", initial: () => ({ revision: 0, fingerprint: "" }),
 });
 const WorkerExportsDoc = defineDoc<{ sourceId?: string; companies: Record<string, { revision: number; fingerprint: string }> }>({
+  checkpointWhen: () => false,
   kind: "dispatch.worker-catalog-exports", version: 1, scope: "session", initial: () => ({ companies: {} }),
 });
 type ManagementReceipt = {
@@ -148,6 +153,7 @@ type ManagementReceipt = {
   at: number; reason: string; evidence: string[]; fields: string[]; restoreRevision?: number; grantVersion: number;
 };
 const ManagementReceiptsDoc = defineDoc<{ receipts: ManagementReceipt[] }>({
+  checkpointWhen: () => false,
   kind: "dispatch.agent-management-receipts", version: 1, scope: "session", initial: () => ({ receipts: [] }),
 });
 type SkillLibraryReceipt = {
@@ -156,6 +162,7 @@ type SkillLibraryReceipt = {
   at: number; reason: string; evidence: string[]; grantVersion: number;
 };
 const SkillLibraryReceiptsDoc = defineDoc<{ receipts: SkillLibraryReceipt[] }>({
+  checkpointWhen: () => false,
   kind: "dispatch.skill-library-receipts", version: 1, scope: "session", initial: () => ({ receipts: [] }),
 });
 type BundleImportReceipt = {
@@ -163,6 +170,7 @@ type BundleImportReceipt = {
   packageId: string; packageVersion: string; importedAt: number; result: { agents: { key: string; id: string }[]; skills: { key: string; id: string }[] };
 };
 const BundleImportsDoc = defineDoc<{ imports: BundleImportReceipt[] }>({
+  checkpointWhen: () => false,
   kind: "dispatch.bundle-imports", version: 1, scope: "session", initial: () => ({ imports: [] }),
 });
 type TrackedBundleEntry = { key: string; id: string; revision: number; baseline: string; upstream: string; present: boolean };
@@ -174,9 +182,11 @@ type SavedGitHubPreview = {
 };
 type GitHubReceipt = { companyId: string; userId: string; requestId: string; previewId: string; result: GitHubBundleApplyResult };
 const GitHubBundlesDoc = defineDoc<{ installations: TrackedBundle[]; previews: SavedGitHubPreview[]; receipts: GitHubReceipt[] }>({
+  checkpointWhen: () => false,
   kind: "dispatch.github-bundles", version: 1, scope: "session", initial: () => ({ installations: [], previews: [], receipts: [] }),
 });
 const CatalogDoc = defineDoc<Catalog>({
+  checkpointWhen: () => false,
   kind: "dispatch.catalog", version: 1, scope: "session",
   initial: () => ({ chats: [], agents: [] }),
 });
@@ -3294,7 +3304,7 @@ export class DispatchRuntime {
       this.shared.turns.expirePresence.definition.name, this.shared.turns.wait.definition.name,
       this.shared.contributions.guard.definition.name,
     ]);
-    for (const status of ["pending", "running", "waiting", "completing"] as const) {
+    for (const status of ["pending", "running", "waiting", "sleeping", "completing"] as const) {
       let page = await tx.scanTasks({ conversationId: id, status }, 100);
       while (true) {
         if (page.items.some(task => !roomTasks.has(task.kind))) return true;
@@ -3507,7 +3517,7 @@ function productionModels() {
 }
 
 async function hasUnfinishedTasks(tx: Tx, conversationId: ConversationId) {
-  for (const status of ["pending", "running", "waiting", "completing"] as const) {
+  for (const status of ["pending", "running", "waiting", "sleeping", "completing"] as const) {
     if ((await tx.scanTasks({ conversationId, status }, 1)).items.length) return true;
   }
   return false;

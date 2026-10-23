@@ -42,7 +42,7 @@ const INITIAL_SCHEMA: readonly string[] = [
     PRIMARY KEY (store_id, id),
     conversation_id BIGINT NOT NULL,
     kind TEXT COLLATE "C" NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'waiting', 'completing', 'terminal')),
+    status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'waiting', 'sleeping', 'completing', 'terminal')),
     abort_requested INTEGER NOT NULL CHECK (abort_requested IN (0, 1)),
     background INTEGER NOT NULL CHECK (background IN (0, 1)),
     record TEXT NOT NULL
@@ -117,9 +117,14 @@ export async function migrateWithinTransaction(client: Client): Promise<void> {
   await client.query("INSERT INTO dispatch_pi.schema_version VALUES (1, 0) ON CONFLICT DO NOTHING");
   const { rows } = await client.query<{ version: number }>("SELECT version FROM dispatch_pi.schema_version WHERE singleton = 1");
   const version = rows[0]?.version;
-  if (version !== 0 && version !== 1) throw new Error("Unsupported PostgreSQL Pi schema version");
+  if (version !== 0 && version !== 1 && version !== 2) throw new Error("Unsupported PostgreSQL Pi schema version");
   if (version === 0) {
     for (const statement of INITIAL_SCHEMA) await client.query(statement);
-    await client.query("UPDATE dispatch_pi.schema_version SET version = 1 WHERE singleton = 1");
   }
+  if (version === 1) {
+    await client.query(`ALTER TABLE dispatch_pi.tasks
+      DROP CONSTRAINT tasks_status_check,
+      ADD CONSTRAINT tasks_status_check CHECK (status IN ('pending', 'running', 'waiting', 'sleeping', 'completing', 'terminal'))`);
+  }
+  if (version < 2) await client.query("UPDATE dispatch_pi.schema_version SET version = 2 WHERE singleton = 1");
 }

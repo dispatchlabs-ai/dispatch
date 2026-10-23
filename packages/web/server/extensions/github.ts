@@ -13,6 +13,7 @@ export interface AgentGitHubAccess {
 }
 type PushReceipt = { id: string; bindingId: string; ref: string; oid: string; createdAt: number; status: "uncertain" | "succeeded" };
 const PushReceipts = defineDoc<{ receipts: PushReceipt[] }>({
+  checkpointWhen: () => false,
   kind: "dispatch.github-push-receipts", version: 1, scope: "conversation", history: "latest", fork: "current", initial: () => ({ receipts: [] }),
 });
 const text = (message: string, isError = false) => ({ content: [{ type: "text" as const, text: message }], ...(isError ? { isError: true as const } : {}) });

@@ -82,6 +82,7 @@ type SessionState = {
   requests: Record<string, { fingerprint: string; taskId: TaskId<MuseRunResult> }>;
 };
 export const MuseSessionDoc = defineDoc<SessionState>({
+  checkpointWhen: () => false,
   kind: "dispatch.muse-session", version: 1, scope: "conversation", history: "latest", fork: "initial",
   initial: () => ({ requests: {} }),
 });

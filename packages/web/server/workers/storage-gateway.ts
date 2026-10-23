@@ -1,5 +1,5 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { StorageRejected, type StorageWrite } from "@earendil-works/pi-durable";
+import type { StorageWrite } from "@earendil-works/pi-durable";
 import { z } from "zod";
 import { PostgresStorage, RemoteStorageConflict } from "../storage/postgres/storage.js";
 import { storageReadMethods, type RemoteStorageReply, type StorageReadMethod } from "../storage/remote.js";
@@ -86,7 +86,6 @@ export class WorkerStorageGateway {
       }
       return { outcome: "ok", value };
     } catch (error) {
-      if (error instanceof StorageRejected) return { outcome: "rejected" };
       if (error instanceof RemoteStorageConflict) return { outcome: "conflict" };
       throw error;
     }

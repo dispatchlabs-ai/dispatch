@@ -23,5 +23,5 @@ export async function verifyWorkerAccess(client: Client, storeId: string): Promi
     OR has_schema_privilege('public','CREATE') AS mutable`);
   if (schemas.mutable) throw new Error("Worker credentials allow schema mutation.");
   const { rows: [schema] } = await client.query("SELECT version FROM dispatch_pi.schema_version WHERE singleton=1");
-  if (schema?.version !== 1) throw new Error("Worker PostgreSQL schema is not provisioned.");
+  if (schema?.version !== 2) throw new Error("Worker PostgreSQL schema is not provisioned for Pi Durable 1.4.0.");
 }

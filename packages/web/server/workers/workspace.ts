@@ -5,6 +5,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { defineDoc, section, type Harness } from "@earendil-works/pi-durable";
 
 export const WorkerWorkspaceDoc = defineDoc<{ generation?: string; recovered?: boolean; notice?: string }>({
+  checkpointWhen: () => false,
   kind: "dispatch.worker-workspace", version: 1, scope: "session", initial: () => ({}),
 });
 

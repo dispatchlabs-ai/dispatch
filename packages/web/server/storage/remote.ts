@@ -1,11 +1,11 @@
 import type { Context } from "@earendil-works/chord";
-import { StorageRejected, type Storage, type Id, type EntryId, type ConversationId } from "@earendil-works/pi-durable";
+import type { Storage, Id, EntryId, ConversationId } from "@earendil-works/pi-durable";
 import { setTimeout as delay } from "node:timers/promises";
 
 export const storageReadMethods = ["conversation", "scanConversations", "entry", "findLatestHeadMarker", "scanEntries",
   "task", "scanTasks", "submission", "scanSubmissions", "submissionByRequest", "findDocument", "document", "scanDocuments"] as const;
 export type StorageReadMethod = typeof storageReadMethods[number];
-export type RemoteStorageReply = { outcome: "ok"; value?: unknown } | { outcome: "rejected" | "conflict" };
+export type RemoteStorageReply = { outcome: "ok"; value?: unknown } | { outcome: "conflict" };
 export type RemoteStorageRequest = { sessionId: string; method: StorageReadMethod | "open" | "commit" | "mintId" | "close";
   args: unknown[]; sequence?: number };
 export type RemoteStorageConfig = { kind: "remote"; storeId: string; sessionId: string;
@@ -45,7 +45,6 @@ export class RemoteStorage implements Storage {
         }
         return this.fail();
       }
-      if (reply.outcome === "rejected") throw new StorageRejected("Remote storage rejected the batch before any durable effect.");
       if (reply.outcome !== "ok") return this.fail();
       if (mutation) this.sequence++;
       return reply.value;

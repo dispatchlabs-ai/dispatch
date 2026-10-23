@@ -25,11 +25,13 @@ type WebReference = {
 // Snapshots are immutable once committed. Rewind/fork follow the corresponding transcript.
 // Never resolve another agent's reference by looking outside its native conversation.
 const WebReferenceDoc = defineDocFamily<WebReference, WebReference>({
+  checkpointWhen: () => false,
   kind: "dispatch.web-reference", family: true, version: 1, scope: "conversation", history: "rewindable", fork: "asOf",
   initial: reference => reference,
 });
 type ReferenceSummary = Pick<WebReference, "id" | "kind" | "url" | "retrievedAt">;
 const RecentReferences = defineDoc<{ references: ReferenceSummary[] }>({
+  checkpointWhen: () => false,
   kind: "dispatch.web-recent", version: 1, scope: "conversation", history: "rewindable", fork: "asOf",
   initial: () => ({ references: [] }),
 });

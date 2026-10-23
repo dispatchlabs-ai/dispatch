@@ -16,16 +16,18 @@ complete terminal example with an integrity-pinned public runner archive.
 For source builds, pack a reviewed revision as below. See the
 [use cases](USE_CASES.md) and [changes](CHANGELOG.md).
 
-The `runner-v0.6.0-alpha.4` GitHub prerelease is a runner-only source snapshot
-using Pi 1.3.0, not the 1.4.0 source build described here and not a release or
-deployment of Dispatch Web. Its notes identify the exact source
-commit and archive checksum. The archive retains the repository's 0.6.0 package
-version; its tag and npm lockfile integrity distinguish the snapshot. Install it
-without checking an archive into your own repository:
+The `runner-v0.6.0-alpha.5` GitHub prerelease is a Runner/Slack source snapshot
+using Pi 1.4.0. Its notes identify the exact source commit and archive checksums.
+The archives retain the repository's 0.6.0 package version; their immutable tag,
+URL and npm lockfile integrity identify the snapshot. Install in the parent
+runtime workspace:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/runner-v0.6.0-alpha.4/dispatch-runner-0.6.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/runner-v0.6.0-alpha.5/dispatch-runner-0.6.0.tgz
 ```
+
+See [definition workspaces](docs/definition-workspaces.md) for separating the
+installation from company definitions, domain workflows and integration code.
 
 Keep the resulting lockfile. Snapshot updates use a new immutable tag and URL;
 published assets are never replaced. This distribution does not change the

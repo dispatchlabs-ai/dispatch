@@ -69,25 +69,31 @@ export type SharedState = {
   definitionOfDone?: { markdown: string; revision: number };
 };
 export const SharedDoc = defineDoc<SharedState>({
+  checkpointWhen: () => false,
   kind: "dispatch.shared-conversation", version: 1, scope: "conversation", history: "latest", fork: "initial",
   initial: () => ({ companyId: "", members: [], epoch: 0, preferences: {}, requests: {}, deliveries: [], replyHistoryVersion: 1 }),
 });
 const LegacyFingerprints = defineDoc<{ fingerprints: Record<string, string> }>({
+  checkpointWhen: () => false,
   kind: "dispatch.request-fingerprints", version: 1, scope: "conversation", history: "latest", fork: "initial", initial: () => ({ fingerprints: {} }),
 });
 const BindingDoc = defineDoc<{ roomId?: ConversationId; participantId?: string }>({
+  checkpointWhen: () => false,
   kind: "dispatch.participant-binding", version: 1, scope: "conversation", history: "latest", fork: "initial", initial: () => ({}),
 });
 const PreparedAttachment = defineDoc<{ attachmentId?: string }>({
+  checkpointWhen: () => false,
   kind: "dispatch.prepared-attachment", version: 1, scope: "task", initial: () => ({}),
 });
 // One receipt per settled native round: replay must not apply an old answer to a newer review cursor.
 const NativeSettlementDoc = defineDoc<{ rounds: Record<string, { ids: string[]; continuation?: string; complete?: boolean }> }>({
+  checkpointWhen: () => false,
   kind: "dispatch.native-settlement", version: 1, scope: "task", initial: () => ({ rounds: {} }),
 });
-const SdkActivity = defineDoc<{ anchored?: boolean }>({ kind: "dispatch.sdk-activity", version: 1, scope: "task", initial: () => ({}) });
+const SdkActivity = defineDoc<{ anchored?: boolean }>({ checkpointWhen: () => false, kind: "dispatch.sdk-activity", version: 1, scope: "task", initial: () => ({}) });
 export const SdkInputEntry = defineEntry<{ threadId: string | null; createdAt: number }>("dispatch.sdk-input");
 const ListeningRequest = defineDoc<{ through?: string; contributionId?: string; publicationOnly?: boolean }>({
+  checkpointWhen: () => false,
   kind: "dispatch.listening-request", version: 1, scope: "task", initial: () => ({}),
 });
 type MessageData = {
@@ -412,7 +418,7 @@ export class SharedConversations {
           const message = messages.find(message => message.id === args.messageId || message.aliases?.includes(args.messageId!));
           if (!message) throw new CollaborationError(404, "Public message not found.");
           const start = args.textOffset ?? 0;
-          return { content: [{ type: "text" as const, text: JSON.stringify({ ...messageMetadata(message), text: message.text.slice(start, start + 12_000), textOffset: start, textLength: message.text.length, nextTextOffset: start + 12_000 < message.text.length ? start + 12_000 : null }) }, ...(message.images ?? []).map(image => ({ type: "image" as const, ...image })), ...await this.attachments.imageContent(message.attachments)] };
+          return { output: [{ type: "text" as const, text: JSON.stringify({ ...messageMetadata(message), text: message.text.slice(start, start + 12_000), textOffset: start, textLength: message.text.length, nextTextOffset: start + 12_000 < message.text.length ? start + 12_000 : null }) }, ...(message.images ?? []).map(image => ({ type: "image" as const, ...image })), ...await this.attachments.imageContent(message.attachments)] };
         }
         const offset = args.offset ?? 0; const limit = args.limit ?? 50;
         const page = []; let chars = 0;
@@ -436,7 +442,7 @@ export class SharedConversations {
         if (!stored || (stored.private && stored.uploaderId !== binding.participantId)) throw new AttachmentError(404, "Attachment not found in this conversation.");
         const metadata = attachmentMetadata(stored);
         if (metadata.kind === "file") return reply({ attachment: metadata, readable: false, reason: "Download-only format. Dispatch does not extract or interpret this file's content." });
-        if (metadata.kind === "image") return { content: [{ type: "text" as const, text: JSON.stringify({ attachment: metadata }) }, ...await this.attachments.imageContent([metadata])] };
+        if (metadata.kind === "image") return { output: [{ type: "text" as const, text: JSON.stringify({ attachment: metadata }) }, ...await this.attachments.imageContent([metadata])] };
         const text = new TextDecoder("utf-8", { fatal: true }).decode(await this.attachments.read(metadata));
         const offset = args.offset ?? 0;
         const end = Math.min(offset + 12_000, text.length);
@@ -1628,7 +1634,7 @@ async function scanEntries(tx: Tx, conversationId: ConversationId) {
   do { const page = await tx.scanEntries({ conversationId }, 200, cursor); entries.push(...page.items); cursor = page.next; } while (cursor);
   return entries.reverse();
 }
-function reply(value: unknown) { return { content: [{ type: "text" as const, text: JSON.stringify(value) }] }; }
+function reply(value: unknown) { return { output: [{ type: "text" as const, text: JSON.stringify(value) }] }; }
 
 /** Publication aliases name receipts, not old public rows. Only aliases that
  * rewrite stored IDs or thread references invalidate loaded history. */

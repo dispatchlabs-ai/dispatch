@@ -3,7 +3,6 @@ import type { Context, JsonValue } from "@earendil-works/chord";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { apply, type Op } from "@earendil-works/chord/delta";
 import { createHash } from "node:crypto";
-import { StorageRejected } from "@earendil-works/pi-durable";
 
 import type {
   ConversationId,
@@ -155,7 +154,7 @@ const writeId = (write: StorageWrite): Id<string> | undefined => {
   }
 };
 
-/** PostgreSQL implementation of Pi Durable 1.1.0 public Storage. See NOTICE for upstream attribution. */
+/** PostgreSQL implementation of Pi Durable 1.4.0 public Storage. See NOTICE for upstream attribution. */
 export class PostgresStorage implements Storage {
   private closed = false;
   private closing: Promise<void> | undefined;
@@ -772,7 +771,7 @@ export class PostgresStorage implements Storage {
     const liveCounts = new Map<string, number>();
     for (const [id, action] of actions) {
       if (action.copy !== undefined && actions.has(action.copy.id)) {
-        throw new StorageRejected(`Document copy ${id} source is changed in the copy batch`);
+        throw new Error(`Document copy ${id} source is changed in the copy batch`);
       }
       const row = await executor.get<JsonRow>("SELECT record FROM dispatch_pi.documents WHERE store_id = $1 AND id = ?", id);
       const existing = row === undefined ? undefined : parseJson<DocumentRecord>(row.record);
@@ -911,8 +910,7 @@ export class PostgresStorage implements Storage {
           }
           content = { kind: "base", version: stored.version, value: stored.value };
         } catch (error) {
-          if (error instanceof StorageRejected) throw error;
-          throw new StorageRejected(`Document copy ${id} was rejected`, { cause: error });
+          throw new Error(`Document copy ${id} was rejected`, { cause: error });
         }
       }
       let record: DocumentRecord;

@@ -23,3 +23,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Updated to the Pi Durable 1.4.0 public Storage contract and schema-v2 task statuses.
+https://github.com/earendil-works/pi/tree/v1.4.0/packages/durable/src/storage

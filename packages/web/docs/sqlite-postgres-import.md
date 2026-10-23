@@ -19,7 +19,7 @@ start a service, or provide automatic failover.
    npx tsx scripts/import-sqlite.ts /private/snapshot/runtime/pi.sqlite new-store-id
    ```
 
-   `DISPATCH_POSTGRES_URL` is required. The command accepts only schema version 1,
+   `DISPATCH_POSTGRES_URL` is required. The command accepts schema versions 1 and 2,
    the exact known table/column layout, terminal tasks, and settled submissions.
    It reads SQLite in one read-only transaction, holds the target store ownership
    lock, refuses any existing target store, and copies all eight Pi tables in one

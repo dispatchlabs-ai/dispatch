@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Document installation-owned runtime dependencies and separate company definition checkouts, including immutable deployment and native schema migration boundaries.
+
 - Upgrade the runner's Chord, Pi AI and Pi Durable dependencies to 1.4.0.
   Declare explicit delta-only document checkpoint policies and use native durable
   sleeps for schedules and handoff progress, preserving existing checkpoint shapes.

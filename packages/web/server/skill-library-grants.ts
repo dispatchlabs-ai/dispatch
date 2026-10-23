@@ -19,6 +19,7 @@ type StoredPolicy = Omit<NonNullable<SkillLibraryGrantInput["policy"]>, "action"
 export type SkillLibraryGrant = { companyId: string; editorId: string; version: number; policy: StoredPolicy | null };
 type SkillLibraryGrantChange = { companyId: string; userId: string; at: number; requestId: string; fingerprint: string; reason?: string; before: SkillLibraryGrant | null; after: SkillLibraryGrant };
 const SkillLibraryGrantsDoc = defineDoc<{ grants: SkillLibraryGrant[]; changes: SkillLibraryGrantChange[] }>({
+  checkpointWhen: () => false,
   kind: "dispatch.skill-library-grants", version: 1, scope: "session", initial: () => ({ grants: [], changes: [] }),
 });
 

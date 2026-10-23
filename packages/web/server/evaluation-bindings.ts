@@ -30,6 +30,7 @@ export type EvaluationBinding = {
 };
 
 export const EvaluationBindingDoc = defineDoc<{ binding: EvaluationBinding | null }>({
+  checkpointWhen: () => false,
   kind: "dispatch.evaluation-binding", version: 1, scope: "conversation", history: "latest", fork: "initial",
   initial: () => ({ binding: null }),
 });

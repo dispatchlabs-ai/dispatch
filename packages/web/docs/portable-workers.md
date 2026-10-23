@@ -24,8 +24,8 @@ A confirmed replacement gets a new attempt and session while keeping the same du
 The client orders storage operations. A mutation's sequence, request hash and result are saved
 in the same transaction as its writes or ID allocation. A lost reply can retry that exact mutation;
 the persisted receipt returns the original result. Only the last receipt is needed because the
-client cannot advance until it acknowledges it. A native `StorageRejected` is returned only after
-confirmed rollback; it does not consume a sequence. Conflicting sessions, closed sessions and
+client cannot advance until it acknowledges it. Pi 1.4 treats storage errors as fatal to the Session. A failed transaction
+rolls back without consuming a sequence; transport retries still use the same receipt identity. Conflicting sessions, closed sessions and
 changed or out-of-order requests fail closed. Exhausted storage recovery retires the worker
 process; it cannot silently reopen its Pi Session.
 

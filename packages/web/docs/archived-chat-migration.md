@@ -1,6 +1,6 @@
 # Copy archived native chats into a worker deployment
 
-The operator tooling copies an idle project from a schema-v1 native Pi snapshot into an existing directory/worker deployment. Each selected chat gets a separate worker store and a pending route with no executor. Directory publication archives every copied chat for all accounts present in the destination company. Existing chats, project settings, authentication and grants remain unchanged.
+The operator tooling copies an idle project from a schema-v1 or schema-v2 native Pi snapshot into an existing directory/worker deployment. Each selected chat gets a separate worker store and a pending route with no executor. Directory publication archives every copied chat for all accounts present in the destination company. Existing chats, project settings, authentication and grants remain unchanged.
 
 This is an offline administration procedure, not a browser import or a whole-installation replacement. The backend must be stopped cleanly during publication. Opening an imported chat later follows normal worker startup behavior; archive preferences hide chats but do not prohibit explicit reads or future work.
 

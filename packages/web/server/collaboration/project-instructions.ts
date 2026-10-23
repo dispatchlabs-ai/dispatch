@@ -12,6 +12,7 @@ export type ProjectInstructionsBinding = {
  * Forks require their own project binding, like the collaboration participant binding.
  */
 export const ProjectInstructionsBindingDoc = defineDoc<ProjectInstructionsBinding>({
+  checkpointWhen: () => false,
   kind: "dispatch.project-instructions-binding", version: 1, scope: "conversation", history: "latest", fork: "initial",
   initial: () => ({ instructionsRevision: 0, markdown: "" }),
 });

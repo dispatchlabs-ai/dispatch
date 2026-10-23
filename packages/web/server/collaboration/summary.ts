@@ -9,6 +9,7 @@ type PublicSummary = {
 
 /** Derived public metadata, committed with its source entry. Never contains private agent history. */
 export const PublicSummaryDoc = defineDoc<PublicSummary>({
+  checkpointWhen: () => false,
   kind: "dispatch.public-summary", version: 1, scope: "conversation", history: "latest", fork: "initial",
   initial: () => ({ complete: false, updatedAt: 0 }),
 });

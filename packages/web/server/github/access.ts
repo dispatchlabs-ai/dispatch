@@ -11,7 +11,7 @@ const GitHubAccessDoc = defineDoc<{
   connections: GitHubConnection[];
   repositories: GitHubRepositoryBinding[];
   receipts: Record<string, { fingerprint: string; result: GitHubConnection | GitHubRepositoryBinding | { removed: string } }>;
-}>({ kind: "dispatch.github-access", version: 1, scope: "session", initial: () => ({ connections: [], repositories: [], receipts: {} }) });
+}>({ checkpointWhen: () => false, kind: "dispatch.github-access", version: 1, scope: "session", initial: () => ({ connections: [], repositories: [], receipts: {} }) });
 type ReceiptResult = GitHubConnection | GitHubRepositoryBinding | { removed: string };
 type State = { connections: GitHubConnection[]; repositories: GitHubRepositoryBinding[]; receipts: Record<string, { fingerprint: string; result: ReceiptResult }> };
 type Actor = { companyId: string; definitionId: string; projectId: string | undefined };

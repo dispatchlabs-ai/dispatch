@@ -7,9 +7,11 @@ import type { ClaudeRunScope } from "../claude-sdk/task.js";
 
 /** A native tool child can post only as its committed SDK parent, never a fabricated Pi run. */
 export const SdkToolBinding = defineDoc<{ reviewer?: TaskId }>({
+  checkpointWhen: () => false,
   kind: "dispatch.sdk-tool-binding", version: 1, scope: "task", initial: () => ({}),
 });
 const SdkToolReceipts = defineDoc<{ calls: Record<string, { taskId: TaskId<ToolTaskResult>; fingerprint: string }> }>({
+  checkpointWhen: () => false,
   kind: "dispatch.sdk-tool-receipts", version: 1, scope: "task", initial: () => ({ calls: {} }),
 });
 
@@ -57,13 +59,16 @@ export async function nativeToolBridge<I, S extends { phase: string }, R>(
           stopReason: "toolUse", timestamp: runtime.now(),
           usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
         }] });
-        taskId = await tx.createTask(ToolTask, { assistant: assistant.id, callId }, { ownership: { kind: "task", taskId: runtime.taskId } });
+        taskId = await tx.createTask(ToolTask, { kind: "model", assistant: assistant.id, callId }, { ownership: { kind: "task", taskId: runtime.taskId } });
         (await tx.doc(SdkToolBinding, taskId)).reviewer = runtime.taskId;
         receipts.calls[key] = { taskId, fingerprint };
       }, context);
       const settled = await runtime.waitForTask(taskId, context);
       if (settled.state.outcome.status !== "completed") return { content: [{ type: "text" as const, text: "Tool execution did not complete; its effects may be uncertain." }], isError: true };
-      const entry = await runtime.entry(settled.state.outcome.result.entryId, context);
+      const outcome = settled.state.outcome.result;
+      // Pre-1.4 completing tasks retain model results without a kind discriminator.
+      if (outcome.kind === "nested") throw new Error("SDK bridge received a nested tool result.");
+      const entry = await runtime.entry(outcome.entryId, context);
       const result = entry?.model?.find(message => message.role === "toolResult");
       if (!result || result.role !== "toolResult") throw new Error("Committed tool result is unavailable.");
       return { content: result.content, isError: result.isError };

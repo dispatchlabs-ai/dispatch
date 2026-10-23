@@ -23,8 +23,9 @@ const connectionSchema = z.object({
 // Retain the historical oauth namespace so stored bindings and tool IDs survive migration.
 type ConnectionConfig = z.infer<typeof connectionSchema> | { id: string; agentId: "oauth"; name: string; endpoint: string; identity: string; instructions: string; applyToExisting: false; source: "oauth" };
 type Catalog = { connections: Record<string, { tools: JsonRepresentation<Tool>[]; instructions: string; checkedAt: number; serverName?: string }> };
-const CatalogDoc = defineDoc<Catalog>({ kind: "dispatch.mcp-catalog", version: 1, scope: "session", initial: () => ({ connections: {} }) });
+const CatalogDoc = defineDoc<Catalog>({ checkpointWhen: () => false, kind: "dispatch.mcp-catalog", version: 1, scope: "session", initial: () => ({ connections: {} }) });
 const BindingDoc = defineDoc<{ connections: string[] }>({
+  checkpointWhen: () => false,
   kind: "dispatch.mcp-bindings", version: 1, scope: "conversation", history: "rewindable", fork: "asOf", initial: () => ({ connections: [] }),
 });
 export const isMcpExtension = (name: string) => name.startsWith("dispatch-mcp-");

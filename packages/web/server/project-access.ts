@@ -26,6 +26,7 @@ export const ProjectsDoc = defineDoc<{
   requests: Record<string, { fingerprint: string; projectId: string }>;
   instructionsRequests?: Record<string, { fingerprint: string; result: { projectId: string; revision: number; content: string } }>;
 }>({
+  checkpointWhen: () => false,
   kind: "dispatch.projects", version: 1, scope: "session",
   initial: () => ({ projects: {}, requests: {} }),
 });

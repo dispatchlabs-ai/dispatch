@@ -79,6 +79,7 @@ type SessionState = {
   requests: Record<string, { fingerprint: string; taskId: TaskId<ClaudeRunResult> }>;
 };
 export const ClaudeSessionDoc = defineDoc<SessionState>({
+  checkpointWhen: () => false,
   kind: "dispatch.claude-sdk-session", version: 1, scope: "conversation", history: "latest", fork: "initial",
   initial: () => ({ requests: {} }),
 });

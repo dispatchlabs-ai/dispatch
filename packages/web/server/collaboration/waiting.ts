@@ -10,10 +10,12 @@ type Wait = {
   status: "waiting" | "ready"; reason?: string; resumedAt?: number; gate?: TaskId;
 };
 export const DependencyWaitsDoc = defineDoc<{ participants: Record<string, Wait> }>({
+  checkpointWhen: () => false,
   kind: "dispatch.dependency-waits", version: 1, scope: "conversation", history: "latest", fork: "initial",
   initial: () => ({ participants: {} }),
 });
 export const WaitReceipt = defineDoc<{ result?: Wait }>({
+  checkpointWhen: () => false,
   kind: "dispatch.dependency-wait-receipt", version: 1, scope: "task", initial: () => ({}),
 });
 type Room = { epoch: number; stopping?: TaskId; definitionOfDone?: { revision: number }; members: { id: string; kind: string; membership?: string }[] };
@@ -27,29 +29,20 @@ export class DependencyWaits {
   constructor(private readonly room: (tx: Tx, roomId: ConversationId) => Promise<Room>) {
     this.task = defineTask<{ roomId: ConversationId; participantId: string; waitId: string }, { phase: "wait" }, null>({
       name: "dispatch.wait-for-dependencies", version: 1, initial: () => ({ phase: "wait" }),
-      phases: { wait: async (task, runtime, ctx) => {
-        while (true) {
-          let done = false;
-          let reviewAt = runtime.now();
-          await runtime.commit(async tx => {
-            const wait = (await tx.doc(DependencyWaitsDoc, task.input.roomId)).participants[task.input.participantId];
-            if (wait?.id === task.input.waitId && wait.status === "waiting") {
-              const room = await this.room(tx, task.input.roomId);
-              const live = await tx.doc(LiveDoc, wait.conversationId);
-              if (room.stopping || room.epoch !== wait.epoch || !active(room.members.find(member => member.id === task.input.participantId))) resume(wait, "cancelled", runtime.now());
-              else if (!live.run || !wait.inputs.every(id => live.run!.inputs.includes(id))) resume(wait, "run-changed", runtime.now());
-              else if ((room.definitionOfDone?.revision ?? 0) !== wait.criteriaRevision) resume(wait, "criteria-changed", runtime.now());
-              else if (wait.dependencies.some(dependency => !active(room.members.find(member => member.id === dependency.participantId)))) resume(wait, "dependency-unavailable", runtime.now());
-              else if (runtime.now() >= wait.reviewAt) resume(wait, "review-deadline", runtime.now());
-              reviewAt = wait.reviewAt;
-            }
-            done = !wait || wait.id !== task.input.waitId || wait.status !== "waiting";
-            if (done) return completed();
-          }, ctx);
-          if (done) return;
-          await runtime.sleep(Math.min(reviewAt, runtime.now() + 250), ctx);
+      phases: { wait: (task, runtime, ctx) => runtime.commit(async tx => {
+        const wait = (await tx.doc(DependencyWaitsDoc, task.input.roomId)).participants[task.input.participantId];
+        if (wait?.id === task.input.waitId && wait.status === "waiting") {
+          const room = await this.room(tx, task.input.roomId);
+          const live = await tx.doc(LiveDoc, wait.conversationId);
+          if (room.stopping || room.epoch !== wait.epoch || !active(room.members.find(member => member.id === task.input.participantId))) resume(wait, "cancelled", runtime.now());
+          else if (!live.run || !wait.inputs.every(id => live.run!.inputs.includes(id))) resume(wait, "run-changed", runtime.now());
+          else if ((room.definitionOfDone?.revision ?? 0) !== wait.criteriaRevision) resume(wait, "criteria-changed", runtime.now());
+          else if (wait.dependencies.some(dependency => !active(room.members.find(member => member.id === dependency.participantId)))) resume(wait, "dependency-unavailable", runtime.now());
+          else if (runtime.now() >= wait.reviewAt) resume(wait, "review-deadline", runtime.now());
         }
-      } },
+        if (!wait || wait.id !== task.input.waitId || wait.status !== "waiting") return completed();
+        return { status: "sleeping", until: Math.min(wait.reviewAt, runtime.now() + 250), checkpoint: { phase: "wait" } };
+      }, ctx) },
       abort: (task, runtime, ctx) => runtime.commit(async tx => {
         const wait = (await tx.doc(DependencyWaitsDoc, task.input.roomId)).participants[task.input.participantId];
         if (wait?.id === task.input.waitId) resume(wait, "cancelled", runtime.now());

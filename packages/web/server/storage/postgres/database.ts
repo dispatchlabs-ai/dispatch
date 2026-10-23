@@ -97,7 +97,7 @@ export class PostgresDatabase implements PostgresExecutor {
       if (options.access === "worker") await verifyWorkerAccess(client, options.storeId);
       if (readOnly) {
         const { rows: [schema] } = await client.query("SELECT version FROM dispatch_pi.schema_version WHERE singleton=1");
-        if (schema?.version !== 1) throw new Error("PostgreSQL history schema is unavailable or unsupported.");
+        if (schema?.version !== 1 && schema?.version !== 2) throw new Error("PostgreSQL history schema is unavailable or unsupported.");
         const { rows: [metadata] } = await client.query("SELECT 1 FROM dispatch_pi.durable_metadata WHERE store_id=$1", [options.storeId]);
         if (!metadata) throw new Error("PostgreSQL history store is unavailable.");
         database.assertHealthy();
@@ -164,7 +164,7 @@ export class PostgresDatabase implements PostgresExecutor {
           this.failure = new AggregateError([error, rollbackError], "PostgreSQL rollback failed; storage is unusable");
           throw this.failure;
         }
-        // StorageRejected is preserved only after rollback is positively acknowledged.
+        // Propagate the original failure only after confirmed rollback; Pi fails the Session.
         throw error;
       }
       active = false;
@@ -173,7 +173,7 @@ export class PostgresDatabase implements PostgresExecutor {
         if (committed.command !== "COMMIT") throw new Error("PostgreSQL did not confirm COMMIT");
         this.assertHealthy();
       } catch (error) {
-        // No retries or StorageRejected: COMMIT may already have taken effect.
+        // Never retry here: COMMIT may already have taken effect.
         this.failure = new Error("PostgreSQL COMMIT outcome is uncertain; storage must be reopened", { cause: error });
         throw this.failure;
       }

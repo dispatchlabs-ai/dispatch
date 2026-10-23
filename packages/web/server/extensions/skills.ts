@@ -11,6 +11,7 @@ export type SkillSnapshot = {
 
 /** Populate once when creating the participant, in the same transaction as its agent configuration. */
 export const SkillBindingsDoc = defineDoc<{ skills: SkillSnapshot[] }>({
+  checkpointWhen: () => false,
   kind: "dispatch.skill-bindings", version: 1, scope: "conversation", history: "rewindable", fork: "asOf",
   initial: () => ({ skills: [] }),
 });

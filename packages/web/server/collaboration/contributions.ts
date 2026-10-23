@@ -17,6 +17,7 @@ export type Contribution = {
   messageId?: string; finalGenerations?: TaskId[]; needsReview?: boolean;
 };
 export const ContributionsDoc = defineDoc<{ items: Record<string, Contribution> }>({
+  checkpointWhen: () => false,
   kind: "dispatch.contributions", version: 1, scope: "conversation", history: "latest", fork: "initial", initial: () => ({ items: {} }),
 });
 const completed = () => ({ status: "terminal", outcome: { status: "completed", result: null } }) as const;
@@ -28,19 +29,12 @@ export class Contributions {
   constructor(private readonly turns: ConversationTurns) {
     this.guard = defineTask<{ roomId: ConversationId; id: string }, { phase: "guard" }, null>({
       name: "dispatch.contribution", version: 1, initial: () => ({ phase: "guard" }),
-      phases: { guard: async (task, runtime, ctx) => {
-        while (true) {
-          let done = false;
-          await runtime.commit(async tx => {
-            const item = (await tx.doc(ContributionsDoc, task.input.roomId)).items[task.input.id];
-            if (item) await this.reconcile(tx, task.input.roomId, item);
-            done = !item || item.phase === "closed";
-            if (done) return completed();
-          }, ctx);
-          if (done) return;
-          await runtime.sleep(runtime.now() + 200, ctx);
-        }
-      } },
+      phases: { guard: (task, runtime, ctx) => runtime.commit(async tx => {
+        const item = (await tx.doc(ContributionsDoc, task.input.roomId)).items[task.input.id];
+        if (item) await this.reconcile(tx, task.input.roomId, item);
+        if (!item || item.phase === "closed") return completed();
+        return { status: "sleeping", until: runtime.now() + 200, checkpoint: { phase: "guard" } };
+      }, ctx) },
       abort: (task, runtime, ctx) => runtime.commit(async tx => {
         const item = (await tx.doc(ContributionsDoc, task.input.roomId)).items[task.input.id];
         if (item) await this.close(tx, task.input.roomId, item);

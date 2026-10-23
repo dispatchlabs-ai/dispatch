@@ -14,12 +14,13 @@ export type BackendWorkerActor = Actor & {
   worker?: { storeId: string; roomId: string; participantId: string; instanceId: string };
 };
 export const WorkerActorsDoc = defineDoc<{ actors: Record<string, BackendWorkerActor[]> }>({
+  checkpointWhen: () => false,
   kind: "dispatch.worker-actors", version: 1, scope: "session", initial: () => ({ actors: {} }),
 });
 export const WorkerInstancesDoc = defineDoc<{ rooms: Record<string, {
   requests: Record<string, { fingerprint: string; actorId: string }>;
   report?: { storeId: string; roomId: string; revision: number; fingerprint: string };
-}> }>({ kind: "dispatch.worker-instances", version: 1, scope: "session", initial: () => ({ rooms: {} }) });
+}> }>({ checkpointWhen: () => false, kind: "dispatch.worker-instances", version: 1, scope: "session", initial: () => ({ rooms: {} }) });
 
 const id = z.string().min(1).max(200);
 const revision = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
@@ -34,4 +35,4 @@ export type WorkerParticipantReport = z.infer<typeof workerParticipantReportSche
 export const WorkerIdentityDoc = defineDoc<{
   mappings: Record<string, { participantId: string; instanceId: string; desiredRevision: number }>;
   report?: WorkerParticipantReport;
-}>({ kind: "dispatch.worker-instance-identity", version: 1, scope: "session", initial: () => ({ mappings: {} }) });
+}>({ checkpointWhen: () => false, kind: "dispatch.worker-instance-identity", version: 1, scope: "session", initial: () => ({ mappings: {} }) });

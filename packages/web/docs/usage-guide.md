@@ -849,7 +849,7 @@ The precise shared types are in `src/shared/contracts.ts` and `src/shared/auth-c
 
 ## Dependency updates and later deployment
 
-The runtime pins Pi Durable, Pi AI, Chord, Pi Coding Agent, and Pi MCP to 1.1.0. Keep these directly used packages aligned when upgrading so the application and native harness share compatible provider, document, and credential implementations. After installing an updated lockfile, restart the development launcher to load the new runtime; frontend hot reload alone does not replace the persistent backend.
+The runtime pins Pi Durable, Pi AI, Chord, Pi Coding Agent, and Pi MCP to 1.4.0. Keep these directly used packages aligned when upgrading so the application and native harness share compatible provider, document, and credential implementations. After installing an updated lockfile, restart the development launcher to load the new runtime; frontend hot reload alone does not replace the persistent backend.
 
 Use exact versions in the owning manifest and commit the root dependency lock. To update `npmDepsHash` in `packages/web/nix/package.nix`, temporarily set `lib.fakeHash`, run `nix build`, replace the placeholder with the reported actual hash, then rebuild. Never commit a placeholder. Toolchain changes through `nix flake update` also require a build.
 

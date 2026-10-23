@@ -119,7 +119,8 @@ export async function prepareNativeChatTransfer(sourceDirectory: string, inspect
   const sourceDocs: Document[] = [];
   try {
     requireValue(source.prepare("PRAGMA quick_check").get()?.quick_check === "ok", "Source integrity check failed");
-    requireValue(source.prepare("SELECT version FROM durable_schema WHERE singleton=1").get()?.version === 1, "Unsupported source schema");
+    const schemaVersion = source.prepare("SELECT version FROM durable_schema WHERE singleton=1").get()?.version;
+    requireValue(schemaVersion === 1 || schemaVersion === 2, "Unsupported source schema");
     requireValue(!source.prepare("SELECT 1 FROM tasks WHERE status!='terminal' LIMIT 1").get()
       && !source.prepare("SELECT 1 FROM submissions WHERE status IN ('queued','placed') LIMIT 1").get(), "Source has unsettled work");
     for (const row of source.prepare("SELECT id FROM documents WHERE retired_at IS NULL AND (scope_kind='session' OR kind=?) ORDER BY id").iterate(JSON.stringify("dispatch.shared-conversation"))) {

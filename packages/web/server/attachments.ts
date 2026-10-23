@@ -9,6 +9,7 @@ import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MAX_COUNT, ATTACHMENT_TOTAL_MAX_BYTES,
 
 export type StoredAttachment = Attachment & { uploaderId: string; createdAt: number; private?: boolean };
 export const AttachmentsDoc = defineDoc<{ records: Record<string, StoredAttachment> }>({
+  checkpointWhen: () => false,
   kind: "dispatch.attachments", version: 1, scope: "conversation", history: "latest", fork: "initial", initial: () => ({ records: {} }),
 });
 export class AttachmentError extends Error {

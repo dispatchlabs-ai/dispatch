@@ -54,7 +54,7 @@ export interface ProjectArchiveStorage {
   save(archive: ProjectArchive): Promise<ArchiveBlob>;
   read(blob: ArchiveBlob): Promise<ProjectArchive>;
 }
-export const ProjectArchivesDoc = defineDoc<{ records: Record<string, ArchiveBlob> }>({ kind: "dispatch.project-archives", version: 1, scope: "session", initial: () => ({ records: {} }) });
+export const ProjectArchivesDoc = defineDoc<{ records: Record<string, ArchiveBlob> }>({ checkpointWhen: () => false, kind: "dispatch.project-archives", version: 1, scope: "session", initial: () => ({ records: {} }) });
 
 /** Immutable content (including file bytes) precedes atomic native admission. Orphans are never visible. */
 export class ProjectArchiveStore implements ProjectArchiveStorage {

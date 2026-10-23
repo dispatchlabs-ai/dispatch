@@ -16,7 +16,7 @@ const layouts = {
   document_revisions: ["document_id", "seq", "kind", "version", "content"],
 } as const;
 
-/** Import an idle schema-v1 snapshot into an empty dedicated PostgreSQL database. */
+/** Import an idle schema-v1/v2 snapshot into an empty dedicated PostgreSQL database. */
 export async function importSqlite(filename: string, connectionString: string, storeId: string, options: { ca?: string; access?: "worker" } = {}) {
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(storeId)) throw new Error("Invalid store ID");
   const source = new DatabaseSync(filename, { readOnly: true });
@@ -34,7 +34,8 @@ export async function importSqlite(filename: string, connectionString: string, s
   try {
     source.exec("BEGIN");
     if (source.prepare("PRAGMA quick_check").get()?.quick_check !== "ok") throw new Error("SQLite integrity check failed");
-    if (source.prepare("SELECT version FROM durable_schema WHERE singleton=1").get()?.version !== 1) throw new Error("Unsupported SQLite schema");
+    const schemaVersion = source.prepare("SELECT version FROM durable_schema WHERE singleton=1").get()?.version;
+    if (schemaVersion !== 1 && schemaVersion !== 2) throw new Error("Unsupported SQLite schema");
     const expectedTables = ["durable_schema", "durable_metadata", ...Object.keys(layouts)].sort();
     const actualTables = source.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map(row => row.name);
     if (JSON.stringify(actualTables) !== JSON.stringify(expectedTables)) throw new Error("Unexpected SQLite tables");

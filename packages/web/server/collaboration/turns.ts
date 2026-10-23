@@ -10,6 +10,7 @@ type Turns = {
   publicationOnly?: boolean; contributionOwned?: boolean; queue: Ticket[]; speaker?: Ticket; sequence: number; presence: Record<string, Presence>;
 };
 export const TurnsDoc = defineDoc<Turns>({
+  checkpointWhen: () => false,
   kind: "dispatch.conversation-turns", version: 1, scope: "conversation", history: "latest", fork: "initial",
   initial: () => ({ publicationOnly: true, contributionOwned: true, queue: [], sequence: 0, presence: {} }),
 });
@@ -19,44 +20,35 @@ export class ConversationTurns {
   private harness!: Harness;
   readonly wait = defineTask<{ roomId: ConversationId; key: string }, { phase: "wait" }, null>({
     name: "dispatch.wait-for-turn", version: 1, initial: () => ({ phase: "wait" }),
-    phases: { wait: async (task, runtime, ctx) => {
-      let done = false;
-      while (!done) {
-        await runtime.commit(async tx => {
-          const turns = await tx.doc(TurnsDoc, task.input.roomId);
-          // Owner receipts release abandoned claims after faults, cancellation or recovery.
-          const owners = new Map(await Promise.all([...turns.queue, ...(turns.speaker ? [turns.speaker] : [])]
-            .flatMap(ticket => [ticket.owner, ...(ticket.requester ? [ticket.requester] : [])]).map(async id => [id, await tx.task(id)] as const)));
-          const active = (ticket: Ticket) => {
-            const owner = owners.get(ticket.owner);
-            const requester = ticket.requester ? owners.get(ticket.requester) : owner;
-            return owner && !owner.abortRequested && owner.state.status !== "terminal" && requester && !requester.abortRequested && requester.state.status !== "terminal";
-          };
-          const remaining = turns.queue.filter(active);
-          if (remaining.length !== turns.queue.length) turns.queue = remaining;
-          if (turns.speaker && !active(turns.speaker)) delete turns.speaker;
-          const ticket = turns.queue.find(item => item.key === task.input.key);
-          if (turns.speaker?.key === task.input.key) {
-            if (humansComposing(turns)) return;
-            done = true;
-            return completed();
-          }
-          if (!ticket) {
-            done = true;
-            return { status: "terminal", outcome: { status: "aborted" } };
-          }
-          const first = [...turns.queue].sort(compareTickets)[0];
-          if (!turns.speaker && !humansComposing(turns) && first?.key === ticket.key) {
-            turns.speaker = ticket;
-            turns.queue = turns.queue.filter(item => item.key !== ticket.key);
-            done = true;
-            return completed();
-          }
-        }, ctx);
-        // The native cancellable clock also wakes for expired human presence and failed owner tasks.
-        if (!done) await runtime.sleep(runtime.now() + 200, ctx);
+    phases: { wait: (task, runtime, ctx) => runtime.commit(async tx => {
+      const turns = await tx.doc(TurnsDoc, task.input.roomId);
+      // Owner receipts release abandoned claims after faults, cancellation or recovery.
+      const owners = new Map(await Promise.all([...turns.queue, ...(turns.speaker ? [turns.speaker] : [])]
+        .flatMap(ticket => [ticket.owner, ...(ticket.requester ? [ticket.requester] : [])]).map(async id => [id, await tx.task(id)] as const)));
+      const active = (ticket: Ticket) => {
+        const owner = owners.get(ticket.owner);
+        const requester = ticket.requester ? owners.get(ticket.requester) : owner;
+        return owner && !owner.abortRequested && owner.state.status !== "terminal" && requester && !requester.abortRequested && requester.state.status !== "terminal";
+      };
+      const remaining = turns.queue.filter(active);
+      if (remaining.length !== turns.queue.length) turns.queue = remaining;
+      if (turns.speaker && !active(turns.speaker)) delete turns.speaker;
+      const ticket = turns.queue.find(item => item.key === task.input.key);
+      if (turns.speaker?.key === task.input.key) {
+        if (!humansComposing(turns)) return completed();
+      } else if (!ticket) {
+        return { status: "terminal", outcome: { status: "aborted" } };
+      } else {
+        const first = [...turns.queue].sort(compareTickets)[0];
+        if (!turns.speaker && !humansComposing(turns) && first?.key === ticket.key) {
+          turns.speaker = ticket;
+          turns.queue = turns.queue.filter(item => item.key !== ticket.key);
+          return completed();
+        }
       }
-    } },
+      // Persist the next poll so presence and owner changes remain recoverable.
+      return { status: "sleeping", until: runtime.now() + 200, checkpoint: { phase: "wait" } };
+    }, ctx) },
     abort: (task, runtime, ctx) => runtime.commit(async tx => {
       const turns = await tx.doc(TurnsDoc, task.input.roomId);
       turns.queue = turns.queue.filter(ticket => ticket.key !== task.input.key);
@@ -67,28 +59,19 @@ export class ConversationTurns {
 
   readonly expirePresence = defineTask<{ roomId: ConversationId; client: string }, { phase: "wait" }, null>({
     name: "dispatch.composing-expiry", version: 1, initial: () => ({ phase: "wait" }),
-    phases: { wait: async (task, runtime, ctx) => {
-      let done = false;
-      while (!done) {
-        const state = await runtime.snapshot(TurnsDoc, task.input.roomId, ctx);
-        const until = state?.presence[task.input.client]?.until ?? 0;
-        if (until > runtime.now()) await runtime.sleep(until, ctx);
-        await runtime.commit(async tx => {
-          const turns = await tx.doc(TurnsDoc, task.input.roomId);
-          const presence = turns.presence[task.input.client];
-          if (!presence || presence.expiry !== task.id) {
-            done = true;
-            return completed();
-          }
-          if (presence.until <= runtime.now()) {
-            presence.until = 0;
-            delete presence.expiry;
-            done = true;
-            return completed();
-          }
-        }, ctx);
+    phases: { wait: (task, runtime, ctx) => runtime.commit(async tx => {
+      const turns = await tx.doc(TurnsDoc, task.input.roomId);
+      const presence = turns.presence[task.input.client];
+      if (!presence || presence.expiry !== task.id) {
+        return completed();
       }
-    } },
+      if (presence.until <= runtime.now()) {
+        presence.until = 0;
+        delete presence.expiry;
+        return completed();
+      }
+      return { status: "sleeping", until: presence.until, checkpoint: { phase: "wait" } };
+    }, ctx) },
     abort: (_task, runtime, ctx) => runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx),
   });
 

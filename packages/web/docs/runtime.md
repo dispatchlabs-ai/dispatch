@@ -1,6 +1,6 @@
 # Durable conversation runtime
 
-The service owns `DispatchRuntime` in `server/runtime.ts` and its collaboration extension in `server/collaboration/shared.ts`. Both use stock `@earendil-works/pi-durable` 1.1.0 public interfaces. Authentication supplies company/user scope; model credentials remain on the service.
+The service owns `DispatchRuntime` in `server/runtime.ts` and its collaboration extension in `server/collaboration/shared.ts`. Both use stock `@earendil-works/pi-durable` 1.4.0 public interfaces. Authentication supplies company/user scope; model credentials remain on the service.
 
 ## Claude Agent SDK integration
 
@@ -175,7 +175,7 @@ Pin/archive preferences remain personal and grant no access. Legacy personal-gro
 
 **Implemented and usable in the running local instance.** The project owns one editable Markdown setting and its instructions revision. Each native agent conversation retains an adopted execution snapshot containing project identity, revision and Markdown; it is not another editable source.
 
-The collaboration extension uses `ProjectInstructionsBindingDoc` and `projectInstructionsSection` from `server/collaboration/project-instructions.ts`. The conversation-scoped binding uses latest state and initial fork behavior, like participant bindings. Pi Durable 1.1.0's native `section("project-instructions", …)` reads only that committed binding. Pi renders the section before the individual instructions and owns effective system-entry history. Base instructions and instance supplements remain separately composed in `AgentDoc.instructions`. Do not inject project text as a public message, rewrite provider requests or manually append system entries. Prompt order is not authorization, and renderer errors must not serve as access gates.
+The collaboration extension uses `ProjectInstructionsBindingDoc` and `projectInstructionsSection` from `server/collaboration/project-instructions.ts`. The conversation-scoped binding uses latest state and initial fork behavior, like participant bindings. Pi Durable 1.4.0's native `section("project-instructions", …)` reads only that committed binding. Pi renders the section before the individual instructions and owns effective system-entry history. Base instructions and instance supplements remain separately composed in `AgentDoc.instructions`. Do not inject project text as a public message, rewrite provider requests or manually append system entries. Prompt order is not authorization, and renderer errors must not serve as access gates.
 
 Creation initializes the binding before the first submission. Existing project agents with no adopted revision initialize once at a safe idle boundary, including when the saved revision is 0; absence is not treated as an adopted empty revision. Existing-instance adoption uses the same safe idle guards as base upgrades, but is independent of base-definition eligibility. Project-only edits reconcile even when the definition is unchanged or archived. Adopt the latest revision directly; active/unfinished admitted work retains its snapshot across restart and authenticated worker synchronization. Stop/removal and access checks remain in force. Hosted instruction propagation filters acknowledgement to this project's chats and uses the non-revoking catalog path: a propagation failure is saved-but-pending/error state, not permission to stop or retire an active worker. An adopted empty snapshot removes the section on the next prepared request.
 
@@ -206,7 +206,7 @@ Source/build evidence, explicitly scoped runtime observations and remaining qual
 
 ## Per-agent MCP connections
 
-`server/mcp.ts` uses stock `@earendil-works/pi-mcp` 1.1.0 with Pi Durable's public
+`server/mcp.ts` uses stock `@earendil-works/pi-mcp` 1.4.0 with Pi Durable's public
 extension, tool and document APIs. The operator file is
 `DISPATCH_AGENT_CONNECTIONS_FILE`, defaulting to
 `<DISPATCH_DATA_DIR>/agent-connections.json`. Entries belong to an `agentId`; they

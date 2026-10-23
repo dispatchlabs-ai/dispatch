@@ -20,6 +20,7 @@ export type Grant = { grantedBy?: string; companyId: string; editorId: string; t
 type GrantChange = { companyId: string; userId?: string; at: number; requestId: string; fingerprint: string; reason?: string; before: Grant | null; after: Grant;
   source?: "self-save"; actor?: { definitionId: string; instanceId: string; operationId: string } };
 const GrantsDoc = defineDoc<{ grants: Grant[]; changes: GrantChange[] }>({
+  checkpointWhen: () => false,
   kind: "dispatch.agent-management-grants", version: 1, scope: "session", initial: () => ({ grants: [], changes: [] }),
 });
 export class ManagementError extends Error {
