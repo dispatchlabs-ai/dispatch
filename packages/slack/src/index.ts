@@ -137,38 +137,84 @@ export async function prepareSlack(root: string, runner: Runner, options: {
             runtime.report(new Error(`Slack streaming unavailable; final reply remains queued: ${slackError(error) ?? "request failed"}`));
           }
         }
-        const watch = stream && !recoveredStream
-          ? await runtime.watchDoc(LiveDoc, runtime.conversationId, ctx) : undefined;
+        const watch = stream ? await runtime.watchDoc(LiveDoc, runtime.conversationId, ctx) : undefined;
         let pending = Promise.resolve();
         let sent = "";
+        let progress = "";
+        let displayed = "";
         let retryAt = 0;
-        let streaming = true;
+        let updatedAt = 0;
+        let ordinary = !!recoveredStream;
+        let closed = false;
+        let missing = false;
+        // Slack ends streams after ten minutes, regardless of appends. Tool work
+        // uses an ordinary editable message; a slow first generation switches too.
+        const openedAt = stream ? Number.parseFloat(stream) * 1000 : runtime.now();
         const append = async (live: Readonly<LiveState> | null) => {
-          if (!stream || !streaming || runtime.signal.aborted || !live?.run?.inputs.includes(submission.id)) return;
-          const raw = live.generation?.message?.content.flatMap(p => p.type === "text" ? [p.text] : []).join("\n") ?? "";
+          if (!stream || missing || runtime.signal.aborted) return;
+          const active = !!live?.run?.inputs.includes(submission.id);
+          const raw = active ? live?.generation?.message?.content.flatMap(p => p.type === "text" ? [p.text] : []).join("\n") ?? "" : "";
           const text = streamText(raw);
-          if (!text.startsWith(sent) || text === sent || runtime.now() < retryAt) return;
-          // The native watcher coalesces updates while this request runs.
-          const delta = replyChunk(text, sent.length, 12_000, false);
+          if (text.trim()) progress = text;
+          ordinary ||= (active && !!live?.tools?.length) || runtime.now() >= openedAt + 8 * 60_000
+            || (!!text && !text.startsWith(sent));
+          if (runtime.now() < retryAt) return;
           try {
-            await client.chat.appendStream({
-              channel: task.input.channel, ts: stream, chunks: [{ type: "markdown_text", text: delta }],
-            });
-            sent += delta;
+            if (ordinary) {
+              if (!closed) {
+                try {
+                  await client.chat.stopStream({ channel: task.input.channel, ts: stream,
+                    chunks: [{ type: "task_update", id: "answer", title: "Response started", status: "complete" }] });
+                } catch (error) {
+                  if (slackError(error) !== "message_not_in_streaming_state") throw error;
+                }
+                closed = true;
+              }
+              const status = !active ? "Queued" : live?.generation?.retry ? "Retrying a temporary model failure"
+                : live?.compactions?.length ? "Organizing context" : "Working";
+              const minutes = Math.floor((runtime.now() - openedAt) / 60_000);
+              const label = `${status}${minutes ? ` · ${minutes}m elapsed` : ""}`;
+              const body = progress ? replyChunk(progress, 0, 10_000) : "";
+              const signature = `${label}\n${body}`;
+              if (signature === displayed || runtime.now() < updatedAt + 2_000) return;
+              await client.chat.update({ channel: task.input.channel, ts: stream,
+                text: fallbackText(signature),
+                blocks: [{ type: "context", elements: [{ type: "plain_text", text: label }] },
+                  ...(body ? replyBlocks(body) : [])],
+                parse: "none", link_names: false,
+              });
+              displayed = signature;
+              updatedAt = runtime.now();
+            } else if (text && text !== sent) {
+              // The native watcher coalesces updates while this request runs.
+              const delta = replyChunk(text, sent.length, 12_000, false);
+              await client.chat.appendStream({
+                channel: task.input.channel, ts: stream, chunks: [{ type: "markdown_text", text: delta }],
+              });
+              sent += delta;
+            }
           } catch (error) {
             if (runtime.signal.aborted) return;
             retryAt = runtime.now() + retryDelay(error);
-            if (!["ratelimited", undefined].includes(slackError(error))) streaming = false;
+            ordinary = true;
+            missing = slackError(error) === "message_not_found";
+            runtime.report(new Error(`Slack progress update pending: ${slackError(error) ?? "request failed"}; final reply remains queued.`));
           }
         };
+        let timer: ReturnType<typeof setInterval> | undefined;
         if (watch) {
           pending = append(watch.value);
           await pending;
-          watch.start(value => { pending = append(value); return pending; });
+          const refresh = () => { pending = pending.then(() => append(watch.value)); return pending; };
+          watch.start(refresh);
+          // Flush throttled partials and end a stream even while the model is
+          // silent. This observes the saved run; it never starts or retries work.
+          timer = setInterval(() => { void refresh(); }, 5_000);
         }
         let receipt;
         try { receipt = await submission.wait(ctx); }
         finally {
+          if (timer) clearInterval(timer);
           if (watch) await watch.stop();
           await pending;
         }

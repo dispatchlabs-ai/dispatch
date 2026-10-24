@@ -101,6 +101,13 @@ each thread across restarts. A deleted thread leaves a recorded failed admission
 Known unrelated threads are filtered without a Slack API request when the event
 identifies their parent author. Existing admission keys survive the inbox upgrade.
 Native tasks also retain outgoing reply progress.
+Short answers stream normally. Once the model starts tools, or before an initial
+stream reaches eight minutes, the adapter closes the stream and updates the same
+message with the latest public response and a working indicator. Later model
+responses replace the progress text, including after restart; private reasoning
+and tool output are not displayed. This avoids Slack's ten-minute stream expiry
+marking an active research job as failed. Final delivery replaces progress with
+the committed answer. See [Slack's response guidance](https://docs.slack.dev/ai/developing-agents/#responding-to-the-user).
 Final replies use Slack's Markdown blocks, matching the Markdown sent while
 streaming, so bold text, inline code and source links retain their formatting.
 Final messages split at complete Markdown blocks where possible. A block too

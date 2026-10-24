@@ -10,7 +10,9 @@
 - **SLK-004 — Recover delivery:** deduplicate incoming event copies and resume
   native admission/turn/reply tasks after restart, retry thread lookups from
   locally saved input, and deliver a final answer when its stream was deleted,
-  with explicit at-least-once posting.
+  with explicit at-least-once posting. Keep long-running work visibly active
+  beyond Slack's stream lifetime and show public progress across model rounds
+  and process restarts.
 - **SLK-005 — Share a workspace:** allow an agent in invited channels and DMs;
   direct explicit mentions to the intended bot and keep another bot's threads
   from becoming competing automatic conversations.

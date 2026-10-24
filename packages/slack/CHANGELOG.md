@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Convert tool-backed or long-running streams into editable progress messages
+  before Slack's expiry; show later model responses and resume progress updates
+  after restart without restarting the underlying work.
 - Preserve Markdown formatting when finalizing streamed replies and when posting
   completed replies without a stream, instead of displaying formatting markers
   as literal text.
