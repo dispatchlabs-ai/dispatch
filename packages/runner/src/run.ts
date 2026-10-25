@@ -12,6 +12,7 @@ export type PreparedAdapter = {
   queueReply: ReplySink;
   start(service: ChatService): Promise<void>;
   close(): Promise<void>;
+  busy?(): Promise<boolean>;
 };
 export type Adapter = { prepare(options: { root: string; runner: Runner }): Promise<PreparedAdapter> };
 export type RunOptions = {

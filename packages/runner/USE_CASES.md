@@ -34,6 +34,10 @@
   including the optional remote SQLite service, while retaining local status
   projections, ownership checks and the default local SQLite path.
 
+- **RUN-011 — Install a shared agent service:** independently select runtime
+  and definition revisions, discover available agents, and use local clients
+  and transport adapters against the same native conversation owner.
+
 The extraction supports Node, SQLite and trusted company definitions.
 Hosted Dispatch Web adoption, portable coding isolation, npm
 registry publication and broad installation qualification remain separate work.

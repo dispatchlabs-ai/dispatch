@@ -323,7 +323,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
         return closing;
       };
       return {
-        harness: activeHarness, conversation: root, configuration, state, close,
+        harness: activeHarness, storage, conversation: root, configuration, state, close,
         async start(once = false, options: StartOptions = {}): Promise<TaskId<null>> {
           if (compromised) throw compromised;
           if (!once && agent.trigger.mode === "manual") throw new Error(`${agent.id} is manual. Use run instead of start.`);
@@ -396,6 +396,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
 
 export type AgentHost = {
   harness: Awaited<ReturnType<typeof Harness.open>>;
+  storage: Storage;
   conversation: Conversation;
   configuration: AgentSetup["configuration"];
   state(): Promise<RunnerState>;

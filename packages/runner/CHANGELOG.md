@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Add an independently installed agent service, a private Unix-socket client API
+  and CLI, optional transport adapters, and separate runtime/definition pins.
+  Share one native owner across clients and publish conversation-list changes.
+
 - Document installation-owned runtime dependencies and separate company definition checkouts, including immutable deployment and native schema migration boundaries.
 
 - Upgrade the runner's Chord, Pi AI and Pi Durable dependencies to 1.4.0.

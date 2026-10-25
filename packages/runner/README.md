@@ -280,3 +280,9 @@ adapter uses private Git worktrees, protects `USE_CASES.md` and the definition
 repository, and supports shell execution only through macOS `sandbox-exec`.
 It is not a portable sandbox or a multi-tenant security boundary. Domain-specific
 read-only tools can run on Linux without the coding adapter.
+
+## Installed service
+
+Use [`dispatch-service`](docs/service.md) when a supervised local process should
+load an independent definition repository and serve clients through one native
+owner. The definition repository does not install the service.

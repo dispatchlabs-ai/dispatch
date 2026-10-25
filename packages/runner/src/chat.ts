@@ -119,6 +119,18 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       return lists.flat().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     }
 
+    async watchList(listener: (chats: Chat[]) => Promise<void>) {
+      const watches = await Promise.all([...this.hosts.values()].map(async host => {
+        await host.harness.commit(async tx => { await tx.doc(Chats); }, context);
+        return host.harness.watchDoc(Chats, context);
+      }));
+      let pending = Promise.resolve();
+      const changed = () => pending = pending.then(async () => listener(await this.list()));
+      for (const watch of watches) watch?.start(changed);
+      await changed();
+      return { stop: async () => { await Promise.all(watches.map(watch => watch?.stop())); await pending; } };
+    }
+
     async create(agent: string, source: Chat["source"], key: string, title = "New chat", origin?: JsonObject): Promise<Chat> {
       const host = this.host(agent);
       return host.harness.commit(async tx => {

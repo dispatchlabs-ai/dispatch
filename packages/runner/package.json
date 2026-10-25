@@ -9,14 +9,26 @@
     "node": ">=22.19.0"
   },
   "exports": {
+    "./service": {
+      "types": "./dist/service.d.ts",
+      "import": "./dist/service.js"
+    },
+    "./gateway": {
+      "types": "./dist/gateway.d.ts",
+      "import": "./dist/gateway.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
+  "bin": {
+    "dispatch-service": "./dist/service-cli.js"
+  },
   "files": [
     "dist",
     "native",
+    "scripts",
     "README.md",
     "USE_CASES.md",
     "CHANGELOG.md",
