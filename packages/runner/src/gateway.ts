@@ -1,6 +1,5 @@
 import { getSupportedThinkingLevels } from '@earendil-works/pi-ai/models';
 import { stream as piStream } from '@earendil-works/pi-ai/api/pi-messages';
-import { stream as responsesStream, streamSimple as responsesSimple } from '@earendil-works/pi-ai/api/openai-responses';
 import { AssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream';
 
 export type ModelChoice = { provider: string; providerName: string; id: string; name: string; levels: string[]; images?: boolean; hidden?: boolean };
@@ -41,7 +40,8 @@ export async function refreshGatewayModels(origin: string, models: any, key?: st
       const output = new AssistantMessageEventStream();
       void (async () => {
         let terminal: any;
-        const upstream = group ? (operation === 'streamSimple' ? responsesSimple : responsesStream)(
+        const responses = group ? await import('@earendil-works/pi-ai/api/openai-responses') : undefined;
+        const upstream = responses ? (operation === 'streamSimple' ? responses.streamSimple : responses.stream)(
           { ...model, api: 'openai-responses', baseUrl: `${origin}/v1` }, transcript, {
             ...options, apiKey: key ?? 'native-keychain',
             fetch: (input: any, init: any) => fetch(input, { ...init, redirect: 'error' }),
