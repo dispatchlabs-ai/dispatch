@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import type { Models } from "@earendil-works/pi-ai/models";
-import type { StorageFactory } from "./runtime.js";
+import type { StorageFactory, OpenOptions } from "./runtime.js";
 import type { Extension } from "@earendil-works/pi-durable";
 import { createRunner, type Runner } from "./index.js";
 import type { ChatService, ChatInitializer } from "./chat.js";
@@ -17,6 +17,8 @@ export type PreparedAdapter = {
 export type Adapter = { prepare(options: { root: string; runner: Runner }): Promise<PreparedAdapter> };
 export type RunOptions = {
   storage?: StorageFactory;
+  /** Native host policy, including model retry; not part of agent definitions. */
+  settings?: OpenOptions["settings"];
   root?: string;
   stateRoot?: string;
   /** Explicit local working directory for native tools and repository instructions. */
@@ -31,7 +33,7 @@ export type RunOptions = {
   initialize?: ChatInitializer;
   adapters?: Adapter[];
   /** Attach domain workflows to the same host before adapters begin receiving. */
-  open?: (options: { extensions: Extension[]; replySink?: ReplySink }) => Promise<ChatService>;
+  open?: (options: { extensions: Extension[]; replySink?: ReplySink; settings?: OpenOptions["settings"] }) => Promise<ChatService>;
   beforeStart?: (service: ChatService) => Promise<void>;
 };
 
@@ -56,7 +58,7 @@ export async function run(options: RunOptions = {}) {
     // A transport destination is opaque to the runner. Adapters select their
     // destinations; applications using multiple transports provide their sink.
     const replySink = adapters.length === 1 ? adapters[0].queueReply : undefined;
-    if (options.open) service = await options.open({ extensions, replySink });
+    if (options.open) service = await options.open({ extensions, replySink, settings: options.settings });
     else {
       if (!options.models) throw new Error("Supply a Pi Models catalog or an open callback.");
       service = await runner.ChatService.open({
@@ -64,7 +66,7 @@ export async function run(options: RunOptions = {}) {
         models: options.models, demo: options.demo ?? false, names: options.names,
         updateDefinitions: options.updateDefinitions, initialize: options.initialize,
         resume: options.resume,
-        cwd: options.cwd, storage: options.storage,
+        cwd: options.cwd, storage: options.storage, settings: options.settings,
         extensions, replySink,
       });
     }

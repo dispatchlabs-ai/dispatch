@@ -9,6 +9,7 @@ import { refreshGatewayModels, type ModelChoice, type GatewayAliases } from "./g
 import type { ChatService } from "./chat.js";
 import { context } from "./chat.js";
 import type { InstanceMessage } from "./messages.js";
+import { modelRetrySettings, type ModelRetry } from "./retry.js";
 
 export type ServiceConfig = {
   root: string;
@@ -18,6 +19,7 @@ export type ServiceConfig = {
   namespace?: string;
   names?: string[];
   updateDefinitions?: boolean;
+  retry?: ModelRetry;
   gateway: { origin: string; credentialFile: string; aliases?: GatewayAliases };
   adapters?: { module: string; optionsFile: string }[];
 };
@@ -53,6 +55,7 @@ async function dispatch(service: ChatService, command: ServiceCommand) {
 
 /** One service owns native sessions; adapters and local clients share that owner. */
 export async function startService(config: ServiceConfig) {
+  const settings = modelRetrySettings(config.retry);
   for (const field of ["root", "stateRoot", "cwd", "socket"] as const) {
     if (!config[field] || resolve(config[field]) !== config[field]) throw new Error(`${field} must be an absolute path.`);
   }
@@ -130,7 +133,7 @@ export async function startService(config: ServiceConfig) {
     });
     listening = true;
     await chmod(config.socket, 0o600);
-    runtime = await run({ ...config, runner, models, adapters });
+    runtime = await run({ ...config, runner, models, adapters, settings });
   } catch (error) { await runtime?.close(); if (listening) server.close(); throw error; }
   let closing: Promise<void> | undefined;
   return {

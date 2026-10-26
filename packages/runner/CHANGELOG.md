@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Pass installation model-retry policy through to stock Pi Durable, with sustained
+  capped backoff, optional jitter and native pending-retry details in snapshots.
+  No replacement task loop or workflow resubmission is introduced.
+
 - Add opt-in `clones: true` and `clone_agent` for parallel coordinator assignments.
   Children inherit the stored native agent configuration without copying history
   or widening tool filters. Native ownership and stable submissions preserve

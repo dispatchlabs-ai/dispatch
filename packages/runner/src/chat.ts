@@ -3,6 +3,8 @@ export type ChatSnapshot = {
   chat: Chat; messages: ChatMessage[]; running: boolean; queued: number;
   partial: string; tools: string[]; error: string | null; demo: boolean;
   background: boolean;
+  /** Native pending retry; at is an epoch-millisecond deadline. */
+  retry?: { attempt: number; at: number; error: string };
 };
 
 export type ChatInitializer = (tx: Tx, chat: Chat, host: Pick<AgentHost, "configuration">) => Promise<void>;
@@ -259,6 +261,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
           partial: messageText(live?.generation?.message?.content),
           tools: live?.tools?.filter(tool => tool.status !== "done").map(tool => tool.name) ?? [],
           error: live?.generation?.retry?.error ?? null, demo: this.demo,
+          ...(live?.generation?.retry ? { retry: { attempt: live.generation.attempt, ...live.generation.retry } } : {}),
           background: deliveries || Object.values(handoffs?.jobs ?? {}).some(job => job.status === "working"),
         } satisfies ChatSnapshot;
       };

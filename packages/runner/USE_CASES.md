@@ -48,6 +48,10 @@
   assignments concurrently, and reconcile their reports through native tool
   results, ownership and recovery.
 
+- **RUN-015 — Wait through provider outages:** configure sustained native model retries
+  with capped exponential backoff and jitter, inspect the next attempt, recover
+  the same submission after restart, and cancel without a replacement workflow.
+
 ## Accepted design, not implemented
 
 - [ ] **RUN-013 — Schedule agent-local assignments:** define named schedules and

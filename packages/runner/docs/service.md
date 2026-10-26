@@ -103,3 +103,54 @@ Build on the target platform with its pinned Node toolchain. The archive retains
 the installed dependency tree, generated dependency lock and each input archive's
 SHA-256. Keep the resulting artifact and its reported digest in the installation's
 artifact store. Definitions, credentials and session state are not bundled.
+
+## Sustained provider recovery
+
+The optional installation `retry` policy feeds stock Pi Durable settings; it
+does not resubmit input or rerun a workflow. For long transient outages:
+
+```json
+{
+  "retry": {
+    "maxRetries": "persistent",
+    "baseDelayMs": 2000,
+    "maxAgentDelayMs": 900000,
+    "jitter": 0.2
+  }
+}
+```
+
+Pi classifies retryable model failures, exponentially backs off, and commits each
+retry deadline in its native task. This example waits 80–100% of the exponential
+delay, capped at 12–15 minutes. Reopening preserves the saved deadline and same
+submission. `persistent` maps to the largest exact integer retry count, making
+exhaustion operationally unreachable; it is not a guarantee of eventual success.
+There is no elapsed-time abandonment. Successful model responses reset the native
+generation retry sequence. Stop explicitly with `stop CHAT` to cancel pending work.
+
+Omitting `retry` preserves Pi's defaults (three retries, 2-second base, 60-second
+cap). Numeric `maxRetries` selects a finite count, `enabled: false` disables retries,
+and `jitter: 0` keeps exact delays. Invalid policy values fail before service
+startup. Retry policy is host-owned, not part of the definition fingerprint.
+Library callers can pass native `settings` (including a callback) to `run`; custom
+`open` callbacks receive it and must forward it to the host they create.
+
+Snapshots/watches expose `retry: { attempt, at, error }` while waiting; `at` is
+epoch milliseconds. The service remains busy during this wait. This supplies
+observability for clients, not an automatic notification service. Non-retryable
+authentication/billing errors and approval or tool failures are not converted
+into retries. Inspect native receipts before repeating any uncertain external
+effect. Already-terminal submissions remain terminal; a deliberate continuation
+is still needed for work exhausted under the old policy.
+
+A policy change requires a controlled owner restart. Preserve unfinished native
+state and the installation's idle/deployment rules. The policy does not repair
+gateway startup/catalog failures before a Harness exists, nor change adapter
+retry policies. No provider, credentials, model or financial logic is replaced.
+
+Manual source qualification on macOS/Node 24 verified five simulated transient
+failures followed by success on the same native submission, with an unchanged
+retry deadline across graceful close/reopen. A permanent 401 settled unanswered;
+stopping during a pending retry settled aborted and left the conversation idle.
+These isolated observations do not establish recovery of a production provider
+outage or abrupt process-loss recovery.
