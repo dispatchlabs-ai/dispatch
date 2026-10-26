@@ -8,6 +8,7 @@ import { run, type Adapter } from "./run.js";
 import { refreshGatewayModels, type ModelChoice, type GatewayAliases } from "./gateway.js";
 import type { ChatService } from "./chat.js";
 import { context } from "./chat.js";
+import type { InstanceMessage } from "./messages.js";
 
 export type ServiceConfig = {
   root: string;
@@ -29,6 +30,8 @@ export type ServiceCommand =
   | { method: "create"; agent: string; key: string; title?: string }
   | { method: "snapshot" | "stop"; id: string }
   | { method: "send"; id: string; text: string; requestId: string }
+  | { method: "message"; from: string; message: InstanceMessage; requestId: string }
+  | { method: "message-status"; from: string; taskId: number }
   | { method: "receipt"; id: string; submissionId: number };
 
 async function dispatch(service: ChatService, command: ServiceCommand) {
@@ -42,6 +45,8 @@ async function dispatch(service: ChatService, command: ServiceCommand) {
     case "stop": await service.stop(command.id); return {};
     case "send": return service.submit(command.id, command.text, command.requestId, "followUp", "cli");
     case "receipt": return service.receipt(command.id, command.submissionId);
+    case "message": return service.message(command.from, command.message, command.requestId);
+    case "message-status": return service.messageStatus(command.from, command.taskId);
     default: throw new Error("Unknown service command.");
   }
 }

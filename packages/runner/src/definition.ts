@@ -24,6 +24,8 @@ export type AgentDefinition = {
   skills?: boolean;
   /** Named agents available for native foreground delegation. */
   delegates?: string[];
+  /** Agent types addressable as independent instances in the same ChatService. */
+  messages?: string[];
   handoff?: { target: string; progressEveryMs: number };
 };
 
@@ -48,6 +50,8 @@ export function defineAgent(definition: AgentDefinition): AgentDefinition {
   }
   if (definition.delegates && (!Array.isArray(definition.delegates) || definition.delegates.some(id => !agentName.test(id))
     || new Set(definition.delegates).size !== definition.delegates.length)) throw new Error("Delegates must be unique agent names.");
+  if (definition.messages && (!Array.isArray(definition.messages) || definition.messages.some(id => !agentName.test(id))
+    || new Set(definition.messages).size !== definition.messages.length)) throw new Error("Message recipients must be unique agent names.");
   const trigger = definition.trigger;
   if (!trigger || !["manual", "continuous", "interval"].includes(trigger.mode)) {
     throw new Error("Trigger mode must be manual, continuous, or interval.");

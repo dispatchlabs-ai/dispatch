@@ -186,6 +186,9 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
 
   async function openAgent(options: OpenOptions): Promise<AgentHost> {
     const { agent, models } = options;
+    if (agent.messages?.length && !options.extensions?.some(extension => extension.name === `${namespace}.instance-messages.${agent.id}`)) {
+      throw new Error(`${agent.id} needs instance messaging. Open it through ChatService, or supply instanceMessagingExtension with the owning service.`);
+    }
     const directory = resolve(options.directory);
     const cwd = options.cwd ? await realpath(resolve(options.cwd)) : undefined;
     const execution = options.execution ?? "live";

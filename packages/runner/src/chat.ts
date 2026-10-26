@@ -19,11 +19,12 @@ import { createRuntime, type AgentHost, type StorageFactory, type OpenOptions } 
 import type { ReplySink } from "./replies.js";
 import { createHandoffs } from "./handoff.js";
 import { privateStateDirectory } from "./private-state.js";
+import { createInstanceMessaging, instanceMessagingExtension, type InstanceMessage } from "./messages.js";
 
 export const context = BACKGROUND_CONTEXT;
 export type Chat = {
   id: string; agent: string; conversationId: number; title: string;
-  source: "cli" | "web" | "slack" | "phone"; createdAt: string; origin?: JsonObject;
+  source: "cli" | "web" | "slack" | "phone" | "agent"; createdAt: string; origin?: JsonObject;
 };
 export function createChats(namespace: string, openAgent: ReturnType<typeof createRuntime>["openAgent"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"]) {
   const Chats = defineDoc<{
@@ -55,6 +56,12 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     });
   }
 
+  function messaging(service: ChatService, from: string) {
+    const agent = service.agents.find(candidate => candidate.id === from.split(":")[0]);
+    if (!agent?.messages?.length) throw new Error("The sender has no instance messaging capability.");
+    return createInstanceMessaging(namespace, agent, service);
+  }
+
   class ChatService {
     readonly hosts = new Map<string, AgentHost>();
     readonly agents: LoadedAgent[];
@@ -80,6 +87,11 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
         (await catalog(options.root)).filter(entry => entry.runnable).map(entry => entry.id);
       const agents = await Promise.all(names.map(name => loadAgent(options.root, name)));
       const service = new ChatService(agents, options.demo, options.initialize);
+      for (const agent of agents) for (const recipient of agent.messages ?? []) {
+        if (!agents.some(candidate => candidate.id === recipient)) {
+          throw new Error(`${agent.id} messages ${recipient}; include both agents in this service's names.`);
+        }
+      }
       const models = options.models;
       if (!options.demo && agents.some(agent => !models.getProvider(agent.model.provider))) throw new Error("Register every agent's provider in the supplied Models catalog.");
       try {
@@ -87,7 +99,9 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
         const results = await Promise.allSettled(agents.map(async agent => {
           const host = await openAgent({
             agent, directory: join(stateRoot, agent.id), models,
-            execution: options.demo ? "demo" : "live", extensions: options.extensions,
+            execution: options.demo ? "demo" : "live",
+            extensions: [...(options.extensions ?? []),
+              ...(agent.messages?.length ? [instanceMessagingExtension(namespace, agent, service)] : [])],
             replySink: options.replySink, updateDefinitions: options.updateDefinitions,
             cwd: options.cwd, storage: options.storage, settings: options.settings,
           });
@@ -201,6 +215,14 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       return record;
     }
 
+    async message(from: string, message: InstanceMessage, requestId: string) {
+      return messaging(this, from).send(from, message, requestId, context);
+    }
+
+    async messageStatus(from: string, taskId: number) {
+      return messaging(this, from).status(from, taskId, context);
+    }
+
     async stop(id: string) {
       const { conversation } = await this.resolve(id);
       await conversation.abort(context, { background: true });
@@ -229,13 +251,15 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
         const inbox = view.docs["pi.inbox"] as { items?: unknown[] } | undefined;
         // Pi's structural view mounts only its built-in documents.
         const handoffs = handoffWatch?.value;
+        const deliveries = (await host.harness.inspect(context)).tasks.some(({ record }) =>
+          record.conversationId === conversation.id && record.kind === `${namespace}.instance-message`);
         return {
           chat, messages: messages([...saved.values()].sort((a, b) => a.id - b.id)),
           running: !!live?.run, queued: inbox?.items?.length ?? 0,
           partial: messageText(live?.generation?.message?.content),
           tools: live?.tools?.filter(tool => tool.status !== "done").map(tool => tool.name) ?? [],
           error: live?.generation?.retry?.error ?? null, demo: this.demo,
-          background: Object.values(handoffs?.jobs ?? {}).some(job => job.status === "working"),
+          background: deliveries || Object.values(handoffs?.jobs ?? {}).some(job => job.status === "working"),
         } satisfies ChatSnapshot;
       };
       let pending = Promise.resolve();

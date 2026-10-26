@@ -66,6 +66,13 @@ snapshot to follow execution. `stop CHAT` aborts its work. `chats` lists saved
 conversations. `status` reports unfinished native and adapter work; `idle`
 returns a failure exit status when work remains.
 
+[Instance messaging](instance-messages.md) lets opted-in definitions create or
+address independent conversations in this service. Include every permitted
+recipient in `names` when selecting a subset. Native message tracking contributes
+to busy status; stopping the sender does not cancel admitted recipient work.
+Use Dispatch Observer for complete saved tool calls/results and message tasks;
+`snapshot` is a text projection, not a full trace.
+
 The versioned local API is `POST /v1/commands` with the exported `ServiceCommand`
 JSON union; success is `{result}`, failure is `{error}`. A caller supplies a
 stable `key` for idempotent `create` and a stable `requestId` for message retries.

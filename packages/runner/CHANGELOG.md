@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Add opt-in service-local messaging between independent top-level instances,
+  native replay-safe delivery/outcome receipts and optional replies. Recipients
+  retain their own configuration, host adapters and cancellation lifecycle.
+
 - Add an independently installed agent service, a private Unix-socket client API
   and CLI, optional transport adapters, and separate runtime/definition pins.
   Share one native owner across clients and publish conversation-list changes.

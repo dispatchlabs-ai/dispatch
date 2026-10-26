@@ -5,7 +5,7 @@ import { startService, serviceRequest, type ServiceCommand, type ServiceConfig }
 
 const [configPath, action, ...args] = process.argv.slice(2);
 try {
-  if (!configPath || !action) throw new Error("Usage: dispatch-service CONFIG serve|agents|chats|create AGENT [TITLE]|send CHAT TEXT|snapshot CHAT|stop CHAT|receipt CHAT SUBMISSION");
+  if (!configPath || !action) throw new Error("Usage: dispatch-service CONFIG serve|agents|chats|create AGENT [TITLE]|send CHAT TEXT|message FROM TO TEXT|ask FROM TO TEXT|message-status FROM TASK|snapshot CHAT|stop CHAT|receipt CHAT SUBMISSION");
   const config: ServiceConfig = JSON.parse(await readFile(configPath, "utf8"));
   if (action === "serve") {
     const service = await startService(config);
@@ -20,6 +20,12 @@ try {
       case "idle": command = { method: "status" }; break;
       case "create": command = { method: action, agent: args[0], key: randomUUID(), title: args.slice(1).join(" ") || undefined }; break;
       case "send": command = { method: action, id: args[0], text: args.slice(1).join(" "), requestId: randomUUID() }; break;
+      case "message": case "ask":
+        if (!args[0] || !args[1]?.includes(":") || !args.slice(2).join(" ").trim()) throw new Error("Usage: message|ask FROM TO TEXT (use full instance IDs).");
+        command = { method: "message", from: args[0], requestId: randomUUID(),
+          message: { agent: args[1].split(":")[0], instance: args[1], text: args.slice(2).join(" "), reply: action === "ask" } };
+        break;
+      case "message-status": command = { method: action, from: args[0], taskId: Number(args[1]) }; break;
       case "snapshot": case "stop": command = { method: action, id: args[0] }; break;
       case "receipt": command = { method: action, id: args[0], submissionId: Number(args[1]) }; break;
       default: throw new Error("Unknown command.");

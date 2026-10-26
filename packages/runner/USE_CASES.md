@@ -38,6 +38,11 @@
   and definition revisions, discover available agents, and use local clients
   and transport adapters against the same native conversation owner.
 
+- **RUN-012 — Message independent instances:** address permitted agent instances,
+  create an independent recipient when needed, deliver assignments/updates and
+  optional replies through native queued inputs, and inspect attributed outcomes
+  without parent-owned delegation or another persistence/recovery system.
+
 The extraction supports Node, SQLite and trusted company definitions.
 Hosted Dispatch Web adoption, portable coding isolation, npm
 registry publication and broad installation qualification remain separate work.

@@ -286,3 +286,6 @@ read-only tools can run on Linux without the coding adapter.
 Use [`dispatch-service`](docs/service.md) when a supervised local process should
 load an independent definition repository and serve clients through one native
 owner. The definition repository does not install the service.
+
+Opt into [instance messages](docs/instance-messages.md) for reusable handoffs
+between independent agents, without private child ownership or a notes store.
