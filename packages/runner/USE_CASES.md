@@ -43,6 +43,11 @@
   optional replies through native queued inputs, and inspect attributed outcomes
   without parent-owned delegation or another persistence/recovery system.
 
+- **RUN-014 — Coordinate parallel clones:** opt into fresh, task-owned children
+  with the parent's stored agent configuration and tool filters, run independent
+  assignments concurrently, and reconcile their reports through native tool
+  results, ownership and recovery.
+
 ## Accepted design, not implemented
 
 - [ ] **RUN-013 — Schedule agent-local assignments:** define named schedules and

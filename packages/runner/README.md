@@ -229,6 +229,12 @@ replay; results return to the parent. Assign bounded work and disjoint files whe
 several children edit one checkout. There is no separate orchestrator or automatic
 acceptance gate.
 
+Declare `clones: true` to expose `clone_agent` for fresh, owned children with the
+calling conversation's native configuration, including its tool filters. This
+differs from named delegation and independent sibling messages. The
+[parallel-child contract](docs/parallel-children.md) covers inherited rights,
+history isolation, concurrent assignments, results, cancellation and recovery.
+
 Agents must explicitly grant file/shell tools, for example `CodingTools` from
 `@earendil-works/pi-durable/tools`. With `cwd`, those tools use the local account's
 access. This is a working-directory choice, not a filesystem sandbox; the existing

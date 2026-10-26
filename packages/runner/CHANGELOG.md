@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Add opt-in `clones: true` and `clone_agent` for parallel coordinator assignments.
+  Children inherit the stored native agent configuration without copying history
+  or widening tool filters. Native ownership and stable submissions preserve
+  cancellation/recovery; domain instructions own QA expectations and acceptance.
+
 - Document the accepted agent-local scheduling design and proposed API. Cron,
   timezone scheduling and the `schedules` field remain unimplemented; existing
   triggers and live installations are unchanged.

@@ -33,13 +33,13 @@ export function createConfiguration(codingExtension: ReturnType<typeof createCod
         },
       }));
     }
-    if (agent.delegateAgents?.length) {
-      const delegates = await Promise.all(agent.delegateAgents.map(async target => {
+    if (agent.delegateAgents?.length || agent.clones) {
+      const delegates = await Promise.all((agent.delegateAgents ?? []).map(async target => {
         const setup = await agentConfiguration(target, directory, demo, [], sink, cwd);
         installed.push(...setup.installed);
         return { name: target.id, description: target.description, configuration: setup.configuration };
       }));
-      extensions.push(delegationExtension(agent.id, delegates));
+      extensions.push(delegationExtension(agent.id, delegates, agent.clones));
     }
     extensions.push(...adapters);
     installed.push(...extensions);

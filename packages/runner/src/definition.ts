@@ -24,6 +24,8 @@ export type AgentDefinition = {
   skills?: boolean;
   /** Named agents available for native foreground delegation. */
   delegates?: string[];
+  /** Fresh task-owned children inheriting the calling conversation's native agent configuration. */
+  clones?: boolean;
   /** Agent types addressable as independent instances in the same ChatService. */
   messages?: string[];
   handoff?: { target: string; progressEveryMs: number };
@@ -67,6 +69,7 @@ export function defineAgent(definition: AgentDefinition): AgentDefinition {
   }
   if (definition.coding !== undefined && typeof definition.coding !== "boolean") throw new Error("coding must be a boolean.");
   if (definition.skills !== undefined && typeof definition.skills !== "boolean") throw new Error("skills must be a boolean.");
+  if (definition.clones !== undefined && typeof definition.clones !== "boolean") throw new Error("clones must be a boolean.");
   if (definition.handoff && (!agentName.test(definition.handoff.target)
     || !Number.isSafeInteger(definition.handoff.progressEveryMs) || definition.handoff.progressEveryMs <= 0)) {
     throw new Error("A handoff needs a target agent and a positive progressEveryMs.");
