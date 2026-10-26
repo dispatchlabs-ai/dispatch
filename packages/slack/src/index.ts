@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { parse } from "yaml";
 import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
-import { awaitWithContext, withAbortSignal } from "@earendil-works/chord/context";
-import { AssistantEntry, LiveDoc, defineDoc, defineExtension, defineTask, type LiveState, type TaskId } from "@earendil-works/pi-durable";
+import { awaitWithContext, withAbortSignal, type Context } from "@earendil-works/chord/context";
+import { AssistantEntry, LiveDoc, defineDoc, defineExtension, defineTask, type LiveState, type TaskId, type TaskRuntime } from "@earendil-works/pi-durable";
 import { context, type ChatService, type Runner, type ReplySink } from "@dispatch/runner";
 import { fallbackText, replyBlocks, replyChunk, streamText } from "./text.js";
 
@@ -35,6 +35,18 @@ function retryDelay(error: unknown) {
 
 function slackError(error: unknown) {
   return (error as { data?: { error?: string } })?.data?.error;
+}
+
+function activity(live: Readonly<LiveState>) {
+  if (live.generation?.retry) return "Retrying a model request";
+  if (live.compactions?.some(task => task.blocking)) return "Organizing context";
+  if (live.tools?.length) {
+    const finished = live.tools.filter(tool => tool.status === "done").length;
+    return `Running tools · ${finished}/${live.tools.length} finished in this round`;
+  }
+  if (live.generation?.deferred) return "Waiting for the model";
+  if (live.generation?.message?.content.some(part => part.type === "text" && part.text.trim())) return "Writing response";
+  return "Working";
 }
 
 export type Report = { agent: string; channel: string; thread?: string; text: string; key: string; origin: import("@earendil-works/pi-durable").JsonObject; title?: string };
@@ -99,6 +111,42 @@ export async function prepareSlack(root: string, runner: Runner, options: {
   });
   const identity = await client.auth.test();
   if (identity.team_id !== config.teamId || !identity.user_id) throw new Error("Slack token does not belong to the configured workspace.");
+  const statuses = new Map<string, { pending: Promise<void>; active?: boolean; renewAt: number; retryAt: number }>();
+  // Serialize only Slack's shared thread indicator, never native execution.
+  // Read current state inside the queue: an older turn must not clear a newer one.
+  const refreshStatus = async (input: SlackInput, runtime: TaskRuntime<SlackInput, Delivery, null, object>, ctx: Context, force = false) => {
+    const key = threadKey(config.teamId, input.channel, input.thread);
+    let state = statuses.get(key);
+    if (!state) {
+      state = { pending: Promise.resolve(), renewAt: 0, retryAt: 0 };
+      statuses.set(key, state);
+    }
+    const status = state;
+    let idle = false;
+    const pending = status.pending.then(async () => {
+      if (runtime.signal.aborted || runtime.now() < status.retryAt) return;
+      try {
+        const live = await runtime.snapshot(LiveDoc, runtime.conversationId, ctx);
+        const active = !!live?.run;
+        idle = !active;
+        if (!force && active === status.active && runtime.now() < status.renewAt) return;
+        await client.assistant.threads.setStatus({
+          channel_id: input.channel, thread_ts: input.thread,
+          status: active ? "is working on your request…" : "",
+        });
+        status.active = active;
+        status.renewAt = runtime.now() + 45_000;
+        status.retryAt = 0;
+      } catch (error) {
+        if (runtime.signal.aborted) return;
+        status.retryAt = runtime.now() + retryDelay(error);
+        runtime.report(new Error(`Slack working indicator unavailable: ${slackError(error) ?? "request failed"}; execution and delivery continue.`));
+      }
+    });
+    status.pending = pending;
+    await pending;
+    if (status.pending === pending && idle) statuses.delete(key);
+  };
   const socket = new SocketModeClient({ appToken });
   const bot = identity.user_id;
   let startService!: (service: ChatService) => void;
@@ -137,7 +185,8 @@ export async function prepareSlack(root: string, runner: Runner, options: {
             runtime.report(new Error(`Slack streaming unavailable; final reply remains queued: ${slackError(error) ?? "request failed"}`));
           }
         }
-        const watch = stream ? await runtime.watchDoc(LiveDoc, runtime.conversationId, ctx) : undefined;
+        await refreshStatus(task.input, runtime, ctx, true);
+        const watch = await runtime.watchDoc(LiveDoc, runtime.conversationId, ctx);
         let pending = Promise.resolve();
         let sent = "";
         let progress = "";
@@ -151,11 +200,13 @@ export async function prepareSlack(root: string, runner: Runner, options: {
         // uses an ordinary editable message; a slow first generation switches too.
         const openedAt = stream ? Number.parseFloat(stream) * 1000 : runtime.now();
         const append = async (live: Readonly<LiveState> | null) => {
-          if (!stream || missing || runtime.signal.aborted) return;
+          if (runtime.signal.aborted) return;
           const active = !!live?.run?.inputs.includes(submission.id);
+          await refreshStatus(task.input, runtime, ctx);
+          if (!stream || missing) return;
           const raw = active ? live?.generation?.message?.content.flatMap(p => p.type === "text" ? [p.text] : []).join("\n") ?? "" : "";
           const text = streamText(raw);
-          if (text.trim()) progress = text;
+          if (raw.trim()) progress = raw;
           ordinary ||= (active && !!live?.tools?.length) || runtime.now() >= openedAt + 8 * 60_000
             || (!!text && !text.startsWith(sent));
           if (runtime.now() < retryAt) return;
@@ -169,29 +220,33 @@ export async function prepareSlack(root: string, runner: Runner, options: {
                   if (slackError(error) !== "message_not_in_streaming_state") throw error;
                 }
                 closed = true;
+                await refreshStatus(task.input, runtime, ctx, true);
               }
-              const status = !active ? "Queued" : live?.generation?.retry ? "Retrying a temporary model failure"
-                : live?.compactions?.length ? "Organizing context" : "Working";
-              const minutes = Math.floor((runtime.now() - openedAt) / 60_000);
-              const label = `${status}${minutes ? ` · ${minutes}m elapsed` : ""}`;
-              const body = progress ? replyChunk(progress, 0, 10_000) : "";
+              const status = active ? activity(live!) : live?.run ? "Queued" : "Finishing reply";
+              const seconds = Math.max(0, Math.floor((runtime.now() - openedAt) / 10_000) * 10);
+              const elapsed = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+              const label = `${status} · ${elapsed} elapsed`;
+              const body = progress ? replyChunk(progress, 0) : "";
               const signature = `${label}\n${body}`;
               if (signature === displayed || runtime.now() < updatedAt + 2_000) return;
               await client.chat.update({ channel: task.input.channel, ts: stream,
                 text: fallbackText(signature),
                 blocks: [{ type: "context", elements: [{ type: "plain_text", text: label }] },
-                  ...(body ? replyBlocks(body) : [])],
+                  ...(body ? replyBlocks(body, progress) : [])],
                 parse: "none", link_names: false,
               });
               displayed = signature;
               updatedAt = runtime.now();
-            } else if (text && text !== sent) {
+              await refreshStatus(task.input, runtime, ctx, true);
+            } else if (text && text !== sent && runtime.now() >= updatedAt + 2_000) {
               // The native watcher coalesces updates while this request runs.
               const delta = replyChunk(text, sent.length, 12_000, false);
               await client.chat.appendStream({
                 channel: task.input.channel, ts: stream, chunks: [{ type: "markdown_text", text: delta }],
               });
               sent += delta;
+              updatedAt = runtime.now();
+              await refreshStatus(task.input, runtime, ctx, true);
             }
           } catch (error) {
             if (runtime.signal.aborted) return;
@@ -201,22 +256,24 @@ export async function prepareSlack(root: string, runner: Runner, options: {
             runtime.report(new Error(`Slack progress update pending: ${slackError(error) ?? "request failed"}; final reply remains queued.`));
           }
         };
-        let timer: ReturnType<typeof setInterval> | undefined;
-        if (watch) {
-          pending = append(watch.value);
-          await pending;
-          const refresh = () => { pending = pending.then(() => append(watch.value)); return pending; };
-          watch.start(refresh);
-          // Flush throttled partials and end a stream even while the model is
-          // silent. This observes the saved run; it never starts or retries work.
-          timer = setInterval(() => { void refresh(); }, 5_000);
-        }
+        const refresh = () => {
+          pending = pending.then(async () => {
+            if (!runtime.signal.aborted) await append(await runtime.snapshot(LiveDoc, runtime.conversationId, ctx) ?? null);
+          });
+          return pending;
+        };
+        await refresh();
+        watch?.start(refresh);
+        // Flush throttled partials and renew status even while the model is
+        // silent. This observes the saved run; it never starts or retries work.
+        const timer = setInterval(() => { void refresh().catch(error => runtime.report(error)); }, 5_000);
         let receipt;
         try { receipt = await submission.wait(ctx); }
         finally {
-          if (timer) clearInterval(timer);
-          if (watch) await watch.stop();
+          clearInterval(timer);
+          await watch?.stop();
           await pending;
+          await refreshStatus(task.input, runtime, ctx);
         }
         let text = "The reply stopped before it completed. Please try again.";
         if (receipt.status === "done" && receipt.type === "input") {
@@ -277,13 +334,16 @@ export async function prepareSlack(root: string, runner: Runner, options: {
           }), ctx);
           return;
         }
+        // Posting/finalizing a reply can clear another turn's loading indicator.
+        await refreshStatus(task.input, runtime, ctx, true);
         const offset = checkpoint.offset + text.length;
         await runtime.commit(() => offset >= checkpoint.text.length
           ? { status: "terminal", outcome: { status: "completed", result: null } }
           : { status: "running", checkpoint: { ...checkpoint, offset, retryAt: 0 } }, ctx);
       },
     },
-    async abort(_task, runtime, ctx) {
+    async abort(task, runtime, ctx) {
+      await refreshStatus(task.input, runtime, ctx, true);
       await runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx);
     },
   });

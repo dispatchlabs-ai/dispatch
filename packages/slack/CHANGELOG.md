@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Keep the native thread working indicator alive across tool work and stream
+  rollover, clear it on completion, and preserve delivery when status calls fail.
+  Read fresh native state when queued or completing turns refresh thread status.
+- Show current-round tool counts, retry/context state and elapsed time during
+  otherwise silent execution, without exposing reasoning or tool contents.
+  Preserve literal Markdown characters in editable progress instead of escaping
+  the same text twice.
+
 - Convert tool-backed or long-running streams into editable progress messages
   before Slack's expiry; show later model responses and resume progress updates
   after restart without restarting the underlying work.

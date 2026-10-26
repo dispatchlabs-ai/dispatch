@@ -101,12 +101,24 @@ each thread across restarts. A deleted thread leaves a recorded failed admission
 Known unrelated threads are filtered without a Slack API request when the event
 identifies their parent author. Existing admission keys survive the inbox upgrade.
 Native tasks also retain outgoing reply progress.
+The native Slack thread loading indicator stays active during model/tool work,
+including quiet periods, and is renewed before its two-minute timeout. Status
+failures never block execution or final delivery; an interrupted process may
+leave the indicator until Slack expires it. This uses the existing `chat:write`
+scope through `assistant.threads.setStatus`, not an additional assistant grant.
+Thread status reads the current native run, including after a reply clears
+Slack's indicator, so a completed or queued turn cannot clear active work.
 Short answers stream normally. Once the model starts tools, or before an initial
 stream reaches eight minutes, the adapter closes the stream and updates the same
-message with the latest public response and a working indicator. Later model
-responses replace the progress text, including after restart; private reasoning
-and tool output are not displayed. This avoids Slack's ten-minute stream expiry
-marking an active research job as failed. Final delivery replaces progress with
+message with the latest public response and execution-derived progress: the
+current tool round's finished/total count, model retry or context preparation,
+and elapsed time in ten-second increments. A finished tool is not necessarily a
+successful tool. These updates do not depend on model narration or invent a
+percentage complete. Slack updates are paced and may lag during API failures.
+Later model responses replace the progress text, including after restart;
+private reasoning and tool names, arguments and output are not displayed. This
+avoids Slack's ten-minute stream expiry marking active work as failed.
+Final delivery replaces progress with
 the committed answer. See [Slack's response guidance](https://docs.slack.dev/ai/developing-agents/#responding-to-the-user).
 Final replies use Slack's Markdown blocks, matching the Markdown sent while
 streaming, so bold text, inline code and source links retain their formatting.
