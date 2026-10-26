@@ -108,6 +108,11 @@ The `model.thinking` value accepts Pi's `off`, `minimal`, `low`, `medium`, `high
 for conversations. Interval schedules skip missed slots after an overdue turn;
 continuous schedules wait their configured delay after each result.
 
+For calendar scheduling, see the accepted [agent-local schedule design](docs/schedules.md).
+Schedules and prompts belong in the owning agent's definition, not a company-wide
+list. Its proposed `schedules` field and cron/timezone support are **not implemented**;
+the documented example does not change the existing triggers above.
+
 `run({ root, stateRoot, models, adapters: [...] })` starts a service and returns
 `service` and `close()`. Call `close()` on SIGTERM/SIGINT. The host application
 owns process supervision. Optional adapters, including

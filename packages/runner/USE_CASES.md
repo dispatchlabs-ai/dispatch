@@ -43,6 +43,15 @@
   optional replies through native queued inputs, and inspect attributed outcomes
   without parent-owned delegation or another persistence/recovery system.
 
+## Accepted design, not implemented
+
+- [ ] **RUN-013 — Schedule agent-local assignments:** define named schedules and
+  predefined prompts beside an agent, including daily calendar-time execution
+  in an explicit timezone, with shared Runner admission and native Pi recovery.
+  See the [design and unresolved policies](docs/schedules.md).
+
+## Availability
+
 The extraction supports Node, SQLite and trusted company definitions.
 Hosted Dispatch Web adoption, portable coding isolation, npm
 registry publication and broad installation qualification remain separate work.

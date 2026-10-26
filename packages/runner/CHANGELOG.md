@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Document the accepted agent-local scheduling design and proposed API. Cron,
+  timezone scheduling and the `schedules` field remain unimplemented; existing
+  triggers and live installations are unchanged.
+
 - Add opt-in service-local messaging between independent top-level instances,
   native replay-safe delivery/outcome receipts and optional replies. Recipients
   retain their own configuration, host adapters and cancellation lifecycle.
