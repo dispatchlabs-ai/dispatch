@@ -50,6 +50,9 @@ agents. Their `prepare` phase declares extensions, `start` receives the service,
 and `close` releases transport resources before the service closes native stores.
 An optional `busy()` reports unfinished adapter-owned compatibility work.
 
+The optional [Gmail adapter](gmail.md) receives alias-addressed email and sends
+threaded final replies through this same owner.
+
 Local clients use the running owner:
 
 ```sh

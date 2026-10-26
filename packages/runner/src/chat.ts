@@ -26,7 +26,7 @@ import { createInstanceMessaging, instanceMessagingExtension, type InstanceMessa
 export const context = BACKGROUND_CONTEXT;
 export type Chat = {
   id: string; agent: string; conversationId: number; title: string;
-  source: "cli" | "web" | "slack" | "phone" | "agent"; createdAt: string; origin?: JsonObject;
+  source: "cli" | "web" | "slack" | "phone" | "email" | "agent"; createdAt: string; origin?: JsonObject;
 };
 export function createChats(namespace: string, openAgent: ReturnType<typeof createRuntime>["openAgent"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"]) {
   const Chats = defineDoc<{

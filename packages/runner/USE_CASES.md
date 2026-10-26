@@ -52,6 +52,11 @@
   with capped exponential backoff and jitter, inspect the next attempt, recover
   the same submission after restart, and cancel without a replacement workflow.
 
+- **RUN-016 — Converse by email:** map authenticated, allowlisted alias mail to
+  native conversations, deliver sender-only threaded final replies from that
+  alias, and file incoming/sent mail. See [Gmail transport](docs/gmail.md) for
+  setup, uncertain-send recovery and remaining qualification boundaries.
+
 ## Accepted design, not implemented
 
 - [ ] **RUN-013 — Schedule agent-local assignments:** define named schedules and

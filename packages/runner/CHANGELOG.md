@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Add an optional Gmail adapter with alias/thread/sender conversation bindings,
+  authenticated sender restrictions, native durable admission and final replies,
+  labeled incoming/sent mail and uncertain-send reconciliation without blind
+  resending. Attachments, reply-all and unsolicited background email are excluded.
+
 - Pass installation model-retry policy through to stock Pi Durable, with sustained
   capped backoff, optional jitter and native pending-retry details in snapshots.
   No replacement task loop or workflow resubmission is introduced.

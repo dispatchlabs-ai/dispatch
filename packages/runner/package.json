@@ -9,6 +9,10 @@
     "node": ">=22.19.0"
   },
   "exports": {
+    "./gmail": {
+      "types": "./dist/gmail.d.ts",
+      "import": "./dist/gmail.js"
+    },
     "./service": {
       "types": "./dist/service.d.ts",
       "import": "./dist/service.js"
