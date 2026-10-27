@@ -18,6 +18,8 @@ export type GmailOptions = {
   routes: { address: string; agent: string; displayName: string; label: string; sendEnabled?: boolean; autoReply?: boolean }[];
   /** Catch-all folder, created if absent. */
   otherLabel?: string;
+  /** Independent label workers can leave unrelated mail to another worker or Gmail filters. */
+  unrouted?: "file" | "ignore";
   pollMs?: number;
   /** Private persistent file store; back up with native SQLite. */
   attachmentRoot?: string;
@@ -63,6 +65,7 @@ export function createAdapter(options: GmailOptions): Adapter {
       || (route.autoReply !== undefined && typeof route.autoReply !== "boolean"))
     || new Set(options.routes.map(route => route.address)).size !== options.routes.length
     || (options.otherLabel !== undefined && (typeof options.otherLabel !== "string" || !options.otherLabel.trim()))
+    || (options.unrouted !== undefined && !["file", "ignore"].includes(options.unrouted))
     || (options.pollMs !== undefined && (!Number.isFinite(options.pollMs) || options.pollMs <= 0))
     || (options.attachmentRoot !== undefined && !isAbsolute(options.attachmentRoot))) {
     throw new Error("Configure Gmail mailbox, private credentials, startAfter and unique address routes with labels distinct from the catch-all.");
@@ -443,6 +446,7 @@ export function createAdapter(options: GmailOptions): Adapter {
           // Other route labels still admit work, including mail between agents.
           const routes = labeled.filter(route => route.address !== sentRoute?.address);
           const filing = [...new Set([...labeled, ...(sentRoute ? [sentRoute] : [])].map(route => labels.get(route.label)!))];
+          if (!filing.length && options.unrouted === "ignore") continue;
           if (!filing.length) filing.push(otherLabel);
           if (message.labelIds.includes("INBOX") || filing.some(label => !message.labelIds.includes(label))
             || (!filing.includes(otherLabel) && message.labelIds.includes(otherLabel))) {

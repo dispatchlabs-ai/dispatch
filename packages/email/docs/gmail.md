@@ -76,6 +76,14 @@ admit work, including mail between agents. Inbox is removed, unread status and
 unrelated labels kept. Gmail filters may file mail immediately, but the adapter
 also handles eventual filing and removes the catch-all when a route label appears.
 
+For independent workers sharing a mailbox, set `unrouted: "ignore"` on each
+label-scoped adapter. Messages without its route labels or owned sent identity
+are left completely unchanged; Gmail filters or another designated consumer must
+file unmatched mail. The default `"file"` retains catch-all filing. Use disjoint
+agent/store ownership across processes, not multiple writers to one native store.
+Multiple labels still fan out through their respective workers. This does not
+provide mailbox-level access isolation or optimize the full polling scan.
+
 Polling defaults to 15 seconds and rereads messages since `startAfter`; this is
 not push/history-based synchronization. The rescan detects labels applied to
 previously seen mail as well as new deliveries. No performance qualification for

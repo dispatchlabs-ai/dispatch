@@ -28,7 +28,9 @@ current Gmail adapter implements every requirement.
   source of agent state. Email presentation need not mirror every event shown
   in other channels.
 - **EMAIL-007 — Keep mail organized:** file every received and sent message under
-  the appropriate folder or label, including mail not routed to an agent.
+  the appropriate folder or label, including mail not routed to an agent. A
+  label-scoped worker may explicitly leave unmatched mail to Gmail filters or
+  another designated consumer instead of changing another worker's filing.
 
 ## Boundaries
 

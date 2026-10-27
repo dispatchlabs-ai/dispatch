@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Add opt-in `unrouted: "ignore"` for independent label workers sharing a mailbox;
+  default catch-all filing remains unchanged.
 - Route incoming work by configured Gmail labels, not recipient headers. Shared
   inbox notifications and later-applied labels admit each route once; replies
   recognize label ownership and retained admission receipts. Filing a route's
