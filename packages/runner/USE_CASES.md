@@ -55,7 +55,9 @@
 - **RUN-016 — Converse by email:** map authenticated, allowlisted alias mail to
   native conversations, read HTML/plain-text mail and privately stored attachments,
   deliver sender-only threaded text/HTML replies and requested files from that
-  alias, and file incoming/sent mail. See [Gmail transport](docs/gmail.md) for
+  alias, and file incoming/sent mail. This describes the current adapter, not
+  intended email restrictions; the [email package use cases](../email/USE_CASES.md)
+  own the approved channel requirements and gaps. See [Gmail transport](docs/gmail.md) for
   setup, uncertain-send recovery and remaining qualification boundaries.
 
 - [x] **RUN-013 — Schedule agent-local assignments:** define named schedules and
