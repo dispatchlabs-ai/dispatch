@@ -53,7 +53,10 @@ with a private options file:
 
 Set `startAfter` to a deliberate epoch-millisecond rollout boundary and **keep it
 fixed across restarts**. Earlier mail is not executed. Configure Gmail filters to
-label and skip Inbox for each alias, plus a catch-all label for everything else.
+label and skip Inbox for each alias, including its From address as well as
+To/Cc/delivery addresses, plus a catch-all excluding all those conditions.
+Gmail can apply filters to sent mail too; excluding alias senders prevents the
+catch-all from also filing agent replies as unrelated mail.
 Do not mark messages read automatically. Polling searches archived mail too.
 
 ## Supported behavior and boundaries
@@ -77,8 +80,10 @@ Do not mark messages read automatically. Polling searches archived mail too.
   never reply-all or an arbitrary Reply-To. From and Reply-To use the addressed
   alias, with proper threading headers. Incoming and sent mail receive the route
   label and are removed from Inbox; unread status is preserved.
-- External sending is **not exactly once**. A stable RFC Message-ID enables
-  Sent-mail reconciliation after an uncertain send. If no matching sent message
+- External sending is **not exactly once**. A stable `X-Dispatch-Delivery` header
+  enables reconciliation against Sent messages in the Gmail thread after an
+  uncertain send. Gmail can rewrite the RFC Message-ID; it is not the recovery
+  identity. If no matching sent message
   appears after two minutes, delivery fails for manual inspection rather than
   blindly resending. Successful sends with pending labels retry labeling without
   sending again. Inspect native tasks and Sent mail before manual recovery.

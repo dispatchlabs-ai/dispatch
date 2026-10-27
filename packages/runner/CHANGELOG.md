@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Reconcile uncertain Gmail sends by a stable delivery header in the Sent thread,
+  rather than an RFC Message-ID which Gmail can rewrite. Document alias-sender
+  filter conditions to keep sent replies out of the catch-all label.
+
 - Add an optional Gmail adapter with alias/thread/sender conversation bindings,
   authenticated sender restrictions, native durable admission and final replies,
   labeled incoming/sent mail and uncertain-send reconciliation without blind

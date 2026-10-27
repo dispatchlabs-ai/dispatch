@@ -152,19 +152,25 @@ export function createAdapter(options: GmailOptions): Adapter {
             const input = task.input;
             const hash = createHash("sha256").update(`${namespace}:${options.mailbox}:${input.address}:${input.key}`).digest("hex");
             const rfcId = `<${hash}@${input.address.split("@")[1]}>`;
-            // Gmail send has no idempotency key. Reconcile an uncertain send;
-            // never blindly resend after a crash or timeout.
+            // Gmail can rewrite Message-ID. Reconcile using our delivery marker
+            // on Sent messages in this thread; never blindly resend.
             if (state.attemptedAt) {
-              let matches;
-              try { matches = await list(`in:sent rfc822msgid:${rfcId}`); }
+              let sent: { id: string } | undefined;
+              try {
+                const thread = await api<{ messages?: { id: string; labelIds?: string[]; payload: Part }[] }>(
+                  `threads/${input.thread}?format=metadata&metadataHeaders=X-Dispatch-Delivery`);
+                sent = thread.messages?.find(message => message.labelIds?.includes("SENT")
+                  && header(message.payload, "X-Dispatch-Delivery") === hash);
+              }
               catch (error) {
                 if (runtime.signal.aborted) throw error;
                 runtime.report(new Error("Gmail Sent-mail reconciliation pending."));
                 await runtime.sleepUntil(runtime.now() + 30_000, state, ctx);
                 return;
               }
-              if (matches[0]) {
-                await runtime.commit(() => ({ status: "running", checkpoint: { phase: "label", sentId: matches[0].id } }), ctx);
+              if (sent) {
+                const sentId = sent.id;
+                await runtime.commit(() => ({ status: "running", checkpoint: { phase: "label", sentId } }), ctx);
               } else if (runtime.now() - state.attemptedAt < 120_000) {
                 await runtime.sleepUntil(runtime.now() + 15_000, state, ctx);
               } else {
@@ -178,6 +184,7 @@ export function createAdapter(options: GmailOptions): Adapter {
             const raw = [
               `From: ${encodedHeader(input.displayName)} <${input.address}>`,
               `To: ${input.sender}`, `Reply-To: ${input.address}`, `Subject: ${encodedHeader(subject)}`,
+              `Date: ${new Date(runtime.now()).toUTCString()}`, `X-Dispatch-Delivery: ${hash}`,
               `Message-ID: ${rfcId}`, `In-Reply-To: ${input.messageId}`,
               `References: ${input.references} ${input.messageId}`.trim(),
               "Auto-Submitted: auto-replied", "X-Auto-Response-Suppress: All", "MIME-Version: 1.0",
