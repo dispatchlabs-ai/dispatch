@@ -391,7 +391,7 @@ export function createAdapter(options: GmailOptions): Adapter {
             }, { conversationId: api.conversationId, ownership: { kind: "conversation" }, background: true });
             outbox.calls[receiptKey] = task;
             const active = (await tx.doc(Files, api.conversationId)).active;
-            if (active?.address === route.address) active.sentExplicitly = true;
+            if (active) active.sentExplicitly = true;
             return task;
           }, ctx);
           return { output: [{ type: "text", text: JSON.stringify({ taskId, status: "queued; check email_delivery_status" }) }] };
