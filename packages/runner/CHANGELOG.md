@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Read HTML-only mail without loading remote resources; prefer plain-text
+  alternatives and send safe rendered HTML plus plain-text fallbacks.
+- Download authenticated-message attachments into private per-message storage,
+  expose manifests to native file/document tools, and add `email_attach` for
+  user-requested reply files. Preserve file hashes, native turn recovery and
+  sender-only delivery, with bounded byte budgets and no automatic execution.
+
 - Reconcile uncertain Gmail sends by a stable delivery header in the Sent thread,
   rather than an RFC Message-ID which Gmail can rewrite. Document alias-sender
   filter conditions to keep sent replies out of the catch-all label.
@@ -9,7 +16,7 @@
 - Add an optional Gmail adapter with alias/thread/sender conversation bindings,
   authenticated sender restrictions, native durable admission and final replies,
   labeled incoming/sent mail and uncertain-send reconciliation without blind
-  resending. Attachments, reply-all and unsolicited background email are excluded.
+  resending. Reply-all and unsolicited background email are excluded.
 
 - Pass installation model-retry policy through to stock Pi Durable, with sustained
   capped backoff, optional jitter and native pending-retry details in snapshots.

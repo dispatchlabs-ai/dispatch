@@ -53,7 +53,8 @@
   the same submission after restart, and cancel without a replacement workflow.
 
 - **RUN-016 — Converse by email:** map authenticated, allowlisted alias mail to
-  native conversations, deliver sender-only threaded final replies from that
+  native conversations, read HTML/plain-text mail and privately stored attachments,
+  deliver sender-only threaded text/HTML replies and requested files from that
   alias, and file incoming/sent mail. See [Gmail transport](docs/gmail.md) for
   setup, uncertain-send recovery and remaining qualification boundaries.
 
