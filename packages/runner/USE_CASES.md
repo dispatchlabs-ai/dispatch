@@ -52,13 +52,9 @@
   with capped exponential backoff and jitter, inspect the next attempt, recover
   the same submission after restart, and cancel without a replacement workflow.
 
-- **RUN-016 — Converse by email:** map authenticated, allowlisted alias mail to
-  native conversations, read HTML/plain-text mail and privately stored attachments,
-  deliver sender-only threaded text/HTML replies and requested files from that
-  alias, and file incoming/sent mail. This describes the current adapter, not
-  intended email restrictions; the [email package use cases](../email/USE_CASES.md)
-  own the approved channel requirements and gaps. See [Gmail transport](docs/gmail.md) for
-  setup, uncertain-send recovery and remaining qualification boundaries.
+- **RUN-016 — Converse by email:** expose native work through the
+  [email package](../email/USE_CASES.md), sharing conversations, tasks and recovery
+  rather than embedding email policy or a second runtime in Runner.
 
 - [x] **RUN-013 — Schedule agent-local assignments:** define named schedules and
   predefined prompts beside an agent, including daily calendar-time execution

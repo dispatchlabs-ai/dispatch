@@ -8,6 +8,7 @@ import { createChats } from "./chat.js";
 import type { LoadedAgent } from "./definition.js";
 
 export * from "./definition.js";
+export { privateStateDirectory } from "./private-state.js";
 export { nextScheduleAt } from "./schedules.js";
 export type { AgentSchedule } from "./schedules.js";
 export { instanceMessagingExtension } from "./messages.js";

@@ -37,13 +37,8 @@ must be reported accurately, not replaced with arbitrary application caps.
 
 ## Implementation status
 
-The current [Gmail adapter](../runner/docs/gmail.md) lives in Runner; this
-directory establishes the email package's requirements, not a completed package
-extraction.
-
-The adapter already routes configured aliases to native agent conversations and
-supports HTML, attachments and filing. It still enforces sender and addressing
-restrictions, only sends threaded replies, and automatically replies to admitted
-messages without the independent outbound enablement gate above. Those are
-implementation gaps, not intended use-case boundaries. Recording these
-requirements does not change or disable a deployed adapter.
+The [Gmail adapter](docs/gmail.md) implements these channel contracts in this
+package, using Runner's native owner. The former Runner entry point remains a
+compatibility forwarder. Live installation qualification and provider-specific
+constraints are separate from source/build checks; see the guide's qualification
+section. No deployment or sending activation is implied by these requirements.

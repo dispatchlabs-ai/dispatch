@@ -5,7 +5,7 @@ import { basename, join, relative, isAbsolute } from "node:path";
 import { convert } from "html-to-text";
 import MarkdownIt from "markdown-it";
 import MailComposer from "nodemailer/lib/mail-composer/index.js";
-import { privateStateDirectory } from "./private-state.js";
+import { privateStateDirectory } from "@dispatch/runner";
 
 export type MailPart = {
   partId?: string; mimeType?: string; filename?: string; parts?: MailPart[];
@@ -20,7 +20,7 @@ export function mailHeader(part: MailPart, name: string) {
 }
 const filePart = (part: MailPart) => !!part.filename || /^attachment\b/i.test(mailHeader(part, "Content-Disposition"))
   || (!part.parts?.length && !!part.mimeType && !["text/plain", "text/html"].includes(part.mimeType));
-export const safeFilename = (name: string) => basename(name.replace(/\\/g, "/")).replace(/[\x00-\x1f\x7f]/g, "_").replace(/^\.+/, "_").slice(0, 120) || "attachment";
+export const safeFilename = (name: string) => basename(name.replace(/\\/g, "/")).replace(/[\x00-\x1f\x7f]/g, "_").replace(/^\.+/, "_") || "attachment";
 const digest = (data: string | Buffer) => createHash("sha256").update(data).digest("hex");
 const inside = (root: string, path: string) => {
   const value = relative(root, path);
@@ -42,6 +42,7 @@ export async function mailText(part: MailPart, load: LoadPart): Promise<string> 
   if (part.mimeType === "text/plain") return decode(await data(part, load), part);
   if (part.mimeType === "text/html") return convert(decode(await data(part, load), part), {
     wordwrap: false,
+    limits: { maxInputLength: undefined },
     selectors: [
       { selector: "script", format: "skip" }, { selector: "style", format: "skip" },
       { selector: "iframe", format: "skip" }, { selector: "object", format: "skip" },
@@ -77,7 +78,7 @@ export function mailFiles(root: string, mailbox: string, address: string, key: s
   async function save(folder: "received" | "frozen", name: string, bytes: Buffer, mimeType: string, contentId?: string): Promise<MailFile> {
     name = safeFilename(name);
     const sha256 = digest(bytes);
-    const path = join(directory, folder, `${sha256}-${name}`);
+    const path = join(directory, folder, sha256);
     const temporary = join(directory, folder, `.staging-${randomUUID()}`);
     try {
       const handle = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
@@ -99,20 +100,12 @@ export function mailFiles(root: string, mailbox: string, address: string, key: s
       return bytes;
     } finally { await handle.close(); }
   }
-  async function receive(part: MailPart, load: LoadPart, maxBytes: number): Promise<ReceivedFile[]> {
-    const files: ReceivedFile[] = [];
-    let used = 0;
+  async function receive(part: MailPart, load: LoadPart): Promise<MailFile[]> {
+    const files: MailFile[] = [];
     async function visit(part: MailPart) {
       if (filePart(part)) {
         const name = safeFilename(part.filename || `inline-${part.partId ?? files.length}`);
-        if ((part.body?.size ?? 0) > maxBytes - used) {
-          files.push({ name, error: "Attachment exceeds the remaining per-message byte limit." }); return;
-        }
         const bytes = await data(part, load);
-        if (bytes.length > maxBytes - used) {
-          files.push({ name, error: "Attachment exceeds the remaining per-message byte limit." }); return;
-        }
-        used += bytes.length;
         files.push(await save("received", name, bytes, part.mimeType ?? "application/octet-stream",
           mailHeader(part, "Content-ID").replace(/^<|>$/g, "") || undefined));
         return;
@@ -122,15 +115,14 @@ export function mailFiles(root: string, mailbox: string, address: string, key: s
     await visit(part);
     return files;
   }
-  async function attach(path: string, name: string | undefined, maxBytes: number): Promise<MailFile> {
+  async function attach(path: string, name: string | undefined, staged = true): Promise<MailFile> {
     const canonical = await realpath(path);
-    if (!isAbsolute(path) || !inside(await realpath(outgoing), canonical)) throw new Error("Create the requested file inside this email turn's outgoing directory first.");
+    if (!isAbsolute(path) || (staged && !inside(await realpath(outgoing), canonical))) throw new Error("Create the requested file inside this email turn's outgoing directory first.");
     const handle = await open(canonical, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     try {
       const info = await handle.stat();
-      if (!info.isFile() || info.nlink !== 1 || info.uid !== process.getuid?.() || info.size > maxBytes) throw new Error("Attachment must be an owned regular file within the per-message byte limit.");
+      if (!info.isFile() || info.nlink !== 1 || info.uid !== process.getuid?.()) throw new Error("Attachment must be an owned regular file.");
       const bytes = await handle.readFile();
-      if (bytes.length > maxBytes) throw new Error("Attachment exceeds the per-message byte limit.");
       return save("frozen", name ?? basename(path), bytes, "application/octet-stream");
     } finally { await handle.close(); }
   }
@@ -141,18 +133,21 @@ const markdown = new MarkdownIt({ html: false, linkify: false });
 // Replies never embed remote images or trackers supplied by model text.
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
 export async function composeMail(options: {
-  from: { name: string; address: string }; to: string; subject: string; messageId: string;
+  from: { name: string; address: string }; to: string | string[]; cc?: string[]; bcc?: string[]; html?: string; subject: string; messageId: string;
   inReplyTo: string; references: string; delivery: string; date: Date; text: string;
   attachments: { file: MailFile; bytes: Buffer }[];
 }) {
-  return new MailComposer({
-    from: options.from, to: options.to, replyTo: options.from.address, subject: options.subject,
+  const message = new MailComposer({
+    from: options.from, to: options.to, cc: options.cc, bcc: options.bcc, replyTo: options.from.address, subject: options.subject,
     date: options.date, messageId: options.messageId, inReplyTo: options.inReplyTo, references: options.references,
-    headers: { "X-Dispatch-Delivery": options.delivery, "Auto-Submitted": "auto-replied", "X-Auto-Response-Suppress": "All" },
-    text: options.text, html: markdown.render(options.text),
+    headers: { "X-Dispatch-Delivery": options.delivery, "Auto-Submitted": options.inReplyTo ? "auto-replied" : "auto-generated", "X-Auto-Response-Suppress": "All" },
+    text: options.text, html: options.html ?? markdown.render(options.text),
     attachments: options.attachments.map(({ file, bytes }) => ({
       filename: file.name, content: bytes, ...(file.mimeType === "application/octet-stream" ? {} : { contentType: file.mimeType }),
     })),
     disableFileAccess: true, disableUrlAccess: true,
-  }).compile().build();
+  }).compile();
+  // Gmail derives recipients from raw MIME, not Nodemailer's SMTP envelope.
+  message.keepBcc = true;
+  return message.build();
 }

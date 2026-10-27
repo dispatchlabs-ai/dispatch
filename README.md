@@ -10,7 +10,8 @@ For company agents that run independently of the browser,
 [Dispatch Runner](packages/runner/README.md) loads agent directories and owns
 native schedules and conversations. The optional
 [Slack package](packages/slack/README.md) connects shared threads and report
-discussions. These source-alpha packages are installed as locally packed
+discussions. The [Email package](packages/email/README.md) connects incoming work,
+replies and agent-initiated mail with explicit sending enablement. These source-alpha packages are installed as locally packed
 dependencies.
 
 [Dispatch Remote](packages/remote/README.md) supplies optional relay routing and

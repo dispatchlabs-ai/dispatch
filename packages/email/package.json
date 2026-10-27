@@ -1,0 +1,47 @@
+{
+  "version": "0.6.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "USE_CASES.md",
+    "CHANGELOG.md",
+    "docs",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretypecheck": "npm run build --workspace @dispatch/runner"
+  },
+  "name": "@dispatch/email",
+  "description": "Email transport for Dispatch agents",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "html-to-text": "10.0.1",
+    "markdown-it": "15.0.3",
+    "nodemailer": "10.2.1"
+  },
+  "devDependencies": {
+    "@types/html-to-text": "9.0.4",
+    "@types/markdown-it": "14.2.0",
+    "@types/nodemailer": "8.0.2",
+    "@types/node": "24.19.1",
+    "typescript": "6.0.3"
+  },
+  "peerDependencies": {
+    "@dispatch/runner": "0.6.0",
+    "@earendil-works/pi-durable": "1.4.0",
+    "@earendil-works/pi-ai": "1.4.0"
+  }
+}

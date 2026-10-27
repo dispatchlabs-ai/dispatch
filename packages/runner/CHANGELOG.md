@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Move Gmail implementation and its MIME dependencies into `@dispatch/email`.
+  Retain an asynchronous `@dispatch/runner/gmail` compatibility entry point;
+  installations must include the email package. Email owns sending enablement,
+  general outbound tools, uncapped content handling and native delivery recovery.
+
 - Add agent-local cron/timezone schedules with explicit missed-run and instance
   policies, optional expiry, native timer recovery and idempotent admission.
   Expose next/last occurrence and native task state through the service/CLI.
@@ -19,7 +24,7 @@
 - Download authenticated-message attachments into private per-message storage,
   expose manifests to native file/document tools, and add `email_attach` for
   user-requested reply files. Preserve file hashes, native turn recovery and
-  sender-only delivery, with bounded byte budgets and no automatic execution.
+  sender-only delivery, with no automatic execution.
 
 - Reconcile uncertain Gmail sends by a stable delivery header in the Sent thread,
   rather than an RFC Message-ID which Gmail can rewrite. Document alias-sender
