@@ -7,7 +7,8 @@ service's native SQLite owner, tasks, submissions and conversations.
 
 ## Configure
 
-Create a mailbox and receiving addresses. Authorize Gmail read/modify access.
+Create a mailbox, agent labels and sending identities. Authorize Gmail
+read/modify access.
 Sending also needs the send and settings access used to verify sending identities;
 receive-only startup does not query send-as settings. A route needs a verified Gmail send-as identity **only when
 sending is enabled**. A receiving alias is not automatically a send-as identity.
@@ -50,11 +51,35 @@ Any directory-defined agent can have a route; names and roles are not hardcoded.
 Keep `startAfter` fixed across restarts. Mail before that deliberate rollout
 boundary is not executed or refiled. Missing labels are created. Polling includes
 archived, automated, list, spam and trash mail; it does not require a sender
-allowlist or passing DMARC. Multiple addressed routes each receive the message.
-To/Cc and delivery headers determine routing; BCC delivery needs an alias-bearing
-delivery header. Unrouted mail is filed under `otherLabel` (default `Team / Other`).
-Sent mail is filed under its sending route. Inbox is removed, unread status kept.
-Gmail filters may file mail immediately but are not required for eventual filing.
+allowlist or passing DMARC.
+
+**The configured `label` selects incoming work; `address` is the agent's sending
+identity, not a recipient filter.** Labels are matched by exact Gmail name and
+resolved to message label IDs. For example, a notification addressed to
+`team@example.com` with label `Assistant` triggers `assistant`. An alias-addressed
+message without that label does not. Use Gmail filters, manual labeling or an
+upstream integration to apply routing labels. A filter can match an alias,
+notification source or any other supported criteria; no alias change is required
+at the sender. The adapter does not create these routing filters.
+
+Multiple route labels each receive the message. Applying another route label
+later admits that route on the next poll, provided the message is at or after
+`startAfter`. Removing/reapplying a label does not replay already-admitted work,
+and removing it does not cancel work already admitted. Labels on other messages
+in the thread do not select this message. No recipient/delivery header is needed
+for routing, including Bcc mail.
+
+Unrouted mail is filed under `otherLabel` (default `Team / Other`), which must be
+distinct from all routing labels. Sent mail is filed under its sending route;
+that route's own sent copy does not trigger it again. Other route labels still
+admit work, including mail between agents. Inbox is removed, unread status and
+unrelated labels kept. Gmail filters may file mail immediately, but the adapter
+also handles eventual filing and removes the catch-all when a route label appears.
+
+Polling defaults to 15 seconds and rereads messages since `startAfter`; this is
+not push/history-based synchronization. The rescan detects labels applied to
+previously seen mail as well as new deliveries. No performance qualification for
+large mailboxes is implied.
 
 **Enablement is explicit:** `sendEnabled` defaults to false and blocks both tools
 and automatic replies. With sending enabled, a final answer is automatically
@@ -77,8 +102,10 @@ sending, including any risk of agents automatically replying to each other.
   Choose `from` when the agent has multiple addresses. Only the agent's own
   configured identities can send; another agent's enablement grants no access.
 - For a reply, supply `replyToMessageId` using the Gmail message ID shown in the
-  incoming input. Recipients and subject default from the message; `replyAll`
-  includes original To/Cc, excluding the sending identity. Explicit recipient
+  incoming input. Reply ownership follows the route label or its durable admission
+  receipt, not the recipient address; removing a label after admission does not
+  revoke the ability to reply to that work. Recipients and subject default from
+  the message; `replyAll` includes original To/Cc, excluding the sending identity. Explicit recipient
   lists override these defaults. Replies can also reference the agent's sent mail.
 - `email_delivery_status`: inspect the returned native `taskId` in the same
   conversation. Queued is not sent. Completed delivery includes the sent Gmail
@@ -142,11 +169,16 @@ old `@dispatch/runner/gmail` entry point forwards to the installed email package
 new integrations should import `GmailOptions` and `createAdapter` from
 `@dispatch/email`. Remove obsolete `allowedSenders` and `maxAttachmentBytes`
 options: neither is enforced. Existing routes without `sendEnabled` become
-receive-only. Keep the native namespace, SQLite and attachment root unchanged.
+receive-only. Routing now uses the existing `label` field rather than recipient
+headers. Before rollout, verify Gmail filters apply the intended route labels to
+each incoming message (including follow-ups); aliases alone no longer trigger
+work. Existing route/message receipts prevent replay, while previously unrouted
+labeled messages after `startAfter` become eligible. Keep the native namespace,
+SQLite and attachment root unchanged.
 The adapter currently requires POSIX file custody; Windows is unqualified.
 
-Qualify first with sending disabled: a message to one or multiple routes should
-trigger native work and filing without producing mail. Then, in an explicitly
+Qualify first with sending disabled: a message carrying one or multiple route
+labels should trigger native work and filing without producing mail. Then, in an explicitly
 enabled qualification installation, inspect new mail, replies, reply-all, Bcc,
 HTML and attachment bytes. Repeat native recovery after restart, including an
 uncertain new-message send. Builds and simulated-provider checks do not establish
@@ -162,3 +194,13 @@ blocked after disablement; an explicit reply suppressed the automatic final
 reply. Reused model call IDs in separate native tool tasks produced distinct
 messages. Disposable stores were removed. These observations are not live Gmail
 or recipient-visible Bcc qualification; no automated test suite was added.
+
+A subsequent label-routing check used native SQLite with simulated Gmail. Shared
+inbox mail selected two routes solely by label; alias addressing alone did not.
+Adding a label later admitted work, and reopening native stores retained the same
+admission task IDs without replay. A route's sent copy did not trigger itself,
+but another route label admitted it to that agent. Reply admission accepted a
+label-owned shared-inbox message and a previously admitted message whose label
+was removed; another route's mail was rejected. Sending disabled blocked tool
+admission. The first received thread binding persisted and admitted an enabled
+background reply. No model work or real delivery was executed in this check.

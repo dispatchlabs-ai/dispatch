@@ -8,8 +8,11 @@ current Gmail adapter implements every requirement.
 
 - **EMAIL-001 — Expose any agent:** configure email access for any existing agent
   without hardcoding agent names, roles or organization-specific behavior.
-- **EMAIL-002 — Trigger work from incoming mail:** receive email addressed to a
-  configured agent and admit it as work in that agent's existing durable runtime.
+- **EMAIL-002 — Trigger work from incoming mail:** receive email selected by a
+  configured agent's Gmail label and admit it as work in that agent's existing
+  durable runtime. Recipient aliases are optional ways to apply labels, not the
+  routing authority. Mail to a shared inbox can trigger any labeled agent; multiple
+  route labels fan out, and labeling eligible mail later admits each route once.
 - **EMAIL-003 — Communicate by email:** let configured agents send email and
   respond to received messages, not only return one final answer to the original
   sender. Email is a channel, not a prescribed task workflow.

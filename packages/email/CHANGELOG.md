@@ -2,10 +2,15 @@
 
 ## [Unreleased]
 
+- Route incoming work by configured Gmail labels, not recipient headers. Shared
+  inbox notifications and later-applied labels admit each route once; replies
+  recognize label ownership and retained admission receipts. Filing a route's
+  own sent copy does not trigger another turn for that route. Persist the first
+  received thread binding for background replies.
 - Extract the Gmail transport from Runner while retaining native task identities,
   conversation bindings, file custody and a compatibility adapter entry point.
 - Default each address to receive-only until sending is explicitly enabled. Admit
-  all sender types and fan out multi-address mail; create labels and file unrouted
+  all sender types and fan out multi-label mail; create labels and file unrouted
   and sent mail without requiring external Gmail filters.
 - Add durable email sending from any agent conversation, including scheduled
   work, with explicit recipients, replies/reply-all, HTML and attachments. Expose
