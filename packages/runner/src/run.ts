@@ -66,13 +66,14 @@ export async function run(options: RunOptions = {}) {
         models: options.models, demo: options.demo ?? false, names: options.names,
         updateDefinitions: options.updateDefinitions, initialize: options.initialize,
         resume: options.resume,
+        deferResume: true,
         cwd: options.cwd, storage: options.storage, settings: options.settings,
         extensions, replySink,
       });
     }
     await options.beforeStart?.(service);
     for (const adapter of adapters) await adapter.start(service);
-    if (options.resume !== false) for (const host of service.hosts.values()) host.harness.resume();
+    if (options.resume !== false) await service.start();
     return { runner, service, adapters, close };
   } catch (error) {
     await close().catch(closeError => reportError("Runner cleanup failed:", closeError));

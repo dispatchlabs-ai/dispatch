@@ -57,6 +57,7 @@ Local clients use the running owner:
 
 ```sh
 dispatch-service /srv/agents/config.json agents
+dispatch-service /srv/agents/config.json schedules
 dispatch-service /srv/agents/config.json create helper "Release notes"
 dispatch-service /srv/agents/config.json send helper:2 "Draft notes for these changes."
 dispatch-service /srv/agents/config.json snapshot helper:2
@@ -66,7 +67,8 @@ dispatch-service /srv/agents/config.json idle
 
 `send` returns native admission, not model completion. Read the receipt and
 snapshot to follow execution. `stop CHAT` aborts its work. `chats` lists saved
-conversations. `status` reports unfinished native and adapter work; `idle`
+conversations. `schedules` exposes [agent-local deadlines and admissions](schedules.md).
+`status` reports unfinished native and adapter work, excluding future sleeping calendar tasks; `idle`
 returns a failure exit status when work remains.
 
 [Instance messaging](instance-messages.md) lets opted-in definitions create or

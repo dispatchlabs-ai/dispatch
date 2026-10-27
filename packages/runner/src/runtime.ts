@@ -45,6 +45,7 @@ import { createCoding } from "./coding.js";
 import type { ReplySink } from "./replies.js";
 import { privateStateDirectory, privateStateFiles } from "./private-state.js";
 import { reportError } from "./terminal-output.js";
+import { scheduleTaskKind } from "./schedules.js";
 
 const context = BACKGROUND_CONTEXT;
 export type RunnerState = {
@@ -266,7 +267,9 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
           throw new Error(`${agent.id}'s definition changed. Use --update-definitions when its saved work is idle, or choose a new --state-dir.`);
         }
         const inspection = await harness.inspect(context);
-        if (inspection.tasks.length || inspection.submissions.length) {
+        if (inspection.tasks.some(task => task.record.kind !== scheduleTaskKind(namespace)
+          || (task.record.state.status !== "terminal"
+            && (task.record.state.checkpoint as { phase?: string }).phase !== "wait")) || inspection.submissions.length) {
           throw new Error(`${agent.id} has pending work. Finish or stop that work with its previous definition before updating.`);
         }
         await harness.commit(async tx => {

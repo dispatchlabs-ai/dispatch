@@ -7,7 +7,6 @@ import { createRunner } from "./index.js";
 import { run, type Adapter } from "./run.js";
 import { refreshGatewayModels, type ModelChoice, type GatewayAliases } from "./gateway.js";
 import type { ChatService } from "./chat.js";
-import { context } from "./chat.js";
 import type { InstanceMessage } from "./messages.js";
 import { modelRetrySettings, type ModelRetry } from "./retry.js";
 
@@ -28,7 +27,7 @@ export type ServiceAdapterContext = {
   connectModels: (models: ReturnType<typeof createModels>) => Promise<ModelChoice[]>;
 };
 export type ServiceCommand =
-  | { method: "agents" | "chats" | "status" }
+  | { method: "agents" | "chats" | "status" | "schedules" }
   | { method: "create"; agent: string; key: string; title?: string }
   | { method: "snapshot" | "stop"; id: string }
   | { method: "send"; id: string; text: string; requestId: string }
@@ -40,6 +39,7 @@ async function dispatch(service: ChatService, command: ServiceCommand) {
   switch (command.method) {
     case "agents": return service.agents.map(({ id, description, model }) => ({ id, description, model }));
     case "chats": return service.list();
+    case "schedules": return service.schedules();
     case "create":
       if (typeof command.key !== "string" || !command.key.trim()) throw new Error("A stable conversation key is required.");
       return service.create(command.agent, "cli", command.key, command.title);
@@ -98,10 +98,7 @@ export async function startService(config: ServiceConfig) {
       const command = JSON.parse(Buffer.concat(chunks).toString());
       const result = command.method === "status" ? {
         busy: (await Promise.all([
-          ...[...runtime.service.hosts.values()].map(async host => {
-            const state = await host.harness.inspect(context);
-            return state.tasks.length > 0 || state.submissions.length > 0;
-          }),
+          runtime.service.busy(),
           ...runtime.adapters.map(adapter => adapter.busy?.() ?? false),
         ])).some(Boolean),
       } : await dispatch(runtime.service, command);

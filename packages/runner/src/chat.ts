@@ -22,11 +22,12 @@ import type { ReplySink } from "./replies.js";
 import { createHandoffs } from "./handoff.js";
 import { privateStateDirectory } from "./private-state.js";
 import { createInstanceMessaging, instanceMessagingExtension, type InstanceMessage } from "./messages.js";
+import { createSchedules, scheduleTaskKind } from "./schedules.js";
 
 export const context = BACKGROUND_CONTEXT;
 export type Chat = {
   id: string; agent: string; conversationId: number; title: string;
-  source: "cli" | "web" | "slack" | "phone" | "email" | "agent"; createdAt: string; origin?: JsonObject;
+  source: "cli" | "web" | "slack" | "phone" | "email" | "agent" | "schedule"; createdAt: string; origin?: JsonObject;
 };
 export function createChats(namespace: string, openAgent: ReturnType<typeof createRuntime>["openAgent"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"]) {
   const Chats = defineDoc<{
@@ -68,6 +69,8 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     readonly hosts = new Map<string, AgentHost>();
     readonly agents: LoadedAgent[];
     readonly demo: boolean;
+    readonly calendars = new Map<string, ReturnType<typeof createSchedules>>();
+    readonly enabled = new Set<string>();
     private constructor(agents: LoadedAgent[], demo: boolean, readonly initialize?: ChatInitializer) { this.agents = agents; this.demo = demo; }
 
     static attach(options: { agents: LoadedAgent[]; hosts: Map<string, AgentHost>; demo?: boolean; initialize?: ChatInitializer }) {
@@ -80,6 +83,8 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       root: string; stateRoot: string; demo: boolean; names?: string[]; extensions?: Extension[];
       replySink?: ReplySink; updateDefinitions?: boolean; models: Models; initialize?: ChatInitializer;
       resume?: boolean;
+      /** The host starts recovery after its adapters and bindings are ready. */
+      deferResume?: boolean;
       cwd?: string;
       storage?: StorageFactory;
       settings?: OpenOptions["settings"];
@@ -89,6 +94,8 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
         (await catalog(options.root)).filter(entry => entry.runnable).map(entry => entry.id);
       const agents = await Promise.all(names.map(name => loadAgent(options.root, name)));
       const service = new ChatService(agents, options.demo, options.initialize);
+      const enabled = await enabledAgents(options.root);
+      for (const id of enabled) service.enabled.add(id);
       for (const agent of agents) for (const recipient of agent.messages ?? []) {
         if (!agents.some(candidate => candidate.id === recipient)) {
           throw new Error(`${agent.id} messages ${recipient}; include both agents in this service's names.`);
@@ -99,26 +106,25 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       try {
         await privateStateDirectory(stateRoot);
         const results = await Promise.allSettled(agents.map(async agent => {
+          const calendar = createSchedules(namespace, agent, service, options.resume !== false);
+          service.calendars.set(agent.id, calendar);
           const host = await openAgent({
             agent, directory: join(stateRoot, agent.id), models,
             execution: options.demo ? "demo" : "live",
             extensions: [...(options.extensions ?? []),
               ...(agent.messages?.length ? [instanceMessagingExtension(namespace, agent, service)] : [])],
             replySink: options.replySink, updateDefinitions: options.updateDefinitions,
+            registryExtensions: [calendar.extension],
             cwd: options.cwd, storage: options.storage, settings: options.settings,
           });
           service.hosts.set(agent.id, host);
         }));
         const failure = results.find(result => result.status === "rejected");
         if (failure?.status === "rejected") throw failure.reason;
-        const enabled = await enabledAgents(options.root);
-        for (const agent of agents) {
-          if (options.resume === false) continue;
-          const host = service.host(agent.id);
-          // This also recovers admitted chat/Slack work, even without a new input.
-          host.harness.resume();
-          if (enabled.includes(agent.id) && agent.trigger.mode !== "manual") await host.start();
+        if (options.resume !== false) {
+          for (const agent of agents) await service.calendars.get(agent.id)!.reconcile(service.host(agent.id), enabled.includes(agent.id));
         }
+        if (options.resume !== false && !options.deferResume) await service.start();
         return service;
       } catch (error) { await service.close(); throw error; }
     }
@@ -127,6 +133,26 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       const host = this.hosts.get(agent);
       if (!host) throw new Error(`Agent not served: ${agent}`);
       return host;
+    }
+
+    async start() {
+      for (const agent of this.agents) {
+        const host = this.host(agent.id);
+        host.harness.resume();
+        if (this.enabled.has(agent.id) && agent.trigger.mode !== "manual") await host.start();
+      }
+    }
+
+    async schedules() {
+      return (await Promise.all([...this.calendars].map(([id, calendar]) => calendar.inspect(this.host(id))))).flat();
+    }
+
+    async busy() {
+      return (await Promise.all([...this.hosts.values()].map(async host => {
+        const state = await host.harness.inspect(context);
+        return state.submissions.length > 0 || state.tasks.some(task =>
+          task.record.kind !== scheduleTaskKind(namespace) || task.state.kind !== "sleeping");
+      }))).some(Boolean);
     }
 
     async list(): Promise<Chat[]> {

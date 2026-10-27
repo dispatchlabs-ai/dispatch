@@ -5,7 +5,7 @@ import { startService, serviceRequest, type ServiceCommand, type ServiceConfig }
 
 const [configPath, action, ...args] = process.argv.slice(2);
 try {
-  if (!configPath || !action) throw new Error("Usage: dispatch-service CONFIG serve|agents|chats|create AGENT [TITLE]|send CHAT TEXT|message FROM TO TEXT|ask FROM TO TEXT|message-status FROM TASK|snapshot CHAT|stop CHAT|receipt CHAT SUBMISSION");
+  if (!configPath || !action) throw new Error("Usage: dispatch-service CONFIG serve|agents|chats|schedules|status|idle|create AGENT [TITLE]|send CHAT TEXT|message FROM TO TEXT|ask FROM TO TEXT|message-status FROM TASK|snapshot CHAT|stop CHAT|receipt CHAT SUBMISSION");
   const config: ServiceConfig = JSON.parse(await readFile(configPath, "utf8"));
   if (action === "serve") {
     const service = await startService(config);
@@ -16,7 +16,7 @@ try {
   } else {
     let command: ServiceCommand;
     switch (action) {
-      case "agents": case "chats": case "status": command = { method: action }; break;
+      case "agents": case "chats": case "status": case "schedules": command = { method: action }; break;
       case "idle": command = { method: "status" }; break;
       case "create": command = { method: action, agent: args[0], key: randomUUID(), title: args.slice(1).join(" ") || undefined }; break;
       case "send": command = { method: action, id: args[0], text: args.slice(1).join(" "), requestId: randomUUID() }; break;

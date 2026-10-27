@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+- Add agent-local cron/timezone schedules with explicit missed-run and instance
+  policies, optional expiry, native timer recovery and idempotent admission.
+  Expose next/last occurrence and native task state through the service/CLI.
+  Waiting timers do not block idle definition updates; existing work survives
+  schedule edits and disablement. No external scheduler or concurrency cap.
+- Manual macOS/Node 24 observation verified timed synthetic inputs, multiple
+  schedules, existing-instance admission, latest-only offline recovery, unchanged
+  restart identities, disabled/re-enabled timers, expired activation, and Eastern
+  DST calculations. Killing the owner after submission but before receipt recording
+  recovered the same input and conversation. These are bounded mechanics checks,
+  not an automated suite or a claim about financial side effects or all crash modes.
+
 - Read HTML-only mail without loading remote resources; prefer plain-text
   alternatives and send safe rendered HTML plus plain-text fallbacks.
 - Download authenticated-message attachments into private per-message storage,

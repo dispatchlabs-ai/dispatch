@@ -58,12 +58,10 @@
   alias, and file incoming/sent mail. See [Gmail transport](docs/gmail.md) for
   setup, uncertain-send recovery and remaining qualification boundaries.
 
-## Accepted design, not implemented
-
-- [ ] **RUN-013 — Schedule agent-local assignments:** define named schedules and
+- [x] **RUN-013 — Schedule agent-local assignments:** define named schedules and
   predefined prompts beside an agent, including daily calendar-time execution
   in an explicit timezone, with shared Runner admission and native Pi recovery.
-  See the [design and unresolved policies](docs/schedules.md).
+  See the [calendar contract and recovery](docs/schedules.md).
 
 ## Availability
 

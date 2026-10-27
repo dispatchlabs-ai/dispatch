@@ -6,6 +6,7 @@ import type { Extension } from "@earendil-works/pi-durable";
 import { parse } from "yaml";
 import { loadSkills, type Skill } from "./skills.js";
 import { formatRepositoryInstructions, loadRepositoryInstructions, type RepositoryInstruction } from "./instructions.js";
+import { validateSchedules, type AgentSchedule } from "./schedules.js";
 
 export type Trigger =
   | { mode: "manual" }
@@ -16,6 +17,7 @@ export type AgentDefinition = {
   trigger: Trigger;
   /** The input sent for each scheduled iteration. */
   input: string;
+  schedules?: AgentSchedule[];
   /** Native Pi Durable extensions. No tools are installed by default. */
   extensions?: Extension[];
   /** Native coding tools, with a private checkout selected by the agent. */
@@ -50,6 +52,7 @@ export function defineAgent(definition: AgentDefinition): AgentDefinition {
   if (!definition || typeof definition.input !== "string" || !definition.input.trim()) {
     throw new Error("An agent needs a nonempty input.");
   }
+  validateSchedules(definition.schedules);
   if (definition.delegates && (!Array.isArray(definition.delegates) || definition.delegates.some(id => !agentName.test(id))
     || new Set(definition.delegates).size !== definition.delegates.length)) throw new Error("Delegates must be unique agent names.");
   if (definition.messages && (!Array.isArray(definition.messages) || definition.messages.some(id => !agentName.test(id))
@@ -125,6 +128,7 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
     ...(delegateAgents ? { delegateAgents } : {}),
     ...(definition.skills ? { skillCatalog } : {}),
     fingerprint: createHash("sha256").update(markdown).update(code).update(instructions).update(handoffAgent?.fingerprint ?? "")
+      .update(definition.schedules?.length ? JSON.stringify(definition.schedules) : "")
       .update(JSON.stringify(repositoryInstructions.map(({ path, revision }) => ({ path: relative(root, path), revision }))))
       .update(JSON.stringify(delegateAgents?.map(agent => agent.fingerprint) ?? []))
       .update(skillCatalog.length ? JSON.stringify(skillCatalog.map(({ id, revision }) => ({ id, revision }))) : "").digest("hex"),
