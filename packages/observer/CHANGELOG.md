@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Add Back, Forward, and Parent conversation controls with keyboard navigation.
+  Returning to a conversation restores its inspection tab, filters, selected
+  evidence, and live/paused viewing state without resuming playback or agent work.
+
 - Update Chord and the Pi Durable sample dependency to 1.4.0, removing
   Observer's remaining 1.3.0 dependency copies. Read Pi 1.4's
   SQLite schema 2 alongside schema 1 without migrating existing databases;

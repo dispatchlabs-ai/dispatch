@@ -127,6 +127,13 @@ source/store/native identity internally; store-local integers are not global IDs
 
 ### Structure, tools, and workflows
 
+- Keep Back and Forward visible above the work header, distinct from event
+  playback controls. Conversation navigation retains the previous inspection
+  tab, filters, selected evidence, and live/paused view; automatic playback stays
+  stopped on return. A Parent conversation control follows native ownership.
+  History is local to the selected connection and clears when switching sources;
+  reconnecting the same source preserves it. Support Alt+Left/Right and Cmd+[/]
+  outside editable fields and dialogs.
 - Default Structure to an indented tree with thin connectors and collapsible
   branches. Depth, selection, and status should explain relationships without
   turning the screen into a graph editor. Native tasks are an optional disclosure.

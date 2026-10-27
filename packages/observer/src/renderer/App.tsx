@@ -79,6 +79,18 @@ function merge(previous: Snapshot | undefined, next: Snapshot): Snapshot {
   };
 }
 
+type ConversationView = {
+  conversationId: number;
+  snapshot?: Snapshot;
+  following: boolean;
+  frozen?: Snapshot;
+  cursor: number;
+  tab: string;
+  selection?: Selection;
+  activityQuery: string;
+  category: string;
+};
+
 export function App() {
   const [railWidth, setRailWidth] = useState(230);
   const [detailWidth, setDetailWidth] = useState(344);
@@ -91,6 +103,10 @@ export function App() {
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const current = useRef<Snapshot | undefined>(undefined);
   const [conversationId, setConversationId] = useState<number>();
+  const [history, setHistory] = useState<{
+    back: ConversationView[];
+    forward: ConversationView[];
+  }>({ back: [], forward: [] });
   const [following, setFollowing] = useState(true);
   const [frozen, setFrozen] = useState<Snapshot>();
   const [cursor, setCursor] = useState(0);
@@ -98,6 +114,7 @@ export function App() {
   const [speed, setSpeed] = useState(1);
   const [tab, setTab] = useState("structure");
   const [selection, setSelection] = useState<Selection>();
+  const restoringView = useRef(false);
   const [query, setQuery] = useState("");
   const [activityQuery, setActivityQuery] = useState("");
   const [category, setCategory] = useState("all");
@@ -149,6 +166,7 @@ export function App() {
       setConnectionId(id);
       setSidebar(false);
       if (!preserve) {
+        setHistory({ back: [], forward: [] });
         current.current = undefined;
         setSnapshot(undefined);
         setConversationId(undefined);
@@ -275,33 +293,83 @@ export function App() {
     return () => clearInterval(timer);
   }, [playing, following, events.length, speed]);
   useEffect(() => {
+    // History restores the inspector as well as the playhead.
+    if (restoringView.current) {
+      restoringView.current = false;
+      return;
+    }
     if (!following && events[at])
       setSelection({ kind: "activity", value: events[at] });
   }, [at, following, viewed]);
 
-  const chooseConversation = (id: number) => {
+  const captureView = (): ConversationView | undefined =>
+    conversationId === undefined
+      ? undefined
+      : {
+          conversationId,
+          snapshot,
+          following,
+          frozen,
+          cursor,
+          tab,
+          selection,
+          activityQuery,
+          category,
+        };
+  const openConversation = (id: number, view?: ConversationView) => {
     ++generation.current;
-    current.current = snapshot
-      ? {
-          ...snapshot,
-          conversationId: id,
-          activities: [],
-          tasks: [],
-          documents: [],
-          live: [],
-          hasEarlier: false,
-          earliestId: undefined,
-          earliestSequence: undefined,
-        }
-      : undefined;
+    restoringView.current = Boolean(view);
+    current.current =
+      view?.snapshot ??
+      (snapshot
+        ? {
+            ...snapshot,
+            conversationId: id,
+            activities: [],
+            tasks: [],
+            documents: [],
+            live: [],
+            hasEarlier: false,
+            earliestId: undefined,
+            earliestSequence: undefined,
+          }
+        : undefined);
     setSnapshot(current.current);
     setConversationId(id);
-    setFollowing(true);
+    setFollowing(view?.following ?? true);
     setPlaying(false);
-    setFrozen(undefined);
-    setSelection(undefined);
-    setActivityQuery("");
+    setFrozen(view?.frozen);
+    setCursor(view?.cursor ?? 0);
+    setTab(view?.tab ?? tab);
+    setSelection(view?.selection);
+    setActivityQuery(view?.activityQuery ?? "");
+    setCategory(view?.category ?? "all");
     setSidebar(false);
+  };
+  const chooseConversation = (id: number) => {
+    if (id === conversationId) return;
+    const previous = captureView();
+    setHistory((value) => ({
+      back: previous ? [...value.back, previous] : value.back,
+      forward: [],
+    }));
+    openConversation(id);
+  };
+  const navigateHistory = (direction: "back" | "forward") => {
+    const destination = history[direction].at(-1);
+    const previous = captureView();
+    if (!destination || !previous || status === "connecting") return;
+    setHistory({
+      back:
+        direction === "back"
+          ? history.back.slice(0, -1)
+          : [...history.back, previous],
+      forward:
+        direction === "forward"
+          ? history.forward.slice(0, -1)
+          : [...history.forward, previous],
+    });
+    openConversation(destination.conversationId, destination);
   };
   const pause = (index?: number) => {
     if (snapshot) {
@@ -393,6 +461,8 @@ export function App() {
       if (connectionId === id) {
         ++generation.current;
         setConnectionId(undefined);
+        setConversationId(undefined);
+        setHistory({ back: [], forward: [] });
         setStatus("idle");
         setSnapshot(undefined);
         current.current = undefined;
@@ -419,6 +489,26 @@ export function App() {
         return;
       }
       const target = event.target as HTMLElement;
+      if (
+        !target.closest(
+          "input,textarea,select,[contenteditable=true],[role=dialog]",
+        ) &&
+        !event.shiftKey &&
+        ((event.altKey &&
+          !event.metaKey &&
+          !event.ctrlKey &&
+          (event.key === "ArrowLeft" || event.key === "ArrowRight")) ||
+          (event.metaKey &&
+            !event.altKey &&
+            !event.ctrlKey &&
+            (event.key === "[" || event.key === "]")))
+      ) {
+        event.preventDefault();
+        navigateHistory(
+          event.key === "ArrowLeft" || event.key === "[" ? "back" : "forward",
+        );
+        return;
+      }
       if (
         target.closest(
           "input,textarea,select,button,summary,pre,.table-scroll,[contenteditable=true],[role=separator],[role=tab],[role=dialog]",
@@ -739,6 +829,52 @@ export function App() {
           ) : (
             <>
               <header className="content-heading">
+                <nav
+                  className="conversation-navigation"
+                  aria-label="Conversation navigation"
+                >
+                  <UI.Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Go back"
+                    title="Go back (Alt+Left / ⌘[)"
+                    disabled={!history.back.length || status === "connecting"}
+                    onClick={() => navigateHistory("back")}
+                  >
+                    <ArrowLeft size={16} />
+                    Back
+                  </UI.Button>
+                  <UI.Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Go forward"
+                    title="Go forward (Alt+Right / ⌘])"
+                    disabled={!history.forward.length || status === "connecting"}
+                    onClick={() => navigateHistory("forward")}
+                  >
+                    <ArrowRight size={16} />
+                    Forward
+                  </UI.Button>
+                  {selectedConversation?.owner && (
+                    <UI.Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={
+                        status === "connecting" ||
+                        !snapshot?.conversations.some(
+                          (item) =>
+                            item.id === selectedConversation.owner!.conversationId,
+                        )
+                      }
+                      onClick={() =>
+                        chooseConversation(selectedConversation.owner!.conversationId)
+                      }
+                    >
+                      <GitBranch size={16} />
+                      Parent conversation
+                    </UI.Button>
+                  )}
+                </nav>
                 <div className="breadcrumb">
                   <span>{connection.name}</span>
                   <ChevronRight size={13} />

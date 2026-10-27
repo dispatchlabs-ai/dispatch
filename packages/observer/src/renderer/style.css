@@ -380,6 +380,12 @@ strong {
   padding: 28px 30px 23px;
   flex-shrink: 0;
 }
+.conversation-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
 .breadcrumb {
   color: var(--subtle);
   display: flex;

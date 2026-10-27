@@ -125,7 +125,24 @@ external-browser confirmation. Provider state, known secret fields, encrypted
 thinking signatures, and image bytes are excluded or redacted. This is not complete
 secret detection; do not publish raw records or screenshots without review.
 
+## Conversation navigation
+
+Use **Back** and **Forward** above the work title to retrace conversation
+selections, or **Parent conversation** to return directly to a child's owner.
+Alt+Left/Right and Cmd+[/] provide the same history navigation outside editable
+fields and dialogs. These controls are separate from previous/next event playback.
+Returning restores the inspection tab, event filters, selected evidence and
+live/paused view, but does not restart automatic playback. A new selection after
+going back replaces the forward path. Switching connections clears history;
+reconnecting the current connection preserves it.
+
 ## Compatibility and qualification
+
+Navigation qualification (October 27, 2026): the packaged macOS ARM64 app was
+checked interactively for Back/Forward navigation. A synthetic renderer preview
+verified paused-event and tab restoration, Alt+Left/Right, forward-history
+replacement, and source isolation. Full-page layouts were reviewed at 1440×900,
+1280×720, 768×1024, and 390×844. Windows and Linux navigation remain unverified.
 
 The reader supports stock Pi Durable SQLite schema 1 as used by 1.1–1.3,
 schema 2 as used by 1.4, and Dispatch's `dispatch_pi` Postgres schema 1.
