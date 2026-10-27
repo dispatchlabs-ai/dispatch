@@ -120,7 +120,9 @@ export function createAdapter(options: GmailOptions): Adapter {
       // Validate the destination before opening stores, which can resume tasks.
       const profile = await api<{ emailAddress: string }>("profile");
       if (profile.emailAddress.toLowerCase() !== options.mailbox.toLowerCase()) throw new Error("Gmail credentials belong to another mailbox.");
-      const senders = await api<{ sendAs: { sendAsEmail: string; verificationStatus?: string }[] }>("settings/sendAs");
+      const senders = options.routes.some(route => route.sendEnabled)
+        ? await api<{ sendAs: { sendAsEmail: string; verificationStatus?: string }[] }>("settings/sendAs")
+        : { sendAs: [] };
       const available = await api<{ labels: { id: string; name: string }[] }>("labels");
       const labels = new Map<string, string>();
       async function ensureLabel(name: string) {

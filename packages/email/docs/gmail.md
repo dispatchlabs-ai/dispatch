@@ -7,8 +7,9 @@ service's native SQLite owner, tasks, submissions and conversations.
 
 ## Configure
 
-Create a mailbox and receiving addresses. Authorize Gmail read/modify/send and
-settings lookup. A route needs a verified Gmail send-as identity **only when
+Create a mailbox and receiving addresses. Authorize Gmail read/modify access.
+Sending also needs the send and settings access used to verify sending identities;
+receive-only startup does not query send-as settings. A route needs a verified Gmail send-as identity **only when
 sending is enabled**. A receiving alias is not automatically a send-as identity.
 Where Google's send-as creation API requires domain-wide delegation, add the
 identity through Gmail Settings instead of enabling delegation solely for this.
