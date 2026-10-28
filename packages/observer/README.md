@@ -5,11 +5,15 @@ saved activity. Inspect conversations, tool calls and results, child agents,
 native tasks, and workflow documents in one read-only workspace.
 
 Start on **This machine** to discover local Pi SQLite stores open by your user's
-processes. Unfinished conversations appear first; click one to open its formatted
-conversation with expandable inline tool calls and results. Discovery requires
+processes, alongside saved local sources. Explicit handoffs group conversations
+by workflow and cycle: open the workflow, select an assignment, and read its
+sender, original request and conversation. Unrelated conversations stay separate.
+Tool activity appears in compact expandable groups. Discovery requires
 macOS or Linux with `lsof`; other stores remain available through
 **Settings → Connections**.
 Process presence and saved task status are shown separately.
+Workflow grouping reads existing records; it does not require a SQLite migration
+or establish a workflow's final outcome.
 
 **Implemented, October 22, 2026.** The macOS Apple Silicon build has been exercised
 with local SQLite, direct/TLS Postgres, Postgres over SSH, and remote SQLite over

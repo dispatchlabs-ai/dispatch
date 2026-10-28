@@ -24,6 +24,16 @@ screens without removing saved connections or remote inspection.
 Discovery observes writable local SQLite file
 handles and validates Pi schemas; it does not infer execution from task age.
 
+**Workflow-first refinement, October 28, 2026:** This machine groups explicitly
+labeled peer handoffs into workflow cycles. Open a workflow, choose an assignment,
+then read its conversation; retain the workflow rail and a way back. Known senders
+are navigable across available local agent stores. Unrelated conversations remain
+separate. Saved local sources also provide history when no process is observed.
+Group only matching workflow/cycle labels in the leading handoff lines, within
+the same Runner namespace and validated agent-store directory. Never merge by
+title, timestamp, native integer ID, or a workflow name alone. These are declared
+handoff groups, not a new native workflow engine or proof of workflow completion.
+
 The approved starting point is the earlier agent-inspector concept: a restrained
 white/gray workspace, a clear task hierarchy or timeline, and an adjacent detail
 pane. Extend it into a desktop application with saved source connections and
@@ -113,6 +123,10 @@ source/store/native identity internally; store-local integers are not global IDs
 
 - Fetch one consistent snapshot, then observe later commits with short reads.
   Preserve selection and expansion state across refreshes.
+- Open new conversations at their assignment context. Live reads continue without
+  moving the reader. **Latest activity** opts into tail-following; scrolling away
+  or inspecting content stops that movement. **Context** returns to the opening
+  context without changing a paused playback boundary.
 - Following appends/reveals new activity. Selecting older content or choosing
   **Pause following** stops automatic movement, not the agent or connection.
   Show a count of newer events and an explicit **Return to live** action.
@@ -163,6 +177,13 @@ source/store/native identity internally; store-local integers are not global IDs
   decodes valid JSON text envelopes, preserves indentation and line numbers,
   and exposes other envelope fields separately. Unrecognized structured output
   uses indented JSON. Long code lines scroll within their own panel.
+- Use compact grouped disclosures for consecutive tool events, with readable
+  operation names and recorded errors. Keep separate calls/results inside them
+  in retained order. Long requests collapse without losing access to full text.
+  Show recorded peer authors rather than calling every user-role message “You.”
+  Opening context identifies the agent, sender, assigned phase and original
+  handoff when available. Distinguish a requested automatic reply from a received
+  reply, and peer messaging from native parent/fork ownership.
 - Selecting a tool event during playback opens its transcript row. A call row
   shows its arguments; later results keep their own event. The inspector retains
   the labeled matching result and the original redacted native entry. Formatting

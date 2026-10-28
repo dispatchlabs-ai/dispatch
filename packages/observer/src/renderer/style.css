@@ -116,16 +116,11 @@ strong {
 .local-work { overflow: auto; padding: 32px; }
 .local-heading { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
 .local-heading h1 { font-size: 28px; margin: 8px 0; letter-spacing: -0.7px; }
-.local-heading p:not(.eyebrow), .local-summary, .local-idle { color: var(--subtle); }
+.local-heading p:not(.eyebrow), .local-summary { color: var(--subtle); }
 .local-summary { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 24px 0; font-size: 12px; }
 .local-summary strong { color: var(--foreground); }
 .local-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
 .local-filters .search-field { margin: 0; flex: 1; min-width: 180px; }
-.local-stores { display: grid; gap: 20px; }
-.local-store { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-.local-store > header { display: flex; align-items: center; gap: 12px; padding: 16px; background: var(--rail); }
-.local-store > header > div { flex: 1; min-width: 0; }
-.local-store h2 { font-size: 15px; text-transform: capitalize; }
 .local-path { overflow-wrap: anywhere; font-size: 11px; color: var(--subtle); margin-top: 4px; }
 .local-presence { font-size: 11px; color: var(--subtle); flex-shrink: 0; }
 .local-conversation { display: flex; width: 100%; height: auto; white-space: normal; text-align: left; padding: 16px; gap: 16px; border-radius: 0; border-top: 1px solid var(--border); }
@@ -133,7 +128,6 @@ strong {
 .local-conversation strong { display: block; overflow-wrap: anywhere; line-height: 1.5; }
 .local-conversation small { display: block; color: var(--subtle); margin-top: 6px; font-weight: 400; }
 .local-work-status { color: var(--subtle); font-size: 11px; font-weight: 400; }
-.local-idle { padding: 16px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; }
 .local-work .evidence-note { margin-top: 24px; }
 .window-bar {
   height: 54px;
@@ -329,6 +323,97 @@ strong {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+.conversation-context {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 24px;
+  background: var(--rail);
+}
+.conversation-context > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.conversation-context h2 {
+  font-size: 17px;
+  font-weight: 600;
+}
+.conversation-context h3 {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.conversation-context > header > span,
+.context-note,
+.context-facts dt {
+  color: var(--subtle);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.context-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+}
+.context-facts dt,
+.agent-name {
+  text-transform: capitalize;
+}
+.context-facts dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.handoff-labels {
+  padding: 12px 0;
+  margin: 12px 0;
+  border-block: 1px solid var(--border);
+}
+.handoff-preview {
+  margin: 12px 0;
+}
+.handoff-preview > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.handoff-preview h3 {
+  margin: 0;
+}
+.handoff-brief {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  line-height: 1.65;
+  white-space: pre-line;
+}
+.conversation-context > .context-note {
+  margin-top: 12px;
+}
+[role="dialog"]:has(> .handoff-content) {
+  width: min(calc(100% - 64px), 920px);
+}
+.handoff-content {
+  min-width: 0;
+}
+.handoff-content > .context-note {
+  margin-bottom: 14px;
+}
+.handoff-address {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  text-transform: capitalize;
 }
 .content-heading {
   padding: 28px 30px 23px;
@@ -1855,3 +1940,46 @@ pre {
   color: var(--subtle);
   font-size: 12px;
 }
+
+/* Workflow navigation uses the same work rail and reading surface as conversations. */
+.workflow-cards { display: grid; gap: 12px; margin-bottom: 28px; }
+.workflow-card { width: 100%; height: auto; min-height: 104px; padding: 20px; gap: 16px; text-align: left; white-space: normal; justify-content: flex-start; }
+.workflow-card > span:first-of-type { flex: 1; min-width: 0; display: grid; gap: 7px; }
+.workflow-card strong { font-size: 16px; overflow-wrap: anywhere; }
+.workflow-card small, .workflow-card > span > span { font-size: 12px; color: var(--subtle); font-weight: 400; }
+.workflow-section-heading, .workflow-senders h2 { font-size: 14px; font-weight: 600; margin: 20px 0 12px; }
+.standalone-conversations { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.local-conversation > span:first-of-type { flex: 1; min-width: 0; }
+.source-notices { margin: 16px 0; color: var(--subtle); font-size: 12px; }
+.source-notices summary { cursor: pointer; }
+.source-notices p { margin-top: 8px; overflow-wrap: anywhere; }
+.workflow-overview-button { white-space: normal; text-align: left; justify-content: flex-start; height: auto; padding: 12px 8px; }
+.workflow-heading { margin: 24px 0 20px; }
+.workflow-heading .eyebrow { display: flex; align-items: center; gap: 8px; }
+.workflow-heading h1 { font-size: 28px; margin: 10px 0; letter-spacing: -.7px; }
+.workflow-heading > p:last-child { color: var(--subtle); }
+.workflow-summary { display: flex; flex-wrap: wrap; gap: 12px 24px; color: var(--subtle); font-size: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.workflow-summary strong { color: var(--foreground); }
+.workflow-sender { width: 100%; height: auto; padding: 14px 16px; gap: 12px; text-align: left; white-space: normal; justify-content: flex-start; }
+.workflow-sender > span { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.workflow-sender small { color: var(--subtle); font-size: 12px; font-weight: 400; text-transform: capitalize; }
+.workflow-assignments { border-top: 1px solid var(--border); }
+.workflow-assignment { display: flex; width: 100%; height: auto; white-space: normal; text-align: left; justify-content: flex-start; padding: 18px 8px; gap: 20px; border-radius: 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+.assignment-agent { display: flex; align-items: center; gap: 8px; width: 150px; flex-shrink: 0; font-size: 12px; }
+.assignment-copy { display: grid; gap: 7px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.assignment-copy > span, .assignment-copy small { font-weight: 400; color: var(--subtle); font-size: 12px; }
+.assignment-state { font-size: 11px; font-weight: 400; color: var(--subtle); width: 110px; flex-shrink: 0; }
+.sender-link { height: auto; white-space: normal; padding: 0; text-align: left; justify-content: flex-start; }
+.breadcrumb button { padding: 0; height: auto; font-size: 12px; white-space: normal; text-align: left; }
+.tool-group { border-block: 1px solid var(--border); margin: 16px 0; }
+.tool-group > summary { display: flex; align-items: center; gap: 10px; padding: 14px 0; cursor: pointer; list-style: none; color: var(--subtle); }
+.tool-group > summary::-webkit-details-marker { display: none; }
+.tool-group > summary > span:first-of-type { display: grid; flex: 1; min-width: 0; gap: 5px; }
+.tool-group small { font-size: 11px; }
+.tool-group[open] > summary > .tool-group-chevron { transform: rotate(90deg); }
+.tool-group-content { padding-left: 24px; }
+.request-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; white-space: pre-line; line-height: 1.75; }
+.transcript-entry header > span { text-transform: capitalize; }
+.workflow-section-heading small { color: var(--subtle); font-size: 12px; font-weight: 400; margin-left: 12px; }
+.transcript-record { margin: 16px 0; color: var(--subtle); font-size: 12px; }
+.transcript-record > summary { cursor: pointer; padding: 8px 0; }

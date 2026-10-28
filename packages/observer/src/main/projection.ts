@@ -3,11 +3,13 @@ import type { JsonValue } from "@earendil-works/chord";
 import type {
   Activity,
   Connection,
+  Conversation,
   Document,
   RawSnapshot,
   RecordData,
   Snapshot,
 } from "../shared/contracts";
+import { handoffLabels, instanceMessage } from "./context";
 
 const secretKey =
   /^(?:api[-_]?key|access[-_]?token|refresh[-_]?token|password|passwd|secret|authorization|cookie|private[-_]?key|connectionString)$/i;
@@ -75,7 +77,12 @@ export function project(raw: RawSnapshot, source: Connection): Snapshot {
     };
     let index = 0;
     for (const message of entry.model ?? []) {
-      const messageText = text(message.content);
+      const sender =
+        message.role === "user" ? instanceMessage(entry) : undefined;
+      const messageText =
+        sender && typeof entry.data?.text === "string"
+          ? entry.data.text
+          : text(message.content);
       if (message.role === "toolResult") {
         const key = `${entry.conversationId}:${message.toolCallId}`,
           call = calls.get(key);
@@ -123,6 +130,7 @@ export function project(raw: RawSnapshot, source: Connection): Snapshot {
             id: `entry:${entry.id}:${index++}`,
             category: "message",
             role: message.role,
+            sender,
             title:
               message.role === "user" ? "User message" : "Assistant response",
             text: messageText,
@@ -206,6 +214,10 @@ export function project(raw: RawSnapshot, source: Connection): Snapshot {
     }
   });
   const names = new Map<number, string>();
+  const chats = new Map<
+    number,
+    Pick<Conversation, "agent" | "namespace" | "channel" | "createdAt">
+  >();
   const live = documents
     .filter((doc) => doc.kind === "pi.live" && doc.value)
     .map((doc) => {
@@ -231,13 +243,24 @@ export function project(raw: RawSnapshot, source: Connection): Snapshot {
     }
   for (const doc of documents) {
     const value = doc.value as RecordData | undefined;
-    if (value?.byId)
-      for (const chat of Object.values(value.byId) as RecordData[])
-        if (
-          typeof chat?.conversationId === "number" &&
-          typeof (chat.title ?? chat.agent) === "string"
-        )
-          names.set(chat.conversationId, chat.title ?? chat.agent);
+    if (!value?.byId) continue;
+    for (const chat of Object.values(value.byId) as RecordData[]) {
+      if (typeof chat?.conversationId !== "number") continue;
+      if (typeof (chat.title ?? chat.agent) === "string")
+        names.set(chat.conversationId, chat.title ?? chat.agent);
+      if (
+        doc.kind.endsWith(".chats") &&
+        typeof chat.agent === "string" &&
+        chat.id === `${chat.agent}:${chat.conversationId}` &&
+        typeof chat.source === "string"
+      )
+        chats.set(chat.conversationId, {
+          agent: chat.agent,
+          namespace: doc.kind.slice(0, -".chats".length),
+          channel: chat.source,
+          createdAt: timestamp(chat.createdAt),
+        });
+    }
   }
   for (const activity of activities) {
     const result = activity.tool?.result as RecordData | undefined;
@@ -254,16 +277,43 @@ export function project(raw: RawSnapshot, source: Connection): Snapshot {
     storeId: source.kind === "postgres" ? source.postgres.storeId : undefined,
     conversations: safe.conversations.map((item) => {
       const last = item.latestEntry?.model?.at(-1);
-      const assignment = text(item.firstEntry?.model?.find((message: RecordData) => message.role === "user")?.content).replace(/\s+/g, " ").trim();
+      const first = item.firstEntry;
+      const message = first?.model?.find(
+        (message: RecordData) => message.role === "user",
+      );
+      const sender = message && first ? instanceMessage(first) : undefined;
+      const openingText =
+        sender && typeof first?.data?.text === "string"
+          ? first.data.text
+          : text(message?.content);
+      const assignment = openingText.replace(/\s+/g, " ").trim();
       return {
+        ...chats.get(item.record.id),
         id: item.record.id,
-        title: names.get(item.record.id) ?? (assignment ? assignment.slice(0, 110) + (assignment.length > 110 ? "…" : "") : `Conversation ${item.record.id}`),
+        title:
+          names.get(item.record.id) ??
+          (assignment
+            ? assignment.slice(0, 110) + (assignment.length > 110 ? "…" : "")
+            : `Conversation ${item.record.id}`),
         owner: item.record.owner,
         parent: item.record.parent,
         entryCount: item.entryCount,
         active: item.active,
         failed: item.failed,
         lastAt: timestamp(last?.timestamp),
+        opening:
+          first && openingText
+            ? {
+                entryId: first.id,
+                text: openingText,
+                at: timestamp(message?.timestamp),
+                sender,
+                labels:
+                  sender?.kind === "message"
+                    ? handoffLabels(openingText)
+                    : undefined,
+              }
+            : undefined,
       };
     }),
     activities,

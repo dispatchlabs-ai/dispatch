@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity as ActivityIcon,
   ArrowLeft,
@@ -25,10 +25,20 @@ import {
 import { UI } from "./controls";
 import { ConnectionDialog } from "./ConnectionDialog";
 import { SettingsDialog } from "./SettingsDialog";
+import { ConversationContext } from "./ConversationContext";
 import { Structure } from "./Structure";
 import { PaneResizer } from "./PaneResizer";
-import { TranscriptEntry } from "./TranscriptEntry";
+import { Transcript } from "./Transcript";
 import { LocalWork } from "./LocalWork";
+import { WorkflowView } from "./WorkflowView";
+import { useLocalWork } from "./useLocalWork";
+import {
+  memberKey,
+  readableName,
+  workflowRuns,
+  type WorkflowMember,
+  type WorkflowRun,
+} from "../shared/workflows";
 import { reconcileActivities } from "../shared/activities";
 import { Badge, Details, time, type Selection } from "./Details";
 import type {
@@ -83,6 +93,7 @@ type ConversationView = {
   conversationId: number;
   snapshot?: Snapshot;
   following: boolean;
+  followTail: boolean;
   frozen?: Snapshot;
   cursor: number;
   tab: string;
@@ -93,6 +104,13 @@ type ConversationView = {
 
 export function App() {
   const [home, setHome] = useState(true);
+  const [workflowOverview, setWorkflowOverview] = useState(false);
+  const [workflowId, setWorkflowId] = useState<string>();
+  const local = useLocalWork(home || workflowOverview);
+  const runs = useMemo(
+    () => workflowRuns(local.data?.stores ?? []),
+    [local.data],
+  );
   const [railWidth, setRailWidth] = useState(230);
   const [detailWidth, setDetailWidth] = useState(344);
   const [preferences, setPreferences] = useState<Preferences>();
@@ -109,6 +127,7 @@ export function App() {
     forward: ConversationView[];
   }>({ back: [], forward: [] });
   const [following, setFollowing] = useState(true);
+  const [followTail, setFollowTail] = useState(false);
   const [frozen, setFrozen] = useState<Snapshot>();
   const [cursor, setCursor] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -140,6 +159,27 @@ export function App() {
   const selectedConversation = snapshot?.conversations.find(
     (item) => item.id === conversationId,
   );
+  const containingRuns = runs.filter(
+    (run) =>
+      connection?.kind === "sqlite" &&
+      connection.transport.kind === "direct" &&
+      run.members.some(
+        (m) =>
+          memberKey(m.connection, m.conversation.id) ===
+          memberKey(connection, conversationId ?? 0),
+      ),
+  );
+  const currentWorkflow = workflowOverview
+    ? runs.find((run) => run.id === workflowId)
+    : (containingRuns.find((run) => run.id === workflowId) ??
+      (containingRuns.length === 1 ? containingRuns[0] : undefined));
+  const handoffSender = currentWorkflow?.members.find(
+    (m) =>
+      `${m.conversation.agent}:${m.conversation.id}` ===
+        selectedConversation?.opening?.sender?.from &&
+      m.conversation.namespace ===
+        selectedConversation?.opening?.sender?.namespace,
+  );
   const activeEventId = events[at]?.id;
   useEffect(() => {
     const pane =
@@ -148,11 +188,12 @@ export function App() {
         : tab === "conversation"
           ? transcriptPane.current
           : null;
-    if (activeEventId)
+    if (following && followTail) pane?.scrollTo({ top: pane.scrollHeight });
+    else if (activeEventId && !following)
       pane
         ?.querySelector<HTMLElement>(`[data-event-id="${activeEventId}"]`)
         ?.scrollIntoView({ block: "nearest" });
-  }, [activeEventId, following, tab]);
+  }, [activeEventId, following, followTail, tab, home, workflowOverview]);
 
   const refreshPreferences = useCallback(async () => {
     const value = await window.observer.preferences();
@@ -162,6 +203,7 @@ export function App() {
   const connect = useCallback(
     async (id: string, preserve = false, requestedConversation?: number) => {
       setHome(false);
+      setWorkflowOverview(false);
       setSettings(false);
       setDialog(undefined);
       preserve = preserve && current.current?.sourceId === id;
@@ -178,6 +220,7 @@ export function App() {
         setConversationId(undefined);
         setFrozen(undefined);
         setFollowing(true);
+        setFollowTail(false);
         setPlaying(false);
         setSelection(undefined);
         setCursor(0);
@@ -191,8 +234,12 @@ export function App() {
           current.current = catalog;
           setSnapshot(catalog);
           setConversationId(
-            catalog.conversations.find((item) => item.id === requestedConversation)?.id ??
-              catalog.conversations.find((item) => item.active > 0 && !item.owner)?.id ??
+            catalog.conversations.find(
+              (item) => item.id === requestedConversation,
+            )?.id ??
+              catalog.conversations.find(
+                (item) => item.active > 0 && !item.owner,
+              )?.id ??
               catalog.conversations.find((item) => !item.owner)?.id ??
               catalog.conversations[0]?.id,
           );
@@ -211,8 +258,7 @@ export function App() {
 
   useEffect(() => {
     mounted.current = true;
-    void refreshPreferences()
-      .catch((error) => setError(errorMessage(error)));
+    void refreshPreferences().catch((error) => setError(errorMessage(error)));
     return () => {
       mounted.current = false;
       ++generation.current;
@@ -232,7 +278,8 @@ export function App() {
     return () => media.removeEventListener("change", update);
   }, [preferences?.theme, preferences?.platform]);
   useEffect(() => {
-    if (home || status !== "connected" || !connectionId) return;
+    if (home || workflowOverview || status !== "connected" || !connectionId)
+      return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const refresh = async () => {
@@ -280,7 +327,14 @@ export function App() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [home, connectionId, conversationId, status, pollRevision]);
+  }, [
+    home,
+    workflowOverview,
+    connectionId,
+    conversationId,
+    status,
+    pollRevision,
+  ]);
   useEffect(() => {
     if (!playing || following) return;
     const timer = setInterval(
@@ -313,6 +367,7 @@ export function App() {
           conversationId,
           snapshot,
           following,
+          followTail,
           frozen,
           cursor,
           tab,
@@ -341,6 +396,7 @@ export function App() {
     setSnapshot(current.current);
     setConversationId(id);
     setFollowing(view?.following ?? true);
+    setFollowTail(view?.followTail ?? false);
     setPlaying(false);
     setFrozen(view?.frozen);
     setCursor(view?.cursor ?? 0);
@@ -352,6 +408,7 @@ export function App() {
   };
   const chooseConversation = (id: number) => {
     setHome(false);
+    setWorkflowOverview(false);
     if (id === conversationId) return;
     const previous = captureView();
     setHistory((value) => ({
@@ -386,6 +443,7 @@ export function App() {
   };
   const goLive = () => {
     setFollowing(true);
+    setFollowTail(true);
     setPlaying(false);
     setFrozen(undefined);
   };
@@ -472,9 +530,11 @@ export function App() {
       setSelection(undefined);
       setFrozen(undefined);
       setFollowing(true);
+      setFollowTail(false);
       setPlaying(false);
       setError("");
       setHome(true);
+      setWorkflowOverview(false);
     }
     await refreshPreferences();
   };
@@ -495,28 +555,64 @@ export function App() {
   const openSaved = (id: string) => {
     if (id === connectionId && status === "connected") {
       setHome(false);
+      setWorkflowOverview(false);
       closeSettings();
     } else {
       void connect(id, id === connectionId);
     }
   };
   const openLocal = async (candidate: Connection, id?: number) => {
-    const existing = preferences?.connections.find(item =>
-      item.kind === "sqlite" && item.transport.kind === "direct" && item.path === candidate.path,
+    const existing = preferences?.connections.find(
+      (item) =>
+        item.kind === "sqlite" &&
+        item.transport.kind === "direct" &&
+        item.path === candidate.path,
     );
-    const saved = existing ?? await window.observer.save({ connection: candidate, rememberSecret: false });
+    const saved =
+      existing ??
+      (await window.observer.save({
+        connection: candidate,
+        rememberSecret: false,
+      }));
     await refreshPreferences();
     await connect(saved.id, false, id);
   };
+  const openWorkflow = (run: WorkflowRun) => {
+    setWorkflowId(run.id);
+    setWorkflowOverview(true);
+    setHome(false);
+    setPlaying(false);
+    setSelection(undefined);
+  };
+  const openMember = (member: WorkflowMember) => {
+    if (currentWorkflow) setWorkflowId(currentWorkflow.id);
+    if (
+      connection?.kind === "sqlite" &&
+      connection.transport.kind === "direct" &&
+      connection.path === member.connection.path &&
+      status === "connected"
+    ) {
+      chooseConversation(member.conversation.id);
+    } else {
+      void openLocal(member.connection, member.conversation.id).catch((error) =>
+        setError(errorMessage(error)),
+      );
+    }
+  };
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
-      if (settings) return;
+      if (
+        settings ||
+        event.defaultPrevented ||
+        (event.target as HTMLElement).closest('[role="dialog"]')
+      )
+        return;
       if (event.key === "Escape") {
         setSelection(undefined);
         setSidebar(false);
         return;
       }
-      if (home) return;
+      if (home || workflowOverview) return;
       const target = event.target as HTMLElement;
       if (
         !target.closest(
@@ -638,77 +734,139 @@ export function App() {
         </div>
       </header>
       <div
-        className={`workspace ${sidebar ? "sidebar-open" : ""} ${!home && selection ? "has-selection" : ""}`}
+        className={`workspace ${sidebar ? "sidebar-open" : ""} ${!home && !workflowOverview && selection ? "has-selection" : ""}`}
       >
         <aside className="sidebar" aria-label="Work navigation">
-          <UI.Button variant={home ? "secondary" : "ghost"} className="machine-button" onClick={() => {
-            setHome(true);
-            setPlaying(false);
-            setSidebar(false);
-          }}><Workflow size={18} />This machine</UI.Button>
-          {!home && connection && (
+          <UI.Button
+            variant={home ? "secondary" : "ghost"}
+            className="machine-button"
+            onClick={() => {
+              setHome(true);
+              setWorkflowOverview(false);
+              setPlaying(false);
+              setSidebar(false);
+            }}
+          >
+            <Workflow size={18} />
+            This machine
+          </UI.Button>
+          {!home && currentWorkflow ? (
             <>
               <div className="rail-heading conversation-heading">
-                <h2>Conversations</h2>
-                <span>{snapshot?.conversations.length ?? "—"}</span>
+                <h2>Workflow</h2>
               </div>
-              <div className="search-field">
-                <Search size={14} />
-                <UI.Input
-                  aria-label="Find a conversation"
-                  value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
-                    setCatalogLimit(40);
-                  }}
-                  placeholder="Find conversation…"
-                />
+              <UI.Button
+                variant={workflowOverview ? "secondary" : "ghost"}
+                className="workflow-overview-button"
+                onClick={() => openWorkflow(currentWorkflow)}
+              >
+                <Workflow size={16} />
+                <span className="agent-name">
+                  {readableName(currentWorkflow.name)}
+                </span>
+              </UI.Button>
+              <div className="rail-heading">
+                <h2>Conversations</h2>
+                <span>{currentWorkflow.members.length}</span>
               </div>
               <div className="conversation-list">
-                {catalog.slice(0, catalogLimit).map((item) => (
+                {currentWorkflow.members.map((member) => (
                   <UI.Button
-                    key={item.id}
+                    key={memberKey(member.connection, member.conversation.id)}
                     variant="ghost"
-                    className={`conversation-button ${conversationId === item.id ? "selected" : ""} ${item.owner ? "child" : ""}`}
-                    onClick={() => chooseConversation(item.id)}
+                    className={`conversation-button ${!workflowOverview && connection?.path === member.connection.path && conversationId === member.conversation.id ? "selected" : ""}`}
+                    disabled={status === "connecting"}
+                    title={member.conversation.title}
+                    onClick={() => openMember(member)}
                   >
                     <Bot size={16} />
                     <span>
-                      <strong>{item.title}</strong>
+                      <strong className="agent-name">
+                        {readableName(member.conversation.agent ?? "Agent")}
+                      </strong>
                       <small>
-                        {item.owner
-                          ? `Child of ${item.owner.conversationId} · `
-                          : item.parent
-                            ? `Fork of ${item.parent.conversationId} · `
-                            : ""}
-                        {item.entryCount} entries
+                        {member.role === "sender"
+                          ? "Handoff sender"
+                          : member.conversation.opening?.labels?.assignment}
                       </small>
                     </span>
-                    {item.active > 0 && (
+                    {member.conversation.active > 0 && (
                       <span
                         className="small-indicator"
-                        title={`${item.active} nonterminal saved tasks`}
+                        title="Unfinished saved tasks"
                       />
                     )}
                   </UI.Button>
                 ))}
-                {catalog.length > catalogLimit && (
-                  <UI.Button
-                    variant="ghost"
-                    onClick={() => setCatalogLimit((value) => value + 40)}
-                  >
-                    Show more conversations
-                  </UI.Button>
-                )}
-                {snapshot && !catalog.length && (
-                  <p className="rail-empty">
-                    {query
-                      ? "No matching conversations."
-                      : "No conversations retained in this store."}
-                  </p>
-                )}
               </div>
             </>
+          ) : (
+            !home &&
+            !workflowOverview &&
+            connection && (
+              <>
+                <div className="rail-heading conversation-heading">
+                  <h2>Conversations</h2>
+                  <span>{snapshot?.conversations.length ?? "—"}</span>
+                </div>
+                <div className="search-field">
+                  <Search size={14} />
+                  <UI.Input
+                    aria-label="Find a conversation"
+                    value={query}
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                      setCatalogLimit(40);
+                    }}
+                    placeholder="Find conversation…"
+                  />
+                </div>
+                <div className="conversation-list">
+                  {catalog.slice(0, catalogLimit).map((item) => (
+                    <UI.Button
+                      key={item.id}
+                      variant="ghost"
+                      className={`conversation-button ${conversationId === item.id ? "selected" : ""} ${item.owner ? "child" : ""}`}
+                      onClick={() => chooseConversation(item.id)}
+                    >
+                      <Bot size={16} />
+                      <span>
+                        <strong>{item.title}</strong>
+                        <small>
+                          {item.owner
+                            ? `Child of ${item.owner.conversationId} · `
+                            : item.parent
+                              ? `Fork of ${item.parent.conversationId} · `
+                              : ""}
+                          {item.entryCount} entries
+                        </small>
+                      </span>
+                      {item.active > 0 && (
+                        <span
+                          className="small-indicator"
+                          title={`${item.active} nonterminal saved tasks`}
+                        />
+                      )}
+                    </UI.Button>
+                  ))}
+                  {catalog.length > catalogLimit && (
+                    <UI.Button
+                      variant="ghost"
+                      onClick={() => setCatalogLimit((value) => value + 40)}
+                    >
+                      Show more conversations
+                    </UI.Button>
+                  )}
+                  {snapshot && !catalog.length && (
+                    <p className="rail-empty">
+                      {query
+                        ? "No matching conversations."
+                        : "No conversations retained in this store."}
+                    </p>
+                  )}
+                </div>
+              </>
+            )
           )}
           <div className="rail-bottom">
             <UI.Button
@@ -735,7 +893,39 @@ export function App() {
         )}
         <main className="main-panel">
           {home ? (
-            <LocalWork open={openLocal} settings={() => openSettings()} />
+            <LocalWork
+              {...local}
+              runs={runs}
+              openWorkflow={openWorkflow}
+              open={openLocal}
+              settings={() => openSettings()}
+            />
+          ) : workflowOverview ? (
+            currentWorkflow ? (
+              <WorkflowView
+                run={currentWorkflow}
+                open={openMember}
+                back={() => {
+                  setHome(true);
+                  setWorkflowOverview(false);
+                }}
+                error={local.error}
+              />
+            ) : (
+              <div className="empty-inline">
+                <h2>
+                  This workflow is not available in the current local sources.
+                </h2>
+                <UI.Button
+                  onClick={() => {
+                    setHome(true);
+                    setWorkflowOverview(false);
+                  }}
+                >
+                  This machine
+                </UI.Button>
+              </div>
+            )
           ) : !connection ? (
             <div className="welcome">
               <div className="welcome-symbol">
@@ -777,6 +967,16 @@ export function App() {
                   className="conversation-navigation"
                   aria-label="Conversation navigation"
                 >
+                  {currentWorkflow && (
+                    <UI.Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openWorkflow(currentWorkflow)}
+                    >
+                      <Workflow size={16} />
+                      Back to workflow
+                    </UI.Button>
+                  )}
                   <UI.Button
                     variant="ghost"
                     size="sm"
@@ -793,7 +993,9 @@ export function App() {
                     size="sm"
                     aria-label="Go forward"
                     title="Go forward (Alt+Right / ⌘])"
-                    disabled={!history.forward.length || status === "connecting"}
+                    disabled={
+                      !history.forward.length || status === "connecting"
+                    }
                     onClick={() => navigateHistory("forward")}
                   >
                     <ArrowRight size={16} />
@@ -807,20 +1009,52 @@ export function App() {
                         status === "connecting" ||
                         !snapshot?.conversations.some(
                           (item) =>
-                            item.id === selectedConversation.owner!.conversationId,
+                            item.id ===
+                            selectedConversation.owner!.conversationId,
                         )
                       }
                       onClick={() =>
-                        chooseConversation(selectedConversation.owner!.conversationId)
+                        chooseConversation(
+                          selectedConversation.owner!.conversationId,
+                        )
                       }
                     >
                       <GitBranch size={16} />
                       Parent conversation
                     </UI.Button>
                   )}
+                  {selectedConversation && (
+                    <UI.Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label="Show assignment context"
+                      onClick={() => {
+                        setTab("conversation");
+                        setPlaying(false);
+                        setFollowTail(false);
+                        requestAnimationFrame(() =>
+                          transcriptPane.current?.scrollTo({ top: 0 }),
+                        );
+                      }}
+                    >
+                      <FileText size={16} />
+                      Context
+                    </UI.Button>
+                  )}
                 </nav>
                 <div className="breadcrumb">
-                  <span>{connection.name}</span>
+                  {currentWorkflow ? (
+                    <UI.Button
+                      variant="link"
+                      size="sm"
+                      onClick={() => openWorkflow(currentWorkflow)}
+                    >
+                      {readableName(currentWorkflow.name)} ·{" "}
+                      {currentWorkflow.cycle}
+                    </UI.Button>
+                  ) : (
+                    <span>{connection.name}</span>
+                  )}
                   <ChevronRight size={13} />
                   <span>{selectedConversation?.title ?? "Conversations"}</span>
                 </div>
@@ -897,6 +1131,10 @@ export function App() {
                       className="view-tabs"
                       aria-label="Inspection view"
                     >
+                      <UI.Tab value="conversation">
+                        <FileText size={15} />
+                        Conversation
+                      </UI.Tab>
                       <UI.Tab value="structure">
                         <GitBranch size={15} />
                         Structure
@@ -904,10 +1142,6 @@ export function App() {
                       <UI.Tab value="timeline">
                         <ActivityIcon size={15} />
                         Timeline
-                      </UI.Tab>
-                      <UI.Tab value="conversation">
-                        <FileText size={15} />
-                        Conversation
                       </UI.Tab>
                     </UI.TabsList>
                     <UI.TabPanel
@@ -1028,10 +1262,39 @@ export function App() {
                       </p>
                     </UI.TabPanel>
                     <UI.TabPanel
+                      key={`${connectionId}:${conversationId}`}
                       value="conversation"
                       className="panel-scroll transcript-view"
                       ref={transcriptPane}
+                      onScroll={(event) => {
+                        const pane = event.currentTarget;
+                        if (
+                          followTail &&
+                          pane.scrollHeight -
+                            pane.scrollTop -
+                            pane.clientHeight >
+                            48
+                        )
+                          setFollowTail(false);
+                      }}
                     >
+                      {selectedConversation && (
+                        <ConversationContext
+                          conversation={selectedConversation}
+                          conversations={snapshot.conversations}
+                          onConversation={chooseConversation}
+                          onRead={() => {
+                            setPlaying(false);
+                            setFollowTail(false);
+                          }}
+                          onSender={
+                            handoffSender
+                              ? () => openMember(handoffSender)
+                              : undefined
+                          }
+                          inWorkflow={Boolean(currentWorkflow)}
+                        />
+                      )}
                       {viewed?.hasEarlier && (
                         <UI.Button
                           variant="outline"
@@ -1047,14 +1310,16 @@ export function App() {
                         compaction boundaries. It is not a reconstruction of the
                         exact model context.
                       </p>
-                      {events.map((item) => (
-                        <TranscriptEntry
-                          key={`${connectionId}:${item.id}`}
-                          item={item}
-                          active={!following && item.id === activeEventId}
-                          inspect={() => selectActivity(item)}
-                        />
-                      ))}
+                      <Transcript
+                        events={events}
+                        conversations={snapshot.conversations}
+                        activeId={!following ? activeEventId : undefined}
+                        inspect={selectActivity}
+                        onRead={() => {
+                          setFollowTail(false);
+                          setPlaying(false);
+                        }}
+                      />
                       {!events.length && (
                         <p className="empty-inline">
                           No transcript entries retained.
@@ -1077,7 +1342,7 @@ export function App() {
             </>
           )}
         </main>
-        {!home && connection && selection && (
+        {!home && !workflowOverview && connection && selection && (
           <Details
             selection={detailSelection}
             historical={!following}
@@ -1140,132 +1405,145 @@ export function App() {
           />
         )}
       </div>
-      {!home && <footer className="playback-bar" aria-label="Recorded event playback">
-        <div className="playback-controls">
-          <UI.Button
-            variant="secondary"
-            size="icon"
-            aria-label={
-              following
-                ? "Pause following"
-                : playing
-                  ? "Pause playback"
-                  : "Play saved events"
-            }
-            disabled={!events.length}
-            onClick={togglePlayback}
-          >
-            {following || playing ? <Pause size={17} /> : <Play size={17} />}
-          </UI.Button>
-          <div className="playback-mode">
-            <strong>
-              <span className={`mode-dot ${following ? "live" : ""}`} />
-              {following
-                ? "Following live"
-                : playing
-                  ? "Playing saved events"
-                  : "Recorded playback"}
-            </strong>
-            <small>
-              {following
-                ? status === "connected"
-                  ? "New commits appear automatically"
-                  : "Waiting for connection"
-                : `${Math.max(0, at + 1)} of ${events.length} loaded events`}
-            </small>
+      {!home && !workflowOverview && (
+        <footer className="playback-bar" aria-label="Recorded event playback">
+          <div className="playback-controls">
+            <UI.Button
+              variant="secondary"
+              size="icon"
+              aria-label={
+                following
+                  ? "Pause following"
+                  : playing
+                    ? "Pause playback"
+                    : "Play saved events"
+              }
+              disabled={!events.length}
+              onClick={togglePlayback}
+            >
+              {following || playing ? <Pause size={17} /> : <Play size={17} />}
+            </UI.Button>
+            <div className="playback-mode">
+              <strong>
+                <span className={`mode-dot ${following ? "live" : ""}`} />
+                {following
+                  ? followTail
+                    ? "Following latest activity"
+                    : "Live updates"
+                  : playing
+                    ? "Playing saved events"
+                    : "Recorded playback"}
+              </strong>
+              <small>
+                {following
+                  ? status === "connected"
+                    ? followTail
+                      ? "New activity appears automatically"
+                      : "Scroll stays where you leave it"
+                    : "Waiting for connection"
+                  : `${Math.max(0, at + 1)} of ${events.length} loaded events`}
+              </small>
+            </div>
+            {!following && (
+              <UI.Button variant="outline" size="sm" onClick={goLive}>
+                <Radio size={13} />
+                Live{newCount ? ` +${newCount}` : ""}
+              </UI.Button>
+            )}
           </div>
-          {!following && (
+          {following && !followTail && (
             <UI.Button variant="outline" size="sm" onClick={goLive}>
-              <Radio size={13} />
-              Live{newCount ? ` +${newCount}` : ""}
+              Latest activity <ArrowRight size={13} />
             </UI.Button>
           )}
-        </div>
-        <div className="playback-track">
-          <div className="step-buttons">
-            <UI.Button
-              variant="ghost"
-              size="icon-sm"
+          <div className="playback-track">
+            <div className="step-buttons">
+              <UI.Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={!events.length}
+                aria-label="First saved event"
+                onClick={() => {
+                  if (following) pause(0);
+                  else setCursor(0);
+                  setPlaying(false);
+                }}
+              >
+                <SkipBack />
+              </UI.Button>
+              <UI.Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={!events.length || at <= 0}
+                aria-label="Previous saved event"
+                onClick={() => step(-1)}
+              >
+                <ArrowLeft />
+              </UI.Button>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(0, events.length - 1)}
+              value={Math.max(0, at)}
               disabled={!events.length}
-              aria-label="First saved event"
-              onClick={() => {
-                if (following) pause(0);
-                else setCursor(0);
+              aria-label="Playback position"
+              aria-valuetext={
+                events[at]
+                  ? `Event ${at + 1}: ${events[at].title}`
+                  : "No events"
+              }
+              onChange={(event) => {
+                const position = Number(event.target.value);
+                if (following) pause(position);
+                else setCursor(position);
                 setPlaying(false);
               }}
+            />
+            <div className="step-buttons">
+              <UI.Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={!events.length || at >= events.length - 1}
+                aria-label="Next saved event"
+                onClick={() => step(1)}
+              >
+                <ArrowRight />
+              </UI.Button>
+              <UI.Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={!events.length}
+                aria-label="Last saved event"
+                onClick={() => {
+                  if (following) pause();
+                  else setCursor(events.length - 1);
+                  setPlaying(false);
+                }}
+              >
+                <SkipForward />
+              </UI.Button>
+            </div>
+            <select
+              aria-label="Playback speed"
+              value={speed}
+              onChange={(event) => setSpeed(Number(event.target.value))}
             >
-              <SkipBack />
-            </UI.Button>
-            <UI.Button
-              variant="ghost"
-              size="icon-sm"
-              disabled={!events.length || at <= 0}
-              aria-label="Previous saved event"
-              onClick={() => step(-1)}
-            >
-              <ArrowLeft />
-            </UI.Button>
+              <option value={0.5}>0.5×</option>
+              <option value={1}>1×</option>
+              <option value={2}>2×</option>
+              <option value={4}>4×</option>
+            </select>
           </div>
-          <input
-            type="range"
-            min={0}
-            max={Math.max(0, events.length - 1)}
-            value={Math.max(0, at)}
-            disabled={!events.length}
-            aria-label="Playback position"
-            aria-valuetext={
-              events[at] ? `Event ${at + 1}: ${events[at].title}` : "No events"
-            }
-            onChange={(event) => {
-              const position = Number(event.target.value);
-              if (following) pause(position);
-              else setCursor(position);
-              setPlaying(false);
-            }}
-          />
-          <div className="step-buttons">
-            <UI.Button
-              variant="ghost"
-              size="icon-sm"
-              disabled={!events.length || at >= events.length - 1}
-              aria-label="Next saved event"
-              onClick={() => step(1)}
-            >
-              <ArrowRight />
-            </UI.Button>
-            <UI.Button
-              variant="ghost"
-              size="icon-sm"
-              disabled={!events.length}
-              aria-label="Last saved event"
-              onClick={() => {
-                if (following) pause();
-                else setCursor(events.length - 1);
-                setPlaying(false);
-              }}
-            >
-              <SkipForward />
-            </UI.Button>
-          </div>
-          <select
-            aria-label="Playback speed"
-            value={speed}
-            onChange={(event) => setSpeed(Number(event.target.value))}
-          >
-            <option value={0.5}>0.5×</option>
-            <option value={1}>1×</option>
-            <option value={2}>2×</option>
-            <option value={4}>4×</option>
-          </select>
-        </div>
-        <span className="playback-caption">
-          {events[at]?.at
-            ? time(events[at].at)
-            : snapshot
-              ? `Commit ${snapshot.sequence}`
-              : "Retained evidence only"}
-        </span>
-      </footer>}
+          <span className="playback-caption">
+            {events[at]?.at
+              ? time(events[at].at)
+              : snapshot
+                ? `Commit ${snapshot.sequence}`
+                : "Retained evidence only"}
+          </span>
+        </footer>
+      )}
       {settings && (
         <SettingsDialog
           preferences={preferences}

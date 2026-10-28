@@ -157,7 +157,11 @@ else {
     );
     session.defaultSession.setPermissionCheckHandler(() => false);
     handle("preferences", () => preferences.get());
-    handle("local-work", () => service("local-work"));
+    handle("local-work", async () =>
+      service("local-work", {
+        connections: (await preferences.get()).connections,
+      }),
+    );
     handle("choose-file", async (kind) => {
       z.enum(["sqlite", "identity", "certificate"]).parse(kind);
       const result = await dialog.showOpenDialog(window!, {

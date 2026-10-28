@@ -12,20 +12,45 @@ for writing by the current user's processes. Observer validates Pi's schema and
 reads supported stores without opening an execution owner. It does not crawl
 directories, request elevated permissions, or inspect remote machines.
 
-Stores with unfinished conversations appear first. **Process observed** means a
+Saved direct SQLite connections are read too, including when their processes have
+stopped. Work with unfinished conversations appears first. **Process observed** means a
 process had the store open at the shown observation time, not that an LLM is
-currently generating. Unfinished tasks may be waiting or sleeping. Idle stores
-offer **View saved conversations**; **Show completed conversations** reveals retained
-history. Search filters stores by agent name, path, or conversation title.
+currently generating. Unfinished tasks may be waiting or sleeping. **Show all
+saved work** reveals retained history. Search finds workflows and conversation
+titles; source setup and paths stay in Settings.
+
+Choose a workflow to see its assignments, with unfinished work first. Select
+an assignment to open its conversation; the workflow's other conversations remain
+in the rail. **Back to workflow** and the workflow breadcrumb return to the
+overview. **Sent by** opens an available sender conversation, including one in
+another local agent store. Same-source Back/Forward history remains separate.
+
+Workflow groups come from recognized Runner instance-message envelopes whose
+leading lines explicitly declare `workflow:` and `cycle:`. `assignment:` and
+`phase:` enrich the view. Matching names alone never group work: namespace,
+validated sibling agent-store directory and exact recipient identity must agree.
+Sender addresses resolve only against unambiguous chat metadata in available
+sources. Missing stores are not opened from message-supplied paths. Arbitrary
+prose, replies and definition files do not create workflow membership. This is
+an interpretation of saved handoffs, not a native workflow-run table, final
+outcome or reconstructed phase graph. No runner change or SQLite migration is needed.
 
 Clicking a conversation saves/reuses its local connection and opens **Conversation**.
 The saved integration title is preferred, with the first retained assignment as a
-fallback. Markdown messages and inline tool rows stay in recorded order. Expand
+fallback. The conversation opens at assignment context: agent, sender, literal
+handoff labels, starting time and the original request when retained. **Read full
+handoff** shows the saved text; a requested automatic reply is not labeled as a
+received reply. Unknown callers and missing openings stay explicit.
+Markdown messages and inline tool rows stay in recorded order. Consecutive tool
+events form compact groups; long requests and unknown native records start
+collapsed. Peer messages show their recorded sender rather than “You.” Expand
 a call or result to read it; shell commands preserve real line breaks, with the
 full arguments available separately. Native details open only on request.
 
-Discovery failure retains the last observed list and labels it stale. Stopped
-processes disappear after a successful refresh; saved connections remain usable.
+An overall read failure retains the last observed list and labels it stale.
+Process-discovery failures and individual unreadable sources appear under
+**Source notices**; saved local sources remain readable when discovery fails.
+Stopped unsaved sources disappear after a successful refresh; saved history remains.
 Windows discovery is not implemented. Processes hidden by OS permissions, stores
 without a writable open handle, extensionless files, remote/Postgres stores, and
 non-Pi runtimes require explicit connections or are outside discovery coverage.
@@ -122,9 +147,13 @@ scope; select its parent link to return. Expand or collapse the hierarchy withou
 changing an agent.
 
 Timeline follows durable commit order and shows timestamps only when recorded.
-Conversation shows saved transcript messages, calls/results, and context boundaries.
+Conversation shows assignment context, saved transcript messages, calls/results,
+and context boundaries. Live reads do not move the reading position on opening.
+**Latest activity** starts following the end; scrolling away or expanding content
+stops movement while updates continue. **Context** returns to the opening without
+resuming paused playback.
 Messages render Markdown, including lists, tables, and fenced code. Tool events
-start as compact rows with previews; click a row or focus it and press Enter/Space
+start inside compact activity groups; expand a group, then click a row or focus it and press Enter/Space
 to expand its arguments or result. JSON text envelopes display their decoded text
 with line breaks and indentation; additional fields remain under a disclosure.
 Other structured results use indented JSON. Code lines scroll horizontally inside
@@ -179,6 +208,37 @@ going back replaces the forward path. Switching connections clears history;
 reconnecting the current connection preserves it.
 
 ## Compatibility and qualification
+
+Workflow-first qualification (October 28, 2026, OBS-007, OBS-008, OBS-010,
+OBS-012, OBS-013, OBS-018): the packaged macOS ARM64 app was checked against
+existing local handoffs and isolated synthetic Pi stores. Workflow → assignment
+→ conversation navigation, cross-store sender links, return to the overview,
+and direct-source opening with workflow context were observed. Stores in separate
+installations with identical workflow/cycle/address values stayed separate.
+Missing senders remained unlinked; replies and workflow names mentioned only in
+prose stayed outside assignment groups. Saved process-free sources, search,
+no-match recovery and the all-work filter were exercised.
+
+Opening context and the complete handoff remained available with only the latest
+500 entries loaded. New synthetic entries arrived without moving the reader;
+Latest activity opted into following, and scrolling away stopped it. Grouped tool
+disclosures worked with the keyboard. Playback opened the selected tool, kept
+later commits outside its frozen boundary, and preserved the selected event when
+earlier pages loaded. Context and handoff dialogs did not resume playback; Escape
+returned focus to the handoff opener. Settings preserved the reading position.
+Native parent navigation and same-source Alt+Left history retained the paused
+event selection. All seven synthetic database checksums were unchanged during
+the final packaged-app pass.
+Home, workflow, conversation, tool and handoff layouts were reviewed at 1440×900
+and 1280×720, including light/dark conversation views. Workspace type/build checks
+and macOS packaging passed; no automated tests were added or run.
+
+This qualification does not establish native workflow-run persistence, arbitrary
+workflow adapters, final workflow outcomes, remote workflow discovery, other
+operating systems, or new transport coverage. Missing-lsof and preference-write
+failures were not exercised in this refinement. Synthetic updates were written
+only by the sample-data producer, never by Observer; source reading remained
+read-only. Private transcript evidence and captures are not public assets.
 
 Settings qualification (October 28, 2026, OBS-005, OBS-014, OBS-015): the packaged
 macOS ARM64 app was checked with an isolated profile and a synthetic Pi store.

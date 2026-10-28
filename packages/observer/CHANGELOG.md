@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Navigate recorded local workflow cycles before their assignments and
+  conversations, with available sender links across agent stores. Include saved
+  local history, keep unrelated conversations separate, and distinguish declared
+  handoff membership from native ownership and workflow completion.
+- Open conversations at assignment context with the original handoff and actual
+  peer author. Group tool activity, collapse long requests, and make following
+  latest activity explicit without stopping live reads.
+
 - Move saved connections and appearance into Settings, leaving the navigation
   rail focused on local work and conversations. Preserve the inspection view
   when closing Settings and keep automatic playback paused.

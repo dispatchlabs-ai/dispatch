@@ -16,7 +16,9 @@ port.on("message", ({ data }) => {
     try {
       let result: unknown;
       if (data.operation === "local-work") {
-        result = await localWork();
+        result = await localWork(
+          data.connections.map((item: unknown) => connectionSchema.parse(item)),
+        );
       } else if (data.operation === "probe") {
         const candidate = new Source(
           connectionSchema.parse(data.connection),

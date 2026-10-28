@@ -11,23 +11,26 @@ const exec = promisify(execFile);
 const identities = new Map<string, string>();
 
 /** Discover open writable files, not stale saved tasks or a filesystem crawl. */
-export async function localWork(): Promise<LocalWork> {
-  if (process.platform === "win32")
-    throw new Error(
-      "Local discovery currently needs macOS or Linux with lsof. Use Add connection to open a store.",
+export async function localWork(saved: Connection[]): Promise<LocalWork> {
+  const issues: string[] = [];
+  let output = "";
+  if (process.platform === "win32") {
+    issues.push(
+      "Local process discovery is not available on Windows. Showing saved local sources.",
     );
-  let output: string;
-  try {
-    const result = await exec(
-      process.platform === "darwin" ? "/usr/sbin/lsof" : "lsof",
-      ["-n", "-P", "-a", "-u", String(process.getuid!()), "-F", "pfan"],
-      { timeout: 15_000, maxBuffer: 32 * 1024 * 1024 },
-    );
-    output = result.stdout;
-  } catch {
-    throw new Error(
-      "Could not inspect local processes. Check that lsof is available, or use Add connection.",
-    );
+  } else {
+    try {
+      const result = await exec(
+        process.platform === "darwin" ? "/usr/sbin/lsof" : "lsof",
+        ["-n", "-P", "-a", "-u", String(process.getuid!()), "-F", "pfan"],
+        { timeout: 15_000, maxBuffer: 32 * 1024 * 1024 },
+      );
+      output = result.stdout;
+    } catch {
+      issues.push(
+        "Could not inspect local processes. Showing saved local sources; check that lsof is available.",
+      );
+    }
   }
   const paths = new Map<string, Set<number>>();
   let pid = 0;
@@ -47,8 +50,14 @@ export async function localWork(): Promise<LocalWork> {
       paths.set(path, owners);
     }
   }
+  const savedByPath = new Map(
+    saved
+      .filter((c) => c.kind === "sqlite" && c.transport.kind === "direct")
+      .map((c) => [c.path, c]),
+  );
+  for (const path of savedByPath.keys())
+    if (!paths.has(path)) paths.set(path, new Set());
   const stores: LocalWork["stores"] = [];
-  const issues: string[] = [];
   for (const [path, owners] of paths) {
     // Identify Pi before loading records; unrelated application databases are ignored.
     let db: DatabaseSync | undefined;
@@ -62,15 +71,25 @@ export async function localWork(): Promise<LocalWork> {
           )
           .get(),
       );
-    } catch {
+    } catch (error) {
+      if (savedByPath.has(path))
+        issues.push(
+          `${savedByPath.get(path)!.name}: ${redact(error instanceof Error ? error.message : "Could not read source")}`,
+        );
       continue;
     } finally {
       db?.close();
     }
-    if (!pi) continue;
+    if (!pi) {
+      if (savedByPath.has(path))
+        issues.push(
+          `${savedByPath.get(path)!.name}: Not a supported Pi store.`,
+        );
+      continue;
+    }
     const id = identities.get(path) ?? randomUUID();
     identities.set(path, id);
-    const connection: Connection = {
+    const connection: Connection = savedByPath.get(path) ?? {
       id,
       name: basename(dirname(path)).replace(/[-_]/g, " "),
       kind: "sqlite",
@@ -97,6 +116,13 @@ export async function localWork(): Promise<LocalWork> {
         );
       stores.push({
         connection,
+        scope:
+          basename(path) === "session.sqlite" &&
+          snapshot.conversations.some(
+            (c) => c.agent === basename(dirname(path)),
+          )
+            ? dirname(dirname(path))
+            : path,
         pids: [...owners],
         conversations: snapshot.conversations,
       });

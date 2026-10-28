@@ -117,6 +117,30 @@ export type Conversation = {
   active: number;
   failed: number;
   lastAt?: number;
+  agent?: string;
+  namespace?: string;
+  channel?: string;
+  createdAt?: number;
+  opening?: {
+    entryId: number;
+    text: string;
+    at?: number;
+    sender?: InstanceMessage;
+    labels?: HandoffLabels;
+  };
+};
+export type HandoffLabels = {
+  workflow?: string;
+  cycle?: string;
+  assignment?: string;
+  phase?: string;
+};
+export type InstanceMessage = {
+  namespace: string;
+  from: string;
+  to: string;
+  kind: "message" | "reply";
+  replyRequested: boolean;
 };
 export type Activity = {
   id: string;
@@ -126,6 +150,7 @@ export type Activity = {
   kind: string;
   category: "message" | "tool" | "boundary" | "record";
   role?: string;
+  sender?: InstanceMessage;
   title: string;
   text: string;
   at?: number;
@@ -194,7 +219,12 @@ export type Preferences = {
 export type Probe = { stores: string[]; message: string };
 export type LocalWork = {
   observedAt: string;
-  stores: { connection: Connection; pids: number[]; conversations: Conversation[] }[];
+  stores: {
+    connection: Connection;
+    scope: string;
+    pids: number[];
+    conversations: Conversation[];
+  }[];
   issues: string[];
 };
 export type ObserverApi = {
