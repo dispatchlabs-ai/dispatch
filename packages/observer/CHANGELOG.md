@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Move saved connections and appearance into Settings, leaving the navigation
+  rail focused on local work and conversations. Preserve the inspection view
+  when closing Settings and keep automatic playback paused.
+
 - Start on This machine with read-only local Pi store discovery, unfinished work
   first, separate process/task evidence, search, and one-click conversation access.
   Keep manual connections and historical inspection.

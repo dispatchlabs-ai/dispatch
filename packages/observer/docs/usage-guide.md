@@ -36,6 +36,18 @@ are not a current requirement; earlier small-layout checks below are historical.
 
 ## Connection setup
 
+Open **Settings** at the bottom of the navigation rail, then **Add connection**.
+Saved sources, their management menu, and the System/Light/Dark color theme live
+here rather than beside the conversations. **Open** returns to the current
+connected source without resetting the view, or connects to a different source.
+The menu provides **Edit connection**, **Reconnect**, and **Remove saved connection**.
+Removing the current connection returns to This machine; agent data is never deleted.
+
+Settings leaves the workspace mounted. **Done**, the close button, or Escape
+returns to the same reading position, expanded tools and inspection state.
+Opening Settings pauses automatic playback, not the agent or live connection.
+Cancelling Add/Edit returns to Settings; **Save & connect** opens the saved source.
+
 **Local SQLite:** choose SQLite, keep Direct connection, and browse to an existing
 `.sqlite`, `.sqlite3`, or `.db` file. The OS identity running Observer must be able
 to read it and any active WAL state. Open the live local database or a consistent
@@ -103,7 +115,7 @@ and reported instead of overwritten.
 
 ## Following and playback
 
-The source rail lists conversations; filter it by name or native ID. Structure
+The navigation rail lists conversations; filter it by name or native ID. Structure
 shows native ownership and fork references, current/final task records, waiting
 relationships, attempts, and saved documents. Select a child to inspect its own
 scope; select its parent link to return. Expand or collapse the hierarchy without
@@ -167,6 +179,22 @@ going back replaces the forward path. Switching connections clears history;
 reconnecting the current connection preserves it.
 
 ## Compatibility and qualification
+
+Settings qualification (October 28, 2026, OBS-005, OBS-014, OBS-015): the packaged
+macOS ARM64 app was checked with an isolated profile and a synthetic Pi store.
+The work rail contains no saved-connection list or setup/appearance controls.
+Settings supports adding, reopening, editing and removing saved sources, and
+System/Light/Dark appearance. Add/Edit cancellation returns to Settings with
+focus retained; closing Settings returns focus to its opener and preserves the
+conversation's scroll position, expanded tool rows, selection and live/paused
+mode. Automatic playback stops without moving the playhead. Explicit reconnect,
+a missing-file error, recovery through Settings, and removal of the active
+profile were exercised; the synthetic database checksum remained unchanged.
+Saved names and theme survived an app restart. Home, conversation and Settings
+layouts were reviewed at 1440×900 and 1280×720 in light/dark appearances.
+Workspace type/build checks and macOS packaging passed. No automated tests were
+added or run. Remote transports, other operating systems, protected-password
+changes and preference-write failures were not requalified by this UI move.
 
 Local-work qualification (October 28, 2026): the packaged macOS ARM64 app
 discovered live local Pi stores, put unfinished conversations first, reused a

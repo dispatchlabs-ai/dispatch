@@ -9,10 +9,8 @@ import {
   FileText,
   GitBranch,
   Menu as MenuIcon,
-  Moon,
   Pause,
   Play,
-  Plus,
   Radio,
   RefreshCw,
   Search,
@@ -20,13 +18,13 @@ import {
   ShieldCheck,
   SkipBack,
   SkipForward,
-  Sun,
   Terminal,
   Unplug,
   Workflow,
 } from "lucide-react";
 import { UI } from "./controls";
 import { ConnectionDialog } from "./ConnectionDialog";
+import { SettingsDialog } from "./SettingsDialog";
 import { Structure } from "./Structure";
 import { PaneResizer } from "./PaneResizer";
 import { TranscriptEntry } from "./TranscriptEntry";
@@ -122,6 +120,7 @@ export function App() {
   const [activityQuery, setActivityQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [dialog, setDialog] = useState<SavedConnection | "new">();
+  const [settings, setSettings] = useState(false);
   const [sidebar, setSidebar] = useState(false);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [catalogLimit, setCatalogLimit] = useState(40);
@@ -163,6 +162,8 @@ export function App() {
   const connect = useCallback(
     async (id: string, preserve = false, requestedConversation?: number) => {
       setHome(false);
+      setSettings(false);
+      setDialog(undefined);
       preserve = preserve && current.current?.sourceId === id;
       const turn = ++generation.current;
       setStatus("connecting");
@@ -459,30 +460,45 @@ export function App() {
     }
   };
   const removeConnection = async (id: string) => {
-    try {
-      await window.observer.remove(id);
-      await refreshPreferences();
-      if (connectionId === id) {
-        ++generation.current;
-        setConnectionId(undefined);
-        setConversationId(undefined);
-        setHistory({ back: [], forward: [] });
-        setStatus("idle");
-        setSnapshot(undefined);
-        current.current = undefined;
-        setSelection(undefined);
-      }
-    } catch (error) {
-      setError(errorMessage(error));
+    await window.observer.remove(id);
+    if (connectionId === id) {
+      ++generation.current;
+      setConnectionId(undefined);
+      setConversationId(undefined);
+      setHistory({ back: [], forward: [] });
+      setStatus("idle");
+      setSnapshot(undefined);
+      current.current = undefined;
+      setSelection(undefined);
+      setFrozen(undefined);
+      setFollowing(true);
+      setPlaying(false);
+      setError("");
+      setHome(true);
     }
-  };
-  const changeTheme = async () => {
-    if (!preferences) return;
-    const next = document.documentElement.classList.contains("dark")
-      ? "light"
-      : "dark";
-    await window.observer.theme(next);
     await refreshPreferences();
+  };
+  const changeTheme = async (theme: Preferences["theme"]) => {
+    await window.observer.theme(theme);
+    await refreshPreferences();
+  };
+  const openSettings = () => {
+    setDialog(undefined);
+    setSettings(true);
+    setPlaying(false);
+    setSidebar(false);
+  };
+  const closeSettings = () => {
+    setSettings(false);
+    setDialog(undefined);
+  };
+  const openSaved = (id: string) => {
+    if (id === connectionId && status === "connected") {
+      setHome(false);
+      closeSettings();
+    } else {
+      void connect(id, id === connectionId);
+    }
   };
   const openLocal = async (candidate: Connection, id?: number) => {
     const existing = preferences?.connections.find(item =>
@@ -494,7 +510,7 @@ export function App() {
   };
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
-      if (dialog) return;
+      if (settings) return;
       if (event.key === "Escape") {
         setSelection(undefined);
         setSidebar(false);
@@ -605,7 +621,7 @@ export function App() {
           className="mobile-menu"
           variant="ghost"
           size="icon-sm"
-          aria-label="Show connections"
+          aria-label="Show navigation"
           onClick={() => setSidebar((value) => !value)}
         >
           <MenuIcon />
@@ -624,84 +640,12 @@ export function App() {
       <div
         className={`workspace ${sidebar ? "sidebar-open" : ""} ${!home && selection ? "has-selection" : ""}`}
       >
-        <aside className="sidebar" aria-label="Connections and conversations">
+        <aside className="sidebar" aria-label="Work navigation">
           <UI.Button variant={home ? "secondary" : "ghost"} className="machine-button" onClick={() => {
             setHome(true);
             setPlaying(false);
             setSidebar(false);
           }}><Workflow size={18} />This machine</UI.Button>
-          <div className="rail-heading">
-            <h2>Connections</h2>
-            <UI.Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Add connection"
-              onClick={() => setDialog("new")}
-            >
-              <Plus />
-            </UI.Button>
-          </div>
-          <nav className="connection-list">
-            {preferences?.connections.map((item) => (
-              <div
-                className={`connection-item ${connectionId === item.id ? "selected" : ""}`}
-                key={item.id}
-              >
-                <UI.Button
-                  variant="ghost"
-                  className="connection-button"
-                  disabled={status === "connecting"}
-                  onClick={() => void connect(item.id)}
-                >
-                  <Database size={19} />
-                  <span>
-                    <strong>{item.name}</strong>
-                    <small>
-                      {item.kind === "postgres" ? "Postgres" : "SQLite"}
-                      {item.transport.kind !== "direct"
-                        ? ` · ${item.transport.kind.toUpperCase()}`
-                        : ""}
-                    </small>
-                  </span>
-                  <span
-                    className={`connection-dot ${connectionId === item.id ? status : "idle"}`}
-                  />
-                </UI.Button>
-                <UI.Menu>
-                  <UI.MenuTrigger
-                    render={
-                      <UI.Button
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={`Manage ${item.name}`}
-                        className="connection-settings"
-                      />
-                    }
-                  >
-                    <Settings2 />
-                  </UI.MenuTrigger>
-                  <UI.MenuContent>
-                    <UI.MenuItem onClick={() => setDialog(item)}>
-                      Edit connection
-                    </UI.MenuItem>
-                    <UI.MenuItem
-                      onClick={() =>
-                        void connect(item.id, item.id === connectionId)
-                      }
-                    >
-                      Reconnect
-                    </UI.MenuItem>
-                    <UI.MenuItem
-                      destructive
-                      onClick={() => void removeConnection(item.id)}
-                    >
-                      Remove saved connection
-                    </UI.MenuItem>
-                  </UI.MenuContent>
-                </UI.Menu>
-              </div>
-            ))}
-          </nav>
           {!home && connection && (
             <>
               <div className="rail-heading conversation-heading">
@@ -769,26 +713,15 @@ export function App() {
           <div className="rail-bottom">
             <UI.Button
               variant="ghost"
-              className="add-connection"
-              onClick={() => setDialog("new")}
+              className="settings-button"
+              onClick={() => openSettings()}
             >
-              <Plus size={18} />
-              Add connection
+              <Settings2 size={18} />
+              Settings
             </UI.Button>
-            <div className="rail-footer">
-              <span>Local to this computer</span>
-              <UI.Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Toggle color theme"
-                onClick={() => void changeTheme()}
-              >
-                {preferences?.theme === "dark" ? <Sun /> : <Moon />}
-              </UI.Button>
-            </div>
           </div>
           <PaneResizer
-            label="Resize connections pane"
+            label="Resize navigation pane"
             value={railWidth}
             onChange={setRailWidth}
           />
@@ -796,13 +729,13 @@ export function App() {
         {sidebar && (
           <button
             className="sidebar-scrim"
-            aria-label="Close connections"
+            aria-label="Close navigation"
             onClick={() => setSidebar(false)}
           />
         )}
         <main className="main-panel">
           {home ? (
-            <LocalWork open={openLocal} add={() => setDialog("new")} />
+            <LocalWork open={openLocal} settings={() => openSettings()} />
           ) : !connection ? (
             <div className="welcome">
               <div className="welcome-symbol">
@@ -818,9 +751,9 @@ export function App() {
                 Follow your agents, explore their tools and subagents, and step
                 through what happened.
               </p>
-              <UI.Button onClick={() => setDialog("new")}>
-                <Plus />
-                Add your first connection
+              <UI.Button onClick={() => openSettings()}>
+                <Settings2 />
+                Open settings
               </UI.Button>
               <div className="welcome-sources">
                 <span>
@@ -941,9 +874,9 @@ export function App() {
                   <UI.Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setDialog(connection)}
+                    onClick={() => openSettings()}
                   >
-                    Edit
+                    Settings
                   </UI.Button>
                 </div>
               )}
@@ -1333,18 +1266,33 @@ export function App() {
               : "Retained evidence only"}
         </span>
       </footer>}
-      {dialog && preferences && (
-        <ConnectionDialog
-          key={dialog === "new" ? "new" : dialog.id}
-          existing={dialog === "new" ? undefined : dialog}
+      {settings && (
+        <SettingsDialog
           preferences={preferences}
-          onClose={() => setDialog(undefined)}
-          onSaved={async (id) => {
-            await refreshPreferences();
-            setDialog(undefined);
-            await connect(id);
-          }}
-        />
+          loadError={!preferences ? error : undefined}
+          connectionId={connectionId}
+          status={status}
+          onClose={closeSettings}
+          onAdd={() => setDialog("new")}
+          onEdit={setDialog}
+          onOpen={openSaved}
+          onReconnect={(id) => void connect(id, id === connectionId)}
+          onRemove={removeConnection}
+          onTheme={changeTheme}
+        >
+          {dialog && preferences && (
+            <ConnectionDialog
+              key={dialog === "new" ? "new" : dialog.id}
+              existing={dialog === "new" ? undefined : dialog}
+              preferences={preferences}
+              onClose={() => setDialog(undefined)}
+              onSaved={async (id) => {
+                await refreshPreferences();
+                await connect(id);
+              }}
+            />
+          )}
+        </SettingsDialog>
       )}
     </div>
   );

@@ -17,8 +17,11 @@ remain the original synthetic ImageGen concepts, not runtime captures.
 connection setup. Show locally observed agent stores with unfinished conversations
 first. A click opens Conversation; Structure, Timeline and playback remain
 secondary inspection tools. The inspector occupies space only when opened.
-This supersedes the connection-first starting flow below without removing saved
-connections or remote inspection. Discovery observes writable local SQLite file
+Connection management and appearance live in **Settings**, reached from the
+bottom of the navigation rail. Keep saved source lists and setup controls out of
+the everyday work view. This supersedes the original connection-first reference
+screens without removing saved connections or remote inspection.
+Discovery observes writable local SQLite file
 handles and validates Pi schemas; it does not infer execution from task age.
 
 The approved starting point is the earlier agent-inspector concept: a restrained
@@ -43,7 +46,9 @@ Pi state. An observer failure must never stop or restart an agent.
 
 ![Live activity reference](docs/design/01-live-activity.png)
 
-The left rail selects a source and agent. The center explains the selected work
+The original reference's left rail selects a source and agent; the current rail
+selects This machine or a conversation, with sources managed in Settings.
+The center explains the selected work
 and its children. The right pane answers what the selected item is doing, with
 its assignment and current/recent tool activity. A parent can be waiting while a
 child is working. The overall work status can therefore differ from the selected
@@ -81,9 +86,10 @@ already explain them; contextual help may replace that column on narrower views.
 
 Use four stable areas rather than a collection of dashboards:
 
-1. **Source rail:** named connections, connection status, available agents or
-   conversations, and Add connection. A source is a selected database/store, not
-   necessarily one agent. Keep selections scoped to their source.
+1. **Navigation rail:** This machine, conversations in the current source, and
+   Settings. Settings contains saved connections with Open, Add, Edit, Reconnect
+   and Remove actions, plus the color theme. A source is a selected database/store,
+   not necessarily one agent. Keep selections scoped to their source.
 2. **Work header:** a human-readable activity title, source/agent breadcrumb,
    recorded start/end information, overall outcome, and last observation time.
 3. **Work area and inspector:** Structure, Timeline, and Conversation are alternate
@@ -174,6 +180,15 @@ source/store/native identity internally; store-local integers are not global IDs
 
 ### Connection lifecycle
 
+Open **Settings → Connections** to manage sources. Settings is a desktop dialog
+over the mounted workspace: closing it restores the reading position, expanded
+tools, selection and viewing mode. Opening it stops automatic playback without
+changing its observation boundary or stopping live reads. Escape closes only the
+top dialog; cancelling Add/Edit returns to Settings. Opening the current connected
+source returns to its existing view; reconnecting is a separate explicit action.
+Removing a saved connection never deletes the agent database. Removing the current
+connection returns the workspace to This machine.
+
 | Source | Setup and read behavior |
 | --- | --- |
 | Local SQLite | Pick an existing file. Check schema compatibility, open read-only, and use short consistent snapshots. Never create a missing database or take its runner owner lock. |
@@ -241,7 +256,7 @@ nodes are needed. The work and its evidence are the visual focus.
   around 13–14 px, supporting text 12 px, pane headings 16 px, work titles 22–24 px.
 - Use a 4 px spacing grid, usually 8/12/16/24 px gaps, 6–8 px control/row radii, and
   1 px dividers. Reserve stronger contrast for selection and keyboard focus.
-- A source rail around 216–240 px and inspector around 340–400 px frame a flexible
+- A navigation rail around 216–240 px and inspector around 340–400 px frame a flexible
   center. Let users resize panes. Keep form widths comfortable; every panel does
   not need a card, border, or shadow.
 - Pair color with text/icons. Ensure contrast and focus visibility in the actual

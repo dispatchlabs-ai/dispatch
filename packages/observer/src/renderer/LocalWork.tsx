@@ -9,10 +9,10 @@ import { time } from "./Details";
 
 export function LocalWork({
   open,
-  add,
+  settings,
 }: {
   open(connection: Connection, conversationId?: number): Promise<void>;
-  add(): void;
+  settings(): void;
 }) {
   const [data, setData] = useState<LocalWorkData>();
   const [error, setError] = useState("");
@@ -202,8 +202,8 @@ export function LocalWork({
               : "Open an existing store to inspect saved work, or refresh after starting an agent."}
           </p>
           {!query && (
-            <UI.Button variant="outline" onClick={add}>
-              Add connection
+            <UI.Button variant="outline" onClick={settings}>
+              Open settings
             </UI.Button>
           )}
         </div>

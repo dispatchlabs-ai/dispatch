@@ -112,7 +112,7 @@ strong {
   flex-direction: column;
   background: var(--background);
 }
-.machine-button { margin: 16px 12px 4px; justify-content: flex-start; }
+.machine-button { justify-content: flex-start; }
 .local-work { overflow: auto; padding: 32px; }
 .local-heading { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
 .local-heading h1 { font-size: 28px; margin: 8px 0; letter-spacing: -0.7px; }
@@ -233,72 +233,12 @@ strong {
   font-size: 12px;
   font-weight: 600;
 }
-.connection-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.connection-item {
-  position: relative;
-  border-radius: 8px;
-}
-.connection-item.selected {
-  background: var(--secondary);
-}
-.connection-button {
-  width: 100%;
-  justify-content: flex-start;
-  height: auto;
-  padding: 11px 24px 11px 10px;
-  gap: 10px;
-  text-align: left;
-}
-.connection-button > span:not(.connection-dot),
 .conversation-button > span:not(.small-indicator) {
   display: flex;
   flex: 1;
   min-width: 0;
   flex-direction: column;
   gap: 3px;
-}
-.connection-button strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-}
-.connection-button small {
-  font-size: 12px;
-  color: var(--subtle);
-  font-weight: 400;
-}
-.connection-settings {
-  position: absolute;
-  right: 3px;
-  top: 3px;
-  opacity: 0;
-}
-.connection-item:hover .connection-settings,
-.connection-item:focus-within .connection-settings {
-  opacity: 1;
-}
-.connection-dot {
-  width: 6px;
-  height: 6px;
-  background: #a3afbf;
-  border-radius: 50%;
-  position: absolute;
-  right: 12px;
-  bottom: 13px;
-}
-.connection-dot.connected {
-  background: #39a582;
-}
-.connection-dot.connecting {
-  background: #d69a38;
-}
-.connection-dot.disconnected {
-  background: #cf6c6c;
 }
 .conversation-heading {
   padding-top: 26px;
@@ -375,20 +315,11 @@ strong {
 .rail-bottom {
   margin-top: auto;
   padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
-.add-connection {
+.settings-button {
   justify-content: flex-start;
   width: 100%;
-  color: var(--subtle);
-  font-size: 12px;
-}
-.rail-footer {
-  margin-top: 10px;
-  padding: 10px 6px 0;
-  border-top: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   color: var(--subtle);
   font-size: 12px;
 }
@@ -1436,6 +1367,102 @@ pre {
   color: var(--subtle);
   font-size: 12px;
 }
+[role="dialog"]:has(> .observer-settings) {
+  width: min(calc(100% - 64px), 840px);
+}
+.observer-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.observer-settings h2 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.settings-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.settings-section-heading p,
+.settings-note,
+.settings-connection-copy small,
+.settings-connection-copy p,
+.settings-empty p {
+  color: var(--subtle);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.settings-section-heading p {
+  margin-top: 4px;
+}
+.settings-connections {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.settings-connection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-connection:first-child {
+  border-top: 1px solid var(--border);
+}
+.settings-connection > svg {
+  color: var(--subtle);
+}
+.settings-connection > button,
+.settings-connection > .badge {
+  flex-shrink: 0;
+}
+.settings-connection-copy {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.settings-connection-copy strong,
+.settings-connection-copy small {
+  display: block;
+}
+.settings-connection-copy small {
+  margin-top: 3px;
+}
+.settings-note {
+  margin-top: 12px;
+}
+.settings-empty {
+  padding: 28px;
+  background: var(--rail);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.settings-appearance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+.settings-appearance select {
+  min-width: 180px;
+}
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+}
 .connection-form {
   display: flex;
   flex-direction: column;
@@ -1772,9 +1799,6 @@ pre {
   .welcome > .welcome-note {
     font-size: 12px !important;
     margin-top: 30px !important;
-  }
-  .connection-settings {
-    opacity: 1;
   }
   .task-row {
     gap: 5px;

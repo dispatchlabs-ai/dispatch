@@ -7,7 +7,8 @@ native tasks, and workflow documents in one read-only workspace.
 Start on **This machine** to discover local Pi SQLite stores open by your user's
 processes. Unfinished conversations appear first; click one to open its formatted
 conversation with expandable inline tool calls and results. Discovery requires
-macOS or Linux with `lsof`; other stores remain available through Add connection.
+macOS or Linux with `lsof`; other stores remain available through
+**Settings → Connections**.
 Process presence and saved task status are shown separately.
 
 **Implemented, October 22, 2026.** The macOS Apple Silicon build has been exercised
@@ -27,7 +28,7 @@ npm run sample -w @dispatch/observer
 npm run start -w @dispatch/observer
 ```
 
-Choose **Add connection → SQLite**, browse to
+Choose **Settings → Add connection → SQLite**, browse to
 `packages/observer/.local/sample.sqlite`, then **Save & connect**. The synthetic
 workspace has a coordinator, two children, a waiting workflow, a failed attempt,
 and a retained tool slot. No model provider or agent process is started. The

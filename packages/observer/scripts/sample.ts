@@ -316,7 +316,7 @@ try {
     readTask,
   );
   console.log(
-    `Created synthetic sample: ${target}\nOpen it with Add connection → SQLite. Saved running states are sample data, not live processes.`,
+    `Created synthetic sample: ${target}\nOpen it with Settings → Add connection → SQLite. Saved running states are sample data, not live processes.`,
   );
 } finally {
   await storage.close(context);
