@@ -99,6 +99,17 @@ already explain them; contextual help may replace that column on narrower views.
 
 ## Information architecture
 
+**Generic journeys, October 28, 2026:** one searchable, collapsible tree handles
+native ownership, every retained labelled handoff and optional versioned
+[`observer.workflow` documents](docs/workflow-records.md). Containment is distinct
+from relationship edges. Rounds, branches, attempts, scopes, turns and passes are
+producer labels, not fixed screen types. Shared conversations may provide evidence
+for multiple nodes/cycles; exact-entry references preserve their distinct scopes.
+Do not infer missing stages, dependencies or results. Retain per-workflow selection,
+search and expansion, with a return path from linked workflows. This source exposes
+explicit remote/Postgres source records without remote discovery. Document state is
+the latest observation, separate from frozen conversation playback.
+
 Use four stable areas rather than a collection of dashboards:
 
 1. **Navigation rail:** This machine, conversations in the current source, and
@@ -197,10 +208,10 @@ source/store/native identity internally; store-local integers are not global IDs
 - Markdown cannot execute HTML or load remote images. Image references and HTTP(S)
   links use the existing deliberate external-open confirmation; unsupported links
   remain text.
-- Workflow adapters may identify stages, deterministic tasks, retries, artifacts,
-  and current/final phase from known domain documents. The generic view must remain
-  useful without an adapter. Never interpret arbitrary JSON fields as universal
-  workflow semantics.
+- Versioned producer documents may identify stages, deterministic tasks, retries,
+  artifacts and current/final phase through the generic workflow contract.
+  Native ownership and handoffs remain useful without those documents. Never
+  interpret arbitrary JSON fields as universal workflow semantics.
 - Show attempts separately when records establish them. A failure in one child
   does not determine the final workflow outcome. File links indicate whether bytes
   can actually be retrieved, not merely whether a path was recorded.

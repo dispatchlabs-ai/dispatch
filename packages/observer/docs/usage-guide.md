@@ -21,11 +21,17 @@ currently generating. Unfinished tasks may be waiting or sleeping. **Unfinished
 only** explicitly filters out history. Search finds workflows and conversation
 titles; source setup and paths stay in Settings.
 
-Choose a workflow to see its assignments, newest recorded activity first. Select
-an assignment to open its conversation; the workflow's other conversations remain
-in the rail. **Back to workflow** and the workflow breadcrumb return to the
-overview. **Sent by** opens an available sender conversation, including one in
-another local agent store. Same-source Back/Forward history remains separate.
+Choose a workflow to explore its searchable, collapsible journey. Select an activity
+to open its conversation or exact saved evidence; groups and relationship links
+preserve context. **Back to workflow** returns to its overview. **Sent by** opens an
+available sender, including one in another local agent store. Same-source
+Back/Forward history remains separate. **This source** catalogs the selected explicit
+source too, including remote SQLite and Postgres without remote discovery.
+
+Native ownership requires no extra instrumentation. Optional producer-written
+[`observer.workflow` documents](workflow-records.md) describe richer nesting,
+rounds, branches, attempts, scopes and linked workflows through one versioned
+contract. Unknown/missing evidence remains explicit; the app executes none of it.
 
 Workflow groups come from recognized Runner instance-message envelopes whose
 leading lines explicitly declare `workflow:` and `cycle:`. `assignment:` and
@@ -65,9 +71,11 @@ are not a current requirement; earlier small-layout checks below are historical.
 ## Find the latest recorded workflow
 
 This machine shows saved workflows by default, with consistent names and last
-recorded activity dates. Workflows sort by their latest assignment activity, so
-a shared sender cannot make an old cycle appear new. Assignments sort newest first;
-unknown timestamps are explicit. The **All saved work / Unfinished only** toggle
+recorded activity dates. Handoff workflows sort by their latest assignment activity;
+shared senders and multi-cycle conversations cannot make an old cycle appear new.
+Document views use explicit node timestamps. Journey siblings follow producer order,
+then timestamp, then stable identity, without implying dependencies.
+The **All saved work / Unfinished only** toggle
 changes the filter, not the task state. Recency is limited to loaded sources.
 
 Opening a validated Runner source also checks immediate sibling agent directories
@@ -77,8 +85,9 @@ crawl: sibling symlinks and paths embedded in messages are not followed. Unreada
 or mismatched stores produce source notices. Sources outside those installations
 still require an explicit connection through Settings.
 
-Open a workflow to see its known sender → assignment links, latest response excerpts,
-activity dates and unfinished counts. Missing senders have a Settings recovery action.
+Open a workflow to see its known structure, activity dates and evidence notices.
+Select an activity and expand **Relationships & evidence** for sender/dependency links
+and native records. Missing sources have a Settings recovery action.
 **Execution unknown** is deliberate: open files and pending tasks do not prove model
 execution. A reported **Changes requested**, **Approved** or other explicit opening
 verdict belongs to that assistant response, not the whole workflow's outcome.
@@ -238,6 +247,24 @@ going back replaces the forward path. Switching connections clears history;
 reconnecting the current connection preserves it.
 
 ## Compatibility and qualification
+
+Generic journey qualification (October 28, 2026, OBS-005, OBS-007–010, OBS-012,
+OBS-013, OBS-015, OBS-016, OBS-018–020): an isolated packaged macOS ARM64 preview
+read the synthetic sample. Nested groups, ancestor-preserving search, keyboard
+collapse/expand, dependency navigation, linked-workflow return, native delegation
+and repeated-handoff cycles were exercised. Exact entries, task/document references,
+same-conversation scope revisions and Back navigation retained their native
+identities. Exact evidence and reopening the connected source preserved frozen
+playback. Missing entries, circular containment, dangling relationships and an
+unsupported document version remained explicit.
+
+Whole-window layouts were reviewed at 1440×900 and 1280×720 in light/dark themes.
+The sample's SHA-256 checksum was unchanged after observation; the existing app
+and its preferences were untouched. Workspace type/build checks in Nix and macOS
+packaging passed. No automated tests were added or run. New remote/Postgres reader
+paths received source/type/build review, not runtime requalification in this pass.
+Windows/Linux, cross-source document references and live producer-document updates
+remain unqualified by this walkthrough. Captures remain private.
 
 Workflow-reading refinement qualification (October 28, 2026, OBS-007, OBS-008,
 OBS-010, OBS-012, OBS-013, OBS-015, OBS-018–020): an isolated packaged macOS ARM64

@@ -3,7 +3,10 @@ import { readRecords } from "./records";
 import type { RawReadRequest } from "../shared/contracts";
 
 export async function readSqlite(path: string, request: RawReadRequest) {
-  const db = new DatabaseSync(path, { readOnly: true, allowExtension: false });
+  const db = new DatabaseSync(path, {
+    readOnly: true,
+    allowExtension: false,
+  });
   try {
     db.exec("PRAGMA query_only=ON; PRAGMA busy_timeout=3000; BEGIN");
     const table = db
@@ -22,6 +25,7 @@ export async function readSqlite(path: string, request: RawReadRequest) {
       {
         table: (name) => name,
         scope: "1=1",
+        instanceMessage: `json_extract(record, '$.kind') LIKE '%.instance-message'`,
         assistantText: `EXISTS (SELECT 1 FROM json_each(e.record, '$.model') m
           WHERE json_extract(m.value, '$.role')='assistant' AND (
             (json_type(m.value, '$.content')='text' AND length(trim(json_extract(m.value, '$.content')))>0)

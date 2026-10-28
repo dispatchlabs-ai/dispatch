@@ -18,6 +18,7 @@ export function ConversationContext({
   onRead,
   onSender,
   inWorkflow,
+  compact = false,
 }: {
   conversation: Conversation;
   conversations: Conversation[];
@@ -25,6 +26,7 @@ export function ConversationContext({
   onRead(): void;
   onSender?: () => void;
   inWorkflow: boolean;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const { opening, agent, channel, owner, parent } = conversation;
@@ -49,7 +51,7 @@ export function ConversationContext({
       ? "Opening reply"
       : "Original handoff"
     : "Opening request";
-  return (
+  const content = (
     <section className="conversation-context" aria-label="Assignment context">
       <header>
         <h2>{labels?.assignment ? "Assignment" : "Conversation context"}</h2>
@@ -130,7 +132,7 @@ export function ConversationContext({
       ) : (
         <p className="context-note">
           {inWorkflow
-            ? "Workflow linked through saved handoffs."
+            ? "Workflow context is shown in the journey."
             : sender?.kind === "reply"
               ? "This opening message is a reply, not a new assignment."
               : "Workflow not identified in the opening message."}
@@ -207,5 +209,13 @@ export function ConversationContext({
         </UI.Dialog>
       )}
     </section>
+  );
+  return compact ? (
+    <details className="workflow-conversation-context">
+      <summary>Conversation opening & native ownership</summary>
+      {content}
+    </details>
+  ) : (
+    content
   );
 }

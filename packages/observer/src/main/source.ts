@@ -140,6 +140,7 @@ export class Source {
         {
           table: (name) => `dispatch_pi.${name}`,
           scope: "store_id=$1",
+          instanceMessage: `record::jsonb->>'kind' LIKE '%.instance-message'`,
           assistantText: `EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(e.record::jsonb->'model','[]'::jsonb)) m
             WHERE m->>'role'='assistant' AND (
               (jsonb_typeof(m->'content')='string' AND length(trim(m->>'content'))>0)
@@ -164,6 +165,7 @@ export class Source {
   async read(request: ReadRequest) {
     const cached =
       !request.before &&
+      request.entryId === undefined &&
       this.cached?.conversationId === request.conversationId &&
       this.cached?.limit === request.limit
         ? this.cached
@@ -179,7 +181,7 @@ export class Source {
             ...project(raw, this.connection),
             conversationId: request.conversationId,
           };
-    if (!request.before)
+    if (!request.before && request.entryId === undefined)
       this.cached = {
         conversationId: request.conversationId,
         limit: request.limit,

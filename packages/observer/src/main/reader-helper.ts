@@ -12,7 +12,7 @@ const config = JSON.parse(
 ) as { path: string; mode: "stdio" | "http"; directory?: string };
 const request = (value: unknown): RawReadRequest => {
   const input = value as Record<string, unknown>;
-  for (const key of ["conversationId"])
+  for (const key of ["conversationId", "entryId"])
     if (
       input?.[key] !== undefined &&
       (!Number.isSafeInteger(input[key]) || Number(input[key]) <= 0)
@@ -40,6 +40,7 @@ const request = (value: unknown): RawReadRequest => {
     throw new Error("Invalid commit sequence");
   return {
     conversationId: input.conversationId as number | undefined,
+    entryId: input.entryId as number | undefined,
     before,
     limit: input.limit as number,
     since: input.since as number | undefined,

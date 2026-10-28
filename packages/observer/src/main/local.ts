@@ -125,14 +125,10 @@ export async function localWork(saved: Connection[]): Promise<LocalWork> {
       },
     };
     try {
-      let snapshot = project(await readSqlite(path, { limit: 1 }), connection);
-      // Session documents can supply the integration's human-authored chat titles.
-      const first = snapshot.conversations[0];
-      if (first)
-        snapshot = project(
-          await readSqlite(path, { conversationId: first.id, limit: 1 }),
-          connection,
-        );
+      const snapshot = project(
+        await readSqlite(path, { limit: 1 }),
+        connection,
+      );
       const runner =
         basename(path) === "session.sqlite" &&
         snapshot.conversations.some(
@@ -158,7 +154,9 @@ export async function localWork(saved: Connection[]): Promise<LocalWork> {
         if (!scanned.has(root)) {
           scanned.add(root);
           try {
-            for (const child of await readdir(root, { withFileTypes: true })) {
+            for (const child of await readdir(root, {
+              withFileTypes: true,
+            })) {
               if (!child.isDirectory() || child.isSymbolicLink()) continue;
               const sibling = join(root, child.name, "session.sqlite");
               try {
@@ -194,6 +192,10 @@ export async function localWork(saved: Connection[]): Promise<LocalWork> {
         scope: runner ? await realpath(dirname(dirname(path))) : path,
         pids: [...owners],
         conversations: snapshot.conversations,
+        handoffs: snapshot.handoffs,
+        documents: snapshot.documents.filter(
+          (doc) => doc.kind === "observer.workflow",
+        ),
       });
     } catch (error) {
       issues.push(

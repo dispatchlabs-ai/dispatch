@@ -88,10 +88,10 @@ export function project(raw: RawSnapshot, source: Connection): Snapshot {
           call = calls.get(key);
         const truncated = Boolean(
           message.details?.truncated ||
-            message.details?.truncation ||
-            entry.data?.diagnostics?.some((item: RecordData) =>
-              /truncat|omitted|dropped/i.test(`${item.code} ${item.message}`),
-            ),
+          message.details?.truncation ||
+          entry.data?.diagnostics?.some((item: RecordData) =>
+            /truncat|omitted|dropped/i.test(`${item.code} ${item.message}`),
+          ),
         );
         const result = {
           ...message,
@@ -330,6 +330,29 @@ export function project(raw: RawSnapshot, source: Connection): Snapshot {
               }
             : undefined,
       };
+    }),
+    handoffs: (safe.handoffs ?? []).flatMap((entry) => {
+      const sender = instanceMessage(entry);
+      if (
+        !sender ||
+        sender.kind !== "message" ||
+        typeof entry.data?.text !== "string"
+      )
+        return [];
+      const message = entry.model?.find(
+        (item: RecordData) => item.role === "user",
+      );
+      if (!message) return [];
+      return [
+        {
+          conversationId: entry.conversationId,
+          entryId: entry.id,
+          text: entry.data.text,
+          at: timestamp(message.timestamp),
+          sender,
+          labels: handoffLabels(entry.data.text),
+        },
+      ];
     }),
     activities,
     hasEarlier: safe.hasEarlier,

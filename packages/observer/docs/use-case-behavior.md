@@ -110,3 +110,20 @@ connection lifecycle, visual tokens, and the implementation’s qualification re
 These contracts do not claim a universal workflow-run engine, confirmed model
 execution, complete installation coverage or a verified workflow outcome. See the
 usage guide for the revision and interactive evidence actually checked.
+
+## Generic workflow journeys — October 28, 2026
+
+- **OBS-007/009/016/018:** one journey displays native families, retained labelled
+  handoffs and optional [versioned producer documents](workflow-records.md).
+  Arbitrary nested groups, activity kinds, dependency links and linked workflows
+  do not require per-orchestrator screens or code. This source uses the same model
+  for explicitly connected remote SQLite/Postgres; no remote discovery is implied.
+- **OBS-010/012/013:** exact evidence resolves by source and native identity.
+  Missing/ambiguous references remain visible. A full conversation is not a scoped
+  segment; entry inspection and latest document structure do not advance playback.
+- **OBS-013/019/020:** shared conversations cannot make older cycles look newer.
+  Document recency uses explicit activity timestamps. Producer-reported outcomes
+  remain separate from execution evidence and child-attempt results.
+- **OBS-015:** preserve each workflow's search, selection and expansion during
+  the app session, navigate linked workflows and return, and support keyboard
+  expansion and native button selection.

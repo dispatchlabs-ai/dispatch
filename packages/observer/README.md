@@ -15,6 +15,12 @@ Process presence and saved task status are shown separately.
 Workflow grouping reads existing records; it does not require a SQLite migration
 or establish a workflow's final outcome.
 
+One searchable, collapsible journey presents native delegation, retained handoffs
+and optional producer-written [workflow records](docs/workflow-records.md).
+Nested rounds, parallel branches, retries, cases, scopes and linked workflows use
+the same reader. Select an activity to open its conversation or exact saved evidence.
+**This source** also exposes the selected explicit remote/Postgres source.
+
 **Implemented, October 22, 2026.** The macOS Apple Silicon build has been exercised
 with local SQLite, direct/TLS Postgres, Postgres over SSH, and remote SQLite over
 SSH and AWS SSM. Windows/Linux desktop execution and Postgres over SSM remain
@@ -35,7 +41,8 @@ npm run start -w @dispatch/observer
 Choose **Settings → Add connection → SQLite**, browse to
 `packages/observer/.local/sample.sqlite`, then **Save & connect**. The synthetic
 workspace has a coordinator, two children, a waiting workflow, a failed attempt,
-and a retained tool slot. No model provider or agent process is started. The
+and a retained tool slot, plus a generic workflow walkthrough with nested groups,
+linked remediation, repeated handoffs and incomplete evidence. No model provider or agent process is started. The
 sample command refuses to replace an existing file; pass a different destination
 with `npm run sample -w @dispatch/observer -- /path/to/new-sample.sqlite`.
 
@@ -69,6 +76,7 @@ policy and its required Nix checks for dependency or packaging changes.
   playback, security boundaries, and dated acceptance evidence.
 - [Use cases](USE_CASES.md): stable `OBS-` goals and implementation coverage.
 - [Design guide](DESIGN_GUIDE.md): interaction rules, appearance, and record fidelity.
+- [Workflow records](docs/workflow-records.md): optional producer contract and generic journey.
 - [Design references](docs/design/README.md): original ImageGen concepts and provenance.
 - [Changelog](CHANGELOG.md): package availability and changes.
 

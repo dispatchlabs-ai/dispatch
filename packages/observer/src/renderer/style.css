@@ -1998,3 +1998,37 @@ pre {
 .assignment-state { width: 130px; }
 .content-heading { padding-top: 14px; padding-bottom: 14px; }
 .content-heading h1 { font-size: 22px; }
+
+/* One journey renderer for native ownership, handoffs and producer documents. */
+.journey-navigation { min-height: 0; flex: 1; overflow: auto; padding: 8px 0; }
+.journey-navigation .search-field { margin: 4px 0 10px; }
+.journey-caption { color: var(--subtle); font-size: 11px; line-height: 1.6; }
+.journey-tree, .journey-tree ul { list-style: none; margin: 8px 0; padding: 0; }
+.journey-tree ul { margin-left: 13px; padding-left: 12px; border-left: 1px solid var(--border); }
+.journey-row { display: flex; align-items: flex-start; border: 1px solid transparent; border-radius: 7px; margin: 4px 0; min-width: 0; }
+.journey-row.selected { border-color: var(--primary); background: var(--secondary); }
+.journey-row > button:first-child { flex-shrink: 0; margin-top: 11px; }
+.journey-row .journey-select { height: auto; white-space: normal; text-align: left; justify-content: flex-start; min-width: 0; flex: 1; padding: 10px 6px; margin-top: 0; }
+.journey-select span { min-width: 0; }
+.journey-select strong, .journey-select small { display: block; overflow-wrap: anywhere; }
+.journey-select small { color: var(--subtle); font-size: 11px; font-weight: 400; margin-top: 4px; }
+.journey-dot { width: 7px; height: 7px; border: 1px solid var(--subtle); border-radius: 50%; flex-shrink: 0; margin: 16px 8px; }
+.journey-row.selected .journey-dot { background: var(--primary); border-color: var(--primary); }
+.journey-context { padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--rail); flex-shrink: 0; max-height: 34vh; overflow: auto; }
+.workflow-view .journey-context { max-height: none; border: 1px solid var(--border); border-radius: 8px; margin-top: 20px; }
+.journey-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.journey-breadcrumb span { display: inline-flex; align-items: center; }
+.journey-context > p { color: var(--subtle); font-size: 12px; margin-top: 6px; }
+.journey-context .journey-summary { color: var(--foreground); white-space: pre-wrap; overflow-wrap: anywhere; }
+.journey-attributes { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 10px 0; }
+.journey-attributes div { display: flex; gap: 6px; min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
+.journey-attributes dt { color: var(--subtle); }
+.journey-attributes dd { margin: 0; }
+.journey-references { margin-top: 8px; font-size: 12px; }
+.journey-references summary { cursor: pointer; color: var(--primary); }
+.journey-reference { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; color: var(--subtle); }
+.journey-reference button { white-space: normal; height: auto; text-align: left; }
+.journey-scope { display: block; }
+.workflow-conversation-context { margin-bottom: 16px; }
+.workflow-conversation-context > summary { cursor: pointer; color: var(--subtle); font-size: 12px; padding: 8px 0; }
+.workflow-conversation-context > .conversation-context { margin-top: 8px; }

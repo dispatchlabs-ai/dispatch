@@ -70,16 +70,30 @@ export const draftSchema = z.object({
   password: z.string().max(8192).optional(),
   rememberSecret: z.boolean(),
 });
-export const readRequestSchema = z.object({
-  conversationId: z.number().int().positive().optional(),
-  before: z
-    .object({
-      sequence: z.number().int().nonnegative(),
-      entryId: z.number().int().positive(),
-    })
-    .optional(),
-  limit: z.number().int().min(1).max(2000).default(500),
-});
+export const readRequestSchema = z
+  .object({
+    conversationId: z.number().int().positive().safe().optional(),
+    before: z
+      .object({
+        sequence: z.number().int().nonnegative(),
+        entryId: z.number().int().positive(),
+      })
+      .optional(),
+    entryId: z.number().int().positive().safe().optional(),
+    limit: z.number().int().min(1).max(2000).default(500),
+  })
+  .superRefine((value, context) => {
+    if (
+      value.entryId !== undefined &&
+      (value.conversationId === undefined || value.before)
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["entryId"],
+        message:
+          "Exact-entry reads require a conversation and cannot use pagination.",
+      });
+  });
 export type ReadRequest = z.infer<typeof readRequestSchema>;
 export type RawReadRequest = ReadRequest & { since?: number };
 export type RecordData = Record<string, any>;
@@ -108,6 +122,7 @@ export type RawSnapshot = {
   }[];
   hasEarlier: boolean;
   unchanged?: boolean;
+  handoffs?: RecordData[];
 };
 export type Conversation = {
   id: number;
@@ -143,6 +158,14 @@ export type InstanceMessage = {
   to: string;
   kind: "message" | "reply";
   replyRequested: boolean;
+};
+export type Handoff = {
+  conversationId: number;
+  entryId: number;
+  text: string;
+  at?: number;
+  sender: InstanceMessage;
+  labels?: HandoffLabels;
 };
 export type Activity = {
   id: string;
@@ -210,6 +233,7 @@ export type Snapshot = {
   sourceId: string;
   conversationId?: number;
   storeId?: string;
+  handoffs: Handoff[];
 };
 export type Preferences = {
   connections: SavedConnection[];
@@ -226,6 +250,8 @@ export type LocalWork = {
     scope: string;
     pids: number[];
     conversations: Conversation[];
+    documents: Document[];
+    handoffs: Handoff[];
   }[];
   issues: string[];
 };

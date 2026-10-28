@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Generic workflow journeys
+
+- Use one searchable, collapsible journey for native delegation, retained handoffs
+  and optional versioned `observer.workflow` documents. Represent arbitrary groups,
+  attempts, branches, scope revisions and relationships without screen adapters.
+- Open exact saved entries, native tasks/documents and linked workflows without
+  changing conversation playback. Keep missing or ambiguous evidence explicit.
+- Include repeated handoffs in reused conversations without assigning shared
+  activity to older cycles; expose journeys for the selected explicit source too.
+- Extend the synthetic walkthrough with nested structure, recovery, scope changes,
+  linked remediation and incomplete evidence.
+
 ### Workflow reading and evidence
 
 - Show saved workflows by default with consistent names and recorded-activity ordering.

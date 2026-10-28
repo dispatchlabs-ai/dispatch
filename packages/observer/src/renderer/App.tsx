@@ -33,13 +33,21 @@ import { recordedTime, reportedResult } from "../shared/workSummary";
 import { Transcript } from "./Transcript";
 import { LocalWork } from "./LocalWork";
 import { WorkflowView } from "./WorkflowView";
+import {
+  WorkflowJourney,
+  WorkflowNodeContext,
+  emptyJourney,
+  type JourneyView,
+} from "./WorkflowJourney";
 import { useLocalWork } from "./useLocalWork";
 import {
   memberKey,
+  sourceKey,
   readableName,
   workflowRuns,
   workflowSender,
   type WorkflowMember,
+  type WorkflowNode,
   type WorkflowRun,
 } from "../shared/workflows";
 import { reconcileActivities } from "../shared/activities";
@@ -47,6 +55,7 @@ import { Badge, Details, time, type Selection } from "./Details";
 import type {
   Activity,
   Connection,
+  LocalWork as WorkCatalog,
   Preferences,
   SavedConnection,
   Snapshot,
@@ -103,18 +112,26 @@ type ConversationView = {
   selection?: Selection;
   activityQuery: string;
   category: string;
+  workflowId?: string;
+  workflowNode?: string;
 };
 
 export function App() {
-  const [home, setHome] = useState(true);
+  const [home, setHome] = useState<"local" | "source" | false>("local");
   const [workflowOverview, setWorkflowOverview] = useState(false);
   const [workflowId, setWorkflowId] = useState<string>();
-  const local = useLocalWork(home || workflowOverview);
-  const runs = useMemo(
-    () => workflowRuns(local.data?.stores ?? []),
-    [local.data],
-  );
+  const local = useLocalWork(true);
+  const [journeys, setJourneys] = useState<Record<string, JourneyView>>({});
+  const [workflowTrail, setWorkflowTrail] = useState<string[]>([]);
+  const [evidenceRequest, setEvidenceRequest] =
+    useState<WorkflowNode["evidence"][number]>();
+  const [evidenceView, setEvidenceView] = useState<{
+    title: string;
+    snapshot?: Snapshot;
+    error?: string;
+  }>();
   const [railWidth, setRailWidth] = useState(230);
+  const [journeyWidth, setJourneyWidth] = useState(320);
   const [detailWidth, setDetailWidth] = useState(344);
   const [preferences, setPreferences] = useState<Preferences>();
   const [connectionId, setConnectionId] = useState<string>();
@@ -123,6 +140,7 @@ export function App() {
   >("idle");
   const [error, setError] = useState("");
   const [snapshot, setSnapshot] = useState<Snapshot>();
+  const [sourceCatalog, setSourceCatalog] = useState<Snapshot>();
   const current = useRef<Snapshot | undefined>(undefined);
   const [conversationId, setConversationId] = useState<number>();
   const [history, setHistory] = useState<{
@@ -155,6 +173,51 @@ export function App() {
   const connection = preferences?.connections.find(
     (item) => item.id === connectionId,
   );
+  const stores = useMemo(() => {
+    const loaded = local.data?.stores ?? [];
+    if (
+      !connection ||
+      sourceCatalog?.sourceId !== connection.id ||
+      loaded.some(
+        (store) => sourceKey(store.connection) === sourceKey(connection),
+      )
+    )
+      return loaded;
+    return [
+      ...loaded,
+      {
+        connection,
+        scope: sourceKey(connection),
+        pids: [],
+        conversations: sourceCatalog.conversations,
+        documents: sourceCatalog.documents,
+        handoffs: sourceCatalog.handoffs,
+      },
+    ];
+  }, [local.data, connection, sourceCatalog]);
+  const runs = useMemo(() => workflowRuns(stores), [stores]);
+  const sourceData: WorkCatalog | undefined =
+    sourceCatalog && connection
+      ? {
+          observedAt: sourceCatalog.observedAt,
+          issues: [],
+          stores: stores.filter(
+            (store) => sourceKey(store.connection) === sourceKey(connection),
+          ),
+        }
+      : undefined;
+  const catalogData = home === "source" ? sourceData : local.data;
+  const catalogSources = new Set(
+    catalogData?.stores.map((store) => sourceKey(store.connection)),
+  );
+  const catalogRuns = runs.filter(
+    (run) =>
+      (run.document &&
+        catalogSources.has(sourceKey(run.document.connection))) ||
+      run.members.some((member) =>
+        catalogSources.has(sourceKey(member.connection)),
+      ),
+  );
   const viewed = following ? snapshot : frozen;
   const events = viewed?.activities ?? [];
   const at = following
@@ -165,8 +228,7 @@ export function App() {
   );
   const containingRuns = runs.filter(
     (run) =>
-      connection?.kind === "sqlite" &&
-      connection.transport.kind === "direct" &&
+      connection &&
       run.members.some(
         (m) =>
           memberKey(m.connection, m.conversation.id) ===
@@ -176,13 +238,34 @@ export function App() {
   const currentWorkflow = workflowOverview
     ? runs.find((run) => run.id === workflowId)
     : (containingRuns.find((run) => run.id === workflowId) ??
-      (containingRuns.length === 1 ? containingRuns[0] : undefined));
+      (!workflowId && containingRuns.length === 1
+        ? containingRuns[0]
+        : undefined));
   const currentMember = currentWorkflow?.members.find(
     (m) =>
       connection &&
       memberKey(m.connection, m.conversation.id) ===
         memberKey(connection, conversationId ?? 0),
   );
+  const journey = currentWorkflow
+    ? (journeys[currentWorkflow.id] ?? emptyJourney)
+    : emptyJourney;
+  const currentNode = currentWorkflow?.nodes.find(
+    (n) =>
+      n.id === journey.selected &&
+      (workflowOverview ||
+        n.evidence.some(
+          (e) =>
+            e.member &&
+            connection &&
+            memberKey(e.member.connection, e.conversationId) ===
+              memberKey(connection, conversationId ?? 0),
+        )),
+  );
+  const changeJourney = (view: JourneyView) => {
+    if (currentWorkflow)
+      setJourneys((all) => ({ ...all, [currentWorkflow.id]: view }));
+  };
   const handoffSender =
     currentWorkflow && currentMember
       ? workflowSender(currentWorkflow, currentMember)
@@ -221,6 +304,7 @@ export function App() {
       setConnectionId(id);
       setSidebar(false);
       if (!preserve) {
+        setSourceCatalog(undefined);
         setTab("conversation");
         setHistory({ back: [], forward: [] });
         current.current = undefined;
@@ -238,6 +322,7 @@ export function App() {
         const catalog = await window.observer.read({ limit: 500 });
         if (turn !== generation.current || !mounted.current) return;
         setStatus("connected");
+        setSourceCatalog(catalog);
         if (!preserve) {
           current.current = catalog;
           setSnapshot(catalog);
@@ -286,13 +371,23 @@ export function App() {
     return () => media.removeEventListener("change", update);
   }, [preferences?.theme, preferences?.platform]);
   useEffect(() => {
-    if (home || workflowOverview || status !== "connected" || !connectionId)
-      return;
+    if (home === "local" || status !== "connected" || !connectionId) return;
+    const catalogueOnly = Boolean(home || workflowOverview);
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const refresh = async () => {
       try {
-        let next = await window.observer.read({ conversationId, limit: 500 });
+        let next = await window.observer.read({
+          conversationId: catalogueOnly ? undefined : conversationId,
+          limit: 500,
+        });
+        if (cancelled) return;
+        setSourceCatalog(next);
+        if (catalogueOnly) {
+          setError("");
+          timer = setTimeout(() => void refresh(), 1800);
+          return;
+        }
         const previous = current.current;
         // Catch up through retained pages if many commits arrived between polls.
         const lastEntry = previous?.activities.at(-1);
@@ -382,8 +477,22 @@ export function App() {
           selection,
           activityQuery,
           category,
+          workflowId,
+          workflowNode: journey.selected,
         };
   const openConversation = (id: number, view?: ConversationView) => {
+    setEvidenceView(undefined);
+    if (view) {
+      setWorkflowId(view.workflowId);
+      if (view.workflowId)
+        setJourneys((all) => ({
+          ...all,
+          [view.workflowId!]: {
+            ...(all[view.workflowId!] ?? emptyJourney),
+            selected: view.workflowNode,
+          },
+        }));
+    }
     ++generation.current;
     restoringView.current = Boolean(view);
     current.current =
@@ -391,7 +500,7 @@ export function App() {
       (snapshot
         ? {
             ...snapshot,
-            conversationId: id,
+            conversationId: undefined,
             activities: [],
             tasks: [],
             documents: [],
@@ -415,6 +524,8 @@ export function App() {
     setSidebar(false);
   };
   const chooseConversation = (id: number) => {
+    setEvidenceRequest(undefined);
+    setEvidenceView(undefined);
     setHome(false);
     setWorkflowOverview(false);
     if (id === conversationId) return;
@@ -429,6 +540,9 @@ export function App() {
     const destination = history[direction].at(-1);
     const previous = captureView();
     if (!destination || !previous || status === "connecting") return;
+    setEvidenceRequest(undefined);
+    setHome(false);
+    setWorkflowOverview(false);
     setHistory({
       back:
         direction === "back"
@@ -541,7 +655,8 @@ export function App() {
       setFollowTail(false);
       setPlaying(false);
       setError("");
-      setHome(true);
+      setSourceCatalog(undefined);
+      setHome("local");
       setWorkflowOverview(false);
     }
     await refreshPreferences();
@@ -561,20 +676,23 @@ export function App() {
     setDialog(undefined);
   };
   const openSaved = (id: string) => {
+    setEvidenceRequest(undefined);
+    setEvidenceView(undefined);
     if (id === connectionId && status === "connected") {
       setHome(false);
       setWorkflowOverview(false);
       closeSettings();
     } else {
+      if (id !== connectionId) {
+        setWorkflowId(undefined);
+        setWorkflowTrail([]);
+      }
       void connect(id, id === connectionId);
     }
   };
   const openLocal = async (candidate: Connection, id?: number) => {
     const existing = preferences?.connections.find(
-      (item) =>
-        item.kind === "sqlite" &&
-        item.transport.kind === "direct" &&
-        item.path === candidate.path,
+      (item) => sourceKey(item) === sourceKey(candidate),
     );
     const saved =
       existing ??
@@ -586,6 +704,8 @@ export function App() {
     await connect(saved.id, false, id);
   };
   const openWorkflow = (run: WorkflowRun) => {
+    setEvidenceRequest(undefined);
+    setEvidenceView(undefined);
     setWorkflowId(run.id);
     setWorkflowOverview(true);
     setHome(false);
@@ -595,9 +715,8 @@ export function App() {
   const openMember = (member: WorkflowMember) => {
     if (currentWorkflow) setWorkflowId(currentWorkflow.id);
     if (
-      connection?.kind === "sqlite" &&
-      connection.transport.kind === "direct" &&
-      connection.path === member.connection.path &&
+      connection &&
+      sourceKey(connection) === sourceKey(member.connection) &&
       status === "connected"
     ) {
       chooseConversation(member.conversation.id);
@@ -607,6 +726,158 @@ export function App() {
       );
     }
   };
+  const openLinkedWorkflow = (id: string) => {
+    const linked = runs.find((run) => run.id === id);
+    if (linked) {
+      if (currentWorkflow)
+        setWorkflowTrail((trail) => [...trail, currentWorkflow.id]);
+      openWorkflow(linked);
+    }
+  };
+  const openWorkflowEvidence = (evidence: WorkflowNode["evidence"][number]) => {
+    if (!evidence.member) return;
+    setEvidenceView(undefined);
+    setPlaying(false);
+    setFollowTail(false);
+    openMember(evidence.member);
+    setEvidenceRequest(evidence);
+  };
+  const selectWorkflowNode = (node: WorkflowNode) => {
+    const evidence = node.evidence.find((item) => item.member);
+    if (
+      node.id !== journey.selected &&
+      evidence?.member &&
+      connection &&
+      memberKey(connection, conversationId ?? 0) ===
+        memberKey(evidence.member.connection, evidence.conversationId)
+    ) {
+      const previous = captureView();
+      if (previous)
+        setHistory((value) => ({
+          back: [...value.back, previous],
+          forward: [],
+        }));
+    }
+    changeJourney({ ...journey, selected: node.id });
+    if (node.type === "activity" && evidence) openWorkflowEvidence(evidence);
+    else {
+      setEvidenceRequest(undefined);
+      setEvidenceView(undefined);
+      setWorkflowOverview(true);
+      setPlaying(false);
+      setSelection(undefined);
+    }
+  };
+  useEffect(() => {
+    if (
+      home ||
+      workflowOverview ||
+      evidenceRequest?.entryId === undefined ||
+      !evidenceRequest.member ||
+      status !== "connected" ||
+      !connection ||
+      memberKey(connection, conversationId ?? 0) !==
+        memberKey(
+          evidenceRequest.member.connection,
+          evidenceRequest.conversationId,
+        )
+    )
+      return;
+    const ref = evidenceRequest;
+    let cancelled = false;
+    const title = ref.label ?? `Saved entry ${ref.entryId}`;
+    setEvidenceView({ title });
+    void window.observer
+      .read({
+        conversationId: ref.conversationId,
+        entryId: ref.entryId,
+        limit: 1,
+      })
+      .then((value) => {
+        if (!cancelled) setEvidenceView({ title, snapshot: value });
+      })
+      .catch((error) => {
+        if (!cancelled) setEvidenceView({ title, error: errorMessage(error) });
+      })
+      .finally(() => {
+        if (!cancelled) setEvidenceRequest(undefined);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    evidenceRequest,
+    status,
+    connection,
+    conversationId,
+    home,
+    workflowOverview,
+  ]);
+  useEffect(() => {
+    if (
+      home ||
+      workflowOverview ||
+      !evidenceRequest?.member ||
+      evidenceRequest.entryId !== undefined ||
+      status !== "connected" ||
+      !connection ||
+      memberKey(connection, conversationId ?? 0) !==
+        memberKey(
+          evidenceRequest.member.connection,
+          evidenceRequest.conversationId,
+        )
+    )
+      return;
+    const ref = evidenceRequest;
+    if (snapshot?.conversationId !== ref.conversationId) return;
+    if (ref.taskId !== undefined) {
+      const task = snapshot.tasks.find(
+        (t) => t.id === ref.taskId && t.conversationId === ref.conversationId,
+      );
+      if (task) setSelection({ kind: "task", value: task });
+      else
+        setEvidenceView({
+          title: "Task unavailable",
+          error: "This task is not retained in the referenced conversation.",
+        });
+    } else if (ref.documentId !== undefined) {
+      const doc = snapshot.documents.find((d) => {
+        const scope = d.scope as {
+          kind: string;
+          conversationId?: number;
+          taskId?: number;
+        };
+        return (
+          d.id === ref.documentId &&
+          (scope.kind === "session" ||
+            (scope.kind === "conversation" &&
+              scope.conversationId === ref.conversationId) ||
+            (scope.kind === "task" &&
+              snapshot.tasks.some(
+                (t) =>
+                  t.id === scope.taskId &&
+                  t.conversationId === ref.conversationId,
+              )))
+        );
+      });
+      if (doc) setSelection({ kind: "document", value: doc });
+      else
+        setEvidenceView({
+          title: "Document unavailable",
+          error:
+            "This document is not readable in the referenced conversation scope.",
+        });
+    }
+    setEvidenceRequest(undefined);
+  }, [
+    evidenceRequest,
+    status,
+    connection,
+    conversationId,
+    snapshot,
+    home,
+    workflowOverview,
+  ]);
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
       if (
@@ -715,7 +986,7 @@ export function App() {
       className="desktop-shell"
       style={
         {
-          "--rail-width": `${railWidth}px`,
+          "--rail-width": `${!home && currentWorkflow ? journeyWidth : railWidth}px`,
           "--detail-width": `${detailWidth}px`,
         } as React.CSSProperties
       }
@@ -746,10 +1017,13 @@ export function App() {
       >
         <aside className="sidebar" aria-label="Work navigation">
           <UI.Button
-            variant={home ? "secondary" : "ghost"}
+            variant={home === "local" ? "secondary" : "ghost"}
             className="machine-button"
             onClick={() => {
-              setHome(true);
+              setEvidenceRequest(undefined);
+              setEvidenceView(undefined);
+              setWorkflowTrail([]);
+              setHome("local");
               setWorkflowOverview(false);
               setPlaying(false);
               setSidebar(false);
@@ -758,6 +1032,23 @@ export function App() {
             <Workflow size={18} />
             This machine
           </UI.Button>
+          {connection && (
+            <UI.Button
+              variant={home === "source" ? "secondary" : "ghost"}
+              className="machine-button"
+              onClick={() => {
+                setEvidenceRequest(undefined);
+                setEvidenceView(undefined);
+                setWorkflowTrail([]);
+                setHome("source");
+                setWorkflowOverview(false);
+                setPlaying(false);
+              }}
+            >
+              <Database size={18} />
+              This source
+            </UI.Button>
+          )}
           {!home && currentWorkflow ? (
             <>
               <div className="rail-heading conversation-heading">
@@ -773,41 +1064,28 @@ export function App() {
                   {readableName(currentWorkflow.name)}
                 </span>
               </UI.Button>
-              <div className="rail-heading">
-                <h2>Conversations</h2>
-                <span>{currentWorkflow.members.length}</span>
-              </div>
-              <div className="conversation-list">
-                {currentWorkflow.members.map((member) => (
-                  <UI.Button
-                    key={memberKey(member.connection, member.conversation.id)}
-                    variant="ghost"
-                    className={`conversation-button ${!workflowOverview && connection?.path === member.connection.path && conversationId === member.conversation.id ? "selected" : ""}`}
-                    disabled={status === "connecting"}
-                    title={member.conversation.title}
-                    onClick={() => openMember(member)}
-                  >
-                    <Bot size={16} />
-                    <span>
-                      <strong className="agent-name">
-                        {readableName(member.conversation.agent ?? "Agent")}
-                      </strong>
-                      <small>
-                        {member.role === "sender"
-                          ? "Handoff sender"
-                          : member.conversation.opening?.labels?.assignment}
-                      </small>
-                      <small>{recordedTime(member.conversation.lastAt)}</small>
-                    </span>
-                    {member.conversation.active > 0 && (
-                      <span
-                        className="small-indicator"
-                        title="Unfinished saved tasks"
-                      />
-                    )}
-                  </UI.Button>
-                ))}
-              </div>
+              {workflowTrail.length > 0 && (
+                <UI.Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const previous = runs.find(
+                      (r) => r.id === workflowTrail.at(-1),
+                    );
+                    setWorkflowTrail((trail) => trail.slice(0, -1));
+                    if (previous) openWorkflow(previous);
+                  }}
+                >
+                  <ArrowLeft size={14} />
+                  Previous workflow
+                </UI.Button>
+              )}
+              <WorkflowJourney
+                run={currentWorkflow}
+                view={{ ...journey, selected: currentNode?.id }}
+                change={changeJourney}
+                select={selectWorkflowNode}
+              />
             </>
           ) : (
             !home &&
@@ -889,8 +1167,8 @@ export function App() {
           </div>
           <PaneResizer
             label="Resize navigation pane"
-            value={railWidth}
-            onChange={setRailWidth}
+            value={!home && currentWorkflow ? journeyWidth : railWidth}
+            onChange={!home && currentWorkflow ? setJourneyWidth : setRailWidth}
           />
         </aside>
         {sidebar && (
@@ -900,12 +1178,64 @@ export function App() {
             onClick={() => setSidebar(false)}
           />
         )}
+        {evidenceView && (
+          <UI.Dialog
+            open
+            title={evidenceView.title}
+            onOpenChange={(open) => {
+              if (!open) {
+                setEvidenceRequest(undefined);
+                setEvidenceView(undefined);
+              }
+            }}
+          >
+            <p className="hint">
+              Latest saved evidence · the conversation playback position is
+              unchanged.
+            </p>
+            {evidenceView.error ? (
+              <p role="alert" className="notice">
+                {evidenceView.error}
+              </p>
+            ) : evidenceView.snapshot ? (
+              <Transcript
+                events={evidenceView.snapshot.activities}
+                conversations={evidenceView.snapshot.conversations}
+                inspect={(item) => {
+                  setEvidenceRequest(undefined);
+                  setEvidenceView(undefined);
+                  setSelection({ kind: "activity", value: item });
+                }}
+                onRead={() => {}}
+              />
+            ) : (
+              <p>Reading saved entry…</p>
+            )}
+          </UI.Dialog>
+        )}
         <main className="main-panel">
           {home ? (
             <LocalWork
-              {...local}
-              runs={runs}
-              openWorkflow={openWorkflow}
+              data={catalogData}
+              error={home === "source" ? error : local.error}
+              loading={
+                home === "source" ? status === "connecting" : local.loading
+              }
+              refresh={
+                home === "source"
+                  ? () => {
+                      if (status === "connected")
+                        setPollRevision((value) => value + 1);
+                      else void connect(connection!.id, true);
+                    }
+                  : local.refresh
+              }
+              sourceName={home === "source" ? connection?.name : undefined}
+              runs={catalogRuns}
+              openWorkflow={(run) => {
+                setWorkflowTrail([]);
+                openWorkflow(run);
+              }}
               open={openLocal}
               settings={() => openSettings()}
             />
@@ -913,13 +1243,16 @@ export function App() {
             currentWorkflow ? (
               <WorkflowView
                 run={currentWorkflow}
-                open={openMember}
+                node={currentNode}
+                select={selectWorkflowNode}
+                openEvidence={openWorkflowEvidence}
+                openWorkflow={openLinkedWorkflow}
                 settings={openSettings}
                 back={() => {
-                  setHome(true);
+                  setHome("local");
                   setWorkflowOverview(false);
                 }}
-                error={local.error}
+                error={error || local.error}
               />
             ) : (
               <div className="empty-inline">
@@ -928,7 +1261,7 @@ export function App() {
                 </h2>
                 <UI.Button
                   onClick={() => {
-                    setHome(true);
+                    setHome("local");
                     setWorkflowOverview(false);
                   }}
                 >
@@ -1042,9 +1375,14 @@ export function App() {
                         setTab("conversation");
                         setPlaying(false);
                         setFollowTail(false);
-                        requestAnimationFrame(() =>
-                          transcriptPane.current?.scrollTo({ top: 0 }),
-                        );
+                        requestAnimationFrame(() => {
+                          const context =
+                            transcriptPane.current?.querySelector<HTMLDetailsElement>(
+                              ".workflow-conversation-context",
+                            );
+                          if (context) context.open = true;
+                          transcriptPane.current?.scrollTo({ top: 0 });
+                        });
                       }}
                     >
                       <FileText size={16} />
@@ -1148,6 +1486,21 @@ export function App() {
                   </div>
                 )}
               </header>
+              {currentWorkflow && currentNode && (
+                <WorkflowNodeContext
+                  run={currentWorkflow}
+                  node={currentNode}
+                  select={selectWorkflowNode}
+                  openEvidence={openWorkflowEvidence}
+                  openWorkflow={openLinkedWorkflow}
+                />
+              )}
+              {workflowId && !runs.some((run) => run.id === workflowId) && (
+                <p className="notice" role="status">
+                  Workflow context is unavailable in loaded sources. The
+                  conversation remains open.
+                </p>
+              )}
               {responseOpen && selectedConversation?.response && (
                 <UI.Dialog
                   open
@@ -1374,6 +1727,7 @@ export function App() {
                               : undefined
                           }
                           inWorkflow={Boolean(currentWorkflow)}
+                          compact={Boolean(currentNode)}
                         />
                       )}
                       {viewed?.hasEarlier && (
@@ -1646,6 +2000,9 @@ export function App() {
               preferences={preferences}
               onClose={() => setDialog(undefined)}
               onSaved={async (id) => {
+                setEvidenceRequest(undefined);
+                setEvidenceView(undefined);
+                setWorkflowId(undefined);
                 await refreshPreferences();
                 await connect(id);
               }}

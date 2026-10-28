@@ -23,6 +23,7 @@ export function LocalWork({
   openWorkflow,
   open,
   settings,
+  sourceName,
 }: {
   data?: LocalWorkData;
   error: string;
@@ -32,6 +33,7 @@ export function LocalWork({
   openWorkflow(run: WorkflowRun): void;
   open(connection: Connection, conversationId?: number): Promise<void>;
   settings(): void;
+  sourceName?: string;
 }) {
   const [query, setQuery] = useState("");
   const [all, setAll] = useState(true);
@@ -64,7 +66,7 @@ export function LocalWork({
     (run) =>
       (all || run.members.some((m) => m.conversation.active > 0)) &&
       matches(
-        `${run.name} ${run.cycle} ${run.members.map((m) => m.conversation.title).join(" ")}`,
+        `${run.name} ${run.cycle} ${run.nodes.map((n) => n.title).join(" ")} ${run.members.map((m) => m.conversation.title).join(" ")}`,
       ),
   );
   const standalone = (data?.stores ?? []).flatMap((store) =>
@@ -83,7 +85,7 @@ export function LocalWork({
       <header className="local-heading">
         <div>
           <p className="eyebrow">DISPATCH OBSERVER</p>
-          <h1>This machine</h1>
+          <h1>{sourceName ?? "This machine"}</h1>
           <p>Follow the workflow, then read the conversations behind it.</p>
         </div>
         <UI.Button
@@ -149,7 +151,7 @@ export function LocalWork({
         <>
           <h2 className="workflow-section-heading">
             Workflows{" "}
-            <small>Latest assignment activity first · loaded sources</small>
+            <small>Latest recorded activity first · loaded sources</small>
           </h2>
           {!visibleRuns.length && (
             <p className="evidence-note">
@@ -162,10 +164,12 @@ export function LocalWork({
           )}
           <div className="workflow-cards">
             {visibleRuns.map((run) => {
-              const latest = run.members.find((m) => m.role === "assignment");
-              const assignments = run.members.filter(
-                (m) => m.role === "assignment",
-              ).length;
+              const latest =
+                run.origin === "handoffs"
+                  ? run.members.find(
+                      (m) => m.role === "assignment" && !m.shared,
+                    )
+                  : undefined;
               const unfinished = run.members.filter(
                 (m) => m.conversation.active > 0,
               ).length;
@@ -182,8 +186,7 @@ export function LocalWork({
                       {readableName(run.name)}
                     </strong>
                     <span>
-                      Latest assignment activity{" "}
-                      {recordedTime(workflowActivity(run))}
+                      Recorded activity {recordedTime(workflowActivity(run))}
                     </span>
                     {latest && (
                       <span>
@@ -193,8 +196,17 @@ export function LocalWork({
                       </span>
                     )}
                     <small>
-                      {run.cycle} · {assignments}{" "}
-                      {assignments === 1 ? "assignment" : "assignments"}
+                      {run.cycle} ·{" "}
+                      {run.origin === "document"
+                        ? "Producer record"
+                        : run.origin === "native"
+                          ? "Native delegation"
+                          : "Handoffs"}{" "}
+                      · {run.nodes.length} activities · {run.members.length}{" "}
+                      conversations
+                      {run.issues.length > 0
+                        ? ` · ${run.issues.length} evidence notices`
+                        : ""}
                     </small>
                   </span>
                   <span className="local-work-status">
@@ -202,7 +214,9 @@ export function LocalWork({
                     <br />
                     {unfinished} unfinished conversations
                     <br />
-                    Workflow outcome unknown
+                    {run.status
+                      ? `Reported: ${run.status}`
+                      : "Workflow outcome unknown"}
                   </span>
                   <ArrowRight size={18} />
                 </UI.Button>
@@ -269,9 +283,10 @@ export function LocalWork({
         </div>
       )}
       <p className="evidence-note">
-        Coverage: known agent runtimes, saved sources and sibling Runner stores.
-        Other hosts or installations may be missing. Unfinished tasks may be
-        waiting; they do not prove a model is running.
+        {sourceName
+          ? "Coverage: selected source and loaded local peers. No remote discovery."
+          : "Coverage: known agent runtimes, saved sources and sibling Runner stores. Other hosts or installations may be missing."}{" "}
+        Unfinished tasks may be waiting; they do not prove a model is running.
       </p>
     </section>
   );

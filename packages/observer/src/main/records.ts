@@ -10,6 +10,7 @@ export interface Query {
   table(name: string): string;
   scope: string;
   assistantText: string;
+  instanceMessage: string;
 }
 const record = (row: Row): RecordData => JSON.parse(String(row.record));
 const number = (value: unknown) => {
@@ -24,6 +25,13 @@ export async function readRecords(
   query: Query,
   request: RawReadRequest,
 ): Promise<RawSnapshot> {
+  if (
+    request.entryId !== undefined &&
+    (request.conversationId === undefined || request.before)
+  )
+    throw new Error(
+      "Exact-entry reads require a conversation and cannot use pagination.",
+    );
   const { table, scope } = query;
   const rows = (sql: string, ...values: (number | string)[]) =>
     query.rows(sql, ...values);
@@ -35,7 +43,7 @@ export async function readRecords(
       "This logical Pi store does not exist or is not visible to this database identity.",
     );
   const sequence = number(metadata.next_seq) - 1;
-  if (request.since === sequence)
+  if (request.since === sequence && request.entryId === undefined)
     return {
       sequence,
       observedAt: new Date().toISOString(),
@@ -76,87 +84,104 @@ export async function readRecords(
     tasks: [],
     documents: [],
     hasEarlier: false,
+    handoffs: (
+      await rows(
+        `SELECT record FROM ${table("entries")} WHERE ${scope} AND ${query.instanceMessage} ORDER BY commit_seq,id`,
+      )
+    ).map(record),
   };
-  if (request.conversationId === undefined) return result;
   const byId = new Map(
     result.conversations.map((item) => [item.record.id, item.record]),
   );
-  if (!byId.has(request.conversationId))
+  if (request.conversationId !== undefined && !byId.has(request.conversationId))
     throw new Error(
       "This conversation is no longer available in the selected store.",
     );
-  const selected = new Set<number>([request.conversationId]);
-  // Only native owner edges establish descendants. Fork ancestry is separate.
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const item of byId.values())
-      if (
-        item.owner &&
-        selected.has(item.owner.conversationId) &&
-        !selected.has(item.id)
-      ) {
-        selected.add(item.id);
-        changed = true;
-      }
-  }
-  const visible = new Map(
-    [...selected].map((id) => [id, Number.MAX_SAFE_INTEGER]),
+  const selected = new Set<number>(
+    request.conversationId === undefined ? [] : [request.conversationId],
   );
-  let ancestor = byId.get(request.conversationId)!;
-  const seen = new Set<number>();
-  let through = Number.MAX_SAFE_INTEGER;
-  while (ancestor.parent) {
-    if (seen.has(ancestor.id))
-      throw new Error("Invalid circular fork ancestry in saved records.");
-    seen.add(ancestor.id);
-    through = Math.min(through, ancestor.parent.at);
-    const parent = byId.get(ancestor.parent.conversationId);
-    if (!parent) break;
-    if (!selected.has(parent.id))
-      visible.set(parent.id, Math.max(visible.get(parent.id) ?? 0, through));
-    ancestor = parent;
+  if (request.conversationId !== undefined) {
+    // Only native owner edges establish descendants. Fork ancestry is separate.
+    let changed = true;
+    while (changed && request.entryId === undefined) {
+      changed = false;
+      for (const item of byId.values())
+        if (
+          item.owner &&
+          selected.has(item.owner.conversationId) &&
+          !selected.has(item.id)
+        ) {
+          selected.add(item.id);
+          changed = true;
+        }
+    }
+    const visible = new Map(
+      [...selected].map((id) => [id, Number.MAX_SAFE_INTEGER]),
+    );
+    let ancestor = byId.get(request.conversationId)!;
+    const seen = new Set<number>();
+    let through = Number.MAX_SAFE_INTEGER;
+    while (ancestor.parent && request.entryId === undefined) {
+      if (seen.has(ancestor.id))
+        throw new Error("Invalid circular fork ancestry in saved records.");
+      seen.add(ancestor.id);
+      through = Math.min(through, ancestor.parent.at);
+      const parent = byId.get(ancestor.parent.conversationId);
+      if (!parent) break;
+      if (!selected.has(parent.id))
+        visible.set(parent.id, Math.max(visible.get(parent.id) ?? 0, through));
+      ancestor = parent;
+    }
+    const clauses = [...visible]
+      .map(() => "(conversation_id=? AND id<=?)")
+      .join(" OR ");
+    const values = [...visible].flatMap(([id, at]) => [id, at]);
+    const entries = await rows(
+      `SELECT record,commit_seq FROM ${table("entries")} WHERE ${scope} AND ${request.entryId === undefined ? `(${clauses})` : "(conversation_id=? AND id=?)"} ${request.before ? "AND (commit_seq<? OR (commit_seq=? AND id<?))" : ""} ORDER BY commit_seq DESC,id DESC LIMIT ?`,
+      ...(request.entryId === undefined
+        ? values
+        : [request.conversationId, request.entryId]),
+      ...(request.before
+        ? [
+            request.before.sequence,
+            request.before.sequence,
+            request.before.entryId,
+          ]
+        : []),
+      request.limit + 1,
+    );
+    result.hasEarlier = entries.length > request.limit;
+    if (request.entryId !== undefined && !entries.length)
+      throw new Error(
+        "The saved entry is not retained in the referenced conversation.",
+      );
+    result.entries = entries
+      .slice(0, request.limit)
+      .reverse()
+      .map((row) => {
+        const value = record(row);
+        return {
+          record: value,
+          sequence: number(row.commit_seq),
+          inherited: !selected.has(value.conversationId),
+        };
+      });
+    const ids = [...selected];
+    const placeholders = ids.map(() => "?").join(",");
+    result.tasks = (
+      await rows(
+        `SELECT record FROM ${table("tasks")} WHERE ${scope} AND conversation_id IN (${placeholders}) ORDER BY id`,
+        ...ids,
+      )
+    ).map(record);
   }
-  const clauses = [...visible]
-    .map(() => "(conversation_id=? AND id<=?)")
-    .join(" OR ");
-  const values = [...visible].flatMap(([id, at]) => [id, at]);
-  const entries = await rows(
-    `SELECT record,commit_seq FROM ${table("entries")} WHERE ${scope} AND (${clauses}) ${request.before ? "AND (commit_seq<? OR (commit_seq=? AND id<?))" : ""} ORDER BY commit_seq DESC,id DESC LIMIT ?`,
-    ...values,
-    ...(request.before
-      ? [
-          request.before.sequence,
-          request.before.sequence,
-          request.before.entryId,
-        ]
-      : []),
-    request.limit + 1,
-  );
-  result.hasEarlier = entries.length > request.limit;
-  result.entries = entries
-    .slice(0, request.limit)
-    .reverse()
-    .map((row) => {
-      const value = record(row);
-      return {
-        record: value,
-        sequence: number(row.commit_seq),
-        inherited: !selected.has(value.conversationId),
-      };
-    });
   const ids = [...selected];
   const placeholders = ids.map(() => "?").join(",");
-  result.tasks = (
-    await rows(
-      `SELECT record FROM ${table("tasks")} WHERE ${scope} AND conversation_id IN (${placeholders}) ORDER BY id`,
-      ...ids,
-    )
-  ).map(record);
   const taskIds = result.tasks.map((task) => task.id as number);
   const docs = await rows(
-    `SELECT record FROM ${table("documents")} WHERE ${scope} AND kind<>? AND (scope_kind='session' OR (scope_kind='conversation' AND owner_id IN (${placeholders})) ${taskIds.length ? `OR (scope_kind='task' AND owner_id IN (${taskIds.map(() => "?").join(",")}))` : ""}) ORDER BY id`,
+    `SELECT record FROM ${table("documents")} WHERE ${scope} AND kind<>? AND (scope_kind='session' OR kind=? ${ids.length ? `OR (scope_kind='conversation' AND owner_id IN (${placeholders}))` : ""} ${taskIds.length ? `OR (scope_kind='task' AND owner_id IN (${taskIds.map(() => "?").join(",")}))` : ""}) ORDER BY id`,
     JSON.stringify("pi.provider"),
+    JSON.stringify("observer.workflow"),
     ...ids,
     ...taskIds,
   );
