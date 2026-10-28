@@ -86,11 +86,19 @@ or mismatched stores produce source notices. Sources outside those installations
 still require an explicit connection through Settings.
 
 Open a workflow to see its known structure, activity dates and evidence notices.
-Select an activity and expand **Relationships & evidence** for sender/dependency links
-and native records. Missing sources have a Settings recovery action.
+**Recorded work** lists activities with direct access to their conversations/evidence.
+Selected activities expose a primary evidence action and any available linked workflow.
+Expand **Relationships & evidence** for ancestry, sender/dependency links, attributes
+and additional references. Missing sources have a Settings recovery action.
 **Execution unknown** is deliberate: open files and pending tasks do not prove model
 execution. A reported **Changes requested**, **Approved** or other explicit opening
 verdict belongs to that assistant response, not the whole workflow's outcome.
+
+Exact workflow entries open expanded in the adjacent **Saved evidence** inspector,
+with **Native entry record** available directly. The conversation stays visible;
+**Return to conversation**, close, or Escape dismisses the evidence without changing
+playback. Loading earlier history also leaves it open. Explicit playback controls
+return to the selected event. At 1180 px and narrower, evidence uses a drawer instead.
 
 In a conversation, **Read latest response** jumps to the response heading rather than
 the bottom. If that response is outside the current loaded/playback page, a labeled
@@ -112,6 +120,8 @@ Settings leaves the workspace mounted. **Done**, the close button, or Escape
 returns to the same reading position, expanded tools and inspection state.
 Opening Settings pauses automatic playback, not the agent or live connection.
 Cancelling Add/Edit returns to Settings; **Save & connect** opens the saved source.
+The wide Add/Edit form separates transport and database fields. Its heading, close
+control and Cancel/Test/Save actions remain visible while the fields scroll.
 
 **Local SQLite:** choose SQLite, keep Direct connection, and browse to an existing
 `.sqlite`, `.sqlite3`, or `.db` file. The OS identity running Observer must be able
@@ -209,7 +219,8 @@ counted separately; they do not change the paused event set. Play/Pause, previou
 next, first, last, the scrubber, and 0.5×/1×/2×/4× speed navigate that saved sequence.
 Playback advances at an event cadence, not the original wall-clock timing. **Live**
 explicitly returns to the current observation. Outside editable controls, Space
-plays/pauses and left/right arrows step. Tab reaches controls; pane separators
+plays/pauses and left/right arrows step; these shortcuts do not operate playback
+while focus is in Saved evidence. Tab reaches controls; pane separators
 resize with arrows or pointer dragging. Escape closes a transient detail or dialog.
 Narrow windows use a detail drawer with its own playback controls.
 
@@ -241,12 +252,34 @@ Use **Back** and **Forward** above the work title to retrace conversation
 selections, or **Parent conversation** to return directly to a child's owner.
 Alt+Left/Right and Cmd+[/] provide the same history navigation outside editable
 fields and dialogs. These controls are separate from previous/next event playback.
+Journey groups use only unmodified left/right arrows for collapse/expand.
 Returning restores the inspection tab, event filters, selected evidence and
 live/paused view, but does not restart automatic playback. A new selection after
 going back replaces the forward path. Switching connections clears history;
 reconnecting the current connection preserves it.
 
 ## Compatibility and qualification
+
+Desktop reading polish (October 28, 2026, OBS-005, OBS-007–010, OBS-012,
+OBS-013, OBS-015): the packaged macOS ARM64 review app was compared with the
+design references at 1440×900 and 1280×720 in light/dark appearances. The first
+request remained visible, exact message/tool evidence opened expanded beside it,
+and the overview exposed recorded work and primary linked-workflow actions.
+At a frozen event, evidence opening, Space/Right and dismissal left the event
+count and position unchanged; Escape restored the direct opener. Alt+Left/Right
+on a focused journey group navigated history while unmodified Right expanded it.
+Linked-workflow return, unavailable-entry recovery and the narrower desktop drawer
+were exercised. Connection-form columns, scrolling with persistent heading/actions,
+validation feedback visibility (including a repeated invalid attempt), and
+cancellation to Settings were checked without connecting to remote systems.
+
+The synthetic store's SHA-256 checksum was unchanged. Workspace type/build checks
+and macOS packaging passed; no automated tests were added or run. Review used an
+isolated profile and disabled credential storage only in the disposable preview;
+this is not credential or remote-transport qualification. Pagination preservation
+received source review, not a new long-history exercise. Other desktop platforms,
+formal accessibility/contrast measurement and live producer updates remain
+unqualified by this pass. Captures remain private.
 
 Generic journey qualification (October 28, 2026, OBS-005, OBS-007–010, OBS-012,
 OBS-013, OBS-015, OBS-016, OBS-018–020): an isolated packaged macOS ARM64 preview

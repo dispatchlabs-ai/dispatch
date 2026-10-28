@@ -9,12 +9,14 @@ export function Transcript({
   activeId,
   inspect,
   onRead,
+  expanded = false,
 }: {
   events: Activity[];
   conversations: Conversation[];
   activeId?: string;
-  inspect(item: Activity): void;
+  inspect?(item: Activity): void;
   onRead(): void;
+  expanded?: boolean;
 }) {
   const matches = new Map<string, Activity>();
   const pending = new Map<string, Activity>();
@@ -50,11 +52,12 @@ export function Transcript({
         author={author}
         matchedResult={matches.get(item.id)}
         active={activeId === item.id}
-        inspect={() => inspect(item)}
+        inspect={inspect ? () => inspect(item) : undefined}
         onRead={onRead}
+        expandedByDefault={expanded}
       />
     ));
-    return group[0].tool ? (
+    return group[0].tool && !expanded ? (
       <ToolGroup
         key={group[0].id}
         events={group}

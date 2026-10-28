@@ -110,6 +110,15 @@ search and expansion, with a return path from linked workflows. This source expo
 explicit remote/Postgres source records without remote discovery. Document state is
 the latest observation, separate from frozen conversation playback.
 
+Keep conversation headers compact, with ancestry and opening details disclosed
+on request. The overview lists recorded activities with direct evidence/conversation
+actions; selected nodes expose their primary evidence and linked workflow without
+opening a disclosure. Exact workflow entries open expanded in the adjacent inspector
+(a drawer at 1180 px and narrower), with native records available there. Reading or dismissing
+this evidence does not move playback; explicit event navigation returns to playback.
+Unmodified arrows expand/collapse journey groups; modified history keys retain
+their navigation meaning.
+
 Use four stable areas rather than a collection of dashboards:
 
 1. **Navigation rail:** This machine, conversations in the current source, and
@@ -226,6 +235,10 @@ top dialog; cancelling Add/Edit returns to Settings. Opening the current connect
 source returns to its existing view; reconnecting is a separate explicit action.
 Removing a saved connection never deletes the agent database. Removing the current
 connection returns the workspace to This machine.
+
+Add/Edit uses a wide desktop form with separate transport/database columns. Only
+fields scroll: the title, close control and Cancel/Test/Save actions stay visible.
+Reveal validation and connection feedback within the scrolling body.
 
 | Source | Setup and read behavior |
 | --- | --- |

@@ -416,14 +416,14 @@ strong {
   text-transform: capitalize;
 }
 .content-heading {
-  padding: 28px 30px 23px;
+  padding: 12px 24px;
   flex-shrink: 0;
 }
 .conversation-navigation {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 .breadcrumb {
   color: var(--subtle);
@@ -431,10 +431,10 @@ strong {
   align-items: center;
   gap: 9px;
   font-size: 12px;
-  margin-bottom: 15px;
+  margin-bottom: 6px;
 }
 .content-heading h1 {
-  font-size: 25px;
+  font-size: 22px;
   letter-spacing: -0.85px;
   line-height: 1.28;
   font-weight: 640;
@@ -450,7 +450,7 @@ strong {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: space-between;
-  margin-top: 13px;
+  margin-top: 8px;
   color: var(--subtle);
   font-size: 12px;
 }
@@ -527,13 +527,13 @@ strong {
   flex: 1;
 }
 .view-tabs {
-  margin: 0 30px;
+  margin: 0 24px;
   padding: 0;
   gap: 22px;
   border-radius: 0;
   background: none;
   border-bottom: 1px solid var(--border);
-  width: calc(100% - 60px);
+  width: calc(100% - 48px);
   flex-wrap: nowrap;
 }
 .view-tabs [role="tab"] {
@@ -542,7 +542,7 @@ strong {
   justify-content: center;
   gap: 7px;
   font-size: 12px;
-  padding: 0 2px 13px;
+  padding: 0 2px 9px;
   border-radius: 0;
   border-bottom: 2px solid transparent;
   min-height: 36px;
@@ -556,7 +556,7 @@ strong {
 .panel-scroll {
   min-height: 0;
   overflow: auto;
-  padding: 22px 30px 35px;
+  padding: 16px 24px 28px;
   flex: 1;
 }
 .section-caption {
@@ -878,7 +878,7 @@ strong {
   font-size: 12px;
   line-height: 1.7;
   color: var(--subtle);
-  margin-bottom: 25px;
+  margin-bottom: 12px;
 }
 .transcript-entry {
   padding: 18px 0;
@@ -1122,6 +1122,11 @@ strong {
   padding: 27px 20px;
   min-width: 0;
 }
+.evidence-panel:focus { outline: none; }
+.evidence-panel .transcript-entry header { align-items: flex-start; flex-direction: column; gap: 4px; }
+.evidence-panel .user-entry { border: 0; padding: 0; background: transparent; }
+.evidence-panel .transcript-record { margin: 12px 0; }
+.evidence-panel > button:last-child { margin-top: 16px; }
 .detail-heading {
   display: flex;
   justify-content: space-between;
@@ -1629,6 +1634,66 @@ pre {
 .dialog-actions button {
   font-size: 12px;
 }
+[role="dialog"]:has(> .observer-connection-form) {
+  width: min(calc(100% - 48px), 920px);
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+/* Only the fields scroll; the dialog title and return actions remain visible. */
+[role="dialog"]:has(> .observer-connection-form) > div:first-child {
+  flex-shrink: 0;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+.connection-form.observer-connection-form {
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.observer-connection-form > .connection-form-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  align-content: start;
+  gap: 16px 24px;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 20px 24px;
+  overflow: auto;
+  scroll-padding: 16px;
+}
+.observer-connection-form > .connection-form-body > .segmented,
+.observer-connection-form[data-transport="direct"] .connection-database {
+  grid-column: 1 / -1;
+}
+.observer-connection-form .form-group {
+  min-width: 0;
+  margin: 0;
+  gap: 12px;
+}
+.observer-connection-form .notice { margin: 0; }
+.observer-connection-form .connection-feedback {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 12px;
+}
+.observer-connection-form > .dialog-actions {
+  position: static;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  margin: 0;
+  padding: 16px 24px 20px;
+}
+.observer-connection-form .connection-cancel { margin-right: auto; }
+@media (max-width: 1000px) {
+  .observer-connection-form > .connection-form-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .error-message,
 .success-message {
   padding: 12px;
@@ -1653,7 +1718,7 @@ pre {
     grid-template-columns: var(--rail-width) minmax(0, 1fr) var(--detail-width);
   }
   .content-heading {
-    padding: 35px 40px 28px;
+    padding: 16px 32px;
   }
   .panel-scroll {
     padding-left: 40px;
@@ -1989,15 +2054,14 @@ pre {
 .workflow-coverage p { color: var(--subtle); margin: 6px 0 0; }
 .chain-source { display: flex; align-items: center; gap: 8px; padding: 10px 8px 0; font-size: 12px; color: var(--subtle); flex-wrap: wrap; }
 .assignment-copy .reported-result { color: var(--foreground); }
-.assignment-summary { display: flex; gap: 12px 24px; align-items: center; flex-wrap: wrap; padding-top: 12px; font-size: 12px; }
+.assignment-summary { display: flex; gap: 8px 20px; align-items: center; flex-wrap: wrap; padding-top: 8px; font-size: 12px; }
 .assignment-summary > div { display: grid; gap: 4px; }
 .assignment-summary span { color: var(--subtle); }
-.assignment-summary button { margin-left: auto; }
+.assignment-summary .response-summary { margin-left: auto; }
+.response-summary button { padding: 0; height: auto; min-height: 24px; justify-content: flex-start; }
 .transcript-entry .message-content { max-width: 86ch; }
 .tool-body pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .assignment-state { width: 130px; }
-.content-heading { padding-top: 14px; padding-bottom: 14px; }
-.content-heading h1 { font-size: 22px; }
 
 /* One journey renderer for native ownership, handoffs and producer documents. */
 .journey-navigation { min-height: 0; flex: 1; overflow: auto; padding: 8px 0; }
@@ -2008,13 +2072,18 @@ pre {
 .journey-row { display: flex; align-items: flex-start; border: 1px solid transparent; border-radius: 7px; margin: 4px 0; min-width: 0; }
 .journey-row.selected { border-color: var(--primary); background: var(--secondary); }
 .journey-row > button:first-child { flex-shrink: 0; margin-top: 11px; }
-.journey-row .journey-select { height: auto; white-space: normal; text-align: left; justify-content: flex-start; min-width: 0; flex: 1; padding: 10px 6px; margin-top: 0; }
+.journey-row .journey-select { height: auto; white-space: normal; text-align: left; justify-content: flex-start; min-width: 0; flex: 1; padding: 8px 6px; margin-top: 0; }
 .journey-select span { min-width: 0; }
 .journey-select strong, .journey-select small { display: block; overflow-wrap: anywhere; }
 .journey-select small { color: var(--subtle); font-size: 11px; font-weight: 400; margin-top: 4px; }
 .journey-dot { width: 7px; height: 7px; border: 1px solid var(--subtle); border-radius: 50%; flex-shrink: 0; margin: 16px 8px; }
 .journey-row.selected .journey-dot { background: var(--primary); border-color: var(--primary); }
 .journey-context { padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--rail); flex-shrink: 0; max-height: 34vh; overflow: auto; }
+.journey-context.compact { padding: 8px 24px; }
+.journey-context-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.journey-context-heading > nav { flex: 1; min-width: 180px; }
+.journey-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.journey-actions button { height: auto; min-height: 28px; white-space: normal; text-align: left; }
 .workflow-view .journey-context { max-height: none; border: 1px solid var(--border); border-radius: 8px; margin-top: 20px; }
 .journey-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .journey-breadcrumb span { display: inline-flex; align-items: center; }
@@ -2026,9 +2095,17 @@ pre {
 .journey-attributes dd { margin: 0; }
 .journey-references { margin-top: 8px; font-size: 12px; }
 .journey-references summary { cursor: pointer; color: var(--primary); }
+.journey-references > p { margin-top: 8px; color: var(--subtle); }
+.journey-references .journey-breadcrumb { margin-top: 8px; }
 .journey-reference { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; color: var(--subtle); }
 .journey-reference button { white-space: normal; height: auto; text-align: left; }
-.journey-scope { display: block; }
-.workflow-conversation-context { margin-bottom: 16px; }
-.workflow-conversation-context > summary { cursor: pointer; color: var(--subtle); font-size: 12px; padding: 8px 0; }
+.workflow-conversation-context { margin-bottom: 8px; }
+.workflow-conversation-context > summary { cursor: pointer; color: var(--subtle); font-size: 12px; padding: 4px 0; }
 .workflow-conversation-context > .conversation-context { margin-top: 8px; }
+.workflow-records { margin-top: 24px; }
+.workflow-records h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.workflow-records ul { list-style: none; padding: 0; margin: 12px 0; border-top: 1px solid var(--border); }
+.workflow-record { width: 100%; height: auto; padding: 14px 8px; border-bottom: 1px solid var(--border); border-radius: 0; gap: 16px; text-align: left; white-space: normal; }
+.workflow-record.selected { background: var(--secondary); }
+.workflow-record > span { display: grid; gap: 6px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.workflow-record small { font-size: 12px; font-weight: 400; color: var(--subtle); }

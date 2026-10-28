@@ -44,16 +44,18 @@ export function TranscriptEntry({
   active,
   inspect,
   onRead,
+  expandedByDefault = false,
 }: {
   item: Activity;
   author?: string;
   matchedResult?: Activity;
   active: boolean;
-  inspect(): void;
+  inspect?(): void;
   onRead(): void;
+  expandedByDefault?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [messageExpanded, setMessageExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(expandedByDefault);
+  const [messageExpanded, setMessageExpanded] = useState(expandedByDefault);
   const longRequest = item.role === "user" && item.text.length > 600;
   useEffect(() => {
     if (active) setExpanded(true);
@@ -64,7 +66,7 @@ export function TranscriptEntry({
       {item.at ? time(item.at) : `Commit ${item.sequence}`}
     </small>
   );
-  const inspectButton = (
+  const inspectButton = inspect ? (
     <UI.Button
       variant="link"
       size="sm"
@@ -74,6 +76,14 @@ export function TranscriptEntry({
       Inspect entry {item.entryId}
       <ArrowRight size={13} />
     </UI.Button>
+  ) : (
+    <details className="transcript-record">
+      <summary>Native entry record</summary>
+      <CodeBlock
+        text={JSON.stringify(item.record, null, 2)}
+        label="Native entry record"
+      />
+    </details>
   );
   if (item.tool) {
     const result = item.tool.phase === "result";
@@ -184,7 +194,8 @@ export function TranscriptEntry({
               )}
               {result && item.tool.durationMs !== undefined && (
                 <p className="hint">
-                  Reported duration: {item.tool.durationMs.toLocaleString()} ms
+                  Reported duration: {item.tool.durationMs.toLocaleString()}{" "}
+                  ms
                 </p>
               )}
               {inspectButton}
@@ -199,7 +210,7 @@ export function TranscriptEntry({
       <details
         className="transcript-record"
         data-event-id={item.id}
-        open={active || undefined}
+        open={active || expandedByDefault || undefined}
       >
         <summary onClick={onRead}>Saved record · {item.title}</summary>
         <ToolText text={item.text} />

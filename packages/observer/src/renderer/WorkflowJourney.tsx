@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Search } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronRight, Search } from "lucide-react";
 import { UI } from "./controls";
 import { recordedTime } from "../shared/workSummary";
 import type { WorkflowNode, WorkflowRun } from "../shared/workflows";
@@ -86,6 +86,13 @@ export function WorkflowJourney({
             aria-current={view.selected === node.id ? "true" : undefined}
             onClick={() => select(node)}
             onKeyDown={(event) => {
+              if (
+                event.altKey ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey
+              )
+                return;
               if (event.key === "ArrowRight" && nested.length && !expanded) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -107,7 +114,9 @@ export function WorkflowJourney({
                 {node.kind ?? (node.type === "group" ? "Group" : "Activity")}
                 {node.status ? ` · ${node.status}` : ""}
               </small>
-              {node.at !== undefined && <small>{recordedTime(node.at)}</small>}
+              {node.at !== undefined && (
+                <small>{recordedTime(node.at)}</small>
+              )}
             </span>
           </UI.Button>
         </div>
@@ -128,7 +137,9 @@ export function WorkflowJourney({
           onChange={(e) => change({ ...view, query: e.target.value })}
         />
       </div>
-      <p className="journey-caption">Recorded structure · expand to explore</p>
+      <p className="journey-caption">
+        Recorded structure · expand to explore
+      </p>
       <ul className="journey-tree">
         {(children.get(undefined) ?? [])
           .filter((n) => visible.has(n.id))
@@ -151,12 +162,14 @@ export function WorkflowNodeContext({
   select,
   openEvidence,
   openWorkflow,
+  compact = false,
 }: {
   run: WorkflowRun;
   node: WorkflowNode;
   select(node: WorkflowNode): void;
   openEvidence(evidence: WorkflowNode["evidence"][number]): void;
   openWorkflow(id: string): void;
+  compact?: boolean;
 }) {
   const byId = new Map(run.nodes.map((n) => [n.id, n]));
   const ancestors: WorkflowNode[] = [];
@@ -166,108 +179,155 @@ export function WorkflowNodeContext({
     ancestors.unshift(item);
     parent = item.parent;
   }
-  const edges = run.edges.filter((e) => e.from === node.id || e.to === node.id);
+  const edges = run.edges.filter(
+    (e) => e.from === node.id || e.to === node.id,
+  );
+  const primary = node.evidence.find((e) => e.member);
+  const provenance =
+    run.origin === "document"
+      ? "Producer-recorded structure · latest observation"
+      : "Recorded relationships · partial coverage";
   return (
     <section
-      className="journey-context"
+      className={`journey-context ${compact ? "compact" : ""}`}
       aria-label="Selected workflow activity"
     >
-      <nav className="journey-breadcrumb" aria-label="Activity path">
-        {ancestors.map((item) => (
-          <span key={item.id}>
-            <UI.Button variant="link" size="sm" onClick={() => select(item)}>
-              {item.title}
-            </UI.Button>
-            <ChevronRight size={12} />
-          </span>
-        ))}
-        <strong>{node.title}</strong>
-      </nav>
-      <p>
-        {node.kind ?? node.type}
-        {node.status ? ` · Reported: ${node.status}` : ""}
-        {node.at !== undefined ? ` · ${recordedTime(node.at)}` : ""}
-      </p>
-      {node.summary && <p className="journey-summary">{node.summary}</p>}
-      {!!Object.keys(node.attributes ?? {}).length && (
-        <dl className="journey-attributes">
-          {Object.entries(node.attributes ?? {}).map(([key, value]) => (
-            <div key={key}>
-              <dt>{key}</dt>
-              <dd>{value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-      {(edges.length > 0 || node.evidence.length > 0 || node.workflow) && (
-        <details className="journey-references">
-          <summary>Relationships & evidence</summary>
-          {edges.map((edge, index) => {
-            const incoming = edge.to === node.id;
-            const other = byId.get(incoming ? edge.from : edge.to);
-            return (
-              <div key={index} className="journey-reference">
-                <span>
-                  {incoming ? "From" : "To"} · {edge.label ?? edge.kind}
-                </span>
-                {other ? (
-                  <UI.Button
-                    variant="link"
-                    size="sm"
-                    onClick={() => select(other)}
-                  >
-                    {other.title}
-                  </UI.Button>
-                ) : (
-                  <span>Unavailable: {incoming ? edge.from : edge.to}</span>
-                )}
-              </div>
-            );
-          })}
-          {node.evidence.map((e, index) => (
-            <div className="journey-reference" key={index}>
-              <UI.Button
-                variant="link"
-                size="sm"
-                disabled={!e.member}
-                onClick={() => openEvidence(e)}
-              >
-                {e.label ??
-                  (e.entryId
-                    ? `Saved entry ${e.entryId}`
-                    : e.taskId
-                      ? `Task ${e.taskId}`
-                      : e.documentId
-                        ? `Document ${e.documentId}`
-                        : "Full conversation")}
-              </UI.Button>
-              {!e.member && <span>{e.unavailable}</span>}
-            </div>
-          ))}
-          {node.workflow &&
-            (node.linkedWorkflow ? (
-              <UI.Button
-                variant="link"
-                size="sm"
-                onClick={() => openWorkflow(node.linkedWorkflow!)}
-              >
-                Open linked workflow
-              </UI.Button>
-            ) : (
-              <p>Linked workflow unavailable in loaded sources.</p>
+      <div className="journey-context-heading">
+        <nav className="journey-breadcrumb" aria-label="Activity path">
+          {!compact &&
+            ancestors.map((item) => (
+              <span key={item.id}>
+                <UI.Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => select(item)}
+                >
+                  {item.title}
+                </UI.Button>
+                <ChevronRight size={12} />
+              </span>
             ))}
-        </details>
+          <strong>{node.title}</strong>
+        </nav>
+        <div className="journey-actions">
+          {primary && (
+            <UI.Button
+              variant="outline"
+              size="sm"
+              onClick={() => openEvidence(primary)}
+            >
+              {evidenceLabel(primary)}
+              <ArrowRight size={13} />
+            </UI.Button>
+          )}
+          {node.linkedWorkflow && (
+            <UI.Button
+              variant="outline"
+              size="sm"
+              onClick={() => openWorkflow(node.linkedWorkflow!)}
+            >
+              Open linked workflow <ArrowRight size={13} />
+            </UI.Button>
+          )}
+        </div>
+      </div>
+      <p className="journey-caption">
+        {node.status ? `Producer-reported: ${node.status} · ` : ""}
+        {compact ? "Full conversation · not limited to this activity. " : ""}
+        {provenance}
+      </p>
+      {node.workflow && !node.linkedWorkflow && (
+        <p>Linked workflow unavailable in loaded sources.</p>
       )}
-      <small className="journey-caption">
-        {run.origin === "document"
-          ? `Producer-recorded document ${run.document?.id} · latest observation`
-          : "Recorded relationships · partial coverage"}
-      </small>
-      {node.evidence.some((e) => e.member) && (
-        <small className="journey-caption journey-scope">
-          Full conversation · not limited to this activity.
-        </small>
+      {!compact && node.summary && (
+        <p className="journey-summary">{node.summary}</p>
       )}
+      <details className="journey-references">
+        <summary>Relationships & evidence</summary>
+        {compact && ancestors.length > 0 && (
+          <nav className="journey-breadcrumb" aria-label="Activity ancestors">
+            {ancestors.map((item) => (
+              <UI.Button
+                key={item.id}
+                variant="link"
+                size="sm"
+                onClick={() => select(item)}
+              >
+                {item.title} <ChevronRight size={12} />
+              </UI.Button>
+            ))}
+          </nav>
+        )}
+        <p>
+          {node.kind ?? node.type}
+          {node.status ? ` · Reported: ${node.status}` : ""}
+          {node.at !== undefined ? ` · ${recordedTime(node.at)}` : ""}
+        </p>
+        {compact && node.summary && (
+          <p className="journey-summary">{node.summary}</p>
+        )}
+        {!!Object.keys(node.attributes ?? {}).length && (
+          <dl className="journey-attributes">
+            {Object.entries(node.attributes ?? {}).map(([key, value]) => (
+              <div key={key}>
+                <dt>{key}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        {run.document && (
+          <p>Producer document {run.document.id} · latest observation</p>
+        )}
+        {edges.map((edge, index) => {
+          const incoming = edge.to === node.id;
+          const other = byId.get(incoming ? edge.from : edge.to);
+          return (
+            <div key={index} className="journey-reference">
+              <span>
+                {incoming ? "From" : "To"} · {edge.label ?? edge.kind}
+              </span>
+              {other ? (
+                <UI.Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => select(other)}
+                >
+                  {other.title}
+                </UI.Button>
+              ) : (
+                <span>Unavailable: {incoming ? edge.from : edge.to}</span>
+              )}
+            </div>
+          );
+        })}
+        {node.evidence.map((e, index) => (
+          <div className="journey-reference" key={index}>
+            <UI.Button
+              variant="link"
+              size="sm"
+              disabled={!e.member}
+              onClick={() => openEvidence(e)}
+            >
+              {evidenceLabel(e)}
+            </UI.Button>
+            {!e.member && <span>{e.unavailable}</span>}
+          </div>
+        ))}
+      </details>
     </section>
+  );
+}
+
+function evidenceLabel(e: WorkflowNode["evidence"][number]) {
+  return (
+    e.label ??
+    (e.entryId
+      ? `Saved entry ${e.entryId}`
+      : e.taskId
+        ? `Task ${e.taskId}`
+        : e.documentId
+          ? `Document ${e.documentId}`
+          : "Full conversation")
   );
 }

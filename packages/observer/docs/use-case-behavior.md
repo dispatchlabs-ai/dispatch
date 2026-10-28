@@ -121,9 +121,18 @@ usage guide for the revision and interactive evidence actually checked.
 - **OBS-010/012/013:** exact evidence resolves by source and native identity.
   Missing/ambiguous references remain visible. A full conversation is not a scoped
   segment; entry inspection and latest document structure do not advance playback.
+  Exact entries open expanded beside the conversation, with native records and a
+  return action; narrower desktop windows use a drawer. Loading earlier history
+  does not dismiss this evidence.
+- **OBS-009/010:** the overview lists recorded activities, and selected nodes expose
+  primary evidence/linked-workflow actions directly. Compact conversation headers
+  leave opening context, ancestry and secondary evidence under disclosures.
 - **OBS-013/019/020:** shared conversations cannot make older cycles look newer.
   Document recency uses explicit activity timestamps. Producer-reported outcomes
   remain separate from execution evidence and child-attempt results.
 - **OBS-015:** preserve each workflow's search, selection and expansion during
   the app session, navigate linked workflows and return, and support keyboard
-  expansion and native button selection.
+  expansion and native button selection. Modified history arrows do not change
+  group expansion. Evidence-reading keys do not operate underlying playback.
+- **OBS-005/015:** Add/Edit keeps its heading, close and Cancel/Test/Save actions
+  visible while connection fields scroll; cancellation returns to Settings.

@@ -1,4 +1,4 @@
-import { ArrowLeft, Workflow } from "lucide-react";
+import { ArrowLeft, ArrowRight, Workflow } from "lucide-react";
 import {
   readableName,
   workflowActivity,
@@ -28,6 +28,8 @@ export function WorkflowView({
   error?: string;
   settings(): void;
 }) {
+  const activities = run.nodes.filter((item) => item.type === "activity");
+  const byId = new Map(run.nodes.map((item) => [item.id, item]));
   return (
     <section className="workflow-view panel-scroll">
       <UI.Button variant="ghost" size="sm" onClick={back}>
@@ -79,7 +81,7 @@ export function WorkflowView({
           </details>
         )}
       </section>
-      {node ? (
+      {node && (
         <WorkflowNodeContext
           run={run}
           node={node}
@@ -87,12 +89,46 @@ export function WorkflowView({
           openEvidence={openEvidence}
           openWorkflow={openWorkflow}
         />
-      ) : (
-        <p className="empty-inline">
-          Select an activity in the journey to read its conversation or
-          evidence.
-        </p>
       )}
+      <section className="workflow-records" aria-label="Recorded work">
+        <h2>Recorded work</h2>
+        <p className="hint">
+          Open an activity to read its conversation or evidence.
+        </p>
+        {activities.length ? (
+          <ul>
+            {activities.map((item) => (
+              <li key={item.id}>
+                <UI.Button
+                  variant="ghost"
+                  className={`workflow-record ${node?.id === item.id ? "selected" : ""}`}
+                  onClick={() => select(item)}
+                >
+                  <span>
+                    <strong>{item.title}</strong>
+                    <small>
+                      {item.parent && byId.get(item.parent)?.title}
+                      {item.parent && byId.has(item.parent) ? " · " : ""}
+                      {item.kind ?? "Activity"}
+                      {item.at !== undefined
+                        ? ` · ${recordedTime(item.at)}`
+                        : ""}
+                    </small>
+                    {item.status && (
+                      <small>Producer-reported: {item.status}</small>
+                    )}
+                  </span>
+                  <ArrowRight size={16} />
+                </UI.Button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="empty-inline">
+            No activities recorded. Explore available groups in the journey.
+          </p>
+        )}
+      </section>
       <p className="evidence-note">
         Groups organize records; links describe relationships. Selection and
         reported results do not establish live execution.

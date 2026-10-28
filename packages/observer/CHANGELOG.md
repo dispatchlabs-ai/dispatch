@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Desktop reading polish
+
+- Compact conversation headers and context so saved messages appear sooner.
+- Inspect exact workflow evidence beside the conversation, expanded with native
+  records, without moving playback.
+- Populate workflow overviews with recorded work and expose primary evidence and
+  linked-workflow actions directly; preserve modified-arrow history navigation.
+- Widen connection setup, separate transport/database fields, and keep the title
+  and Cancel/Test/Save controls visible while scrolling.
+
 ### Generic workflow journeys
 
 - Use one searchable, collapsible journey for native delegation, retained handoffs

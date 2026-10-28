@@ -1,13 +1,19 @@
 import { ExternalLink, FileText, Terminal, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type Ref } from "react";
 import { UI } from "./controls";
-import type { Activity, Task, Document } from "../shared/contracts";
+import type { Activity, Task, Document, Snapshot } from "../shared/contracts";
 import { MessageContent, ToolResult } from "./Content";
+import { Transcript } from "./Transcript";
 
 export type Selection =
   | { kind: "activity"; value: Activity }
   | { kind: "task"; value: Task }
   | { kind: "document"; value: Document };
+export type EvidenceView = {
+  title: string;
+  snapshot?: Snapshot;
+  error?: string;
+};
 export const pretty = (value: unknown) =>
   typeof value === "string" ? value : JSON.stringify(value, null, 2);
 export const time = (value?: number) =>
@@ -33,12 +39,15 @@ function Code({ value }: { value: unknown }) {
 }
 type DetailsProps = {
   selection?: Selection;
+  evidence?: EvidenceView;
   close(): void;
   historical: boolean;
   resizer: React.ReactNode;
   controls?: React.ReactNode;
 };
 export function Details(props: DetailsProps) {
+  const panel = useRef<HTMLElement>(null);
+  const evidenceOpener = useRef<HTMLElement | null>(null);
   const [narrow, setNarrow] = useState(
     () => matchMedia("(max-width:1180px)").matches,
   );
@@ -48,11 +57,33 @@ export function Details(props: DetailsProps) {
     media.addEventListener("change", change);
     return () => media.removeEventListener("change", change);
   }, []);
-  if (narrow && props.selection) {
+  const hasEvidence = Boolean(props.evidence);
+  useEffect(() => {
+    if (narrow || !hasEvidence) return;
+    evidenceOpener.current = document.activeElement as HTMLElement | null;
+    panel.current?.focus({ preventScroll: true });
+  }, [hasEvidence, narrow]);
+  const closeEvidence = () => {
+    props.close();
+    if (!narrow && evidenceOpener.current?.isConnected)
+      evidenceOpener.current.focus({ preventScroll: true });
+  };
+  const content = props.evidence ? (
+    <EvidencePanel
+      evidence={props.evidence}
+      close={closeEvidence}
+      resizer={props.resizer}
+      panelRef={panel}
+    />
+  ) : (
+    <DetailPanel {...props} />
+  );
+  if (narrow && (props.selection || props.evidence)) {
     const title =
-      props.selection.kind === "activity"
-        ? props.selection.value.title
-        : props.selection.value.kind;
+      props.evidence?.title ??
+      (props.selection!.kind === "activity"
+        ? props.selection!.value.title
+        : props.selection!.value.kind);
     return (
       <UI.Dialog
         open
@@ -62,25 +93,97 @@ export function Details(props: DetailsProps) {
           if (!open) props.close();
         }}
       >
-        <div className="detail-content">
-          <DetailPanel {...props} />
-        </div>
-        {props.selection.kind === "activity" && (
+        <div className="detail-content">{content}</div>
+        {!props.evidence && props.selection?.kind === "activity" && (
           <div className="mobile-playback">{props.controls}</div>
         )}
       </UI.Dialog>
     );
   }
-  return <DetailPanel {...props} />;
+  return content;
 }
-function DetailPanel({ selection, close, historical, resizer }: DetailsProps) {
+
+function EvidencePanel({
+  evidence,
+  close,
+  resizer,
+  panelRef,
+}: {
+  evidence: EvidenceView;
+  close(): void;
+  resizer: React.ReactNode;
+  panelRef: Ref<HTMLElement>;
+}) {
+  return (
+    <aside
+      className="detail-panel evidence-panel"
+      aria-label="Saved evidence"
+      tabIndex={-1}
+      ref={panelRef}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.stopPropagation();
+          close();
+        }
+      }}
+    >
+      {resizer}
+      <div className="detail-heading">
+        <div>
+          <p className="eyebrow">Saved evidence</p>
+          <h2>
+            {evidence.error
+              ? "Referenced evidence unavailable"
+              : evidence.title}
+          </h2>
+        </div>
+        <UI.Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Close evidence"
+          onClick={close}
+        >
+          <X />
+        </UI.Button>
+      </div>
+      <p className="hint">Latest observation · playback unchanged</p>
+      {evidence.error ? (
+        <p role="alert" className="notice">
+          {evidence.error}
+        </p>
+      ) : evidence.snapshot ? (
+        <Transcript
+          events={evidence.snapshot.activities}
+          conversations={evidence.snapshot.conversations}
+          expanded
+          onRead={() => {}}
+        />
+      ) : (
+        <p className="notice" role="status">
+          Reading saved entry…
+        </p>
+      )}
+      <UI.Button variant="outline" size="sm" onClick={close}>
+        Return to conversation
+      </UI.Button>
+    </aside>
+  );
+}
+function DetailPanel({
+  selection,
+  close,
+  historical,
+  resizer,
+}: DetailsProps) {
   if (!selection)
     return (
       <aside className="detail-panel empty-detail">
         {resizer}
         <FileText size={28} strokeWidth={1.3} />
         <h3>A closer look</h3>
-        <p>Select an event, task, or document to inspect the saved evidence.</p>
+        <p>
+          Select an event, task, or document to inspect the saved evidence.
+        </p>
       </aside>
     );
   const item = selection.value;
@@ -89,7 +192,9 @@ function DetailPanel({ selection, close, historical, resizer }: DetailsProps) {
       ? selection.value.title
       : selection.value.kind;
   const links = [
-    ...new Set(pretty(selection.value).match(/https?:\/\/[^\s"<>\\]+/g) ?? []),
+    ...new Set(
+      pretty(selection.value).match(/https?:\/\/[^\s"<>\\]+/g) ?? [],
+    ),
   ].filter((url) => {
     try {
       const parsed = new URL(url);
@@ -126,7 +231,9 @@ function DetailPanel({ selection, close, historical, resizer }: DetailsProps) {
             <span>Conversation {selection.value.conversationId}</span>
           </div>
           {selection.value.inherited && (
-            <p className="notice">Inherited from the recorded fork ancestry.</p>
+            <p className="notice">
+              Inherited from the recorded fork ancestry.
+            </p>
           )}
           {selection.value.tool ? (
             <>
@@ -158,8 +265,8 @@ function DetailPanel({ selection, close, historical, resizer }: DetailsProps) {
                     <h4>Latest retained live slot</h4>
                     <Code value={selection.value.tool.live} />
                     <p className="hint">
-                      This is the last observed slot, separate from the playback
-                      cursor.
+                      This is the last observed slot, separate from the
+                      playback cursor.
                     </p>
                   </>
                 )}
@@ -206,8 +313,10 @@ function DetailPanel({ selection, close, historical, resizer }: DetailsProps) {
           )}
           <p className="hint">
             Commit {selection.value.sequence}
-            {selection.value.taskId ? ` · Task ${selection.value.taskId}` : ""}.
-            Saved transcript content is not the exact provider request.
+            {selection.value.taskId
+              ? ` · Task ${selection.value.taskId}`
+              : ""}
+            . Saved transcript content is not the exact provider request.
           </p>
           <details className="detail-card">
             <summary>Native entry record</summary>

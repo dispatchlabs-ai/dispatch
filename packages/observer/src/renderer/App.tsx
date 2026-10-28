@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Bot,
-  ChevronRight,
   Database,
   FileText,
   GitBranch,
@@ -51,7 +50,13 @@ import {
   type WorkflowRun,
 } from "../shared/workflows";
 import { reconcileActivities } from "../shared/activities";
-import { Badge, Details, time, type Selection } from "./Details";
+import {
+  Badge,
+  Details,
+  time,
+  type EvidenceView,
+  type Selection,
+} from "./Details";
 import type {
   Activity,
   Connection,
@@ -64,7 +69,8 @@ import type {
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 const startsEarlier = (left: Snapshot, right: Snapshot) =>
-  (left.earliestSequence ?? Infinity) < (right.earliestSequence ?? Infinity) ||
+  (left.earliestSequence ?? Infinity) <
+    (right.earliestSequence ?? Infinity) ||
   (left.earliestSequence === right.earliestSequence &&
     (left.earliestId ?? Infinity) <= (right.earliestId ?? Infinity));
 function merge(previous: Snapshot | undefined, next: Snapshot): Snapshot {
@@ -125,11 +131,7 @@ export function App() {
   const [workflowTrail, setWorkflowTrail] = useState<string[]>([]);
   const [evidenceRequest, setEvidenceRequest] =
     useState<WorkflowNode["evidence"][number]>();
-  const [evidenceView, setEvidenceView] = useState<{
-    title: string;
-    snapshot?: Snapshot;
-    error?: string;
-  }>();
+  const [evidenceView, setEvidenceView] = useState<EvidenceView>();
   const [railWidth, setRailWidth] = useState(230);
   const [journeyWidth, setJourneyWidth] = useState(320);
   const [detailWidth, setDetailWidth] = useState(344);
@@ -459,8 +461,9 @@ export function App() {
       restoringView.current = false;
       return;
     }
-    if (!following && events[at])
+    if (!following && events[at]) {
       setSelection({ kind: "activity", value: events[at] });
+    }
   }, [at, following, viewed]);
 
   const captureView = (): ConversationView | undefined =>
@@ -556,6 +559,8 @@ export function App() {
     openConversation(destination.conversationId, destination);
   };
   const pause = (index?: number) => {
+    setEvidenceRequest(undefined);
+    setEvidenceView(undefined);
     if (snapshot) {
       setFrozen(snapshot);
       setFollowing(false);
@@ -564,12 +569,16 @@ export function App() {
     setPlaying(false);
   };
   const goLive = () => {
+    setEvidenceRequest(undefined);
+    setEvidenceView(undefined);
     setFollowing(true);
     setFollowTail(true);
     setPlaying(false);
     setFrozen(undefined);
   };
   const togglePlayback = () => {
+    setEvidenceRequest(undefined);
+    setEvidenceView(undefined);
     if (following) pause();
     else {
       if (cursor >= events.length - 1) setCursor(0);
@@ -577,20 +586,25 @@ export function App() {
     }
   };
   const selectActivity = (activity: Activity) => {
+    setEvidenceRequest(undefined);
+    setEvidenceView(undefined);
     const index = events.findIndex((item) => item.id === activity.id);
     if (following || index < 0)
-      pause(snapshot?.activities.findIndex((item) => item.id === activity.id));
+      pause(
+        snapshot?.activities.findIndex((item) => item.id === activity.id),
+      );
     else setCursor(index);
     setSelection({ kind: "activity", value: activity });
   };
-  const step = (direction: number) => {
-    if (following) pause(Math.max(0, events.length - 1 + direction));
-    else
-      setCursor((value) =>
-        Math.max(0, Math.min(events.length - 1, value + direction)),
-      );
+  const seek = (position: number) => {
+    setEvidenceRequest(undefined);
+    setEvidenceView(undefined);
+    if (following) pause(position);
+    else setCursor(position);
     setPlaying(false);
   };
+  const step = (direction: number) =>
+    seek(Math.max(0, Math.min(events.length - 1, at + direction)));
   const loadEarlier = async () => {
     const base = current.current;
     if (base?.earliestId === undefined || base.earliestSequence === undefined)
@@ -721,8 +735,8 @@ export function App() {
     ) {
       chooseConversation(member.conversation.id);
     } else {
-      void openLocal(member.connection, member.conversation.id).catch((error) =>
-        setError(errorMessage(error)),
+      void openLocal(member.connection, member.conversation.id).catch(
+        (error) => setError(errorMessage(error)),
       );
     }
   };
@@ -734,7 +748,9 @@ export function App() {
       openWorkflow(linked);
     }
   };
-  const openWorkflowEvidence = (evidence: WorkflowNode["evidence"][number]) => {
+  const openWorkflowEvidence = (
+    evidence: WorkflowNode["evidence"][number],
+  ) => {
     if (!evidence.member) return;
     setEvidenceView(undefined);
     setPlaying(false);
@@ -797,7 +813,8 @@ export function App() {
         if (!cancelled) setEvidenceView({ title, snapshot: value });
       })
       .catch((error) => {
-        if (!cancelled) setEvidenceView({ title, error: errorMessage(error) });
+        if (!cancelled)
+          setEvidenceView({ title, error: errorMessage(error) });
       })
       .finally(() => {
         if (!cancelled) setEvidenceRequest(undefined);
@@ -887,6 +904,8 @@ export function App() {
       )
         return;
       if (event.key === "Escape") {
+        setEvidenceRequest(undefined);
+        setEvidenceView(undefined);
         setSelection(undefined);
         setSidebar(false);
         return;
@@ -915,7 +934,7 @@ export function App() {
       }
       if (
         target.closest(
-          "input,textarea,select,button,summary,pre,.table-scroll,[contenteditable=true],[role=separator],[role=tab],[role=dialog]",
+          "input,textarea,select,button,summary,pre,.table-scroll,.evidence-panel,[contenteditable=true],[role=separator],[role=tab],[role=dialog]",
         ) ||
         event.metaKey ||
         event.ctrlKey ||
@@ -1013,7 +1032,7 @@ export function App() {
         </div>
       </header>
       <div
-        className={`workspace ${sidebar ? "sidebar-open" : ""} ${!home && !workflowOverview && selection ? "has-selection" : ""}`}
+        className={`workspace ${sidebar ? "sidebar-open" : ""} ${!home && !workflowOverview && (selection || evidenceView) ? "has-selection" : ""}`}
       >
         <aside className="sidebar" aria-label="Work navigation">
           <UI.Button
@@ -1168,7 +1187,9 @@ export function App() {
           <PaneResizer
             label="Resize navigation pane"
             value={!home && currentWorkflow ? journeyWidth : railWidth}
-            onChange={!home && currentWorkflow ? setJourneyWidth : setRailWidth}
+            onChange={
+              !home && currentWorkflow ? setJourneyWidth : setRailWidth
+            }
           />
         </aside>
         {sidebar && (
@@ -1177,41 +1198,6 @@ export function App() {
             aria-label="Close navigation"
             onClick={() => setSidebar(false)}
           />
-        )}
-        {evidenceView && (
-          <UI.Dialog
-            open
-            title={evidenceView.title}
-            onOpenChange={(open) => {
-              if (!open) {
-                setEvidenceRequest(undefined);
-                setEvidenceView(undefined);
-              }
-            }}
-          >
-            <p className="hint">
-              Latest saved evidence · the conversation playback position is
-              unchanged.
-            </p>
-            {evidenceView.error ? (
-              <p role="alert" className="notice">
-                {evidenceView.error}
-              </p>
-            ) : evidenceView.snapshot ? (
-              <Transcript
-                events={evidenceView.snapshot.activities}
-                conversations={evidenceView.snapshot.conversations}
-                inspect={(item) => {
-                  setEvidenceRequest(undefined);
-                  setEvidenceView(undefined);
-                  setSelection({ kind: "activity", value: item });
-                }}
-                onRead={() => {}}
-              />
-            ) : (
-              <p>Reading saved entry…</p>
-            )}
-          </UI.Dialog>
         )}
         <main className="main-panel">
           {home ? (
@@ -1281,8 +1267,8 @@ export function App() {
                 behind the answer.
               </h1>
               <p>
-                Follow your agents, explore their tools and subagents, and step
-                through what happened.
+                Follow your agents, explore their tools and subagents, and
+                step through what happened.
               </p>
               <UI.Button onClick={() => openSettings()}>
                 <Settings2 />
@@ -1403,8 +1389,6 @@ export function App() {
                   ) : (
                     <span>{connection.name}</span>
                   )}
-                  <ChevronRight size={13} />
-                  <span>{selectedConversation?.title ?? "Conversations"}</span>
                 </div>
                 <h1>{title}</h1>
                 <div className="heading-meta">
@@ -1440,49 +1424,52 @@ export function App() {
                         activity {recordedTime(selectedConversation.lastAt)}
                       </span>
                     </div>
-                    <div>
-                      <strong>
-                        {selectedConversation.response &&
-                        reportedResult(selectedConversation.response.text)
-                          ? `Reported result: ${reportedResult(selectedConversation.response.text)}`
-                          : "Latest saved response"}
-                      </strong>
-                      <span>
-                        {selectedConversation.response
-                          ? recordedTime(selectedConversation.response.at)
-                          : "No saved assistant response"}
-                      </span>
-                    </div>
-                    {selectedConversation.response && (
-                      <UI.Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setPlaying(false);
-                          setFollowTail(false);
-                          setTab("conversation");
-                          const entryId =
-                            selectedConversation.response!.entryId;
-                          const response = events.findLast(
-                            (item) =>
-                              item.entryId === entryId &&
-                              item.role === "assistant" &&
-                              item.category === "message",
-                          );
-                          if (!response) setResponseOpen(true);
-                          else
-                            requestAnimationFrame(() =>
-                              transcriptPane.current
-                                ?.querySelector<HTMLElement>(
-                                  `[data-event-id="${response.id}"]`,
-                                )
-                                ?.scrollIntoView({ block: "start" }),
+                    <div className="response-summary">
+                      {selectedConversation.response &&
+                        reportedResult(
+                          selectedConversation.response.text,
+                        ) && (
+                          <strong>
+                            Reported result:{" "}
+                            {reportedResult(
+                              selectedConversation.response.text,
+                            )}
+                          </strong>
+                        )}
+                      {selectedConversation.response ? (
+                        <UI.Button
+                          variant="link"
+                          size="sm"
+                          title={`Saved response · ${recordedTime(selectedConversation.response.at)}`}
+                          onClick={() => {
+                            setPlaying(false);
+                            setFollowTail(false);
+                            setTab("conversation");
+                            const entryId =
+                              selectedConversation.response!.entryId;
+                            const response = events.findLast(
+                              (item) =>
+                                item.entryId === entryId &&
+                                item.role === "assistant" &&
+                                item.category === "message",
                             );
-                        }}
-                      >
-                        Read latest response <ArrowRight size={14} />
-                      </UI.Button>
-                    )}
+                            if (!response) setResponseOpen(true);
+                            else
+                              requestAnimationFrame(() =>
+                                transcriptPane.current
+                                  ?.querySelector<HTMLElement>(
+                                    `[data-event-id="${response.id}"]`,
+                                  )
+                                  ?.scrollIntoView({ block: "start" }),
+                              );
+                          }}
+                        >
+                          Read latest response <ArrowRight size={14} />
+                        </UI.Button>
+                      ) : (
+                        <span>No saved assistant response</span>
+                      )}
+                    </div>
                   </div>
                 )}
               </header>
@@ -1493,6 +1480,7 @@ export function App() {
                   select={selectWorkflowNode}
                   openEvidence={openWorkflowEvidence}
                   openWorkflow={openLinkedWorkflow}
+                  compact
                 />
               )}
               {workflowId && !runs.some((run) => run.id === workflowId) && (
@@ -1587,7 +1575,11 @@ export function App() {
                         snapshot={snapshot}
                         conversationId={conversationId}
                         selection={selection}
-                        onSelection={setSelection}
+                        onSelection={(value) => {
+                          setEvidenceRequest(undefined);
+                          setEvidenceView(undefined);
+                          setSelection(value);
+                        }}
                         onConversation={(id) =>
                           id === conversationId
                             ? setTab("conversation")
@@ -1616,7 +1608,9 @@ export function App() {
                         <select
                           aria-label="Event type"
                           value={category}
-                          onChange={(event) => setCategory(event.target.value)}
+                          onChange={(event) =>
+                            setCategory(event.target.value)
+                          }
                         >
                           <option value="all">All events</option>
                           <option value="tool">Tools</option>
@@ -1727,7 +1721,7 @@ export function App() {
                               : undefined
                           }
                           inWorkflow={Boolean(currentWorkflow)}
-                          compact={Boolean(currentNode)}
+                          compact
                         />
                       )}
                       {viewed?.hasEarlier && (
@@ -1741,9 +1735,7 @@ export function App() {
                         </UI.Button>
                       )}
                       <p className="transcript-note">
-                        Saved transcript, including retained reset and
-                        compaction boundaries. It is not a reconstruction of the
-                        exact model context.
+                        Saved transcript · not the exact model context.
                       </p>
                       <Transcript
                         events={events}
@@ -1777,68 +1769,76 @@ export function App() {
             </>
           )}
         </main>
-        {!home && !workflowOverview && connection && selection && (
-          <Details
-            selection={detailSelection}
-            historical={!following}
-            close={() => setSelection(undefined)}
-            controls={
-              <>
-                <UI.Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Previous event in details"
-                  disabled={at <= 0}
-                  onClick={() => step(-1)}
-                >
-                  <ArrowLeft />
-                </UI.Button>
-                <UI.Button
-                  variant="secondary"
-                  size="icon"
-                  aria-label={
-                    playing
-                      ? "Pause playback in details"
-                      : "Play events in details"
-                  }
-                  onClick={togglePlayback}
-                >
-                  {playing ? <Pause /> : <Play />}
-                </UI.Button>
-                <UI.Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Next event in details"
-                  disabled={at >= events.length - 1}
-                  onClick={() => step(1)}
-                >
-                  <ArrowRight />
-                </UI.Button>
-                <span>
-                  {at + 1} / {events.length}
-                </span>
-                <UI.Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    goLive();
-                    setSelection(undefined);
-                  }}
-                >
-                  Live
-                </UI.Button>
-              </>
-            }
-            resizer={
-              <PaneResizer
-                label="Resize details pane"
-                value={detailWidth}
-                onChange={setDetailWidth}
-                reverse
-              />
-            }
-          />
-        )}
+        {!home &&
+          !workflowOverview &&
+          connection &&
+          (selection || evidenceView) && (
+            <Details
+              selection={detailSelection}
+              evidence={evidenceView}
+              historical={!following}
+              close={() => {
+                setEvidenceRequest(undefined);
+                setEvidenceView(undefined);
+                setSelection(undefined);
+              }}
+              controls={
+                <>
+                  <UI.Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Previous event in details"
+                    disabled={at <= 0}
+                    onClick={() => step(-1)}
+                  >
+                    <ArrowLeft />
+                  </UI.Button>
+                  <UI.Button
+                    variant="secondary"
+                    size="icon"
+                    aria-label={
+                      playing
+                        ? "Pause playback in details"
+                        : "Play events in details"
+                    }
+                    onClick={togglePlayback}
+                  >
+                    {playing ? <Pause /> : <Play />}
+                  </UI.Button>
+                  <UI.Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Next event in details"
+                    disabled={at >= events.length - 1}
+                    onClick={() => step(1)}
+                  >
+                    <ArrowRight />
+                  </UI.Button>
+                  <span>
+                    {at + 1} / {events.length}
+                  </span>
+                  <UI.Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      goLive();
+                      setSelection(undefined);
+                    }}
+                  >
+                    Live
+                  </UI.Button>
+                </>
+              }
+              resizer={
+                <PaneResizer
+                  label="Resize details pane"
+                  value={detailWidth}
+                  onChange={setDetailWidth}
+                  reverse
+                />
+              }
+            />
+          )}
       </div>
       {!home && !workflowOverview && (
         <footer className="playback-bar" aria-label="Recorded event playback">
@@ -1856,7 +1856,11 @@ export function App() {
               disabled={!events.length}
               onClick={togglePlayback}
             >
-              {following || playing ? <Pause size={17} /> : <Play size={17} />}
+              {following || playing ? (
+                <Pause size={17} />
+              ) : (
+                <Play size={17} />
+              )}
             </UI.Button>
             <div className="playback-mode">
               <strong>
@@ -1898,11 +1902,7 @@ export function App() {
                 size="icon-sm"
                 disabled={!events.length}
                 aria-label="First saved event"
-                onClick={() => {
-                  if (following) pause(0);
-                  else setCursor(0);
-                  setPlaying(false);
-                }}
+                onClick={() => seek(0)}
               >
                 <SkipBack />
               </UI.Button>
@@ -1928,12 +1928,7 @@ export function App() {
                   ? `Event ${at + 1}: ${events[at].title}`
                   : "No events"
               }
-              onChange={(event) => {
-                const position = Number(event.target.value);
-                if (following) pause(position);
-                else setCursor(position);
-                setPlaying(false);
-              }}
+              onChange={(event) => seek(Number(event.target.value))}
             />
             <div className="step-buttons">
               <UI.Button
@@ -1950,11 +1945,7 @@ export function App() {
                 size="icon-sm"
                 disabled={!events.length}
                 aria-label="Last saved event"
-                onClick={() => {
-                  if (following) pause();
-                  else setCursor(events.length - 1);
-                  setPlaying(false);
-                }}
+                onClick={() => seek(events.length - 1)}
               >
                 <SkipForward />
               </UI.Button>
