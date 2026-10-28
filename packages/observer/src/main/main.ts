@@ -105,7 +105,7 @@ function createWindow() {
   window = new BrowserWindow({
     width: 1440,
     height: 940,
-    minWidth: 360,
+    minWidth: 900,
     minHeight: 600,
     title: "Dispatch Observer",
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#151d1b" : "#f4f6f3",
@@ -157,6 +157,7 @@ else {
     );
     session.defaultSession.setPermissionCheckHandler(() => false);
     handle("preferences", () => preferences.get());
+    handle("local-work", () => service("local-work"));
     handle("choose-file", async (kind) => {
       z.enum(["sqlite", "identity", "certificate"]).parse(kind);
       const result = await dialog.showOpenDialog(window!, {

@@ -4,6 +4,36 @@ Observer reads supported Pi stores from a local desktop. The selected source,
 logical store, and conversation define the inspection scope. No hosted account,
 model credentials, new telemetry database, or agent-side instrumentation is needed.
 
+## This machine
+
+The app starts on **This machine**, refreshing about every five seconds. On macOS
+and Linux, `lsof` identifies existing `.sqlite`, `.sqlite3`, and `.db` files open
+for writing by the current user's processes. Observer validates Pi's schema and
+reads supported stores without opening an execution owner. It does not crawl
+directories, request elevated permissions, or inspect remote machines.
+
+Stores with unfinished conversations appear first. **Process observed** means a
+process had the store open at the shown observation time, not that an LLM is
+currently generating. Unfinished tasks may be waiting or sleeping. Idle stores
+offer **View saved conversations**; **Show completed conversations** reveals retained
+history. Search filters stores by agent name, path, or conversation title.
+
+Clicking a conversation saves/reuses its local connection and opens **Conversation**.
+The saved integration title is preferred, with the first retained assignment as a
+fallback. Markdown messages and inline tool rows stay in recorded order. Expand
+a call or result to read it; shell commands preserve real line breaks, with the
+full arguments available separately. Native details open only on request.
+
+Discovery failure retains the last observed list and labels it stale. Stopped
+processes disappear after a successful refresh; saved connections remain usable.
+Windows discovery is not implemented. Processes hidden by OS permissions, stores
+without a writable open handle, extensionless files, remote/Postgres stores, and
+non-Pi runtimes require explicit connections or are outside discovery coverage.
+No process is started, stopped, resumed or instrumented.
+
+Observer is a desktop app, with a 900 px minimum window width. Mobile layouts
+are not a current requirement; earlier small-layout checks below are historical.
+
 ## Connection setup
 
 **Local SQLite:** choose SQLite, keep Direct connection, and browse to an existing
@@ -137,6 +167,18 @@ going back replaces the forward path. Switching connections clears history;
 reconnecting the current connection preserves it.
 
 ## Compatibility and qualification
+
+Local-work qualification (October 28, 2026): the packaged macOS ARM64 app
+discovered live local Pi stores, put unfinished conversations first, reused a
+saved connection, and opened the selected conversation directly. Saved integration
+titles, automatic arrival of new entries, inline multiline commands/results,
+history navigation with Alt+Left, search/no-match recovery, and the all-conversations
+toggle were checked interactively. Home and conversation layouts were reviewed at
+1440×900 and 1280×720. Workspace type/build checks and macOS packaging passed;
+no automated tests were added or run. Linux discovery, unavailable-lsof recovery,
+process-exit discovery refresh, and remote regressions were not exercised in this
+refinement. Windows discovery is explicitly unavailable. Mobile qualification
+was removed from the current scope.
 
 Navigation qualification (October 27, 2026): the packaged macOS ARM64 app was
 checked interactively for Back/Forward navigation. A synthetic renderer preview

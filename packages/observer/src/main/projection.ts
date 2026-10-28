@@ -254,9 +254,10 @@ export function project(raw: RawSnapshot, source: Connection): Snapshot {
     storeId: source.kind === "postgres" ? source.postgres.storeId : undefined,
     conversations: safe.conversations.map((item) => {
       const last = item.latestEntry?.model?.at(-1);
+      const assignment = text(item.firstEntry?.model?.find((message: RecordData) => message.role === "user")?.content).replace(/\s+/g, " ").trim();
       return {
         id: item.record.id,
-        title: names.get(item.record.id) ?? `Conversation ${item.record.id}`,
+        title: names.get(item.record.id) ?? (assignment ? assignment.slice(0, 110) + (assignment.length > 110 ? "…" : "") : `Conversation ${item.record.id}`),
         owner: item.record.owner,
         parent: item.record.parent,
         entryCount: item.entryCount,

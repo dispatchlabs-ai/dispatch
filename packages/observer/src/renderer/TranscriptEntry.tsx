@@ -49,6 +49,9 @@ export function TranscriptEntry({
   );
   if (item.tool) {
     const result = item.tool.phase === "result";
+    const args = item.tool.arguments;
+    const command = args && typeof args === "object" && "command" in args && typeof args.command === "string"
+      ? args.command : undefined;
     return (
       <article
         data-event-id={item.id}
@@ -86,10 +89,13 @@ export function TranscriptEntry({
               {result ? (
                 <ToolResult activity={item} />
               ) : (
-                <CodeBlock
-                  text={JSON.stringify(item.tool.arguments ?? {}, null, 2)}
-                  label="Tool arguments"
-                />
+                <>
+                  {command !== undefined && <CodeBlock text={command} label="Command" />}
+                  {command === undefined ? <CodeBlock text={JSON.stringify(args ?? {}, null, 2)} label="Tool arguments" /> :
+                    <details className="argument-details"><summary>All arguments</summary>
+                      <CodeBlock text={JSON.stringify(args, null, 2)} label="Tool arguments" />
+                    </details>}
+                </>
               )}
               {result && item.tool.truncated && (
                 <p className="notice">

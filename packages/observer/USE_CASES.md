@@ -23,8 +23,13 @@ proof of platform qualification.
 
 ## Understand current work
 
+**Current focus, October 28, 2026:** discover work on this machine, then open a
+human-readable conversation with inline tool calls. Remote discovery and execution
+controls are not part of this refinement; existing explicit connections remain.
+
 | ID | User goal | Required observable outcome |
 | --- | --- | --- |
+| OBS-018 | Find local agents without knowing database paths. | Start on This machine; refresh discovered Pi SQLite stores opened for writing by the current user's processes. Put stores with unfinished conversations first and distinguish process presence from task execution. Click a conversation to open its formatted transcript. Preserve manual connections, report discovery failure separately from an empty result, and exclude stopped stores from discovery without deleting their saved connections/history. |
 | OBS-006 | Follow an active agent. | Show its current retained task/activity, recent tool calls, latest conversation content, and last successful observation time. New commits refresh the view. Pausing following preserves the selected event while the agent continues. Agent execution and database connectivity have separate status indicators. |
 | OBS-007 | Follow delegation. | Expand recorded parent/child conversation and task relationships, select a child, and inspect its assignment, conversation, tools, and outcome. Back/Forward restore the prior inspection view; Parent conversation returns through native ownership. Navigation never resumes agent work or playback. History stays within the selected source. Waiting parents and working children remain distinguishable. Missing or cross-store links are labeled; similar names or timestamps do not establish a relationship. |
 | OBS-008 | Inspect a tool call. | Show the retained tool name, arguments, result, duration, error, and native identity when available. Match calls to results by recorded identity. Distinguish an in-progress call, a recorded failure, truncated output, redacted content, and a result that was not retained. |

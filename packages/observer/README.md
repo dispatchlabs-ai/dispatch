@@ -4,6 +4,12 @@ A local Electron app for following Pi Durable agents and stepping through their
 saved activity. Inspect conversations, tool calls and results, child agents,
 native tasks, and workflow documents in one read-only workspace.
 
+Start on **This machine** to discover local Pi SQLite stores open by your user's
+processes. Unfinished conversations appear first; click one to open its formatted
+conversation with expandable inline tool calls and results. Discovery requires
+macOS or Linux with `lsof`; other stores remain available through Add connection.
+Process presence and saved task status are shown separately.
+
 **Implemented, October 22, 2026.** The macOS Apple Silicon build has been exercised
 with local SQLite, direct/TLS Postgres, Postgres over SSH, and remote SQLite over
 SSH and AWS SSM. Windows/Linux desktop execution and Postgres over SSM remain

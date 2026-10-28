@@ -30,10 +30,12 @@ import { ConnectionDialog } from "./ConnectionDialog";
 import { Structure } from "./Structure";
 import { PaneResizer } from "./PaneResizer";
 import { TranscriptEntry } from "./TranscriptEntry";
+import { LocalWork } from "./LocalWork";
 import { reconcileActivities } from "../shared/activities";
 import { Badge, Details, time, type Selection } from "./Details";
 import type {
   Activity,
+  Connection,
   Preferences,
   SavedConnection,
   Snapshot,
@@ -92,6 +94,7 @@ type ConversationView = {
 };
 
 export function App() {
+  const [home, setHome] = useState(true);
   const [railWidth, setRailWidth] = useState(230);
   const [detailWidth, setDetailWidth] = useState(344);
   const [preferences, setPreferences] = useState<Preferences>();
@@ -112,7 +115,7 @@ export function App() {
   const [cursor, setCursor] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
-  const [tab, setTab] = useState("structure");
+  const [tab, setTab] = useState("conversation");
   const [selection, setSelection] = useState<Selection>();
   const restoringView = useRef(false);
   const [query, setQuery] = useState("");
@@ -158,7 +161,8 @@ export function App() {
     return value;
   }, []);
   const connect = useCallback(
-    async (id: string, preserve = false) => {
+    async (id: string, preserve = false, requestedConversation?: number) => {
+      setHome(false);
       preserve = preserve && current.current?.sourceId === id;
       const turn = ++generation.current;
       setStatus("connecting");
@@ -166,6 +170,7 @@ export function App() {
       setConnectionId(id);
       setSidebar(false);
       if (!preserve) {
+        setTab("conversation");
         setHistory({ back: [], forward: [] });
         current.current = undefined;
         setSnapshot(undefined);
@@ -185,7 +190,9 @@ export function App() {
           current.current = catalog;
           setSnapshot(catalog);
           setConversationId(
-            catalog.conversations.find((item) => !item.owner)?.id ??
+            catalog.conversations.find((item) => item.id === requestedConversation)?.id ??
+              catalog.conversations.find((item) => item.active > 0 && !item.owner)?.id ??
+              catalog.conversations.find((item) => !item.owner)?.id ??
               catalog.conversations[0]?.id,
           );
         }
@@ -204,10 +211,6 @@ export function App() {
   useEffect(() => {
     mounted.current = true;
     void refreshPreferences()
-      .then((value) => {
-        if (value.lastConnection && mounted.current)
-          void connect(value.lastConnection);
-      })
       .catch((error) => setError(errorMessage(error)));
     return () => {
       mounted.current = false;
@@ -228,7 +231,7 @@ export function App() {
     return () => media.removeEventListener("change", update);
   }, [preferences?.theme, preferences?.platform]);
   useEffect(() => {
-    if (status !== "connected" || !connectionId) return;
+    if (home || status !== "connected" || !connectionId) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const refresh = async () => {
@@ -276,7 +279,7 @@ export function App() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [connectionId, conversationId, status, pollRevision]);
+  }, [home, connectionId, conversationId, status, pollRevision]);
   useEffect(() => {
     if (!playing || following) return;
     const timer = setInterval(
@@ -340,13 +343,14 @@ export function App() {
     setPlaying(false);
     setFrozen(view?.frozen);
     setCursor(view?.cursor ?? 0);
-    setTab(view?.tab ?? tab);
+    setTab(view?.tab ?? "conversation");
     setSelection(view?.selection);
     setActivityQuery(view?.activityQuery ?? "");
     setCategory(view?.category ?? "all");
     setSidebar(false);
   };
   const chooseConversation = (id: number) => {
+    setHome(false);
     if (id === conversationId) return;
     const previous = captureView();
     setHistory((value) => ({
@@ -480,6 +484,14 @@ export function App() {
     await window.observer.theme(next);
     await refreshPreferences();
   };
+  const openLocal = async (candidate: Connection, id?: number) => {
+    const existing = preferences?.connections.find(item =>
+      item.kind === "sqlite" && item.transport.kind === "direct" && item.path === candidate.path,
+    );
+    const saved = existing ?? await window.observer.save({ connection: candidate, rememberSecret: false });
+    await refreshPreferences();
+    await connect(saved.id, false, id);
+  };
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
       if (dialog) return;
@@ -488,6 +500,7 @@ export function App() {
         setSidebar(false);
         return;
       }
+      if (home) return;
       const target = event.target as HTMLElement;
       if (
         !target.closest(
@@ -532,16 +545,7 @@ export function App() {
     document.addEventListener("keydown", keyboard);
     return () => document.removeEventListener("keydown", keyboard);
   });
-  const title =
-    events
-      .find(
-        (item) =>
-          item.role === "user" && item.conversationId === conversationId,
-      )
-      ?.text.split("\n")[0]
-      .slice(0, 110) ||
-    selectedConversation?.title ||
-    "Choose a conversation";
+  const title = selectedConversation?.title ?? "Choose a conversation";
   const visibleActivities = events.filter(
     (activity) =>
       (category === "all" || activity.category === category) &&
@@ -618,9 +622,14 @@ export function App() {
         </div>
       </header>
       <div
-        className={`workspace ${sidebar ? "sidebar-open" : ""} ${selection ? "has-selection" : ""}`}
+        className={`workspace ${sidebar ? "sidebar-open" : ""} ${!home && selection ? "has-selection" : ""}`}
       >
         <aside className="sidebar" aria-label="Connections and conversations">
+          <UI.Button variant={home ? "secondary" : "ghost"} className="machine-button" onClick={() => {
+            setHome(true);
+            setPlaying(false);
+            setSidebar(false);
+          }}><Workflow size={18} />This machine</UI.Button>
           <div className="rail-heading">
             <h2>Connections</h2>
             <UI.Button
@@ -693,7 +702,7 @@ export function App() {
               </div>
             ))}
           </nav>
-          {connection && (
+          {!home && connection && (
             <>
               <div className="rail-heading conversation-heading">
                 <h2>Conversations</h2>
@@ -792,7 +801,9 @@ export function App() {
           />
         )}
         <main className="main-panel">
-          {!connection ? (
+          {home ? (
+            <LocalWork open={openLocal} add={() => setDialog("new")} />
+          ) : !connection ? (
             <div className="welcome">
               <div className="welcome-symbol">
                 <Workflow size={36} strokeWidth={1.4} />
@@ -1133,7 +1144,7 @@ export function App() {
             </>
           )}
         </main>
-        {connection && (
+        {!home && connection && selection && (
           <Details
             selection={detailSelection}
             historical={!following}
@@ -1196,7 +1207,7 @@ export function App() {
           />
         )}
       </div>
-      <footer className="playback-bar" aria-label="Recorded event playback">
+      {!home && <footer className="playback-bar" aria-label="Recorded event playback">
         <div className="playback-controls">
           <UI.Button
             variant="secondary"
@@ -1321,7 +1332,7 @@ export function App() {
               ? `Commit ${snapshot.sequence}`
               : "Retained evidence only"}
         </span>
-      </footer>
+      </footer>}
       {dialog && preferences && (
         <ConnectionDialog
           key={dialog === "new" ? "new" : dialog.id}

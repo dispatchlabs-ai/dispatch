@@ -90,6 +90,7 @@ export type RawSnapshot = {
     record: RecordData;
     entryCount: number;
     latestEntry?: RecordData;
+    firstEntry?: RecordData;
     active: number;
     failed: number;
   }[];
@@ -191,7 +192,13 @@ export type Preferences = {
   platform: string;
 };
 export type Probe = { stores: string[]; message: string };
+export type LocalWork = {
+  observedAt: string;
+  stores: { connection: Connection; pids: number[]; conversations: Conversation[] }[];
+  issues: string[];
+};
 export type ObserverApi = {
+  localWork(): Promise<LocalWork>;
   preferences(): Promise<Preferences>;
   chooseFile(
     kind: "sqlite" | "identity" | "certificate",

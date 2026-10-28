@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Start on This machine with read-only local Pi store discovery, unfinished work
+  first, separate process/task evidence, search, and one-click conversation access.
+  Keep manual connections and historical inspection.
+- Open Conversation by default, prefer saved chat titles, hide the unused inspector,
+  and display shell arguments as multiline commands beside inline tool results.
+
 - Add Back, Forward, and Parent conversation controls with keyboard navigation.
   Returning to a conversation restores its inspection tab, filters, selected
   evidence, and live/paused viewing state without resuming playback or agent work.

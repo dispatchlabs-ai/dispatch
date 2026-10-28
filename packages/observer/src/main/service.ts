@@ -1,6 +1,7 @@
 import { Source } from "./source";
 import { connectionSchema, readRequestSchema } from "../shared/contracts";
 import { redact } from "./projection";
+import { localWork } from "./local";
 
 type Port = {
   on(event: "message", listener: (event: { data: any }) => void): void;
@@ -14,7 +15,9 @@ port.on("message", ({ data }) => {
   serial = serial.then(async () => {
     try {
       let result: unknown;
-      if (data.operation === "probe") {
+      if (data.operation === "local-work") {
+        result = await localWork();
+      } else if (data.operation === "probe") {
         const candidate = new Source(
           connectionSchema.parse(data.connection),
           data.password,

@@ -13,6 +13,14 @@ remain the original synthetic ImageGen concepts, not runtime captures.
 
 ## Product direction
 
+**Refinement, October 28, 2026:** the default entry point is **This machine**, not
+connection setup. Show locally observed agent stores with unfinished conversations
+first. A click opens Conversation; Structure, Timeline and playback remain
+secondary inspection tools. The inspector occupies space only when opened.
+This supersedes the connection-first starting flow below without removing saved
+connections or remote inspection. Discovery observes writable local SQLite file
+handles and validates Pi schemas; it does not infer execution from task age.
+
 The approved starting point is the earlier agent-inspector concept: a restrained
 white/gray workspace, a clear task hierarchy or timeline, and an adjacent detail
 pane. Extend it into a desktop application with saved source connections and
@@ -242,11 +250,12 @@ nodes are needed. The work and its evidence are the visual focus.
 
 ### Window sizes and keyboard use
 
-Qualify the implementation at 1440×900 and 1280×720, then verify a stacked/drawer
-layout at 768×1024 and a single-pane fallback at 390×844. The small layout is a
-resizing/accessibility check, not a mobile application promise. Hide the help rail
-first, make the source list a drawer, and open detail as a focused pane before
-squeezing readable text. Long tool lines scroll within their panel.
+**Desktop-only scope, October 28, 2026:** qualify the implementation at 1440×900
+and 1280×720. The Electron window has a 900 px minimum width. Phone/mobile layout
+qualification is no longer required; this supersedes the earlier 768×1024 and
+390×844 acceptance requirement. Existing small-layout styles are not a supported
+mobile product. At narrower desktop sizes, details open in a drawer rather than
+squeezing the conversation. Long tool lines scroll within their panel.
 
 Use platform-native title bars and dialogs; the macOS traffic lights in the
 references are not to be drawn on Windows or Linux. Provide tab order, visible

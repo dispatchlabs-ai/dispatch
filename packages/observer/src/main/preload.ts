@@ -7,6 +7,7 @@ const invoke = async (operation: string, ...args: unknown[]) => {
   return reply.result;
 };
 const api: ObserverApi = {
+  localWork: () => invoke("local-work"),
   preferences: () => invoke("preferences"),
   chooseFile: (kind) => invoke("choose-file", kind),
   probe: (draft) => invoke("probe", draft),

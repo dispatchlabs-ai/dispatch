@@ -112,6 +112,29 @@ strong {
   flex-direction: column;
   background: var(--background);
 }
+.machine-button { margin: 16px 12px 4px; justify-content: flex-start; }
+.local-work { overflow: auto; padding: 32px; }
+.local-heading { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+.local-heading h1 { font-size: 28px; margin: 8px 0; letter-spacing: -0.7px; }
+.local-heading p:not(.eyebrow), .local-summary, .local-idle { color: var(--subtle); }
+.local-summary { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 24px 0; font-size: 12px; }
+.local-summary strong { color: var(--foreground); }
+.local-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
+.local-filters .search-field { margin: 0; flex: 1; min-width: 180px; }
+.local-stores { display: grid; gap: 20px; }
+.local-store { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.local-store > header { display: flex; align-items: center; gap: 12px; padding: 16px; background: var(--rail); }
+.local-store > header > div { flex: 1; min-width: 0; }
+.local-store h2 { font-size: 15px; text-transform: capitalize; }
+.local-path { overflow-wrap: anywhere; font-size: 11px; color: var(--subtle); margin-top: 4px; }
+.local-presence { font-size: 11px; color: var(--subtle); flex-shrink: 0; }
+.local-conversation { display: flex; width: 100%; height: auto; white-space: normal; text-align: left; padding: 16px; gap: 16px; border-radius: 0; border-top: 1px solid var(--border); }
+.local-conversation > span:first-child { flex: 1; min-width: 0; }
+.local-conversation strong { display: block; overflow-wrap: anywhere; line-height: 1.5; }
+.local-conversation small { display: block; color: var(--subtle); margin-top: 6px; font-weight: 400; }
+.local-work-status { color: var(--subtle); font-size: 11px; font-weight: 400; }
+.local-idle { padding: 16px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; }
+.local-work .evidence-note { margin-top: 24px; }
 .window-bar {
   height: 54px;
   flex-shrink: 0;
@@ -167,7 +190,7 @@ strong {
   min-height: 0;
   overflow: hidden;
 }
-.workspace:has(.welcome) {
+.workspace:not(:has(.detail-panel)) {
   grid-template-columns: var(--rail-width) minmax(0, 1fr);
 }
 .sidebar {
@@ -1561,7 +1584,7 @@ pre {
     display: none;
   }
   .workspace,
-  .workspace:has(.welcome) {
+  .workspace:not(:has(.detail-panel)) {
     grid-template-columns: minmax(0, 1fr);
   }
   .sidebar {
