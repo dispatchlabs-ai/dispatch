@@ -73,6 +73,13 @@ New mention and DM conversations include `origin.slack` with `teamId`,
 `channelId` and `threadTs` for a company initializer. Existing report origins
 are preserved.
 
+`onActionToken` optionally hands an incoming search credential and its verified
+workspace/channel/thread/requester identity to trusted host code before input
+admission. Keep this callback local and idempotent: redelivery may repeat it.
+Tokens never enter native task input or model context. The host owns secure
+credential storage, expiry handling and any search policy; the callback alone
+does not authorize a conversation or expand Slack scopes.
+
 ## Publish a report with a discussion
 
 Retain the adapter returned by `slack()` and use its `publish` method after the

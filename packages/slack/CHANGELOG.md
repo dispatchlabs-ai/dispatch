@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Hand event-scoped search credentials to an optional trusted host callback
+  without recording bearer tokens in native transcripts or model context.
+
 - Keep the native thread working indicator alive across tool work and stream
   rollover, clear it on completion, and preserve delivery when status calls fail.
   Read fresh native state when queued or completing turns refresh thread status.

@@ -18,6 +18,10 @@
 - **SLK-005 — Share a workspace:** allow an agent in invited channels and DMs;
   direct explicit mentions to the intended bot and keep another bot's threads
   from becoming competing automatic conversations.
+- **SLK-006 — Bind search credentials:** hand an eligible event's action token
+  and verified origin to trusted host code without putting credentials in native
+  input. Redelivery can refresh that handoff without duplicating the message;
+  a failed handoff leaves the event unacknowledged for retry.
 
 Slack app creation, workspace invitations, company policy and business research
 belong to administrators or company definitions. The package does not infer those

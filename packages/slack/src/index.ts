@@ -52,7 +52,16 @@ function activity(live: Readonly<LiveState>) {
 export type Report = { agent: string; channel: string; thread?: string; text: string; key: string; origin: import("@earendil-works/pi-durable").JsonObject; title?: string };
 export const threadKey = (team: string, channel: string, thread: string) => `slack:${team}:${channel}:${thread}`;
 
-export function slack(options: { connection?: string; config?: SlackConfig; credentials?: { botToken: string; appToken: string } } = {}) {
+export type SlackActionToken = {
+  teamId: string; channelId: string; threadTs: string; userId: string; eventTs: string; token: string;
+};
+export type SlackOptions = {
+  connection?: string; config?: SlackConfig; credentials?: { botToken: string; appToken: string };
+  /** Host-only credential handoff. Never put the token in native input or model context. */
+  onActionToken?: (value: SlackActionToken) => void | Promise<void>;
+};
+
+export function slack(options: SlackOptions = {}) {
   let prepared: Awaited<ReturnType<typeof prepareSlack>> | undefined;
   let service: ChatService | undefined;
   return {
@@ -72,9 +81,7 @@ export function slack(options: { connection?: string; config?: SlackConfig; cred
   };
 }
 
-export async function prepareSlack(root: string, runner: Runner, options: {
-  connection?: string; config?: SlackConfig; credentials?: { botToken: string; appToken: string };
-} = {}) {
+export async function prepareSlack(root: string, runner: Runner, options: SlackOptions = {}) {
   const { namespace } = runner;
   const factory = options.config ? undefined : parse(await readFile(join(root, "factory.yaml"), "utf8"));
   const config = options.config ?? (options.connection ? factory?.slack?.connections?.[options.connection] : factory?.slack) as SlackConfig | undefined;
@@ -491,9 +498,20 @@ export async function prepareSlack(root: string, runner: Runner, options: {
           const eventKey = `slack:${body.team_id}:${event.channel}:${event.ts}`;
           await host.conversation.commit(async tx => {
             const inbox = await tx.doc(SlackInbox);
-            if (inbox.tasks[eventKey]) return;
             const previous = inbox.threads[key] ?? null;
             if (!direct && !mentioned && !existing && previous === null && parentUser !== null && parentUser !== bot) return;
+            // Mention/message copies can carry different credential metadata.
+            // Hand off even on redelivery, without admitting a duplicate input.
+            const actionToken = body.action_token ?? event.action_token;
+            if (typeof actionToken === "string" && actionToken && options.onActionToken) {
+              try {
+                await options.onActionToken({ teamId: config.teamId, channelId: event.channel,
+                  threadTs: thread, userId: event.user, eventTs: event.ts, token: actionToken });
+              } catch {
+                throw new Error("Slack action-token handoff failed; the event remains unacknowledged.");
+              }
+            }
+            if (inbox.tasks[eventKey]) return;
             const id = await tx.createTask(incoming, {
               key: eventKey, text, channel: event.channel, thread, user: event.user,
               agent, direct, mentioned, threaded: Boolean(event.thread_ts), parentUser, previous,
