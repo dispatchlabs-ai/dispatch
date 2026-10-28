@@ -28,6 +28,8 @@ import { SettingsDialog } from "./SettingsDialog";
 import { ConversationContext } from "./ConversationContext";
 import { Structure } from "./Structure";
 import { PaneResizer } from "./PaneResizer";
+import { MessageContent } from "./Content";
+import { recordedTime, reportedResult } from "../shared/workSummary";
 import { Transcript } from "./Transcript";
 import { LocalWork } from "./LocalWork";
 import { WorkflowView } from "./WorkflowView";
@@ -36,6 +38,7 @@ import {
   memberKey,
   readableName,
   workflowRuns,
+  workflowSender,
   type WorkflowMember,
   type WorkflowRun,
 } from "../shared/workflows";
@@ -139,6 +142,7 @@ export function App() {
   const [activityQuery, setActivityQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [dialog, setDialog] = useState<SavedConnection | "new">();
+  const [responseOpen, setResponseOpen] = useState(false);
   const [settings, setSettings] = useState(false);
   const [sidebar, setSidebar] = useState(false);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
@@ -173,13 +177,17 @@ export function App() {
     ? runs.find((run) => run.id === workflowId)
     : (containingRuns.find((run) => run.id === workflowId) ??
       (containingRuns.length === 1 ? containingRuns[0] : undefined));
-  const handoffSender = currentWorkflow?.members.find(
+  const currentMember = currentWorkflow?.members.find(
     (m) =>
-      `${m.conversation.agent}:${m.conversation.id}` ===
-        selectedConversation?.opening?.sender?.from &&
-      m.conversation.namespace ===
-        selectedConversation?.opening?.sender?.namespace,
+      connection &&
+      memberKey(m.connection, m.conversation.id) ===
+        memberKey(connection, conversationId ?? 0),
   );
+  const handoffSender =
+    currentWorkflow && currentMember
+      ? workflowSender(currentWorkflow, currentMember)
+      : undefined;
+  useEffect(() => setResponseOpen(false), [connectionId, conversationId]);
   const activeEventId = events[at]?.id;
   useEffect(() => {
     const pane =
@@ -789,6 +797,7 @@ export function App() {
                           ? "Handoff sender"
                           : member.conversation.opening?.labels?.assignment}
                       </small>
+                      <small>{recordedTime(member.conversation.lastAt)}</small>
                     </span>
                     {member.conversation.active > 0 && (
                       <span
@@ -905,6 +914,7 @@ export function App() {
               <WorkflowView
                 run={currentWorkflow}
                 open={openMember}
+                settings={openSettings}
                 back={() => {
                   setHome(true);
                   setWorkflowOverview(false);
@@ -1061,9 +1071,7 @@ export function App() {
                 <h1>{title}</h1>
                 <div className="heading-meta">
                   <div>
-                    <Badge
-                      value={status === "connected" ? "connected" : status}
-                    />
+                    <Badge value={`Observer ${status}`} />
                     {selectedConversation && (
                       <span>Conversation {selectedConversation.id}</span>
                     )}
@@ -1082,7 +1090,80 @@ export function App() {
                       : "Waiting for the first snapshot"}
                   </span>
                 </div>
+                {selectedConversation && (
+                  <div
+                    className="assignment-summary"
+                    aria-label="Latest recorded assignment status"
+                  >
+                    <div>
+                      <strong>Execution unknown</strong>
+                      <span>
+                        {selectedConversation.active} unfinished tasks · Last
+                        activity {recordedTime(selectedConversation.lastAt)}
+                      </span>
+                    </div>
+                    <div>
+                      <strong>
+                        {selectedConversation.response &&
+                        reportedResult(selectedConversation.response.text)
+                          ? `Reported result: ${reportedResult(selectedConversation.response.text)}`
+                          : "Latest saved response"}
+                      </strong>
+                      <span>
+                        {selectedConversation.response
+                          ? recordedTime(selectedConversation.response.at)
+                          : "No saved assistant response"}
+                      </span>
+                    </div>
+                    {selectedConversation.response && (
+                      <UI.Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setPlaying(false);
+                          setFollowTail(false);
+                          setTab("conversation");
+                          const entryId =
+                            selectedConversation.response!.entryId;
+                          const response = events.findLast(
+                            (item) =>
+                              item.entryId === entryId &&
+                              item.role === "assistant" &&
+                              item.category === "message",
+                          );
+                          if (!response) setResponseOpen(true);
+                          else
+                            requestAnimationFrame(() =>
+                              transcriptPane.current
+                                ?.querySelector<HTMLElement>(
+                                  `[data-event-id="${response.id}"]`,
+                                )
+                                ?.scrollIntoView({ block: "start" }),
+                            );
+                        }}
+                      >
+                        Read latest response <ArrowRight size={14} />
+                      </UI.Button>
+                    )}
+                  </div>
+                )}
               </header>
+              {responseOpen && selectedConversation?.response && (
+                <UI.Dialog
+                  open
+                  title="Latest saved assistant response"
+                  onOpenChange={setResponseOpen}
+                >
+                  <p className="hint">
+                    Latest observation · entry{" "}
+                    {selectedConversation.response.entryId} ·{" "}
+                    {recordedTime(selectedConversation.response.at)}. This
+                    response is outside the displayed transcript or playback
+                    page.
+                  </p>
+                  <MessageContent text={selectedConversation.response.text} />
+                </UI.Dialog>
+              )}
               {error && (
                 <div className="source-error" role="alert">
                   <Unplug size={17} />

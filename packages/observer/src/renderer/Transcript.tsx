@@ -16,6 +16,18 @@ export function Transcript({
   inspect(item: Activity): void;
   onRead(): void;
 }) {
+  const matches = new Map<string, Activity>();
+  const pending = new Map<string, Activity>();
+  for (const event of events) {
+    if (!event.tool) continue;
+    const key = `${event.conversationId}:${event.tool.callId}`;
+    if (event.tool.phase === "call") pending.set(key, event);
+    else {
+      const call = pending.get(key);
+      if (call) matches.set(call.id, event);
+      pending.delete(key);
+    }
+  }
   const groups: Activity[][] = [];
   for (const event of events) {
     const previous = groups.at(-1);
@@ -36,6 +48,7 @@ export function Transcript({
         key={item.id}
         item={item}
         author={author}
+        matchedResult={matches.get(item.id)}
         active={activeId === item.id}
         inspect={() => inspect(item)}
         onRead={onRead}

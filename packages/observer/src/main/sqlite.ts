@@ -22,6 +22,11 @@ export async function readSqlite(path: string, request: RawReadRequest) {
       {
         table: (name) => name,
         scope: "1=1",
+        assistantText: `EXISTS (SELECT 1 FROM json_each(e.record, '$.model') m
+          WHERE json_extract(m.value, '$.role')='assistant' AND (
+            (json_type(m.value, '$.content')='text' AND length(trim(json_extract(m.value, '$.content')))>0)
+            OR EXISTS (SELECT 1 FROM json_each(CASE WHEN json_type(m.value, '$.content')='array' THEN json_extract(m.value, '$.content') ELSE '[]' END) p
+              WHERE json_extract(CASE WHEN p.type='object' THEN p.value ELSE '{}' END, '$.type')='text' AND length(trim(json_extract(CASE WHEN p.type='object' THEN p.value ELSE '{}' END, '$.text')))>0)))`,
         rows: async (sql, ...values) => db.prepare(sql).all(...values),
       },
       request,

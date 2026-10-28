@@ -94,19 +94,34 @@ export function workflowRuns(stores: LocalWork["stores"]): WorkflowRun[] {
       members: run.members.sort(
         (a, b) =>
           Number(a.role === "assignment") - Number(b.role === "assignment") ||
-          Number(b.conversation.active > 0) -
-            Number(a.conversation.active > 0) ||
-          (a.conversation.createdAt ?? a.conversation.opening?.at ?? Infinity) -
-            (b.conversation.createdAt ??
-              b.conversation.opening?.at ??
-              Infinity) ||
-          a.conversation.title.localeCompare(b.conversation.title),
+          (b.conversation.lastAt ?? -Infinity) -
+            (a.conversation.lastAt ?? -Infinity) ||
+          a.conversation.id - b.conversation.id,
       ),
     }))
     .sort(
       (a, b) =>
-        Number(b.members.some((m) => m.conversation.active > 0)) -
-          Number(a.members.some((m) => m.conversation.active > 0)) ||
-        a.cycle.localeCompare(b.cycle),
+        (workflowActivity(b) ?? -Infinity) -
+          (workflowActivity(a) ?? -Infinity) || a.id.localeCompare(b.id),
     );
+}
+
+export function workflowActivity(run: WorkflowRun): number | undefined {
+  const times = run.members
+    .filter((m) => m.role === "assignment")
+    .flatMap((m) =>
+      m.conversation.lastAt === undefined ? [] : [m.conversation.lastAt],
+    );
+  return times.length ? Math.max(...times) : undefined;
+}
+
+export function workflowSender(run: WorkflowRun, member: WorkflowMember) {
+  const sender = member.conversation.opening?.sender;
+  const candidates = run.members.filter(
+    (m) =>
+      sender &&
+      `${m.conversation.agent}:${m.conversation.id}` === sender.from &&
+      m.conversation.namespace === sender.namespace,
+  );
+  return candidates.length === 1 ? candidates[0] : undefined;
 }

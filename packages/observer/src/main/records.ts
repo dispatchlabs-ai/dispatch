@@ -9,6 +9,7 @@ export interface Query {
   rows(sql: string, ...values: (number | string)[]): Promise<Row[]>;
   table(name: string): string;
   scope: string;
+  assistantText: string;
 }
 const record = (row: Row): RecordData => JSON.parse(String(row.record));
 const number = (value: unknown) => {
@@ -49,6 +50,7 @@ export async function readRecords(
     (SELECT COUNT(*) FROM ${table("entries")} e WHERE ${scope.replaceAll("store_id", "e.store_id")} AND e.conversation_id=c.id) AS entry_count,
     (SELECT e.record FROM ${table("entries")} e WHERE ${scope.replaceAll("store_id", "e.store_id")} AND e.conversation_id=c.id ORDER BY e.commit_seq DESC,e.id DESC LIMIT 1) AS latest_entry,
     (SELECT e.record FROM ${table("entries")} e WHERE ${scope.replaceAll("store_id", "e.store_id")} AND e.conversation_id=c.id ORDER BY e.commit_seq,e.id LIMIT 1) AS first_entry,
+    (SELECT e.record FROM ${table("entries")} e WHERE ${scope.replaceAll("store_id", "e.store_id")} AND e.conversation_id=c.id AND ${query.assistantText} ORDER BY e.commit_seq DESC,e.id DESC LIMIT 1) AS latest_response,
     (SELECT COUNT(*) FROM ${table("tasks")} t WHERE ${scope.replaceAll("store_id", "t.store_id")} AND t.conversation_id=c.id AND t.status<>'terminal') AS active,
     (SELECT COUNT(*) FROM ${table("tasks")} t WHERE ${scope.replaceAll("store_id", "t.store_id")} AND t.conversation_id=c.id AND t.status='terminal' AND t.record LIKE '%"status":"failed"%') AS failed
     FROM ${table("conversations")} c WHERE ${scope.replaceAll("store_id", "c.store_id")} ORDER BY c.id DESC`);
@@ -61,7 +63,12 @@ export async function readRecords(
       latestEntry: row.latest_entry
         ? JSON.parse(String(row.latest_entry))
         : undefined,
-      firstEntry: row.first_entry ? JSON.parse(String(row.first_entry)) : undefined,
+      latestResponseEntry: row.latest_response
+        ? JSON.parse(String(row.latest_response))
+        : undefined,
+      firstEntry: row.first_entry
+        ? JSON.parse(String(row.first_entry))
+        : undefined,
       active: number(row.active),
       failed: number(row.failed),
     })),

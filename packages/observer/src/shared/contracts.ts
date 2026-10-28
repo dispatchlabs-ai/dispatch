@@ -90,6 +90,7 @@ export type RawSnapshot = {
     record: RecordData;
     entryCount: number;
     latestEntry?: RecordData;
+    latestResponseEntry?: RecordData;
     firstEntry?: RecordData;
     active: number;
     failed: number;
@@ -117,6 +118,7 @@ export type Conversation = {
   active: number;
   failed: number;
   lastAt?: number;
+  response?: { entryId: number; text: string; at?: number };
   agent?: string;
   namespace?: string;
   channel?: string;

@@ -40,12 +40,14 @@ export function toolTitle(item: Activity) {
 export function TranscriptEntry({
   item,
   author,
+  matchedResult,
   active,
   inspect,
   onRead,
 }: {
   item: Activity;
   author?: string;
+  matchedResult?: Activity;
   active: boolean;
   inspect(): void;
   onRead(): void;
@@ -101,7 +103,15 @@ export function TranscriptEntry({
                 <span
                   className={`tool-phase ${result && item.tool.error ? "tool-error" : ""}`}
                 >
-                  {result ? (item.tool.error ? "Error" : "Result") : "Called"}
+                  {result
+                    ? item.tool.error
+                      ? "Error"
+                      : "Result"
+                    : matchedResult
+                      ? matchedResult.tool?.error
+                        ? "Recorded error"
+                        : "Result recorded"
+                      : "Result unavailable"}
                 </span>
                 {item.tool.truncated && result && (
                   <span className="tool-phase">Truncated</span>
@@ -109,7 +119,13 @@ export function TranscriptEntry({
               </span>
               {!expanded && (
                 <span className="tool-preview">
-                  {outputPreview(item.text) || "No saved text"}
+                  {!result &&
+                  args &&
+                  typeof args === "object" &&
+                  "path" in args &&
+                  typeof args.path === "string"
+                    ? args.path
+                    : outputPreview(item.text) || "No saved text"}
                 </span>
               )}
               {metadata}
@@ -140,6 +156,27 @@ export function TranscriptEntry({
                   )}
                 </>
               )}
+              {!result &&
+                (matchedResult ? (
+                  <details className="matched-result">
+                    <summary onClick={onRead}>
+                      Matching result ·{" "}
+                      {matchedResult.at
+                        ? time(matchedResult.at)
+                        : `commit ${matchedResult.sequence}`}{" "}
+                      · later recorded event
+                    </summary>
+                    <ToolResult activity={matchedResult} />
+                    {matchedResult.tool?.truncated && (
+                      <p className="notice">Stored output is truncated.</p>
+                    )}
+                  </details>
+                ) : (
+                  <p className="hint">
+                    No matching result in loaded evidence; it may be pending,
+                    outside this page, or not retained.
+                  </p>
+                ))}
               {result && item.tool.truncated && (
                 <p className="notice">
                   The stored result reports omitted or truncated output.

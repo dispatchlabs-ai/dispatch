@@ -8,18 +8,20 @@ model credentials, new telemetry database, or agent-side instrumentation is need
 
 The app starts on **This machine**, refreshing about every five seconds. On macOS
 and Linux, `lsof` identifies existing `.sqlite`, `.sqlite3`, and `.db` files open
-for writing by the current user's processes. Observer validates Pi's schema and
-reads supported stores without opening an execution owner. It does not crawl
-directories, request elevated permissions, or inspect remote machines.
+for writing by the current user's Node, Bun, Deno, Pi, Dispatch or Electron
+processes. Observer validates Pi's schema and reads supported stores without
+opening an execution owner. It does not recursively crawl directories, request
+elevated permissions, or inspect remote machines. Other runtime hosts require
+a saved explicit source; unrelated application databases are excluded.
 
 Saved direct SQLite connections are read too, including when their processes have
-stopped. Work with unfinished conversations appears first. **Process observed** means a
+stopped. All saved work is visible by default. **Process observed** means a
 process had the store open at the shown observation time, not that an LLM is
-currently generating. Unfinished tasks may be waiting or sleeping. **Show all
-saved work** reveals retained history. Search finds workflows and conversation
+currently generating. Unfinished tasks may be waiting or sleeping. **Unfinished
+only** explicitly filters out history. Search finds workflows and conversation
 titles; source setup and paths stay in Settings.
 
-Choose a workflow to see its assignments, with unfinished work first. Select
+Choose a workflow to see its assignments, newest recorded activity first. Select
 an assignment to open its conversation; the workflow's other conversations remain
 in the rail. **Back to workflow** and the workflow breadcrumb return to the
 overview. **Sent by** opens an available sender conversation, including one in
@@ -50,7 +52,8 @@ full arguments available separately. Native details open only on request.
 An overall read failure retains the last observed list and labels it stale.
 Process-discovery failures and individual unreadable sources appear under
 **Source notices**; saved local sources remain readable when discovery fails.
-Stopped unsaved sources disappear after a successful refresh; saved history remains.
+Stopped unsaved sources outside validated sibling installations disappear after
+a successful refresh; saved sources and discovered siblings remain readable.
 Windows discovery is not implemented. Processes hidden by OS permissions, stores
 without a writable open handle, extensionless files, remote/Postgres stores, and
 non-Pi runtimes require explicit connections or are outside discovery coverage.
@@ -58,6 +61,34 @@ No process is started, stopped, resumed or instrumented.
 
 Observer is a desktop app, with a 900 px minimum window width. Mobile layouts
 are not a current requirement; earlier small-layout checks below are historical.
+
+## Find the latest recorded workflow
+
+This machine shows saved workflows by default, with consistent names and last
+recorded activity dates. Workflows sort by their latest assignment activity, so
+a shared sender cannot make an old cycle appear new. Assignments sort newest first;
+unknown timestamps are explicit. The **All saved work / Unfinished only** toggle
+changes the filter, not the task state. Recency is limited to loaded sources.
+
+Opening a validated Runner source also checks immediate sibling agent directories
+for session.sqlite. Stopped coordinator, developer and reviewer stores can therefore
+participate without each having an open process. This is not a recursive filesystem
+crawl: sibling symlinks and paths embedded in messages are not followed. Unreadable
+or mismatched stores produce source notices. Sources outside those installations
+still require an explicit connection through Settings.
+
+Open a workflow to see its known sender → assignment links, latest response excerpts,
+activity dates and unfinished counts. Missing senders have a Settings recovery action.
+**Execution unknown** is deliberate: open files and pending tasks do not prove model
+execution. A reported **Changes requested**, **Approved** or other explicit opening
+verdict belongs to that assistant response, not the whole workflow's outcome.
+
+In a conversation, **Read latest response** jumps to the response heading rather than
+the bottom. If that response is outside the current loaded/playback page, a labeled
+dialog displays it without changing the playback boundary. The existing **Latest
+activity** control follows the transcript tail instead. Expand a tool call to view
+its identity-matched result under **Matching result**, or inspect the original result
+event in its saved order. Commands wrap and full arguments remain available.
 
 ## Connection setup
 
@@ -156,8 +187,7 @@ Messages render Markdown, including lists, tables, and fenced code. Tool events
 start inside compact activity groups; expand a group, then click a row or focus it and press Enter/Space
 to expand its arguments or result. JSON text envelopes display their decoded text
 with line breaks and indentation; additional fields remain under a disclosure.
-Other structured results use indented JSON. Code lines scroll horizontally inside
-their panel. **Inspect entry** opens the formatted detail and original redacted
+Other structured results use indented JSON. Command lines wrap inside their panel. **Inspect entry** opens the formatted detail and original redacted
 native record. Playback opens the selected tool row without merging separate call
 and result events.
 Entries load in pages of 500. **Load earlier events** extends the loaded history;
@@ -209,7 +239,36 @@ reconnecting the current connection preserves it.
 
 ## Compatibility and qualification
 
-Workflow-first qualification (October 28, 2026, OBS-007, OBS-008, OBS-010,
+Workflow-reading refinement qualification (October 28, 2026, OBS-007, OBS-008,
+OBS-010, OBS-012, OBS-013, OBS-015, OBS-018–020): an isolated packaged macOS ARM64
+preview read existing local Pi stores without changing agent state. The default
+home exposed saved work immediately; validated sibling discovery made previously
+unavailable coordinator, developer and tester conversations navigable. The overview
+and card agreed on name, latest assignment activity and unfinished-conversation count.
+Assignments were ordered by recorded activity, not numeric assignment suffix.
+An explicit reviewer verdict appeared in the overview and persistent conversation
+header even though its task count was zero. A developer's later tool-only records
+did not erase its preceding prose response. The response shortcut landed at the
+message heading; invoking it in recorded playback left the playhead at its original
+event. Source notices exposed a mismatched sibling rather than silently grouping it.
+
+Call expansion displayed the identity-matched result with its own timestamp and
+later-event label; keyboard Return toggled the result disclosure. Commands wrapped
+without horizontal hunting. Search/no-match recovery and the unfinished-only toggle
+worked. Home, overview and conversation layouts were reviewed at 1440×900 and
+1280×720, with light/dark appearances; Settings preserved the response reading
+position and paused event. Captures remain private. The user's running app and
+normal preferences were not replaced during this pass.
+
+Workspace type/build checks passed in Nix; no automated tests were added or run.
+This pass does not requalify Postgres queries at runtime, remote transports,
+Windows/Linux, exhaustive machine discovery, permission/connection-loss recovery,
+or the out-of-loaded-page response dialog. Multiple-cycle ordering and symlink
+alias deduplication received source review but no new runtime fixture exercise.
+Existing broader use-case conditions remain unchecked in the catalog rather than
+being promoted to blanket verification claims.
+
+Earlier workflow-first qualification (October 28, 2026, OBS-007, OBS-008, OBS-010,
 OBS-012, OBS-013, OBS-018): the packaged macOS ARM64 app was checked against
 existing local handoffs and isolated synthetic Pi stores. Workflow → assignment
 → conversation navigation, cross-store sender links, return to the overview,

@@ -1,10 +1,13 @@
 import { ArrowLeft, ArrowRight, Bot, Workflow } from "lucide-react";
 import {
   readableName,
+  workflowActivity,
+  workflowSender,
   type WorkflowMember,
   type WorkflowRun,
 } from "../shared/workflows";
 import { instanceLabel } from "./ConversationContext";
+import { recordedTime, responseSummary } from "../shared/workSummary";
 import { UI } from "./controls";
 
 export function WorkflowView({
@@ -12,11 +15,13 @@ export function WorkflowView({
   open,
   back,
   error,
+  settings,
 }: {
   run: WorkflowRun;
   open(member: WorkflowMember): void;
   back(): void;
   error?: string;
+  settings(): void;
 }) {
   const assignments = run.members.filter((m) => m.role === "assignment");
   const senders = run.members.filter((m) => m.role === "sender");
@@ -45,16 +50,34 @@ export function WorkflowView({
           {assignments.length === 1 ? "assignment" : "assignments"}
         </strong>
         <span>
-          {assignments.filter((m) => m.conversation.active > 0).length} with
-          unfinished tasks
+          {run.members.filter((m) => m.conversation.active > 0).length}{" "}
+          unfinished conversations
         </span>
-        <span>Grouped from saved handoffs</span>
+        <span>
+          Latest assignment activity {recordedTime(workflowActivity(run))}
+        </span>
+        <span>Execution unknown · Workflow outcome unknown</span>
         <span>
           {run.members.some((m) => m.pids.length > 0)
             ? "Local process observed"
             : "Saved history"}
         </span>
       </div>
+      <section className="workflow-coverage" aria-label="Evidence coverage">
+        <strong>Known handoff chain · partial evidence</strong>
+        <p>
+          Recorded sender → assignment. Other steps and final workflow outcome
+          are not established.
+        </p>
+        {assignments.some((m) => !workflowSender(run, m)) && (
+          <p>
+            Some sender conversations are unavailable.{" "}
+            <UI.Button variant="link" size="sm" onClick={settings}>
+              Locate a source in Settings
+            </UI.Button>
+          </p>
+        )}
+      </section>
       {senders.length > 0 && (
         <section className="workflow-senders" aria-label="Handoff senders">
           <h2>Handoffs sent from</h2>
@@ -81,39 +104,75 @@ export function WorkflowView({
       )}
       <section aria-label="Workflow assignments">
         <h2 className="workflow-section-heading">
-          Assignments <small>Unfinished first</small>
+          Assignments <small>Latest recorded activity first</small>
         </h2>
         <div className="workflow-assignments">
           {assignments.map((member) => {
             const { conversation: c } = member;
+            const sender = workflowSender(run, member);
             return (
-              <UI.Button
+              <div
+                className="assignment-chain"
                 key={member.connection.id + c.id}
-                variant="ghost"
-                className="workflow-assignment"
-                onClick={() => open(member)}
               >
-                <span className="assignment-agent">
-                  <Bot size={17} />
+                <div className="chain-source">
+                  {sender ? (
+                    <UI.Button
+                      variant="link"
+                      size="sm"
+                      onClick={() => open(sender)}
+                    >
+                      {instanceLabel(c.opening!.sender!.from)}
+                    </UI.Button>
+                  ) : (
+                    <span>
+                      {c.opening?.sender
+                        ? instanceLabel(c.opening.sender.from)
+                        : "Sender not recorded"}{" "}
+                      · unavailable
+                    </span>
+                  )}
+                  <ArrowRight size={14} />
                   <span className="agent-name">
                     {readableName(c.agent ?? "Agent")}
                   </span>
-                </span>
-                <span className="assignment-copy">
-                  <strong>{c.title}</strong>
-                  <span>{c.opening?.labels?.phase}</span>
-                  <small>
-                    {c.opening?.labels?.assignment}
-                    {c.opening?.sender
-                      ? ` · From ${instanceLabel(c.opening.sender.from)}`
-                      : ""}
-                  </small>
-                </span>
-                <span className="assignment-state">
-                  {c.active ? "Unfinished tasks" : "No unfinished tasks"}
-                </span>
-                <ArrowRight size={16} />
-              </UI.Button>
+                </div>
+                <UI.Button
+                  variant="ghost"
+                  className="workflow-assignment"
+                  onClick={() => open(member)}
+                >
+                  <span className="assignment-agent">
+                    <Bot size={17} />
+                    <span className="agent-name">
+                      {readableName(c.agent ?? "Agent")}
+                    </span>
+                  </span>
+                  <span className="assignment-copy">
+                    <strong>{c.title}</strong>
+                    <span>
+                      {c.opening?.labels?.phase} · Last activity{" "}
+                      {recordedTime(c.lastAt)}
+                    </span>
+                    <span className="reported-result">
+                      {c.response ? "Last response: " : ""}
+                      {responseSummary(c)}
+                    </span>
+                    <small>
+                      {c.opening?.labels?.assignment}
+                      {c.opening?.sender
+                        ? ` · From ${instanceLabel(c.opening.sender.from)}`
+                        : ""}
+                    </small>
+                  </span>
+                  <span className="assignment-state">
+                    Execution unknown
+                    <br />
+                    {c.active} unfinished tasks
+                  </span>
+                  <ArrowRight size={16} />
+                </UI.Button>
+              </div>
             );
           })}
         </div>
@@ -121,7 +180,8 @@ export function WorkflowView({
       <p className="evidence-note">
         Available conversations in this local installation. Handoff labels
         identify the workflow and cycle; they do not establish a final workflow
-        outcome. Missing stores are not searched automatically.
+        outcome. Sibling Runner stores are discovered within validated local
+        installations; other sources may still be missing.
       </p>
     </section>
   );

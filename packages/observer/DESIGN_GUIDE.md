@@ -13,26 +13,31 @@ remain the original synthetic ImageGen concepts, not runtime captures.
 
 ## Product direction
 
-**Refinement, October 28, 2026:** the default entry point is **This machine**, not
-connection setup. Show locally observed agent stores with unfinished conversations
-first. A click opens Conversation; Structure, Timeline and playback remain
-secondary inspection tools. The inspector occupies space only when opened.
-Connection management and appearance live in **Settings**, reached from the
-bottom of the navigation rail. Keep saved source lists and setup controls out of
-the everyday work view. This supersedes the original connection-first reference
-screens without removing saved connections or remote inspection.
-Discovery observes writable local SQLite file
-handles and validates Pi schemas; it does not infer execution from task age.
+**Workflow-reading refinement, October 28, 2026:** start on **This machine** with
+all saved workflows visible and newest recorded activity first. Card and overview
+share a consistent workflow name and cycle. An explicit unfinished-only filter
+must explain hidden history. Show last recorded activity separately from observation
+time; recency applies only to loaded sources. Unrelated conversations remain separate.
+Connections and appearance remain in **Settings**, not the everyday work rail.
 
-**Workflow-first refinement, October 28, 2026:** This machine groups explicitly
-labeled peer handoffs into workflow cycles. Open a workflow, choose an assignment,
-then read its conversation; retain the workflow rail and a way back. Known senders
-are navigable across available local agent stores. Unrelated conversations remain
-separate. Saved local sources also provide history when no process is observed.
-Group only matching workflow/cycle labels in the leading handoff lines, within
-the same Runner namespace and validated agent-store directory. Never merge by
-title, timestamp, native integer ID, or a workflow name alone. These are declared
-handoff groups, not a new native workflow engine or proof of workflow completion.
+Workflow → assignment → conversation is the primary route. Group explicit leading
+handoff labels only within the same validated installation and Runner namespace.
+Native identities and exact sender addresses establish links, not prose or proximity.
+A validated local Runner store also discovers immediate sibling agent/session.sqlite
+files, including stopped peers. Process discovery covers writable files in Node,
+Bun, Deno, Pi, Dispatch and Electron hosts; other hosts require explicit sources.
+No recursive crawl, sibling symlink following or transcript
+path retrieval is permitted. Validate sibling schema, agent identity and namespace.
+Show the known sender → assignment chain and unavailable links near the overview,
+with a Settings recovery action. Never draw unrecorded developer/tester stages as facts.
+
+Separate **Execution unknown**, unfinished-task count, **Observer connected** and
+**Reported result**. A store's open file handle does not prove model execution.
+Recognize only explicit opening verdicts in the latest saved assistant text; otherwise
+show its excerpt. Keep assignment results separate from unknown workflow outcomes.
+**Read latest response** anchors to the message's beginning; if outside the loaded
+or frozen page, open a latest-observation dialog without advancing playback.
+**Latest activity** remains deliberate tail-following, not an outcome shortcut.
 
 The approved starting point is the earlier agent-inspector concept: a restrained
 white/gray workspace, a clear task hierarchy or timeline, and an adjacent detail
@@ -176,10 +181,11 @@ source/store/native identity internally; store-local integers are not global IDs
   in recorded order, initially collapsed with a short preview. Expanding a result
   decodes valid JSON text envelopes, preserves indentation and line numbers,
   and exposes other envelope fields separately. Unrecognized structured output
-  uses indented JSON. Long code lines scroll within their own panel.
+  uses indented JSON. Long command lines wrap within their own panel.
 - Use compact grouped disclosures for consecutive tool events, with readable
   operation names and recorded errors. Keep separate calls/results inside them
-  in retained order. Long requests collapse without losing access to full text.
+  in retained order. Calls also expose an identity-matched result disclosure,
+  labeled as a later recorded event; missing matches remain unknown. Long requests collapse without losing access to full text.
   Show recorded peer authors rather than calling every user-role message “You.”
   Opening context identifies the agent, sender, assigned phase and original
   handoff when available. Distinguish a requested automatic reply from a received
@@ -291,7 +297,7 @@ and 1280×720. The Electron window has a 900 px minimum width. Phone/mobile layo
 qualification is no longer required; this supersedes the earlier 768×1024 and
 390×844 acceptance requirement. Existing small-layout styles are not a supported
 mobile product. At narrower desktop sizes, details open in a drawer rather than
-squeezing the conversation. Long tool lines scroll within their panel.
+squeezing the conversation. Long tool commands and output wrap within their panel.
 
 Use platform-native title bars and dialogs; the macOS traffic lights in the
 references are not to be drawn on Windows or Linux. Provide tab order, visible

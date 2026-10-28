@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Workflow reading and evidence
+
+- Show saved workflows by default with consistent names and recorded-activity ordering.
+- Discover validated sibling Runner stores so stopped handoff senders and assignments remain reachable.
+- Separate unknown execution, task bookkeeping, source connection and reported assignment results; expose partial handoff chains.
+- Add a beginning-of-message latest-response shortcut and matching-result tool disclosures with wrapped commands.
+- Maintain a terse stable-ID use-case catalog, with behavioral contracts and qualification evidence kept separately.
+
 - Navigate recorded local workflow cycles before their assignments and
   conversations, with available sender links across agent stores. Include saved
   local history, keep unrelated conversations separate, and distinguish declared

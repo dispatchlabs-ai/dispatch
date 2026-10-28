@@ -277,6 +277,11 @@ export function project(raw: RawSnapshot, source: Connection): Snapshot {
     storeId: source.kind === "postgres" ? source.postgres.storeId : undefined,
     conversations: safe.conversations.map((item) => {
       const last = item.latestEntry?.model?.at(-1);
+      const responseEntry = item.latestResponseEntry;
+      const response = responseEntry?.model?.findLast(
+        (message: RecordData) =>
+          message.role === "assistant" && text(message.content).trim(),
+      );
       const first = item.firstEntry;
       const message = first?.model?.find(
         (message: RecordData) => message.role === "user",
@@ -300,7 +305,17 @@ export function project(raw: RawSnapshot, source: Connection): Snapshot {
         entryCount: item.entryCount,
         active: item.active,
         failed: item.failed,
-        lastAt: timestamp(last?.timestamp),
+        lastAt:
+          timestamp(last?.timestamp) ??
+          timestamp(item.latestEntry?.data?.timestamp),
+        response:
+          response && responseEntry
+            ? {
+                entryId: responseEntry.id,
+                text: text(response.content),
+                at: timestamp(response.timestamp),
+              }
+            : undefined,
         opening:
           first && openingText
             ? {

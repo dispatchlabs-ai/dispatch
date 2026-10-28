@@ -1,79 +1,57 @@
 # Observer use cases
 
-Dispatch Observer is intended for a person operating Pi Durable agents who needs
-to understand current work and inspect what happened afterward. Its desktop UI
-works against the agents' existing stores, wherever those stores live.
+Dispatch Observer helps an operator understand local agent work and read the
+recorded conversations behind it. This catalog contains 20 intended user goals;
+stable IDs survive implementation changes. Unchecked boxes mean the whole goal
+is not yet fully implemented and verified across its supported conditions, not
+that the capability is absent.
 
-**Implementation status, October 22, 2026:** the Electron app implements the
-inspection, connection, and playback flows below. macOS has interactive evidence;
-Windows/Linux desktop execution and Postgres over SSM remain unqualified. See
-[dated qualification and limits](docs/usage-guide.md#compatibility-and-qualification)
-for the evidence against these stable identifiers. A source implementation is not
-proof of platform qualification.
+Behavioral contracts and boundaries live in [use-case behavior](docs/use-case-behavior.md)
+and [design guidance](DESIGN_GUIDE.md). Dated evidence and platform limits live in
+[usage and qualification](docs/usage-guide.md#compatibility-and-qualification),
+not in this goal catalog.
 
-## Connect to existing state
+## 1. Find and understand work
 
-| ID | User goal | Required observable outcome |
-| --- | --- | --- |
-| OBS-001 | Open a local SQLite database. | A native file picker selects an existing supported Pi database. The app validates it without creating, migrating, or changing it, then lists available conversations/activity. Reading works beside its owner and when the owner is stopped. A missing file is reported, never created. |
-| OBS-002 | Inspect agents using central Postgres. | Configure a database connection and select an authorized logical store. Conversations, tasks, entries, and documents stay scoped to that source/store. Numeric record IDs from different stores never collide in the UI. A read-only database identity and read-only transactions are supported. |
-| OBS-003 | Reach Postgres through a tunnel. | Choose SSH or AWS SSM, validate transport and database access separately, and reach the same store without exposing a database port publicly. Closing or reconnecting the viewer only affects its own connection. A tunnel does not bypass database authentication or TLS identity verification. |
-| OBS-004 | Read SQLite on a remote host. | Select a host, SSH or AWS SSM transport, and an existing remote database path. A compatible read-only helper queries SQLite on its own machine and returns snapshots/activity through the protected channel. The app explains a missing helper or unsupported host without pretending the database is empty. |
-| OBS-005 | Reuse named connections. | Manage saved sources in Settings, not the work rail: add, open, edit, reconnect, or remove a named connection. Opening and closing Settings preserves the reading position, expanded tools and inspection state; automatic playback stays stopped. Opening the current connected source preserves its view. Removing a connection never deletes agent data. Secrets use the operating system's protected credential facility or an explicitly configured credential provider; an unavailable secure store is visible and never causes plaintext fallback. No account with a hosted Observer service is required. |
+- [ ] **OBS-018 — Find local work.** An operator discovers workflows and standalone conversations on this machine without knowing each database path.
+- [ ] **OBS-019 — Find the latest workflow activity.** An operator identifies the most recently recorded workflow activity among available sources without guessing from assignment numbers or confusing observation time with work time.
+- [ ] **OBS-006 — Follow an active agent.** An operator follows retained agent activity while distinguishing execution evidence, unfinished tasks, source connectivity and viewing mode.
+- [ ] **OBS-007 — Follow delegation.** An operator follows recorded sender, assignment and native parent relationships to understand who requested work and how it was handed off.
+- [ ] **OBS-009 — Understand a workflow.** An operator understands recorded steps, attempts, phases and outcomes while distinguishing partial evidence from the whole workflow's state.
+- [ ] **OBS-020 — Understand the reported result.** An operator sees an assignment's latest reported result and reads its source response without treating that report as proof of workflow completion.
 
-## Understand current work
+## 2. Read the evidence
 
-**Current focus, October 28, 2026:** discover work on this machine, then open a
-human-readable conversation with inline tool calls. Remote discovery and execution
-controls are not part of this refinement; existing explicit connections remain.
+- [ ] **OBS-010 — Read the conversation.** An operator reads formatted saved messages and inline tool activity in workflow context without losing their place as new records arrive.
+- [ ] **OBS-008 — Inspect a tool action.** An operator understands a saved tool call and its identity-matched result, including available timing, errors and missing or truncated evidence.
+- [ ] **OBS-011 — Review earlier work.** An operator reads finished or interrupted work even when the executing process is no longer available.
+- [ ] **OBS-012 — Replay recorded activity.** An operator steps or plays through retained events without executing tools, contacting a model or changing agent state.
+- [ ] **OBS-013 — Recognize incomplete evidence.** An operator distinguishes recorded facts from unavailable relationships, timestamps, intermediate states and artifacts.
+- [ ] **OBS-014 — Recover from a disconnect.** An operator retains the last readable view and reconnects to its source without restarting work or silently leaving playback.
 
-Workflow navigation follows explicit saved handoff labels within one local
-installation. Available sender and assignment conversations form the navigation
-scope; missing sources and unknown membership are not filled in by inference.
-Conversations open with their assignment context, and tool activity stays compact
-until inspected. This adapts the existing Dispatch conversation design's clear
-authors, progressive disclosure and deliberate latest-activity navigation.
+## 3. Connect to existing state
 
-| ID | User goal | Required observable outcome |
-| --- | --- | --- |
-| OBS-018 | Find local workflows and agents without knowing database paths. | Start on This machine; refresh discovered Pi SQLite stores opened for writing by the current user's processes and saved local sources. Put unfinished work first and distinguish process presence from task execution. Open a recorded workflow cycle, then its assignments and conversations; unrelated conversations remain separate. Preserve manual connections and saved history; report discovery/source failures separately from an empty result. |
-| OBS-006 | Follow an active agent. | Show its current retained task/activity, recent tool calls, latest conversation content, and last successful observation time. New commits refresh the view. Pausing following preserves the selected event while the agent continues. Agent execution and database connectivity have separate status indicators. |
-| OBS-007 | Follow delegation. | Navigate a workflow's recorded assignments and available handoff senders across local stores, preserving workflow context. Also expand native parent/child conversation and task relationships. Inspect the original handoff, tools and outcome; Back/Forward restore the prior same-source inspection view. Parent conversation follows native ownership; peer messages remain distinct. Navigation never resumes agent work or playback. Missing links remain explicit; similar names or timestamps do not establish a relationship. |
-| OBS-008 | Inspect a tool call. | Show the retained tool name, arguments, result, duration, error, and native identity when available. Match calls to results by recorded identity. Distinguish an in-progress call, a recorded failure, truncated output, redacted content, and a result that was not retained. |
-| OBS-009 | Inspect a workflow. | Show recorded deterministic steps as well as agent work, current/final phase, child activity, attempts, outcomes, and retained artifacts. Separate a failed attempt from a later successful workflow. Custom workflow documents can enrich the view without being required to inspect ordinary Pi records. |
-| OBS-010 | Read the relevant conversation. | Move from an activity or child to its saved transcript, with formatted Markdown messages, expandable tool calls/results, readable multiline output, and retained fork/reset/compaction boundaries. Native records remain inspectable. The transcript is what was saved; it is not presented as the exact provider request or as a full record of private model reasoning. |
+- [ ] **OBS-001 — Open local SQLite.** An operator opens an existing supported Pi SQLite database read-only while its owner is running or stopped.
+- [ ] **OBS-002 — Read central Postgres.** An operator inspects an authorized Postgres logical store without mixing identities or records from other stores.
+- [ ] **OBS-003 — Tunnel to Postgres.** An operator reaches an authorized Postgres store through SSH or AWS SSM without exposing a public database port or bypassing authentication.
+- [ ] **OBS-004 — Read remote SQLite.** An operator inspects SQLite on its host through an authorized helper and protected transport without mounting the live database over a network.
+- [ ] **OBS-005 — Manage saved sources.** An operator manages named connections and appearance in Settings while preserving the current reading and inspection state.
 
-## Inspect retained history
+## 4. Operate safely on desktop
 
-| ID | User goal | Required observable outcome |
-| --- | --- | --- |
-| OBS-011 | Review finished or interrupted work. | Select retained activity by agent/conversation and time, then inspect its saved records even when the executing process is unavailable. Reading a pending task does not resume it. A stopped process is not required for inspection; the database or a consistent snapshot must remain available. |
-| OBS-012 | Step through what happened. | Play, pause, step backward/forward, scrub, and change playback speed across recorded events. Event order is stable within the selected source and observation boundary. Playback never calls a provider, executes a tool, retries a workflow, or writes target state. Returning to live is explicit. |
-| OBS-013 | Understand incomplete evidence. | Mark unavailable intermediate states, omitted/truncated tool output, retired temporary documents, and unknown timestamps. Display current/final workflow state separately from the selected historical event. Do not fabricate missing phase transitions, token streams, or task-state history. |
-| OBS-014 | Investigate an apparent stall or disconnect. | Preserve the last readable state and its timestamp when the source is lost, show the connection error separately, and allow reconnecting without restarting work. A saved running task is labeled as last observed when runtime presence cannot be confirmed. Reconnection restores selection and does not silently leave recorded playback. |
+- [ ] **OBS-015 — Use a native desktop viewer.** An operator navigates readable, resizable, keyboard-accessible windows on each qualified desktop platform.
+- [ ] **OBS-016 — Inspect unfamiliar extensions.** An operator receives a faithful generic record view or an actionable compatibility explanation without automatic migration.
+- [ ] **OBS-017 — Inspect untrusted content safely.** An operator deliberately reads sensitive saved content without executing it or automatically retrieving linked resources.
 
-## Operate the desktop app
+## Deliberate boundaries
 
-| ID | User goal | Required observable outcome |
-| --- | --- | --- |
-| OBS-015 | Use the same model on macOS, Windows, and Linux. | Native file dialogs, platform-appropriate window controls and shortcuts, keyboard access, readable resizable panes, and secure credential handling work on each qualified platform. The macOS reference images establish visual direction, not Windows/Linux installer or runtime evidence. |
-| OBS-016 | Open unfamiliar agent extensions safely. | Check Pi/storage compatibility before interpreting records. Supported unknown kinds have a redacted generic record view; unsupported schemas show an actionable compatibility message and never auto-migrate. Agent-specific labels enrich, rather than replace, native identities. |
-| OBS-017 | Inspect sensitive or untrusted content deliberately. | Credential/provider state is excluded; tool output and transcript content are treated as data, never scripts or commands. Links require a deliberate external-open action. Source/store selection defines the accessible scope; opening a database does not recreate the target application's end-user permission model. |
+Observer is read-only toward agent state: it does not launch agents, send messages,
+retry tools, migrate stores or acquire execution ownership. Mobile layouts,
+remote automatic discovery, hosted multi-user aggregation and arbitrary artifact
+retrieval are outside the current scope. Local preferences and owned connection
+transports are separate from agent execution. Existing stores remain canonical;
+a new telemetry database is not required.
 
-## Scope boundaries
-
-- Observation is read-only with respect to agent state. Saving local connection
-  preferences or starting a transport/helper is distinct from running agent work.
-- Play-by-play uses retained evidence. Exact historical frames, every token, every
-  ephemeral task document, and historical re-execution are not promised.
-- Creating agents, sending messages, editing definitions, pausing/stopping agents,
-  approving tools, and retrying workflows are outside this observer's current scope.
-- Existing stores remain canonical. A new telemetry database, agent migration,
-  mandatory central server, and automatic agent instrumentation are not required.
-- General-purpose SQL editing, cross-company data aggregation, shared hosted
-  accounts, and exporting sensitive transcripts are not part of this design slice.
-- Files/artifacts outside the Pi store require a separately authorized retrieval
-  path. A recorded artifact reference alone does not make its bytes available.
-
-See [DESIGN_GUIDE.md](DESIGN_GUIDE.md) for interaction rules, record fidelity,
-connection lifecycle, visual tokens, and the implementation’s qualification requirements.
+Before removing a supported capability, inspect actual usage evidence and record
+its environment, time window, attribution and coverage limits separately. Missing
+instrumentation or no observed hits does not establish that a capability is unused.

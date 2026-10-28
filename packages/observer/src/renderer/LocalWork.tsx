@@ -4,7 +4,13 @@ import type {
   Connection,
   LocalWork as LocalWorkData,
 } from "../shared/contracts";
-import { memberKey, readableName, type WorkflowRun } from "../shared/workflows";
+import {
+  memberKey,
+  readableName,
+  workflowActivity,
+  type WorkflowRun,
+} from "../shared/workflows";
+import { recordedTime, responseSummary } from "../shared/workSummary";
 import { UI } from "./controls";
 import { time } from "./Details";
 
@@ -28,7 +34,7 @@ export function LocalWork({
   settings(): void;
 }) {
   const [query, setQuery] = useState("");
-  const [all, setAll] = useState(false);
+  const [all, setAll] = useState(true);
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState("");
   const choose = async (connection: Connection, id: number) => {
@@ -97,8 +103,8 @@ export function LocalWork({
             : "Looking for local work…"}
         </strong>
         <span>
-          {unfinished} {unfinished === 1 ? "conversation" : "conversations"} with
-          unfinished tasks
+          {unfinished} {unfinished === 1 ? "conversation" : "conversations"}{" "}
+          with unfinished tasks
         </span>
         {data && (
           <span>
@@ -123,7 +129,7 @@ export function LocalWork({
           aria-pressed={all}
           onClick={() => setAll(!all)}
         >
-          {all ? "Showing all saved work" : "Show all saved work"}
+          {all ? "All saved work" : "Unfinished only"}
         </UI.Button>
       </div>
       {(error || openError) && (
@@ -139,12 +145,24 @@ export function LocalWork({
           ))}
         </details>
       )}
-      {visibleRuns.length > 0 && (
+      {data && (
         <>
-          <h2 className="workflow-section-heading">Workflows</h2>
+          <h2 className="workflow-section-heading">
+            Workflows{" "}
+            <small>Latest assignment activity first · loaded sources</small>
+          </h2>
+          {!visibleRuns.length && (
+            <p className="evidence-note">
+              {query
+                ? "No workflows match this search."
+                : all
+                  ? "No recorded workflows in loaded sources."
+                  : "No unfinished workflows. Choose All saved work to see history."}
+            </p>
+          )}
           <div className="workflow-cards">
             {visibleRuns.map((run) => {
-              const sender = run.members.find((m) => m.role === "sender");
+              const latest = run.members.find((m) => m.role === "assignment");
               const assignments = run.members.filter(
                 (m) => m.role === "assignment",
               ).length;
@@ -160,20 +178,31 @@ export function LocalWork({
                 >
                   <Workflow size={22} />
                   <span>
-                    <strong>
-                      {sender?.conversation.title ??
-                        run.members[0]?.conversation.title ??
-                        readableName(run.name)}
+                    <strong className="agent-name">
+                      {readableName(run.name)}
                     </strong>
-                    <span className="agent-name">{readableName(run.name)}</span>
+                    <span>
+                      Latest assignment activity{" "}
+                      {recordedTime(workflowActivity(run))}
+                    </span>
+                    {latest && (
+                      <span>
+                        Latest assignment:{" "}
+                        {latest.conversation.opening?.labels?.assignment} ·{" "}
+                        {responseSummary(latest.conversation)}
+                      </span>
+                    )}
                     <small>
                       {run.cycle} · {assignments}{" "}
                       {assignments === 1 ? "assignment" : "assignments"}
                     </small>
                   </span>
                   <span className="local-work-status">
-                    {unfinished} unfinished{" "}
-                    {unfinished === 1 ? "conversation" : "conversations"}
+                    Execution unknown
+                    <br />
+                    {unfinished} unfinished conversations
+                    <br />
+                    Workflow outcome unknown
                   </span>
                   <ArrowRight size={18} />
                 </UI.Button>
@@ -205,7 +234,7 @@ export function LocalWork({
                   </small>
                 </span>
                 <span className="local-work-status">
-                  {c.active ? "Unfinished tasks" : "No unfinished tasks"}
+                  Execution unknown · {c.active} unfinished tasks
                 </span>
                 <ArrowRight size={16} />
               </UI.Button>
@@ -227,7 +256,7 @@ export function LocalWork({
               ? "Try another name."
               : all
                 ? "Open an existing source in Settings to inspect its history."
-                : "Show all saved work to explore earlier workflows and conversations."}
+                : "Choose All saved work to explore earlier workflows and conversations."}
           </p>
           {!query && (
             <UI.Button
@@ -240,8 +269,9 @@ export function LocalWork({
         </div>
       )}
       <p className="evidence-note">
-        Local Pi stores observed in processes and saved local sources.
-        Unfinished tasks may be waiting; they do not prove a model is running.
+        Coverage: known agent runtimes, saved sources and sibling Runner stores.
+        Other hosts or installations may be missing. Unfinished tasks may be
+        waiting; they do not prove a model is running.
       </p>
     </section>
   );
