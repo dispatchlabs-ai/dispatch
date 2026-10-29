@@ -193,7 +193,9 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         await runtime.commit(async tx => {
           const live = await tx.doc(LiveDoc, runtime.conversationId);
           const owner = await tx.doc(ResponseOwner, runtime.conversationId);
-          const run = live.run?.taskId ?? submission.id;
+          // Generation task IDs change at each tool boundary; the first admitted
+          // input remains the answer's identity throughout in-run steering.
+          const run = live.run?.inputs[0] ?? submission.id;
           if (owner.run === run && owner.key !== task.input.key) return;
           owner.run = run; owner.key = task.input.key; ownsReply = true;
         }, ctx);
