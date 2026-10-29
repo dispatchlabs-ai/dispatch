@@ -1,4 +1,4 @@
-export type ChatMessage = { id: string; role: string; text: string; author?: string; background?: boolean; error?: string };
+export type ChatMessage = { id: string; role: string; text: string; author?: string; background?: boolean; error?: string; artifacts?: Artifact[] };
 export type ChatSnapshot = {
   chat: Chat; messages: ChatMessage[]; running: boolean; queued: number;
   partial: string; tools: string[]; error: string | null; demo: boolean;
@@ -23,13 +23,14 @@ import { createHandoffs } from "./handoff.js";
 import { privateStateDirectory } from "./private-state.js";
 import { createInstanceMessaging, instanceMessagingExtension, type InstanceMessage } from "./messages.js";
 import { createSchedules, scheduleTaskKind } from "./schedules.js";
+import type { Artifact, ArtifactRecord, ArtifactOptions, createArtifacts } from "./artifacts.js";
 
 export const context = BACKGROUND_CONTEXT;
 export type Chat = {
   id: string; agent: string; conversationId: number; title: string;
   source: "cli" | "web" | "slack" | "phone" | "email" | "agent" | "schedule"; createdAt: string; origin?: JsonObject;
 };
-export function createChats(namespace: string, openAgent: ReturnType<typeof createRuntime>["openAgent"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"]) {
+export function createChats(namespace: string, openAgent: ReturnType<typeof createRuntime>["openAgent"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"], Artifacts: ReturnType<typeof createArtifacts>["Artifacts"]) {
   const Chats = defineDoc<{
     byId: Record<string, Chat>; keys: Record<string, string>;
   }>({
@@ -46,6 +47,10 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
 
   function messages(entries: readonly EntryRecord[]): ChatMessage[] {
     return entries.flatMap<ChatMessage>(entry => {
+      if (entry.kind === `${namespace}.artifact`) {
+        const { deliveries: _initialDeliveryTasks, ...artifact } = entry.data as ArtifactRecord;
+        return [{ id: `${entry.id}:artifact`, role: "assistant", text: "", artifacts: [artifact] }];
+      }
       if (entry.kind === `${namespace}.background-reply`) {
         const data = entry.data as { author: string; text: string };
         return [{ id: `${entry.id}:background`, role: "assistant", text: data.text, author: data.author, background: true }];
@@ -88,6 +93,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       cwd?: string;
       storage?: StorageFactory;
       settings?: OpenOptions["settings"];
+      artifacts?: ArtifactOptions;
     }) {
       const stateRoot = resolve(options.stateRoot);
       const names = options.names?.length ? options.names :
@@ -116,6 +122,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
             replySink: options.replySink, updateDefinitions: options.updateDefinitions,
             registryExtensions: [calendar.extension],
             cwd: options.cwd, storage: options.storage, settings: options.settings,
+            artifacts: options.artifacts,
           });
           service.hosts.set(agent.id, host);
         }));
@@ -313,6 +320,13 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       const watch = await this.watch(id, async snapshot => { value = snapshot; });
       await watch.stop();
       return value;
+    }
+
+    async artifact(id: string, artifactId: string) {
+      const { host, conversation } = await this.resolve(id);
+      const record = (await host.harness.snapshot(Artifacts, conversation.id, context))?.records[artifactId];
+      if (!record) throw new Error("Unknown artifact in this conversation.");
+      return { artifact: record, bytes: await host.artifacts.read(conversation.id, record) };
     }
 
     async close() {

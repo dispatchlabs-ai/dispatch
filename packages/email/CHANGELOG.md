@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Include shared retained artifacts in enabled automatic replies and explicitly
+  selected `email_send.artifactIds`; preserve receive-only routes and distinguish
+  suppressed automatic replies from delivery.
 - Add opt-in `unrouted: "ignore"` for independent label workers sharing a mailbox;
   default catch-all filing remains unchanged.
 - Route incoming work by configured Gmail labels, not recipient headers. Shared

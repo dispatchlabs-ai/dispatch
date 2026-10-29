@@ -32,6 +32,9 @@ installation from company definitions, domain workflows and integration code.
 For repo-owned immutable application releases, use the
 [shared Nix builder and deployment procedure](docs/nix-releases.md).
 
+Use [documents and images](docs/artifacts.md) for retained artifact tools,
+conversation-scoped downloads and transport receipts.
+
 Keep the resulting lockfile. Snapshot updates use a new immutable tag and URL;
 published assets are never replaced. This distribution does not change the
 repository's lockstep version policy or publish private workspaces to npm.

@@ -5,6 +5,9 @@
 - Add a host evidence gate for partial model text without hiding native activity.
 - Retry retained Stop cleanup on supervisor recovery before restarting thread work.
 
+- Deliver retained artifacts with Slack's external-upload API, installed file
+  scopes and exact originating-thread receipts. Preserve allocated file identities
+  across retry/restart; never report queued or failed uploads as sent.
 - Optional per-thread process routing with durable cancellation cutoffs and recovery; busy messages steer the active run without duplicate answers.
 
 - Hand event-scoped search credentials to an optional trusted host callback

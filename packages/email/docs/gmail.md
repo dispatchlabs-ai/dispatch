@@ -124,6 +124,13 @@ sending, including any risk of agents automatically replying to each other.
   then call with `path` and optional `filename`. Explicit `email_send` instead
   accepts authorized local files directly and freezes its own attachment bytes.
 
+Runner's `publish_artifact` also retains files for enabled automatic replies.
+For an explicit `email_send`, select retained files with `artifactIds: [ID]`;
+publishing alone does not send from a non-email or receive-only conversation.
+Explicit sending suppresses the automatic reply, including any published files
+not explicitly selected. Inspect the returned delivery task rather than treating
+a suppressed automatic reply as sent. See [artifact custody](../../runner/docs/artifacts.md).
+
 Example request to an enabled agent: “Email person@example.com a short update with
 subject Project update, and attach the report I asked you to create. Check the
 email delivery status before telling me it was sent.”

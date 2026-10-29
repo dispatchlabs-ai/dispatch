@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Retain documents/images independently of workspace lifetime; expose scoped
+  downloads and native delivery receipts across clients, including owned children.
+  Add explicit failed-delivery retries without regenerating bytes. First adoption
+  requires an idle definition migration.
 - Make company instruction provenance definition-root-relative so changing a
   release store path does not invalidate unchanged definitions. Preserve absolute
   target-checkout guidance and explicit idle migration for changed definitions.

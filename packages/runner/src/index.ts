@@ -5,6 +5,7 @@ import { createHandoffs } from "./handoff.js";
 import { createConfiguration } from "./configuration.js";
 import { createRuntime } from "./runtime.js";
 import { createChats } from "./chat.js";
+import { createArtifacts } from "./artifacts.js";
 import type { LoadedAgent } from "./definition.js";
 
 export * from "./definition.js";
@@ -30,19 +31,22 @@ export { context } from "./chat.js";
 export { run } from "./run.js";
 export type { Adapter, PreparedAdapter, RunOptions } from "./run.js";
 export { ProcessScope, serveProcess, cancelService } from "./process-scope.js";
+export { ArtifactStore, artifactFilename, artifactMimeType } from "./artifacts.js";
+export type { Artifact, ArtifactRecord, ArtifactDelivery, ArtifactSource, ArtifactSink, ArtifactOptions } from "./artifacts.js";
 
 /** Keep a namespace fixed for the lifetime of its persisted native sessions. */
 export function createRunner(options: { namespace?: string; workspacePrefix?: string; progressInstructions?: (agent: LoadedAgent) => string } = {}) {
   const namespace = options.namespace ?? "dispatch";
   if (!/^[a-z][a-z0-9-]*$/.test(namespace)) throw new Error("Invalid durable namespace.");
   const progress = createProgress(namespace);
+  const artifacts = createArtifacts(namespace);
   const replies = createReplies(namespace);
   const coding = createCoding(namespace, options.workspacePrefix);
   const handoffs = createHandoffs(namespace, progress.Progress, replies.publishReply);
   const configuration = createConfiguration(coding.codingExtension, handoffs.handoffExtension, options.progressInstructions);
-  const runtime = createRuntime(namespace, configuration.agentConfiguration, handoffs.Handoffs, coding.codingEnvironment);
-  const chats = createChats(namespace, runtime.openAgent, handoffs.Handoffs);
-  return { namespace, ...progress, ...replies, ...coding, ...handoffs, ...configuration, ...runtime, ...chats };
+  const runtime = createRuntime(namespace, configuration.agentConfiguration, handoffs.Handoffs, coding.codingEnvironment, artifacts);
+  const chats = createChats(namespace, runtime.openAgent, handoffs.Handoffs, artifacts.Artifacts);
+  return { namespace, ...progress, ...artifacts, ...replies, ...coding, ...handoffs, ...configuration, ...runtime, ...chats };
 }
 
 export type Runner = ReturnType<typeof createRunner>;

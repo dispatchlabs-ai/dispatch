@@ -10,6 +10,12 @@ source. It shares the repository's 0.6.0 development version and has not been
 published to npm.
 See [use cases](USE_CASES.md) and [changes](CHANGELOG.md).
 
+Runner's [artifact tools](../runner/docs/artifacts.md) upload documents/images
+to the authenticated originating thread using Slack's external-upload flow.
+Install both `files:write` and `files:read` scopes and reauthorize existing apps.
+Native upload identities survive retries; success requires a matching Slack
+file/thread receipt. Text replies and image observations are not file delivery.
+
 ## Configure
 
 Install both packed packages in a private company repository. Use the same exact

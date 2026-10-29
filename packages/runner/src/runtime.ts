@@ -18,6 +18,7 @@ export type OpenOptions = {
   updateConversation?: (tx: import("@earendil-works/pi-durable").Tx, id: ConversationId, setup: AgentSetup) => Promise<boolean>;
   /** The factory transfers ownership to this host. Keep each logical store single-owner. */
   storage?: StorageFactory;
+  artifacts?: ArtifactOptions;
 };
 
 export type StorageFactory = (agent: LoadedAgent) => Promise<Storage>;
@@ -46,12 +47,14 @@ import type { ReplySink } from "./replies.js";
 import { privateStateDirectory, privateStateFiles } from "./private-state.js";
 import { reportError } from "./terminal-output.js";
 import { scheduleTaskKind } from "./schedules.js";
+import { ArtifactStore, type ArtifactOptions, type createArtifacts } from "./artifacts.js";
 
 const context = BACKGROUND_CONTEXT;
 export type RunnerState = {
   fingerprint: string;
   execution: string;
   hostExtensions?: string[];
+  artifactVersion?: number;
   cwd?: string | null;
   loopId: number | null;
   conversationId?: number;
@@ -65,7 +68,7 @@ export type RunnerState = {
 
 export type StartOptions = { conversationId?: ConversationId; input?: string };
 
-export function createRuntime(namespace: string, agentConfiguration: ReturnType<typeof createConfiguration>["agentConfiguration"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"], codingEnvironment: ReturnType<typeof createCoding>["codingEnvironment"]) {
+export function createRuntime(namespace: string, agentConfiguration: ReturnType<typeof createConfiguration>["agentConfiguration"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"], codingEnvironment: ReturnType<typeof createCoding>["codingEnvironment"], artifacts: ReturnType<typeof createArtifacts>) {
   const RunnerDoc = defineDoc<RunnerState>({
     kind: `${namespace}.runner`, version: 1, scope: "session",
     checkpointWhen: () => false,
@@ -235,8 +238,10 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       const registry = createRegistry();
       const loopExtension = defineExtension({ name: `${namespace}.runner`, tasks: [AgentLoop],
         tools: agent.trigger.mode === "continuous" ? [pauseLoop] : [], });
+      const artifactStore = new ArtifactStore(join(directory, "artifacts"));
+      const artifactExtension = artifacts.artifactExtension(artifactStore, options.artifacts);
       const setup = await agentConfiguration(
-        agent, directory, execution === "demo", [loopExtension, ...(options.extensions ?? [])], options.replySink, cwd,
+        agent, directory, execution === "demo", [loopExtension, ...(options.extensions ?? [])], options.replySink, cwd, [artifactExtension],
       );
       const { configuration, installed } = setup;
       for (const extension of new Map([...installed, ...(options.registryExtensions ?? [])].map(extension => [extension.name, extension])).values()) registry.install(extension);
@@ -262,7 +267,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       if (existing?.fingerprint && existing.execution !== execution) {
         throw new Error(`${agent.id}'s demo/live mode changed. Preserve this state and choose a new --state-dir.`);
       }
-      if (existing?.fingerprint && existing.fingerprint !== agent.fingerprint) {
+      if (existing?.fingerprint && (existing.fingerprint !== agent.fingerprint || existing.artifactVersion !== 1)) {
         if (!options.updateDefinitions) {
           throw new Error(`${agent.id}'s definition changed. Use --update-definitions when its saved work is idle, or choose a new --state-dir.`);
         }
@@ -300,6 +305,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
         state.execution = execution;
         state.cwd = cwd ?? null;
         state.hostExtensions = hostExtensions;
+        state.artifactVersion = 1;
       }, context);
       const watch = await harness.watchDoc(RunnerDoc, context);
       if (!watch) throw new Error("Missing runner state.");
@@ -329,7 +335,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
         return closing;
       };
       return {
-        harness: activeHarness, storage, conversation: root, configuration, state, close,
+        harness: activeHarness, storage, conversation: root, configuration, state, close, artifacts: artifactStore,
         async start(once = false, options: StartOptions = {}): Promise<TaskId<null>> {
           if (compromised) throw compromised;
           if (!once && agent.trigger.mode === "manual") throw new Error(`${agent.id} is manual. Use run instead of start.`);
@@ -401,6 +407,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
 }
 
 export type AgentHost = {
+  artifacts: ArtifactStore;
   harness: Awaited<ReturnType<typeof Harness.open>>;
   storage: Storage;
   conversation: Conversation;

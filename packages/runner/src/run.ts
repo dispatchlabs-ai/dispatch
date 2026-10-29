@@ -6,10 +6,12 @@ import { createRunner, type Runner } from "./index.js";
 import type { ChatService, ChatInitializer } from "./chat.js";
 import type { ReplySink } from "./replies.js";
 import { reportError } from "./terminal-output.js";
+import type { ArtifactOptions, ArtifactSink } from "./artifacts.js";
 
 export type PreparedAdapter = {
   extension: Extension;
   queueReply: ReplySink;
+  queueArtifact?: ArtifactSink;
   start(service: ChatService): Promise<void>;
   close(): Promise<void>;
   busy?(): Promise<boolean>;
@@ -32,8 +34,9 @@ export type RunOptions = {
   resume?: boolean;
   initialize?: ChatInitializer;
   adapters?: Adapter[];
+  artifacts?: ArtifactOptions;
   /** Attach domain workflows to the same host before adapters begin receiving. */
-  open?: (options: { extensions: Extension[]; replySink?: ReplySink; settings?: OpenOptions["settings"] }) => Promise<ChatService>;
+  open?: (options: { extensions: Extension[]; replySink?: ReplySink; settings?: OpenOptions["settings"]; artifacts?: ArtifactOptions }) => Promise<ChatService>;
   beforeStart?: (service: ChatService) => Promise<void>;
 };
 
@@ -58,7 +61,9 @@ export async function run(options: RunOptions = {}) {
     // A transport destination is opaque to the runner. Adapters select their
     // destinations; applications using multiple transports provide their sink.
     const replySink = adapters.length === 1 ? adapters[0].queueReply : undefined;
-    if (options.open) service = await options.open({ extensions, replySink, settings: options.settings });
+    const artifacts: ArtifactOptions = { ...options.artifacts, sink: options.artifacts?.sink ?? (async (tx, id, artifact) =>
+      (await Promise.all(adapters.map(adapter => adapter.queueArtifact?.(tx, id, artifact) ?? []))).flat()) };
+    if (options.open) service = await options.open({ extensions, replySink, settings: options.settings, artifacts });
     else {
       if (!options.models) throw new Error("Supply a Pi Models catalog or an open callback.");
       service = await runner.ChatService.open({
@@ -68,7 +73,7 @@ export async function run(options: RunOptions = {}) {
         resume: options.resume,
         deferResume: true,
         cwd: options.cwd, storage: options.storage, settings: options.settings,
-        extensions, replySink,
+        extensions, replySink, artifacts,
       });
     }
     await options.beforeStart?.(service);

@@ -9,6 +9,7 @@ import { awaitWithContext, withAbortSignal, type Context } from "@earendil-works
 import { AssistantEntry, LiveDoc, defineDoc, defineExtension, defineTask, type LiveState, type TaskId, type TaskRuntime } from "@earendil-works/pi-durable";
 import { context, type ChatService, type Runner, type ReplySink } from "@dispatch/runner";
 import { fallbackText, replyBlocks, replyChunk, streamText } from "./text.js";
+import { slackArtifacts } from "./files.js";
 export { SlackThreadProcesses } from "./threads.js";
 
 export type SlackConfig = {
@@ -173,6 +174,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
   const bot = identity.user_id;
   let startService!: (service: ChatService) => void;
   const ready = new Promise<ChatService>(resolve => { startService = resolve; });
+  const artifacts = slackArtifacts(runner, client, config.teamId, ready);
   const turn = defineTask<SlackInput, Delivery, null>({
     name: `${namespace}.slack-turn`, version: 1,
     initial: input => input.replyText === undefined ? { phase: "answer" } : {
@@ -491,7 +493,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
       await runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx);
     },
   });
-  const extension = defineExtension({ name: `${namespace}.slack`, tasks: [turn, incoming] });
+  const extension = defineExtension({ name: `${namespace}.slack`, tasks: [turn, incoming, artifacts.task] });
   const queueReply: ReplySink = async (tx, conversationId, destination, text, key) => {
     await tx.createTask(turn, { ...destination, text, replyText: text, key }, {
       conversationId, ownership: { kind: "conversation" }, background: true,
@@ -561,6 +563,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
     },
     extension,
     queueReply,
+    queueArtifact: artifacts.queue,
     connected: () => socket.websocket?.isActive() ?? false,
     async start(service: ChatService, listen = true) {
       for (const agent of [...Object.values(config.channels), ...(config.directMessagesAgent ? [config.directMessagesAgent] : [])]) service.host(agent);

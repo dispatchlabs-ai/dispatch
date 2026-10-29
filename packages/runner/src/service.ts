@@ -30,6 +30,7 @@ export type ServiceCommand =
   | { method: "agents" | "chats" | "status" | "schedules" }
   | { method: "create"; agent: string; key: string; title?: string }
   | { method: "snapshot" | "stop"; id: string }
+  | { method: "artifact"; id: string; artifactId: string }
   | { method: "send"; id: string; text: string; requestId: string }
   | { method: "message"; from: string; message: InstanceMessage; requestId: string }
   | { method: "message-status"; from: string; taskId: number }
@@ -44,6 +45,10 @@ async function dispatch(service: ChatService, command: ServiceCommand) {
       if (typeof command.key !== "string" || !command.key.trim()) throw new Error("A stable conversation key is required.");
       return service.create(command.agent, "cli", command.key, command.title);
     case "snapshot": return service.snapshot(command.id);
+    case "artifact": {
+      const { artifact, bytes } = await service.artifact(command.id, command.artifactId);
+      return { artifact, dataBase64: bytes.toString("base64") };
+    }
     case "stop": await service.stop(command.id); return {};
     case "send": return service.submit(command.id, command.text, command.requestId, "followUp", "cli");
     case "receipt": return service.receipt(command.id, command.submissionId);

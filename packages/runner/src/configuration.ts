@@ -12,6 +12,7 @@ export type AgentSetup = { configuration: AgentChange; installed: Extension[]; d
 export function createConfiguration(codingExtension: ReturnType<typeof createCoding>["codingExtension"], handoffExtension: ReturnType<typeof createHandoffs>["handoffExtension"], progressInstructions?: (agent: LoadedAgent) => string) {
   async function agentConfiguration(
     agent: LoadedAgent, directory: string, demo: boolean, adapters: Extension[], sink?: ReplySink, cwd?: string,
+    shared: Extension[] = [],
   ): Promise<AgentSetup> {
     const repositoryInstructions = repositoryInstructionsExtension();
     const extensions: Extension[] = [repositoryInstructions, ...(agent.extensions ?? [])];
@@ -21,7 +22,7 @@ export function createConfiguration(codingExtension: ReturnType<typeof createCod
     const model = demo ? { provider: "faux", modelId: "faux-1" } : { provider: agent.model.provider, modelId: agent.model.id };
     if (agent.coding) extensions.push(...(await codingExtension(agent.root, directory)).extensions);
     if (agent.handoff && agent.handoffAgent) {
-      const child = await agentConfiguration(agent.handoffAgent, directory, demo, [], sink, cwd);
+      const child = await agentConfiguration(agent.handoffAgent, directory, demo, [], sink, cwd, shared);
       delegate = child;
       installed.push(...child.installed);
       extensions.push(handoffExtension({
@@ -35,13 +36,13 @@ export function createConfiguration(codingExtension: ReturnType<typeof createCod
     }
     if (agent.delegateAgents?.length || agent.clones) {
       const delegates = await Promise.all((agent.delegateAgents ?? []).map(async target => {
-        const setup = await agentConfiguration(target, directory, demo, [], sink, cwd);
+        const setup = await agentConfiguration(target, directory, demo, [], sink, cwd, shared);
         installed.push(...setup.installed);
         return { name: target.id, description: target.description, configuration: setup.configuration };
       }));
       extensions.push(delegationExtension(agent.id, delegates, agent.clones));
     }
-    extensions.push(...adapters);
+    extensions.push(...shared, ...adapters);
     installed.push(...extensions);
     return {
       configuration: { model, thinkingLevel: agent.model.thinking, instructions: agent.instructions + skillInstructions(agent.skillCatalog ?? []), extensions, ...(cwd ? { cwd } : {}) },

@@ -15,8 +15,11 @@ export type TerminalOptions = RunOptions & {
 };
 
 async function showHistory(service: ChatService, chat: Chat) {
+  const { host, conversation } = await service.resolve(chat.id);
   for (const message of (await service.snapshot(chat.id)).messages) {
     console.log(terminalText(`${message.role}: ${message.text}${message.error ? `\nError: ${message.error}` : ""}\n`));
+    for (const file of message.artifacts ?? []) console.log(terminalText(
+      `Attachment: ${file.name} (${file.size} bytes)\n${host.artifacts.directory}/${conversation.id}/files/${file.id}`));
   }
 }
 
@@ -57,6 +60,12 @@ export async function chatInTerminal(options: TerminalOptions): Promise<void> {
           if (message.role !== "assistant") continue;
           process.stdout.write(terminalText(message.text.startsWith(partial) ? message.text.slice(partial.length) : `\n${message.text}`));
           process.stdout.write("\n");
+          for (const file of message.artifacts ?? []) {
+            const { host, conversation } = await app.service.resolve(chat.id);
+            // Direct terminal mode runs as the local owner. Print the retained
+            // file, never the temporary source workspace path.
+            process.stdout.write(terminalText(`Attachment: ${file.name}\n${host.artifacts.directory}/${conversation.id}/files/${file.id}\n`));
+          }
           partial = "";
           if (message.error) generationError = message.error;
         }
