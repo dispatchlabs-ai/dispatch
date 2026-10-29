@@ -144,3 +144,28 @@ Streaming failure preserves the final reply, which retries through the native
 outbox. If a stream message was deleted, delivery clears its saved timestamp and
 posts the completed answer as an ordinary thread reply. The package imposes no
 global inference concurrency limit.
+
+## Thread processes and steering
+
+Additional messages use native in-run steering, not after-completion follow-ups.
+They share the active run's answer; a separate response is produced only for a
+new run. Native tool boundaries still determine when steering is consumed.
+`onInput` lets a trusted host wake an owned observation without cancelling work.
+Exact authenticated `stop` or `cancel` messages bypass ordinary admission waits.
+
+Opt into `SlackThreadProcesses(directory, launch, stopped)` through `threads`.
+The host launches one trusted entry point per workspace/channel/thread and gives
+it a separate native state directory. Attach its adapter with `start(service,
+false)`; only the supervisor connects Socket Mode. Forward IPC `receive` to the
+worker adapter. Report `idle` with the last admitted input key only after native
+and descendant work are idle. Report `stream` events with key/ts/done; supplying
+`eventId` requests an `eventSaved` acknowledgement after fsynced receipt storage.
+
+The launch callback receives `cancelPending`: clean retained tasks without
+replaying them before signalling readiness. Routing records persist cancellation
+cutoffs before termination. Newer inputs may resume the same history, while
+cancelled inputs cannot restart it. Unexpected worker exits recover active work;
+closing the supervisor suspends it. There is no global concurrency cap. The
+`stopped` callback finalizes saved streams and cancels host-owned external work.
+Remote jobs, existing-history migration and company authorization remain host
+responsibilities. Slack's post/receipt crash window remains at least once.

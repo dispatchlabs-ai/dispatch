@@ -29,6 +29,7 @@ export type { ReplyDestination, ReplySink } from "./replies.js";
 export { context } from "./chat.js";
 export { run } from "./run.js";
 export type { Adapter, PreparedAdapter, RunOptions } from "./run.js";
+export { ProcessScope, serveProcess, cancelService } from "./process-scope.js";
 
 /** Keep a namespace fixed for the lifetime of its persisted native sessions. */
 export function createRunner(options: { namespace?: string; workspacePrefix?: string; progressInstructions?: (agent: LoadedAgent) => string } = {}) {

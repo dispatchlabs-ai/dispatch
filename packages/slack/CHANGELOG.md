@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Optional per-thread process routing with durable cancellation cutoffs and recovery; busy messages steer the active run without duplicate answers.
+
 - Hand event-scoped search credentials to an optional trusted host callback
   without recording bearer tokens in native transcripts or model context.
 

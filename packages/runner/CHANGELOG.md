@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- POSIX owned process groups with concurrent IPC, enforced tree termination and paused-store cancellation cleanup.
+
 - Move Gmail implementation and its MIME dependencies into `@dispatch/email`.
   Retain an asynchronous `@dispatch/runner/gmail` compatibility entry point;
   installations must include the email package. Email owns sending enablement,

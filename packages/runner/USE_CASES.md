@@ -61,6 +61,9 @@
   in an explicit timezone, with shared Runner admission and native Pi recovery.
   See the [calendar contract and recovery](docs/schedules.md).
 
+- **RUN-017 — Own process trees:** supervise trusted POSIX workers and inherited
+  descendants; distinguish recoverable suspension from durable cancellation.
+
 ## Availability
 
 The extraction supports Node, SQLite and trusted company definitions.

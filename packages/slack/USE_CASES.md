@@ -23,6 +23,10 @@
   input. Redelivery can refresh that handoff without duplicating the message;
   a failed handoff leaves the event unacknowledged for retry.
 
+- **SLK-007 — Own thread lifecycles:** optionally launch an isolated process per
+  thread, steer active work, cancel its owned descendants without affecting other
+  threads, and retain history and cancellation decisions across restart.
+
 Slack app creation, workspace invitations, company policy and business research
 belong to administrators or company definitions. The package does not infer those
 permissions from a message or create an HTTP endpoint.

@@ -300,3 +300,18 @@ owner. The definition repository does not install the service.
 
 Opt into [instance messages](docs/instance-messages.md) for reusable handoffs
 between independent agents, without private child ownership or a notes store.
+
+## Owned processes (POSIX)
+
+`ProcessScope` forks a trusted Node entry point into its own process group;
+`serveProcess` handles concurrent IPC requests so observations do not serialize
+steering or Stop. Normal descendants inherit that group. `close("cancel")` sends
+cooperative cancellation, then kills the group after one second. `close()`
+suspends retained native work instead. The child also enforces termination when
+its owner disconnects. Deliberately detached processes and remote effects need
+the host's separate ownership/cancellation integration.
+
+Before recovering a cancelled store, open it with `resume: false` and call
+`cancelService`. It marks all tasks before enabling native abort cleanup; pending
+tools must not replay merely to be cancelled. Persist the cancellation decision
+outside the worker before terminating it. This does not undo external effects.
