@@ -29,6 +29,9 @@ npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/runner
 See [definition workspaces](docs/definition-workspaces.md) for separating the
 installation from company definitions, domain workflows and integration code.
 
+For repo-owned immutable application releases, use the
+[shared Nix builder and deployment procedure](docs/nix-releases.md).
+
 Keep the resulting lockfile. Snapshot updates use a new immutable tag and URL;
 published assets are never replaced. This distribution does not change the
 repository's lockstep version policy or publish private workspaces to npm.
@@ -136,6 +139,8 @@ adapters share one native harness; never open a second writer to the same store.
 `chatInTerminal({ root, models, agent: "helper", stateRoot, session: "main" })`
 starts the same headless service with a streaming terminal client. It selects one
 agent, creates or resumes a named conversation and owns process signal cleanup.
+Supply `names` to include that agent's instance-message recipients in the same
+process; their hosts resume admitted work without enabling schedules.
 `prompt` sends one turn and exits; `history` prints the selected history without
 inference. `newChat` creates a fresh session and prints its key. Interactive
 commands are `/new`, `/history` and `/quit`; Ctrl-C suspends unfinished work and

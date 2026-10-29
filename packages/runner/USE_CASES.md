@@ -64,6 +64,10 @@
 - **RUN-017 — Own process trees:** supervise trusted POSIX workers and inherited
   descendants; distinguish recoverable suspension from durable cancellation.
 
+- **RUN-018 — Release an agent application:** compose a pinned shared runtime and
+  company source into a Nix closure; publish and select it separately from host
+  provisioning, secrets, native state and process activation.
+
 ## Availability
 
 The extraction supports Node, SQLite and trusted company definitions.

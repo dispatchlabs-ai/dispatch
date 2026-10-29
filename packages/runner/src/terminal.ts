@@ -23,7 +23,7 @@ async function showHistory(service: ChatService, chat: Chat) {
 /** A local terminal is another client of the same durable conversation service. */
 export async function chatInTerminal(options: TerminalOptions): Promise<void> {
   if (options.continuous && options.history) throw new Error("Choose continuous work or history.");
-  const app = await run({ ...options, names: [options.agent], resume: false })
+  const app = await run({ ...options, names: options.names ?? [options.agent], resume: false })
     .catch((error: unknown) => { throw terminalError(error); });
   const controller = new AbortController();
   let input: ReturnType<typeof createInterface> | undefined;
@@ -41,7 +41,7 @@ export async function chatInTerminal(options: TerminalOptions): Promise<void> {
       const saved = await host.state();
       const task = saved.loopId ? await host.harness.getTask(saved.loopId as import("@earendil-works/pi-durable").TaskId, context) : undefined;
       if (task && task.state.status !== "terminal") throw new Error("A saved loop is still active. Resume in continuous mode instead of starting a separate terminal turn.");
-      host.harness.resume();
+      for (const sibling of app.service.hosts.values()) sibling.harness.resume();
     }
 
     const observe = async (action: () => Promise<void>) => {

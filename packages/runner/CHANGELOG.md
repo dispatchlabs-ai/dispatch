@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+- Add a focused Nix Runner package and shared agent-release builder with copied
+  definitions, source provenance and build-time catalog loading. Agent repos own
+  locked composition; hosts retain secrets/state. The on-demand CLI isolates
+  named session stores and uses the terminal client without calendars/listeners.
+- Allow terminal hosts to include instance-message recipients in the same
+  process without starting their autonomous schedules.
+- Manual Linux x86_64 qualification observed parallel streaming processes,
+  retained native skill calls/results, history reopening and same-store owner
+  rejection. Linux x86_64 and macOS arm64 packages built; other platforms and
+  live provider/business workflows remain unqualified by this work.
+
 - POSIX owned process groups with concurrent IPC, enforced tree termination and paused-store cancellation cleanup.
 
 - Move Gmail implementation and its MIME dependencies into `@dispatch/email`.

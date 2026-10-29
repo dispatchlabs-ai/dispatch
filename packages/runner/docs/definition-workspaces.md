@@ -45,8 +45,10 @@ For immutable deployment, package the runtime manifest and lockfile above a
 `definitions/` directory containing the exact committed company tree. Install
 both layers separately and point the service at `definitions/`. Keep each
 release's runtime with that release so rollback never silently selects a newer
-parent dependency tree. Deployment configuration belongs to the installation's
-owner, outside the company definition repository.
+parent dependency tree. The company repository can own application release
+composition and deployment declarations through the [shared Nix builder](nix-releases.md).
+Host provisioning, secret values and mutable state remain the infrastructure
+owner's responsibility.
 
 Before opening an existing store with Pi 1.4, stop its owner and retain a complete
 backup. Native SQLite migrates to schema 2; Pi 1.3 cannot reopen it. A source
