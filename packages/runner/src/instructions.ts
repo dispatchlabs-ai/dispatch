@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile, realpath, stat } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { defineExtension, section } from "@earendil-works/pi-durable";
 
 export type RepositoryInstruction = { path: string; revision: string; text: string };
@@ -38,12 +38,15 @@ export async function loadRepositoryInstructions(directory: string, fallbackRoot
   return sources;
 }
 
-export function formatRepositoryInstructions(sources: readonly RepositoryInstruction[], scope: "agent" | "repository" = "repository"): string {
+export function formatRepositoryInstructions(sources: readonly RepositoryInstruction[], agentRoot?: string): string {
   if (!sources.length) return "";
-  const heading = scope === "agent"
-    ? "These AGENTS.md files define this agent's shared rules. Apply their agent-behavior rules to every assignment. Repository-specific contributor commands and paths apply only to their source repository. More specific files refine the shared rules."
+  const heading = agentRoot
+    ? "These AGENTS.md files define this agent's shared rules. Source paths are relative to the agent definition repository, not the working directory. Apply their agent-behavior rules to every assignment. Repository-specific contributor commands and paths apply only to their source repository. More specific files refine the shared rules."
     : "Target repository instructions apply within their named directories. More specific files govern their subtree.";
-  return heading + "\n\n" + sources.map(source => `# AGENTS.md from ${dirname(source.path)}\n${source.text}`).join("\n\n");
+  return heading + "\n\n" + sources.map(source => {
+    const folder = agentRoot ? relative(agentRoot, dirname(source.path)) || "." : dirname(source.path);
+    return `# AGENTS.md from ${folder}\n${source.text}`;
+  }).join("\n\n");
 }
 
 /** Refresh target-repository guidance before each model request, including recovery. */

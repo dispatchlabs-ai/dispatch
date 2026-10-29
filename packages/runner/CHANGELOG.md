@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Make company instruction provenance definition-root-relative so changing a
+  release store path does not invalidate unchanged definitions. Preserve absolute
+  target-checkout guidance and explicit idle migration for changed definitions.
+  Earlier absolute-path fingerprints require a one-time explicit migration.
 - Add a focused Nix Runner package and shared agent-release builder with copied
   definitions, source provenance and build-time catalog loading. Agent repos own
   locked composition; hosts retain secrets/state. The on-demand CLI isolates

@@ -215,6 +215,10 @@ on demand, rather than hot-reloaded under a saved definition.
 root-to-agent-directory `AGENTS.md` chain. Those source revisions contribute to
 the definition fingerprint, including delegated roles. Without Git, the company
 root is the boundary. Missing instruction files are allowed.
+Company source paths are relative to that root, so relocating unchanged
+definitions does not change their fingerprint. Target-checkout paths stay
+absolute. Stores using the earlier absolute company paths require one explicit
+idle definition update.
 Shared agent-behavior rules follow the agent across assignments; contributor
 commands and paths stay scoped to their source repository. Role bodies are
 explicitly labeled with their `agents/<name>/agent.md` source.

@@ -70,6 +70,10 @@ manager, updater or automatic service activation.
 Binary rollback does not undo Pi schema changes or native definition migrations.
 Keep compatible closed-state backups. A rollout must preserve namespace,
 adapters, tool/data bindings and store ownership; never open a second writer.
+Company instruction paths are definition-root-relative, so a different release
+store path alone does not change a definition fingerprint. Stores created before
+this correction still require an explicit idle definition migration once; actual
+instruction, role or skill changes continue to require it.
 
 ## On-demand CLI
 

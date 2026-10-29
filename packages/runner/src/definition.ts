@@ -119,7 +119,7 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
     ? await loadAgent(root, definition.handoff.target, [...ancestors, id]) : undefined;
   const delegateAgents = definition.delegates?.length
     ? await Promise.all(definition.delegates.map(name => loadAgent(root, name, [...ancestors, id]))) : undefined;
-  const instructions = [formatRepositoryInstructions(repositoryInstructions, "agent"),
+  const instructions = [formatRepositoryInstructions(repositoryInstructions, root),
     `# Role instructions from agents/${id}/agent.md\n${match[2].trim()}`].filter(Boolean).join("\n\n");
   return {
     ...definition, root, id, instructions,
