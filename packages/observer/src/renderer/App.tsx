@@ -1988,7 +1988,6 @@ export function App() {
             <ConnectionDialog
               key={dialog === "new" ? "new" : dialog.id}
               existing={dialog === "new" ? undefined : dialog}
-              preferences={preferences}
               onClose={() => setDialog(undefined)}
               onSaved={async (id) => {
                 setEvidenceRequest(undefined);

@@ -180,6 +180,11 @@ are encrypted with Electron's operating-system credential facility; Linux's
 unencrypted `basic_text` fallback is refused. SSH keys and AWS credentials stay
 with their existing providers. The renderer never receives a saved password.
 
+Startup, Settings and local discovery do not unlock the credential store.
+Protected-storage availability is checked when reading or saving a password,
+not while reading ordinary preferences. An unavailable store produces an error;
+choose session-only storage explicitly rather than falling back silently.
+
 Settings default to the platform's application-data directory under
 `Dispatch Observer/connections.json`. `DISPATCH_OBSERVER_DATA_DIR` can select an
 isolated local directory for development. Never commit that directory or copy a
@@ -259,6 +264,13 @@ going back replaces the forward path. Switching connections clears history;
 reconnecting the current connection preserves it.
 
 ## Compatibility and qualification
+
+Startup follow-up (October 28, 2026, OBS-001, OBS-005): the normal packaged
+macOS ARM64 app opened, discovered local work, opened Settings/Add/Cancel and
+displayed a saved workflow conversation and its adjacent evidence. No credential
+storage bypass or permission change was used; the preferences file was unchanged.
+Workspace type/build checks and packaging passed. Protected-password operations
+received source review, not renewed runtime qualification.
 
 Desktop reading polish (October 28, 2026, OBS-005, OBS-007–010, OBS-012,
 OBS-013, OBS-015): the packaged macOS ARM64 review app was compared with the

@@ -240,6 +240,10 @@ Add/Edit uses a wide desktop form with separate transport/database columns. Only
 fields scroll: the title, close control and Cancel/Test/Save actions stay visible.
 Reveal validation and connection feedback within the scrolling body.
 
+Reading preferences and discovering local stores must not initialize credential
+storage. Check it when an operation actually reads or saves a protected password;
+report unavailable storage without silently switching to plaintext.
+
 | Source | Setup and read behavior |
 | --- | --- |
 | Local SQLite | Pick an existing file. Check schema compatibility, open read-only, and use short consistent snapshots. Never create a missing database or take its runner owner lock. |

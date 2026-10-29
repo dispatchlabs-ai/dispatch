@@ -151,15 +151,15 @@ else {
       app.quit();
       return;
     }
-    nativeTheme.themeSource = (await preferences.get()).theme;
+    nativeTheme.themeSource = preferences.get().theme;
     session.defaultSession.setPermissionRequestHandler(
       (_contents, _permission, callback) => callback(false),
     );
     session.defaultSession.setPermissionCheckHandler(() => false);
     handle("preferences", () => preferences.get());
-    handle("local-work", async () =>
+    handle("local-work", () =>
       service("local-work", {
-        connections: (await preferences.get()).connections,
+        connections: preferences.get().connections,
       }),
     );
     handle("choose-file", async (kind) => {
@@ -197,7 +197,7 @@ else {
     handle("save", (input) => preferences.save(draftSchema.parse(input)));
     handle("remove", async (input) => {
       const id = z.string().uuid().parse(input);
-      if ((await preferences.get()).lastConnection === id)
+      if (preferences.get().lastConnection === id)
         await service("disconnect");
       await preferences.remove(id);
     });

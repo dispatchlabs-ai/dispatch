@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Credential-free startup
+
+- Open the viewer, settings and local discovery without initializing OS credential
+  storage. Check protected storage only when reading or saving a password, retaining
+  explicit errors and refusing plaintext fallback.
+
 ### Desktop reading polish
 
 - Compact conversation headers and context so saved messages appear sooner.

@@ -12,7 +12,6 @@ import { UI } from "./controls";
 import {
   connectionSchema,
   type Connection,
-  type Preferences,
   type SavedConnection,
 } from "../shared/contracts";
 
@@ -36,20 +35,16 @@ function fresh(): Connection {
 }
 export function ConnectionDialog({
   existing,
-  preferences,
   onClose,
   onSaved,
 }: {
   existing?: SavedConnection;
-  preferences: Preferences;
   onClose(): void;
   onSaved(id: string): Promise<void>;
 }) {
   const [value, setValue] = useState<Connection>(existing ?? fresh);
   const [password, setPassword] = useState<string | undefined>();
-  const [remember, setRemember] = useState(
-    existing?.secretSaved ?? preferences.secureStorage,
-  );
+  const [remember, setRemember] = useState(existing?.secretSaved ?? true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [probe, setProbe] = useState<{ stores: string[]; message: string }>();
@@ -423,17 +418,14 @@ export function ConnectionDialog({
                 <UI.Checkbox
                   checked={remember}
                   onCheckedChange={setRemember}
-                  disabled={!preferences.secureStorage}
                 />
                 <KeyRound size={14} />
                 Save password in protected OS storage
               </label>
-              {!preferences.secureStorage && (
-                <p className="notice">
-                  Protected storage is unavailable. A password is kept only
-                  until this app exits.
-                </p>
-              )}
+              <p className="hint">
+                OS access is requested only when saving or opening a stored
+                password.
+              </p>
               <UI.Field label="Transport encryption">
                 {(props) => (
                   <select

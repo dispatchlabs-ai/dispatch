@@ -239,7 +239,6 @@ export type Preferences = {
   connections: SavedConnection[];
   lastConnection?: string;
   theme: "system" | "light" | "dark";
-  secureStorage: boolean;
   platform: string;
 };
 export type Probe = { stores: string[]; message: string };

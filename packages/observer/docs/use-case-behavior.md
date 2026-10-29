@@ -136,3 +136,5 @@ usage guide for the revision and interactive evidence actually checked.
   group expansion. Evidence-reading keys do not operate underlying playback.
 - **OBS-005/015:** Add/Edit keeps its heading, close and Cancel/Test/Save actions
   visible while connection fields scroll; cancellation returns to Settings.
+  Startup, settings and local discovery do not initialize protected credential
+  storage; actual password operations retain availability checks and errors.

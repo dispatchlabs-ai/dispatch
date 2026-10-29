@@ -16,7 +16,7 @@ export class PreferenceStore {
   private appearance: Preferences["theme"] = "system";
   private path = join(app.getPath("userData"), "connections.json");
   private pendingWrite: Promise<void> = Promise.resolve();
-  async secure() {
+  private async secure() {
     return (
       (await safeStorage.isAsyncEncryptionAvailable()) &&
       (process.platform !== "linux" ||
@@ -46,11 +46,14 @@ export class PreferenceStore {
         typeof item.encrypted === "string" ? item.encrypted : undefined,
     }));
     this.selected =
-      typeof data.lastConnection === "string" ? data.lastConnection : undefined;
+      typeof data.lastConnection === "string"
+        ? data.lastConnection
+        : undefined;
     if (["system", "light", "dark"].includes(data.theme))
       this.appearance = data.theme;
   }
-  async get(): Promise<Preferences> {
+  get(): Preferences {
+    // Checking encryption availability can prompt; ordinary preferences must not.
     return {
       connections: this.items.map((item) => ({
         ...item.connection,
@@ -60,7 +63,6 @@ export class PreferenceStore {
       })),
       lastConnection: this.selected,
       theme: this.appearance,
-      secureStorage: await this.secure(),
       platform: process.platform,
     };
   }
@@ -138,7 +140,10 @@ export class PreferenceStore {
     const write = this.pendingWrite
       .catch(() => {})
       .then(async () => {
-        await mkdir(app.getPath("userData"), { recursive: true, mode: 0o700 });
+        await mkdir(app.getPath("userData"), {
+          recursive: true,
+          mode: 0o700,
+        });
         const temporary = `${this.path}.tmp`;
         await writeFile(temporary, content, { mode: 0o600 });
         await rename(temporary, this.path);
