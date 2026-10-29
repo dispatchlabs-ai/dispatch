@@ -67,6 +67,8 @@ export type SlackOptions = {
   /** Wake an owned coordinator's observation so in-run steering is not held behind a long poll. */
   onInput?: (conversationId: number) => void;
   onStream?: (event: { key: string; ts: string; done?: boolean }) => void | Promise<void>;
+  /** Host evidence gate for partial model text. Status and final-answer delivery remain independent. */
+  allowProgressText?: (conversationId: number, inputIds: readonly number[]) => boolean | Promise<boolean>;
 };
 
 export function slack(options: SlackOptions = {}) {
@@ -242,8 +244,10 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
           const active = !!live?.run?.inputs.includes(submission.id);
           await refreshStatus(task.input, runtime, ctx);
           if (!stream || missing) return;
-          const raw = active ? live?.generation?.message?.content.flatMap(p => p.type === "text" ? [p.text] : []).join("\n") ?? "" : "";
+          const allowed = !options.allowProgressText || await options.allowProgressText(runtime.conversationId, live?.run?.inputs ?? []);
+          const raw = active && allowed ? live?.generation?.message?.content.flatMap(p => p.type === "text" ? [p.text] : []).join("\n") ?? "" : "";
           const text = streamText(raw);
+          if (!allowed) progress = "";
           if (raw.trim()) progress = raw;
           ordinary ||= (active && !!live?.tools?.length) || runtime.now() >= openedAt + 8 * 60_000
             || (!!text && !text.startsWith(sent));

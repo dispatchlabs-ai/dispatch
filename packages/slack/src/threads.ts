@@ -132,6 +132,12 @@ export class SlackThreadProcesses {
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
     await Promise.all((await readdir(this.directory)).filter(name => /^[a-f0-9]{64}$/.test(name)).map(async name => {
       const state: RecordState = JSON.parse(await readFile(join(this.directory, name, "thread.json"), "utf8"));
+      // A supervisor can die after persisting Stop but before external cleanup.
+      // Repeat the idempotent host cleanup before any new primary may recover.
+      if (state.needsCancel) {
+        await this.stopped(state.input, Object.values(state.streams));
+        await this.change(state.key, current => ({ ...current!, streams: {} }));
+      }
       if (state.active && state.input.timestamp > state.cancelledThrough) await this.receive(state.input);
     }));
   }

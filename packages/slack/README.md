@@ -169,3 +169,7 @@ closing the supervisor suspends it. There is no global concurrency cap. The
 `stopped` callback finalizes saved streams and cancels host-owned external work.
 Remote jobs, existing-history migration and company authorization remain host
 responsibilities. Slack's post/receipt crash window remains at least once.
+
+Hosts may supply `allowProgressText(conversationId, inputIds)` to withhold partial
+model text until required evidence exists for the current inputs. Native activity
+status continues; the host must separately enforce its final-answer policy.

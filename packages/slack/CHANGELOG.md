@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Add a host evidence gate for partial model text without hiding native activity.
+- Retry retained Stop cleanup on supervisor recovery before restarting thread work.
+
 - Optional per-thread process routing with durable cancellation cutoffs and recovery; busy messages steer the active run without duplicate answers.
 
 - Hand event-scoped search credentials to an optional trusted host callback
