@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Separate summary output allowance from compaction trigger reserves without
+  modifying Pi Durable. Preserve the working context and model/thinking, recover
+  incomplete summaries through smaller sections, and keep summary work, usage,
+  provider retry deadlines and cancellation in native owned tasks.
+
 - Expose native compaction budgets, failed-run queue policy and same-conversation
   recovery; report held inputs and compaction failures.
 
