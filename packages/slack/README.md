@@ -124,12 +124,21 @@ Slack's indicator, so a completed or queued turn cannot clear active work.
 Short answers stream normally. Once the model starts tools, or before an initial
 stream reaches eight minutes, the adapter closes the stream and updates the same
 message with the latest public response and execution-derived progress: the
-current tool round's finished/total count, model retry or context preparation,
-and elapsed time in ten-second increments. A finished tool is not necessarily a
-successful tool. These updates do not depend on model narration or invent a
-percentage complete. Slack updates are paced and may lag during API failures.
-Later model responses replace the progress text, including after restart;
-private reasoning and tool names, arguments and output are not displayed. This
+current operation, model retry or context preparation, and elapsed time in
+ten-second increments. The same activity supplies Slack's loading messages.
+Hosts can provide `describeTool({ name, arguments })` in `SlackOptions`, returning
+`{ label, subject? }` for public display, such as `Searching the knowledge base`
+and `release history`. It reads native tool intent, including repaired arguments
+and nested calls. Select safe fields; never return credentials or raw commands.
+Without a formatter, generic operation labels reveal no arguments or tool output.
+The last selected subject remains visible while the model reviews results or
+prepares its answer; that wording does not assert tool success. These updates do
+not require model narration or invent a percentage complete. Slack updates are
+paced and may lag during API failures.
+Later public model responses replace the progress text, including after restart.
+Partial text waits for a sentence or line boundary; unfinished fragments remain
+hidden until more text arrives or the final answer commits. Private reasoning
+and raw tool output are never displayed. This
 avoids Slack's ten-minute stream expiry marking active work as failed.
 Final delivery replaces progress with
 the committed answer. See [Slack's response guidance](https://docs.slack.dev/ai/developing-agents/#responding-to-the-user).

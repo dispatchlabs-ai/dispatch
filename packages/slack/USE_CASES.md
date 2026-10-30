@@ -14,7 +14,9 @@
   beyond Slack's stream lifetime, renew the native loading indicator during quiet
   execution, and show safe execution-derived progress without requiring model
   narration. Show the latest public response across model rounds and process
-  restarts; completion of an earlier turn must not clear a later active turn.
+  restarts, buffering unfinished sentences. Allow trusted hosts to describe the
+  actual operation and select public subjects for both the progress message and
+  loading text; completion of an earlier turn must not clear a later active turn.
 - **SLK-005 — Share a workspace:** allow an agent in invited channels and DMs;
   direct explicit mentions to the intended bot and keep another bot's threads
   from becoming competing automatic conversations.

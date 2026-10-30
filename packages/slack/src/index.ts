@@ -8,8 +8,10 @@ import { WebClient } from "@slack/web-api";
 import { awaitWithContext, withAbortSignal, type Context } from "@earendil-works/chord/context";
 import { AssistantEntry, LiveDoc, defineDoc, defineExtension, defineTask, type LiveState, type TaskId, type TaskRuntime } from "@earendil-works/pi-durable";
 import { context, type ChatService, type Runner, type ReplySink } from "@dispatch/runner";
-import { fallbackText, replyBlocks, replyChunk, streamText } from "./text.js";
+import { fallbackText, progressText, replyBlocks, replyChunk, streamText } from "./text.js";
 import { slackArtifacts } from "./files.js";
+import { activityLabel, currentToolActivity, type SlackActivity, type SlackToolDescription } from "./progress.js";
+export type { SlackActivity, SlackToolCall, SlackToolDescription } from "./progress.js";
 export { SlackThreadProcesses } from "./threads.js";
 export { runSlackHost, type SlackHostOptions } from "./host.js";
 
@@ -42,18 +44,6 @@ function slackError(error: unknown) {
   return (error as { data?: { error?: string } })?.data?.error;
 }
 
-function activity(live: Readonly<LiveState>) {
-  if (live.generation?.retry) return "Retrying a model request";
-  if (live.compactions?.some(task => task.blocking)) return "Organizing context";
-  if (live.tools?.length) {
-    const finished = live.tools.filter(tool => tool.status === "done").length;
-    return `Running tools · ${finished}/${live.tools.length} finished in this round`;
-  }
-  if (live.generation?.deferred) return "Waiting for the model";
-  if (live.generation?.message?.content.some(part => part.type === "text" && part.text.trim())) return "Writing response";
-  return "Working";
-}
-
 export type Report = { agent: string; channel: string; thread?: string; text: string; key: string; origin: import("@earendil-works/pi-durable").JsonObject; title?: string };
 export const threadKey = (team: string, channel: string, thread: string) => `slack:${team}:${channel}:${thread}`;
 
@@ -71,6 +61,8 @@ export type SlackOptions = {
   onStream?: (event: { key: string; ts: string; done?: boolean }) => void | Promise<void>;
   /** Host evidence gate for partial model text. Status and final-answer delivery remain independent. */
   allowProgressText?: (conversationId: number, inputIds: readonly number[]) => boolean | Promise<boolean>;
+  /** Select public activity wording from native tool intent. Raw arguments are never displayed by default. */
+  describeTool?: SlackToolDescription;
 };
 
 export function slack(options: SlackOptions = {}) {
@@ -135,7 +127,10 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
   });
   const identity = await client.auth.test();
   if (identity.team_id !== config.teamId || !identity.user_id) throw new Error("Slack token does not belong to the configured workspace.");
-  const statuses = new Map<string, { pending: Promise<void>; active?: boolean; renewAt: number; retryAt: number }>();
+  const statuses = new Map<string, {
+    pending: Promise<void>; active?: boolean; run?: number; previous?: SlackActivity;
+    label?: string; published?: string; renewAt: number; retryAt: number;
+  }>();
   // Serialize only Slack's shared thread indicator, never native execution.
   // Read current state inside the queue: an older turn must not clear a newer one.
   const refreshStatus = async (input: SlackInput, runtime: TaskRuntime<SlackInput, Delivery, null, object>, ctx: Context, force = false) => {
@@ -148,17 +143,26 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
     const status = state;
     let idle = false;
     const pending = status.pending.then(async () => {
-      if (runtime.signal.aborted || runtime.now() < status.retryAt) return;
+      if (runtime.signal.aborted) return;
       try {
         const live = await runtime.snapshot(LiveDoc, runtime.conversationId, ctx);
         const active = !!live?.run;
         idle = !active;
-        if (!force && active === status.active && runtime.now() < status.renewAt) return;
+        const run = live?.run?.inputs[0];
+        if (run !== status.run) { status.run = run; status.previous = undefined; }
+        const tool = active ? await currentToolActivity(live!, runtime, ctx, options.describeTool) : undefined;
+        if (tool) status.previous = { ...tool.activity, subject: tool.activity.subject ?? status.previous?.subject };
+        const label = active ? activityLabel(live!, tool?.running ? tool.activity : undefined, status.previous) : "";
+        status.label = label;
+        if (runtime.now() < status.retryAt) return;
+        if (!force && active === status.active && label === status.published && runtime.now() < status.renewAt) return;
         await client.assistant.threads.setStatus({
           channel_id: input.channel, thread_ts: input.thread,
-          status: active ? "is working on your request…" : "",
+          status: active ? `is ${label[0]!.toLowerCase()}${label.slice(1)}…` : "",
+          ...(active ? { loading_messages: [label] } : {}),
         });
         status.active = active;
+        status.published = label;
         status.renewAt = runtime.now() + 45_000;
         status.retryAt = 0;
       } catch (error) {
@@ -170,6 +174,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
     status.pending = pending;
     await pending;
     if (status.pending === pending && idle) statuses.delete(key);
+    return status.label;
   };
   const socket = new SocketModeClient({ appToken });
   const bot = identity.user_id;
@@ -245,13 +250,14 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         const append = async (live: Readonly<LiveState> | null) => {
           if (runtime.signal.aborted) return;
           const active = !!live?.run?.inputs.includes(submission.id);
-          await refreshStatus(task.input, runtime, ctx);
+          const currentActivity = await refreshStatus(task.input, runtime, ctx);
           if (!stream || missing) return;
           const allowed = !options.allowProgressText || await options.allowProgressText(runtime.conversationId, live?.run?.inputs ?? []);
           const raw = active && allowed ? live?.generation?.message?.content.flatMap(p => p.type === "text" ? [p.text] : []).join("\n") ?? "" : "";
-          const text = streamText(raw);
+          const complete = progressText(raw);
+          const text = streamText(complete);
           if (!allowed) progress = "";
-          if (raw.trim()) progress = raw;
+          if (complete) progress = complete;
           ordinary ||= (active && !!live?.tools?.length) || runtime.now() >= openedAt + 8 * 60_000
             || (!!text && !text.startsWith(sent));
           if (runtime.now() < retryAt) return;
@@ -267,7 +273,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
                 closed = true;
                 await refreshStatus(task.input, runtime, ctx, true);
               }
-              const status = active ? activity(live!) : live?.run ? "Applying your update" : "Finishing reply";
+              const status = active ? currentActivity || "Planning the next step" : live?.run ? "Applying your update" : "Finishing reply";
               const seconds = Math.max(0, Math.floor((runtime.now() - openedAt) / 10_000) * 10);
               const elapsed = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
               const label = `${status} · ${elapsed} elapsed`;

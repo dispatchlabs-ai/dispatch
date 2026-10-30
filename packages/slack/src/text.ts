@@ -25,6 +25,15 @@ export function markdownText(text: string) {
   return result + escape(text.slice(offset));
 }
 
+// Forward complete sentences or lines, while the final delivery retains every byte.
+// A quiet provider should not leave a fragment such as "The latest" on screen.
+export function progressText(text: string) {
+  let end = text.lastIndexOf("\n") + 1;
+  for (const match of text.matchAll(/[.!?](?:[*_~"'”’\])]*)(?=\s|$)/g))
+    end = Math.max(end, match.index + match[0].length);
+  return text.slice(0, end).trimEnd();
+}
+
 // Keep a partly generated mention out of the stream until its closing bracket
 // arrives, so completing it does not change an already appended prefix.
 export function streamText(text: string) {

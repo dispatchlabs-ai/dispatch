@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Show native tool activity in progress and loading messages, with an optional
+  trusted host formatter for readable operations and selected public subjects.
+  Keep the subject visible between tool rounds and buffer unfinished sentences.
+
 - Compose the existing thread-process protocol through `runSlackHost`, preserving
   native state, durable Stop, stream receipts and host-owned workspace cleanup.
 
