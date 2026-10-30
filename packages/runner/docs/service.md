@@ -168,31 +168,58 @@ outage or abrupt process-loss recovery.
 
 Service configuration accepts Pi's native `compaction` settings and
 `afterFailedRun` (`keep`, `continue`, or `withdraw`). Omission preserves Pi's
-defaults. `continue` advances inputs already queued behind a failed run; it does
-not replay the failed input or its tools. `keep` retains them for explicit
-continuation. `withdraw` settles them unanswered.
+trigger and inbox defaults. `continue` advances inputs already queued behind a
+failed run; it does not replay the failed input or its tools. `keep` retains them
+for explicit continuation. `withdraw` settles them unanswered.
 
-Pi Durable 1.4 uses the agent's model/thinking for summaries and limits their
-output to 80% of `reserveTokens`, capped by the model's output limit. Its default
-reserve of 16,384 therefore allows 13,107 output tokens, including reasoning
-where the provider shares that budget. A length-terminated summary is rejected,
-not saved as a checkpoint, and is not a transient model retry. For long-context,
-high-reasoning agents, select a larger reserve within the model's context window:
+Runner supplies summaries through stock Pi Durable's `beforeCompact` hook.
+The summary keeps the selected model and thinking level. Its output allowance is
+the model's advertised maximum output, reduced when necessary to fit the
+estimated summary request inside the model's configured context window.
+`reserveTokens` controls when compaction starts; it does not cap this allowance.
+The configured working context remains unchanged.
+
+Summary requests run as native tasks owned by Pi's compaction task. Transient
+provider errors use the configured native retry policy and durable deadlines.
+An output-limit or context-overflow response splits the source into smaller
+chronological sections, summarizes them independently, then merges the complete
+results into one current checkpoint. Merging requires a smaller source, so
+recursive recovery keeps reducing the workload. Attempts, completed sections and
+usage survive reopening in the same native store; stopping the compaction
+cancels its owned work. The original history stays intact until Pi places a
+complete, smaller summary at its selected boundary.
+
+If the model cannot complete even the smallest section, a section fails for
+another reason, or the result does not reduce the source, Runner falls through
+to Pi's built-in summarizer. Pi's hook API has no failure decision; native
+compaction remains responsible for reporting its terminal outcome. Neither path
+places incomplete text. Service status exposes summary tasks and their native
+states; a busy compaction is not necessarily an active provider request.
+
+Older Runner installations used Pi Durable 1.4's built-in allowance of 80% of
+`reserveTokens`, capped by the model's output limit. The default reserve of
+16,384 allowed 13,107 output tokens, including shared reasoning tokens. A larger
+reserve was a workaround that also moved compaction earlier. With Runner's
+summary extension, select the reserve for trigger headroom alone:
 
 ```json
 {
   "afterFailedRun": "continue",
   "compaction": {
     "modelOverrides": {
-      "provider/long-context-model": { "reserveTokens": 65536 }
+      "provider/long-context-model": { "reserveTokens": 16384 }
     }
   }
 }
 ```
 
-This also starts compaction earlier; it does not change normal generation's
-thinking level or output limit. `keepRecentTokens`, `backgroundTokens`, and
-`enabled` retain Pi's meanings.
+`keepRecentTokens`, `backgroundTokens`, and `enabled` retain Pi's meanings.
+The summary extension is added to existing Runner conversations before native
+scheduling resumes, preserving their other configuration. An already-selected
+built-in summary request retains its saved policy; the hook applies when Pi next
+selects a compaction range. Reopening with an older Runner while custom summary
+tasks remain unfinished is unsupported; preserve the matching runtime until
+those tasks settle.
 
 After correcting policy and gracefully reopening the same owner, recover a
 held conversation with `compact CHAT [INSTRUCTIONS]`. This invokes native
@@ -204,3 +231,12 @@ an uncertain request. Failure or a no-op compaction is not recovery success.
 The command also works during an active run; Pi controls when the resulting
 summary is placed. Never edit SQLite or reset the
 conversation to bypass a failed summary.
+
+Manual macOS/Node 24 qualification on October 30, 2026 exercised a long-transcript
+replay through a live model route: input-budget splitting, complete section
+summaries, a final merge and native summary placement succeeded. Graceful
+close/reopen retained task identities and budgets; original transcript entries
+remained unchanged and usage appeared in the native ledger. Type/build checks
+passed. No automated tests were added or run. Direct provider-length responses,
+terminal cancellation, abrupt process loss and other platforms were not exercised
+by this replay.

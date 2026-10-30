@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Separate summary output allowance from compaction trigger reserves without
+  modifying Pi Durable. Preserve the working context and model/thinking, recover
+  incomplete summaries through smaller sections, and keep summary work, usage,
+  provider retry deadlines and cancellation in native owned tasks.
+
 - Observe separately hosted workflows with native durable progress tasks, atomic
   reply queuing, milestone updates and optional regular progress reports.
 

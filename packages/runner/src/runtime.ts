@@ -48,6 +48,7 @@ import { privateStateDirectory, privateStateFiles } from "./private-state.js";
 import { reportError } from "./terminal-output.js";
 import { scheduleTaskKind } from "./schedules.js";
 import { ArtifactStore, type ArtifactOptions, type createArtifacts } from "./artifacts.js";
+import { compactionExtension } from "./compaction.js";
 
 const context = BACKGROUND_CONTEXT;
 export type RunnerState = {
@@ -240,8 +241,9 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
         tools: agent.trigger.mode === "continuous" ? [pauseLoop] : [], });
       const artifactStore = new ArtifactStore(join(directory, "artifacts"));
       const artifactExtension = artifacts.artifactExtension(artifactStore, options.artifacts);
+      const compaction = compactionExtension(namespace, () => harness!);
       const setup = await agentConfiguration(
-        agent, directory, execution === "demo", [loopExtension, ...(options.extensions ?? [])], options.replySink, cwd, [artifactExtension],
+        agent, directory, execution === "demo", [loopExtension, ...(options.extensions ?? [])], options.replySink, cwd, [artifactExtension, compaction],
       );
       const { configuration, installed } = setup;
       for (const extension of new Map([...installed, ...(options.registryExtensions ?? [])].map(extension => [extension.name, extension])).values()) registry.install(extension);
@@ -299,6 +301,18 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
           }
         }, context);
       }
+      // Install host summary policy before scheduling resumes, preserving every
+      // conversation's model, instructions, tools and existing extension order.
+      await harness.commit(async tx => {
+        let cursor: Cursor | undefined;
+        const conversations = [];
+        do {
+          const page = await tx.scanConversations({}, 250, cursor);
+          conversations.push(...page.items);
+          cursor = page.next;
+        } while (cursor);
+        for (const conversation of conversations) await configure(tx, conversation.id, { extensions: { add: [compaction] } });
+      }, context);
       await root.commit(async (tx) => {
         const state = await tx.doc(RunnerDoc);
         state.fingerprint = agent.fingerprint;
