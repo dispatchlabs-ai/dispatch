@@ -7,7 +7,7 @@ import { createModels } from "@earendil-works/pi-ai/models";
 import { catalog, loadAgent } from "./definition.js";
 import { createRunner } from "./index.js";
 import { refreshGatewayModels } from "./gateway.js";
-import { modelRetrySettings } from "./retry.js";
+import { serviceSettings } from "./settings.js";
 import type { ServiceConfig } from "./service.js";
 import { chatInTerminal } from "./terminal.js";
 import { terminalError } from "./terminal-output.js";
@@ -45,8 +45,9 @@ try {
       }
       const session = values.session ?? randomUUID();
       if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(session)) throw new Error("Invalid session key.");
-      const config: Pick<ServiceConfig, "stateRoot" | "cwd" | "namespace" | "gateway" | "retry"> =
+      const config: Pick<ServiceConfig, "stateRoot" | "cwd" | "namespace" | "gateway" | "retry" | "compaction" | "afterFailedRun"> =
         JSON.parse(await readFile(values.config, "utf8"));
+      const settings = serviceSettings(config);
       for (const field of ["stateRoot", "cwd"] as const) {
         if (typeof config[field] !== "string" || !isAbsolute(config[field])) throw new Error(`${field} must be an absolute path.`);
       }
@@ -65,7 +66,7 @@ try {
         root, stateRoot: join(config.stateRoot, session), cwd: config.cwd,
         runner: createRunner({ namespace: config.namespace }), models, names: [...names],
         agent: values.agent, session, prompt: values.prompt, history: values.history,
-        updateDefinitions: values["update-definitions"], settings: modelRetrySettings(config.retry),
+        updateDefinitions: values["update-definitions"], settings,
       });
     }
   }

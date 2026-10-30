@@ -5,7 +5,7 @@ import { startService, serviceRequest, type ServiceCommand, type ServiceConfig }
 
 const [configPath, action, ...args] = process.argv.slice(2);
 try {
-  if (!configPath || !action) throw new Error("Usage: dispatch-service CONFIG serve|agents|chats|schedules|status|idle|create AGENT [TITLE]|send CHAT TEXT|message FROM TO TEXT|ask FROM TO TEXT|message-status FROM TASK|snapshot CHAT|download CHAT ARTIFACT DESTINATION|stop CHAT|receipt CHAT SUBMISSION");
+  if (!configPath || !action) throw new Error("Usage: dispatch-service CONFIG serve|agents|chats|schedules|status|idle|create AGENT [TITLE]|send CHAT TEXT|message FROM TO TEXT|ask FROM TO TEXT|message-status FROM TASK|snapshot CHAT|compact CHAT [INSTRUCTIONS]|download CHAT ARTIFACT DESTINATION|stop CHAT|receipt CHAT SUBMISSION");
   const config: ServiceConfig = JSON.parse(await readFile(configPath, "utf8"));
   if (action === "serve") {
     const service = await startService(config);
@@ -27,6 +27,7 @@ try {
         break;
       case "message-status": command = { method: action, from: args[0], taskId: Number(args[1]) }; break;
       case "snapshot": case "stop": command = { method: action, id: args[0] }; break;
+      case "compact": command = { method: action, id: args[0], instructions: args.slice(1).join(" ") || undefined }; break;
       case "download":
         if (!args[2]) throw new Error("Usage: download CHAT ARTIFACT DESTINATION (a new file).");
         command = { method: "artifact", id: args[0], artifactId: args[1] }; break;

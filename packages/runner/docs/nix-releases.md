@@ -88,7 +88,8 @@ instruction, role or skill changes continue to require it.
 `--session KEY` reopens an explicit one. `--history` replaces the prompt.
 `--update-definitions` explicitly opts into Runner's existing idle migration.
 
-HOST.json contains `stateRoot`, `cwd`, `namespace`, `gateway` and optional `retry`
+HOST.json contains `stateRoot`, `cwd`, `namespace`, `gateway` and optional `retry`,
+`compaction` and `afterFailedRun` [host policies](service.md#compaction-and-queued-input-recovery)
 from the [service configuration](service.md). State and working-directory paths
 are absolute. The definition root is supplied by the immutable release.
 Each session stores agents under `stateRoot/KEY/`; do not aim this launcher at

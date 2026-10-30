@@ -73,6 +73,10 @@
 - **RUN-020 — Require knowledge consultation:** withhold actions and answers until
   authenticated knowledge evidence covers the current request, including steering.
 
+- **RUN-021 — Recover context compaction:** configure native summary reserves,
+  distinguish held input from executing work, and compact the same conversation
+  to continue queued work without discarding history or replaying completed tools.
+
 ## Availability
 
 The extraction supports Node, SQLite and trusted company definitions.

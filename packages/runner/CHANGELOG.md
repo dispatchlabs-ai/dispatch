@@ -5,6 +5,10 @@
 - Observe separately hosted workflows with native durable progress tasks, atomic
   reply queuing, milestone updates and optional regular progress reports.
 
+- Expose native compaction budgets and failed-run inbox policy in service
+  configuration. Add same-conversation manual compaction and report held input,
+  compaction progress and failures without resubmitting work or resetting state.
+
 - Pin agent releases to patched Node 24.22.1 and patched shared TLS, Brotli and
   c-ares dependencies; expose the same runtime toolchain for application builds.
 
