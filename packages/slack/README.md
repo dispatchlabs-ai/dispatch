@@ -179,3 +179,12 @@ responsibilities. Slack's post/receipt crash window remains at least once.
 Hosts may supply `allowProgressText(conversationId, inputIds)` to withhold partial
 model text until required evidence exists for the current inputs. Native activity
 status continues; the host must separately enforce its final-answer policy.
+
+`runSlackHost` composes this protocol without a second scheduler. Supply `root`,
+`stateRoot`, the trusted `entrypoint`, `runner`, Slack config/credentials and an
+`open` callback that opens suspended native stores using the provided bindings.
+It handles supervisor/`--thread` modes, stream acknowledgements, cancelled recovery,
+steering and shutdown. Supply `stopThread` and `threadBusy` for independently
+enforced external workspace ownership; `allowProgressText` receives the opened
+service. `ready` runs only after supervisor recovery. It never starts calendars.
+An existing non-threaded installation still needs an explicit history migration.

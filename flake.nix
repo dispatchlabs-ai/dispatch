@@ -12,8 +12,9 @@
           pkgs = import nixpkgs { inherit system; };
           web = pkgs.callPackage ./packages/web/nix/package.nix { };
           runner = pkgs.callPackage ./packages/runner/nix/package.nix { };
+          runner-slack = pkgs.callPackage ./packages/runner/nix/package.nix { withSlack = true; };
         in {
-          packages = { default = web; inherit runner; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
+          packages = { default = web; inherit runner runner-slack; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
             macos-release = pkgs.callPackage ./packages/web/nix/macos-release.nix { inherit web; };
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             oci = pkgs.callPackage ./packages/web/nix/oci.nix {
@@ -28,17 +29,18 @@
           };
           checks.web = web;
           checks.runner = runner;
+          checks.runner-slack = runner-slack;
           devShells.default = pkgs.mkShell {
             packages = [ pkgs.nodejs_24 ];
           };
         };
     in {
-      lib.mkAgentRelease = { system, ... }@args:
+      lib.mkAgentRelease = { system, withSlack ? false, ... }@args:
         let pkgs = import nixpkgs { inherit system; };
         in (pkgs.callPackage ./packages/runner/nix/release.nix {
-          runtime = (forSystem system).packages.runner;
+          runtime = pkgs.callPackage ./packages/runner/nix/package.nix { inherit withSlack; };
           runtimeRevision = self.rev or self.dirtyRev or "uncommitted";
-        }) (builtins.removeAttrs args [ "system" ]);
+        }) (builtins.removeAttrs args [ "system" "withSlack" ]);
       packages = eachSystem (system: (forSystem system).packages);
       checks = eachSystem (system: (forSystem system).checks);
       devShells = eachSystem (system: (forSystem system).devShells);

@@ -93,12 +93,17 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       cwd?: string;
       storage?: StorageFactory;
       settings?: OpenOptions["settings"];
+      /** Trusted host binding, applied before opening any store or model request. */
+      prepareAgent?: (agent: LoadedAgent) => LoadedAgent | Promise<LoadedAgent>;
       artifacts?: ArtifactOptions;
     }) {
       const stateRoot = resolve(options.stateRoot);
       const names = options.names?.length ? options.names :
         (await catalog(options.root)).filter(entry => entry.runnable).map(entry => entry.id);
-      const agents = await Promise.all(names.map(name => loadAgent(options.root, name)));
+      const agents = await Promise.all(names.map(async name => {
+        const agent = await loadAgent(options.root, name);
+        return options.prepareAgent ? options.prepareAgent(agent) : agent;
+      }));
       const service = new ChatService(agents, options.demo, options.initialize);
       const enabled = await enabledAgents(options.root);
       for (const id of enabled) service.enabled.add(id);

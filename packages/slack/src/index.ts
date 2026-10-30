@@ -11,6 +11,7 @@ import { context, type ChatService, type Runner, type ReplySink } from "@dispatc
 import { fallbackText, replyBlocks, replyChunk, streamText } from "./text.js";
 import { slackArtifacts } from "./files.js";
 export { SlackThreadProcesses } from "./threads.js";
+export { runSlackHost, type SlackHostOptions } from "./host.js";
 
 export type SlackConfig = {
   teamId: string; channels: Record<string, string>; directMessagesAgent?: string;

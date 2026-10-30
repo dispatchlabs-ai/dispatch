@@ -1,5 +1,5 @@
 { lib, runCommand, makeWrapper, runtime, runtimeRevision }:
-{ name, src, revision, entrypoint ? null }:
+{ name, src, revision, entrypoint ? null, nodeModules ? null }:
 
 assert builtins.match "[a-z][a-z0-9-]*" name != null;
 runCommand "${name}-${lib.substring 0 12 revision}" {
@@ -9,6 +9,7 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
   app="$out/lib/${name}"
   mkdir -p "$app/definitions" "$out/bin" "$out/share/${name}"
   cp -R ${src}/. "$app/definitions/"
+  ${lib.optionalString (nodeModules != null) ''ln -s ${nodeModules} "$app/definitions/node_modules"''}
   ln -s ${runtime}/lib/agent-node_modules "$app/node_modules"
   echo '{"type":"module","private":true}' > "$app/package.json"
   ${if entrypoint == null then ''

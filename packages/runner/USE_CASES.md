@@ -68,6 +68,11 @@
   company source into a Nix closure; publish and select it separately from host
   provisioning, secrets, native state and process activation.
 
+- **RUN-019 — Isolate native tools:** retain native execution/retry identities
+  while a host runs tools outside its credential-bearing primary process.
+- **RUN-020 — Require knowledge consultation:** withhold actions and answers until
+  authenticated knowledge evidence covers the current request, including steering.
+
 ## Availability
 
 The extraction supports Node, SQLite and trusted company definitions.

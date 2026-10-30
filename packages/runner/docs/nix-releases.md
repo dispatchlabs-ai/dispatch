@@ -27,9 +27,12 @@ Dirty/local revisions are for qualification, not published release provenance.
 The default `bin/NAME` runs the shared on-demand CLI. An application with its own
 host can supply `entrypoint = "src/main.ts"`; it is run with the packaged Node.
 That host still owns native initialization, adapters, signals and recovery.
-The base runtime contains Runner, not Web or optional Slack/email/remote
-adapters. Additional business dependencies must be packaged before using them;
-this builder does not resolve missing imports on the target.
+The base runtime contains Runner, not Web. Set `withSlack = true` for the pinned
+Slack adapter. Other adapters are not included. An optional `nodeModules` store
+path supplies separately locked business dependencies under the definitions,
+without a second Runner/Pi tree. The builder never installs dependencies on the
+target. `dispatch-native-tools` supplies the model-free worker endpoint described
+in [isolated native tools](isolated-native-tools.md).
 
 ## Build, publish, activate
 

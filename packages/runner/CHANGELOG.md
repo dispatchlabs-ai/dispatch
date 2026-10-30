@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Add model-free native tool workers/proxies, host definition preparation and
+  per-input authenticated knowledge gates.
+- Compose optional Slack and separately locked business dependencies in agent
+  Nix releases; export the native tool launcher.
+
 - Detach retained-artifact results before native transactions settle so
   deduplicated publication and explicit delivery retries return usable metadata.
 - Retain documents/images independently of workspace lifetime; expose scoped

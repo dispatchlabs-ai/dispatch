@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Compose the existing thread-process protocol through `runSlackHost`, preserving
+  native state, durable Stop, stream receipts and host-owned workspace cleanup.
+
 - Resume unfinished external uploads when Slack reports their allocated IDs as
   `file_deleted`; retain the same ID and still require a verified thread share.
 - Add a host evidence gate for partial model text without hiding native activity.
