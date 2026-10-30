@@ -40,7 +40,10 @@ export function slackArtifacts(runner: Runner, client: WebClient, teamId: string
       }
       // Reconcile a completion accepted before its local checkpoint committed.
       const info = await client.files.info({ file: state.fileId! }).catch(error => {
-        if (code(error) === "file_not_found") return undefined;
+        const failure = code(error);
+        // Slack also reports unfinished external allocations as file_deleted.
+        // After completion, that code is a failure, not permission to reupload.
+        if (failure === "file_not_found" || failure === "file_deleted" && state.phase !== "verify") return undefined;
         throw error;
       });
       const file = info?.file;

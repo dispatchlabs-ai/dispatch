@@ -171,7 +171,8 @@ export function createArtifacts(namespace: string) {
                     previous.deliveries = await options.sink?.(tx, target, previous) ?? [];
                   }
                 }
-                return previous;
+                // Native document overlays expire when this transaction settles.
+                return JSON.parse(JSON.stringify(previous)) as ArtifactRecord;
               }
               const record = { ...artifact!, deliveries: await options.sink?.(tx, target, artifact!) ?? [] };
               state.records[record.id] = record;

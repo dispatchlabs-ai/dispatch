@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Detach retained-artifact results before native transactions settle so
+  deduplicated publication and explicit delivery retries return usable metadata.
 - Retain documents/images independently of workspace lifetime; expose scoped
   downloads and native delivery receipts across clients, including owned children.
   Add explicit failed-delivery retries without regenerating bytes. First adoption

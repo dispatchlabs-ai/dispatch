@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Resume unfinished external uploads when Slack reports their allocated IDs as
+  `file_deleted`; retain the same ID and still require a verified thread share.
 - Add a host evidence gate for partial model text without hiding native activity.
 - Retry retained Stop cleanup on supervisor recovery before restarting thread work.
 
