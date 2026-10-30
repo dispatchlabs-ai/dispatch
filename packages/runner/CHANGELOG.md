@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Observe separately hosted workflows with native durable progress tasks, atomic
+  reply queuing, milestone updates and optional regular progress reports.
+
 - Pin agent releases to patched Node 24.22.1 and patched shared TLS, Brotli and
   c-ares dependencies; expose the same runtime toolchain for application builds.
 

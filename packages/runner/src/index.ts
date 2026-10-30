@@ -13,6 +13,8 @@ export { privateStateDirectory } from "./private-state.js";
 export { nextScheduleAt } from "./schedules.js";
 export type { AgentSchedule } from "./schedules.js";
 export { instanceMessagingExtension } from "./messages.js";
+export { createWorkflowProgress } from "./workflow-progress.js";
+export type { WorkflowWatch, WorkflowObservation } from "./workflow-progress.js";
 export type { InstanceMessage } from "./messages.js";
 export { loadRepositoryInstructions } from "./instructions.js";
 export { loadSkills } from "./skills.js";
