@@ -20,6 +20,9 @@ Pin `dispatch` and follow its `nixpkgs` input in the application lock. The
 builder includes Node 24, Runner/Pi dependencies and physically nested
 definitions, with no installation on the target. It imports every runnable
 definition during the build and writes `share/NAME/{catalog,release}.json`.
+`dispatch.lib.agentRuntime { inherit system; }` exposes the same patched Node,
+Git, SSH, curl and Python selections for a company's business-dependency build
+and isolated workspace toolchain. Do not select an older Node from raw nixpkgs.
 The release records both the application commit and the Dispatch commit; they
 belong to different repositories. The store path identifies the complete build.
 Dirty/local revisions are for qualification, not published release provenance.

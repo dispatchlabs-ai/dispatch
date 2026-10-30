@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Pin agent releases to patched Node 24.22.1 and patched shared TLS, Brotli and
+  c-ares dependencies; expose the same runtime toolchain for application builds.
+
 - Add model-free native tool workers/proxies, host definition preparation and
   per-input authenticated knowledge gates.
 - Compose optional Slack and separately locked business dependencies in agent

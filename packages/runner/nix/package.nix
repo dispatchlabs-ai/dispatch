@@ -1,5 +1,7 @@
 { lib, stdenv, buildNpmPackage, nodejs_24, makeWrapper, autoPatchelfHook, withSlack ? false }:
 
+assert lib.assertMsg (lib.versions.major nodejs_24.version == "24" && lib.versionAtLeast nodejs_24.version "24.22.1")
+  "Runner releases require patched Node 24.22.1+ within 24.x";
 buildNpmPackage {
   pname = "dispatch-runner";
   version = (builtins.fromJSON (builtins.readFile ../package.json)).version;
