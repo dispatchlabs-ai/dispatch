@@ -151,7 +151,9 @@ process; their hosts resume admitted work without enabling schedules.
 inference. `newChat` creates a fresh session and prints its key. Interactive
 commands are `/new`, `/history` and `/quit`; Ctrl-C suspends unfinished work and
 exits with status 130. A turn failure rejects the function for the caller to
-report with a nonzero exit status. Model credentials remain the host's choice.
+report with a nonzero exit status. Recovered generation errors remain diagnostics;
+the native submission or loop outcome determines success. Model credentials
+remain the host's choice.
 Terminal clients do not start the schedules listed in `factory.yaml`; use `run`
 for the scheduled service.
 

@@ -52,7 +52,6 @@ export async function chatInTerminal(options: TerminalOptions): Promise<void> {
       const previous = new Set((await app.service.snapshot(chat.id)).messages.map(message => message.id));
       let partial = "";
       let lastTools = "";
-      let generationError: string | undefined;
       const watch = await app.service.watch(chat.id, async snapshot => {
         for (const message of snapshot.messages) {
           if (previous.has(message.id)) continue;
@@ -67,7 +66,8 @@ export async function chatInTerminal(options: TerminalOptions): Promise<void> {
             process.stdout.write(terminalText(`Attachment: ${file.name}\n${host.artifacts.directory}/${conversation.id}/files/${file.id}\n`));
           }
           partial = "";
-          if (message.error) generationError = message.error;
+          // Native submission/loop outcomes determine failure after retries settle.
+          if (message.error) diagnostics.write(terminalText(`${message.error}\n`));
         }
         if (snapshot.partial && snapshot.partial !== partial) {
           process.stdout.write(terminalText(snapshot.partial.startsWith(partial) ? snapshot.partial.slice(partial.length) : `\n${snapshot.partial}`));
@@ -89,7 +89,6 @@ export async function chatInTerminal(options: TerminalOptions): Promise<void> {
         controller.signal.removeEventListener("abort", cancel);
         await watch.stop();
       }
-      if (generationError) throw new Error(generationError);
     };
 
     const submit = (text: string) => observe(async () => {

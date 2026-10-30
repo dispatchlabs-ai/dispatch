@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Use native terminal submission/loop outcomes for exit status; an earlier
+  recovered provider error no longer turns completed work into a failed command.
+
 - Separate summary output allowance from compaction trigger reserves without
   modifying Pi Durable. Preserve the working context and model/thinking, recover
   incomplete summaries through smaller sections, and keep summary work, usage,
