@@ -63,7 +63,12 @@
   in an explicit timezone, with shared Runner admission and native Pi recovery.
   See the [calendar contract and recovery](docs/schedules.md).
 
+- **RUN-021 — Recover context compaction:** configure native summary reserves,
+  distinguish held input from executing work, and compact the same conversation
+  to continue queued work without discarding history or replaying completed tools.
+
 ## Availability
+
 
 The extraction supports Node, SQLite and trusted company definitions.
 Hosted Dispatch Web adoption, portable coding isolation, npm

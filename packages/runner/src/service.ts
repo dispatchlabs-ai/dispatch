@@ -8,9 +8,9 @@ import { run, type Adapter } from "./run.js";
 import { refreshGatewayModels, type ModelChoice, type GatewayAliases } from "./gateway.js";
 import type { ChatService } from "./chat.js";
 import type { InstanceMessage } from "./messages.js";
-import { modelRetrySettings, type ModelRetry } from "./retry.js";
+import { serviceSettings, type ServicePolicy } from "./settings.js";
 
-export type ServiceConfig = {
+export type ServiceConfig = ServicePolicy & {
   root: string;
   stateRoot: string;
   cwd: string;
@@ -18,7 +18,6 @@ export type ServiceConfig = {
   namespace?: string;
   names?: string[];
   updateDefinitions?: boolean;
-  retry?: ModelRetry;
   gateway: { origin: string; credentialFile: string; aliases?: GatewayAliases };
   adapters?: { module: string; optionsFile: string }[];
 };
@@ -30,6 +29,7 @@ export type ServiceCommand =
   | { method: "agents" | "chats" | "status" | "schedules" }
   | { method: "create"; agent: string; key: string; title?: string }
   | { method: "snapshot" | "stop"; id: string }
+  | { method: "compact"; id: string; instructions?: string }
   | { method: "send"; id: string; text: string; requestId: string }
   | { method: "message"; from: string; message: InstanceMessage; requestId: string }
   | { method: "message-status"; from: string; taskId: number }
@@ -44,6 +44,7 @@ async function dispatch(service: ChatService, command: ServiceCommand) {
       if (typeof command.key !== "string" || !command.key.trim()) throw new Error("A stable conversation key is required.");
       return service.create(command.agent, "cli", command.key, command.title);
     case "snapshot": return service.snapshot(command.id);
+    case "compact": return service.compact(command.id, command.instructions);
     case "stop": await service.stop(command.id); return {};
     case "send": return service.submit(command.id, command.text, command.requestId, "followUp", "cli");
     case "receipt": return service.receipt(command.id, command.submissionId);
@@ -55,7 +56,7 @@ async function dispatch(service: ChatService, command: ServiceCommand) {
 
 /** One service owns native sessions; adapters and local clients share that owner. */
 export async function startService(config: ServiceConfig) {
-  const settings = modelRetrySettings(config.retry);
+  const settings = serviceSettings(config);
   for (const field of ["root", "stateRoot", "cwd", "socket"] as const) {
     if (!config[field] || resolve(config[field]) !== config[field]) throw new Error(`${field} must be an absolute path.`);
   }
@@ -96,12 +97,12 @@ export async function startService(config: ServiceConfig) {
         chunks.push(chunk);
       }
       const command = JSON.parse(Buffer.concat(chunks).toString());
-      const result = command.method === "status" ? {
-        busy: (await Promise.all([
-          runtime.service.busy(),
-          ...runtime.adapters.map(adapter => adapter.busy?.() ?? false),
-        ])).some(Boolean),
-      } : await dispatch(runtime.service, command);
+      let result;
+      if (command.method === "status") {
+        const activity = await runtime.service.activity();
+        const adapterBusy = (await Promise.all(runtime.adapters.map(adapter => adapter.busy?.() ?? false))).some(Boolean);
+        result = { ...activity, adapterBusy, busy: activity.busy || adapterBusy };
+      } else result = await dispatch(runtime.service, command);
       response.end(JSON.stringify({ result }));
     } catch (error) {
       response.writeHead(400).end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));

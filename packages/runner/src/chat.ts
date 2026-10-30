@@ -5,6 +5,8 @@ export type ChatSnapshot = {
   background: boolean;
   /** Native pending retry; at is an epoch-millisecond deadline. */
   retry?: { attempt: number; at: number; error: string };
+  compactions?: LiveState["compactions"];
+  compactionFailure?: LiveState["compactionFailure"];
 };
 
 export type ChatInitializer = (tx: Tx, chat: Chat, host: Pick<AgentHost, "configuration">) => Promise<void>;
@@ -12,7 +14,7 @@ import { isDeepStrictEqual } from "node:util";
 import { join, resolve } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import {
-  configure, defineDoc, type ConversationId, type ConversationView, type Cursor,
+  configure, defineDoc, LiveDoc, type ConversationId, type ConversationView, type Cursor,
   type EntryRecord, type Extension, type LiveState, type SubmissionId, type Tx, type JsonObject,
 } from "@earendil-works/pi-durable";
 import { catalog, enabledAgents, loadAgent, type LoadedAgent } from "./definition.js";
@@ -155,6 +157,27 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       }))).some(Boolean);
     }
 
+    /** Unfinished is not necessarily executing: failed runs may retain queued input. */
+    async activity() {
+      const hosts = await Promise.all([...this.hosts].map(async ([agent, host]) => {
+        const state = await host.harness.inspect(context);
+        const tasks = state.tasks.filter(task => task.record.kind !== scheduleTaskKind(namespace) || task.state.kind !== "sleeping");
+        const ids = new Set([...tasks.map(task => task.record.conversationId), ...state.submissions.map(item => item.conversationId)]);
+        const conversations = await Promise.all([...ids].map(async id => {
+          const live = await host.harness.snapshot(LiveDoc, id, context);
+          const pending = state.submissions.filter(item => item.conversationId === id);
+          const work = tasks.filter(task => task.record.conversationId === id);
+          return { id: `${agent}:${id}`, queued: pending.filter(item => item.status === "queued").length,
+            held: pending.length > 0 && work.length === 0,
+            tasks: work.map(task => ({ id: task.record.id, kind: task.record.kind, state: task.state.kind })),
+            ...(live?.compactions?.length ? { compactions: live.compactions } : {}),
+            ...(live?.compactionFailure ? { compactionFailure: live.compactionFailure } : {}) };
+        }));
+        return { agent, scheduling: state.scheduling, conversations, busy: tasks.length > 0 || state.submissions.length > 0 };
+      }));
+      return { busy: hosts.some(host => host.busy), hosts };
+    }
+
     async list(): Promise<Chat[]> {
       const lists = await Promise.all([...this.hosts.values()].map(async host =>
         Object.values((await host.harness.snapshot(Chats, context))?.byId ?? {})));
@@ -256,6 +279,14 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       await conversation.abort(context, { background: true });
     }
 
+    async compact(id: string, instructions?: string) {
+      if (instructions !== undefined && typeof instructions !== "string") throw new Error("Compaction instructions must be text.");
+      const { host, conversation } = await this.resolve(id);
+      const live = await host.harness.snapshot(LiveDoc, conversation.id, context);
+      if (live?.compactions?.length) throw new Error("Compaction is already pending; inspect its native task before retrying.");
+      return { taskId: await conversation.compact(instructions, context) };
+    }
+
     async watch(id: string, listener: (snapshot: ChatSnapshot) => Promise<void>) {
       const { host, chat: selectedChat, conversation } = await this.resolve(id);
       // Older chats predate delegation. Mount its document once before observing.
@@ -286,7 +317,9 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
           running: !!live?.run, queued: inbox?.items?.length ?? 0,
           partial: messageText(live?.generation?.message?.content),
           tools: live?.tools?.filter(tool => tool.status !== "done").map(tool => tool.name) ?? [],
-          error: live?.generation?.retry?.error ?? null, demo: this.demo,
+          error: live?.generation?.retry?.error ?? live?.compactionFailure?.error ?? null, demo: this.demo,
+          ...(live?.compactions?.length ? { compactions: live.compactions } : {}),
+          ...(live?.compactionFailure ? { compactionFailure: live.compactionFailure } : {}),
           ...(live?.generation?.retry ? { retry: { attempt: live.generation.attempt, ...live.generation.retry } } : {}),
           background: deliveries || Object.values(handoffs?.jobs ?? {}).some(job => job.status === "working"),
         } satisfies ChatSnapshot;

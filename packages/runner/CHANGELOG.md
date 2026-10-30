@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Expose native compaction budgets, failed-run queue policy and same-conversation
+  recovery; report held inputs and compaction failures.
+
 - Add agent-local cron/timezone schedules with explicit missed-run and instance
   policies, optional expiry, native timer recovery and idempotent admission.
   Expose next/last occurrence and native task state through the service/CLI.

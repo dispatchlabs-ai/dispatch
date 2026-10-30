@@ -70,6 +70,10 @@ snapshot to follow execution. `stop CHAT` aborts its work. `chats` lists saved
 conversations. `schedules` exposes [agent-local deadlines and admissions](schedules.md).
 `status` reports unfinished native and adapter work, excluding future sleeping calendar tasks; `idle`
 returns a failure exit status when work remains.
+Status also lists native task states and queued counts by conversation. `held`
+means pending input has no unfinished task, not that inference is running.
+Snapshots expose native compaction progress/failure, including a failure after
+its parent generation has ended.
 
 [Instance messaging](instance-messages.md) lets opted-in definitions create or
 address independent conversations in this service. Include every permitted
@@ -159,3 +163,44 @@ retry deadline across graceful close/reopen. A permanent 401 settled unanswered;
 stopping during a pending retry settled aborted and left the conversation idle.
 These isolated observations do not establish recovery of a production provider
 outage or abrupt process-loss recovery.
+
+## Compaction and queued-input recovery
+
+Service configuration accepts Pi's native `compaction` settings and
+`afterFailedRun` (`keep`, `continue`, or `withdraw`). Omission preserves Pi's
+defaults. `continue` advances inputs already queued behind a failed run; it does
+not replay the failed input or its tools. `keep` retains them for explicit
+continuation. `withdraw` settles them unanswered.
+
+Pi Durable 1.4 uses the agent's model/thinking for summaries and limits their
+output to 80% of `reserveTokens`, capped by the model's output limit. Its default
+reserve of 16,384 therefore allows 13,107 output tokens, including reasoning
+where the provider shares that budget. A length-terminated summary is rejected,
+not saved as a checkpoint, and is not a transient model retry. For long-context,
+high-reasoning agents, select a larger reserve within the model's context window:
+
+```json
+{
+  "afterFailedRun": "continue",
+  "compaction": {
+    "modelOverrides": {
+      "provider/long-context-model": { "reserveTokens": 65536 }
+    }
+  }
+}
+```
+
+This also starts compaction earlier; it does not change normal generation's
+thinking level or output limit. `keepRecentTokens`, `backgroundTokens`, and
+`enabled` retain Pi's meanings. There is no automatic unbounded budget escalation.
+
+After correcting policy and gracefully reopening the same owner, recover a
+held conversation with `compact CHAT [INSTRUCTIONS]`. This invokes native
+`Conversation.compact`, returns its task ID, and preserves entries, task outcomes
+and submission IDs. A successful summary write admits retained queued input at
+the native boundary. Inspect `status`, `snapshot` and the original receipt; no
+second submission is needed. Concurrent pending compaction is reported rather
+than knowingly duplicated. Failure or a no-op compaction is not recovery success.
+The command may also request background compaction during an active run; Pi
+controls when the resulting summary is placed. Never edit SQLite or reset the
+conversation to bypass a failed summary.
