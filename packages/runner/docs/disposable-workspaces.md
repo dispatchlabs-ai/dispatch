@@ -85,7 +85,10 @@ native execution environment using it. `shell` with `stream: true` emits newline
 JSON output frames followed by a result frame. The native client preserves
 stdout/stderr streaming, output spill files, cancellation and tool timeouts.
 Each shell cancellation kills that command's guest process group. Independent
-commands use shared run locks; checkpoint/delete use exclusive locks. No global
+commands use shared run locks; checkpoint/delete use exclusive locks. Trusted
+Python adapters can hold `Controller.desktop_lease(run)` around external Cua
+calls; it validates the running computer and holds the same shared lock until
+the call finishes. No global
 workspace or command concurrency limit is imposed.
 
 ## On-demand agent CLI

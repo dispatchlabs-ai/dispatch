@@ -2,6 +2,7 @@
 """Host-owned, digest-pinned disposable workspaces. One JSON request per process."""
 import argparse
 import base64
+from contextlib import contextmanager
 import fcntl
 import hashlib
 import ipaddress
@@ -91,6 +92,26 @@ class Controller:
         if not isinstance(run, str) or not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_.-]*', run): raise ValueError('Invalid run identity')
         identity = hashlib.sha256((self.owner + '\0' + run).encode()).hexdigest()
         return identity, self.root / 'runs' / (identity + '.json')
+
+    @contextmanager
+    def locked(self, run, shared=False):
+        identity, _ = self.location(run)
+        with (self.root / 'locks' / identity).open('a') as lock:
+            os.chmod(lock.name, 0o600)
+            fcntl.flock(lock, fcntl.LOCK_SH if shared else fcntl.LOCK_EX)
+            yield
+
+    @contextmanager
+    def desktop_lease(self, run):
+        """Keep lifecycle operations out while a trusted adapter calls this desktop."""
+        with self.locked(run, shared=True):
+            record = self.load(run)
+            if not record or record['state'] != 'ready':
+                raise ValueError('Ensure the workspace before acquiring its desktop lease')
+            row = self.owned(record)
+            if not row or not row['State']['Running']:
+                raise ValueError('Workspace is not running; ensure it before acquiring its desktop lease')
+            yield record
 
     def save(self, record): atomic(self.location(record['run'])[1], record)
 
@@ -400,10 +421,9 @@ class Controller:
     def execute(self, q):
         op = q['op']
         if op == 'configure-network': return self.network(configure=True)
-        run = q['run']; identity, _ = self.location(run)
+        run = q['run']
         read_only = op in ('status', 'shell', 'read', 'write', 'fs', 'read-artifact')
-        with (self.root / 'locks' / identity).open('a') as lock:
-            os.chmod(lock.name, 0o600); fcntl.flock(lock, fcntl.LOCK_SH if read_only else fcntl.LOCK_EX)
+        with self.locked(run, shared=read_only):
             if op == 'bind': return self.bind(run, q['release'])
             record = self.load(run)
             if op == 'status': return record
