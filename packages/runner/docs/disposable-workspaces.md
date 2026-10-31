@@ -29,6 +29,9 @@ use `--net-raw`, `--allow-packet-socket-write`, `--allow-suid`, and
 its nftables rules with `configure-network` before admitting work. These rules
 block guest access to new host connections, other workspaces on that bridge and
 cloud instance metadata. The Cua control port is bound only to host loopback.
+Containers never restart automatically: after a host reboot, `ensure` verifies the network policy before
+starting a retained computer. Host provisioning must restore the nftables rules
+before admitting workspace operations.
 
 ## Host controller
 

@@ -211,6 +211,7 @@ class Controller:
                 record.get('imageId') and row['Image'] != record['imageId']):
             raise ValueError('Workspace container owner or image changed')
         if (host['Runtime'] != self.config['runtime'] or host['NetworkMode'] != self.config['network'] or host.get('Privileged') or host.get('Binds') or
+                host.get('RestartPolicy', {}).get('Name') != 'no' or
                 host.get('Tmpfs') != {'/run': 'rw,mode=755'} or any(x.get('Type') != 'tmpfs' or x.get('Destination') != '/run' for x in row.get('Mounts', []))):
             raise ValueError('Workspace isolation differs from its saved binding')
         if host.get('PortBindings', {}).get('3211/tcp') != [{'HostIp': '127.0.0.1', 'HostPort': str(record['controlPort'])}]:
@@ -273,7 +274,7 @@ class Controller:
             environment = control / 'environment'; environment.write_text('CUA_ENV_TOKEN=' + token.read_text() + '\nCUA_TELEMETRY=0\nDO_NOT_TRACK=1\n'); environment.chmod(0o600)
             try:
                 self.docker('create', '--name', record['name'], '--platform', workspace['platform'], '--runtime', self.config['runtime'], '--cap-add', 'ALL',
-                    '--network', self.config['network'], '--shm-size', '2g', '--restart', 'unless-stopped', '--tmpfs', '/run:rw,mode=755',
+                    '--network', self.config['network'], '--shm-size', '2g', '--restart', 'no', '--tmpfs', '/run:rw,mode=755',
                     '--label', LABEL + '.owner=' + self.owner, '--label', LABEL + '.run=' + record['run'],
                     '--publish', f"127.0.0.1:{record['controlPort']}:3211", '--env-file', str(environment), workspace['image'])
             finally: environment.unlink(missing_ok=True)
