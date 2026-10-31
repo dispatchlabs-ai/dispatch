@@ -20,6 +20,7 @@ export type { WorkflowWatch, WorkflowObservation } from "./workflow-progress.js"
 export type { InstanceMessage } from "./messages.js";
 export { loadRepositoryInstructions } from "./instructions.js";
 export { loadSkills } from "./skills.js";
+export { definitionResourcesExtension } from "./definition-resources.js";
 export type { Skill } from "./skills.js";
 export { chatInTerminal } from "./terminal.js";
 export type { TerminalOptions } from "./terminal.js";

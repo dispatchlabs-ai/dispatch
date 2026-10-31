@@ -72,7 +72,8 @@ def main(q):
         directory = Path('/tmp/dispatch-workspace-jobs'); directory.mkdir(exist_ok=True, mode=0o700)
         marker = directory / job
         args = q['command']; args = ['/bin/bash', '--noprofile', '--norc', '-c', args] if isinstance(args, str) else args
-        env = dict(os.environ) if q.get('inheritEnv', True) else {'HOME': '/home/cua', 'USER': 'cua', 'PATH': '/usr/local/bin:/usr/bin:/bin'}
+        env = dict(os.environ) if q.get('inheritEnv', True) else {'PATH': '/usr/local/bin:/usr/bin:/bin'}
+        env.update(HOME='/home/cua', USER='cua', LOGNAME='cua')
         env.update(q.get('env', {}))
         child = subprocess.Popen(args, cwd=q.get('cwd', '/workspace'), env=env, start_new_session=True,
                                  stdout=subprocess.PIPE if q.get('stream') else None,

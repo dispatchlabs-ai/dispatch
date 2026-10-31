@@ -73,7 +73,9 @@ class Controller:
         self.owner = c['namespace']
 
     def command(self, args, **kwargs):
-        p = subprocess.run(args, capture_output=True, **kwargs)
+        kwargs.setdefault('stdout', subprocess.PIPE)
+        kwargs.setdefault('stderr', subprocess.PIPE)
+        p = subprocess.run(args, **kwargs)
         if p.returncode:
             error = p.stderr.decode(errors='replace') if isinstance(p.stderr, bytes) else p.stderr
             raise RuntimeError('Workspace host operation failed: ' + error[-2000:])
@@ -243,7 +245,7 @@ class Controller:
         row = self.owned(record)
         if not row or not row['State']['Running']: raise ValueError('Workspace is not running; ensure it first')
         script = (HERE / 'workspace_guest.py').read_text()
-        args = [self.config.get('docker', 'docker'), 'exec', '-i', '-u', 'cua', row['Id'], 'python3', '-c', script]
+        args = self.guest_command(row, 'python3', '-c', script)
         if not shell:
             p = subprocess.run(args, input=json.dumps(request), capture_output=True, text=True)
             try: result = json.loads(p.stdout)
@@ -269,6 +271,35 @@ class Controller:
                 child.kill(); child.communicate()
             raise
         finally: signal.signal(signal.SIGTERM, old)
+
+    def guest_command(self, row, *args):
+        return [self.config.get('docker', 'docker'), 'exec', '-i', '-u', 'cua',
+                '--env', 'HOME=/home/cua', '--env', 'USER=cua', '--env', 'LOGNAME=cua', row['Id'], *args]
+
+    def copy_from_guest(self, row, remote, local, root=None):
+        # Docker's archive API cannot see live gVisor tmpfs mounts. Stream from
+        # the running guest, checking the opened file rather than a raced path.
+        script = """import os, shutil, stat, sys
+from pathlib import Path
+fd = os.open(sys.argv[1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+with os.fdopen(fd, 'rb') as source:
+    if not stat.S_ISREG(os.fstat(source.fileno()).st_mode): raise ValueError('Export a regular file')
+    if len(sys.argv) > 2: Path('/proc/self/fd/' + str(source.fileno())).resolve().relative_to(Path(sys.argv[2]))
+    shutil.copyfileobj(source, sys.stdout.buffer)
+"""
+        with local.open('xb') as target:
+            self.command(self.guest_command(row, 'python3', '-c', script, remote, *([root] if root else [])), stdout=target)
+            target.flush(); os.fsync(target.fileno())
+
+    def copy_to_guest(self, row, local, remote):
+        script = """import os, shutil, sys
+fd = os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+with os.fdopen(fd, 'wb') as target:
+    shutil.copyfileobj(sys.stdin.buffer, target)
+    target.flush(); os.fsync(target.fileno())
+"""
+        with local.open('rb') as source:
+            self.command(self.guest_command(row, 'python3', '-c', script, remote), stdin=source)
 
     def ensure(self, record):
         if record.get('finished'): raise ValueError('The workspace was finished; start a new run')
@@ -321,11 +352,12 @@ class Controller:
             if record.get('recovery'):
                 with tempfile.TemporaryDirectory(prefix='workspace-restore-') as temporary:
                     archive = Path(temporary) / 'recovery.tar.gz'; self.retrieve(record, record['recovery'], archive)
-                    self.docker('cp', str(archive), row['Id'] + ':/tmp/dispatch-recovery.tar.gz')
-                    self.docker('exec', '-u', 'root', row['Id'], 'chown', 'cua:cua', '/tmp/dispatch-recovery.tar.gz')
+                    remote = '/tmp/dispatch-recovery-' + uuid.uuid4().hex + '.tar.gz'
                     script = (HERE / 'workspace_checkpoint.py').read_text()
-                    self.docker('exec', '-u', 'cua', row['Id'], 'python3', '-c', script, 'restore', '/tmp/dispatch-recovery.tar.gz')
-                    self.docker('exec', '-u', 'cua', row['Id'], 'rm', '/tmp/dispatch-recovery.tar.gz')
+                    try:
+                        self.copy_to_guest(row, archive, remote)
+                        self.command(self.guest_command(row, 'python3', '-c', script, 'restore', remote), text=True)
+                    finally: self.command(self.guest_command(row, 'rm', '-f', remote), text=True)
         record['state'] = 'ready'; self.save(record)
         return record
 
@@ -390,11 +422,11 @@ class Controller:
         remote = '/tmp/dispatch-checkpoint-' + uuid.uuid4().hex + '.tar.gz'
         script = (HERE / 'workspace_checkpoint.py').read_text()
         try:
-            manifest = json.loads(self.docker('exec', '-u', 'cua', row['Id'], 'python3', '-c', script, 'save', remote))
+            manifest = json.loads(self.command(self.guest_command(row, 'python3', '-c', script, 'save', remote), text=True))
             with tempfile.TemporaryDirectory(prefix='workspace-save-') as temporary:
-                archive = Path(temporary) / 'source-and-artifacts.tar.gz'; self.docker('cp', row['Id'] + ':' + remote, str(archive))
+                archive = Path(temporary) / 'source-and-artifacts.tar.gz'; self.copy_from_guest(row, remote, archive)
                 receipt = self.store(record, archive, 'deliverables' if final else 'recovery', archive.name)
-        finally: self.docker('exec', '-u', 'cua', row['Id'], 'rm', '-f', remote)
+        finally: self.command(self.guest_command(row, 'rm', '-f', remote), text=True)
         if final:
             record['finalSnapshot'] = receipt
             if receipt not in record['artifacts']: record['artifacts'].append(receipt)
@@ -443,8 +475,7 @@ class Controller:
                 if not path.startswith('/workspace/'): raise ValueError('Export must stay inside /workspace')
                 row = self.owned(record)
                 with tempfile.TemporaryDirectory(prefix='workspace-export-') as temporary:
-                    local = Path(temporary) / 'file'; self.docker('cp', row['Id'] + ':' + path, str(local))
-                    if local.is_symlink() or not local.is_file(): raise ValueError('Export a regular file')
+                    local = Path(temporary) / 'file'; self.copy_from_guest(row, path, local, '/workspace')
                     receipt = self.store(record, local, 'deliverables', Path(path).name)
                 if receipt not in record['artifacts']: record['artifacts'].append(receipt)
                 self.save(record); return receipt

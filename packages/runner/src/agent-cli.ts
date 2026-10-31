@@ -102,6 +102,7 @@ try {
       await chatInTerminal({
         root, stateRoot: join(config.stateRoot, session), cwd: workspace ? "/workspace" : config.cwd,
         env: workspace ? target => workspace.environment(target.cwd ?? "/workspace") : undefined,
+        definitionResources: !!workspace,
         artifacts: workspace ? { source: async (path, _api, context) => {
           const env = workspace.environment();
           const canonical = getOrThrow(await env.canonicalPath(path, context));

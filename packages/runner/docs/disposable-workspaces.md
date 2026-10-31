@@ -91,6 +91,12 @@ calls; it validates the running computer and holds the same shared lock until
 the call finishes. No global
 workspace or command concurrency limit is imposed.
 
+Guest commands and checkpoint operations run as `cua` with `HOME=/home/cua` and
+matching `USER`/`LOGNAME`. Checkpoint, restore and artifact bytes stream through
+the live guest, including files on its temporary filesystems. Transfers verify
+regular files and do not follow a final symlink; exports remain inside
+`/workspace`.
+
 ## On-demand agent CLI
 
 In the ordinary CLI host config add:
@@ -115,7 +121,18 @@ example-agents workspace --config /etc/example/host.json --agent development --s
 
 The session key is also the controller run ID. Every agent participating in that
 session uses the same workspace environment. Repository instructions are read
-through that environment. Artifact publication copies guest bytes into the
+through that environment. The read-only `read_definition_resource` tool reads
+UTF-8 files and lists directories within the session's pinned definition
+package, including workflow references linked from agent instructions. Relative
+links resolve against their packaged document's directory. The tool rejects
+paths and symlinks that leave the package. It grants no host shell or writes;
+native file/shell tools continue to use the guest, and `read_skill` retains its
+scoped catalog. Custom hosts can opt in with `definitionResources: true` on
+`ChatService.open`, `openAgent`, or `run`; native children inherit the reader.
+`definitionResourcesExtension(root)` also exposes the bounded reader for host
+adapters that select their own immutable definition root.
+
+Artifact publication copies guest bytes into the
 existing native artifact store. A host source-transfer helper can import a Git
 bundle or publish completed commits using the user's existing Git credentials;
 never copy credentials, SSH agents or a credential-bearing remote URL into the

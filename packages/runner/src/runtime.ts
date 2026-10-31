@@ -5,6 +5,8 @@ export type OpenOptions = {
   cwd?: string;
   /** A trusted host supplies remote execution before any local environment is considered. */
   env?: HarnessOptions["env"];
+  /** Read-only packaged references, shared with this agent's native children. */
+  definitionResources?: boolean;
   models: Models;
   execution?: "live" | "demo";
   settings?: HarnessOptions["settings"];
@@ -51,6 +53,7 @@ import { reportError } from "./terminal-output.js";
 import { scheduleTaskKind } from "./schedules.js";
 import { ArtifactStore, type ArtifactOptions, type createArtifacts } from "./artifacts.js";
 import { compactionExtension } from "./compaction.js";
+import { definitionResourcesExtension } from "./definition-resources.js";
 
 const context = BACKGROUND_CONTEXT;
 export type RunnerState = {
@@ -244,8 +247,9 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       const artifactStore = new ArtifactStore(join(directory, "artifacts"));
       const artifactExtension = artifacts.artifactExtension(artifactStore, options.artifacts);
       const compaction = compactionExtension(namespace, () => harness!);
+      const resources = options.definitionResources ? [await definitionResourcesExtension(agent.root)] : [];
       const setup = await agentConfiguration(
-        agent, directory, execution === "demo", [loopExtension, ...(options.extensions ?? [])], options.replySink, cwd, [artifactExtension, compaction],
+        agent, directory, execution === "demo", [loopExtension, ...(options.extensions ?? [])], options.replySink, cwd, [artifactExtension, compaction, ...resources],
       );
       const { configuration, installed } = setup;
       for (const extension of new Map([...installed, ...(options.registryExtensions ?? [])].map(extension => [extension.name, extension])).values()) registry.install(extension);
@@ -263,7 +267,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       if (existing?.fingerprint && (existing.cwd ?? null) !== (cwd ?? null)) {
         throw new Error("The saved agent belongs to a different working directory. Use the original --cwd or a separate --state-dir.");
       }
-      const hostExtensions = [...(options.extensions ?? []), ...(options.registryExtensions ?? [])].map(extension => extension.name);
+      const hostExtensions = [...(options.extensions ?? []), ...(options.registryExtensions ?? []), ...resources].map(extension => extension.name);
       const missing = existing?.hostExtensions?.filter(name => !hostExtensions.includes(name)) ?? [];
       if (missing.length) {
         throw new Error(`${agent.id}'s saved state requires ${missing.join(", ")}. Restart its chat server with the same adapters (serve --slack for Slack), then attach the CLI. Pending work has been preserved.`);
@@ -313,7 +317,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
           conversations.push(...page.items);
           cursor = page.next;
         } while (cursor);
-        for (const conversation of conversations) await configure(tx, conversation.id, { extensions: { add: [compaction] } });
+        for (const conversation of conversations) await configure(tx, conversation.id, { extensions: { add: [compaction, ...resources] } });
       }, context);
       await root.commit(async (tx) => {
         const state = await tx.doc(RunnerDoc);

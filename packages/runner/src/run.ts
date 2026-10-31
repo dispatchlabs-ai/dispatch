@@ -26,6 +26,7 @@ export type RunOptions = {
   /** Explicit local working directory for native tools and repository instructions. */
   cwd?: string;
   env?: OpenOptions["env"];
+  definitionResources?: OpenOptions["definitionResources"];
   runner?: Runner;
   models?: Models;
   names?: string[];
@@ -74,6 +75,7 @@ export async function run(options: RunOptions = {}) {
         resume: options.resume,
         deferResume: true,
         cwd: options.cwd, env: options.env, storage: options.storage, settings: options.settings,
+        definitionResources: options.definitionResources,
         extensions, replySink, artifacts,
       });
     }
