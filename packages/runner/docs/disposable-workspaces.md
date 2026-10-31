@@ -189,7 +189,10 @@ never migrates its pinned release or image. End a workspace explicitly with
 before exiting. Exiting a terminal turn alone does not finish the workspace.
 
 Recovery archives omit Git-ignored dependencies and caches and preserve Git
-metadata plus tracked and untracked source. Restore installs those bytes into a
+metadata plus tracked and untracked source. Initialized submodules, including
+nested submodules, retain their working files, `.git` pointers and shared Git
+metadata under `/workspace`. Each repository's own ignore rules apply;
+uninitialized submodules remain uninitialized. Restore installs those bytes into a
 fresh copy of the same prepared image; callers reinstall ignored dependencies
 as needed. A failed archive, upload, verification or deletion leaves the saved
 record and recovery evidence intact. Native Pi state is never stored in the
