@@ -19,11 +19,51 @@ The application release supplies a `workspace` descriptor to `mkAgentRelease`:
 }
 ```
 
-Build the image from `packages/runner/workspace-image` at that source revision.
-The controller checks the image digest, platform, contract and source labels
-before launch. An ordinary image tag is not accepted. The image includes a Cua
-server and a credential-free developer desktop; the host must supply Docker,
-gVisor, Cua CLI, nftables and reachable DNS. The configured Docker runtime must
+From a clean Dispatch checkout at the chosen image source revision, use Docker
+Buildx and `jq` to build and publish the image below. Replace the example
+registry/repository with one you control and authenticate Docker to it first.
+The build requires the exact
+40-character `WORKSPACE_SOURCE_REVISION` argument; it is recorded in the image.
+
+```sh
+WORKSPACE_SOURCE_REVISION="$(git rev-parse HEAD)"
+WORKSPACE_IMAGE_REPOSITORY=registry.example.com/team/agent-workspace
+docker buildx build \
+  --platform linux/amd64 \
+  --build-arg WORKSPACE_SOURCE_REVISION="$WORKSPACE_SOURCE_REVISION" \
+  --tag "$WORKSPACE_IMAGE_REPOSITORY:$WORKSPACE_SOURCE_REVISION" \
+  --metadata-file /tmp/dispatch-workspace-image.json \
+  --push packages/runner/workspace-image
+jq -r '."containerimage.digest"' /tmp/dispatch-workspace-image.json
+```
+
+Use the printed digest as `REPOSITORY@sha256:...` in the descriptor and the same
+source revision in `sourceRevision`. Retain the build metadata with the release
+record. The controller checks the image digest, platform, contract and source
+labels before launch. An ordinary image tag is not accepted.
+
+The image includes a Cua server and a credential-free developer desktop. The
+host must supply Docker, gVisor, Cua CLI, nftables and reachable DNS. On a Linux
+x86_64 host with Nix flakes enabled, the pinned Cua and gVisor packages can be
+built from a published Dispatch revision. Run from a clean checkout of that
+revision:
+
+```sh
+WORKSPACE_TOOLS_REVISION="$(git rev-parse HEAD)"
+nix build "github:dispatchlabs-ai/dispatch/$WORKSPACE_TOOLS_REVISION#workspace-cua" \
+  --out-link result-workspace-cua
+nix build "github:dispatchlabs-ai/dispatch/$WORKSPACE_TOOLS_REVISION#workspace-runsc" \
+  --out-link result-workspace-runsc
+readlink -f result-workspace-cua
+readlink -f result-workspace-runsc
+```
+
+Append `/bin/cua` and `/bin/runsc` to the respective resolved store paths in
+host-owned configuration. Keep these output links or equivalent GC roots while
+the tools are installed. The gVisor output includes adjacent helpers; retain the complete
+output rather than copying only `runsc`.
+
+The configured Docker runtime must
 use `--net-raw`, `--allow-packet-socket-write`, `--allow-suid`, and
 `--overlay2=none`. Runtime names are host-owned. Provision a dedicated bridge and
 its nftables rules with `configure-network` before admitting work. These rules
