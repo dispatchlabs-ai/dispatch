@@ -254,10 +254,12 @@ class Controller:
             return result['value']
         request = {**request, 'action': 'shell', 'job': uuid.uuid4().hex}
         child = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        old = signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(InterruptedError('Workspace command interrupted')))
+        # Python retries InterruptedError during pipe I/O. Use an exception
+        # that reaches the cancellation cleanup while the command is running.
+        old = signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(RuntimeError('Workspace command interrupted')))
         try:
             if request.get('stream'):
-                child.stdin.write(json.dumps(request)); child.stdin.close()
+                child.stdin.write(json.dumps(request)); child.stdin.close(); child.stdin = None
                 # Output frames contain only guest command bytes; host diagnostics stay separate.
                 for line in child.stdout: print(line, end='', flush=True)
                 error = child.stderr.read(); code = child.wait()
