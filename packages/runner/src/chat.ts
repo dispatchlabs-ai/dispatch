@@ -93,6 +93,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       /** The host starts recovery after its adapters and bindings are ready. */
       deferResume?: boolean;
       cwd?: string;
+      env?: OpenOptions["env"];
       storage?: StorageFactory;
       settings?: OpenOptions["settings"];
       /** Trusted host binding, applied before opening any store or model request. */
@@ -128,7 +129,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
               ...(agent.messages?.length ? [instanceMessagingExtension(namespace, agent, service)] : [])],
             replySink: options.replySink, updateDefinitions: options.updateDefinitions,
             registryExtensions: [calendar.extension],
-            cwd: options.cwd, storage: options.storage, settings: options.settings,
+            cwd: options.cwd, env: options.env, storage: options.storage, settings: options.settings,
             artifacts: options.artifacts,
           });
           service.hosts.set(agent.id, host);
@@ -167,6 +168,38 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
         return state.submissions.length > 0 || state.tasks.some(task =>
           task.record.kind !== scheduleTaskKind(namespace) || task.state.kind !== "sleeping");
       }))).some(Boolean);
+    }
+
+    /** Drain already-admitted native work, including peer replies, before an on-demand host exits. */
+    async waitForIdle(signal?: AbortSignal) {
+      let revision = 0;
+      let wake: (() => void) | undefined;
+      const unsubscribe = [...this.hosts.values()].map(host => host.harness.subscribeCommits(() => {
+        revision++; wake?.();
+      }));
+      try {
+        while (true) {
+          signal?.throwIfAborted();
+          const observed = revision;
+          const states = await Promise.all([...this.hosts.values()].map(host => host.harness.inspect(context)));
+          if (revision !== observed) continue;
+          const tasks = states.flatMap(state => state.tasks).filter(task =>
+            task.record.kind !== scheduleTaskKind(namespace) || task.state.kind !== "sleeping");
+          const submissions = states.flatMap(state => state.submissions);
+          if (!tasks.length && !submissions.length) return;
+          const blocked = tasks.find(task => task.state.kind === "blocked");
+          if (blocked) throw new Error(`Native task ${blocked.record.id} is blocked; inspect saved session activity before resuming.`);
+          if (!tasks.length) throw new Error("Saved input is held without an active task; inspect session history before resuming.");
+          await new Promise<void>((resolve, reject) => {
+            const finish = () => { signal?.removeEventListener("abort", abort); wake = undefined; resolve(); };
+            const abort = () => { wake = undefined; reject(signal?.reason); };
+            wake = finish;
+            signal?.addEventListener("abort", abort, { once: true });
+            if (signal?.aborted) abort();
+            else if (revision !== observed) finish();
+          });
+        }
+      } finally { for (const stop of unsubscribe) stop(); }
     }
 
     /** Unfinished is not necessarily executing: failed runs may retain queued input. */

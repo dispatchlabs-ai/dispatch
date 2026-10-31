@@ -54,3 +54,7 @@ Before opening an existing store with Pi 1.4, stop its owner and retain a comple
 backup. Native SQLite migrates to schema 2; Pi 1.3 cannot reopen it. A source
 rollback alone cannot undo this migration. Preserve admitted work and verify
 recovery against a private copy before changing a live installation.
+
+Opt-in development agents can use [disposable workspaces](disposable-workspaces.md)
+with a prepared image and a pinned per-run release. This keeps their editable
+source separate from the immutable definition/runtime installation.

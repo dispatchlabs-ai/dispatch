@@ -3,6 +3,8 @@ export type OpenOptions = {
   directory: string;
   /** Trusted local checkout. Tools run with the host user's filesystem access. */
   cwd?: string;
+  /** A trusted host supplies remote execution before any local environment is considered. */
+  env?: HarnessOptions["env"];
   models: Models;
   execution?: "live" | "demo";
   settings?: HarnessOptions["settings"];
@@ -195,7 +197,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       throw new Error(`${agent.id} needs instance messaging. Open it through ChatService, or supply instanceMessagingExtension with the owning service.`);
     }
     const directory = resolve(options.directory);
-    const cwd = options.cwd ? await realpath(resolve(options.cwd)) : undefined;
+    const cwd = options.cwd ? (options.env ? options.cwd : await realpath(resolve(options.cwd))) : undefined;
     const execution = options.execution ?? "live";
     const now = options.now ?? Date.now;
     await privateStateDirectory(directory);
@@ -250,8 +252,8 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       storage = options.storage ? await options.storage(agent) : await openNodeSqliteStorage(join(directory, "session.sqlite"));
       harness = await Harness.open(storage, {
         models, registry, now, settings: options.settings,
-        env: async (target, ctx) => await codingEnvironment(target, ctx) ??
-          (cwd ? new NodeExecutionEnv({ cwd: target.cwd ?? cwd }) : undefined),
+        env: options.env ?? (async (target, ctx) => await codingEnvironment(target, ctx) ??
+          (cwd ? new NodeExecutionEnv({ cwd: target.cwd ?? cwd }) : undefined)),
         onReport: (error) => reportError(`[${agent.id}] Pi Durable:`, error),
       }, context);
       root = await harness.root(context, {

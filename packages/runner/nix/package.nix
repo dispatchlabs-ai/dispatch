@@ -1,4 +1,4 @@
-{ lib, stdenv, buildNpmPackage, nodejs_24, makeWrapper, autoPatchelfHook, withSlack ? false }:
+{ lib, stdenv, buildNpmPackage, nodejs_24, python3, makeWrapper, autoPatchelfHook, withSlack ? false }:
 
 assert lib.assertMsg (lib.versions.major nodejs_24.version == "24" && lib.versionAtLeast nodejs_24.version "24.22.1")
   "Runner releases require patched Node 24.22.1+ within 24.x";
@@ -23,6 +23,7 @@ buildNpmPackage {
       ../tsconfig.json
       ../src
       ../native
+      ../scripts
     ] ++ lib.optionals withSlack [ ../../slack/src ../../slack/tsconfig.json ]);
   };
   npmDepsHash = "sha256-SDsGv0ChsOoXTzhcdMgbcw8U0XL78GqBmrDCAWA6R1A=";
@@ -38,7 +39,7 @@ buildNpmPackage {
     cp package.json package-lock.json LICENSE "$app/"
     cp -R node_modules "$app/"
     cp packages/runner/package.json "$app/packages/runner/"
-    cp -R packages/runner/{dist,native} "$app/packages/runner/"
+    cp -R packages/runner/{dist,native,scripts} "$app/packages/runner/"
     if test -d packages/runner/node_modules; then
       cp -R packages/runner/node_modules "$app/packages/runner/"
     fi
@@ -76,5 +77,5 @@ buildNpmPackage {
       --add-flags "$app/packages/runner/dist/native-tools-cli.js"
     runHook postInstall
   '';
-  passthru.nodejs = nodejs_24;
+  passthru = { nodejs = nodejs_24; inherit python3; };
 }

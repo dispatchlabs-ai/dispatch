@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Add opt-in digest-pinned disposable development desktops with host-owned release
+  bindings, streamed native tools, verified source checkpoints, explicit cleanup,
+  and on-demand CLI recovery through the original runtime and definitions.
+
 - Use native terminal submission/loop outcomes for exit status; an earlier
   recovered provider error no longer turns completed work into a failed command.
 

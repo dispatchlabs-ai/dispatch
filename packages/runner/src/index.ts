@@ -9,6 +9,8 @@ import { createArtifacts } from "./artifacts.js";
 import type { LoadedAgent } from "./definition.js";
 
 export * from "./definition.js";
+export { WorkspaceClient, WorkspaceEnvironment } from "./workspace.js";
+export type { WorkspaceImage, WorkspaceRelease, WorkspaceRecord } from "./workspace.js";
 export { privateStateDirectory } from "./private-state.js";
 export { nextScheduleAt } from "./schedules.js";
 export type { AgentSchedule } from "./schedules.js";

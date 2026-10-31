@@ -80,10 +80,15 @@
   with smaller source sections, and retain attempts, usage and cancellation in
   Pi's native task ownership and recovery model.
 
+- **RUN-022 — Resume a disposable development workspace:** pin the application
+  release and prepared desktop image on admission; keep native history and host
+  credentials outside the guest; preserve source/results before reclaiming the
+  writable layer, and restore unfinished work on its original release.
+
 ## Availability
 
 The extraction supports Node, SQLite and trusted company definitions.
-Hosted Dispatch Web adoption, portable coding isolation, npm
+Hosted Dispatch Web adoption, broad disposable-host qualification, npm
 registry publication and broad installation qualification remain separate work.
 Runner source snapshots can be installed from public GitHub release archives;
 their exact tag, source revision and lockfile integrity identify the bytes.

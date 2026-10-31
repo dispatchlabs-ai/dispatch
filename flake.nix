@@ -27,6 +27,9 @@
               sourceRevision = self.rev or self.dirtyRev or "uncommitted";
               disposableWorkspace = true;
             };
+          } // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+            workspace-cua = (import ./packages/runner/nix/workspace-tools.nix { inherit pkgs; }).cua;
+            workspace-runsc = (import ./packages/runner/nix/workspace-tools.nix { inherit pkgs; }).runsc;
           };
           checks.web = web;
           checks.runner = runner;

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
+import { getOrThrow } from "@earendil-works/pi-durable/env";
 import { defineExtension, section } from "@earendil-works/pi-durable";
 
 export type RepositoryInstruction = { path: string; revision: string; text: string };
@@ -53,10 +54,30 @@ export function formatRepositoryInstructions(sources: readonly RepositoryInstruc
 export function repositoryInstructionsExtension() {
   return defineExtension({
     name: "dispatch.repository-instructions",
-    sections: [section("repository_instructions", async input => {
+    sections: [section("repository_instructions", async (input, context) => {
       if (!input.env?.cwd) return undefined;
       const cwd = input.env.cwd;
-      return formatRepositoryInstructions(await loadRepositoryInstructions(cwd)) ||
+      const env = input.env;
+      const currentDirectory = getOrThrow(await env.canonicalPath(cwd, context));
+      const directories: string[] = [];
+      let current = currentDirectory;
+      let repository = false;
+      while (true) {
+        directories.unshift(current);
+        const git = getOrThrow(await env.joinPath([current, ".git"], context));
+        if (getOrThrow(await env.exists(git, context))) { repository = true; break; }
+        const parent = getOrThrow(await env.joinPath([current, ".."], context));
+        if (parent === current) break;
+        current = parent;
+      }
+      const sources: RepositoryInstruction[] = [];
+      for (const directory of repository ? directories : [currentDirectory]) {
+        const path = getOrThrow(await env.joinPath([directory, "AGENTS.md"], context));
+        if (!getOrThrow(await env.exists(path, context))) continue;
+        const text = getOrThrow(await env.readTextFile(path, context));
+        if (text.trim()) sources.push({ path, text: text.trim(), revision: createHash("sha256").update(text).digest("hex") });
+      }
+      return formatRepositoryInstructions(sources) ||
         `Working directory: ${cwd}. No applicable AGENTS.md exists in this repository yet.`;
     })],
   });

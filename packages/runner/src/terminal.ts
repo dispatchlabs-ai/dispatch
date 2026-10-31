@@ -10,6 +10,8 @@ export type TerminalOptions = RunOptions & {
   prompt?: string;
   newChat?: boolean;
   history?: boolean;
+  /** Keep this on-demand session alive through admitted peer work and automatic replies. */
+  drain?: boolean;
   /** Keep a continuous agent working in this named conversation until paused or interrupted. */
   continuous?: boolean;
 };
@@ -97,6 +99,11 @@ export async function chatInTerminal(options: TerminalOptions): Promise<void> {
       if (!submission) throw new Error("Submitted turn is missing.");
       const receipt = await submission.wait(context);
       if (receipt.status !== "done") throw new Error(`Turn did not complete: ${receipt.reason}. Use --history for details.`);
+      if (options.drain) {
+        await app.service.waitForIdle(controller.signal);
+        const last = (await app.service.snapshot(chat.id)).messages.findLast(message => message.role === "assistant");
+        if (last?.error) throw new Error(`Follow-up did not complete: ${last.error}. Use --history for details.`);
+      }
     });
 
     if (options.continuous) {
