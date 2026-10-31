@@ -1,0 +1,29 @@
+#!/bin/sh
+# Docker's daemon and all its images/volumes live inside this gVisor sandbox.
+set -eu
+update-alternatives --set iptables /usr/sbin/iptables-legacy >/dev/null
+update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy >/dev/null
+if docker info >/dev/null 2>&1; then exit 0; fi
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<'JSON'
+{"storage-driver":"vfs","iptables":false,"ip6tables":false,"features":{"containerd-snapshotter":false}}
+JSON
+iface=$(ip route show default | sed -n 's/.* dev \([^ ]*\).*/\1/p')
+address=$(ip -o -4 addr show dev "$iface" | awk '{print $4}' | cut -d/ -f1)
+echo 1 > /proc/sys/net/ipv4/ip_forward
+for protocol in tcp udp; do
+  iptables-legacy -t nat -C POSTROUTING -o "$iface" -p "$protocol" -j SNAT --to-source "$address" 2>/dev/null ||
+    iptables-legacy -t nat -A POSTROUTING -o "$iface" -p "$protocol" -j SNAT --to-source "$address"
+done
+if ! pgrep -x dockerd >/dev/null; then
+  # The outer container can stop without its nested daemon removing this file.
+  rm -f /run/docker.pid
+  nohup dockerd >/var/log/dispatch-docker.log 2>&1 </dev/null &
+fi
+attempt=0
+until docker info >/dev/null 2>&1; do
+  attempt=$((attempt + 1))
+  if [ "$attempt" -ge 60 ]; then tail -40 /var/log/dispatch-docker.log >&2; exit 1; fi
+  sleep 1
+done
+usermod -aG docker cua
