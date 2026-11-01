@@ -38,7 +38,7 @@ export function createConfiguration(codingExtension: ReturnType<typeof createCod
       const delegates = await Promise.all((agent.delegateAgents ?? []).map(async target => {
         const setup = await agentConfiguration(target, directory, demo, [], sink, cwd, shared);
         installed.push(...setup.installed);
-        return { name: target.id, description: target.description, configuration: setup.configuration };
+        return { name: target.id, description: target.description, fingerprint: target.fingerprint, configuration: setup.configuration };
       }));
       extensions.push(delegationExtension(agent.id, delegates, agent.clones));
     }

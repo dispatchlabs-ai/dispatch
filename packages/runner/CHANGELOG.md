@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Expose configured delegates through `list_agents`, with model/thinking,
+  declared tools, host catalog pricing and observations from retained receipts.
+  Return child-subtree usage and elapsed-time receipts on delegated results
+  without duplicating native usage accounting; retain selection rationales.
+  Pricing is estimated and returned answers are not quality verdicts.
+
 - Add opt-in digest-pinned disposable development desktops with host-owned release
   bindings, streamed native tools, verified source checkpoints, explicit cleanup,
   and on-demand CLI recovery through the original runtime and definitions.

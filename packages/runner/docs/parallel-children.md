@@ -51,9 +51,11 @@ call reuses that conversation and its stable input request ID. Closing the host
 suspends work; compatible reopening resumes it. An explicit abort follows native
 ownership to the child. A clone is not an independently scheduled sibling.
 
-Successful completion returns the child's final text and native conversation/
-answer identifiers in tool details. A failed, aborted or unsuccessful model
-answer produces a tool error. The coordinator must account for that child rather
+Successful completion returns the child's final text, recorded usage/cost receipt
+and native conversation/answer identifiers in tool details. A terminal unsuccessful
+child produces a tool error with the recorded receipt when the parent can still
+return it. Parent cancellation can prevent that return; native ledgers retain
+recorded usage. The coordinator must account for that child rather
 than silently omit it or count it as passed. A successful tool call means the
 child returned an answer, not that the assigned checks passed.
 

@@ -238,13 +238,40 @@ chain must be read before entering their scope. Target guidance refreshes before
 each model request; company/role guidance follows definition update rules.
 The working directory is saved and must match when reopening the store.
 
-An agent can declare `delegates: ["worker"]` to expose the `delegate` tool. Each
+An agent can declare `delegates: ["worker"]` to expose `list_agents` and `delegate`. Each
 call creates a native task-owned foreground conversation using the named agent's
 own instructions, model and tools. Parallel calls can run concurrently. A stable
 submission ID and task ownership preserve the child across interrupted tool
 replay; results return to the parent. Assign bounded work and disjoint files when
 several children edit one checkout. There is no separate orchestrator or automatic
 acceptance gate.
+
+`list_agents({})` reads the configured roster and current host model catalog
+without inference or credential probing. It returns descriptions, exact model
+and thinking selections, declared tools, context/modalities and catalog rates
+in USD per million tokens, including any price tiers. It also shows the
+coordinator's model rates so the agent can account for its own work. Registration
+does not prove live access; catalog prices can be stale or zero placeholders and
+are not a statement of subscription billing. Declared tools remain subject to
+inherited native filters and host authorization.
+
+`delegate({ agent: "worker", task: "...", reason: "..." })` accepts an optional
+short selection rationale. Named and cloned children return a recorded receipt
+alongside their answer, or with a terminal unsuccessful result. Receipts contain
+native identities, elapsed wall time (including waits/recovery), recorded token
+counts and estimated cost from the child's native usage ledger and owned
+descendants as of collection. Failed/retried model attempts recorded by Pi are
+included; future background work and coordinator inference are not. The receipt
+is model-visible and retained in tool details; it is deliberately not returned
+as tool usage, which would double-count the existing native ledger. Aborting the
+parent can prevent a tool receipt; the native usage records remain authoritative.
+
+The catalog summarizes retained receipts for the exact worker definition in the
+calling conversation, including earlier transcript entries after compaction.
+Sample counts, returned answers, estimated spend and elapsed time are observations
+across those assignments, not correctness scores or comparable-task benchmarks.
+There is no global performance database or automatic quality grader. Company
+instructions own task-fit guidance, escalation and the cost/latency tradeoff.
 
 Declare `clones: true` to expose `clone_agent` for fresh, owned children with the
 calling conversation's native configuration, including its tool filters. This

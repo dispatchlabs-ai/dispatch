@@ -85,6 +85,8 @@
   credentials outside the guest; preserve source/results before reclaiming the
   writable layer, and restore unfinished work on its original release.
 
+- **RUN-023 — Select workers with cost evidence:** A coordinator can inspect configured worker capabilities and catalog prices, delegate concurrently, and use recorded outcomes, elapsed time and usage costs to inform later choices.
+
 ## Availability
 
 The extraction supports Node, SQLite and trusted company definitions.
