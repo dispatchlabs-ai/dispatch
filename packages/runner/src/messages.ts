@@ -7,6 +7,7 @@ import {
 } from "@earendil-works/pi-durable";
 import type { ChatService } from "./chat.js";
 import type { LoadedAgent } from "./definition.js";
+import { waitForMessageWork } from "./message-wait.js";
 
 export type InstanceMessage = {
   agent: string; instance?: string; title?: string; text: string; reply?: boolean;
@@ -142,7 +143,9 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
           await service.resolve(self);
           const instances = (await service.list()).filter(chat => allowed.includes(chat.agent))
             .map(({ id, agent, title, source }) => ({ id, agent, title, source }));
-          return { output: [{ type: "text", text: JSON.stringify({ self, agents: allowed, instances }) }] };
+          const capabilities = service.agents.filter(target => allowed.includes(target.id))
+            .map(target => ({ agent: target.id, description: target.description, model: target.model }));
+          return { output: [{ type: "text", text: JSON.stringify({ self, agents: allowed, capabilities, instances }) }] };
         },
       }),
       defineTool({
@@ -167,6 +170,18 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
         parameters: Type.Object({ taskId: Type.Integer({ minimum: 1 }) }), replay: "safe",
         async execute({ taskId }, api, context) {
           const value = await status(`${agent.id}:${api.conversationId}`, taskId, context);
+          return { output: [{ type: "text", text: JSON.stringify(value) }] };
+        },
+      }),
+      defineTool({
+        name: "wait_for_agent",
+        description: "Wait for work admitted by your message_agent task, including its native children, subsequent peer handoffs and replies. Returns the recipient's latest report when that work settles, or a blocked/held status. No model polling or new assignment. Prefer reply=false when you will wait; reply=true also queues the initial answer separately. A settled run is not proof of task completion. Use the returned instance for follow-up messages. Cancelling this wait does not cancel independent recipient work.",
+        parameters: Type.Object({ taskId: Type.Integer({ minimum: 1 }) }), replay: "safe",
+        async execute({ taskId }, api, context) {
+          const from = `${agent.id}:${api.conversationId}`;
+          const receipt = await status(from, taskId, context);
+          const target = receipt.message as Message;
+          const value = await waitForMessageWork(service, namespace, from, target.to, taskId, context);
           return { output: [{ type: "text", text: JSON.stringify(value) }] };
         },
       }),

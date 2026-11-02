@@ -87,6 +87,8 @@
 
 - **RUN-023 — Select workers with cost evidence:** A coordinator can inspect configured worker capabilities and catalog prices, delegate concurrently, and use recorded outcomes, elapsed time and usage costs to inform later choices.
 
+- **RUN-024 — Await an independent workflow:** A conversational agent can discover specialized capabilities, send a scoped assignment, await native children and subsequent peer handoffs, and reconcile the final report in its original conversation without model polling or duplicate admission.
+
 ## Availability
 
 The extraction supports Node, SQLite and trusted company definitions.

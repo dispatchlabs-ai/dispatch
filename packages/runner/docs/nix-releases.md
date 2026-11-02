@@ -96,9 +96,14 @@ Each session stores agents under `stateRoot/KEY/`; do not aim this launcher at
 an existing service's stores. The selected agent and its transitive
 `message_agent` recipients share one native service in that process. Separate
 sessions run concurrently; same-store locking remains authoritative.
+Every participant can read its packaged instructions and linked workflow
+references through `read_definition_resource`, including host-bound sessions.
 
 No socket, scheduled work or transport adapter is started. Output streams through
 the existing terminal client. SIGINT/SIGTERM suspend native work; restarting
-resumes admitted work, not calendars. Independent message recipients may still
-have suspended work when the foreground turn ends. This is not a scheduler,
+resumes admitted work, not calendars. Sessions with messaging recipients drain
+admitted peer work and replies before exiting, including on host-bound desktops.
+The trusted process binding `DISPATCH_SESSION_STATE_ROOT` gives definition-owned
+inspection tools the selected session directory; it grants no new permissions.
+This is not a scheduler,
 whole-tree cancellation API or automatic integration of external services.

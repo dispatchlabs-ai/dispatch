@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Add `wait_for_agent` for existing instance-message assignments, following native
+  child ownership and peer handoffs through settlement without model polling.
+  Expose recipient capabilities in discovery and drain admitted peer work before
+  on-demand CLI exit. Preserve independent lifetimes and distinguish idle work
+  from successful acceptance; expose the trusted session path to inspection tools
+  and packaged workflow references to every on-demand participant.
+
 - Add opt-in request completion records with Pi Durable's native end-of-answer
   continuation. Preserve the original goal and remaining work through follow-ups,
   compaction and recovery; require a current completion or explicit input/cancel

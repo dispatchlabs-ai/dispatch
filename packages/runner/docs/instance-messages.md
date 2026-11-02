@@ -3,7 +3,8 @@
 Use instance messages for assignments, handoffs and updates between separately
 addressable agents. Unlike `delegate` or the private `handoff` helper, recipients
 are ownerless top-level conversations with their own configuration, host adapters
-and lifecycle. No parent model waits for them. Pi Durable owns tasks, admission,
+and lifecycle. A sender may await their result without repeated model calls.
+Pi Durable owns tasks, admission,
 busy-input queueing and recovery; Runner adds routing, attribution and receipts.
 There is no notes store, external broker, new scheduler or supervising LLM.
 
@@ -26,14 +27,30 @@ Definitions without `messages` receive no messaging tools.
 
 The enabled agent can use:
 
-- `agent_instances`: its own ID, allowed agent names and addressable conversation
-  identities. It does not expose other conversations' text or tool history.
+- `agent_instances`: its own ID, allowed agent names, capability descriptions and
+  model selections, and addressable conversation identities. It does not expose
+  other conversations' text or tool history.
 - `message_agent({agent, instance?, title?, text, reply?})`: supply an existing
   instance ID or omit it (an empty string also means new) to create an independent instance. Include the
   assignment, scope, exact revisions, evidence and any needed knowledge links;
   history and authority are not inherited. `title` applies to new instances.
 - `message_status({taskId})`: inspect one of its own message tasks when needed.
   Do not busy-poll for an automatic reply.
+- `wait_for_agent({taskId})`: await the recipient's work, including native owned
+  children, self-continuations, admitted peer handoffs and their replies. Returns
+  its latest report when the related native work settles, or a blocked/held
+  status. Prefer `reply: false` when waiting; automatic replies are still separate
+  inputs. A wait for one's own instance is rejected.
+
+The wait follows recorded outgoing message receipts and native ownership from
+the admitted recipient, rather than waiting for every conversation in the
+service. It subscribes to native commits without model polling, timers or a
+second workflow store. Compatible recovery reconstructs the same work from the
+retained message task. Repeating a wait submits no new assignment. Its `idle`
+result is execution state, not a successful business outcome or acceptance
+verdict; the caller must reconcile the final report and evidence with the goal.
+`waiting_on_sender` returns control when a recipient needs the calling instance
+to process a message; held inputs and blocked tasks remain explicit.
 
 The send tool returns `{messageId, from, to, taskId}` after durable admission.
 That is not delivery or recipient completion. A native background task submits
@@ -84,6 +101,9 @@ native task outcome; they are not a promise that an automatic reply arrived.
 An ordinary sender turn can finish while delivery/outcome tracking continues.
 Stopping its conversation with background cancellation stops that tracking, not
 already admitted recipient work. Stop the recipient explicitly when intended.
+Cancelling `wait_for_agent` cancels observation only, preserving that same
+independent-recipient lifetime. The latest report can be a partial or failed
+outcome; it never implies that every external effect has been verified.
 Graceful service close suspends native work and compatible reopening resumes it.
 Keep the namespace, adapters and both definitions available on recovery.
 

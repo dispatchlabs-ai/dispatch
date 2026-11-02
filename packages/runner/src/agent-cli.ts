@@ -90,6 +90,8 @@ try {
         if (!values.history) await workspace.request({ op: "ensure" });
       }
       const names = new Set<string>();
+      // A trusted per-process binding for definition-owned inspection tools.
+      process.env.DISPATCH_SESSION_STATE_ROOT = join(config.stateRoot, session);
       const include = async (id: string) => {
         if (names.has(id)) return;
         names.add(id);
@@ -102,7 +104,7 @@ try {
       await chatInTerminal({
         root, stateRoot: join(config.stateRoot, session), cwd: workspace ? "/workspace" : config.cwd,
         env: workspace ? target => workspace.environment(target.cwd ?? "/workspace") : undefined,
-        definitionResources: !!workspace,
+        definitionResources: true,
         artifacts: workspace ? { source: async (path, _api, context) => {
           const env = workspace.environment();
           const canonical = getOrThrow(await env.canonicalPath(path, context));
@@ -120,7 +122,7 @@ try {
           })() };
         } } : undefined,
         runner: createRunner({ namespace: config.namespace }), models, names: [...names],
-        agent: values.agent, session, drain: !!workspace, prompt: values.prompt, history: values.history,
+        agent: values.agent, session, drain: !!workspace || names.size > 1, prompt: values.prompt, history: values.history,
         updateDefinitions: values["update-definitions"], settings,
       });
     }
