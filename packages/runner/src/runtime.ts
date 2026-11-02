@@ -37,7 +37,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { Models } from "@earendil-works/pi-ai/models";
 import { Type } from "@earendil-works/pi-ai";
 import {
-  AssistantEntry, configure, createRegistry, defineDoc, defineExtension, defineTask, defineTool, Harness,
+  AgentDoc, AssistantEntry, configure, createRegistry, defineDoc, defineExtension, defineTask, defineTool, Harness,
   type Conversation, type ConversationId, type Cursor, type Extension, type HarnessOptions, type Storage, type TaskId,
 } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
@@ -317,7 +317,16 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
           conversations.push(...page.items);
           cursor = page.next;
         } while (cursor);
-        for (const conversation of conversations) await configure(tx, conversation.id, { extensions: { add: [compaction, ...resources] } });
+        const added = [compaction, ...resources].map(extension => extension.name);
+        for (const conversation of conversations) {
+          const state = await tx.doc(AgentDoc, conversation.id);
+          const selected = state.extensions;
+          // configure's object form replaces the selection; it does not patch it.
+          state.extensions = Array.isArray(selected)
+            ? [...new Set([...selected, ...added])]
+            : { ...selected, add: [...new Set([...(selected?.add ?? []), ...added])],
+                ...(selected?.remove ? { remove: selected.remove.filter(name => !added.includes(name)) } : {}) };
+        }
       }, context);
       await root.commit(async (tx) => {
         const state = await tx.doc(RunnerDoc);

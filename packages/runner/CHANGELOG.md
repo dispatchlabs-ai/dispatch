@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Preserve each conversation's exact extension selection when installing host
+  summary and reference tools on reopen; registry-only worker capabilities no
+  longer become enabled on coordinators or other saved roles.
+
 - Add `wait_for_agent` for existing instance-message assignments, following native
   child ownership and peer handoffs through settlement without model polling.
   Expose recipient capabilities in discovery and drain admitted peer work before
