@@ -32,7 +32,7 @@ export type SlackThreadInput = SlackInput & {
   parentUser: string | null;
 };
 type Incoming = SlackThreadInput & { previous: number | null };
-type Delivery = { phase: "answer" } | {
+type Delivery = { phase: "answer"; commentary?: boolean } | {
   phase: "deliver"; text: string; offset: number; retryAt: number; stream: string | null; after?: number;
 };
 
@@ -189,7 +189,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
   const artifacts = slackArtifacts(runner, client, config.teamId, ready);
   const turn = defineTask<SlackInput, Delivery, null>({
     name: `${namespace}.slack-turn`, version: 1,
-    initial: input => input.replyText === undefined ? { phase: "answer" } : {
+    initial: input => input.replyText === undefined ? { phase: "answer", commentary: true } : {
       phase: "deliver", text: input.replyText, offset: 0, retryAt: 0, stream: null, ...(input.after ? { after: input.after } : {}),
     },
     phases: {
@@ -257,6 +257,16 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
           const receipt = await submission.status(ctx);
           if (receipt.type !== "input" || !receipt.entry) return;
           const saved = (await runtime.snapshot(Commentary, runtime.conversationId, ctx))?.turns[task.input.key];
+          // Pre-upgrade turns already showed their earlier prose in the working
+          // message. Begin at the current entry instead of flooding the thread.
+          if (!saved && !task.state.checkpoint.commentary) {
+            const latest = await runtime.entries({ order: "descending" }, 1, undefined, ctx);
+            await runtime.commit(async tx => {
+              (await tx.doc(Commentary, runtime.conversationId)).turns[task.input.key] ??=
+                { entry: latest.items[0]?.id ?? receipt.entry!, lastTask: null, text: "" };
+            }, ctx);
+            return;
+          }
           let cursor: Cursor | undefined;
           do {
             const page = await runtime.entries({ minEntryId: ((saved?.entry ?? receipt.entry) + 1) as EntryId,
