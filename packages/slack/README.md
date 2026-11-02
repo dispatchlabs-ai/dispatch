@@ -19,7 +19,7 @@ file/thread receipt. Text replies and image observations are not file delivery.
 ## Configure
 
 Install both packed packages in a private company repository. Use the same exact
-Pi Durable version as the runner (1.4.0 for current source). Upgrade both packages
+Pi Durable version as the runner (1.5.0 for current source). Upgrade both packages
 together and follow the runner's [state upgrade precautions](../runner/README.md#persistence-and-boundaries)
 before opening an existing store. Add a connection to `factory.yaml`:
 

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { withAbortSignal, type Context } from "@earendil-works/chord/context";
-import { Type } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import {
   AssistantEntry, defineDoc, defineExtension, defineTask, defineTool,
   type SubmissionId, type TaskId,

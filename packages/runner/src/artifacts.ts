@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { open, realpath, rename, rm } from "node:fs/promises";
 import { basename, isAbsolute, join, relative } from "node:path";
-import { Type } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import { defineDoc, defineExtension, defineTool, type ConversationId, type ToolExecutionApi, type Tx } from "@earendil-works/pi-durable";
 import type { Context } from "@earendil-works/chord/context";
 import { privateStateDirectory } from "./private-state.js";

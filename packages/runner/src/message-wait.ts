@@ -16,9 +16,9 @@ export async function waitForMessageWork(service: ChatService, namespace: string
   add(root.chat.agent, root.conversation.id);
   let revision = 0;
   let wake: (() => void) | undefined;
-  const stops = [...service.hosts.values()].map(host => host.harness.subscribeCommits(() => {
+  const stops = [...service.hosts.values()].map(host => host.harness.observeCommits({ advance: () => {
     revision++; wake?.();
-  }));
+  }, end: () => { revision++; wake?.(); } }));
   const signal = context.abortSignal;
   try {
     while (true) {
@@ -91,5 +91,5 @@ export async function waitForMessageWork(service: ChatService, namespace: string
         else if (revision !== observed) finish();
       });
     }
-  } finally { for (const stop of stops) stop(); }
+  } finally { for (const observation of stops) observation.detach(); }
 }

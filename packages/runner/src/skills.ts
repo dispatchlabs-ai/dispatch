@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { lstat, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { Type } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import { defineExtension, defineTool } from "@earendil-works/pi-durable";
 import { parse } from "yaml";
 

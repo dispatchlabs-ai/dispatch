@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { open, readdir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import { Type } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import { defineExtension, defineTool } from "@earendil-works/pi-durable";
 
 /** The host supplies the retained definition root, never a model-selected host path. */

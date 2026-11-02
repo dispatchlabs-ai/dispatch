@@ -176,9 +176,9 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     async waitForIdle(signal?: AbortSignal) {
       let revision = 0;
       let wake: (() => void) | undefined;
-      const unsubscribe = [...this.hosts.values()].map(host => host.harness.subscribeCommits(() => {
+      const unsubscribe = [...this.hosts.values()].map(host => host.harness.observeCommits({ advance: () => {
         revision++; wake?.();
-      }));
+      }, end: () => { revision++; wake?.(); } }));
       try {
         while (true) {
           signal?.throwIfAborted();
@@ -201,7 +201,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
             else if (revision !== observed) finish();
           });
         }
-      } finally { for (const stop of unsubscribe) stop(); }
+      } finally { for (const observation of unsubscribe) observation.detach(); }
     }
 
     /** Unfinished is not necessarily executing: failed runs may retain queued input. */
@@ -349,6 +349,16 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
         cursor = page.next;
       } while (cursor);
       const project = async (view: ConversationView) => {
+        // Coalesced watch calls can skip past the transcript window. Fill that
+        // gap from native history before combining it with the newest frame.
+        if (view.before !== undefined && !saved.has(view.before)) {
+          let cursor: Cursor | undefined;
+          do {
+            const page = await conversation.entries({ maxEntryId: view.before }, 250, cursor, context);
+            for (const entry of page.items) saved.set(entry.id, entry);
+            cursor = page.next;
+          } while (cursor);
+        }
         for (const entry of view.entries) saved.set(entry.id, entry);
         const { chat } = await this.resolve(id);
         const live = view.docs["pi.live"] as unknown as LiveState | undefined;
@@ -380,7 +390,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       };
       try {
         await notify(watch.value);
-        watch.start(notify);
+        watch.start(async call => { if (call.kind === "value") await notify(call.value); });
         handoffWatch?.start(() => notify(watch.value));
         return { stop, closed: watch.closed };
       } catch (error) { await stop(); throw error; }

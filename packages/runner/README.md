@@ -6,7 +6,7 @@ The default remains local SQLite. See [remote SQLite](https://github.com/dispatc
 for the optional relay service and its single-owner recovery boundary.
 
 `@dispatch/runner` runs directory-defined company agents with stock Pi Durable
-1.4.0. It loads trusted definitions, owns each SQLite session, schedules native
+1.5.0. It loads trusted definitions, owns each SQLite session, schedules native
 tasks and exposes persistent shared conversations without a web server.
 
 This is a source-alpha package. Its current 0.6.0 manifest follows the repository
@@ -297,7 +297,11 @@ handoff children; applications with pinned domain configurations use the
 `updateConversation(tx, id, setup)` callback to preserve or migrate their profiles before changing those definitions. Imported tool
 code is not transitively hashed.
 
-Source builds now use Pi 1.4.0. Before upgrading, stop the owner and back up
+Source builds now use Pi 1.5.0. The current runner, Slack and email adapters must
+use matching Pi versions; Web, Observer and Remote retain their own installation
+pins. Custom storage providers must implement Pi 1.5 grouped commits before use
+with this runner. Pi 1.5 writes newer native live-document and task versions that
+Pi 1.4 cannot resume. Before upgrading, stop the owner and back up
 its complete state directory. Opening SQLite automatically migrates it to schema
 version 2; Pi 1.3.0 (including alpha.4) cannot reopen that migrated store. Use a
 separate state directory to try the upgrade. To roll back, restore the closed

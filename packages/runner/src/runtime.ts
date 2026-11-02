@@ -35,7 +35,7 @@ import { readFile, realpath, rename, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { Models } from "@earendil-works/pi-ai/models";
-import { Type } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import {
   AgentDoc, AssistantEntry, configure, createRegistry, defineDoc, defineExtension, defineTask, defineTool, Harness,
   type Conversation, type ConversationId, type Cursor, type Extension, type HarnessOptions, type Storage, type TaskId,
@@ -258,7 +258,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
         models, registry, now, settings: options.settings,
         env: options.env ?? (async (target, ctx) => await codingEnvironment(target, ctx) ??
           (cwd ? new NodeExecutionEnv({ cwd: target.cwd ?? cwd }) : undefined)),
-        onReport: (error) => reportError(`[${agent.id}] Pi Durable:`, error),
+        onReport: (report) => reportError(`[${agent.id}] Pi Durable (${report.kind}):`, report.error),
       }, context);
       root = await harness.root(context, {
         agent: configuration,
@@ -340,7 +340,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       if (!watch) throw new Error("Missing runner state.");
       stopWatch = async () => { await watch.stop(); };
       project(copy(watch.value!), true);
-      watch.start(async (state) => { if (state) project(copy(state), true); });
+      watch.start(async call => { if (call.kind === "value" && !call.retired) project(copy(call.value), true); });
       const activeHarness = harness;
       const state = async () => copy((await activeHarness.snapshot(RunnerDoc, context))!);
       const close = () => {

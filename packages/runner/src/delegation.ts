@@ -1,4 +1,4 @@
-import { Type } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import type { Context } from "@earendil-works/chord/context";
 import {
   AssistantEntry, configure, defineExtension, defineTool,

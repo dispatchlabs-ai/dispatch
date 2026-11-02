@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Use Pi 1.5 for native execution and transport integration; upgrade the runner and adapters together. Preserve TypeBox tool schemas through a direct dependency.
+
 - Include shared retained artifacts in enabled automatic replies and explicitly
   selected `email_send.artifactIds`; preserve receive-only routes and distinguish
   suppressed automatic replies from delivery.

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { Type, type AssistantMessage } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
+import { type AssistantMessage } from "@earendil-works/pi-ai";
 import {
   LiveDoc, configure, defineDoc, defineExtension, defineTask, defineTool,
   type AgentChange, type ConversationId,

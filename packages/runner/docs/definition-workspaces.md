@@ -23,7 +23,7 @@ workspace/
 Install the selected immutable Runner archive in `workspace`, retaining its
 lockfile. Install optional adapters and the inference client in that same
 installation. All shared packages must use the same Pi version; current Runner
-uses Pi Durable, Pi AI and Chord 1.4.0. Run `npm ls` in the installation to inspect
+uses Pi Durable, Pi AI and Chord 1.5.0. Run `npm ls` in the installation to inspect
 the complete dependency tree after an update.
 
 From a nested company checkout, `npm ci` installs only its business and developer

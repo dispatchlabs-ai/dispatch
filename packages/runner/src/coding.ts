@@ -5,7 +5,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import { homedir } from "node:os";
 import { promisify } from "node:util";
 import type { Context } from "@earendil-works/chord";
-import { Type } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import { defineDoc, defineExtension, defineTool, section, type EnvTarget } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import type { ExecutionEnv, ShellExecOptions } from "@earendil-works/pi-durable/env";

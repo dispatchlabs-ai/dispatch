@@ -1,4 +1,4 @@
-import { Type } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import { defineDoc, defineExtension, defineTool, GenerationTask, hook, LiveDoc } from "@earendil-works/pi-durable";
 
 export type RequestState = {

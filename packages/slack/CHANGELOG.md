@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Use Pi 1.5 for native execution and transport integration; upgrade the runner and adapters together. Preserve TypeBox tool schemas through a direct dependency.
+
 - Show native tool activity in progress and loading messages, with an optional
   trusted host formatter for readable operations and selected public subjects.
   Keep the subject visible between tool rounds and buffer unfinished sentences.
