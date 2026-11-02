@@ -6,10 +6,11 @@ import { parse } from "yaml";
 import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
 import { awaitWithContext, withAbortSignal, type Context } from "@earendil-works/chord/context";
-import { AssistantEntry, LiveDoc, defineDoc, defineExtension, defineTask, type LiveState, type TaskId, type TaskRuntime } from "@earendil-works/pi-durable";
-import { context, type ChatService, type Runner, type ReplySink } from "@dispatch/runner";
+import { AssistantEntry, LiveDoc, defineDoc, defineExtension, defineTask, type Cursor, type EntryId, type LiveState, type TaskId, type TaskRuntime } from "@earendil-works/pi-durable";
+import { context, publicCommentary, publicAnswer, type ChatService, type Runner, type ReplySink } from "@dispatch/runner";
 import { fallbackText, progressText, replyBlocks, replyChunk, streamText } from "./text.js";
 import { slackArtifacts } from "./files.js";
+import { createStatusDelivery } from "./status.js";
 import { activityLabel, currentToolActivity, type SlackActivity, type SlackToolDescription } from "./progress.js";
 export type { SlackActivity, SlackToolCall, SlackToolDescription } from "./progress.js";
 export { SlackThreadProcesses } from "./threads.js";
@@ -24,7 +25,7 @@ export type SlackConfig = {
   /** With "started", require mentions inside threads started for another bot. */
   threadReplies?: "all" | "started";
 };
-type SlackInput = { text: string; key: string; channel: string; thread: string; user: string; replyText?: string };
+type SlackInput = { text: string; key: string; channel: string; thread: string; user: string; replyText?: string; after?: number };
 export type SlackThreadInput = SlackInput & {
   team: string; timestamp: string;
   agent: string; direct: boolean; mentioned: boolean; threaded: boolean;
@@ -32,7 +33,7 @@ export type SlackThreadInput = SlackInput & {
 };
 type Incoming = SlackThreadInput & { previous: number | null };
 type Delivery = { phase: "answer" } | {
-  phase: "deliver"; text: string; offset: number; retryAt: number; stream: string | null;
+  phase: "deliver"; text: string; offset: number; retryAt: number; stream: string | null; after?: number;
 };
 
 function retryDelay(error: unknown) {
@@ -127,6 +128,11 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
   });
   const identity = await client.auth.test();
   if (identity.team_id !== config.teamId || !identity.user_id) throw new Error("Slack token does not belong to the configured workspace.");
+  const statusDelivery = createStatusDelivery(namespace, client);
+  const Commentary = defineDoc<{ turns: Record<string, { entry: number; lastTask: number | null; text: string }> }>({
+    kind: `${namespace}.slack-commentary`, version: 1, scope: "conversation", history: "latest", fork: "initial",
+    initial: () => ({ turns: {} }), checkpointWhen: () => false,
+  });
   const statuses = new Map<string, {
     pending: Promise<void>; active?: boolean; run?: number; previous?: SlackActivity;
     label?: string; published?: string; renewAt: number; retryAt: number;
@@ -184,7 +190,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
   const turn = defineTask<SlackInput, Delivery, null>({
     name: `${namespace}.slack-turn`, version: 1,
     initial: input => input.replyText === undefined ? { phase: "answer" } : {
-      phase: "deliver", text: input.replyText, offset: 0, retryAt: 0, stream: null,
+      phase: "deliver", text: input.replyText, offset: 0, retryAt: 0, stream: null, ...(input.after ? { after: input.after } : {}),
     },
     phases: {
       async answer(task, runtime, ctx) {
@@ -247,17 +253,45 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         // Slack ends streams after ten minutes, regardless of appends. Tool work
         // uses an ordinary editable message; a slow first generation switches too.
         const openedAt = stream ? Number.parseFloat(stream) * 1000 : runtime.now();
+        const publishCommentary = async () => {
+          const receipt = await submission.status(ctx);
+          if (receipt.type !== "input" || !receipt.entry) return;
+          const saved = (await runtime.snapshot(Commentary, runtime.conversationId, ctx))?.turns[task.input.key];
+          let cursor: Cursor | undefined;
+          do {
+            const page = await runtime.entries({ minEntryId: ((saved?.entry ?? receipt.entry) + 1) as EntryId,
+              ...(receipt.status === "done" ? { maxEntryId: receipt.answer } : {}), order: "ascending" }, 100, cursor, ctx);
+            await runtime.commit(async tx => {
+              const { turns } = await tx.doc(Commentary, runtime.conversationId);
+              const state = turns[task.input.key] ??= { entry: receipt.entry!, lastTask: null, text: "" };
+              for (const entry of page.items) {
+                if (entry.id <= state.entry) continue;
+                state.entry = entry.id;
+                if (!AssistantEntry.is(entry)) continue;
+                const message = entry.model?.[0];
+                const text = message?.role === "assistant" ? publicCommentary(message) : "";
+                if (!text || text === state.text) continue;
+                state.lastTask = await tx.createTask(turn, { ...task.input, key: `commentary:${task.id}:${entry.id}`,
+                  text, replyText: text, ...(state.lastTask ? { after: state.lastTask } : {}) },
+                { conversationId: runtime.conversationId, ownership: { kind: "conversation" }, background: true });
+                state.text = text;
+              }
+            }, ctx);
+            cursor = page.next;
+          } while (cursor);
+        };
         const append = async (live: Readonly<LiveState> | null) => {
           if (runtime.signal.aborted) return;
           const active = !!live?.run?.inputs.includes(submission.id);
           const currentActivity = await refreshStatus(task.input, runtime, ctx);
-          if (!stream || missing) return;
           const allowed = !options.allowProgressText || await options.allowProgressText(runtime.conversationId, live?.run?.inputs ?? []);
+          if (allowed) await publishCommentary();
+          if (!stream || missing) return;
           const raw = active && allowed ? live?.generation?.message?.content.flatMap(p => p.type === "text" ? [p.text] : []).join("\n") ?? "" : "";
           const complete = progressText(raw);
           const text = streamText(complete);
           if (!allowed) progress = "";
-          if (complete) progress = complete;
+          progress = complete;
           ordinary ||= (active && !!live?.tools?.length) || runtime.now() >= openedAt + 8 * 60_000
             || (!!text && !text.startsWith(sent));
           if (runtime.now() < retryAt) return;
@@ -327,17 +361,32 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
           await refreshStatus(task.input, runtime, ctx);
         }
         let text = "The reply stopped before it completed. Please try again.";
+        if (!options.allowProgressText || await options.allowProgressText(runtime.conversationId, [submission.id])) await publishCommentary();
         if (receipt.status === "done" && receipt.type === "input") {
           const entry = await runtime.entry(AssistantEntry, receipt.answer, ctx);
           const message = entry?.model?.[0];
-          if (message?.role === "assistant") text = message.content.flatMap(p => p.type === "text" ? [p.text] : []).join("\n") || "(No text response.)";
+          if (message?.role === "assistant") text = publicAnswer(message) || "(No text response.)";
+        }
+        // Keep the progress transcript, and put the final answer after it.
+        const commentary = (await runtime.snapshot(Commentary, runtime.conversationId, ctx))?.turns[task.input.key];
+        if (commentary?.lastTask && stream) {
+          try {
+            try { await client.chat.stopStream({ channel: task.input.channel, ts: stream }); }
+            catch (error) { if (slackError(error) !== "message_not_in_streaming_state") throw error; }
+            await client.chat.update({ channel: task.input.channel, ts: stream, text: "Work finished. Final reply below.",
+              blocks: replyBlocks("Work finished. Final reply below.") });
+          } catch (error) { runtime.signal.throwIfAborted(); runtime.report(error); }
+          await options.onStream?.({ key: task.input.key, ts: stream, done: true });
+          stream = undefined;
         }
         await runtime.commit(() => ({
-          status: "running", checkpoint: { phase: "deliver", text, offset: 0, retryAt: 0, stream: stream ?? null },
+          status: "running", checkpoint: { phase: "deliver", text, offset: 0, retryAt: 0, stream: stream ?? null,
+            ...(commentary?.lastTask ? { after: commentary.lastTask } : {}) },
         }), ctx);
       },
       async deliver(task, runtime, ctx) {
         const checkpoint = task.state.checkpoint;
+        if (checkpoint.after) await runtime.waitForTask(checkpoint.after as TaskId, ctx);
         if (checkpoint.retryAt > runtime.now()) {
           return runtime.sleepUntil(checkpoint.retryAt, checkpoint, ctx);
         }
@@ -500,7 +549,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
       await runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx);
     },
   });
-  const extension = defineExtension({ name: `${namespace}.slack`, tasks: [turn, incoming, artifacts.task] });
+  const extension = defineExtension({ name: `${namespace}.slack`, tasks: [turn, incoming, artifacts.task, statusDelivery.task] });
   const queueReply: ReplySink = async (tx, conversationId, destination, text, key) => {
     await tx.createTask(turn, { ...destination, text, replyText: text, key }, {
       conversationId, ownership: { kind: "conversation" }, background: true,
@@ -570,6 +619,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
     },
     extension,
     queueReply,
+    queueStatus: statusDelivery.queue,
     queueArtifact: artifacts.queue,
     connected: () => socket.websocket?.isActive() ?? false,
     async start(service: ChatService, listen = true) {

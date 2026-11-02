@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Retain completed public commentary as ordered replies before the final answer,
+  using native entry cursors and delivery receipts across restart. Add durable
+  editable workflow statuses with coalesced updates and metadata-based recovery.
+
 - Use Pi 1.5 for native execution and transport integration; upgrade the runner and adapters together. Preserve TypeBox tool schemas through a direct dependency.
 
 - Show native tool activity in progress and loading messages, with an optional

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Publish new public workflow evidence from all participating sources, deduplicate
+  repeated milestones, and route quiet heartbeats to an optional editable status
+  sink. Preserve narration timestamps and provider commentary labels; suppress
+  stale reports while human steering is queued and seed upgraded live cursors.
+
 - Use Pi 1.5 for native execution and transport integration; upgrade the runner and adapters together. Preserve TypeBox tool schemas through a direct dependency.
 
 - Preserve each conversation's exact extension selection when installing host

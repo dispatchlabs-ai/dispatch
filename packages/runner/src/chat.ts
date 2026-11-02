@@ -1,4 +1,4 @@
-export type ChatMessage = { id: string; role: string; text: string; author?: string; background?: boolean; error?: string; artifacts?: Artifact[] };
+export type ChatMessage = { id: string; role: string; text: string; at?: number; commentary?: string; author?: string; background?: boolean; error?: string; artifacts?: Artifact[] };
 export type ChatSnapshot = {
   chat: Chat; messages: ChatMessage[]; running: boolean; queued: number;
   partial: string; tools: string[]; error: string | null; demo: boolean;
@@ -23,6 +23,7 @@ import { createRuntime, type AgentHost, type StorageFactory, type OpenOptions } 
 import type { ReplySink } from "./replies.js";
 import { createHandoffs } from "./handoff.js";
 import { privateStateDirectory } from "./private-state.js";
+import { publicCommentary } from "./commentary.js";
 import { createInstanceMessaging, instanceMessagingExtension, type InstanceMessage } from "./messages.js";
 import { createSchedules, scheduleTaskKind } from "./schedules.js";
 import type { Artifact, ArtifactRecord, ArtifactOptions, createArtifacts } from "./artifacts.js";
@@ -61,7 +62,9 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
         if (message.role !== "user" && message.role !== "assistant") return [];
         const text = messageText(message.content);
         const error = message.role === "assistant" ? message.errorMessage : undefined;
-        return text || error ? [{ id: `${entry.id}:${index}`, role: message.role, text, ...(error ? { error } : {}) }] : [];
+        const at = message.timestamp + (message.role === "assistant" ? message.durationMs ?? 0 : 0);
+        return text || error ? [{ id: `${entry.id}:${index}`, role: message.role, text, at,
+          ...(message.role === "assistant" ? { commentary: publicCommentary(message) } : {}), ...(error ? { error } : {}) }] : [];
       });
     });
   }

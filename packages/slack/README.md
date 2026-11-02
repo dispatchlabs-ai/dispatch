@@ -5,6 +5,19 @@
 admission, shared thread routing, streaming receipts and durable reply delivery.
 No web server or public webhook is required.
 
+Completed public commentary is retained as ordered thread replies while work
+continues. Provider commentary labels are respected; providers without them can
+publish prose accompanying tool calls. Thinking blocks, failed partial responses
+and tool output are never commentary. The final answer follows those replies.
+Native entry cursors and delivery dependencies survive restart. The editable
+working message supplies current activity during quiet periods.
+
+Hosts observing external workflows can pass `transport.queueStatus` as Runner's
+`createWorkflowProgress.statusSink`. Its stable key selects one editable message;
+unchanged waiting state does not create repeated thread replies. Status writes
+coalesce, serialize per key, retry, and recover the timestamp using message
+metadata after an uncertain initial post. Thread-history access is required.
+
 This is a source-alpha package, installed as a packed archive from reviewed
 source. It shares the repository's 0.6.0 development version and has not been
 published to npm.
