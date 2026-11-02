@@ -35,6 +35,9 @@ For repo-owned immutable application releases, use the
 Hosts can use [durable workflow progress](docs/workflow-progress.md) to report
 separately hosted work in the originating conversation after the initial reply.
 
+Definitions can select [request completion](docs/request-completion.md) to retain
+the original goal and continue unfinished work when the model reaches an answer.
+
 Use [documents and images](docs/artifacts.md) for retained artifact tools,
 conversation-scoped downloads and transport receipts.
 

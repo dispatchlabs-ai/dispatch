@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Add opt-in request completion records with Pi Durable's native end-of-answer
+  continuation. Preserve the original goal and remaining work through follow-ups,
+  compaction and recovery; require a current completion or explicit input/cancel
+  assessment before a model answer can end the run.
+
 - Expose configured delegates through `list_agents`, with model/thinking,
   declared tools, host catalog pricing and observations from retained receipts.
   Return child-subtree usage and elapsed-time receipts on delegated results
