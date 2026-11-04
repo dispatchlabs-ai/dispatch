@@ -89,6 +89,8 @@
 
 - **RUN-024 — Await an independent workflow:** A conversational agent can discover specialized capabilities, send a scoped assignment, await native children and subsequent peer handoffs, and reconcile the final report in its original conversation without model polling or duplicate admission.
 
+- **RUN-025 — Watch local sessions:** An operator can discover running application sessions, follow agent activity, inspect retained conversations and matching tool results, and leave the terminal viewer without affecting execution.
+
 ## Availability
 
 The extraction supports Node, SQLite and trusted company definitions.

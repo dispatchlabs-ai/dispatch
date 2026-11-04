@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Add a separate read-only terminal watcher for local application sessions,
+  with process discovery, agent activity, navigable history and matching tool
+  results. Viewer exit leaves execution untouched. Nix application releases can
+  add this companion while retaining an explicitly pinned execution runtime.
+
 - Yield peer-work waits to queued steering and allow explicit steering messages
   for corrections to active instances, preserving ordinary follow-up delivery.
 

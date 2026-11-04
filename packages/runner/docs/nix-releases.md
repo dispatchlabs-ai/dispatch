@@ -37,6 +37,31 @@ without a second Runner/Pi tree. The builder never installs dependencies on the
 target. `dispatch-native-tools` supplies the model-free worker endpoint described
 in [isolated native tools](isolated-native-tools.md).
 
+The default launcher also routes `NAME watch --config HOST.json` to the separate
+[read-only terminal watcher](watch.md). Applications may add a newer watcher
+without changing the runtime that owns their agent state:
+
+```nix
+tools.lib.mkAgentRelease {
+  inherit system;
+  name = "company-agents";
+  src = source;
+  revision = self.rev;
+  execution = {
+    package = pinnedDispatch.packages.${system}.runner;
+    revision = pinnedDispatch.rev;
+  };
+}
+```
+
+Here `tools` and `pinnedDispatch` are separately locked Dispatch inputs. Omit
+`execution` to use the builder's own Runner. The execution package and its source
+revision must describe the same artifact; supply `runner-slack` when that pinned
+execution needs Slack. `release.json` records execution under `dispatch` and the
+viewer separately under `watch`. All execution commands and `runtimeEntryPoint`
+continue to use the selected execution package. Custom application entrypoints
+own their own command routing.
+
 ## Build, publish, activate
 
 Build on the target OS/architecture using a clean, published application revision:
@@ -87,6 +112,8 @@ instruction, role or skill changes continue to require it.
 `run --config HOST.json --agent helper --prompt "..."` creates a random session;
 `--session KEY` reopens an explicit one. `--history` replaces the prompt.
 `--update-definitions` explicitly opts into Runner's existing idle migration.
+`watch --config HOST.json` discovers running sessions without opening a runtime;
+`watch --session KEY` also inspects stopped work. Viewer exit leaves owners running.
 
 HOST.json contains `stateRoot`, `cwd`, `namespace`, `gateway` and optional `retry`,
 `compaction` and `afterFailedRun` [host policies](service.md#compaction-and-queued-input-recovery)

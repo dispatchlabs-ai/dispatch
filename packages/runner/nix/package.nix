@@ -26,7 +26,7 @@ buildNpmPackage {
       ../scripts
     ] ++ lib.optionals withSlack [ ../../slack/src ../../slack/tsconfig.json ]);
   };
-  npmDepsHash = "sha256-b53cLPZjajspft1YkCotEDbtVKjdMl6i3W2AkNsoX+k=";
+  npmDepsHash = "sha256-BNoj5FQ1C9N1CSIRN6MYHKs9U9f45C0dUH7/dWD5qew=";
   npmInstallFlags = [ "--workspace=@dispatch/runner" "--include-workspace-root=false" ]
     ++ lib.optional withSlack "--workspace=@dispatch/slack";
   npmWorkspace = "packages/runner";
@@ -75,6 +75,8 @@ buildNpmPackage {
       --add-flags "$app/packages/runner/dist/service-cli.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-native-tools" \
       --add-flags "$app/packages/runner/dist/native-tools-cli.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-watch" \
+      --add-flags "$app/packages/runner/dist/watch-cli.js"
     runHook postInstall
   '';
   passthru = { nodejs = nodejs_24; inherit python3; };

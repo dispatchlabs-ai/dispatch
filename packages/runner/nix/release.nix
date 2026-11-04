@@ -1,10 +1,10 @@
-{ lib, runCommand, makeWrapper, runtime, runtimeRevision }:
+{ lib, runCommand, makeWrapper, runtimeShell, runtime, runtimeRevision, watcher, watcherRevision }:
 { name, src, revision, entrypoint ? null, nodeModules ? null, workspace ? null }:
 
 assert builtins.match "[a-z][a-z0-9-]*" name != null;
 runCommand "${name}-${lib.substring 0 12 revision}" {
   nativeBuildInputs = [ makeWrapper ];
-  passthru = { inherit runtime; };
+  passthru = { inherit runtime watcher; };
 } ''
   app="$out/lib/${name}"
   mkdir -p "$app/definitions" "$out/bin" "$out/share/${name}"
@@ -13,8 +13,24 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
   ln -s ${runtime}/lib/agent-node_modules "$app/node_modules"
   echo '{"type":"module","private":true}' > "$app/package.json"
   ${if entrypoint == null then ''
-    makeWrapper ${runtime}/bin/dispatch-agent "$out/bin/${name}" \
+    makeWrapper ${runtime}/bin/dispatch-agent "$out/bin/.${name}-run" \
       --add-flags "--root $app/definitions --release-manifest $out/share/${name}/release.json"
+    cat > "$out/bin/${name}" <<'SH'
+    #!${runtimeShell}
+    if [ "''${1:-}" = watch ]; then
+      shift
+      exec ${watcher}/bin/dispatch-watch "$@"
+    fi
+    if [ "''${1:-}" = --help ]; then
+      @EXECUTION@ "$@"
+      echo
+      echo '${name} watch --config HOST.json [--session KEY] [--json]'
+      exit
+    fi
+    exec @EXECUTION@ "$@"
+    SH
+    substituteInPlace "$out/bin/${name}" --replace-fail '@EXECUTION@' "$out/bin/.${name}-run"
+    chmod +x "$out/bin/${name}"
   '' else ''
     test -f "$app/definitions/"${lib.escapeShellArg entrypoint}
     makeWrapper ${runtime.nodejs}/bin/node "$out/bin/${name}" \
@@ -28,6 +44,7 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
     inherit name revision;
     system = runtime.system;
     dispatch = { revision = runtimeRevision; version = runtime.version; storePath = toString runtime; };
+    watch = { revision = watcherRevision; storePath = toString watcher; command = "${watcher}/bin/dispatch-watch"; };
     node = runtime.nodejs.version;
     python = "${runtime.python3}/bin/python3";
     workspaceController = "${runtime}/lib/dispatch-runner/packages/runner/scripts/workspace.py";

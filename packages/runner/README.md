@@ -145,6 +145,11 @@ adapters share one native harness; never open a second writer to the same store.
 
 ## Terminal conversations
 
+Use the separate [terminal watcher](docs/watch.md) to discover existing local
+sessions and inspect their agent conversations and tool results without starting
+or controlling work. An application release exposes `NAME watch --config HOST.json`;
+the standalone command is `dispatch-watch --config HOST.json`.
+
 `chatInTerminal({ root, models, agent: "helper", stateRoot, session: "main" })`
 starts the same headless service with a streaming terminal client. It selects one
 agent, creates or resumes a named conversation and owns process signal cleanup.

@@ -17,6 +17,7 @@ import { terminalError } from "./terminal-output.js";
 const usage = `dispatch-agent --root DEFINITIONS catalog
 dispatch-agent --root DEFINITIONS run --config HOST.json --agent AGENT [--session KEY] --prompt TEXT
 dispatch-agent --root DEFINITIONS run --config HOST.json --agent AGENT --session KEY --history
+dispatch-agent --root DEFINITIONS watch --config HOST.json [--session KEY] [--json]
 
 Each session owns a separate process state directory. No listener or schedules.
 Use --update-definitions only for an explicit idle definition migration.
@@ -30,7 +31,7 @@ try {
       root: { type: "string" }, config: { type: "string" }, agent: { type: "string" },
       session: { type: "string" }, prompt: { type: "string" }, history: { type: "boolean" },
       action: { type: "string" }, "release-manifest": { type: "string" },
-      "update-definitions": { type: "boolean" }, help: { type: "boolean" },
+      "update-definitions": { type: "boolean" }, help: { type: "boolean" }, json: { type: "boolean" },
     },
   });
   if (values.help) console.log(usage);
@@ -42,6 +43,14 @@ try {
         .map(agent => loadAgent(root, agent.id)));
       console.log(JSON.stringify(agents.map(({ id, description, model, fingerprint }) =>
         ({ id, description, model, fingerprint })), null, 2));
+    } else if (positionals[0] === "watch") {
+      if (values.agent || values.prompt || values.history || values.action || values["update-definitions"]) throw new Error(usage);
+      const { watchCommand } = await import("./watch.js");
+      await watchCommand([
+        ...(values.config ? ["--config", values.config] : []),
+        ...(values.session ? ["--session", values.session] : []),
+        ...(values.json ? ["--json"] : []),
+      ]);
     } else {
       const workspaceAction = positionals[0] === "workspace";
       if ((!workspaceAction && positionals[0] !== "run") || !values.config || !values.agent

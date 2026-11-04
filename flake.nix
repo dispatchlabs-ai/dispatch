@@ -41,12 +41,15 @@
     in {
       lib.agentRuntime = { system }:
         import ./packages/runner/nix/runtime.nix { pkgs = import nixpkgs { inherit system; }; };
-      lib.mkAgentRelease = { system, withSlack ? false, ... }@args:
+      lib.mkAgentRelease = { system, withSlack ? false, execution ? null, ... }@args:
         let pkgs = import nixpkgs { inherit system; };
         in (pkgs.callPackage ./packages/runner/nix/release.nix {
-          runtime = if withSlack then (forSystem system).packages.runner-slack else (forSystem system).packages.runner;
-          runtimeRevision = self.rev or self.dirtyRev or "uncommitted";
-        }) (builtins.removeAttrs args [ "system" "withSlack" ]);
+          runtime = if execution != null then execution.package
+            else if withSlack then (forSystem system).packages.runner-slack else (forSystem system).packages.runner;
+          runtimeRevision = if execution != null then execution.revision else self.rev or self.dirtyRev or "uncommitted";
+          watcher = (forSystem system).packages.runner;
+          watcherRevision = self.rev or self.dirtyRev or "uncommitted";
+        }) (builtins.removeAttrs args [ "system" "withSlack" "execution" ]);
       packages = eachSystem (system: (forSystem system).packages);
       checks = eachSystem (system: (forSystem system).checks);
       devShells = eachSystem (system: (forSystem system).devShells);
