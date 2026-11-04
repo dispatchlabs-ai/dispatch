@@ -303,6 +303,7 @@ export function project(raw: RawSnapshot, source: Connection): Snapshot {
         owner: item.record.owner,
         parent: item.record.parent,
         entryCount: item.entryCount,
+        turnCount: item.turnCount,
         active: item.active,
         failed: item.failed,
         lastAt:

@@ -13,6 +13,32 @@ remain the original synthetic ImageGen concepts, not runtime captures.
 
 ## Product direction
 
+**Process and turn reading, November 4, 2026:** the primary route is now
+**Processes → agent runs → saved turns → transcript**. Use quiet shadcn tables,
+breadcrumbs, messages and tool disclosures on neutral surfaces. This route has no
+permanent navigation rail or inspector. Use the available width for the process
+and agent tables, with a comfortable centered column for reading a turn.
+
+Each process is identified by PID and start time, and groups its discovered Pi
+stores. Each agent row is a conversation with recorded entries or pending work;
+empty bookkeeping conversations are excluded. Sort by recorded start time,
+display native parentage, and report overlapping model-task intervals only when
+both saved start and end timestamps establish them. Literal opening labels may
+improve names, but cannot establish relationships or outcomes.
+
+One saved `pi.assistant` entry is one turn, ordered by commit sequence and entry
+ID. Tool calls do not inflate that count. Numbered turns include the preceding
+user messages and identity-matched tool results. Long requests and tools start
+collapsed; full retained arguments/results remain available. Previous/Next turn,
+breadcrumbs and history shortcuts preserve the reader's place and expansions.
+New observations must not move the page. Missing results remain unknown.
+
+The workflow-first workspace described below remains available under
+**Settings → Open saved work**, including saved sources, explicit remote/Postgres
+connections, native record inspection and playback. Its route and pane rules do
+not apply to the new default process pages. This supersedes the earlier primary
+navigation direction without removing the supported saved-work reader.
+
 **Workflow-reading refinement, October 28, 2026:** start on **This machine** with
 all saved workflows visible and newest recorded activity first. Card and overview
 share a consistent workflow name and cycle. An explicit unfinished-only filter

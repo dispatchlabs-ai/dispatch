@@ -13,7 +13,7 @@ not in this goal catalog.
 
 ## 1. Find and understand work
 
-- [ ] **OBS-018 — Find local work.** An operator discovers workflows and standalone conversations on this machine without knowing each database path.
+- [ ] **OBS-018 — Find local work.** An operator discovers running agent processes and their chronological conversations and turn counts, plus saved workflows, without knowing each database path.
 - [ ] **OBS-019 — Find the latest workflow activity.** An operator identifies the most recently recorded workflow activity among available sources without guessing from assignment numbers or confusing observation time with work time.
 - [ ] **OBS-006 — Follow an active agent.** An operator follows retained agent activity while distinguishing execution evidence, unfinished tasks, source connectivity and viewing mode.
 - [ ] **OBS-007 — Follow delegation.** An operator follows recorded sender, assignment and native parent relationships to understand who requested work and how it was handed off.
@@ -22,7 +22,7 @@ not in this goal catalog.
 
 ## 2. Read the evidence
 
-- [ ] **OBS-010 — Read the conversation.** An operator reads formatted saved messages and inline tool activity in workflow context without losing their place as new records arrive.
+- [ ] **OBS-010 — Read the conversation.** An operator opens numbered saved turns or a workflow conversation and reads formatted messages with collapsible tools without losing their place as new records arrive.
 - [ ] **OBS-008 — Inspect a tool action.** An operator understands a saved tool call and its identity-matched result, including available timing, errors and missing or truncated evidence.
 - [ ] **OBS-011 — Review earlier work.** An operator reads finished or interrupted work even when the executing process is no longer available.
 - [ ] **OBS-012 — Replay recorded activity.** An operator steps or plays through retained events without executing tools, contacting a model or changing agent state.

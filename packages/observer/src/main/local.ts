@@ -13,12 +13,12 @@ const identities = new Map<string, string>();
 
 /** Discover agent-runtime writable files, not OS application databases. Other
  * hosts remain reachable through saved sources without a filesystem crawl. */
-export async function localWork(saved: Connection[]): Promise<LocalWork> {
+export async function discoverLocalFiles(saved: Connection[]) {
   const issues: string[] = [];
   let output = "";
   if (process.platform === "win32") {
     issues.push(
-      "Local process discovery is not available on Windows. Showing saved local sources.",
+      "Local process discovery is not available on Windows. Saved local sources remain available.",
     );
   } else {
     try {
@@ -30,7 +30,7 @@ export async function localWork(saved: Connection[]): Promise<LocalWork> {
       output = result.stdout;
     } catch {
       issues.push(
-        "Could not inspect local processes. Showing saved local sources; check that lsof is available.",
+        "Could not inspect local processes. Check that lsof is available; saved sources remain available.",
       );
     }
   }
@@ -74,6 +74,11 @@ export async function localWork(saved: Connection[]): Promise<LocalWork> {
       savedByPath.set(await canonicalPath(connection.path), connection);
   for (const path of savedByPath.keys())
     if (!paths.has(path)) paths.set(path, new Set());
+  return { paths, savedByPath, issues };
+}
+
+export async function localWork(saved: Connection[]): Promise<LocalWork> {
+  const { paths, savedByPath, issues } = await discoverLocalFiles(saved);
   const stores: LocalWork["stores"] = [];
   const scanned = new Set<string>();
   const siblingNamespaces = new Map<string, Set<string>>();

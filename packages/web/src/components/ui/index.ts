@@ -18,3 +18,5 @@ export * from "./overlays";
 export * from "./chat-patterns";
 export * from "./prompt-form";
 export { PromptForm as ChatComposer } from "./prompt-form";
+export * from "./table";
+export * from "./breadcrumb";

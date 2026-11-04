@@ -14,6 +14,11 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { draftSchema, readRequestSchema } from "../shared/contracts";
+import {
+  processConversationSchema,
+  processToolSchema,
+  processTurnSchema,
+} from "../shared/processes";
 import { PreferenceStore } from "./preferences";
 import { redact } from "./projection";
 
@@ -103,8 +108,8 @@ function handle(name: string, operation: (...args: any[]) => unknown) {
 }
 function createWindow() {
   window = new BrowserWindow({
-    width: 1440,
-    height: 940,
+    width: 1280,
+    height: 720,
     minWidth: 900,
     minHeight: 600,
     title: "Dispatch Observer",
@@ -157,6 +162,18 @@ else {
     );
     session.defaultSession.setPermissionCheckHandler(() => false);
     handle("preferences", () => preferences.get());
+    handle("processes", () => service("processes"));
+    handle("process-turns", (request) =>
+      service("process-turns", {
+        request: processConversationSchema.parse(request),
+      }),
+    );
+    handle("process-turn", (request) =>
+      service("process-turn", { request: processTurnSchema.parse(request) }),
+    );
+    handle("process-tool", (request) =>
+      service("process-tool", { request: processToolSchema.parse(request) }),
+    );
     handle("local-work", () =>
       service("local-work", {
         connections: preferences.get().connections,
@@ -197,8 +214,7 @@ else {
     handle("save", (input) => preferences.save(draftSchema.parse(input)));
     handle("remove", async (input) => {
       const id = z.string().uuid().parse(input);
-      if (preferences.get().lastConnection === id)
-        await service("disconnect");
+      if (preferences.get().lastConnection === id) await service("disconnect");
       await preferences.remove(id);
     });
     handle("connect", async (input) => {

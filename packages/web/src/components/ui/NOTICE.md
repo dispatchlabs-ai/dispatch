@@ -48,3 +48,12 @@ the Dispatch behavior and license, update this source record, and review the
 affected stories. Do not overwrite this directory with a generated template.
 Use [the workshop guide](../../../docs/component-workshop.md) for the public API
 and migration workflow.
+
+## Observer process navigation — November 4, 2026
+
+`table.tsx` and `breadcrumb.tsx` adapt the MIT-licensed shadcn/ui Base Nova
+registry sources at [Table](https://ui.shadcn.com/r/styles/base-nova/table.json)
+and [Breadcrumb](https://ui.shadcn.com/r/styles/base-nova/breadcrumb.json),
+retrieved November 4, 2026. Local changes resolve the shared `cn` utility and
+Lucide icons. They are exposed through the existing shared UI entry point;
+existing Web screens are unchanged.

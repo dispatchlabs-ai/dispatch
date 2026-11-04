@@ -4,9 +4,42 @@ Observer reads supported Pi stores from a local desktop. The selected source,
 logical store, and conversation define the inspection scope. No hosted account,
 model credentials, new telemetry database, or agent-side instrumentation is needed.
 
-## This machine
+## Processes and turns
 
-The app starts on **This machine**, refreshing about every five seconds. On macOS
+The app starts on **Processes**. Open a process to see agent conversations in
+recorded start order, their saved turn counts and native parent relationships.
+Search by process/application/PID or by agent. Expand an agent to browse all its
+numbered turns; **Latest turn** opens the newest saved response directly.
+
+One retained `pi.assistant` entry counts as one turn, including any tool calls
+and matching results. It is not a user-message round trip or a tool-event count.
+Each turn includes user messages since the preceding response. Tools start
+collapsed; opening one loads its arguments and saved result. Calls and results
+are paired by conversation and call ID. A missing match says **No result saved**,
+not that the tool failed. Markdown and multiline output remain readable, and
+**Show full message** expands a long request. Previous/Next turn and breadcrumbs
+provide navigation; Alt+Left/Right and Cmd+[/] use local history. Returning to a
+turn restores its open tools and scroll position. Live reads do not move you.
+
+**Running** describes observed process presence. **Pending work** describes
+unfinished recorded tasks, which can be waiting. Overlap notes require saved
+model-task start/end intervals. These labels do not claim workflow completion.
+Dates accompany timestamps from earlier days; unknown timing stays explicit.
+Empty bookkeeping conversations are excluded from agent counts.
+
+Local discovery uses the same writable-handle and Pi-schema checks described
+below, but the process list contains only currently observed PIDs. A selected
+process remains readable from the last observation after it exits, with **No
+longer observed** shown. Source failures show a notice and Retry. Discovery does
+not cover remote/Postgres stores or unrelated agent runtimes automatically.
+
+For saved history and remote sources, use **Settings → Open saved work**. This
+opens the existing workflow workspace described below. Its **Settings** manages
+connections, and **Processes** returns to the process reader.
+
+## Saved work: This machine
+
+The saved-work workspace opens on **This machine**, refreshing about every five seconds. On macOS
 and Linux, `lsof` identifies existing `.sqlite`, `.sqlite3`, and `.db` files open
 for writing by the current user's Node, Bun, Deno, Pi, Dispatch or Electron
 processes. Observer validates Pi's schema and reads supported stores without
@@ -264,6 +297,21 @@ going back replaces the forward path. Switching connections clears history;
 reconnecting the current connection preserves it.
 
 ## Compatibility and qualification
+
+Process-reader qualification (November 4, 2026): the packaged macOS ARM64 app
+discovered live local Pi processes and opened chronological agents, numbered
+turns, long-message disclosure and identity-matched tool arguments/results.
+Process/agent search and no-match recovery, Latest/Previous/Next turn,
+Alt+Left navigation, retained tool expansion, live count updates without page
+movement, Settings dismissal and entry/return through saved work were exercised.
+An unsupported synthetic store showed its error without migration; stopping its
+owner changed the selected view to **No longer observed**. Full-page process,
+agent and transcript layouts were inspected at 1440×900 and 1280×720, including
+long paths and expanded multiline output. Workspace TypeScript checks, the Nix
+build and flake checks, renderer build and macOS packaging passed. No automated
+tests were added or run. This pass does not qualify Windows/Linux execution,
+remote transports, dark appearance, full keyboard/focus behavior or a formal
+screen-reader audit. Private captures and transcripts are not public assets.
 
 Startup follow-up (October 28, 2026, OBS-001, OBS-005): the normal packaged
 macOS ARM64 app opened, discovered local work, opened Settings/Add/Cancel and

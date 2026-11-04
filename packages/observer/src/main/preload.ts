@@ -7,6 +7,10 @@ const invoke = async (operation: string, ...args: unknown[]) => {
   return reply.result;
 };
 const api: ObserverApi = {
+  processes: () => invoke("processes"),
+  processTurns: (request) => invoke("process-turns", request),
+  processTurn: (request) => invoke("process-turn", request),
+  processTool: (request) => invoke("process-tool", request),
   localWork: () => invoke("local-work"),
   preferences: () => invoke("preferences"),
   chooseFile: (kind) => invoke("choose-file", kind),

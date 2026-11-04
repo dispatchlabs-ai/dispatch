@@ -2,6 +2,17 @@ import { Source } from "./source";
 import { connectionSchema, readRequestSchema } from "../shared/contracts";
 import { redact } from "./projection";
 import { localWork } from "./local";
+import {
+  processCatalog,
+  processTool,
+  processTurn,
+  processTurns,
+} from "./processes";
+import {
+  processConversationSchema,
+  processToolSchema,
+  processTurnSchema,
+} from "../shared/processes";
 
 type Port = {
   on(event: "message", listener: (event: { data: any }) => void): void;
@@ -15,7 +26,14 @@ port.on("message", ({ data }) => {
   serial = serial.then(async () => {
     try {
       let result: unknown;
-      if (data.operation === "local-work") {
+      if (data.operation === "processes") result = await processCatalog();
+      else if (data.operation === "process-turns")
+        result = processTurns(processConversationSchema.parse(data.request));
+      else if (data.operation === "process-turn")
+        result = processTurn(processTurnSchema.parse(data.request));
+      else if (data.operation === "process-tool")
+        result = processTool(processToolSchema.parse(data.request));
+      else if (data.operation === "local-work") {
         result = await localWork(
           data.connections.map((item: unknown) => connectionSchema.parse(item)),
         );

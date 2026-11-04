@@ -26,6 +26,7 @@ export async function readSqlite(path: string, request: RawReadRequest) {
         table: (name) => name,
         scope: "1=1",
         instanceMessage: `json_extract(record, '$.kind') LIKE '%.instance-message'`,
+        assistantEntry: `json_extract(e.record, '$.kind')='pi.assistant'`,
         assistantText: `EXISTS (SELECT 1 FROM json_each(e.record, '$.model') m
           WHERE json_extract(m.value, '$.role')='assistant' AND (
             (json_type(m.value, '$.content')='text' AND length(trim(json_extract(m.value, '$.content')))>0)

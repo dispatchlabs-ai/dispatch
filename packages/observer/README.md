@@ -4,14 +4,18 @@ A local Electron app for following Pi Durable agents and stepping through their
 saved activity. Inspect conversations, tool calls and results, child agents,
 native tasks, and workflow documents in one read-only workspace.
 
-Start on **This machine** to discover local Pi SQLite stores open by your user's
-processes, alongside saved local sources. Explicit handoffs group conversations
-by workflow and cycle: open the workflow, select an assignment, and read its
-sender, original request and conversation. Unrelated conversations stay separate.
-Tool activity appears in compact expandable groups. Discovery requires
-macOS or Linux with `lsof`; other stores remain available through
-**Settings → Connections**.
-Process presence and saved task status are shown separately.
+Start on **Processes** to see local agent processes, their application, PID,
+agent count and saved turn count. Open a process for its chronological agent
+conversations, expand an agent, then open a numbered turn. The focused transcript
+uses shadcn Message and Trace components, with tool arguments and results loaded
+on expansion. Back restores your reading position and open tools. Discovery
+requires macOS or Linux with `lsof`; pending tasks do not prove model execution.
+
+**Settings → Open saved work** retains the workflow viewer, saved local sources,
+remote connections and playback. In that workspace, explicit handoffs group
+conversations by workflow and cycle. Open a workflow, select an assignment, and
+read its sender, original request and conversation. Unrelated conversations stay
+separate. Connections are managed in that workspace's **Settings**.
 Workflow grouping reads existing records; it does not require a SQLite migration
 or establish a workflow's final outcome.
 
@@ -38,7 +42,7 @@ npm run sample -w @dispatch/observer
 npm run start -w @dispatch/observer
 ```
 
-Choose **Settings → Add connection → SQLite**, browse to
+Choose **Settings → Open saved work → Settings → Add connection → SQLite**, browse to
 `packages/observer/.local/sample.sqlite`, then **Save & connect**. The synthetic
 workspace has a coordinator, two children, a waiting workflow, a failed attempt,
 and a retained tool slot, plus a generic workflow walkthrough with nested groups,

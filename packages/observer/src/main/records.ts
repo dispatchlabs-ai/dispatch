@@ -10,6 +10,7 @@ export interface Query {
   table(name: string): string;
   scope: string;
   assistantText: string;
+  assistantEntry: string;
   instanceMessage: string;
 }
 const record = (row: Row): RecordData => JSON.parse(String(row.record));
@@ -56,6 +57,7 @@ export async function readRecords(
     };
   const conversations = await rows(`SELECT c.record,
     (SELECT COUNT(*) FROM ${table("entries")} e WHERE ${scope.replaceAll("store_id", "e.store_id")} AND e.conversation_id=c.id) AS entry_count,
+    (SELECT COUNT(*) FROM ${table("entries")} e WHERE ${scope.replaceAll("store_id", "e.store_id")} AND e.conversation_id=c.id AND ${query.assistantEntry}) AS turn_count,
     (SELECT e.record FROM ${table("entries")} e WHERE ${scope.replaceAll("store_id", "e.store_id")} AND e.conversation_id=c.id ORDER BY e.commit_seq DESC,e.id DESC LIMIT 1) AS latest_entry,
     (SELECT e.record FROM ${table("entries")} e WHERE ${scope.replaceAll("store_id", "e.store_id")} AND e.conversation_id=c.id ORDER BY e.commit_seq,e.id LIMIT 1) AS first_entry,
     (SELECT e.record FROM ${table("entries")} e WHERE ${scope.replaceAll("store_id", "e.store_id")} AND e.conversation_id=c.id AND ${query.assistantText} ORDER BY e.commit_seq DESC,e.id DESC LIMIT 1) AS latest_response,
@@ -68,6 +70,7 @@ export async function readRecords(
     conversations: conversations.map((row) => ({
       record: record(row),
       entryCount: number(row.entry_count),
+      turnCount: number(row.turn_count),
       latestEntry: row.latest_entry
         ? JSON.parse(String(row.latest_entry))
         : undefined,

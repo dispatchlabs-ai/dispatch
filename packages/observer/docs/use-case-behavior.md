@@ -23,9 +23,19 @@ proof of platform qualification.
 
 ## Understand current work
 
-**Current focus, October 28, 2026:** discover work on this machine, then open a
-human-readable conversation with inline tool calls. Remote discovery and execution
-controls are not part of this refinement; existing explicit connections remain.
+**Current focus, November 4, 2026:** discover running local processes, open their
+chronological agent conversations and saved turn counts, then read each numbered
+turn with collapsible tools. The process view uses the owning PID/start time and
+validated Pi stores, not a generated workflow identity. A saved assistant entry
+is one turn; tool calls/results add no turns. Parentage uses native ownership;
+overlap requires recorded model-task intervals. Pending tasks are not proof of
+current model execution. Back/Forward, breadcrumbs and Previous/Next turn retain
+reading/expansion state. Exact tool payloads load on expansion, with errors and
+missing results explicit. New observations never scroll the reader.
+
+This updates the default route for **OBS-006/007/008/010/013/015/018**. The workflow
+and connection contracts below remain available through **Settings → Open saved
+work**. Remote discovery and execution controls remain outside scope.
 
 Workflow navigation follows explicit saved handoff labels within one local
 installation. Available sender and assignment conversations form the navigation

@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Processes and saved turns
+
+- Start with running local agent processes, grouped by PID/start time, then open
+  chronological agent conversations and exact saved assistant-turn counts.
+- Browse numbered turns in a focused shadcn transcript with collapsed tool calls,
+  lazy argument/result loading, long-message disclosure and identity-matched output.
+- Add process/agent search, latest/previous/next turn navigation, and retained
+  scroll/expansion state. Show native parents and recorded model-task overlap.
+- Keep saved workflows, remote connections, native records and playback available
+  through Settings → Open saved work. Include copied shadcn component licenses
+  in the desktop bundle.
+
 ### Credential-free startup
 
 - Open the viewer, settings and local discovery without initializing OS credential

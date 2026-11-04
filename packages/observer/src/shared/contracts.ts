@@ -1,4 +1,12 @@
 import { z } from "zod";
+import type {
+  ProcessCatalog,
+  ProcessConversationRequest,
+  ProcessToolRequest,
+  ProcessTurnRequest,
+  ProcessTurns,
+  TurnTranscript,
+} from "./processes";
 
 const port = z.number().int().min(1).max(65535);
 const path = z.string().trim().min(1).max(4096);
@@ -103,6 +111,7 @@ export type RawSnapshot = {
   conversations: {
     record: RecordData;
     entryCount: number;
+    turnCount?: number;
     latestEntry?: RecordData;
     latestResponseEntry?: RecordData;
     firstEntry?: RecordData;
@@ -130,6 +139,7 @@ export type Conversation = {
   owner?: { conversationId: number; taskId: number };
   parent?: { conversationId: number; at: number };
   entryCount: number;
+  turnCount?: number;
   active: number;
   failed: number;
   lastAt?: number;
@@ -255,6 +265,10 @@ export type LocalWork = {
   issues: string[];
 };
 export type ObserverApi = {
+  processes(): Promise<ProcessCatalog>;
+  processTurns(request: ProcessConversationRequest): Promise<ProcessTurns>;
+  processTurn(request: ProcessTurnRequest): Promise<TurnTranscript>;
+  processTool(request: ProcessToolRequest): Promise<Activity>;
   localWork(): Promise<LocalWork>;
   preferences(): Promise<Preferences>;
   chooseFile(
