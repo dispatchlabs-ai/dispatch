@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Open agent lists at the first conversation and retain unassigned or unavailable
+  agent hosts in the full list on narrow terminals.
+
 - Make Watch readable during long runs: keep the latest public update and current
   activity visible, group and pair tool calls/results, add searchable history,
   an error filter, mouse navigation and a responsive agent sidebar.

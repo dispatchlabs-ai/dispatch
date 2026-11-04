@@ -93,6 +93,8 @@ export async function watchInTerminal(options: WatchOptions): Promise<void> {
     render(): string[] { return []; }
     get snapshot(): WatchSnapshot | undefined { return this.run && this.snapshots.get(this.run.key); }
     get conversations(): WatchConversation[] { return this.snapshot?.conversations ?? []; }
+    get unassignedStores() { return (this.run?.stores ?? []).filter(store => !this.conversations.some(c => c.agent === store.agent)); }
+    unassignedStatus(agent: string): string { return this.snapshot?.unavailableAgents.includes(agent) ? "State unavailable" : "No conversation yet"; }
     get entries(): WatchActivity[] { return this.page?.entries ?? []; }
     get rows(): FeedRow[] { return feedRows(this.entries, this.filter, this.expanded, this.query); }
     get following(): boolean { return this.view === "conversation" && this.scroll.isFollowingEnd && !this.query && this.filter === "updates"; }
@@ -103,7 +105,13 @@ export async function watchInTerminal(options: WatchOptions): Promise<void> {
       return ansi(this.light ? "48;5;153;38;5;17" : "48;5;24;38;5;231")(pad(stripTerminalSequences(text), width));
     }
     redraw(): void { if (!closed) tui.requestRender(); }
-    resetScroll(): void { this.selected = ""; this.scroll.scrollToStart(); tui.resetTextSelection(); }
+    resetScroll(): void {
+      this.selected = "";
+      // The previous view may fit on screen. Do not carry its follow-end state
+      // into a longer agent list, search result, or inspector on the next layout.
+      this.scroll.scrollTo(0, { disableFollow: true });
+      tui.resetTextSelection();
+    }
 
     async refresh(): Promise<void> {
       if (this.busy || closed) return;
@@ -152,6 +160,8 @@ export async function watchInTerminal(options: WatchOptions): Promise<void> {
       this.navigation++; this.autoOpen = false; this.run = run; this.view = "agents";
       terminal.setTitle(`Dispatch Watch · ${oneLine(run.session)}`);
       this.agentIndex = 0; this.resetScroll();
+      this.sidebar.scrollToStart();
+      this.selected = this.conversations[0]?.key ?? "";
       if (this.conversations.length === 1) await this.openConversation(this.conversations[0]);
       this.redraw();
     }
@@ -351,10 +361,7 @@ export async function watchInTerminal(options: WatchOptions): Promise<void> {
           fit(`  ${muted(`#${c.conversationId} · ${age(c.updatedAt)} ago`)}`, width), "");
         this.agentHits.push({ key: c.key, top, bottom: lines.length - 1 });
       }
-      for (const store of this.run?.stores ?? []) {
-        if (!this.conversations.some(c => c.agent === store.agent)) lines.push(fit(humanName(store.agent), width),
-          muted(this.snapshot?.unavailableAgents.includes(store.agent) ? "  State unavailable" : "  No conversation yet"), "");
-      }
+      for (const store of this.unassignedStores) lines.push(fit(humanName(store.agent), width), muted(`  ${this.unassignedStatus(store.agent)}`), "");
       lines.push(rule(width), muted("a  All agents"), muted("s  Change session"), "", muted("Read-only · q closes viewer"));
       return lines;
     }
@@ -420,6 +427,8 @@ export async function watchInTerminal(options: WatchOptions): Promise<void> {
           `${status(c.status)} · Updated ${age(c.updatedAt)} ago`,
           ...(c.parentKey ? [oneLine(c.title)] : []),
           ...(c.latestMessage ? prose(c.latestMessage.text, width - 4).slice(0, 4) : [muted("No public update yet")])]);
+        for (const store of this.unassignedStores) lines.push(fit(`  ${bold(humanName(store.agent))}`, width),
+          muted(`  ${this.unassignedStatus(store.agent)}`), "");
         if (!this.conversations.length) lines.push("No conversations available yet.");
       } else {
         if (this.page?.hasEarlier) add("earlier", [accent(this.reading ? "Loading earlier history…" : "↑ Load earlier history · b")]);
