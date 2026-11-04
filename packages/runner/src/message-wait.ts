@@ -1,5 +1,5 @@
 import type { Context } from "@earendil-works/chord/context";
-import type { ConversationId, Cursor, EntryId, TaskId } from "@earendil-works/pi-durable";
+import { InboxDoc, type ConversationId, type Cursor, type EntryId, type TaskId } from "@earendil-works/pi-durable";
 import type { ChatService } from "./chat.js";
 
 /** Follow native ownership and admitted peer messages, without another workflow store. */
@@ -62,6 +62,8 @@ export async function waitForMessageWork(service: ChatService, namespace: string
         .map(task => ({ agent, ...task })));
       const submissions = inspections.flatMap(({ agent, inspection }) => inspection.submissions
         .filter(input => members.has(`${agent}:${input.conversationId}`)));
+      const inputPending = (await sender.host.harness.snapshot(InboxDoc, sender.conversation.id, context))
+        ?.items.some(item => item.mode === "steer");
       if (revision !== observed) continue;
       const blocked = tasks.filter(task => task.state.kind === "blocked");
       const waitingOnSender = tasks.some(task => task.record.kind === `${namespace}.instance-message`
@@ -69,17 +71,17 @@ export async function waitForMessageWork(service: ChatService, namespace: string
       const held = inspections.some(({ agent, inspection }) => inspection.submissions.some(input =>
         members.has(`${agent}:${input.conversationId}`) && !inspection.tasks.some(task =>
           task.record.conversationId === input.conversationId && !task.record.background)));
-      if (blocked.length || waitingOnSender || held || (!tasks.length && !submissions.length)) {
+      if (inputPending || blocked.length || waitingOnSender || held || (!tasks.length && !submissions.length)) {
         const snapshot = await service.snapshot(to);
         if (revision !== observed) continue;
         const answer = snapshot.messages.findLast(message => message.role === "assistant");
         return {
-          from, to, taskId, state: blocked.length ? "blocked" : waitingOnSender ? "waiting_on_sender" : held ? "held" : "idle",
+          from, to, taskId, state: inputPending ? "input_pending" : blocked.length ? "blocked" : waitingOnSender ? "waiting_on_sender" : held ? "held" : "idle",
           instances: [...members.keys()],
           delivery: delivery.state,
           answer: answer ? { text: answer.text, ...(answer.error ? { error: answer.error } : {}) } : null,
           blockedTasks: blocked.map(task => ({ agent: task.agent, taskId: task.record.id, kind: task.record.kind })),
-          note: "Idle means the admitted work has settled, not that the user's goal or workflow acceptance criteria were met. Check the final report and evidence. Waiting never cancels independently admitted work.",
+          note: "Input pending yields to a queued correction. Idle means the admitted work has settled, not that the user's goal or workflow acceptance criteria were met. Check the final report and evidence. Waiting never cancels independently admitted work.",
         };
       }
       await new Promise<void>((resolve, reject) => {

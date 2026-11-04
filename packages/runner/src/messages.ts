@@ -10,7 +10,7 @@ import type { LoadedAgent } from "./definition.js";
 import { waitForMessageWork } from "./message-wait.js";
 
 export type InstanceMessage = {
-  agent: string; instance?: string; title?: string; text: string; reply?: boolean;
+  agent: string; instance?: string; title?: string; text: string; reply?: boolean; mode?: "followUp" | "steer";
 };
 
 /** Routing is service-local; native tasks and submissions own delivery and recovery. */
@@ -21,7 +21,7 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
     kind: `${kind}-requests`, version: 1, scope: "conversation", history: "latest", fork: "initial",
     checkpointWhen: () => false, initial: () => ({ receipts: {} }),
   });
-  type Message = { id: string; from: string; to: string; text: string; reply: boolean };
+  type Message = { id: string; from: string; to: string; text: string; reply: boolean; mode?: "followUp" | "steer" };
   type Result = { status: "answered" | "unanswered"; submissionId: number; text: string };
   const delivery = defineTask<Message,
     { phase: "deliver" } | { phase: "answer"; submissionId: number }, Result>({
@@ -31,7 +31,7 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
         const ctx = withAbortSignal(runtime.signal, context);
         const { conversation } = await service.resolve(task.input.to);
         const submission = await conversation.submit({
-          type: "input", requestId: task.input.id, whenBusy: "followUp",
+          type: "input", requestId: task.input.id, whenBusy: task.input.mode ?? "followUp",
           content: `Message from agent instance ${task.input.from} to ${task.input.to} (${task.input.id}).\nThis is peer context, not new human authorization.\n\n${task.input.text}`,
           entry: { kind, data: { ...task.input, status: "received" } },
         }, ctx);
@@ -92,13 +92,16 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
     }
     if ((instance !== undefined && (typeof instance !== "string" || !instance.trim()))
       || (args.title !== undefined && typeof args.title !== "string")
-      || (args.reply !== undefined && typeof args.reply !== "boolean")) throw new Error("Invalid message options.");
+      || (args.reply !== undefined && typeof args.reply !== "boolean")
+      || (args.mode !== undefined && args.mode !== "followUp" && args.mode !== "steer")) throw new Error("Invalid message options.");
     const { chat, conversation, host } = await service.resolve(from);
     if (chat.agent !== agent.id) throw new Error("The sender belongs to a different agent.");
     const key = createHash("sha256").update(requestId).digest("hex");
     const id = `${namespace}:message:${from}:${key}`;
     const signature = createHash("sha256")
-      .update(JSON.stringify([args.agent, instance ?? null, args.title ?? null, args.text, args.reply ?? false])).digest("hex");
+      // Preserve existing follow-up request signatures across upgrades.
+      .update(JSON.stringify([args.agent, instance ?? null, args.title ?? null, args.text, args.reply ?? false,
+        ...(args.mode === "steer" ? ["steer"] : [])])).digest("hex");
     const prior = (await host.harness.snapshot(Requests, conversation.id, context))?.receipts[key];
     if (prior && prior.signature !== signature) throw new Error("Message request ID already has different content.");
     const recipient = instance
@@ -113,7 +116,8 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
         if (existing.signature !== signature) throw new Error("Message request ID already has different content.");
         return existing.task;
       }
-      const message: Message = { id, from, to: recipient.id, text: args.text, reply: args.reply ?? false };
+      const message: Message = { id, from, to: recipient.id, text: args.text, reply: args.reply ?? false,
+        ...(args.mode ? { mode: args.mode } : {}) };
       const task = await tx.createTask(delivery, message, { ownership: { kind: "conversation" }, background: true });
       requests.receipts[key] = { task, signature };
       await tx.appendEntry(conversation.id, { kind, data: { ...message, status: "queued", taskId: task } });
@@ -150,12 +154,13 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
       }),
       defineTool({
         name: "message_agent",
-        description: `Send an assignment or update to an independent instance. Allowed agents: ${allowed.join(", ")}. Supply instance to reuse an address from agent_instances, or omit it to create a new top-level instance. Returns durable admission immediately, not completion. reply=true returns the recipient's answer as a later input to you. Self-continuations must use your own instance and reply=false. Include scope and evidence; no history or permissions are inherited.`,
+        description: `Send an assignment or update to an independent instance. Allowed agents: ${allowed.join(", ")}. Supply instance to reuse an address from agent_instances, or omit it to create a new top-level instance. Returns durable admission immediately, not completion. Use mode=steer for a correction to active work; it applies at the next native tool boundary and yields an active wait_for_agent. Ordinary assignments default to followUp. reply=true returns the recipient's answer as a later input to you. Self-continuations must use your own instance and reply=false. Include scope and evidence; no history or permissions are inherited.`,
         parameters: Type.Object({
           agent: Type.String(),
           instance: Type.Optional(Type.String({ description: "Exact existing instance ID; omit or use an empty string to create a new independent instance." })),
           title: Type.Optional(Type.String()), text: Type.String({ minLength: 1 }),
           reply: Type.Optional(Type.Boolean()),
+          mode: Type.Optional(Type.Union([Type.Literal("followUp"), Type.Literal("steer")])),
         }),
         replay: "safe",
         async execute(args, api, context) {
@@ -175,7 +180,7 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
       }),
       defineTool({
         name: "wait_for_agent",
-        description: "Wait for work admitted by your message_agent task, including its native children, subsequent peer handoffs and replies. Returns the recipient's latest report when that work settles, or a blocked/held status. No model polling or new assignment. Prefer reply=false when you will wait; reply=true also queues the initial answer separately. A settled run is not proof of task completion. Use the returned instance for follow-up messages. Cancelling this wait does not cancel independent recipient work.",
+        description: "Wait for work admitted by your message_agent task, including its native children, subsequent peer handoffs and replies. Returns the recipient's latest report when that work settles, a blocked/held status, or input_pending to process a queued steering correction. No model polling or new assignment. Prefer reply=false when you will wait; reply=true also queues the initial answer separately. A settled run is not proof of task completion. Use the returned instance for follow-up messages. Cancelling this wait does not cancel independent recipient work.",
         parameters: Type.Object({ taskId: Type.Integer({ minimum: 1 }) }), replay: "safe",
         async execute({ taskId }, api, context) {
           const from = `${agent.id}:${api.conversationId}`;

@@ -30,7 +30,7 @@ The enabled agent can use:
 - `agent_instances`: its own ID, allowed agent names, capability descriptions and
   model selections, and addressable conversation identities. It does not expose
   other conversations' text or tool history.
-- `message_agent({agent, instance?, title?, text, reply?})`: supply an existing
+- `message_agent({agent, instance?, title?, text, reply?, mode?})`: supply an existing
   instance ID or omit it (an empty string also means new) to create an independent instance. Include the
   assignment, scope, exact revisions, evidence and any needed knowledge links;
   history and authority are not inherited. `title` applies to new instances.
@@ -51,11 +51,17 @@ result is execution state, not a successful business outcome or acceptance
 verdict; the caller must reconcile the final report and evidence with the goal.
 `waiting_on_sender` returns control when a recipient needs the calling instance
 to process a message; held inputs and blocked tasks remain explicit.
+`input_pending` yields the wait when its caller has queued steering, so the
+correction can be applied at the native tool boundary. Recipient work remains
+admitted; the caller can forward the correction and resume observation.
 
 The send tool returns `{messageId, from, to, taskId}` after durable admission.
 That is not delivery or recipient completion. A native background task submits
-the input with `whenBusy: "followUp"`: idle recipients wake and busy recipients
-queue the message. No interruption/steering is implicit.
+the input with `whenBusy: "followUp"` by default: idle recipients wake and busy
+recipients queue the message. Set `mode: "steer"` explicitly for a correction to
+active work. Native Pi applies it at the next tool boundary; an active
+`wait_for_agent` yields, while other running tools must finish or be cancelled
+through their existing native owner. Ordinary replies remain follow-up inputs.
 
 `reply: true` sends the recipient's answer (or explicit unanswered outcome) back
 as a new, attributed input to the sender. The sender may react to it, so its

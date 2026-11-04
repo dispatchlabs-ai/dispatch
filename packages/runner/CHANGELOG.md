@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Yield peer-work waits to queued steering and allow explicit steering messages
+  for corrections to active instances, preserving ordinary follow-up delivery.
+
 - Support one editable workflow status and atomic returned-result handoff to the
   supervisor. Retain a stable request identity through follow-ups.
 
