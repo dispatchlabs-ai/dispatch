@@ -1,14 +1,15 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { parseArgs } from "node:util";
-import { discoverWatchRuns, readWatchRun } from "./watch-reader.js";
+import { discoverWatchRuns, isWatchSessionKey, readWatchRun } from "./watch-reader.js";
 import { terminalText } from "./terminal-output.js";
 import type { WatchOptions } from "./watch-types.js";
 
 const usage = `dispatch-watch --config HOST.json [--session KEY] [--json]
 
 Discover local running sessions and inspect their saved activity without starting
-or controlling agents. --session also opens saved work with no observed process.
+or controlling agents. --session also opens saved work with no observed process;
+use a relative directory, or . for agents directly under the configured stateRoot.
 --json prints one observation. Redirected output prints a plain-text observation.
 In the viewer: arrows select, Enter inspects, Esc goes back, q or Ctrl+C quits.
 Quitting the viewer leaves the agents running.`;
@@ -20,7 +21,7 @@ export async function watchCommand(args: string[]): Promise<void> {
   } });
   if (values.help) { console.log(usage); return; }
   if (positionals.length || !values.config) throw new Error(usage);
-  if (values.session !== undefined && !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(values.session)) {
+  if (values.session !== undefined && !isWatchSessionKey(values.session)) {
     throw new Error("Invalid session key.");
   }
   const config: unknown = JSON.parse(await readFile(values.config, "utf8"));

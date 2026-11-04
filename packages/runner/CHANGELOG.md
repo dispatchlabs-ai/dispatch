@@ -6,6 +6,9 @@
   activity visible, group and pair tool calls/results, add searchable history,
   an error filter, mouse navigation and a responsive agent sidebar.
 
+- Discover direct and nested native service stores as well as on-demand sessions,
+  so the shared terminal watcher can serve different company applications.
+
 - Add a separate read-only terminal watcher for local application sessions,
   with process discovery, agent activity, navigable history and matching tool
   results. Viewer exit leaves execution untouched. Nix application releases can

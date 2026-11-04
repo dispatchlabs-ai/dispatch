@@ -1,6 +1,6 @@
 # Watch local agent sessions
 
-Watch is a read-only terminal viewer for existing on-demand Runner sessions.
+Watch is a read-only terminal viewer for existing Runner sessions and services.
 Start the work in one terminal, then open the viewer in another:
 
 ```sh
@@ -76,12 +76,28 @@ An explicit session also opens stopped work. With redirected output, Watch print
 one plain-text observation and exits. `--json` provides one structured observation
 with source issues and observation times; it does not enter terminal mode.
 
+The same viewer serves different company repositories. Its configuration needs
+only an absolute `stateRoot` and, optionally, the installation's Runner `namespace`.
+The root may contain on-demand sessions, agents directly, or nested service/thread
+directories. A session key is its directory relative to `stateRoot`; use `.` when
+the agent directories are directly under that root, or `threads/example/native`
+for a nested service session. The viewer does not load the company's definitions
+or start its service.
+
+Default application launchers route `NAME watch` to this shared implementation.
+Custom application launchers can invoke `dispatch-watch --config HOST.json` from
+the shared Runner installation without copying its UI or storage reader. Run the
+viewer on the host and under the account that owns the native stores; local
+discovery does not grant access to another service account or remote machine.
+
 ## Discovery and limits
 
 On macOS and Linux, `lsof` discovers same-user runtime processes holding writable
-`stateRoot/SESSION/AGENT/session.sqlite` files. Discovery stays inside the configured
-installation. Native schema, Runner namespace and agent identity are checked;
-immediate sibling stores supply other participants. Read-only viewer handles do
+native `AGENT/session.sqlite` files anywhere under the configured `stateRoot`.
+The parent of each agent directory identifies its session. Discovery uses open
+handles rather than recursively scanning the filesystem. Native schema, Runner
+namespace and agent identity are checked; immediate sibling stores supply other
+participants. Read-only viewer handles do
 not count as agent owners. Session state must be owned by the current account and
 must not be redirected through symlinks. A missing, unreadable or unsupported
 source is reported rather than treated as a completed run.
@@ -93,9 +109,9 @@ guarantee of ongoing model execution or a successful workflow outcome. Known
 credential fields are redacted; terminal controls are displayed as escaped text.
 
 Automatic process discovery is unavailable on Windows; explicit saved sessions
-remain addressable. Remote stores and other installation layouts are outside
-this command's scope. This initial implementation is qualified on macOS; other
-platforms require their own interactive qualification.
+remain addressable. Remote stores are outside this command's scope. The initial
+implementation is qualified on macOS; other platforms require their own
+interactive qualification.
 
 The [release composer](nix-releases.md) can keep an existing execution runtime
 pinned while adding the viewer from a newer source revision. Installing Watch

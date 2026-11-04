@@ -14,6 +14,8 @@ type Row = Record<string, unknown>;
 const exec = promisify(execFile);
 const pageSize = 100;
 const keyPattern = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
+export const isWatchSessionKey = (value: string): boolean =>
+  value === "." || value.split("/").every(part => keyPattern.test(part));
 const secretKey = /^(?:api[-_]?key|access[-_]?token|refresh[-_]?token|password|passwd|secret|authorization|cookie|private[-_]?key|connectionString|thoughtSignature|thinkingSignature|encryptedContent)$/i;
 
 /** Redact known credential fields without exposing provider state or reasoning. */
@@ -62,6 +64,8 @@ async function withStore<T>(path: string, read: (db: DatabaseSync) => T): Promis
   await ownedPath(dirname(dirname(path)), true);
   await ownedPath(dirname(path), true);
   await ownedPath(path, false);
+  // Retained selections must not follow an ancestor redirected after discovery.
+  if (await realpath(path) !== path) throw new Error("Session path was redirected; rediscover the configured installation.");
   const db = new DatabaseSync(path, { readOnly: true, allowExtension: false });
   try {
     db.exec("PRAGMA query_only=ON; PRAGMA busy_timeout=1000; BEGIN");
@@ -139,7 +143,7 @@ async function validateStore(path: string, pids: number[], namespace?: string): 
 /** Current writable handles establish process presence; unfinished tasks do not. */
 export async function discoverWatchRuns(options: WatchOptions): Promise<{ runs: WatchRun[]; issues: string[] }> {
   if (!isAbsolute(options.stateRoot)) throw new Error("stateRoot must be an absolute path.");
-  if (options.session !== undefined && !keyPattern.test(options.session)) throw new Error("Invalid session key.");
+  if (options.session !== undefined && !isWatchSessionKey(options.session)) throw new Error("Invalid session key.");
   const issues: string[] = [];
   let root: string;
   try { root = await realpath(options.stateRoot); await ownedPath(root, true); }
@@ -165,17 +169,21 @@ export async function discoverWatchRuns(options: WatchOptions): Promise<{ runs: 
     else if (line.startsWith("a")) access = line.slice(1);
     else if (runtime && pid !== process.pid && line.startsWith("n/") && (access === "u" || access === "w")) {
       const path = line.slice(1), parts = relative(root, path).split(sep);
-      if (parts.length !== 3 || !keyPattern.test(parts[0]) || !keyPattern.test(parts[1]) || parts[2] !== "session.sqlite") continue;
+      if (parts.length < 2 || parts.at(-1) !== "session.sqlite" || !parts.slice(0, -1).every(part => keyPattern.test(part))) continue;
       const found = owners.get(path) ?? new Set<number>(); found.add(pid); owners.set(path, found);
     }
   }
-  const sessions = new Set([...owners.keys()].map(path => basename(dirname(dirname(path)))));
+  const sessions = new Set([...owners.keys()].map(path => relative(root, dirname(dirname(path))).split(sep).join("/") || "."));
   if (options.session) { sessions.clear(); sessions.add(options.session); }
   const runs: WatchRun[] = [];
   for (const session of sessions) {
-    const path = join(root, session), runIssues: string[] = [], stores: WatchStore[] = [];
+    const path = join(root, ...session.split("/")), runIssues: string[] = [], stores: WatchStore[] = [];
     try {
-      await ownedPath(path, true);
+      let directory = root;
+      for (const part of session === "." ? [] : session.split("/")) {
+        directory = join(directory, part);
+        await ownedPath(directory, true);
+      }
       for (const child of await readdir(path, { withFileTypes: true })) {
         if (!child.isDirectory() || child.isSymbolicLink() || !keyPattern.test(child.name)) continue;
         const file = join(path, child.name, "session.sqlite");
