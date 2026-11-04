@@ -1,5 +1,5 @@
 import {
-  defineDoc, defineExtension, defineTask, InboxDoc, type JsonObject, type ToolExecutionApi, type TaskId,
+  defineDoc, defineExtension, defineTask, InboxDoc, type JsonObject, type ToolExecutionApi, type TaskId, type Tx, type ConversationId,
 } from "@earendil-works/pi-durable";
 import type { Context } from "@earendil-works/chord/context";
 import { createReplies, type ReplyDestination, type ReplySink } from "./replies.js";
@@ -15,6 +15,8 @@ export type WorkflowObservation = {
   updates?: { source: string; id: string; text: string; at?: number }[];
   /** Current factual activity, independent of the last narrative milestone. */
   activity?: string;
+  /** Complete returned evidence for the supervising agent, not a public verdict. */
+  result?: string;
   /** Settled means this assignment returned; it does not assert acceptance. */
   settled: boolean;
 };
@@ -27,11 +29,18 @@ export function createWorkflowProgress(options: {
   sink?: ReplySink;
   /** Replace one status message identified by key; never append a heartbeat. */
   statusSink?: ReplySink;
+  /** Keep routine narration in one editable status instead of new replies. */
+  narration?: "replies" | "status";
+  /** Atomically queue a trusted native continuation when the assignment returns. */
+  onSettled?(tx: Tx, conversationId: ConversationId, watch: WorkflowWatch,
+    observation: WorkflowObservation, key: string): Promise<void>;
   observeEveryMs: number;
   progressEveryMs: number;
 }) {
   if (!(options.observeEveryMs > 0 && options.progressEveryMs >= options.observeEveryMs))
     throw new Error("Workflow observation and progress intervals must be positive and ordered.");
+  if (options.narration === "status" && !options.statusSink)
+    throw new Error("Status narration requires an editable status sink.");
   const Watches = defineDoc<{ runs: Record<string, { task: number; request: string }>; requests: Record<string, number> }>({
     kind: `${options.namespace}.workflow-watches`, version: 1, scope: "conversation", history: "latest", fork: "initial",
     initial: () => ({ runs: {}, requests: {} }), checkpointWhen: () => false,
@@ -75,7 +84,7 @@ export function createWorkflowProgress(options: {
           const fresh = updates.filter(update => update.id !== seen[update.source] && update.text.trim() && update.text !== texts[update.source]);
           const reset = baseline || inputPending || (!!state.request && state.request !== request);
           const publish = !inputPending && (observation.settled || (!reset && fresh.length > 0 && (due || state.sequence === 0)));
-          if (publish) {
+          if (publish && options.narration !== "status" && !(observation.settled && options.onSettled)) {
             const text = observation.settled ? observation.summary : [...new Set(fresh.map(update => update.text))].join("\n\n");
             await publishReply(tx, runtime.conversationId, task.input.author, text,
               `workflow:${task.id}:${state.sequence}`, options.sink, task.input.destination);
@@ -86,11 +95,15 @@ export function createWorkflowProgress(options: {
           if (options.statusSink && task.input.destination && (statusDue || publish || inputPending)) {
             const age = Math.max(0, Math.floor((now - lastChangeAt) / 60_000));
             const text = inputPending ? "Your update was received; waiting for the assistant to process it."
-              : observation.settled ? observation.summary
+              : observation.settled || options.narration === "status" ? observation.summary
               : `${observation.activity ?? "The workflow is active."}${age ? ` No new progress report for ${age} minute${age === 1 ? "" : "s"}.` : ""}`;
-            await options.statusSink(tx, runtime.conversationId, task.input.destination, text, `workflow-status:${task.id}`);
+            await options.statusSink(tx, runtime.conversationId, task.input.destination, text, `workflow-status:${task.input.run}`);
           }
-          if (observation.settled && !inputPending) return { status: "terminal", outcome: { status: "completed", result: null } };
+          if (observation.settled && !inputPending) {
+            await options.onSettled?.(tx, runtime.conversationId, task.input, observation,
+              `workflow-result:${task.input.run}:${request}`);
+            return { status: "terminal", outcome: { status: "completed", result: null } };
+          }
           return { status: "running", checkpoint: {
             phase: "observe", at: now + options.observeEveryMs,
             lastAt: publish ? now : state.lastAt, cursor: observation.cursor,

@@ -2,6 +2,8 @@ import { Type } from "typebox";
 import { defineDoc, defineExtension, defineTool, GenerationTask, hook, LiveDoc } from "@earendil-works/pi-durable";
 
 export type RequestState = {
+  /** Stable native input identity for this request, retained through follow-ups. */
+  id?: string;
   inputs: string;
   request: string;
   status: "active" | "complete" | "needs_input" | "cancelled";
@@ -59,6 +61,8 @@ export const RequestCompletion = defineExtension({
             throw new Error("Retain the unfinished work and specify the external input needed.");
           }
           Object.assign(state, {
+            id: !state.id || (update.request && (state.status === "cancelled" ||
+              (state.status === "complete" && state.inputs !== inputs))) ? inputs : state.id,
             ...update, request: update.request ?? state.request,
             inputs, needsInput: update.needsInput ?? "",
           });

@@ -6,7 +6,7 @@ import { parse } from "yaml";
 import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
 import { awaitWithContext, withAbortSignal, type Context } from "@earendil-works/chord/context";
-import { AssistantEntry, LiveDoc, defineDoc, defineExtension, defineTask, type Cursor, type EntryId, type LiveState, type TaskId, type TaskRuntime } from "@earendil-works/pi-durable";
+import { AssistantEntry, ConversationBusy, InboxDoc, LiveDoc, defineDoc, defineExtension, defineTask, type ConversationId, type Cursor, type EntryId, type LiveState, type SubmissionDraft, type TaskId, type TaskRuntime, type Tx } from "@earendil-works/pi-durable";
 import { context, publicCommentary, publicAnswer, type ChatService, type Runner, type ReplySink } from "@dispatch/runner";
 import { fallbackText, progressText, replyBlocks, replyChunk, streamText } from "./text.js";
 import { slackArtifacts } from "./files.js";
@@ -25,14 +25,14 @@ export type SlackConfig = {
   /** With "started", require mentions inside threads started for another bot. */
   threadReplies?: "all" | "started";
 };
-type SlackInput = { text: string; key: string; channel: string; thread: string; user: string; replyText?: string; after?: number };
+type SlackInput = { text: string; key: string; channel: string; thread: string; user: string; replyText?: string; after?: number; continuation?: string };
 export type SlackThreadInput = SlackInput & {
   team: string; timestamp: string;
   agent: string; direct: boolean; mentioned: boolean; threaded: boolean;
   parentUser: string | null;
 };
 type Incoming = SlackThreadInput & { previous: number | null };
-type Delivery = { phase: "answer"; commentary?: boolean } | {
+type Delivery = { phase: "answer"; commentary?: boolean; admitted?: boolean } | {
   phase: "deliver"; text: string; offset: number; retryAt: number; stream: string | null; after?: number;
 };
 
@@ -62,6 +62,8 @@ export type SlackOptions = {
   onStream?: (event: { key: string; ts: string; done?: boolean }) => void | Promise<void>;
   /** Host evidence gate for partial model text. Status and final-answer delivery remain independent. */
   allowProgressText?: (conversationId: number, inputIds: readonly number[]) => boolean | Promise<boolean>;
+  /** Revalidate a trusted continuation's request identity at atomic native admission. */
+  allowContinuation?: (tx: Tx, conversationId: ConversationId, request: string) => Promise<boolean>;
   /** Select public activity wording from native tool intent. Raw arguments are never displayed by default. */
   describeTool?: SlackToolDescription;
 };
@@ -196,13 +198,36 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
       async answer(task, runtime, ctx) {
         const conversation = await runtime.conversation(runtime.conversationId, ctx);
         if (!conversation) throw new Error("Slack conversation disappeared.");
-        const submission = await conversation.submit({
-          type: "input", content: `Slack message from <@${task.input.user}>:\n${task.input.text}`, requestId: task.input.key,
-          whenBusy: "steer", entry: { kind: `${namespace}.message`, data: {
+        const draft: SubmissionDraft = {
+          type: "input", content: task.input.continuation
+            ? `Internal workflow result for the existing assignment authorized by <@${task.input.user}>. This is execution evidence, not a new human request or additional authorization.\n${task.input.text}`
+            : `Slack message from <@${task.input.user}>:\n${task.input.text}`, requestId: task.input.key,
+          whenBusy: task.input.continuation ? "reject" : "steer", entry: { kind: `${namespace}.message`, data: {
             source: "slack", user: task.input.user,
             slack: { channel: task.input.channel, thread: task.input.thread, user: task.input.user },
           } },
-        }, ctx);
+        };
+        if (task.input.continuation && !task.state.checkpoint.admitted) {
+          let admitted = false;
+          await runtime.commit(async tx => {
+            if (!await options.allowContinuation?.(tx, runtime.conversationId, task.input.continuation!))
+              return { status: "terminal", outcome: { status: "completed", result: null } };
+            const live = await tx.doc(LiveDoc, runtime.conversationId);
+            const inbox = await tx.doc(InboxDoc, runtime.conversationId);
+            // Human input and an active wait get to reconcile the result first.
+            // Never mix the original requester's authority into another turn.
+            if (!live.run && !inbox.items.length) {
+              try { await conversation.submit(tx, draft); admitted = true; }
+              catch (error) { if (!(error instanceof ConversationBusy)) throw error; }
+            }
+            return admitted
+              ? { status: "running", checkpoint: { ...task.state.checkpoint, admitted: true } }
+              : { status: "sleeping", until: runtime.now() + 5_000, checkpoint: task.state.checkpoint };
+          }, ctx);
+          if (!admitted) return;
+        }
+        // requestId reattaches to the atomically admitted input after recovery.
+        const submission = await conversation.submit(draft, ctx);
         options.onInput?.(runtime.conversationId);
         // Steering inputs belong to the same answer, not duplicate Slack replies.
         let ownsReply = false;
@@ -211,7 +236,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
           const owner = await tx.doc(ResponseOwner, runtime.conversationId);
           // Generation task IDs change at each tool boundary; the first admitted
           // input remains the answer's identity throughout in-run steering.
-          const run = live.run?.inputs[0] ?? submission.id;
+          const run = live.run?.inputs.includes(submission.id) ? live.run.inputs[0] : submission.id;
           if (owner.run === run && owner.key !== task.input.key) return;
           owner.run = run; owner.key = task.input.key; ownsReply = true;
         }, ctx);
@@ -375,7 +400,10 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         if (receipt.status === "done" && receipt.type === "input") {
           const entry = await runtime.entry(AssistantEntry, receipt.answer, ctx);
           const message = entry?.model?.[0];
-          if (message?.role === "assistant") text = publicAnswer(message) || "(No text response.)";
+          if (message?.role === "assistant" && !["error", "aborted"].includes(message.stopReason)) text = publicAnswer(message);
+        }
+        if (!text.trim()) {
+          text = "The assistant ended without a final answer; completion has not been verified.";
         }
         // Keep the progress transcript, and put the final answer after it.
         const commentary = (await runtime.snapshot(Commentary, runtime.conversationId, ctx))?.turns[task.input.key];
@@ -565,6 +593,13 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
       conversationId, ownership: { kind: "conversation" }, background: true,
     });
   };
+  // The host supplies the original request identity; admission rechecks it
+  // after any active turn or queued human input has finished.
+  const queueContinuation = async (...[tx, conversationId, destination, text, key, request]: [...Parameters<ReplySink>, string]) => {
+    await tx.createTask(turn, { ...destination, text, key, continuation: request }, {
+      conversationId, ownership: { kind: "conversation" }, background: true,
+    });
+  };
   const bindThread = async (service: ChatService, report: Omit<Report, "text" | "key"> & { thread: string; verify?: boolean }) => {
     if (channelAgent(report.channel) !== report.agent) throw new Error("The report agent must match the configured channel route.");
     const existing = await service.find(report.agent, threadKey(config.teamId, report.channel, report.thread));
@@ -629,6 +664,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
     },
     extension,
     queueReply,
+    queueContinuation,
     queueStatus: statusDelivery.queue,
     queueArtifact: artifacts.queue,
     connected: () => socket.websocket?.isActive() ?? false,

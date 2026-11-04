@@ -18,6 +18,12 @@ unchanged waiting state does not create repeated thread replies. Status writes
 coalesce, serialize per key, retry, and recover the timestamp using message
 metadata after an uncertain initial post. Thread-history access is required.
 
+Trusted hosts can call `queueContinuation` with the original request identity
+and supply `allowContinuation` to revalidate it in the native admission commit.
+It waits for active work and queued human input, then resumes only an unfinished
+matching request. Cancelled, completed or replaced requests are discarded.
+Admission and recovery use native tasks and submission identities.
+
 This is a source-alpha package, installed as a packed archive from reviewed
 source. It shares the repository's 0.6.0 development version and has not been
 published to npm.

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Resume unfinished requests from trusted workflow results after active work and
+  human input settle. Revalidate admission and preserve answer ownership on recovery.
+
 - Retain completed public commentary as ordered replies before the final answer,
   using native entry cursors and delivery receipts across restart. Add durable
   editable workflow statuses with coalesced updates and metadata-based recovery.

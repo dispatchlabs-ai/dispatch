@@ -18,6 +18,12 @@ it does not assert successful acceptance.
 
 Native tasks publish new narrative evidence at the progress interval and final
 results. Changing a tool or active-role list does not republish the last prose.
+Use `narration: "status"` with `statusSink` to keep routine updates in one
+editable message per external run, including across follow-ups. An `onSettled`
+callback receives the returned `result` and commits a host-owned continuation
+atomically instead of publishing a second final reply. The supervisor decides
+whether the user's requested outcome is complete. Persist its request identity
+and revalidate it when admitting any delayed continuation.
 Unchanged IDs or identical text from a source are suppressed. Optional `statusSink`
 updates one editable status identified by its stable key; without it, quiet periods
 produce no heartbeat posts. Slack's `queueStatus` implements that sink and reports

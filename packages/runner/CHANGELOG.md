@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Support one editable workflow status and atomic returned-result handoff to the
+  supervisor. Retain a stable request identity through follow-ups.
+
 - Publish new public workflow evidence from all participating sources, deduplicate
   repeated milestones, and route quiet heartbeats to an optional editable status
   sink. Preserve narration timestamps and provider commentary labels; suppress
