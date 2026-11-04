@@ -66,7 +66,7 @@ export async function watchInTerminal(options: WatchOptions): Promise<void> {
     anchor?: { key: string; offset: number };
     updateLinkLine = -1;
     readonly feed = component(width => this.renderFeed(width), event => this.feedMouse(event));
-    readonly scroll = new ScrollView(this.feed, { primary: true, follow: "end", scrollbar: "always",
+    readonly scroll = new ScrollView(this.feed, { primary: true, follow: "end", scrollbar: "auto",
       scrollbarTrackStyle: muted, scrollbarThumbStyle: accent });
     readonly sidebar = new ScrollView(component(width => this.renderAgents(width), event => this.agentsMouse(event)), { scrollbar: "auto" });
     readonly layout = new VStack([

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Hide Watch's scrollbar when the content fits; show it while scrolling longer
+  session lists, histories and details.
+
 - Open agent lists at the first conversation and retain unassigned or unavailable
   agent hosts in the full list on narrow terminals.
 
