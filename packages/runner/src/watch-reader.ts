@@ -274,6 +274,16 @@ export async function readWatchRun(run: WatchRun): Promise<WatchSnapshot> {
           const latestRows = db.prepare("SELECT record,commit_seq FROM entries WHERE conversation_id=? ORDER BY commit_seq DESC,id DESC LIMIT 8").all(id).reverse();
           const latest = projectEntries(store, latestRows), last = latest.at(-1);
           activity.push(...latest);
+          const messageRow = db.prepare(`SELECT e.record,e.commit_seq FROM entries e
+            WHERE e.conversation_id=? AND EXISTS (
+              SELECT 1 FROM json_each(e.record,'$.model') m
+              WHERE json_extract(m.value,'$.role')='assistant' AND (
+                (json_type(m.value,'$.content')='text' AND length(trim(json_extract(m.value,'$.content')))>0)
+                OR EXISTS (SELECT 1 FROM json_each(CASE WHEN json_type(m.value,'$.content')='array'
+                  THEN json_extract(m.value,'$.content') ELSE '[]' END) p
+                  WHERE p.type='object' AND json_extract(p.value,'$.type')='text' AND length(trim(json_extract(p.value,'$.text')))>0)))
+            ORDER BY e.commit_seq DESC,e.id DESC LIMIT 1`).get(id);
+          const latestMessage = messageRow && projectEntries(store, [messageRow]).filter(item => item.kind === "message" && item.role === "assistant").at(-1);
           const toolCalls = active.filter(task => task.kind === "pi.tool").flatMap(task => {
             if (!Number.isSafeInteger(task.input?.assistant)) return [];
             const callRow = db.prepare("SELECT record,commit_seq FROM entries WHERE id=? AND conversation_id=?").get(task.input.assistant, id);
@@ -296,7 +306,8 @@ export async function readWatchRun(run: WatchRun): Promise<WatchSnapshot> {
             title: redact(chat?.title) || openingTitle(first) || store.agent,
             parentKey: Number.isSafeInteger(record.owner?.conversationId) ? `${store.agent}:${record.owner.conversationId}` : undefined,
             active: active.length, failed: number(row.failed), status, activity: detail.replace(/\s+/g, " ").slice(0, 240),
-            updatedAt: last?.at, startedAt: timestamp(chat?.createdAt) ?? timestamp(firstMessage?.timestamp), entryCount });
+            updatedAt: last?.at, startedAt: timestamp(chat?.createdAt) ?? timestamp(firstMessage?.timestamp), entryCount,
+            latestMessage, currentTools: toolCalls });
         }
         return { conversations, activity };
       });

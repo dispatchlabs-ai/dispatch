@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Make Watch readable during long runs: keep the latest public update and current
+  activity visible, group and pair tool calls/results, add searchable history,
+  an error filter, mouse navigation and a responsive agent sidebar.
+
 - Add a separate read-only terminal watcher for local application sessions,
   with process discovery, agent activity, navigable history and matching tool
   results. Viewer exit leaves execution untouched. Nix application releases can

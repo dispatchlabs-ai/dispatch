@@ -9,6 +9,8 @@ export type WatchConversation = {
   key: string; agent: string; conversationId: number; title: string; parentKey?: string;
   active: number; failed: number; status: "working" | "waiting" | "idle" | "unavailable";
   activity: string; updatedAt?: number; startedAt?: number; entryCount: number;
+  latestMessage?: WatchActivity;
+  currentTools?: WatchActivity[];
 };
 export type WatchActivity = {
   id: string; conversationKey: string; entryId: number; sequence: number; at?: number;
