@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Share one reply when a follow-up joins active work. Persist commentary cursors
+  on first use and claim each native message once across observers and recovery.
+
 - Resume unfinished requests from trusted workflow results after active work and
   human input settle. Revalidate admission and preserve answer ownership on recovery.
 

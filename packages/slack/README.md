@@ -11,6 +11,8 @@ publish prose accompanying tool calls. Thinking blocks, failed partial responses
 and tool output are never commentary. The final answer follows those replies.
 Native entry cursors and delivery dependencies survive restart. The editable
 working message supplies current activity during quiet periods.
+Follow-ups joining active work share its reply; native message identities prevent
+duplicate commentary and final answers across observers and recovery.
 
 Hosts observing external workflows can pass `transport.queueStatus` as Runner's
 `createWorkflowProgress.statusSink`. Its stable key selects one editable message;

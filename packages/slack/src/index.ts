@@ -117,7 +117,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
     kind: `${namespace}.slack-thread-replies`, version: 1, scope: "session", initial: () => ({ byKey: {} }),
     checkpointWhen: () => false,
   });
-  const ResponseOwner = defineDoc<{ run?: number; key?: string }>({
+  const ResponseOwner = defineDoc<{ run?: number; key?: string; runs?: Record<string, string> }>({
     kind: `${namespace}.slack-response-owner`, version: 1, scope: "conversation",
     history: "latest", fork: "initial",
     initial: () => ({}), checkpointWhen: () => false,
@@ -134,6 +134,10 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
   const Commentary = defineDoc<{ turns: Record<string, { entry: number; lastTask: number | null; text: string }> }>({
     kind: `${namespace}.slack-commentary`, version: 1, scope: "conversation", history: "latest", fork: "initial",
     initial: () => ({ turns: {} }), checkpointWhen: () => false,
+  });
+  const MessageOwners = defineDoc<Record<string, number>>({
+    kind: `${namespace}.slack-message-owners`, version: 1, scope: "conversation", history: "latest", fork: "initial",
+    initial: () => ({}), checkpointWhen: () => false,
   });
   const statuses = new Map<string, {
     pending: Promise<void>; active?: boolean; run?: number; previous?: SlackActivity;
@@ -229,6 +233,28 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         // requestId reattaches to the atomically admitted input after recovery.
         const submission = await conversation.submit(draft, ctx);
         options.onInput?.(runtime.conversationId);
+        const finishRedundant = async () => {
+          const redundant = await runtime.memo<string>("stream", ctx);
+          if (redundant) {
+            try { await client.chat.delete({ channel: task.input.channel, ts: redundant }); }
+            catch (error) {
+              if (slackError(error) !== "message_not_found") {
+                runtime.signal.throwIfAborted();
+                runtime.report(error instanceof Error ? error : new Error("Slack progress cleanup failed."));
+                await runtime.sleepUntil(runtime.now() + retryDelay(error), task.state.checkpoint, ctx);
+                return;
+              }
+            }
+            await options.onStream?.({ key: task.input.key, ts: redundant, done: true });
+          }
+          await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), ctx);
+        };
+        // A steering input is admitted before it joins LiveDoc's run. Wait for
+        // placement so it shares that run's reply instead of claiming another.
+        if ((await submission.status(ctx)).status === "queued") {
+          await runtime.sleepUntil(runtime.now() + 1_000, task.state.checkpoint, ctx);
+          return;
+        }
         // Steering inputs belong to the same answer, not duplicate Slack replies.
         let ownsReply = false;
         await runtime.commit(async tx => {
@@ -237,12 +263,13 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
           // Generation task IDs change at each tool boundary; the first admitted
           // input remains the answer's identity throughout in-run steering.
           const run = live.run?.inputs.includes(submission.id) ? live.run.inputs[0] : submission.id;
-          if (owner.run === run && owner.key !== task.input.key) return;
-          owner.run = run; owner.key = task.input.key; ownsReply = true;
+          owner.runs ??= {};
+          if (owner.run && owner.key) owner.runs[owner.run] ??= owner.key;
+          if (owner.runs[run] && owner.runs[run] !== task.input.key) return;
+          owner.runs[run] = task.input.key; ownsReply = true;
         }, ctx);
         if (!ownsReply) {
-          await submission.wait(ctx);
-          await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), ctx);
+          await finishRedundant();
           return;
         }
         // Inference starts independently of Slack's stream-creation request.
@@ -298,7 +325,9 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
               ...(receipt.status === "done" ? { maxEntryId: receipt.answer } : {}), order: "ascending" }, 100, cursor, ctx);
             await runtime.commit(async tx => {
               const { turns } = await tx.doc(Commentary, runtime.conversationId);
-              const state = turns[task.input.key] ??= { entry: receipt.entry!, lastTask: null, text: "" };
+              const owners = await tx.doc(MessageOwners, runtime.conversationId);
+              turns[task.input.key] ??= { entry: receipt.entry!, lastTask: null, text: "" };
+              const state = turns[task.input.key]!;
               for (const entry of page.items) {
                 if (entry.id <= state.entry) continue;
                 state.entry = entry.id;
@@ -306,9 +335,11 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
                 const message = entry.model?.[0];
                 const text = message?.role === "assistant" ? publicCommentary(message) : "";
                 if (!text || text === state.text) continue;
-                state.lastTask = await tx.createTask(turn, { ...task.input, key: `commentary:${task.id}:${entry.id}`,
-                  text, replyText: text, ...(state.lastTask ? { after: state.lastTask } : {}) },
-                { conversationId: runtime.conversationId, ownership: { kind: "conversation" }, background: true });
+                const key = `commentary:${entry.id}`;
+                if (!owners[key]) owners[key] = await tx.createTask(turn, { ...task.input, key,
+                    text, replyText: text, ...(state.lastTask ? { after: state.lastTask } : {}) },
+                  { conversationId: runtime.conversationId, ownership: { kind: "conversation" }, background: true });
+                state.lastTask = owners[key]!;
                 state.text = text;
               }
             }, ctx);
@@ -394,6 +425,16 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
           await watch?.stop();
           await pending;
           await refreshStatus(task.input, runtime, ctx);
+        }
+        if (receipt.status === "done" && receipt.type === "input") {
+          let ownsAnswer = false;
+          await runtime.commit(async tx => {
+            const owners = await tx.doc(MessageOwners, runtime.conversationId);
+            const key = `answer:${receipt.answer}`;
+            owners[key] ??= task.id;
+            ownsAnswer = owners[key] === task.id;
+          }, ctx);
+          if (!ownsAnswer) { await finishRedundant(); return; }
         }
         let text = "The reply stopped before it completed. Please try again.";
         if (!options.allowProgressText || await options.allowProgressText(runtime.conversationId, [submission.id])) await publishCommentary();
