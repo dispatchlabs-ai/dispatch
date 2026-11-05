@@ -144,6 +144,15 @@ export async function enabledAgents(root: string): Promise<string[]> {
   return factory.agents;
 }
 
+/** Default for a new conversation; independent of enabled calendars and loops. */
+export async function defaultAgent(root: string): Promise<string> {
+  const factory = parse(await readFile(join(root, "factory.yaml"), "utf8"));
+  if (typeof factory?.defaultAgent !== "string" || !agentName.test(factory.defaultAgent))
+    throw new Error("Select --agent or set factory.yaml defaultAgent for new conversations.");
+  await loadAgent(root, factory.defaultAgent);
+  return factory.defaultAgent;
+}
+
 /** Fixed cadence for intervals; skip slots missed while busy or offline. */
 export function nextDeadline(trigger: Trigger, previous: number, now: number): number {
   if (trigger.mode === "manual") throw new Error("Manual agents have no next deadline.");

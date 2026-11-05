@@ -15,8 +15,14 @@ export type WorkspaceRelease = {
 };
 export type WorkspaceRecord = { run: string; release: WorkspaceRelease; state: string; finished?: boolean; sandbox?: string };
 
+/** A host-owned, run-bound route to the workspace controller. */
+export interface WorkspaceTransport {
+  readonly run: string;
+  request<T>(request: Record<string, unknown>, signal?: AbortSignal, output?: ShellExecOptions["onOutput"], context?: Context): Promise<T>;
+}
+
 /** The trusted host chooses the command and run. Neither comes from model arguments. */
-export class WorkspaceClient {
+export class WorkspaceClient implements WorkspaceTransport {
   constructor(readonly command: readonly string[], readonly run: string) {
     if (!command.length || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(run)) throw new Error("Invalid workspace command or run.");
   }
@@ -68,7 +74,7 @@ export class WorkspaceClient {
 export class WorkspaceEnvironment implements ExecutionEnv {
   readonly id: string;
   private commands = new Set<AbortController>();
-  constructor(readonly client: WorkspaceClient, public cwd = "/workspace") { this.id = `dispatch-workspace:${client.run}`; }
+  constructor(readonly client: WorkspaceTransport, public cwd = "/workspace") { this.id = `dispatch-workspace:${client.run}`; }
   private path(path: string) { return posix.resolve(this.cwd, path); }
   private async fs<T>(action: string, request: Record<string, unknown>, context: Context): Promise<Result<T, FileError>> {
     try { return ok(await this.client.request<T>({ op: "fs", request: { action, ...request } }, context.abortSignal)); }

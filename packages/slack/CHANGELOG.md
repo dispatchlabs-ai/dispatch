@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Preserve retained thread identities when routes change, and optionally pin immutable application entrypoints and Node executables for recovery.
+
 - Share one reply when a follow-up joins active work. Persist commentary cursors
   on first use and claim each native message once across observers and recovery.
 

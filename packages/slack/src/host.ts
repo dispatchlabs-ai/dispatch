@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { link, open, readFile, realpath, rm, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { cancelService, run, serveProcess, type ChatService, type RunOptions } from "@dispatch/runner";
 import { prepareSlack, type SlackOptions, type SlackThreadInput } from "./index.js";
@@ -10,6 +10,8 @@ export type SlackHostOptions = {
   root: string;
   stateRoot: string;
   entrypoint: string;
+  /** Keep immutable application paths available for retained thread recovery. */
+  retainRelease?: boolean;
   runner: NonNullable<RunOptions["runner"]>;
   slack: Omit<SlackOptions, "threads" | "onStream" | "allowProgressText">;
   /** Open suspended native stores; the host attaches adapters before recovery. */
@@ -32,11 +34,36 @@ export async function runSlackHost(options: SlackHostOptions) {
   let service!: ChatService;
   let transport!: Awaited<ReturnType<typeof prepareSlack>>;
   const threads = directory ? undefined : new SlackThreadProcesses(join(options.stateRoot, "slack-threads"),
-    async (path, _input, cancelPending) => ({
-      module: resolve(options.entrypoint),
-      args: ["--thread", path, ...(cancelPending ? ["--cancel-pending"] : [])],
-      options: { cwd: options.root, env: process.env },
-    }),
+    async (path, _input, cancelPending) => {
+      let release = { root: await realpath(options.root), module: await realpath(options.entrypoint),
+        node: await realpath(process.execPath), execArgv: process.execArgv };
+      if (options.retainRelease) {
+        const target = join(path, "application-release.json");
+        try { release = JSON.parse(await readFile(target, "utf8")); }
+        catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+          try {
+            await stat(join(path, "native"));
+            throw new Error("Retained thread has no application pin. Restore its original release before recovery.");
+          } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+          const temporary = `${target}.${randomUUID()}`;
+          const file = await open(temporary, "wx", 0o600);
+          try { await file.writeFile(JSON.stringify(release)); await file.sync(); }
+          finally { await file.close(); }
+          try { await link(temporary, target); }
+          catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
+          finally { await rm(temporary, { force: true }); }
+          const folder = await open(path, "r");
+          try { await folder.sync(); } finally { await folder.close(); }
+          release = JSON.parse(await readFile(target, "utf8"));
+        }
+      }
+      return {
+        module: resolve(release.module),
+        args: ["--thread", path, ...(cancelPending ? ["--cancel-pending"] : [])],
+        options: { cwd: release.root, execPath: release.node, execArgv: release.execArgv, env: process.env },
+      };
+    },
     async (input, streams) => {
       await Promise.all([transport.stopStreams(input, streams), options.stopThread(input)]);
     });
@@ -47,6 +74,13 @@ export async function runSlackHost(options: SlackHostOptions) {
   if (directory) process.on("message", saved);
   transport = await prepareSlack(options.root, options.runner, {
     ...options.slack, threads,
+    ...(thread && options.slack.config ? { config: { ...options.slack.config,
+      channels: { ...options.slack.config.channels,
+        ...(options.slack.config.channels[thread.channel] || options.slack.config.channels["*"]
+          ? { [thread.channel]: thread.agent } : {}),
+      },
+      ...(thread.channel.startsWith("D") && options.slack.config.directMessagesAgent ? { directMessagesAgent: thread.agent } : {}),
+    } } : {}),
     allowProgressText: options.allowProgressText
       ? (id, inputs) => options.allowProgressText!(service, id, inputs) : undefined,
     ...(directory ? { onStream: (event: object) => new Promise<void>(done => {

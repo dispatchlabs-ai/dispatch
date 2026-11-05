@@ -218,3 +218,14 @@ steering and shutdown. Supply `stopThread` and `threadBusy` for independently
 enforced external workspace ownership; `allowProgressText` receives the opened
 service. `ready` runs only after supervisor recovery. It never starts calendars.
 An existing non-threaded installation still needs an explicit history migration.
+
+A route change selects the agent only for a new thread. Saved threads retain
+their admitted agent for follow-ups, Stop, and worker-side routing. Hosts must
+open the recorded `thread.agent`, including its message recipients.
+
+For immutable installations, `runSlackHost({ retainRelease: true })` also retains
+the initial application root, entrypoint, Node executable and Node flags per
+thread. Keep those release paths installed while a thread can be resumed. A
+pre-existing thread with native state must be pinned to its original installation
+before enabling this option. Older non-threaded histories require an explicit
+migration before changing routes.

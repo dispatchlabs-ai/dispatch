@@ -12,7 +12,7 @@ export function requireKnowledge(options: { namespace: string; instruction: stri
     kind: `${options.namespace}.knowledge-required`, version: 1, scope: "conversation", history: "latest", fork: "initial",
     initial: () => ({ inputs: "", searched: false, articles: [], read: [] }), checkpointWhen: () => false,
   });
-  const inputs = async (api: HookApi, ctx: Context) => (await api.snapshot(LiveDoc, api.conversationId, ctx))?.run?.inputs.join(",") ?? "";
+  const inputs = async (api: Pick<HookApi, "snapshot" | "conversationId">, ctx: Context) => (await api.snapshot(LiveDoc, api.conversationId, ctx))?.run?.inputs.join(",") ?? "";
   const evidence = async (api: HookApi, ctx: Context) => {
     const state = await api.snapshot(EvidenceDoc, api.conversationId, ctx);
     return state?.inputs === await inputs(api, ctx) ? state : undefined;

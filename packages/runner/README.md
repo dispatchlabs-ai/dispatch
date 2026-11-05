@@ -371,3 +371,17 @@ Before recovering a cancelled store, open it with `resume: false` and call
 `cancelService`. It marks all tasks before enabling native abort cleanup; pending
 tools must not replay merely to be cancelled. Persist the cancellation decision
 outside the worker before terminating it. This does not undo external effects.
+
+### Conversation defaults and protected execution
+
+Set `defaultAgent: jett` in the definition tree's `factory.yaml` to select the
+agent for new `dispatch-agent run` sessions. `--agent` overrides that selection.
+The CLI saves the initial choice per session; changing the factory default does
+not relabel saved conversations. For an older session without a saved choice,
+supply its original `--agent` once. This setting does not enable calendars.
+
+`ChatService.open({ prepareAgent })` applies the trusted binding recursively to
+primary definitions, named delegates and legacy handoff children. Hosts can
+filter unavailable optional delegates before binding. `WorkspaceEnvironment`
+accepts a `WorkspaceTransport` for a host-authenticated broker, with no local
+filesystem or shell fallback. The host supplies it as an `env` factory.

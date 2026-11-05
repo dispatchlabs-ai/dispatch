@@ -100,17 +100,21 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       definitionResources?: OpenOptions["definitionResources"];
       storage?: StorageFactory;
       settings?: OpenOptions["settings"];
-      /** Trusted host binding, applied before opening any store or model request. */
+      /** Trusted host binding, applied recursively to primaries and their private children before opening stores. */
       prepareAgent?: (agent: LoadedAgent) => LoadedAgent | Promise<LoadedAgent>;
       artifacts?: ArtifactOptions;
     }) {
       const stateRoot = resolve(options.stateRoot);
       const names = options.names?.length ? options.names :
         (await catalog(options.root)).filter(entry => entry.runnable).map(entry => entry.id);
-      const agents = await Promise.all(names.map(async name => {
-        const agent = await loadAgent(options.root, name);
-        return options.prepareAgent ? options.prepareAgent(agent) : agent;
-      }));
+      const prepare = async (definition: LoadedAgent): Promise<LoadedAgent> => {
+        const agent = options.prepareAgent ? await options.prepareAgent(definition) : definition;
+        return { ...agent,
+          ...(agent.delegateAgents ? { delegateAgents: await Promise.all(agent.delegateAgents.map(prepare)) } : {}),
+          ...(agent.handoffAgent ? { handoffAgent: await prepare(agent.handoffAgent) } : {}),
+        };
+      };
+      const agents = await Promise.all(names.map(async name => prepare(await loadAgent(options.root, name))));
       const service = new ChatService(agents, options.demo, options.initialize);
       const enabled = await enabledAgents(options.root);
       for (const id of enabled) service.enabled.add(id);

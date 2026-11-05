@@ -98,7 +98,11 @@ export class SlackThreadProcesses {
     const key = this.key(input);
     const state = await this.change(key, current => {
       current ??= { key, input, active: false, needsCancel: false, cancelledThrough: "", streams: {} };
-      if (input.timestamp > current.cancelledThrough) { current.input = input; current.active = true; }
+      // A changed route applies to new threads. Retained native stores and their
+      // release pins still belong to the definition admitted on the first input.
+      if (input.timestamp > current.cancelledThrough) {
+        current.input = { ...input, agent: current.input.agent }; current.active = true;
+      }
       return current;
     });
     if (input.timestamp <= state.cancelledThrough) return;
@@ -106,7 +110,7 @@ export class SlackThreadProcesses {
     if (!worker) return;
     // A Stop may have arrived while the worker was opening its native stores.
     if (input.timestamp <= (await this.record(key))!.cancelledThrough) return;
-    await worker.request("receive", input);
+    await worker.request("receive", { ...input, agent: state.input.agent });
   }
   async stop(input: SlackThreadInput) {
     const key = this.key(input);
@@ -122,7 +126,7 @@ export class SlackThreadProcesses {
       // Read after exit so the last committed stream receipt is included.
       await this.writes.get(key);
       const latest = await this.record(key);
-      await this.stopped(input, Object.values(latest?.streams ?? state.streams));
+      await this.stopped({ ...input, agent: state.input.agent }, Object.values(latest?.streams ?? state.streams));
       await this.change(key, current => ({ ...current!, streams: {} }));
     })();
     this.stops.set(key, stopping);

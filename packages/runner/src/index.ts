@@ -11,7 +11,7 @@ import type { LoadedAgent } from "./definition.js";
 export * from "./definition.js";
 export { publicCommentary, publicAnswer } from "./commentary.js";
 export { WorkspaceClient, WorkspaceEnvironment } from "./workspace.js";
-export type { WorkspaceImage, WorkspaceRelease, WorkspaceRecord } from "./workspace.js";
+export type { WorkspaceImage, WorkspaceRelease, WorkspaceRecord, WorkspaceTransport } from "./workspace.js";
 export { privateStateDirectory } from "./private-state.js";
 export { nextScheduleAt } from "./schedules.js";
 export type { AgentSchedule } from "./schedules.js";

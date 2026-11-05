@@ -15,13 +15,15 @@ import { getOrThrow } from "@earendil-works/pi-durable/env";
 import { WorkspaceClient, type WorkspaceRecord, type WorkspaceRelease } from "./workspace.js";
 import { terminalError } from "./terminal-output.js";
 import type { ArtifactSource } from "./artifacts.js";
+import { sessionAgent } from "./session-agent.js";
 
 const usage = `dispatch-agent --root DEFINITIONS catalog
-dispatch-agent --root DEFINITIONS run --config HOST.json --agent AGENT [--session KEY] --prompt TEXT
-dispatch-agent --root DEFINITIONS run --config HOST.json --agent AGENT --session KEY --history
+dispatch-agent --root DEFINITIONS run --config HOST.json [--agent AGENT] [--session KEY] --prompt TEXT
+dispatch-agent --root DEFINITIONS run --config HOST.json [--agent AGENT] --session KEY --history
 dispatch-agent --root DEFINITIONS watch --config HOST.json [--session KEY] [--json]
 
 Each session owns a separate process state directory. No listener or schedules.
+New sessions use factory.yaml defaultAgent unless --agent is supplied; retained selections stay fixed.
 Use --update-definitions only for an explicit idle definition migration.
 dispatch-agent --root DEFINITIONS workspace --config HOST.json --agent AGENT --session KEY --action ensure|status|checkpoint|suspend|finish
 SIGINT/SIGTERM suspend native work; they do not undo external effects.`;
@@ -55,7 +57,7 @@ try {
       ]);
     } else {
       const workspaceAction = positionals[0] === "workspace";
-      if ((!workspaceAction && positionals[0] !== "run") || !values.config || !values.agent
+      if ((!workspaceAction && positionals[0] !== "run") || !values.config
         || (workspaceAction ? !values.session || !values.action :
           values.history ? values.prompt !== undefined || !values.session : !values.prompt?.trim())) {
         throw new Error(usage);
@@ -72,7 +74,8 @@ try {
         if (typeof config[field] !== "string" || !isAbsolute(config[field])) throw new Error(`${field} must be an absolute path.`);
       }
       if (!config.gateway?.origin || !isAbsolute(config.gateway.credentialFile)) throw new Error("Supply gateway.origin and an absolute gateway.credentialFile.");
-      const workspace = config.workspace?.agents.includes(values.agent) ? new WorkspaceClient(config.workspace.command, session) : undefined;
+      const agentId = await sessionAgent(root, join(config.stateRoot, session), values.agent);
+      const workspace = config.workspace?.agents.includes(agentId) ? new WorkspaceClient(config.workspace.command, session) : undefined;
       let artifactSource: ArtifactSource | undefined;
       if (config.artifacts) {
         if (workspace) throw new Error("Choose a workspace or an artifact source module, not both.");
@@ -101,6 +104,7 @@ try {
           const args = process.argv.slice(2);
           const at = args.indexOf("--root");
           if (at >= 0) args.splice(at, 2);
+          if (!values.agent) args.push("--agent", agentId);
           if (!process.execve) throw new Error("Pinned workspace recovery requires Node on a supported POSIX host.");
           process.execve(entry.node, [entry.node, entry.module, "--root", root, ...args],
             Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)));
@@ -121,7 +125,7 @@ try {
         names.add(id);
         for (const recipient of (await loadAgent(root, id)).messages ?? []) await include(recipient);
       };
-      await include(values.agent);
+      await include(agentId);
       const models = createModels({ authContext: { env: async () => undefined, fileExists: async () => false } });
       const { key } = JSON.parse(await readFile(config.gateway.credentialFile, "utf8"));
       await refreshGatewayModels(config.gateway.origin, models, key, config.gateway.aliases);
@@ -146,7 +150,7 @@ try {
           })() };
         } } : artifactSource ? { source: artifactSource } : undefined,
         runner: createRunner({ namespace: config.namespace }), models, names: [...names],
-        agent: values.agent, session, drain: !!workspace || names.size > 1, prompt: values.prompt, history: values.history,
+        agent: agentId, session, drain: !!workspace || names.size > 1, prompt: values.prompt, history: values.history,
         updateDefinitions: values["update-definitions"], settings,
       });
     }

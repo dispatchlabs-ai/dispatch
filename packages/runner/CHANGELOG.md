@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Select `factory.yaml` defaultAgent for new CLI sessions and retain the initial selection when resuming.
+- Apply trusted host bindings recursively to private workers; accept broker-backed workspace transports.
+
 - Let direct CLI installations select a trusted artifact source factory so
   files on an authenticated remote computer use the native publication path.
 
