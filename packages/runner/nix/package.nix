@@ -1,4 +1,4 @@
-{ lib, stdenv, buildNpmPackage, nodejs_24, python3, makeWrapper, autoPatchelfHook, withSlack ? false }:
+{ lib, stdenv, buildNpmPackage, nodejs_24, python3, makeWrapper, autoPatchelfHook, libxcb, withSlack ? false }:
 
 assert lib.assertMsg (lib.versions.major nodejs_24.version == "24" && lib.versionAtLeast nodejs_24.version "24.22.1")
   "Runner releases require patched Node 24.22.1+ within 24.x";
@@ -7,7 +7,7 @@ buildNpmPackage {
   version = (builtins.fromJSON (builtins.readFile ../package.json)).version;
   nodejs = nodejs_24;
   nativeBuildInputs = [ makeWrapper ] ++ lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];
-  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [ stdenv.cc.cc.lib ];
+  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [ stdenv.cc.cc.lib libxcb ];
   src = lib.fileset.toSource {
     root = ../../..;
     fileset = lib.fileset.unions ([
