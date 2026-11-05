@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, realpath } from "node:fs/promises";
 import { isAbsolute, join, resolve, posix } from "node:path";
 import { parseArgs } from "node:util";
+import { pathToFileURL } from "node:url";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { catalog, loadAgent } from "./definition.js";
 import { createRunner } from "./index.js";
@@ -13,6 +14,7 @@ import { chatInTerminal } from "./terminal.js";
 import { getOrThrow } from "@earendil-works/pi-durable/env";
 import { WorkspaceClient, type WorkspaceRecord, type WorkspaceRelease } from "./workspace.js";
 import { terminalError } from "./terminal-output.js";
+import type { ArtifactSource } from "./artifacts.js";
 
 const usage = `dispatch-agent --root DEFINITIONS catalog
 dispatch-agent --root DEFINITIONS run --config HOST.json --agent AGENT [--session KEY] --prompt TEXT
@@ -62,6 +64,7 @@ try {
       if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(session)) throw new Error("Invalid session key.");
       const config: Pick<ServiceConfig, "stateRoot" | "cwd" | "namespace" | "gateway" | "retry" | "compaction" | "afterFailedRun"> & {
         workspace?: { agents: string[]; command: string[] };
+        artifacts?: { module: string; export: string; args?: unknown[] };
       } =
         JSON.parse(await readFile(values.config, "utf8"));
       const settings = serviceSettings(config);
@@ -70,6 +73,18 @@ try {
       }
       if (!config.gateway?.origin || !isAbsolute(config.gateway.credentialFile)) throw new Error("Supply gateway.origin and an absolute gateway.credentialFile.");
       const workspace = config.workspace?.agents.includes(values.agent) ? new WorkspaceClient(config.workspace.command, session) : undefined;
+      let artifactSource: ArtifactSource | undefined;
+      if (config.artifacts) {
+        if (workspace) throw new Error("Choose a workspace or an artifact source module, not both.");
+        const { module, export: name, args = [] } = config.artifacts;
+        if (typeof module !== "string" || !isAbsolute(module) || typeof name !== "string" || !name || !Array.isArray(args)) {
+          throw new Error("Supply an absolute artifacts.module, its factory export, and optional args array.");
+        }
+        const factory = (await import(pathToFileURL(module).href))[name];
+        if (typeof factory !== "function") throw new Error("The configured artifact source factory is unavailable.");
+        artifactSource = await factory(...args);
+        if (typeof artifactSource !== "function") throw new Error("The artifact source factory must return an ArtifactSource function.");
+      }
       if (workspaceAction && !workspace) throw new Error("This agent has no configured disposable workspace.");
       if (workspace) {
         let record = await workspace.request<WorkspaceRecord | null>({ op: "status" });
@@ -129,7 +144,7 @@ try {
               }
             } finally { await reader.close(context); }
           })() };
-        } } : undefined,
+        } } : artifactSource ? { source: artifactSource } : undefined,
         runner: createRunner({ namespace: config.namespace }), models, names: [...names],
         agent: values.agent, session, drain: !!workspace || names.size > 1, prompt: values.prompt, history: values.history,
         updateDefinitions: values["update-definitions"], settings,

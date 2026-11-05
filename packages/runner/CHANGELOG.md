@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Let direct CLI installations select a trusted artifact source factory so
+  files on an authenticated remote computer use the native publication path.
+
 - Hide Watch's scrollbar when the content fits; show it while scrolling longer
   session lists, histories and details.
 
