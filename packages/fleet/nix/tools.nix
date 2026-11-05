@@ -1,7 +1,11 @@
 { pkgs }:
 let
   workspace = import ../../runner/nix/workspace-tools.nix { inherit pkgs; };
-  python = pkgs.python3.withPackages (ps: [ ps.boto3 ]);
+  pythonRuntime = pkgs.python3.withPackages (ps: [ ps.boto3 ]);
+  python = pkgs.writeShellScriptBin "python3" ''
+    export PYTHONDONTWRITEBYTECODE=1
+    exec ${pythonRuntime}/bin/python3 -B "$@"
+  '';
 in {
   python = "${python}/bin/python3";
   cua = "${workspace.cua}/bin/cua";

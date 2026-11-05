@@ -8,6 +8,8 @@
   exact EFS workspace bind and private DynamicUser artifact ownership.
 - Add pressure placement, graceful retirement, durable cancellation intent,
   watchdog recovery, and a token-free Slack execution bridge.
+- Keep staged Nix closures unchanged when root fleet processes import Python
+  modules by disabling runtime bytecode writes.
 
 ## [0.6.0]
 
