@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Let direct CLI installations select a trusted artifact source factory so
+  files on an authenticated remote computer use the native publication path.
+
 - Add opt-in digest-pinned disposable development desktops with host-owned release
   bindings, streamed native tools, verified source checkpoints, explicit cleanup,
   and on-demand CLI recovery through the original runtime and definitions.

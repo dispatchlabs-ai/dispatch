@@ -13,6 +13,27 @@ no file-creation tools or arbitrary host access. A host can supply
 not model arguments, selects that workspace. Optional source size/SHA-256 is
 verified before publication. Binary bytes do not pass through model context.
 
+The direct `dispatch-agent run --config HOST.json` CLI can select an existing
+source factory from trusted host configuration:
+
+```json
+{
+  "artifacts": {
+    "module": "/srv/agents/definitions/company/src/artifacts.js",
+    "export": "desktopArtifactSource",
+    "args": ["production"]
+  }
+}
+```
+
+The absolute module path identifies installed host code. Its named export accepts
+the configured arguments and returns an `ArtifactSource` (or a promise of one).
+That source performs authorization and selects the remote filesystem; the model
+still supplies only the file path to `publish_artifact`. This is an alternative
+to the CLI's disposable-workspace source, so configuring both is rejected. Keep
+the module and its configuration outside agent write access and pin them with
+the installation. Existing local-file behavior applies when neither is supplied.
+
 Native task-owned children publish into their owning user conversation.
 Independent instances/processes need an explicit authorized host transfer.
 Published files have sanitized names, MIME types, byte sizes and SHA-256 hashes.
