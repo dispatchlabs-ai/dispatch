@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { link, open, readFile, realpath, rm, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { cancelService, run, serveProcess, type ChatService, type RunOptions } from "@dispatch/runner";
-import { prepareSlack, type SlackOptions, type SlackThreadInput } from "./index.js";
-import { SlackThreadProcesses } from "./threads.js";
+import { prepareSlack, slackThreadConfig, type SlackOptions, type SlackThreadInput } from "./index.js";
+import { SlackThreadProcesses, type SlackThreadExecutor } from "./threads.js";
 
 type Open = NonNullable<RunOptions["open"]>;
 export type SlackHostOptions = {
@@ -12,6 +12,8 @@ export type SlackHostOptions = {
   entrypoint: string;
   /** Keep immutable application paths available for retained thread recovery. */
   retainRelease?: boolean;
+  /** Execute the pinned thread locally or through a trusted remote owner. */
+  executeThread?: SlackThreadExecutor;
   runner: NonNullable<RunOptions["runner"]>;
   slack: Omit<SlackOptions, "threads" | "onStream" | "allowProgressText">;
   /** Open suspended native stores; the host attaches adapters before recovery. */
@@ -66,7 +68,7 @@ export async function runSlackHost(options: SlackHostOptions) {
     },
     async (input, streams) => {
       await Promise.all([transport.stopStreams(input, streams), options.stopThread(input)]);
-    });
+    }, options.executeThread);
   const events = new Map<string, () => void>();
   const saved = (event: any) => {
     if (event?.type === "eventSaved") { events.get(event.eventId)?.(); events.delete(event.eventId); }
@@ -74,13 +76,7 @@ export async function runSlackHost(options: SlackHostOptions) {
   if (directory) process.on("message", saved);
   transport = await prepareSlack(options.root, options.runner, {
     ...options.slack, threads,
-    ...(thread && options.slack.config ? { config: { ...options.slack.config,
-      channels: { ...options.slack.config.channels,
-        ...(options.slack.config.channels[thread.channel] || options.slack.config.channels["*"]
-          ? { [thread.channel]: thread.agent } : {}),
-      },
-      ...(thread.channel.startsWith("D") && options.slack.config.directMessagesAgent ? { directMessagesAgent: thread.agent } : {}),
-    } } : {}),
+    ...(thread && options.slack.config ? { config: slackThreadConfig(options.slack.config, thread) } : {}),
     allowProgressText: options.allowProgressText
       ? (id, inputs) => options.allowProgressText!(service, id, inputs) : undefined,
     ...(directory ? { onStream: (event: object) => new Promise<void>(done => {

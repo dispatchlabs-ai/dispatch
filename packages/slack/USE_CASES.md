@@ -20,7 +20,9 @@
   loading text; completion of an earlier turn must not clear a later active turn.
 - **SLK-005 — Share a workspace:** allow an agent in invited channels and DMs;
   direct explicit mentions to the intended bot and keep another bot's threads
-  from becoming competing automatic conversations.
+  from becoming competing automatic conversations. One app can select trusted
+  profiles per channel, retaining each thread's agent and profile across recovery;
+  host adapters enforce the selected capabilities without model-supplied grants.
 - **SLK-006 — Bind search credentials:** hand an eligible event's action token
   and verified origin to trusted host code without putting credentials in native
   input. Redelivery can refresh that handoff without duplicating the message;
@@ -28,7 +30,10 @@
 
 - **SLK-007 — Own thread lifecycles:** optionally launch an isolated process per
   thread, steer active work, cancel its owned descendants without affecting other
-  threads, and retain history and cancellation decisions across restart.
+  threads, and retain history and cancellation decisions across restart. A trusted
+  executor may place the whole native thread remotely while one coordinator keeps
+  Socket Mode, release pins and stream receipts; worker Web API calls use a scoped
+  host relay without Slack tokens.
 
 Slack app creation, workspace invitations, company policy and business research
 belong to administrators or company definitions. The package does not infer those

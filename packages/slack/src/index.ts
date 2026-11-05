@@ -6,18 +6,24 @@ import { parse } from "yaml";
 import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
 import { awaitWithContext, withAbortSignal, type Context } from "@earendil-works/chord/context";
-import { AssistantEntry, ConversationBusy, InboxDoc, LiveDoc, defineDoc, defineExtension, defineTask, type ConversationId, type Cursor, type EntryId, type LiveState, type SubmissionDraft, type TaskId, type TaskRuntime, type Tx } from "@earendil-works/pi-durable";
+import { AssistantEntry, ConversationBusy, InboxDoc, LiveDoc, defineDoc, defineExtension, defineTask, type ConversationId, type Cursor, type EntryId, type JsonObject, type LiveState, type SubmissionDraft, type TaskId, type TaskRuntime, type Tx } from "@earendil-works/pi-durable";
 import { context, publicCommentary, publicAnswer, type ChatService, type Runner, type ReplySink } from "@dispatch/runner";
 import { fallbackText, progressText, replyBlocks, replyChunk, streamText } from "./text.js";
 import { slackArtifacts } from "./files.js";
 import { createStatusDelivery } from "./status.js";
 import { activityLabel, currentToolActivity, type SlackActivity, type SlackToolDescription } from "./progress.js";
+import type { SlackWebApi } from "./api.js";
 export type { SlackActivity, SlackToolCall, SlackToolDescription } from "./progress.js";
-export { SlackThreadProcesses } from "./threads.js";
+export { createSlackWebApi, type SlackApiCall, type SlackApiMethod, type SlackWebApi } from "./api.js";
+export { SlackThreadProcesses, type SlackThreadExecution, type SlackThreadExecutor, type ThreadLaunch } from "./threads.js";
 export { runSlackHost, type SlackHostOptions } from "./host.js";
 
+/** Trusted configuration, not a grant. The host enforces actual tool authority. */
+export type SlackChannelProfile = {
+  id: string; agent: string; instructions?: string; context?: JsonObject; capabilities?: string[];
+};
 export type SlackConfig = {
-  teamId: string; channels: Record<string, string>; directMessagesAgent?: string;
+  teamId: string; channels: Record<string, string | SlackChannelProfile>; directMessagesAgent?: string;
   allowedUsers?: string[]; botTokenEnv?: string; appTokenEnv?: string; credentialsEnv?: string;
   displayName?: string;
   /** Ignore messages addressed to a peer bot unless this bot is also mentioned. */
@@ -30,7 +36,25 @@ export type SlackThreadInput = SlackInput & {
   team: string; timestamp: string;
   agent: string; direct: boolean; mentioned: boolean; threaded: boolean;
   parentUser: string | null;
+  /** Snapshot selected by trusted channel configuration at initial admission. */
+  profile?: SlackChannelProfile;
 };
+/** Project an admitted thread's identity onto a worker's configured routes. */
+export function slackThreadConfig(config: SlackConfig, thread: SlackThreadInput): SlackConfig {
+  return { ...config, channels: { ...config.channels,
+    ...(config.channels[thread.channel] || config.channels["*"]
+      ? { [thread.channel]: thread.profile ?? thread.agent } : {}),
+  }, ...(thread.channel.startsWith("D") && config.directMessagesAgent ? { directMessagesAgent: thread.agent } : {}) };
+}
+function validChannelRoute(route: unknown): route is string | SlackChannelProfile {
+  if (typeof route === "string") return true;
+  if (!route || typeof route !== "object" || Array.isArray(route)) return false;
+  const value = route as SlackChannelProfile;
+  return typeof value.id === "string" && !!value.id && typeof value.agent === "string" && !!value.agent
+    && (value.instructions === undefined || typeof value.instructions === "string")
+    && (value.context === undefined || !!value.context && typeof value.context === "object" && !Array.isArray(value.context))
+    && (value.capabilities === undefined || Array.isArray(value.capabilities) && value.capabilities.every(name => typeof name === "string"));
+}
 type Incoming = SlackThreadInput & { previous: number | null };
 type Delivery = { phase: "answer"; commentary?: boolean; admitted?: boolean } | {
   phase: "deliver"; text: string; offset: number; retryAt: number; stream: string | null; after?: number;
@@ -53,6 +77,8 @@ export type SlackActionToken = {
 };
 export type SlackOptions = {
   connection?: string; config?: SlackConfig; credentials?: { botToken: string; appToken: string };
+  /** Trusted Web API relay for a thread worker; it cannot connect Socket Mode. */
+  webApi?: SlackWebApi;
   /** Host-only credential handoff. Never put the token in native input or model context. */
   onActionToken?: (value: SlackActionToken) => void | Promise<void>;
   /** Trusted host routing: admission completes when the thread's native store accepts it. */
@@ -93,21 +119,30 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
   const factory = options.config ? undefined : parse(await readFile(join(root, "factory.yaml"), "utf8"));
   const config = options.config ?? (options.connection ? factory?.slack?.connections?.[options.connection] : factory?.slack) as SlackConfig | undefined;
   if (!config?.teamId || !config.channels || typeof config.channels !== "object" || Array.isArray(config.channels)
-    || Object.values(config.channels).some(agent => typeof agent !== "string")
+    || Object.values(config.channels).some(route => !validChannelRoute(route))
     || (config.threadReplies !== undefined && !["all", "started"].includes(config.threadReplies))
     || (config.peerBotUserIds !== undefined && (!Array.isArray(config.peerBotUserIds)
       || config.peerBotUserIds.some(id => typeof id !== "string" || !/^[UW][A-Z0-9]+$/.test(id))))) {
     throw new Error("Configure the Slack connection's teamId and channels in factory.yaml.");
   }
-  let credentials = options.credentials;
-  const encoded = process.env[config.credentialsEnv ?? "SLACK_CREDENTIALS_JSON"];
-  if (!credentials && encoded) {
-    try { credentials = JSON.parse(encoded); }
-    catch { throw new Error("Slack credentials must be JSON containing botToken and appToken."); }
+  let appToken: string | undefined;
+  let configuredApi = options.webApi;
+  if (!configuredApi) {
+    let credentials = options.credentials;
+    const encoded = process.env[config.credentialsEnv ?? "SLACK_CREDENTIALS_JSON"];
+    if (!credentials && encoded) {
+      try { credentials = JSON.parse(encoded); }
+      catch { throw new Error("Slack credentials must be JSON containing botToken and appToken."); }
+    }
+    const botToken = process.env[config.botTokenEnv ?? "SLACK_BOT_TOKEN"] ?? credentials?.botToken;
+    appToken = process.env[config.appTokenEnv ?? "SLACK_APP_TOKEN"] ?? credentials?.appToken;
+    if (!botToken || !appToken) throw new Error("Slack requires its bot and app tokens in the configured environment.");
+    configuredApi = new WebClient(botToken, {
+      retryConfig: { retries: 0 }, rejectRateLimitedCalls: true,
+      maxRequestConcurrency: Infinity, timeout: 15_000,
+    });
   }
-  const botToken = process.env[config.botTokenEnv ?? "SLACK_BOT_TOKEN"] ?? credentials?.botToken;
-  const appToken = process.env[config.appTokenEnv ?? "SLACK_APP_TOKEN"] ?? credentials?.appToken;
-  if (!botToken || !appToken) throw new Error("Slack requires its bot and app tokens in the configured environment.");
+  const client = configuredApi;
   const SlackInbox = defineDoc<{ tasks: Record<string, number>; threads: Record<string, number> }>({
     kind: `${namespace}.slack-inbox`, version: 2, scope: "session", initial: () => ({ tasks: {}, threads: {} }),
     checkpointWhen: () => false,
@@ -122,12 +157,12 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
     history: "latest", fork: "initial",
     initial: () => ({}), checkpointWhen: () => false,
   });
-  const channelAgent = (channel: string) => config.channels[channel] ?? config.channels["*"];
+  const channelRoute = (channel: string) => config.channels[channel] ?? config.channels["*"];
+  const channelAgent = (channel: string) => {
+    const route = channelRoute(channel);
+    return typeof route === "string" ? route : route?.agent;
+  };
 
-  const client = new WebClient(botToken, {
-    retryConfig: { retries: 0 }, rejectRateLimitedCalls: true,
-    maxRequestConcurrency: Infinity, timeout: 15_000,
-  });
   const identity = await client.auth.test();
   if (identity.team_id !== config.teamId || !identity.user_id) throw new Error("Slack token does not belong to the configured workspace.");
   const statusDelivery = createStatusDelivery(namespace, client);
@@ -188,7 +223,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
     if (status.pending === pending && idle) statuses.delete(key);
     return status.label;
   };
-  const socket = new SocketModeClient({ appToken });
+  const socket = appToken ? new SocketModeClient({ appToken }) : undefined;
   const bot = identity.user_id;
   let startService!: (service: ChatService) => void;
   const ready = new Promise<ChatService>(resolve => { startService = resolve; });
@@ -611,7 +646,8 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
           return;
         }
         const chat = existing ?? await service.create(input.agent, "slack", key, input.text, {
-          slack: { teamId: config.teamId, channelId: input.channel, threadTs: input.thread },
+          slack: { teamId: config.teamId, channelId: input.channel, threadTs: input.thread,
+            ...(input.profile ? { profile: input.profile } : {}) },
         });
         const { conversation } = await service.resolve(chat.id);
         // Transfer admission to the turn and finish this task in one commit.
@@ -671,6 +707,9 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
   async function receive(service: ChatService, input: SlackThreadInput) {
     if (input.team !== config!.teamId || channelAgent(input.channel) !== input.agent && config!.directMessagesAgent !== input.agent
       || config!.allowedUsers && !config!.allowedUsers.includes(input.user)) throw new Error("Unconfigured Slack thread input.");
+    const route = input.direct ? undefined : channelRoute(input.channel);
+    // Callers cannot replace trusted context or capability selection in a message.
+    input = { ...input, profile: typeof route === "object" ? structuredClone(route) : undefined };
     const host = service.host(input.agent);
     const key = threadKey(config!.teamId, input.channel, input.thread);
     const existing = await service.find(input.agent, key);
@@ -708,11 +747,13 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
     queueContinuation,
     queueStatus: statusDelivery.queue,
     queueArtifact: artifacts.queue,
-    connected: () => socket.websocket?.isActive() ?? false,
+    connected: () => socket?.websocket?.isActive() ?? false,
     async start(service: ChatService, listen = true) {
-      for (const agent of [...Object.values(config.channels), ...(config.directMessagesAgent ? [config.directMessagesAgent] : [])]) service.host(agent);
+      if (listen && !socket) throw new Error("A Slack Web API relay must use start(service, false).");
+      for (const route of [...Object.values(config.channels), ...(config.directMessagesAgent ? [config.directMessagesAgent] : [])])
+        service.host(typeof route === "string" ? route : route.agent);
       startService(service);
-      if (!listen) return;
+      if (!listen || !socket) return;
       socket.on("slack_event", async ({ body, ack }) => {
         try {
           const event = body.event;
@@ -759,6 +800,6 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
       await socket.start();
       console.log(`Slack connected: ${identity.team} / ${identity.user}; ${Object.keys(config.channels).length} channel route(s).`);
     },
-    async close() { await socket.disconnect(); },
+    async close() { await socket?.disconnect(); },
   };
 }

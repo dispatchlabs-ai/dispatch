@@ -1,5 +1,5 @@
 import { defineDoc, defineTask, type PhaseHandler } from "@earendil-works/pi-durable";
-import type { WebClient } from "@slack/web-api";
+import type { SlackWebApi } from "./api.js";
 import { type Artifact, type ArtifactSink, type ChatService, type Runner } from "@dispatch/runner";
 
 type Input = { chat: string; artifact: Artifact; channel: string; thread: string; resume?: State };
@@ -8,7 +8,7 @@ type Receipt = { fileId: string; permalink: string; channel: string; thread: str
 const code = (error: unknown) => (error as { data?: { error?: string } })?.data?.error;
 
 /** One retained Slack file ID across upload/completion retries; never repost blindly. */
-export function slackArtifacts(runner: Runner, client: WebClient, teamId: string, ready: Promise<ChatService>) {
+export function slackArtifacts(runner: Runner, client: SlackWebApi, teamId: string, ready: Promise<ChatService>) {
   const Uploads = defineDoc<{ files: Record<string, State> }>({
     kind: `${runner.namespace}.slack-uploads`, version: 1, scope: "conversation", history: "latest", fork: "initial",
     initial: () => ({ files: {} }), checkpointWhen: () => false,

@@ -4,10 +4,11 @@ import { join, resolve } from "node:path";
 import lockfile from "proper-lockfile";
 import {
   createRegistry, defineDoc, defineExtension, defineTask, defineTool, Harness, NestedCallDoc, ToolTask,
-  type JsonObject, type TaskId, type ToolExecutionApi, type ToolExecutionResult, type ToolRegistration,
+  type JsonObject, type TaskId, type ToolExecutionApi, type ToolExecutionResult, type ToolRegistration, type Storage,
 } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
+import type { ExecutionEnv } from "@earendil-works/pi-durable/env";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { BACKGROUND_CONTEXT as context, type Context } from "@earendil-works/chord/context";
@@ -76,16 +77,16 @@ export function nativeToolProxies(
 }
 
 /** The host must supply isolation. A different cwd or scrubbed environment is not an OS boundary. */
-export async function openNativeTools(directory: string, workspace: string) {
+export async function openNativeTools(directory: string, workspace: string, options: { storage?: Storage; env?: ExecutionEnv } = {}) {
   await privateStateDirectory(directory);
   const release = await lockfile.lock(directory, { realpath: false });
-  const env = new NodeExecutionEnv({ cwd: resolve(workspace) });
+  const env = options.env ?? new NodeExecutionEnv({ cwd: resolve(workspace) });
   let harness: Harness;
   try {
     const registry = createRegistry();
     registry.install(CodingTools);
     registry.install({ name: "dispatch.native-tool-executor", tasks: [Execute] });
-    harness = await Harness.open(await openNodeSqliteStorage(join(directory, "session.sqlite")), {
+    harness = await Harness.open(options.storage ?? await openNodeSqliteStorage(join(directory, "session.sqlite")), {
       registry, models: createModels({ authContext: { env: async () => undefined, fileExists: async () => false } }),
       env: async () => env,
     }, context);

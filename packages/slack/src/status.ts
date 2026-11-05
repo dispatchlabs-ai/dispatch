@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import { defineDoc, defineTask, type TaskId } from "@earendil-works/pi-durable";
 import type { ReplyDestination, ReplySink } from "@dispatch/runner";
-import type { WebClient } from "@slack/web-api";
+import type { SlackWebApi } from "./api.js";
 import { fallbackText, replyBlocks } from "./text.js";
 
 /** A durable, coalescing editable status. Narrative replies use the normal outbox. */
-export function createStatusDelivery(namespace: string, client: WebClient) {
+export function createStatusDelivery(namespace: string, client: SlackWebApi) {
   const Statuses = defineDoc<{ slots: Record<string, {
     text: string; revision: number; task: number | null; ts: string | null;
   }> }>({

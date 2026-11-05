@@ -14,6 +14,10 @@ buildNpmPackage {
       ../../../package-lock.json
       ../../../scripts
       ../../email/package.json
+      ../../fleet/package.json
+      ../../fleet/tsconfig.json
+      ../../fleet/src
+      ../../fleet/scripts
       ../../email/tsconfig.json
       ../../email/src
       ../../runner/package.json
@@ -48,7 +52,7 @@ buildNpmPackage {
     ];
   };
 
-  npmDepsHash = "sha256-BNoj5FQ1C9N1CSIRN6MYHKs9U9f45C0dUH7/dWD5qew=";
+  npmDepsHash = "sha256-XQEg/yk53uKKYlyK4w+R6whcEuS3Qm5Vr44s5DJ2DXw=";
   # The workspace compiles Observer here; its platform runtime is packaged separately.
   ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
   npmBuildScript = "build";
@@ -74,10 +78,11 @@ buildNpmPackage {
     if test -d packages/web/node_modules; then
       cp -R packages/web/node_modules "$app/packages/web/"
     fi
-    for package in runner remote slack observer email; do
+    for package in runner remote slack observer email fleet; do
       mkdir -p "$app/packages/$package"
       cp packages/$package/package.json "$app/packages/$package/"
       cp -R packages/$package/dist "$app/packages/$package/"
+      if test "$package" = fleet; then cp -R packages/fleet/scripts "$app/packages/fleet/"; fi
       if test -d packages/$package/node_modules; then
         cp -R packages/$package/node_modules "$app/packages/$package/"
       fi

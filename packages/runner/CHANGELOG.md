@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Compose optional immutable Fleet application releases; allow isolated native
+  tools to use host-supplied Pi Storage and execution environments.
+- Support one exact root-owned persistent workspace bind for fleet recovery,
+  retaining default disposable-workspace behavior for other installations.
+
 - Select `factory.yaml` defaultAgent for new CLI sessions and retain the initial selection when resuming.
 - Apply trusted host bindings recursively to private workers; accept broker-backed workspace transports.
 

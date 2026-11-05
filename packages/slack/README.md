@@ -87,6 +87,31 @@ not join channels or expand the bot's Slack permissions. Set
 `directMessagesAgent: helper` and subscribe to `message.im` with `im:history`
 to accept DMs from workspace members.
 
+One Slack app can route several channels to the same agent with different trusted
+profiles. A channel value may remain an agent name or use this object:
+
+```yaml
+channels:
+  C0123456789:
+    id: engineering-v1
+    agent: helper
+    instructions: Summarize implementation decisions and their evidence.
+    context:
+      project: example
+    capabilities: [wiki.read]
+  C0987654321: helper
+```
+
+Profiles are host configuration. The adapter snapshots the selected profile in
+the admitted input and exposes it as `origin.slack.profile` when creating a native
+mention conversation. With thread supervision, `thread.json` pins that exact
+snapshot along with the agent; changing the channel configuration affects new
+threads. Hosts receive it through `thread.profile` and decide how to apply its
+instructions, context and capability selection. The package neither grants
+tools nor interprets the profile as permission. Enforce actual grants in trusted
+host adapters; message text cannot supply or replace this profile. Existing
+report origins and string channel routes retain their behavior.
+
 When bots share a channel, list the other bots' Slack user IDs in
 `peerBotUserIds`. Messages explicitly mentioning a peer are ignored unless this
 bot is also mentioned. An assistant used inside other bots' threads can select
@@ -206,6 +231,17 @@ closing the supervisor suspends it. There is no global concurrency cap. The
 Remote jobs, existing-history migration and company authorization remain host
 responsibilities. Slack's post/receipt crash window remains at least once.
 
+The optional fourth constructor argument is a `SlackThreadExecutor`. It receives
+the thread key, native directory, pinned input, cancellation state and the resolved
+`ThreadLaunch`, plus an awaited event handler. Return a `SlackThreadExecution`
+with `request`, `close` and `exited`; `child.pid` is optional for remote owners.
+The default still creates a local Runner `ProcessScope`. Remote executors must
+preserve the resolved release, enforce one owner and terminate or fence it before
+reporting cancellation. A normal `close` suspends retained work; `cancel` must
+persist cancellation before acknowledging. Do not forward the launch environment
+or host credentials to an untrusted workspace. Await the event handler before
+acknowledging stream events so their receipts have reached durable storage.
+
 Hosts may supply `allowProgressText(conversationId, inputIds)` to withhold partial
 model text until required evidence exists for the current inputs. Native activity
 status continues; the host must separately enforce its final-answer policy.
@@ -218,6 +254,10 @@ steering and shutdown. Supply `stopThread` and `threadBusy` for independently
 enforced external workspace ownership; `allowProgressText` receives the opened
 service. `ready` runs only after supervisor recovery. It never starts calendars.
 An existing non-threaded installation still needs an explicit history migration.
+Pass `executeThread` to select a trusted remote executor after the existing
+application-release pin is resolved. The fleet package's
+[`FleetSlackThreads` and `createFleetSlackRun`](../fleet/README.md) implement this
+composition for its coordinator/worker protocol.
 
 A route change selects the agent only for a new thread. Saved threads retain
 their admitted agent for follow-ups, Stop, and worker-side routing. Hosts must
@@ -229,3 +269,30 @@ thread. Keep those release paths installed while a thread can be resumed. A
 pre-existing thread with native state must be pinned to its original installation
 before enabling this option. Older non-threaded histories require an explicit
 migration before changing routes.
+
+### Worker Web API relay
+
+Native Slack admission and reply tasks can run on a worker without Slack tokens:
+
+```ts
+import { createSlackWebApi, prepareSlack, slackThreadConfig } from "@dispatch/slack";
+
+const transport = await prepareSlack(root, runner, {
+  config: slackThreadConfig(config, pinnedThread),
+  webApi: createSlackWebApi((method, args) => trustedRelay({ method, args })),
+  onStream: event => retainAtCoordinator({ type: "stream", ...event }),
+});
+// Open suspended native stores with transport.extension, then attach them:
+await transport.start(service, false);
+```
+
+The relay replaces only Web API calls. Native tasks still own admission,
+streaming checkpoints, retry decisions and delivery receipts. Relay mode never
+reads Slack credentials or opens Socket Mode; `start(service, true)` fails.
+The coordinator remains the single Socket Mode consumer. The host must validate
+the original team/channel/thread and allowed method on every request, track
+message/file ownership, and refuse caller-supplied tokens or alternate targets.
+Retain Slack provider errors as `{ ok: false, error, retryAfter? }` so the native
+tasks keep their existing retry behavior; the relay adapter adds no blind retry.
+Artifact bytes use the existing exact `https://files.slack.com` upload allocation
+and retained native file ID; the worker needs access to that upload endpoint.

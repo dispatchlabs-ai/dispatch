@@ -1,7 +1,12 @@
-{ lib, runCommand, makeWrapper, runtimeShell, runtime, runtimeRevision, watcher, watcherRevision }:
-{ name, src, revision, entrypoint ? null, nodeModules ? null, workspace ? null }:
+{ lib, runCommand, makeWrapper, runtimeShell, runtime, runtimeRevision, watcher, watcherRevision, fleetTools ? null }:
+{ name, src, revision, entrypoint ? null, nodeModules ? null, workspace ? null, fleet ? null }:
 
 assert builtins.match "[a-z][a-z0-9-]*" name != null;
+assert fleet == null || (fleetTools != null && workspace != null && fleet.roles != []
+  && builtins.match "[a-z][a-z0-9-]*" fleet.namespace != null
+  && builtins.match "[a-zA-Z0-9_./-]+" fleet.module != null
+  && !(lib.hasPrefix "/" fleet.module) && !(builtins.elem ".." (lib.splitString "/" fleet.module))
+  && builtins.all (role: builtins.match "[a-z][a-z0-9_-]*" role != null) fleet.roles);
 runCommand "${name}-${lib.substring 0 12 revision}" {
   nativeBuildInputs = [ makeWrapper ];
   passthru = { inherit runtime watcher; };
@@ -50,6 +55,15 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
     workspaceController = "${runtime}/lib/dispatch-runner/packages/runner/scripts/workspace.py";
     runtimeEntryPoint = { node = "${runtime.nodejs}/bin/node"; module = "${runtime}/lib/dispatch-runner/packages/runner/dist/agent-cli.js"; };
     inherit workspace;
+    fleet = if fleet == null then null else fleet // {
+      format = 1;
+      tools = fleetTools // {
+        node = "${runtime.nodejs}/bin/node";
+        host = "${runtime}/lib/dispatch-runner/packages/fleet/dist/host.js";
+        storage = "${runtime}/lib/dispatch-runner/packages/fleet/dist/storage-server.js";
+        scripts = "${runtime}/lib/dispatch-runner/packages/fleet/scripts";
+      };
+    };
   }}
   JSON
   ${runtime.nodejs}/bin/node --input-type=module - "$out/share/${name}/release.json" "$app/definitions" <<'JS'

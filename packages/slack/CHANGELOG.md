@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Add trusted channel profiles, pinned per supervised thread, while preserving
+  string channel routes and keeping capability grants with host policy.
+- Allow host-injected thread execution and a token-free worker Web API relay;
+  preserve local process defaults, native delivery tasks and existing release pins.
+
 - Preserve retained thread identities when routes change, and optionally pin immutable application entrypoints and Node executables for recovery.
 
 - Share one reply when a follow-up joins active work. Persist commentary cursors

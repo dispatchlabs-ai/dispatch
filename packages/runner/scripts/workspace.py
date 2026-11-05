@@ -45,6 +45,29 @@ def private_directory(path):
         raise ValueError('Controller state must be a private owned directory')
 
 
+def persistent_workspace(run, root, create=False):
+    """The host grants one owned bind, never a model-selected host path."""
+    if os.geteuid() != 0 or not re.fullmatch('[a-f0-9]{64}', run):
+        raise ValueError('Persistent workspaces require a root-owned fleet run')
+    root = Path(root)
+    if not root.is_absolute() or '..' in root.parts or not os.path.ismount(root):
+        raise ValueError('The persistent workspace root must be a mounted filesystem')
+    for path in (root, *root.parents):
+        info = path.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid or info.st_mode & 0o022:
+            raise ValueError('Persistent workspace parents must be root-owned directories')
+    owner = root / run
+    if create: owner.mkdir(mode=0o700, exist_ok=True)
+    info = owner.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid or info.st_mode & 0o077:
+        raise ValueError('The persistent run parent must remain private and root owned')
+    workspace = owner / 'workspace'
+    if create: workspace.mkdir(mode=0o700, exist_ok=True)
+    if not stat.S_ISDIR(workspace.lstat().st_mode):
+        raise ValueError('The workspace bind cannot be a symlink')
+    return workspace
+
+
 def descriptor(value):
     if (not isinstance(value, dict) or value.get('format') != 1 or value.get('contract') != CONTRACT or
             value.get('platform') not in ('linux/amd64', 'linux/arm64') or
@@ -81,6 +104,9 @@ class Controller:
             raise RuntimeError('Workspace host operation failed: ' + error[-2000:])
         return p.stdout
 
+    def persistent(self, run, create=False):
+        return persistent_workspace(run, self.config['persistentRoot'], create)
+
     def docker(self, *args, **kwargs):
         return self.command([self.config.get('docker', 'docker'), *args], text=True, **kwargs).strip()
 
@@ -115,7 +141,14 @@ class Controller:
                 raise ValueError('Workspace is not running; ensure it before acquiring its desktop lease')
             yield record
 
-    def save(self, record): atomic(self.location(record['run'])[1], record)
+    def save(self, record):
+        if self.config.get('persistentRoot'):
+            # Lifecycle and export receipts survive host replacement; local
+            # container endpoints and root control credentials do not move.
+            parent = self.persistent(record['run'], create=True).parent
+            keys = ('run', 'namespace', 'release', 'artifacts', 'finished', 'finalSnapshot', 'recovery', 'pendingDeletes')
+            atomic(parent / 'workspace-state.json', {key: record[key] for key in keys if key in record})
+        atomic(self.location(record['run'])[1], record)
 
     def load(self, run):
         _, path = self.location(run)
@@ -159,10 +192,21 @@ class Controller:
         if record: return record
         value = self.validate_release(release)
         record = {'format': 1, 'namespace': self.owner, 'run': run, 'release': value, 'state': 'uncreated', 'artifacts': [], 'createdAt': time.time()}
+        if self.config.get('persistentRoot'):
+            retained = self.persistent(run, create=True).parent / 'workspace-state.json'
+            if retained.exists():
+                info = retained.lstat()
+                if not stat.S_ISREG(info.st_mode) or info.st_uid or info.st_nlink != 1:
+                    raise ValueError('Invalid persistent workspace lifecycle record')
+                saved = json.loads(retained.read_text())
+                if saved.get('run') != run or saved.get('namespace') != self.owner or saved.get('release') != value:
+                    raise ValueError('Persistent workspace belongs to another admitted release')
+                record.update(saved)
+                if record.get('finished'): record['state'] = 'deleted'
         identity, _ = self.location(run)
         paths = [value['definitionsRoot'], *value.get('runtimeEntryPoint', {}).values()]
         roots = {str(Path('/nix/store') / Path(path).parts[3]) for path in paths if path.startswith('/nix/store/')}
-        for index, root in enumerate(sorted(roots)):
+        for index, root in enumerate(sorted(roots) if self.config.get('registerNixRoots', True) else []):
             self.command([self.config.get('nixStore', '/nix/var/nix/profiles/default/bin/nix-store'),
                 '--realise', root, '--add-root', str(self.root / 'gcroots' / (identity + '-' + str(index))), '--indirect'], text=True)
         self.save(record)
@@ -233,9 +277,17 @@ class Controller:
                 record.get('container') and row['Id'] != record['container'] or row['Config']['Image'] != record['release']['workspace']['image'] or
                 record.get('imageId') and row['Image'] != record['imageId']):
             raise ValueError('Workspace container owner or image changed')
-        if (host['Runtime'] != self.config['runtime'] or host['NetworkMode'] != self.config['network'] or host.get('Privileged') or host.get('Binds') or
+        persistent = self.config.get('persistentRoot')
+        source = str(persistent_workspace(record['run'], persistent)) if persistent else None
+        binds = [source + ':/workspace:rw'] if source else []
+        mounts = row.get('Mounts', [])
+        valid_mounts = all((mount.get('Type') == 'tmpfs' and mount.get('Destination') == '/run') or
+                          (source and mount.get('Type') == 'bind' and mount.get('Source') == source
+                           and mount.get('Destination') == '/workspace' and mount.get('RW') is True) for mount in mounts)
+        if (host['Runtime'] != self.config['runtime'] or host['NetworkMode'] != self.config['network'] or host.get('Privileged') or (host.get('Binds') or []) != binds or
                 host.get('RestartPolicy', {}).get('Name') != 'no' or
-                host.get('Tmpfs') != {'/run': 'rw,mode=755'} or any(x.get('Type') != 'tmpfs' or x.get('Destination') != '/run' for x in row.get('Mounts', []))):
+                host.get('Tmpfs') != {'/run': 'rw,mode=755'} or not valid_mounts or
+                source and sum(mount.get('Destination') == '/workspace' for mount in mounts) != 1):
             raise ValueError('Workspace isolation differs from its saved binding')
         if host.get('PortBindings', {}).get('3211/tcp') != [{'HostIp': '127.0.0.1', 'HostPort': str(record['controlPort'])}]:
             raise ValueError('Workspace control port must be loopback only')
@@ -309,6 +361,8 @@ with os.fdopen(fd, 'wb') as target:
         runtimes = json.loads(self.docker('info', '--format', '{{json .Runtimes}}'))
         if not {'--net-raw', '--allow-packet-socket-write', '--allow-suid', '--overlay2=none'}.issubset(runtimes.get(self.config['runtime'], {}).get('runtimeArgs', [])):
             raise ValueError('gVisor must support nested Docker, sudo and persistent writes')
+        persistent = self.config.get('persistentRoot')
+        path = persistent_workspace(record['run'], persistent, create=True) if persistent else None
         if record.get('imageId') and record['imageId'] != image['Id']: raise ValueError('Pinned image changed')
         record['imageId'] = image['Id']
         if record['state'] in ('uncreated', 'deleted'):
@@ -323,18 +377,24 @@ with os.fdopen(fd, 'wb') as target:
         row = self.owned(record)
         if not row:
             if record['state'] not in ('creating', 'preparing'):
-                if not record.get('recovery'): raise ValueError('Workspace disappeared without a saved checkpoint; retain its record for recovery')
+                if not path and not record.get('recovery'): raise ValueError('Workspace disappeared without a saved checkpoint; retain its record for recovery')
                 record['state'] = 'deleted'; self.save(record); return self.ensure(record)
             environment = control / 'environment'; environment.write_text('CUA_ENV_TOKEN=' + token.read_text() + '\nCUA_TELEMETRY=0\nDO_NOT_TRACK=1\n'); environment.chmod(0o600)
             try:
                 self.docker('create', '--name', record['name'], '--platform', workspace['platform'], '--runtime', self.config['runtime'], '--cap-add', 'ALL',
                     '--network', self.config['network'], '--shm-size', '2g', '--restart', 'no', '--tmpfs', '/run:rw,mode=755',
                     '--label', LABEL + '.owner=' + self.owner, '--label', LABEL + '.run=' + record['run'],
-                    '--publish', f"127.0.0.1:{record['controlPort']}:3211", '--env-file', str(environment), workspace['image'])
+                    '--publish', f"127.0.0.1:{record['controlPort']}:3211", '--env-file', str(environment),
+                    *(['--volume', str(path) + ':/workspace:rw'] if path else []), workspace['image'])
             finally: environment.unlink(missing_ok=True)
             row = self.owned(record)
         record['container'] = row['Id']; self.save(record)
         if not row['State']['Running']: self.docker('start', row['Id'])
+        if path:
+            # The image owns its guest UID; only this exact bind root is changed.
+            uid = int(self.docker('exec', '-u', 'root', row['Id'], 'id', '-u', 'cua'))
+            gid = int(self.docker('exec', '-u', 'root', row['Id'], 'id', '-g', 'cua'))
+            os.chown(path, uid, gid); path.chmod(0o700)
         dns = self.config.get('dns') or [line.split()[1] for line in Path('/etc/resolv.conf').read_text().splitlines() if line.startswith('nameserver ')]
         if not dns or any(ipaddress.ip_address(x).is_loopback for x in dns): raise ValueError('Supply reachable DNS servers for gVisor')
         self.docker('exec', '-i', '-u', 'root', row['Id'], 'sh', '-c', 'cat > /etc/resolv.conf', input=''.join('nameserver ' + x + '\n' for x in dns))
@@ -351,7 +411,7 @@ with os.fdopen(fd, 'wb') as target:
         self.docker('exec', '-u', 'root', row['Id'], '/usr/local/sbin/dispatch-docker-start')
         if record['state'] in ('creating', 'preparing'):
             record['state'] = 'preparing'; self.save(record)
-            if record.get('recovery'):
+            if record.get('recovery') and not path:
                 with tempfile.TemporaryDirectory(prefix='workspace-restore-') as temporary:
                     archive = Path(temporary) / 'recovery.tar.gz'; self.retrieve(record, record['recovery'], archive)
                     remote = '/tmp/dispatch-recovery-' + uuid.uuid4().hex + '.tar.gz'
@@ -447,7 +507,7 @@ with os.fdopen(fd, 'wb') as target:
         if record.get('sandbox'):
             # Removing a direct registration never deletes a remote provider VM.
             rows = json.loads(self.cua('spaces', 'ls')); rows = rows.get('spaces', []) if isinstance(rows, dict) else rows
-            if any(x.get('id') == record['sandbox'] for x in rows): self.cua('spaces', 'rm', record['sandbox'])
+            if any(x.get('id') == record['sandbox'] and x.get('name') == record.get('name') for x in rows): self.cua('spaces', 'rm', record['sandbox'])
         record['state'] = 'deleted'; record['deletedAt'] = time.time(); self.save(record)
         if record.get('name'): shutil.rmtree(self.root / 'control' / record['name'], ignore_errors=True)
         return record

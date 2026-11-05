@@ -30,6 +30,8 @@ Dirty/local revisions are for qualification, not published release provenance.
 The default `bin/NAME` runs the shared on-demand CLI. An application with its own
 host can supply `entrypoint = "src/main.ts"`; it is run with the packaged Node.
 That host still owns native initialization, adapters, signals and recovery.
+Applications hosting replaceable workers can select `withFleet = true` and a
+trusted `fleet` descriptor; see [Fleet packaging and installation](../../fleet/README.md).
 The base runtime contains Runner, not Web. Set `withSlack = true` for the pinned
 Slack adapter. Other adapters are not included. An optional `nodeModules` store
 path supplies separately locked business dependencies under the definitions,
@@ -95,8 +97,8 @@ nix-env --profile "$PROFILE" --rollback
 Nix profile generations retain previous closures and change the selection
 atomically. Do not remove generations needed for rollback. Activation does not
 restart an already-running process. Service deployments need their own idle/
-drain, closed-state backup and supervised restart; this pilot supplies no fleet
-manager, updater or automatic service activation.
+drain, closed-state backup and supervised restart. The optional Fleet package
+supplies worker ownership and retirement; ordinary releases remain inactive.
 
 Binary rollback does not undo Pi schema changes or native definition migrations.
 Keep compatible closed-state backups. A rollout must preserve namespace,

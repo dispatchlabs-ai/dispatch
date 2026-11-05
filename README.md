@@ -18,6 +18,10 @@ dependencies.
 remote SQLite storage for standalone runners. The storage host owns the files;
 models and tools execute on the runner. See its guide for ownership and recovery.
 
+[Dispatch Fleet](packages/fleet/README.md) hosts complete durable runs on
+replaceable EC2 workers, with coordinator-owned credentials and native SQLite.
+Applications supply their own transport and authority adapters.
+
 [Dispatch Observer](packages/observer/README.md) is the read-only Electron desktop
 package for inspecting those agents through SQLite or Postgres, locally or over
 a remote connection. It provides live following, saved-event playback, native

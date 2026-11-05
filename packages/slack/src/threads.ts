@@ -11,11 +11,22 @@ type RecordState = {
   cancelledThrough: string; streams: Record<string, string>;
 };
 export type ThreadLaunch = { module: string; args: string[]; options: ForkOptions };
+export type SlackThreadExecution = {
+  readonly exited: Promise<void>;
+  readonly child?: { readonly pid?: number };
+  request(operation: string, value?: unknown, signal?: AbortSignal): Promise<any>;
+  close(operation?: "cancel" | "close"): Promise<void>;
+};
+export type SlackThreadExecutor = (
+  request: { key: string; directory: string; input: SlackThreadInput; cancelPending: boolean; launch: ThreadLaunch },
+  /** Resolve only after the coordinator has durably retained the event. */
+  onEvent: (event: any) => Promise<void>,
+) => SlackThreadExecution | Promise<SlackThreadExecution>;
 
 /** Transport routing only; each worker's native Pi store owns admitted work and recovery. */
 export class SlackThreadProcesses {
-  private workers = new Map<string, ProcessScope>();
-  private starts = new Map<string, Promise<ProcessScope>>();
+  private workers = new Map<string, SlackThreadExecution>();
+  private starts = new Map<string, Promise<SlackThreadExecution>>();
   private stops = new Map<string, Promise<void>>();
   private writes = new Map<string, Promise<unknown>>();
   private closing = false;
@@ -23,6 +34,8 @@ export class SlackThreadProcesses {
     readonly directory: string,
     readonly launch: (directory: string, input: SlackThreadInput, cancelPending: boolean) => Promise<ThreadLaunch>,
     readonly stopped: (input: SlackThreadInput, streams: string[]) => Promise<void>,
+    readonly execute: SlackThreadExecutor = ({ launch }, onEvent) =>
+      new ProcessScope(launch.module, launch.args, launch.options, onEvent),
   ) {}
   private key(input: SlackThreadInput) { return `${input.team}:${input.channel}:${input.thread}`; }
   private path(key: string) { return join(this.directory, createHash("sha256").update(key).digest("hex")); }
@@ -46,7 +59,7 @@ export class SlackThreadProcesses {
     this.writes.set(key, next);
     return next;
   }
-  private async worker(key: string, state: RecordState): Promise<ProcessScope | undefined> {
+  private async worker(key: string, state: RecordState): Promise<SlackThreadExecution | undefined> {
     await this.stops.get(key);
     state = (await this.record(key))!;
     if (!state.active || state.input.timestamp <= state.cancelledThrough) return;
@@ -57,7 +70,9 @@ export class SlackThreadProcesses {
       pending = (async () => {
         if (this.closing) throw new Error("Thread supervisor is closing.");
         const configuration = await this.launch(this.path(key), state.input, state.needsCancel);
-        const worker = new ProcessScope(configuration.module, configuration.args, configuration.options, async event => {
+        let worker: SlackThreadExecution | undefined;
+        worker = await this.execute({ key, directory: this.path(key), input: state.input,
+          cancelPending: state.needsCancel, launch: configuration }, async event => {
           if (event?.type === "ready") await this.change(key, current => {
             if (!current) throw new Error("Missing thread record.");
             if (current.cancelledThrough === state.cancelledThrough) current.needsCancel = false;
@@ -72,7 +87,7 @@ export class SlackThreadProcesses {
           }
           if (event?.type === "idle") await this.change(key, current => {
             if (!current) throw new Error("Missing thread record.");
-            if (this.workers.get(key) === worker && current.input.key === event.key) current.active = false;
+            if (worker && this.workers.get(key) === worker && current.input.key === event.key) current.active = false;
             return current;
           });
         });
@@ -101,7 +116,7 @@ export class SlackThreadProcesses {
       // A changed route applies to new threads. Retained native stores and their
       // release pins still belong to the definition admitted on the first input.
       if (input.timestamp > current.cancelledThrough) {
-        current.input = { ...input, agent: current.input.agent }; current.active = true;
+        current.input = { ...input, agent: current.input.agent, profile: current.input.profile }; current.active = true;
       }
       return current;
     });
@@ -110,7 +125,7 @@ export class SlackThreadProcesses {
     if (!worker) return;
     // A Stop may have arrived while the worker was opening its native stores.
     if (input.timestamp <= (await this.record(key))!.cancelledThrough) return;
-    await worker.request("receive", { ...input, agent: state.input.agent });
+    await worker.request("receive", { ...input, agent: state.input.agent, profile: state.input.profile });
   }
   async stop(input: SlackThreadInput) {
     const key = this.key(input);
@@ -126,7 +141,7 @@ export class SlackThreadProcesses {
       // Read after exit so the last committed stream receipt is included.
       await this.writes.get(key);
       const latest = await this.record(key);
-      await this.stopped({ ...input, agent: state.input.agent }, Object.values(latest?.streams ?? state.streams));
+      await this.stopped({ ...input, agent: state.input.agent, profile: state.input.profile }, Object.values(latest?.streams ?? state.streams));
       await this.change(key, current => ({ ...current!, streams: {} }));
     })();
     this.stops.set(key, stopping);
@@ -147,7 +162,7 @@ export class SlackThreadProcesses {
   }
   async status() {
     return Promise.all([...this.workers].map(async ([key, worker]) => ({
-      key, pid: worker.child.pid, directory: this.path(key), state: await this.record(key),
+      key, pid: worker.child?.pid, directory: this.path(key), state: await this.record(key),
     })));
   }
   async close() {
