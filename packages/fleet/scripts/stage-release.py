@@ -194,8 +194,8 @@ def main():
                 "This release requires Linux x86_64")
         require(not Path("/nix/var/nix/db/db.sqlite").exists(),
                 "Use Nix's native import on a Nix-managed machine")
-        for directory in (Path("/nix"), Path("/nix/store"), Path("/opt/dispatch-fleet-agents"),
-                          Path("/opt/dispatch-fleet-agents/releases")):
+        for directory in (Path("/nix"), Path("/nix/store"), Path("/opt/dispatch-fleet"),
+                          Path("/opt/dispatch-fleet/releases")):
             require(not directory.is_symlink(), "Installation directory cannot be a symlink")
             directory.mkdir(mode=0o755, parents=True, exist_ok=True)
             require(directory.stat().st_uid == 0 and not directory.stat().st_mode & 0o022,
@@ -209,7 +209,7 @@ def main():
     try:
         manifest, installation, closure = verify(args.archive, args.sha256, Path(temporary))
         if not args.verify_only:
-            with open("/opt/dispatch-fleet-agents/.stage.lock", "a") as lock:
+            with open("/opt/dispatch-fleet/.stage.lock", "a") as lock:
                 fcntl.flock(lock, fcntl.LOCK_EX)
                 for source in sorted((closure / "nix/store").iterdir()):
                     target = Path("/nix/store") / source.name
@@ -218,7 +218,7 @@ def main():
                                 "Existing Nix store object differs; refusing overwrite: " + target.name)
                     else:
                         source.rename(target)
-                release = Path("/opt/dispatch-fleet-agents/releases") / args.sha256
+                release = Path("/opt/dispatch-fleet/releases") / args.sha256
                 if release.exists() or release.is_symlink():
                     require(release.is_symlink() and os.readlink(release) == installation,
                             "Existing release receipt differs")
