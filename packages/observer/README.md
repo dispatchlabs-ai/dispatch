@@ -10,6 +10,9 @@ conversations, expand an agent, then open a numbered turn. The focused transcrip
 uses shadcn Message and Trace components, with tool arguments and results loaded
 on expansion. Back restores your reading position and open tools. Discovery
 requires macOS or Linux with `lsof`; pending tasks do not prove model execution.
+Service presence and agent activity have separate labels. Last activity and the
+latest attributed agent update explain an online service with no active agents;
+**Read full turn** opens the saved response behind that update.
 
 **Settings → Open saved work** retains the workflow viewer, saved local sources,
 remote connections and playback. In that workspace, explicit handoffs group

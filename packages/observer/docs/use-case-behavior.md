@@ -33,6 +33,12 @@ current model execution. Back/Forward, breadcrumbs and Previous/Next turn retain
 reading/expansion state. Exact tool payloads load on expansion, with errors and
 missing results explicit. New observations never scroll the reader.
 
+**November 5 clarification:** process presence says **Service online**, separately
+from the count of agents with unfinished work or **No active agents**. Unknown
+source state is not idle. Show last recorded agent activity separately from service
+start and observation time, plus the latest attributed assistant update with an
+exact-turn link. This update never infers a workflow outcome from idle tasks.
+
 This updates the default route for **OBS-006/007/008/010/013/015/018**. The workflow
 and connection contracts below remain available through **Settings → Open saved
 work**. Remote discovery and execution controls remain outside scope.

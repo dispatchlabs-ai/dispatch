@@ -4,6 +4,9 @@
 
 ### Processes and saved turns
 
+- Distinguish online services from agents with pending work or no active agents.
+  Show last recorded activity and the latest attributed update with an exact-turn
+  link, separately from service start and observation times.
 - Start with running local agent processes, grouped by PID/start time, then open
   chronological agent conversations and exact saved assistant-turn counts.
 - Browse numbered turns in a focused shadcn transcript with collapsed tool calls,

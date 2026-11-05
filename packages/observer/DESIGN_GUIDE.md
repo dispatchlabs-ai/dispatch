@@ -33,6 +33,15 @@ collapsed; full retained arguments/results remain available. Previous/Next turn,
 breadcrumbs and history shortcuts preserve the reader's place and expansions.
 New observations must not move the page. Missing results remain unknown.
 
+**Service presence and agent activity, November 5, 2026:** label an observed
+process **Service online**. Show **No active agents** only when all readable
+conversations have no unfinished tasks; otherwise show the number of agents with
+pending work, without claiming model execution. Unavailable or stale discovery
+must not imply current activity or inactivity. Keep service start time separate
+from last recorded agent activity. Surface the latest dated assistant update as
+an attributed opening excerpt with a link to its exact saved turn. That report
+is evidence of what the agent said, not an inferred workflow verdict.
+
 The workflow-first workspace described below remains available under
 **Settings → Open saved work**, including saved sources, explicit remote/Postgres
 connections, native record inspection and playback. Its route and pane rules do

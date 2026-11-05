@@ -10,6 +10,7 @@ export type ProcessAgent = {
   parentKey?: string;
   startedAt?: number;
   lastAt?: number;
+  response?: { entryId: number; at?: number; excerpt: string };
   active: number;
   failed: number;
   turns: number;
@@ -69,6 +70,35 @@ export type TurnTranscript = {
 export const readable = (value: string) =>
   value.replace(/[-_]+/g, " ").replace(/^./, (c) => c.toUpperCase());
 export const oneLine = (value: string) => value.replace(/\s+/g, " ").trim();
+
+export function processActivity(process: AgentProcess): string {
+  if (process.issues.length) return "Activity unavailable";
+  const pending = process.agents.filter((agent) => agent.active > 0).length;
+  return pending
+    ? `${pending} ${pending === 1 ? "agent" : "agents"} with pending work`
+    : "No active agents";
+}
+
+export function lastProcessActivity(process: AgentProcess): number | undefined {
+  const times = process.agents.flatMap((agent) =>
+    agent.lastAt === undefined ? [] : [agent.lastAt],
+  );
+  return times.length ? Math.max(...times) : undefined;
+}
+
+/** A literal opening excerpt; it does not classify or infer a workflow outcome. */
+export function responseExcerpt(text: string): string {
+  const paragraphs = text
+    .trim()
+    .split(/\n\s*\n/)
+    .slice(0, 3)
+    .join("\n\n");
+  if (paragraphs.length <= 600) return paragraphs;
+  return `${paragraphs
+    .slice(0, 600)
+    .replace(/\s+\S*$/, "")
+    .trimEnd()}…`;
+}
 
 /** A recorded label or a short literal path, never an inferred outcome. */
 export function toolLabel(event: {

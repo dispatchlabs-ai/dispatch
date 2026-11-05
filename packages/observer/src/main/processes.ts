@@ -15,7 +15,12 @@ import type {
   ProcessTurns,
   TurnTranscript,
 } from "../shared/processes";
-import { oneLine, readable, toolLabel } from "../shared/processes";
+import {
+  oneLine,
+  readable,
+  responseExcerpt,
+  toolLabel,
+} from "../shared/processes";
 import { discoverLocalFiles } from "./local";
 import { project, redact } from "./projection";
 import { readSqlite } from "./sqlite";
@@ -240,7 +245,14 @@ export async function processCatalog(): Promise<ProcessCatalog> {
             ? `${sourceId}:${c.owner.conversationId}`
             : undefined,
           startedAt: c.createdAt ?? c.opening?.at,
-          lastAt: c.lastAt,
+          lastAt: c.lastAt ?? c.response?.at,
+          response: c.response
+            ? {
+                entryId: c.response.entryId,
+                at: c.response.at,
+                excerpt: responseExcerpt(c.response.text),
+              }
+            : undefined,
           active: c.active,
           failed: c.failed,
           turns: c.turnCount ?? 0,

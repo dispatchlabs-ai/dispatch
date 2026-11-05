@@ -22,6 +22,8 @@ import {
 import { UI } from "./controls";
 import { processTime as clock } from "./process-time";
 import { ProcessTranscript, type TurnView } from "./ProcessTranscript";
+import { MessageContent } from "./Content";
+import { lastProcessActivity, processActivity } from "../shared/processes";
 import type {
   AgentProcess,
   ProcessAgent,
@@ -339,8 +341,8 @@ export function ProcessApp() {
                 {agent
                   ? `${agent.name} · ${clock(turn?.at)}`
                   : process
-                    ? `${process.application} · PID ${process.pid} · Started ${clock(process.startedAt)}`
-                    : `Agent processes running on ${catalog?.host ?? "this machine"}.`}
+                    ? `${process.application} · PID ${process.pid} · Service started ${clock(process.startedAt)}`
+                    : `Agent services detected on ${catalog?.host ?? "this machine"}.`}
               </p>
             </div>
             {agent && turns ? (
@@ -369,13 +371,29 @@ export function ProcessApp() {
               </div>
             ) : process ? (
               <span className="process-status">
-                <i className={live ? "status-dot" : "status-dot idle"} />
-                {live ? "Running" : "No longer observed"}
+                <i
+                  className={live && !error ? "status-dot" : "status-dot idle"}
+                />
+                {error
+                  ? "Presence unavailable"
+                  : live
+                    ? "Service online"
+                    : "No longer observed"}
               </span>
             ) : (
               <span className="process-status">
-                <i className={error ? "status-dot idle" : "status-dot"} />
-                {error ? "Discovery unavailable" : "Running processes"}
+                <i
+                  className={
+                    !error && catalog?.processes.length
+                      ? "status-dot"
+                      : "status-dot idle"
+                  }
+                />
+                {error
+                  ? "Discovery unavailable"
+                  : catalog
+                    ? `${catalog.processes.length} services online`
+                    : "Finding services…"}
               </span>
             )}
           </div>
@@ -411,12 +429,12 @@ export function ProcessApp() {
                   <UI.TableRow>
                     <UI.TableHead>Process</UI.TableHead>
                     <UI.TableHead>Application</UI.TableHead>
-                    <UI.TableHead>PID</UI.TableHead>
-                    <UI.TableHead className="numeric">Agents</UI.TableHead>
+                    <UI.TableHead>Agent activity</UI.TableHead>
+                    <UI.TableHead className="numeric">Agent runs</UI.TableHead>
                     <UI.TableHead className="numeric" title={turnHint}>
                       Turns
                     </UI.TableHead>
-                    <UI.TableHead>Started</UI.TableHead>
+                    <UI.TableHead>Last activity</UI.TableHead>
                     <UI.TableHead>
                       <span className="sr-only">Open</span>
                     </UI.TableHead>
@@ -438,15 +456,23 @@ export function ProcessApp() {
                             navigate({ processKey: process.key });
                           }}
                         >
-                          <i className="status-dot" />
+                          <i
+                            className={error ? "status-dot idle" : "status-dot"}
+                            title={
+                              error ? "Last observed service" : "Service online"
+                            }
+                          />
                           {process.name}
                         </UI.Button>
                       </UI.TableCell>
                       <UI.TableCell className="secondary">
                         {process.application}
+                        <small className="process-pid">PID {process.pid}</small>
                       </UI.TableCell>
-                      <UI.TableCell className="secondary tabular-nums">
-                        {process.pid}
+                      <UI.TableCell className="process-activity-cell">
+                        {error
+                          ? "Activity unavailable"
+                          : processActivity(process)}
                       </UI.TableCell>
                       <UI.TableCell className="numeric">
                         {process.issues.length ? "—" : process.agents.length}
@@ -460,7 +486,8 @@ export function ProcessApp() {
                             )}
                       </UI.TableCell>
                       <UI.TableCell className="tabular-nums">
-                        {clock(process.startedAt)}
+                        {process.issues.length || error ? "Last known: " : ""}
+                        {clock(lastProcessActivity(process))}
                       </UI.TableCell>
                       <UI.TableCell>
                         <ChevronRight className="size-4 secondary" />
@@ -472,7 +499,7 @@ export function ProcessApp() {
               {!filtered.length && (
                 <div className="process-empty">
                   {!catalog && loading ? (
-                    "Finding agent processes…"
+                    "Finding agent services…"
                   ) : !catalog && error ? (
                     "Process discovery is unavailable. Retry above or open saved work in Settings."
                   ) : query ? (
@@ -484,7 +511,7 @@ export function ProcessApp() {
                     </>
                   ) : (
                     <>
-                      <p>No running agent processes found.</p>
+                      <p>No online agent services found.</p>
                       <span>
                         Saved conversations and remote connections are available
                         in Settings.
@@ -498,12 +525,12 @@ export function ProcessApp() {
                   {catalog
                     ? query
                       ? `${filtered.length} of ${catalog.processes.length} processes`
-                      : `${catalog.processes.length} running ${catalog.processes.length === 1 ? "process" : "processes"}`
+                      : `${catalog.processes.length} ${catalog.processes.length === 1 ? "service" : "services"} ${error ? "last observed" : "online"}`
                     : ""}
                 </span>
                 <span>
                   {catalog
-                    ? `Updated ${clock(Date.parse(catalog.observedAt))}`
+                    ? `Checked ${clock(Date.parse(catalog.observedAt))}`
                     : ""}
                   <UI.Button
                     variant="ghost"
@@ -527,6 +554,33 @@ export function ProcessApp() {
             />
           ) : (
             <>
+              <section
+                className="process-current"
+                aria-label="Current agent activity"
+              >
+                <div className="process-current-status">
+                  <strong title="Active agents have unfinished recorded tasks. Pending work can include waiting; it does not prove model execution.">
+                    {error
+                      ? "Activity unavailable"
+                      : `${!live ? "Last observed: " : ""}${processActivity(process)}`}
+                  </strong>
+                  <span>
+                    {process.issues.length || error || !live
+                      ? "Last known activity"
+                      : "Last activity"}
+                    <time>{clock(lastProcessActivity(process))}</time>
+                  </span>
+                </div>
+                <LatestProcessUpdate
+                  key={process.key}
+                  process={process}
+                  cached={turnLists}
+                  onOpen={(sourceAgent, data, turn) => {
+                    saveTurns(sourceAgent.key, data);
+                    openTurn(sourceAgent, turn);
+                  }}
+                />
+              </section>
               <div className="process-agents-toolbar">
                 <p className="process-summary" title={turnHint}>
                   {process.issues.length && !process.agents.length ? (
@@ -534,7 +588,7 @@ export function ProcessApp() {
                   ) : (
                     <>
                       {process.issues.length > 0 && "Last observed: "}
-                      {process.agents.length} agent runs <span>·</span>{" "}
+                      {process.agents.length} recorded agent runs <span>·</span>{" "}
                       {process.agents.reduce(
                         (count, agent) => count + agent.turns,
                         0,
@@ -556,7 +610,7 @@ export function ProcessApp() {
               <UI.Table className="process-table agent-table">
                 <UI.TableHeader>
                   <UI.TableRow>
-                    <UI.TableHead>Started</UI.TableHead>
+                    <UI.TableHead>Agent started</UI.TableHead>
                     <UI.TableHead>Agent</UI.TableHead>
                     <UI.TableHead className="numeric" title={turnHint}>
                       Turns
@@ -653,6 +707,91 @@ export function ProcessApp() {
         </div>
       </UI.Dialog>
     </div>
+  );
+}
+
+function LatestProcessUpdate({
+  process,
+  cached,
+  onOpen,
+}: {
+  process: AgentProcess;
+  cached: Record<string, ProcessTurns>;
+  onOpen(agent: ProcessAgent, data: ProcessTurns, turn: RecordedTurn): void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const agent = process.agents
+    .filter((item) => item.response)
+    .sort(
+      (a, b) => (b.response!.at ?? -Infinity) - (a.response!.at ?? -Infinity),
+    )[0];
+  if (!agent?.response)
+    return <p className="process-update-empty">No saved agent update.</p>;
+  const report = agent.response;
+  const open = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const previous = cached[agent.key];
+      const data = previous?.turns.some(
+        (turn) => turn.entryId === report.entryId,
+      )
+        ? previous
+        : await window.observer.processTurns({
+            sourceId: agent.sourceId,
+            conversationId: agent.conversationId,
+          });
+      if (!mounted.current) return;
+      const turn = data.turns.find((turn) => turn.entryId === report.entryId);
+      if (!turn)
+        throw new Error("This update is no longer retained as a saved turn.");
+      onOpen(agent, data, turn);
+    } catch (error) {
+      if (mounted.current) setError(errorText(error));
+    } finally {
+      if (mounted.current) setLoading(false);
+    }
+  };
+  return (
+    <UI.Message className="process-update">
+      <UI.MessageContent>
+        <UI.MessageHeader className="process-update-header">
+          <span>
+            {report.at === undefined
+              ? "Saved agent update"
+              : "Latest reported update"}
+          </span>
+          <span>
+            {agent.name} · {clock(report.at)}
+          </span>
+        </UI.MessageHeader>
+        <MessageContent text={report.excerpt} />
+        <div className="process-update-actions">
+          {error && <span role="status">{error}</span>}
+          <UI.Button
+            variant="ghost"
+            size="sm"
+            disabled={loading}
+            onClick={() => void open()}
+          >
+            {loading
+              ? "Opening turn…"
+              : error
+                ? "Retry opening turn"
+                : "Read full turn"}{" "}
+            <ArrowRight />
+          </UI.Button>
+        </div>
+      </UI.MessageContent>
+    </UI.Message>
   );
 }
 

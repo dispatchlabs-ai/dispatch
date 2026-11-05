@@ -21,8 +21,16 @@ not that the tool failed. Markdown and multiline output remain readable, and
 provide navigation; Alt+Left/Right and Cmd+[/] use local history. Returning to a
 turn restores its open tools and scroll position. Live reads do not move you.
 
-**Running** describes observed process presence. **Pending work** describes
-unfinished recorded tasks, which can be waiting. Overlap notes require saved
+**Service online** describes observed process presence. **No active agents**
+means no unfinished tasks were recorded in its readable conversations; an online
+service can be idle. Otherwise, the activity summary counts **agents with pending
+work**, which can include waiting. Source errors say **Activity unavailable**
+instead of implying that agents are idle. Service start time, last recorded agent
+activity and Observer's **Checked** time are separate. The process page also shows
+the latest dated assistant update, attributed to its agent and timestamp; **Read
+full turn** opens that exact response. The excerpt does not infer a final workflow
+outcome. If no response timestamp is retained, the view labels it a saved update.
+Overlap notes require saved
 model-task start/end intervals. These labels do not claim workflow completion.
 Dates accompany timestamps from earlier days; unknown timing stays explicit.
 Empty bookkeeping conversations are excluded from agent counts.
@@ -297,6 +305,18 @@ going back replaces the forward path. Switching connections clears history;
 reconnecting the current connection preserves it.
 
 ## Compatibility and qualification
+
+Service/activity follow-up (November 5, 2026, OBS-006/010/013/014/018): the
+packaged macOS ARM64 app distinguished an online service with no active agents
+from a service with pending work. Recorded activity, service start and observation
+times remained distinct. The attributed update opened its exact saved turn;
+Previous/Next, history and the process breadcrumb remained usable. An unsupported
+synthetic store showed **Activity unavailable**, then **No longer observed** after
+its owner exited. The fixture was removed afterward. Full-page layouts were
+reviewed at 1280×720 and a maximized 1512×949; the exact 1440×900 review was not
+repeated in this follow-up. Workspace TypeScript checks, renderer build and macOS
+packaging passed. No automated tests were added or run. Global discovery failure
+received source review; Windows/Linux and dark appearance were not requalified.
 
 Process-reader qualification (November 4, 2026): the packaged macOS ARM64 app
 discovered live local Pi processes and opened chronological agents, numbered
