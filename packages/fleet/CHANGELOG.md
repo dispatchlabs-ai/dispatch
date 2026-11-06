@@ -16,6 +16,8 @@
   so bursts of native storage connections can wait for acceptance.
 - Finish suspended runs through their cleanup assignment before releasing
   retained workspace and artifact files.
+- Render Slack service working directories and credential paths with systemd's
+  scalar syntax so the installed units load correctly.
 
 ## [0.6.0]
 
