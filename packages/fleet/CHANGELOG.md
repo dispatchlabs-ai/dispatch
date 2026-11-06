@@ -14,6 +14,8 @@
   changing native agent or computer-service permissions.
 - Use the operating system's socket backlog for fleet control and run relays
   so bursts of native storage connections can wait for acceptance.
+- Finish suspended runs through their cleanup assignment before releasing
+  retained workspace and artifact files.
 
 ## [0.6.0]
 
