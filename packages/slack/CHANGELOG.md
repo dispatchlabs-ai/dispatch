@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Remove temporary progress messages after the ordered final reply is delivered,
+  instead of leaving a canned completion message. Resume cleanup retries without
+  reposting the answer; preserve commentary and failure details.
+
 - Reuse Runner thread supervision while preserving Slack process, route, profile
   and cancellation recovery behavior.
 

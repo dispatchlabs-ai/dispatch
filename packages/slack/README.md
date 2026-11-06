@@ -187,7 +187,11 @@ hidden until more text arrives or the final answer commits. Private reasoning
 and raw tool output are never displayed. This
 avoids Slack's ten-minute stream expiry marking active work as failed.
 Final delivery replaces progress with
-the committed answer. See [Slack's response guidance](https://docs.slack.dev/ai/developing-agents/#responding-to-the-user).
+the committed answer. When commentary is delivered as separate replies, the final
+answer follows it and the temporary progress message is removed afterward.
+Cleanup retries resume independently of answer delivery, preserving commentary
+and failure details without a redundant completion notice.
+See [Slack's response guidance](https://docs.slack.dev/ai/developing-agents/#responding-to-the-user).
 Final replies use Slack's Markdown blocks, matching the Markdown sent while
 streaming, so bold text, inline code and source links retain their formatting.
 Final messages split at complete Markdown blocks where possible. A block too
