@@ -102,6 +102,10 @@ export class GoogleChatApi {
       }
     }
   }
+  async deleteMessage(name: string, signal?: AbortSignal) {
+    try { await this.request("chat", name, "DELETE", undefined, signal); }
+    catch (error) { if (!(error instanceof GoogleApiError) || error.status !== 404) throw error; }
+  }
 }
 
 /** The API limit includes JSON bytes. Never split a Unicode code point. */

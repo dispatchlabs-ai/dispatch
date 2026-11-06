@@ -69,6 +69,12 @@ interaction. This adapter does not subscribe to all historical space messages.
 - Public commentary, editable status, final replies and host-authorized workflow
   continuations use native tasks. Continuations wait for an idle conversation and
   recheck the original request through the host's `allowContinuation` callback.
+- The automatic working message is removed after the complete final reply is
+  delivered. Stop removes the thread's owned working/status messages and posts
+  one deterministic acknowledgement, including when no status was posted.
+  Missing messages count as already removed; failed cleanup retains its receipt
+  for retry before acknowledgement. App-owned deletion uses the existing
+  `chat.bot` permission.
 - Malformed input is discarded individually with its Pub/Sub message ID logged.
   Transient admission or acknowledgement failures remain eligible for redelivery.
 - Hosts enforce company permissions from native input attribution. Space membership

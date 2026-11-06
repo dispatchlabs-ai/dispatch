@@ -40,7 +40,7 @@ export { ProcessScope, serveProcess, cancelService } from "./process-scope.js";
 export { nativeToolProxies, openNativeTools } from "./native-tools.js";
 export type { NativeToolCommand } from "./native-tools.js";
 export { requireKnowledge } from "./knowledge-required.js";
-export { RequestCompletion, RequestWork } from "./request-completion.js";
+export { RequestCompletion, RequestWork, recordRequestCancellation } from "./request-completion.js";
 export type { RequestState } from "./request-completion.js";
 export { ArtifactStore, artifactFilename, artifactMimeType } from "./artifacts.js";
 export type { Artifact, ArtifactRecord, ArtifactDelivery, ArtifactSource, ArtifactSink, ArtifactOptions } from "./artifacts.js";

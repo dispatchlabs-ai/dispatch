@@ -373,7 +373,14 @@ the host's separate ownership/cancellation integration.
 Before recovering a cancelled store, open it with `resume: false` and call
 `cancelService`. It marks all tasks before enabling native abort cleanup; pending
 tools must not replay merely to be cancelled. Persist the cancellation decision
-outside the worker before terminating it. This does not undo external effects.
+outside the worker before terminating it, and finish cleanup before accepting new
+input. It also reconciles unfinished [request records](docs/request-completion.md)
+in the native store without model calls. This does not undo external effects.
+`ThreadProcesses` performs this cancellation-only reopen before confirming Stop,
+including when the previous worker already exited. Its executor must publish
+`ready` only after `cancelPending` cleanup finishes; no input is sent during that
+reopen. Recovery retains the cancellation flag until native and presentation
+cleanup both succeed.
 
 ### Conversation defaults and protected execution
 

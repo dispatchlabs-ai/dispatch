@@ -7,6 +7,7 @@ import {
 } from "@earendil-works/pi-durable";
 import { createProgress } from "./progress.js";
 import { createReplies, type ReplyDestination, type ReplySink } from "./replies.js";
+import { recordRequestCancellation } from "./request-completion.js";
 
 type Job = {
   taskId: number; question: string; status: "working" | "done" | "failed" | "stopped";
@@ -238,7 +239,14 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
       parameters: Type.Object({}), replay: "unsafe",
       async execute(_args, api, context) {
         const state = await api.snapshot(Handoffs, api.conversationId, context);
-        if (state?.child) await (await api.conversation(state.child as ConversationId, context))?.abort(context, { background: true });
+        if (state?.child) {
+          const child = await api.conversation(state.child as ConversationId, context);
+          if (child) {
+            await recordRequestCancellation(api, child.id, context);
+            await child.abort(context, { background: true });
+            await recordRequestCancellation(api, child.id, context);
+          }
+        }
         return { output: [{ type: "text", text: `${target}'s current work is stopped.` }] };
       },
     });

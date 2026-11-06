@@ -2,6 +2,7 @@ import { fork, type ChildProcess, type ForkOptions } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { context, type ChatService } from "./chat.js";
+import { recordRequestCancellation } from "./request-completion.js";
 
 /** A trusted worker and all of its local descendants share one cancellation boundary. */
 export class ProcessScope {
@@ -91,14 +92,17 @@ export class ProcessScope {
 
 /** Mark every task before enabling native abort cleanup: no pending tool gets replayed. */
 export async function cancelService(service: ChatService) {
+  const chats = [...service.hosts.values()].map(host => ({ host, conversation: host.conversation }));
+  chats.push(...await Promise.all((await service.list()).map(chat => service.resolve(chat.id))));
+  await Promise.all(chats.map(({ host, conversation }) =>
+    recordRequestCancellation(host.harness, conversation.id, context)));
   for (const host of service.hosts.values()) {
     const state = await host.harness.inspect(context);
     for (const task of state.tasks) await host.harness.abortTask(task.record.id, context);
   }
-  await Promise.all((await service.list()).map(async chat => {
-    const { conversation } = await service.resolve(chat.id);
-    await conversation.abort(context, { background: true });
-  }));
+  await Promise.all(chats.map(({ conversation }) => conversation.abort(context, { background: true })));
+  await Promise.all(chats.map(({ host, conversation }) =>
+    recordRequestCancellation(host.harness, conversation.id, context)));
 }
 
 /** Trusted IPC endpoint. Concurrent requests allow steering/stop during an observation. */

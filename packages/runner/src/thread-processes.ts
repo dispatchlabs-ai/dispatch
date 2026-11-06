@@ -61,10 +61,10 @@ export class ThreadProcesses<Input extends ThreadInput> {
     this.writes.set(key, next);
     return next;
   }
-  private async worker(key: string, state: ThreadRecord<Input>): Promise<ThreadExecution | undefined> {
-    await this.stops.get(key);
+  private async worker(key: string, state: ThreadRecord<Input>, cancelOnly = false): Promise<ThreadExecution | undefined> {
+    if (!cancelOnly) await this.stops.get(key);
     state = (await this.record(key))!;
-    if (!state.active || state.input.timestamp <= state.cancelledThrough) return;
+    if (!cancelOnly && (!state.active || state.input.timestamp <= state.cancelledThrough)) return;
     const existing = this.workers.get(key);
     if (existing) return existing;
     let pending = this.starts.get(key);
@@ -72,14 +72,19 @@ export class ThreadProcesses<Input extends ThreadInput> {
       pending = (async () => {
         if (this.closing) throw new Error("Thread supervisor is closing.");
         const configuration = await this.launch(this.path(key), state.input, state.needsCancel);
+        let ready!: () => void;
+        const prepared = new Promise<void>(resolve => { ready = resolve; });
         let worker: ThreadExecution | undefined;
         worker = await this.execute({ key, directory: this.path(key), input: state.input,
           cancelPending: state.needsCancel, launch: configuration }, async event => {
-          if (event?.type === "ready") await this.change(key, current => {
-            if (!current) throw new Error("Missing thread record.");
-            if (current.cancelledThrough === state.cancelledThrough) current.needsCancel = false;
-            return current;
-          });
+          if (event?.type === "ready") {
+            if (!cancelOnly) await this.change(key, current => {
+              if (!current) throw new Error("Missing thread record.");
+              if (current.cancelledThrough === state.cancelledThrough) current.needsCancel = false;
+              return current;
+            });
+            ready();
+          }
           if (event?.type === "stream" && typeof event.key === "string" && typeof event.ts === "string") {
             await this.change(key, current => {
               if (!current) throw new Error("Missing thread record.");
@@ -104,6 +109,9 @@ export class ThreadProcesses<Input extends ThreadInput> {
           if (retained?.active && retained.input.timestamp > retained.cancelledThrough)
             await this.receive(retained.input);
         }).catch(console.error);
+        if (cancelOnly) await Promise.race([prepared, worker.exited.then(() => {
+          throw new Error("Cancellation worker exited before native cleanup was ready.");
+        })]);
         return worker;
       })();
       this.starts.set(key, pending);
@@ -137,20 +145,26 @@ export class ThreadProcesses<Input extends ThreadInput> {
       let superseded = false;
       const state = await this.change(key, current => {
         if (current && input.timestamp < current.cancelledThrough) { superseded = true; return current; }
-        return { ...(current ?? { key, input, streams: {} }), active: false, needsCancel: true,
+        return { ...(current ?? { key, input, streams: {} }), active: false, needsCancel: !!current,
           cancelledThrough: input.timestamp };
       });
       if (superseded) return;
       const worker = this.workers.get(key) ?? await this.starts.get(key);
       if (worker) await worker.close("cancel");
+      if (state.needsCancel) await this.cancelPending(key, state);
       // Read after exit so the last committed stream receipt is included.
       await this.writes.get(key);
       const latest = await this.record(key);
       await this.stopped(this.retain(state.input, input), Object.values(latest?.streams ?? state.streams));
-      await this.change(key, current => ({ ...current!, streams: {} }));
+      await this.change(key, current => ({ ...current!, streams: {}, needsCancel: false }));
     })();
     this.stops.set(key, stopping);
     try { await stopping; } finally { if (this.stops.get(key) === stopping) this.stops.delete(key); }
+  }
+  private async cancelPending(key: string, state: ThreadRecord<Input>) {
+    // Even cooperative Stop may hit its termination deadline before native cleanup.
+    const worker = (await this.worker(key, state, true))!;
+    await worker.close();
   }
   async recover() {
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
@@ -159,8 +173,9 @@ export class ThreadProcesses<Input extends ThreadInput> {
       // A supervisor can die after persisting Stop but before external cleanup.
       // Repeat the idempotent host cleanup before any new primary may recover.
       if (state.needsCancel) {
+        await this.cancelPending(state.key, state);
         await this.stopped(state.input, Object.values(state.streams));
-        await this.change(state.key, current => ({ ...current!, streams: {} }));
+        await this.change(state.key, current => ({ ...current!, streams: {}, needsCancel: false }));
       }
       if (state.active && state.input.timestamp > state.cancelledThrough) await this.receive(state.input);
     }));

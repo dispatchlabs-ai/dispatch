@@ -66,7 +66,9 @@ dispatch-service /srv/agents/config.json idle
 ```
 
 `send` returns native admission, not model completion. Read the receipt and
-snapshot to follow execution. `stop CHAT` aborts its work. `chats` lists saved
+snapshot to follow execution. `stop CHAT` aborts its work and cancels existing
+unfinished [request records](request-completion.md) in its owned scope. Sends
+admitted after Stop wait until its cancellation bookkeeping finishes. `chats` lists saved
 conversations. `schedules` exposes [agent-local deadlines and admissions](schedules.md).
 `status` reports unfinished native and adapter work, excluding future sleeping calendar tasks; `idle`
 returns a failure exit status when work remains.

@@ -24,6 +24,7 @@ import type { ReplySink } from "./replies.js";
 import { createHandoffs } from "./handoff.js";
 import { privateStateDirectory } from "./private-state.js";
 import { publicCommentary } from "./commentary.js";
+import { recordRequestCancellation } from "./request-completion.js";
 import { createInstanceMessaging, instanceMessagingExtension, type InstanceMessage } from "./messages.js";
 import { createSchedules, scheduleTaskKind } from "./schedules.js";
 import type { Artifact, ArtifactRecord, ArtifactOptions, createArtifacts } from "./artifacts.js";
@@ -73,6 +74,16 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     const agent = service.agents.find(candidate => candidate.id === from.split(":")[0]);
     if (!agent?.messages?.length) throw new Error("The sender has no instance messaging capability.");
     return createInstanceMessaging(namespace, agent, service);
+  }
+
+  const admissions = new WeakMap<object, Map<string, Promise<unknown>>>();
+  async function admit<T>(service: object, id: string, operation: () => Promise<T>): Promise<T> {
+    const pending = admissions.get(service) ?? new Map<string, Promise<unknown>>();
+    admissions.set(service, pending);
+    const next = (pending.get(id) ?? Promise.resolve()).catch(() => {}).then(operation);
+    pending.set(id, next);
+    try { return await next; }
+    finally { if (pending.get(id) === next) pending.delete(id); }
   }
 
   class ChatService {
@@ -303,13 +314,15 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
 
     async submit(id: string, text: string, requestId: string, mode: "followUp" | "steer" = "followUp", source: Chat["source"] = "web") {
       if (!text.trim() || !requestId.trim()) throw new Error("A message and request ID are required.");
-      const { chat, conversation } = await this.resolve(id);
-      const submission = await conversation.submit({
-        type: "input", content: text, requestId, whenBusy: mode,
-        entry: { kind: `${namespace}.message`, data: { source } },
-      }, context);
-      if (chat.title === "New chat") await this.rename(id, text);
-      return { submissionId: submission.id };
+      return admit(this, id, async () => {
+        const { chat, conversation } = await this.resolve(id);
+        const submission = await conversation.submit({
+          type: "input", content: text, requestId, whenBusy: mode,
+          entry: { kind: `${namespace}.message`, data: { source } },
+        }, context);
+        if (chat.title === "New chat") await this.rename(id, text);
+        return { submissionId: submission.id };
+      });
     }
 
     async receipt(id: string, submissionId: number) {
@@ -329,8 +342,13 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     }
 
     async stop(id: string) {
-      const { conversation } = await this.resolve(id);
-      await conversation.abort(context, { background: true });
+      await admit(this, id, async () => {
+        const { host, conversation } = await this.resolve(id);
+        await recordRequestCancellation(host.harness, conversation.id, context);
+        await conversation.abort(context, { background: true });
+        // Include a child or first request record created while native abort was taking effect.
+        await recordRequestCancellation(host.harness, conversation.id, context);
+      });
     }
 
     async compact(id: string, instructions?: string) {
