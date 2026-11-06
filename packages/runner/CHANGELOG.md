@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Keep chat models available in provider pools when another model type shares
+  the same ID.
+
 - Accept renewable authorization callbacks for gateway catalog and inference
   requests, including provider pools; refresh once on an authentication rejection
   before admission, with cancellation and same-origin credential confinement.
