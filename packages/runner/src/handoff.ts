@@ -2,11 +2,12 @@ import { createHash } from "node:crypto";
 import { Type } from "typebox";
 import { type AssistantMessage } from "@earendil-works/pi-ai";
 import {
-  LiveDoc, configure, defineDoc, defineExtension, defineTask, defineTool,
-  type AgentChange, type ConversationId,
+  AssistantEntry, LiveDoc, configure, defineDoc, defineExtension, defineTask, defineTool,
+  type AgentChange, type ConversationId, type TaskId, type ToolTaskInput, type Tx,
 } from "@earendil-works/pi-durable";
 import { createProgress } from "./progress.js";
 import { createReplies, type ReplyDestination, type ReplySink } from "./replies.js";
+import { publicCommentary } from "./commentary.js";
 
 type Job = {
   taskId: number; question: string; status: "working" | "done" | "failed" | "stopped";
@@ -15,7 +16,7 @@ type Job = {
 export function createHandoffs(namespace: string, Progress: ReturnType<typeof createProgress>["Progress"], publishReply: ReturnType<typeof createReplies>["publishReply"]) {
   const Handoffs = defineDoc<{
     child: number | null; monitor: number | null; jobs: Record<string, Job>;
-    reported: number[]; summary: string; result: string;
+    reported: number[]; summary: string; result: string; stopping?: boolean;
   }>({
     kind: `${namespace}.handoffs`, version: 1, scope: "conversation", history: "latest", fork: "initial",
     checkpointWhen: () => false,
@@ -23,6 +24,13 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
   });
   const textOf = (message?: AssistantMessage) =>
     message?.content.flatMap(part => part.type === "text" ? [part.text] : []).join("\n") ?? "";
+  const acknowledged = async (tx: Tx, taskId: TaskId, callId: string) => {
+    const input = (await tx.task(taskId))?.input as ToolTaskInput | undefined;
+    if (!input || input.kind === "nested") return false;
+    const message = (await tx.entry(AssistantEntry, input.assistant))?.model?.[0];
+    return message?.role === "assistant" && message.content.some(part => part.type === "toolCall" && part.id === callId)
+      && !!publicCommentary(message).trim();
+  };
 
   function handoffExtension(options: {
     target: string; supervisorName: string; configuration: AgentChange; supervisor: AgentChange;
@@ -63,11 +71,11 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
             job.status = answer && textOf(answer) ? "done" :
               receipt.status === "unanswered" && receipt.reason === "aborted" ? "stopped" : "failed";
             const message = answer && textOf(answer) ? answer :
-              job.status === "stopped" ? `${target}'s work was stopped.` :
+              job.status === "stopped" ? `The request to ${target} was cancelled.` :
                 `${target} could not finish this request. ${receipt.status === "unanswered" ? receipt.reason : "No answer was returned."}`;
             // Steering can combine several inputs into one answer.
             const answerId = receipt.status === "done" && receipt.type === "input" ? receipt.answer : undefined;
-            if (answerId === undefined || !state.reported.includes(answerId)) {
+            if (!(state.stopping && job.status === "stopped") && (answerId === undefined || !state.reported.includes(answerId))) {
               await publishReply(tx, runtime.conversationId, target, message, `handoff-result:${task.id}`, sink, job.destination);
               if (answerId !== undefined) state.reported.push(answerId);
               state.result = typeof message === "string" ? message : textOf(message);
@@ -107,11 +115,22 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
             }, context);
             return;
           }
+          if (state.stopping) {
+            await runtime.sleepUntil(runtime.now() + options.progressEveryMs, checkpoint, context);
+            return;
+          }
           const progress = await runtime.snapshot(Progress, state.child as ConversationId, context);
           const live = await runtime.snapshot(LiveDoc, state.child as ConversationId, context);
+          const requests: { question: string; status: string }[] = [];
+          await runtime.commit(async tx => {
+            for (const job of jobs) {
+              const receipt = await tx.submissionByRequest(state.child as ConversationId, `handoff:${job.taskId}`);
+              requests.push({ question: job.question, status: receipt?.status ?? "pending_admission" });
+            }
+          }, context);
           // Only public progress and tool status; never model reasoning.
           const facts = JSON.stringify({
-            requests: jobs.map(job => job.question),
+            requests,
             milestone: progress?.summary || null,
             tools: live?.tools?.filter(tool => tool.status !== "done").map(tool => tool.name) ?? [],
             working: !!live?.run,
@@ -134,7 +153,7 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
             return {
               status: "running", checkpoint: {
                 phase: "summarize", cycle: checkpoint.cycle, digest, narrator,
-                facts: `Previous update: ${state.summary || "(none)"}\nCurrent observed facts: ${facts}`,
+                facts: `Queued requests have been received but not delivered to the active run. Placed requests have reached the conversation; neither status proves their requested changes have been applied. Describe changes as applied only with supporting milestones.\nPrevious update: ${state.summary || "(none)"}\nCurrent observed facts: ${facts}`,
               },
             };
           }, context);
@@ -153,7 +172,7 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
           await runtime.commit(async tx => {
             const state = await tx.doc(Handoffs, runtime.conversationId);
             const jobs = Object.values(state.jobs).filter(job => job.status === "working");
-            if (jobs.length && answer && text && text !== "NO_UPDATE" && text !== state.summary) {
+            if (!state.stopping && jobs.length && answer && text && text !== "NO_UPDATE" && text !== state.summary) {
               await publishReply(tx, runtime.conversationId, options.supervisorName, answer, `progress:${task.id}:${checkpoint.cycle}`, sink, jobs.at(-1)?.destination);
               state.summary = text;
             }
@@ -187,13 +206,10 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
           const entries = await tx.scanEntries({ conversationId: api.conversationId, order: "descending" }, 30);
           const latest = entries.items.find(entry => entry.kind === `${namespace}.message`);
           const data = latest?.data as { slack?: ReplyDestination } | undefined;
-          const acknowledged = entries.items.some(entry => entry.model?.some(message =>
-            message.role === "assistant"
-            && message.content.some(part => part.type === "toolCall" && part.id === api.callId)
-            && message.content.some(part => part.type === "text" && part.text.trim())));
+          const hasAcknowledgement = await acknowledged(tx, api.taskId, api.callId);
           const state = await tx.doc(Handoffs, api.conversationId);
           const existing = state.jobs[String(api.taskId)];
-          if (existing) return { child: state.child, taskId: existing.taskId, acknowledged };
+          if (existing) return { child: state.child, taskId: existing.taskId, acknowledged: hasAcknowledgement };
           const background = { ownership: { kind: "conversation" }, background: true } as const;
           if (state.child === null) {
             const owner = await tx.createTask(anchor, null, background);
@@ -204,13 +220,14 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
           const taskId = await tx.createTask(worker, {
             child: state.child, call: String(api.taskId), question, mode: mode ?? "followUp",
           }, background);
+          state.stopping = false;
           state.jobs[String(api.taskId)] = {
             taskId, question, status: "working", ...(data?.slack ? { destination: data.slack } : {}),
           };
           if (state.monitor === null) {
             state.monitor = await tx.createTask(monitor, { firstAt: api.now() + options.progressEveryMs }, background);
           }
-          return { child: state.child, taskId, acknowledged };
+          return { child: state.child, taskId, acknowledged: hasAcknowledgement };
         }, context);
         return {
           output: [{ type: "text", text: `${target} has the request and is working in the background. Respond to the user now with one brief acknowledgement. Do not wait, poll, or answer the technical question yourself.` }],
@@ -229,6 +246,7 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
         const progress = state?.child ? await api.snapshot(Progress, state.child as ConversationId, context) : undefined;
         return { output: [{ type: "text", text: JSON.stringify({
           jobs: Object.values(state?.jobs ?? {}).map(job => ({ question: job.question, status: job.status })),
+          stopping: !!state?.stopping && Object.values(state.jobs).some(job => job.status === "working"),
           progress: progress?.summary ?? null, lastResult: state?.result ?? null,
         }) }] };
       },
@@ -238,8 +256,26 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
       parameters: Type.Object({}), replay: "unsafe",
       async execute(_args, api, context) {
         const state = await api.snapshot(Handoffs, api.conversationId, context);
-        if (state?.child) await (await api.conversation(state.child as ConversationId, context))?.abort(context, { background: true });
-        return { output: [{ type: "text", text: `${target}'s current work is stopped.` }] };
+        const hasAcknowledgement = await api.commit(tx => acknowledged(tx, api.taskId, api.callId), context);
+        if (state?.child) {
+          const child = await api.conversation(state.child as ConversationId, context);
+          if (child) {
+            await api.commit(async tx => { (await tx.doc(Handoffs, api.conversationId)).stopping = true; }, context);
+            await child.abort(context, { background: true });
+          }
+        }
+        const text = `${target}'s current work is stopped.`;
+        if (hasAcknowledgement) {
+          // Native abort has drained the child. Publish one completion notice,
+          // rather than one for each withdrawn steering input.
+          await api.commit(async tx => {
+            const state = await tx.doc(Handoffs, api.conversationId);
+            await publishReply(tx, api.conversationId, target, text, `handoff-stop:${api.taskId}`, sink,
+              Object.values(state.jobs).at(-1)?.destination);
+            state.result = text;
+          }, context);
+        }
+        return { output: [{ type: "text", text }], ...(hasAcknowledgement ? { control: { terminate: true as const } } : {}) };
       },
     });
     return defineExtension({ name: `${namespace}.handoff`, tasks: [anchor, worker, monitor], tools: [ask, status, stop] });

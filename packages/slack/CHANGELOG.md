@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Deliver initial partial text without waiting for a sentence or status API call.
+  Renew and clear thread indicators in a recoverable native background task.
+  Preserve ordered acknowledgements for successful tool-requested termination
+  without a duplicate reply or false empty-answer notice.
+
 - Preserve retained thread identities when routes change, and optionally pin immutable application entrypoints and Node executables for recovery.
 
 - Share one reply when a follow-up joins active work. Persist commentary cursors

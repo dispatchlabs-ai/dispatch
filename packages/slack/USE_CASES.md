@@ -14,7 +14,10 @@
   beyond Slack's stream lifetime, renew the native loading indicator during quiet
   execution, and show safe execution-derived progress without requiring model
   narration. Retain completed public commentary in order across model rounds and
-  process restarts, followed by the final answer. Buffer unfinished sentences.
+  process restarts, followed by the final answer. Stream initial response text
+  without waiting for status writes; buffer unfinished sentences in editable
+  tool progress. Recognize successful native termination with a delivered
+  acknowledgement without a duplicate reply or false failure notice.
   Keep unchanged external-workflow heartbeats in one editable status. Allow trusted hosts to describe the
   actual operation and select public subjects for both the progress message and
   loading text; completion of an earlier turn must not clear a later active turn.

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Preserve the caller's abort signal across authenticated gateway requests and
+  retries, including after response headers arrive and temporary requests expire.
+
+- Include native queued/placed receipt states in handoff progress and distinguish
+  requested changes from verified work. Suppress progress during cancellation
+  and publish one stop confirmation after native work drains. Acknowledged stops
+  settle without a redundant model round; empty acknowledgements do not terminate.
+
 - Keep chat models available in provider pools when another model type shares
   the same ID.
 
