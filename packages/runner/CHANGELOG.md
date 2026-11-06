@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Share durable thread-process supervision across delivery adapters; carry terminal
+  workflow status explicitly without changing existing Slack routes or identities.
+
 - Compose optional immutable Fleet application releases; allow isolated native
   tools to use host-supplied Pi Storage and execution environments.
 - Support one exact root-owned persistent workspace bind for fleet recovery,

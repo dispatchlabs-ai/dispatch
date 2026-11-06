@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Reuse Runner thread supervision while preserving Slack process, route, profile
+  and cancellation recovery behavior.
+
 - Add trusted channel profiles, pinned per supervised thread, while preserving
   string channel routes and keeping capability grants with host policy.
 - Allow host-injected thread execution and a token-free worker Web API relay;

@@ -10,7 +10,8 @@ For company agents that run independently of the browser,
 [Dispatch Runner](packages/runner/README.md) loads agent directories and owns
 native schedules and conversations. The optional
 [Slack package](packages/slack/README.md) connects shared threads and report
-discussions. The [Email package](packages/email/README.md) connects incoming work,
+discussions. The [Google Chat package](packages/google-chat/README.md) connects
+app interactions through Pub/Sub. The [Email package](packages/email/README.md) connects incoming work,
 replies and agent-initiated mail with explicit sending enablement. These source-alpha packages are installed as locally packed
 dependencies.
 

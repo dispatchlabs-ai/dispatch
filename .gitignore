@@ -15,3 +15,4 @@ result-*
 # Compiled workspace libraries are packed from source, not committed.
 packages/runner/dist/
 packages/slack/dist/
+packages/google-chat/dist/

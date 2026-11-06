@@ -31,7 +31,7 @@ import type { Artifact, ArtifactRecord, ArtifactOptions, createArtifacts } from 
 export const context = BACKGROUND_CONTEXT;
 export type Chat = {
   id: string; agent: string; conversationId: number; title: string;
-  source: "cli" | "web" | "slack" | "phone" | "email" | "agent" | "schedule"; createdAt: string; origin?: JsonObject;
+  source: "cli" | "web" | "slack" | "google-chat" | "phone" | "email" | "agent" | "schedule"; createdAt: string; origin?: JsonObject;
 };
 export function createChats(namespace: string, openAgent: ReturnType<typeof createRuntime>["openAgent"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"], Artifacts: ReturnType<typeof createArtifacts>["Artifacts"]) {
   const Chats = defineDoc<{

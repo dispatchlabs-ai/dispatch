@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { defineDoc, defineTask, type TaskId } from "@earendil-works/pi-durable";
-import type { ReplyDestination, ReplySink } from "@dispatch/runner";
+import type { ReplyDestination, StatusSink } from "@dispatch/runner";
 import type { SlackWebApi } from "./api.js";
 import { fallbackText, replyBlocks } from "./text.js";
 
@@ -70,7 +70,7 @@ export function createStatusDelivery(namespace: string, client: SlackWebApi) {
       await runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), context);
     },
   });
-  const queue: ReplySink = async (tx, conversationId, destination, text, key) => {
+  const queue: StatusSink = async (tx, conversationId, destination, text, key) => {
     const { slots } = await tx.doc(Statuses, conversationId);
     const previous = slots[key];
     if (previous?.text === text) return;

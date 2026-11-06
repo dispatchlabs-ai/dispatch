@@ -6,6 +6,8 @@ export type ReplySink = (
   tx: Tx, conversationId: ConversationId, destination: ReplyDestination, text: string, key: string,
 ) => Promise<void>;
 
+export type StatusSink = (...args: [...Parameters<ReplySink>, finished?: boolean]) => Promise<void>;
+
 export function createReplies(namespace: string) {
   /** The visible entry and the transport outbox are committed together. */
   async function publishReply(
@@ -23,7 +25,7 @@ export function createReplies(namespace: string) {
       }),
     });
     if (destination) {
-      if (!sink) throw new Error("This reply needs the Slack adapter.");
+      if (!sink) throw new Error("This reply needs a delivery adapter.");
       await sink(tx, conversationId, destination, `${author}:\n${text}`, key);
     }
   }

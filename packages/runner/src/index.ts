@@ -32,7 +32,7 @@ export { withPrivateProviderErrors } from "./private-provider-errors.js";
 export type { AgentHost, OpenOptions, RunnerState, StatusFile, StartOptions, StorageFactory } from "./runtime.js";
 export type { AgentSetup } from "./configuration.js";
 export type { Chat, ChatInitializer, ChatMessage, ChatService, ChatSnapshot } from "./chat.js";
-export type { ReplyDestination, ReplySink } from "./replies.js";
+export type { ReplyDestination, ReplySink, StatusSink } from "./replies.js";
 export { context } from "./chat.js";
 export { run } from "./run.js";
 export type { Adapter, PreparedAdapter, RunOptions } from "./run.js";
@@ -61,3 +61,6 @@ export function createRunner(options: { namespace?: string; workspacePrefix?: st
 }
 
 export type Runner = ReturnType<typeof createRunner>;
+
+export { ThreadProcesses } from "./thread-processes.js";
+export type { ThreadInput, ThreadExecution, ThreadExecutor, ThreadLaunch } from "./thread-processes.js";

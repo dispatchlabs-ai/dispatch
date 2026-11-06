@@ -14,9 +14,10 @@
           runtime = import ./packages/runner/nix/runtime.nix { inherit pkgs; };
           runner = pkgs.callPackage ./packages/runner/nix/package.nix { inherit (runtime) nodejs_24; };
           runner-slack = pkgs.callPackage ./packages/runner/nix/package.nix { inherit (runtime) nodejs_24; withSlack = true; };
+          runner-google-chat = pkgs.callPackage ./packages/runner/nix/package.nix { inherit (runtime) nodejs_24; withGoogleChat = true; };
           runner-fleet = pkgs.callPackage ./packages/runner/nix/package.nix { inherit (runtime) nodejs_24; withSlack = true; withFleet = true; };
         in {
-          packages = { default = web; inherit runner runner-slack runner-fleet; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
+          packages = { default = web; inherit runner runner-slack runner-fleet runner-google-chat; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
             macos-release = pkgs.callPackage ./packages/web/nix/macos-release.nix { inherit web; };
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             oci = pkgs.callPackage ./packages/web/nix/oci.nix {
@@ -36,6 +37,7 @@
           checks.runner = runner;
           checks.runner-slack = runner-slack;
           checks.runner-fleet = runner-fleet;
+          checks.runner-google-chat = runner-google-chat;
           devShells.default = pkgs.mkShell {
             packages = [ runtime.nodejs_24 ];
           };
@@ -43,17 +45,19 @@
     in {
       lib.agentRuntime = { system }:
         import ./packages/runner/nix/runtime.nix { pkgs = import nixpkgs { inherit system; }; };
-      lib.mkAgentRelease = { system, withSlack ? false, withFleet ? false, execution ? null, ... }@args:
+      lib.mkAgentRelease = { system, withSlack ? false, withFleet ? false, withGoogleChat ? false, execution ? null, ... }@args:
         let pkgs = import nixpkgs { inherit system; };
         in (pkgs.callPackage ./packages/runner/nix/release.nix {
           runtime = if execution != null then execution.package
-            else if withFleet then (forSystem system).packages.runner-fleet
-            else if withSlack then (forSystem system).packages.runner-slack else (forSystem system).packages.runner;
+            else pkgs.callPackage ./packages/runner/nix/package.nix {
+              inherit ((import ./packages/runner/nix/runtime.nix { inherit pkgs; })) nodejs_24;
+              inherit withFleet withGoogleChat; withSlack = withSlack || withFleet;
+            };
           runtimeRevision = if execution != null then execution.revision else self.rev or self.dirtyRev or "uncommitted";
           watcher = (forSystem system).packages.runner;
           watcherRevision = self.rev or self.dirtyRev or "uncommitted";
           fleetTools = if withFleet then import ./packages/fleet/nix/tools.nix { inherit pkgs; } else null;
-        }) (builtins.removeAttrs args [ "system" "withSlack" "withFleet" "execution" ]);
+        }) (builtins.removeAttrs args [ "system" "withSlack" "withFleet" "withGoogleChat" "execution" ]);
       packages = eachSystem (system: (forSystem system).packages);
       checks = eachSystem (system: (forSystem system).checks);
       devShells = eachSystem (system: (forSystem system).devShells);

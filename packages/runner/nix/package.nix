@@ -1,4 +1,4 @@
-{ lib, stdenv, buildNpmPackage, nodejs_24, python3, makeWrapper, autoPatchelfHook, libxcb, withSlack ? false, withFleet ? false }:
+{ lib, stdenv, buildNpmPackage, nodejs_24, python3, makeWrapper, autoPatchelfHook, libxcb, withSlack ? false, withFleet ? false, withGoogleChat ? false }:
 
 assert lib.assertMsg (lib.versions.major nodejs_24.version == "24" && lib.versionAtLeast nodejs_24.version "24.22.1")
   "Runner releases require patched Node 24.22.1+ within 24.x";
@@ -17,6 +17,7 @@ buildNpmPackage {
       ../../web/package.json
       ../../remote/package.json
       ../../slack/package.json
+      ../../google-chat/package.json
       ../../observer/package.json
       ../../email/package.json
       ../../fleet/package.json
@@ -25,19 +26,22 @@ buildNpmPackage {
       ../src
       ../native
       ../scripts
-    ] ++ lib.optionals withSlack [ ../../slack/src ../../slack/tsconfig.json ]
+    ] ++ lib.optionals withGoogleChat [ ../../google-chat/src ../../google-chat/tsconfig.json ]
+      ++ lib.optionals withSlack [ ../../slack/src ../../slack/tsconfig.json ]
       ++ lib.optionals withFleet [ ../../fleet/src ../../fleet/scripts ../../fleet/tsconfig.json ]);
   };
-  npmDepsHash = "sha256-XQEg/yk53uKKYlyK4w+R6whcEuS3Qm5Vr44s5DJ2DXw=";
+  npmDepsHash = "sha256-uHntmEwIE+mSvFyKRfrPNyXaM2Rk3EZME08ZKGL2EkI=";
   npmInstallFlags = [ "--workspace=@dispatch/runner" "--include-workspace-root=false" ]
+    ++ lib.optional withGoogleChat "--workspace=@dispatch/google-chat"
     ++ lib.optional withSlack "--workspace=@dispatch/slack"
     ++ lib.optional withFleet "--workspace=@dispatch/fleet";
   npmWorkspace = "packages/runner";
-  postBuild = lib.optionalString withSlack "npm run build --workspace=@dispatch/slack\n"
+  postBuild = lib.optionalString withGoogleChat "npm run build --workspace=@dispatch/google-chat\n"
+    + lib.optionalString withSlack "npm run build --workspace=@dispatch/slack\n"
     + lib.optionalString withFleet "npm run build --workspace=@dispatch/fleet\n";
   installPhase = ''
     runHook preInstall
-    npm prune --workspace=@dispatch/runner ${lib.optionalString withSlack "--workspace=@dispatch/slack"} ${lib.optionalString withFleet "--workspace=@dispatch/fleet"} --include-workspace-root=false --omit=dev --ignore-scripts
+    npm prune --workspace=@dispatch/runner ${lib.optionalString withGoogleChat "--workspace=@dispatch/google-chat"} ${lib.optionalString withSlack "--workspace=@dispatch/slack"} ${lib.optionalString withFleet "--workspace=@dispatch/fleet"} --include-workspace-root=false --omit=dev --ignore-scripts
     app="$out/lib/dispatch-runner"
     mkdir -p "$app/packages/runner" "$out/bin"
     cp package.json package-lock.json LICENSE "$app/"
@@ -53,6 +57,12 @@ buildNpmPackage {
       cp -R packages/slack/dist "$app/packages/slack/"
       if test -d packages/slack/node_modules; then cp -R packages/slack/node_modules "$app/packages/slack/"; fi
     ''}
+    ${lib.optionalString withGoogleChat ''
+      mkdir -p "$app/packages/google-chat"
+      cp packages/google-chat/package.json "$app/packages/google-chat/"
+      cp -R packages/google-chat/dist "$app/packages/google-chat/"
+      if test -d packages/google-chat/node_modules; then cp -R packages/google-chat/node_modules "$app/packages/google-chat/"; fi
+    ''}
     ${lib.optionalString withFleet ''
       mkdir -p "$app/packages/fleet"
       cp packages/fleet/package.json "$app/packages/fleet/"
@@ -65,7 +75,7 @@ buildNpmPackage {
     import { existsSync, mkdirSync, readFileSync, symlinkSync } from "node:fs";
     import { dirname, join } from "node:path";
     const [app, modules] = process.argv.slice(2);
-    for (const component of ["runner"${lib.optionalString withSlack '', "slack"''}${lib.optionalString withFleet '', "fleet"''}]) {
+    for (const component of ["runner"${lib.optionalString withGoogleChat '', "google-chat"''}${lib.optionalString withSlack '', "slack"''}${lib.optionalString withFleet '', "fleet"''}]) {
     const directory = join(app, "packages", component);
     const manifest = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
     for (const name of [manifest.name, ...Object.keys(manifest.dependencies), ...Object.keys(manifest.optionalDependencies ?? {})]) {

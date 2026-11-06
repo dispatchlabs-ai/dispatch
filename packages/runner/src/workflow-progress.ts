@@ -2,7 +2,7 @@ import {
   defineDoc, defineExtension, defineTask, InboxDoc, type JsonObject, type ToolExecutionApi, type TaskId, type Tx, type ConversationId,
 } from "@earendil-works/pi-durable";
 import type { Context } from "@earendil-works/chord/context";
-import { createReplies, type ReplyDestination, type ReplySink } from "./replies.js";
+import { createReplies, type ReplyDestination, type ReplySink, type StatusSink } from "./replies.js";
 
 export type WorkflowWatch = {
   run: string; author: string; origin: JsonObject; destination?: ReplyDestination;
@@ -28,7 +28,7 @@ export function createWorkflowProgress(options: {
   authorize(watch: WorkflowWatch): void | Promise<void>;
   sink?: ReplySink;
   /** Replace one status message identified by key; never append a heartbeat. */
-  statusSink?: ReplySink;
+  statusSink?: StatusSink;
   /** Keep routine narration in one editable status instead of new replies. */
   narration?: "replies" | "status";
   /** Atomically queue a trusted native continuation when the assignment returns. */
@@ -97,7 +97,7 @@ export function createWorkflowProgress(options: {
             const text = inputPending ? "Your update was received; waiting for the assistant to process it."
               : observation.settled || options.narration === "status" ? observation.summary
               : `${observation.activity ?? "The workflow is active."}${age ? ` No new progress report for ${age} minute${age === 1 ? "" : "s"}.` : ""}`;
-            await options.statusSink(tx, runtime.conversationId, task.input.destination, text, `workflow-status:${task.input.run}`);
+            await options.statusSink(tx, runtime.conversationId, task.input.destination, text, `workflow-status:${task.input.run}`, observation.settled && !inputPending);
           }
           if (observation.settled && !inputPending) {
             await options.onSettled?.(tx, runtime.conversationId, task.input, observation,
