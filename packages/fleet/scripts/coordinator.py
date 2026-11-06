@@ -124,11 +124,14 @@ class Broker:
                 value['fleetCleanup'] = True
                 placement = self.controller.place(value, cleanup=True)
             if placement:
-                if cancel:
+                if cancel and not value.get('fleetCleanup'):
                     try: self.controller.command(placement, run, 'request', {'command': {'tool': 'cancel'}}, timeout=30)
                     except Exception: pass  # Persisted intent precedes the bounded best-effort native abort.
                 try:
-                    self.controller.suspend(value, timeout=60)
+                    # A cleanup-only epoch is installed by space.delete itself;
+                    # no native process has been admitted under that ownership.
+                    if not value.get('fleetCleanup'):
+                        self.controller.suspend(value, timeout=60)
                     self.controller.command(placement, run, 'space.delete', {'finished': finished, 'assignment': value}, timeout=120)
                 except Exception:
                     with self.controller.condition:
