@@ -44,7 +44,9 @@ export async function refreshGatewayModels(origin: string, models: any, key?: st
       const group = target.slice(9);
       const members = catalog.connections.filter((c: any) => c.provider === group);
       if (!members.length) throw new Error(`Model alias ${provider} requires gateway provider ${group}.`);
-      const models = [...new Map<string, any>(members.flatMap((c: any) => c.models.map((model: any) => [model.id, model]))).values()];
+      const models = [...new Map<string, any>(members.flatMap((c: any) => c.models
+        .filter((model: any) => !model.type || model.type === 'chat')
+        .map((model: any) => [model.id, model]))).values()];
       bindings.push({ provider, group, hidden, connection: { models }, name: hidden ? `${provider} (earlier selection)` : `${group} pool` });
       continue;
     }
