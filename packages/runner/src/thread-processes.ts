@@ -8,7 +8,7 @@ export type ThreadInput = { key: string; agent: string; timestamp: string };
 
 type ThreadRecord<Input extends ThreadInput> = {
   key: string; input: Input; active: boolean; needsCancel: boolean;
-  cancelledThrough: string; streams: Record<string, string>;
+  cancelledThrough: string; streams: Record<string, string>; stopInput?: Input;
 };
 export type ThreadLaunch = { module: string; args: string[]; options: ForkOptions };
 export type ThreadExecution = {
@@ -146,6 +146,7 @@ export class ThreadProcesses<Input extends ThreadInput> {
       const state = await this.change(key, current => {
         if (current && input.timestamp < current.cancelledThrough) { superseded = true; return current; }
         return { ...(current ?? { key, input, streams: {} }), active: false, needsCancel: !!current,
+          stopInput: current ? this.retain(current.input, input) : input,
           cancelledThrough: input.timestamp };
       });
       if (superseded) return;
@@ -174,7 +175,7 @@ export class ThreadProcesses<Input extends ThreadInput> {
       // Repeat the idempotent host cleanup before any new primary may recover.
       if (state.needsCancel) {
         await this.cancelPending(state.key, state);
-        await this.stopped(state.input, Object.values(state.streams));
+        await this.stopped(state.stopInput ?? state.input, Object.values(state.streams));
         await this.change(state.key, current => ({ ...current!, streams: {}, needsCancel: false }));
       }
       if (state.active && state.input.timestamp > state.cancelledThrough) await this.receive(state.input);

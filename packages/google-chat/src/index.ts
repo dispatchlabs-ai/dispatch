@@ -27,7 +27,10 @@ export type GoogleChatOptions = {
   allowContinuation?: (tx: Tx, conversationId: ConversationId, request: string) => Promise<boolean>;
 };
 type Turn = ReplyDestination & { key: string; text: string; replyText?: string; after?: number; continuation?: string };
-type TurnState = { phase: "answer"; admitted?: boolean } | { phase: "deliver"; text: string; offset: number; retryAt: number; after?: number };
+type TurnState = { phase: "answer"; admitted?: boolean } | {
+  phase: "deliver"; text: string; offset: number; retryAt: number; after?: number;
+  status?: { key: string; task: number };
+};
 const complete = { status: "terminal", outcome: { status: "completed", result: null } } as const;
 const retryDelay = (error: unknown) => error instanceof GoogleApiError ? error.retryAfter : 30_000;
 
@@ -50,7 +53,10 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
         !/^users\/\d+$/.test(value.user) || config.allowedUsers && !config.allowedUsers.includes(value.user))
       throw new Error("Unconfigured Google Chat destination.");
   };
-  const Inbox = defineDoc<{ tasks: Record<string, number>; threads: Record<string, number>; stopped: Record<string, string> }>({
+  const Inbox = defineDoc<{
+    tasks: Record<string, number>; threads: Record<string, number>; stopped: Record<string, string>;
+    acknowledgements?: Record<string, string>;
+  }>({
     kind: `${namespace}.google-chat-inbox`, version: 1, scope: "session",
     initial: () => ({ tasks: {}, threads: {}, stopped: {} }), checkpointWhen: () => false,
   });
@@ -65,6 +71,16 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
   });
   let startService!: (service: ChatService) => void;
   const ready = new Promise<ChatService>(resolve => { startService = resolve; });
+  async function acknowledgeStop(input: GoogleChatInput, messages: string[], signal?: AbortSignal) {
+    const service = await ready;
+    const name = await service.host(input.agent).harness.commit(async tx => {
+      const inbox = await tx.doc(Inbox);
+      inbox.acknowledgements ??= {};
+      return inbox.acknowledgements[input.key] ??= [...new Set(messages)].sort()[0]
+        ?? `${input.space}/messages/${messageId(`${input.key}:stopped`)}`;
+    }, context);
+    await client.stopMessage(name, input.thread, signal);
+  }
   const statusTask = defineTask<ReplyDestination & { key: string; revision: number; previous?: number },
     { phase: "deliver"; retryAt: number }, null>({
     name: `${namespace}.google-chat-status`, version: 1, initial: () => ({ phase: "deliver", retryAt: 0 }),
@@ -76,8 +92,7 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
       try {
         const key = `${task.input.thread}:status:${task.input.key}`;
         const name = `${task.input.channel}/messages/${messageId(key)}`;
-        if (slot.finished && !slot.text) await client.deleteMessage(name, runtime.signal);
-        else {
+        if (slot.text) {
           if (!slot.finished) await options.onStream?.({ key, ts: name });
           await runtime.commit(async tx => { (await tx.doc(Statuses, runtime.conversationId)).slots[task.input.key]!.open = true; }, ctx);
           await client.message(task.input.channel, task.input.thread, messageChunk(slot.text, 0, task.input.thread), key, true, runtime.signal);
@@ -199,22 +214,35 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
         if (!text.trim()) text = "The assistant ended without a final answer; completion has not been verified.";
         await runtime.commit(async tx => {
           const after = (await tx.doc(Output, runtime.conversationId)).commentary[task.input.key]?.after;
-          return { status: "running", checkpoint: { phase: "deliver", text, offset: 0, retryAt: 0, ...(after ? { after } : {}) } };
+          const key = `turn:${task.input.key}`;
+          const slot = (await tx.doc(Statuses, runtime.conversationId)).slots[key];
+          // Retire queued status writers before reusing their message for the answer.
+          if (slot) { slot.finished = true; slot.revision++; }
+          return { status: "running", checkpoint: { phase: "deliver", text, offset: 0, retryAt: 0,
+            ...(after ? { after } : {}), ...(slot ? { status: { key, task: slot.task } } : {}) } };
         }, ctx);
       },
       async deliver(task, runtime, ctx) {
         const state = task.state.checkpoint;
         if (state.after) await runtime.waitForTask(state.after as TaskId, ctx);
+        if (state.status) await runtime.waitForTask(state.status.task as TaskId, ctx);
         if (state.retryAt > runtime.now()) return runtime.sleepUntil(state.retryAt, state, ctx);
         const text = messageChunk(state.text, state.offset, task.input.thread);
+        const status = state.offset === 0 ? state.status : undefined;
         if (text) {
-          try { await client.message(task.input.channel, task.input.thread, text, `${task.input.thread}:${task.input.key}:${state.offset}`, false, runtime.signal); }
+          try {
+            const key = status ? `${task.input.thread}:status:${status.key}` : `${task.input.thread}:${task.input.key}:${state.offset}`;
+            const name = await client.message(task.input.channel, task.input.thread, text, key, !!status, runtime.signal);
+            if (status) await options.onStream?.({ key, ts: name, done: true });
+          }
           catch (error) { runtime.signal.throwIfAborted(); runtime.report(error); await runtime.sleepUntil(runtime.now() + retryDelay(error), state, ctx); return; }
         }
         const offset = state.offset + text.length;
         await runtime.commit(async tx => {
+          if (status) (await tx.doc(Statuses, runtime.conversationId)).slots[status.key]!.open = false;
           if (offset < state.text.length) return { status: "running", checkpoint: { ...state, offset } };
-          if (task.input.replyText === undefined)
+          // Older delivery checkpoints retain their reply ID; retire any remaining status without deleting it.
+          if (!state.status && task.input.replyText === undefined)
             await setStatus(tx, runtime.conversationId, task.input, "", `turn:${task.input.key}`, true);
           return complete;
         }, ctx);
@@ -246,18 +274,17 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
                 await service.stop(chat.id);
                 const statuses = await service.host(input.agent).conversation.commit(async tx =>
                   (await tx.doc(Statuses, chat.conversationId as ConversationId)).slots, ctx);
-                for (const [statusKey, slot] of Object.entries(statuses)) if (slot.open) {
-                  await client.deleteMessage(`${input.space}/messages/${messageId(`${input.thread}:status:${statusKey}`)}`, runtime.signal);
-                  await service.host(input.agent).conversation.commit(async tx => {
-                    (await tx.doc(Statuses, chat.conversationId as ConversationId)).slots[statusKey]!.open = false;
-                  }, ctx);
-                }
+                await acknowledgeStop(input, Object.entries(statuses).filter(([, slot]) => slot.open)
+                  .map(([statusKey]) => `${input.space}/messages/${messageId(`${input.thread}:status:${statusKey}`)}`), runtime.signal);
+                await service.host(input.agent).conversation.commit(async tx => {
+                  for (const slot of Object.values((await tx.doc(Statuses, chat.conversationId as ConversationId)).slots)) slot.open = false;
+                }, ctx);
               }
             }
           }
           checkpoint = { ...checkpoint, stopped: true };
           await runtime.commit(() => ({ status: "running", checkpoint }), ctx);
-          await client.message(input.space, input.thread, "Stopped.", `${input.key}:stopped`, false, runtime.signal);
+          await acknowledgeStop(input, [], runtime.signal);
         } catch (error) {
           runtime.signal.throwIfAborted(); runtime.report(error);
           await runtime.sleepUntil(runtime.now() + retryDelay(error), checkpoint, ctx); return;
@@ -323,7 +350,7 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
     async queueContinuation(...[tx, id, destination, text, key, request]: [...Parameters<ReplySink>, string]) {
       await enqueue(tx, id, { ...destination, text, key, continuation: request });
     },
-    async stopStreams(_input: GoogleChatInput, messages: string[]) { await Promise.all(messages.map(name => client.deleteMessage(name))); },
+    stopStreams: acknowledgeStop,
     connected: () => connected,
     async start(service: ChatService, listen = true) {
       for (const agent of Object.values(config.spaces)) service.host(agent);

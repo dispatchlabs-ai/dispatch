@@ -7,6 +7,8 @@
   prevent cancelled input from reopening a request while abort takes effect.
 - Finish native cancellation before acknowledging Stop even after a worker has
   exited or exceeded its cooperative cleanup deadline.
+- Retain the actual Stop input for thread cleanup recovery and acknowledgement
+  identity, preserving the thread's originally selected agent.
 
 - Share durable thread-process supervision across delivery adapters; carry terminal
   workflow status explicitly without changing existing Slack routes or identities.

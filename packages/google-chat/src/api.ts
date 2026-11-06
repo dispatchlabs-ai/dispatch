@@ -88,17 +88,17 @@ export class GoogleChatApi {
     }
     return name;
   }
-  async stopMessage(name: string, thread: string) {
-    try { await this.request("chat", `${name}?updateMask=text`, "PATCH", { text: "Stopped." }); }
+  async stopMessage(name: string, thread: string, signal?: AbortSignal) {
+    try { await this.request("chat", `${name}?updateMask=text`, "PATCH", { text: "Stopped." }, signal); }
     catch (error) {
       if (!(error instanceof GoogleApiError) || error.status !== 404) throw error;
       const [space, id] = name.split("/messages/");
       try {
         await this.request("chat", `${space}/messages?messageId=${id}&messageReplyOption=REPLY_MESSAGE_OR_FAIL`, "POST",
-          { text: "Stopped.", thread: { name: thread } });
+          { text: "Stopped.", thread: { name: thread } }, signal);
       } catch (error) {
         if (!(error instanceof GoogleApiError) || error.status !== 409) throw error;
-        await this.request("chat", `${name}?updateMask=text`, "PATCH", { text: "Stopped." });
+        await this.request("chat", `${name}?updateMask=text`, "PATCH", { text: "Stopped." }, signal);
       }
     }
   }

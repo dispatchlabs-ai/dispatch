@@ -380,7 +380,8 @@ in the native store without model calls. This does not undo external effects.
 including when the previous worker already exited. Its executor must publish
 `ready` only after `cancelPending` cleanup finishes; no input is sent during that
 reopen. Recovery retains the cancellation flag until native and presentation
-cleanup both succeed.
+cleanup both succeed, and passes the retained Stop input to presentation cleanup
+so its acknowledgement keeps the same identity.
 
 ### Conversation defaults and protected execution
 
