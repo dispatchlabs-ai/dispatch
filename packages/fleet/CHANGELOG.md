@@ -12,6 +12,8 @@
   modules by disabling runtime bytecode writes.
 - Allow the trusted root worker to verify its workspace firewall without
   changing native agent or computer-service permissions.
+- Use the operating system's socket backlog for fleet control and run relays
+  so bursts of native storage connections can wait for acceptance.
 
 ## [0.6.0]
 

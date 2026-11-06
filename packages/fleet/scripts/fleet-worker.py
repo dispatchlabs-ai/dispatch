@@ -126,6 +126,7 @@ class UnixConnection(http.client.HTTPConnection):
 
 class UnixHTTP(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
     daemon_threads = True
+    request_queue_size = socket.SOMAXCONN
 
 
 def worker_request(run, command, timeout=None):

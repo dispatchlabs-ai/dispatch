@@ -32,6 +32,10 @@ class UnixConnection(http.client.HTTPConnection):
         self.sock.connect(self.path)
 
 
+class HTTPServer(http.server.ThreadingHTTPServer):
+    request_queue_size = socket.SOMAXCONN
+
+
 class Controller:
     def __init__(self, config, broker):
         import boto3
@@ -138,7 +142,7 @@ class Controller:
                 self.send_header('Content-Length', str(len(payload)))
                 self.end_headers(); self.wfile.write(payload)
 
-        server = http.server.ThreadingHTTPServer(('0.0.0.0', self.config.get('port', 8788)), Handler)
+        server = HTTPServer(('0.0.0.0', self.config.get('port', 8788)), Handler)
         server.daemon_threads = True
         threading.Thread(target=server.serve_forever, daemon=True).start()
         threading.Thread(target=self.monitor, daemon=True).start()
