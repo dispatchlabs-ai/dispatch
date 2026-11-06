@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Accept renewable authorization callbacks for gateway catalog and inference
+  requests, including provider pools; refresh once on an authentication rejection
+  before admission, with cancellation and same-origin credential confinement.
+
 - Record explicit Stop in unfinished request summaries, including owned children
   and paused-store recovery. Preserve completed requests and ordinary suspension;
   prevent cancelled input from reopening a request while abort takes effect.
