@@ -4,11 +4,32 @@ import { AssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-s
 
 export type ModelChoice = { provider: string; providerName: string; id: string; name: string; levels: string[]; images?: boolean; hidden?: boolean };
 export type GatewayAliases = Record<string, string | { target: string; hidden?: boolean }>;
+export type GatewayAuthorization = (options?: { forceRefresh?: boolean; signal?: AbortSignal }) => Promise<string>;
 const filtered = (options: any) => Object.fromEntries(Object.entries(options ?? {}).filter(([key, value]) =>
   value !== undefined && !['model','toolExecution','apiKey','headers','env','signal','fetch','onPayload','onResponse','onProviderStreamEvent','identity','telemetry','telemetryContext','transformHeaders'].includes(key)));
 
-export async function refreshGatewayModels(origin: string, models: any, key?: string, aliases: GatewayAliases = {}): Promise<ModelChoice[]> {
-  const response = await fetch(`${origin}/v1/catalog`, { redirect: 'error', ...(key ? { headers: { authorization: `Bearer ${key}` } } : {}) });
+export async function refreshGatewayModels(origin: string, models: any, key?: string | GatewayAuthorization, aliases: GatewayAliases = {}, options: { signal?: AbortSignal } = {}): Promise<ModelChoice[]> {
+  const gatewayOrigin = new URL(origin).origin;
+  const authorizedFetch: typeof fetch = async (input, init) => {
+    const request = new Request(input, init);
+    const url = new URL(request.url);
+    if (url.origin !== gatewayOrigin || !url.pathname.startsWith('/v1/')) throw new Error('Gateway transport cannot access another origin or API path.');
+    const send = async (forceRefresh: boolean) => {
+      request.signal.throwIfAborted();
+      const token = typeof key === 'function' ? await key({ forceRefresh, signal: request.signal }) : key;
+      request.signal.throwIfAborted();
+      if (typeof key === 'function' && !token) throw new Error('Gateway authorization returned an empty token.');
+      const headers = new Headers(request.headers);
+      if (token) headers.set('authorization', `Bearer ${token}`);
+      return fetch(request.clone(), { headers, redirect: 'error' });
+    };
+    const response = await send(false);
+    // Gateway authentication failures precede admission; never replay accepted work.
+    if (response.status !== 401 || typeof key !== 'function') return response;
+    await response.body?.cancel();
+    return send(true);
+  };
+  const response = await authorizedFetch(`${origin}/v1/catalog`, { signal: options.signal });
   if (!response.ok) throw new Error(`Model access: HTTP ${response.status}`);
   const catalog = await response.json();
   if (catalog.version !== 1 || !Array.isArray(catalog.connections)) throw new Error('Unsupported gateway catalog.');
@@ -43,11 +64,11 @@ export async function refreshGatewayModels(origin: string, models: any, key?: st
         const responses = group ? await import('@earendil-works/pi-ai/api/openai-responses') : undefined;
         const upstream = responses ? (operation === 'streamSimple' ? responses.streamSimple : responses.stream)(
           { ...model, api: 'openai-responses', baseUrl: `${origin}/v1` }, transcript, {
-            ...options, apiKey: key ?? 'native-keychain',
-            fetch: (input: any, init: any) => fetch(input, { ...init, redirect: 'error' }),
+            ...options, apiKey: typeof key === 'string' ? key : 'native-keychain',
+            fetch: authorizedFetch,
             onPayload: (payload: any) => ({ ...payload, model: `${group}/${model.id}` }),
           }) : piStream({ ...model, api: 'pi-messages', baseUrl: `${origin}/v1/connections/${connection.id}` }, transcript, {
-          apiKey: key ?? 'native-keychain', signal: options?.signal,
+          apiKey: typeof key === 'string' ? key : 'native-keychain', signal: options?.signal, fetch: authorizedFetch,
           onPayload: () => ({ model: model.id, context: transcript, operation, options: filtered(options) }),
           onProviderStreamEvent: (event: any) => { if (event.message) terminal = event.message; },
         });

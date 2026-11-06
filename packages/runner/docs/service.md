@@ -37,6 +37,23 @@ Responses API. Pool failover remains server-owned. The installation must supply 
 required by its agents. This connector is not an arbitrary OpenAI-compatible
 endpoint adapter.
 
+Custom hosts can import `refreshGatewayModels` and `GatewayAuthorization` from
+`@dispatch/runner/gateway`. Its third argument accepts the existing static key or
+an async authorization callback:
+
+```ts
+await refreshGatewayModels(origin, models, async ({ forceRefresh, signal } = {}) => {
+  return broker.authorize({ forceRefresh, signal });
+}, { openai: 'provider:openai-codex' }, { signal: startupSignal });
+```
+
+The callback runs for each catalog or inference request; the host owns token
+caching and renewal. A gateway HTTP 401 triggers one retry with `forceRefresh`
+set to `true`, before request admission. Other HTTP failures and accepted streams
+are not retried by this connector. Cancellation reaches the callback and request.
+Credentials are sent only to the configured origin's `/v1/` paths; redirects are
+rejected. Static-key and native-keychain callers retain their existing auth flow.
+
 Paths are absolute. The socket's parent must be owned by the process user and
 mode `0700`; the socket itself is `0600`. This API serves the local account over
 a Unix socket. Remote clients use separately authenticated adapters; the service

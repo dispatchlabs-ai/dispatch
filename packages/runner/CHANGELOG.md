@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Accept renewable authorization callbacks for gateway catalog and inference
+  requests, including provider pools; refresh once on an authentication rejection
+  before admission, with cancellation and same-origin credential confinement.
+
 - Select `factory.yaml` defaultAgent for new CLI sessions and retain the initial selection when resuming.
 - Apply trusted host bindings recursively to private workers; accept broker-backed workspace transports.
 
