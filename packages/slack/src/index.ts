@@ -33,8 +33,8 @@ export type SlackThreadInput = SlackInput & {
 };
 type Incoming = SlackThreadInput & { previous: number | null };
 type Delivery = { phase: "answer"; commentary?: boolean; admitted?: boolean } | {
-  phase: "deliver"; text: string; offset: number; retryAt: number; stream: string | null; after?: number;
-};
+  phase: "deliver"; text: string; offset: number; retryAt: number; stream: string | null; after?: number; cleanup?: string;
+} | { phase: "cleanup"; stream: string; retryAt: number };
 
 function retryDelay(error: unknown) {
   const seconds = (error as { retryAfter?: number })?.retryAfter;
@@ -446,20 +446,13 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         if (!text.trim()) {
           text = "The assistant ended without a final answer; completion has not been verified.";
         }
-        // Keep the progress transcript, and put the final answer after it.
+        // Keep commentary in order. Remove its temporary progress message only
+        // after the complete final reply has been delivered.
         const commentary = (await runtime.snapshot(Commentary, runtime.conversationId, ctx))?.turns[task.input.key];
-        if (commentary?.lastTask && stream) {
-          try {
-            try { await client.chat.stopStream({ channel: task.input.channel, ts: stream }); }
-            catch (error) { if (slackError(error) !== "message_not_in_streaming_state") throw error; }
-            await client.chat.update({ channel: task.input.channel, ts: stream, text: "Work finished. Final reply below.",
-              blocks: replyBlocks("Work finished. Final reply below.") });
-          } catch (error) { runtime.signal.throwIfAborted(); runtime.report(error); }
-          await options.onStream?.({ key: task.input.key, ts: stream, done: true });
-          stream = undefined;
-        }
+        const cleanup = commentary?.lastTask ? stream : undefined;
         await runtime.commit(() => ({
-          status: "running", checkpoint: { phase: "deliver", text, offset: 0, retryAt: 0, stream: stream ?? null,
+          status: "running", checkpoint: { phase: "deliver", text, offset: 0, retryAt: 0,
+            stream: cleanup ? null : stream ?? null, ...(cleanup ? { cleanup } : {}),
             ...(commentary?.lastTask ? { after: commentary.lastTask } : {}) },
         }), ctx);
       },
@@ -519,14 +512,36 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         if (offset >= checkpoint.text.length && checkpoint.stream)
           await options.onStream?.({ key: task.input.key, ts: checkpoint.stream, done: true });
         await runtime.commit(() => offset >= checkpoint.text.length
-          ? { status: "terminal", outcome: { status: "completed", result: null } }
+          ? checkpoint.cleanup
+            ? { status: "running", checkpoint: { phase: "cleanup", stream: checkpoint.cleanup, retryAt: 0 } }
+            : { status: "terminal", outcome: { status: "completed", result: null } }
           : { status: "running", checkpoint: { ...checkpoint, offset, retryAt: 0 } }, ctx);
+      },
+      async cleanup(task, runtime, ctx) {
+        const checkpoint = task.state.checkpoint;
+        if (checkpoint.retryAt > runtime.now()) return runtime.sleepUntil(checkpoint.retryAt, checkpoint, ctx);
+        try {
+          await client.chat.delete({ channel: task.input.channel, ts: checkpoint.stream });
+        } catch (error) {
+          if (slackError(error) !== "message_not_found") {
+            runtime.signal.throwIfAborted();
+            runtime.report(error instanceof Error ? error : new Error("Slack progress cleanup failed."));
+            const retryAt = runtime.now() + retryDelay(error);
+            await runtime.sleepUntil(retryAt, { ...checkpoint, retryAt }, ctx);
+            return;
+          }
+        }
+        await options.onStream?.({ key: task.input.key, ts: checkpoint.stream, done: true });
+        await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), ctx);
       },
     },
     async abort(task, runtime, ctx) {
       const stream = await runtime.memo<string>("stream", ctx);
       if (stream) {
-        await stopStreams(task.input, [stream]);
+        if (task.state.checkpoint.phase === "cleanup") {
+          try { await client.chat.delete({ channel: task.input.channel, ts: stream }); }
+          catch (error) { if (slackError(error) !== "message_not_found") throw error; }
+        } else await stopStreams(task.input, [stream]);
         await options.onStream?.({ key: task.input.key, ts: stream, done: true });
       }
       await refreshStatus(task.input, runtime, ctx, true);

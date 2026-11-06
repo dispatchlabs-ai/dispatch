@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Remove temporary progress messages after the ordered final reply is delivered,
+  instead of leaving a canned completion message. Resume cleanup retries without
+  reposting the answer; preserve commentary and failure details.
+
 - Preserve retained thread identities when routes change, and optionally pin immutable application entrypoints and Node executables for recovery.
 
 - Share one reply when a follow-up joins active work. Persist commentary cursors
