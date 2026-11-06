@@ -11,8 +11,15 @@ import subprocess
 from common import immutable_path, load_release, private_config
 
 
+def unit_literal(value):
+    value = str(value)
+    if any(char in value for char in ('\0', '\n', '\r')):
+        raise ValueError('Unit settings must be single-line values')
+    return value.replace('%', '%%')
+
+
 def unit_value(value):
-    return json.dumps(str(value).replace('%', '%%'))
+    return json.dumps(unit_literal(value))
 
 
 def protected_directory(path):
@@ -56,7 +63,7 @@ for field in ('slack', 'inference', 'wiki-config', 'wiki-key'):
     info = path.lstat()
     if not stat.S_ISREG(info.st_mode) or info.st_uid or info.st_mode & 0o077:
         raise ValueError('Application credentials must be private root-owned regular files')
-    credentials.append('LoadCredential=' + unit_value(field + ':' + str(path)))
+    credentials.append('LoadCredential=' + unit_literal(field + ':' + str(path)))
 tools = manifest['fleet']['tools']
 body = f'''[Unit]
 Description=Durable Slack coordinator ({namespace})
@@ -69,7 +76,7 @@ Environment=FLEET_HOST_CONFIG={unit_value(args.config)}
 Environment=HOME={unit_value(config['stateRoot'])}
 Environment=AWS_EC2_METADATA_DISABLED=true
 Environment=NODE_EXTRA_CA_CERTS={unit_value(tools['caBundle'])}
-WorkingDirectory={unit_value(config['stateRoot'])}
+WorkingDirectory={unit_literal(config['stateRoot'])}
 RuntimeDirectory={name}
 RuntimeDirectoryMode=0700
 {chr(10).join(credentials)}
