@@ -345,7 +345,11 @@ A directory lock enforces Pi SQLite's single-owner contract without limiting
 independent native tasks. Status JSON is an observation, not durable authority.
 
 Optional handoffs create a private child per parent conversation and publish
-results/progress through a supplied reply sink. The inherited local coding
+results/progress through a supplied reply sink. Progress distinguishes queued
+requests from those placed in the child conversation; placement alone does not
+verify that a requested change was applied. Cancellation suppresses progress
+while native owned work drains; a cancelled request is not a claim that every
+background job has stopped. The inherited local coding
 adapter uses private Git worktrees, protects `USE_CASES.md` and the definition
 repository, and supports shell execution only through macOS `sandbox-exec`.
 It is not a portable sandbox or a multi-tenant security boundary. Domain-specific

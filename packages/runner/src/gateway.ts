@@ -11,6 +11,7 @@ const filtered = (options: any) => Object.fromEntries(Object.entries(options ?? 
 export async function refreshGatewayModels(origin: string, models: any, key?: string | GatewayAuthorization, aliases: GatewayAliases = {}, options: { signal?: AbortSignal } = {}): Promise<ModelChoice[]> {
   const gatewayOrigin = new URL(origin).origin;
   const authorizedFetch: typeof fetch = async (input, init) => {
+    const signal = init?.signal !== undefined ? init.signal : input instanceof Request ? input.signal : undefined;
     const request = new Request(input, init);
     const url = new URL(request.url);
     if (url.origin !== gatewayOrigin || !url.pathname.startsWith('/v1/')) throw new Error('Gateway transport cannot access another origin or API path.');
@@ -21,7 +22,7 @@ export async function refreshGatewayModels(origin: string, models: any, key?: st
       if (typeof key === 'function' && !token) throw new Error('Gateway authorization returned an empty token.');
       const headers = new Headers(request.headers);
       if (token) headers.set('authorization', `Bearer ${token}`);
-      return fetch(request.clone(), { headers, redirect: 'error' });
+      return fetch(request.clone(), { headers, redirect: 'error', signal });
     };
     const response = await send(false);
     // Gateway authentication failures precede admission; never replay accepted work.

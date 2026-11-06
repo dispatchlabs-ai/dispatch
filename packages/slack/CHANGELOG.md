@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Deliver initial partial text without waiting for a sentence or status API call.
+  Renew and clear thread indicators in a recoverable native background task.
+  Preserve ordered acknowledgements for successful tool-requested termination
+  without a duplicate reply or false empty-answer notice.
+
 - Remove temporary progress messages after the ordered final reply is delivered,
   instead of leaving a canned completion message. Resume cleanup retries without
   reposting the answer; preserve commentary and failure details.

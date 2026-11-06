@@ -167,7 +167,10 @@ leave the indicator until Slack expires it. This uses the existing `chat:write`
 scope through `assistant.threads.setStatus`, not an additional assistant grant.
 Thread status reads the current native run, including after a reply clears
 Slack's indicator, so a completed or queued turn cannot clear active work.
-Short answers stream normally. Once the model starts tools, or before an initial
+The loading indicator runs in a separate native background task, so status API
+requests never hold text delivery. It resumes after restart and clears after the
+reply task settles, rechecking the current thread before each status write.
+Short answers stream partial text as it arrives. Once the model starts tools, or before an initial
 stream reaches eight minutes, the adapter closes the stream and updates the same
 message with the latest public response and execution-derived progress: the
 current operation, model retry or context preparation, and elapsed time in
@@ -182,7 +185,7 @@ prepares its answer; that wording does not assert tool success. These updates do
 not require model narration or invent a percentage complete. Slack updates are
 paced and may lag during API failures.
 Later public model responses replace the progress text, including after restart.
-Partial text waits for a sentence or line boundary; unfinished fragments remain
+Editable tool progress waits for a sentence or line boundary; unfinished fragments remain
 hidden until more text arrives or the final answer commits. Private reasoning
 and raw tool output are never displayed. This
 avoids Slack's ten-minute stream expiry marking active work as failed.
@@ -191,6 +194,10 @@ the committed answer. When commentary is delivered as separate replies, the fina
 answer follows it and the temporary progress message is removed afterward.
 Cleanup retries resume independently of answer delivery, preserving commentary
 and failure details without a redundant completion notice.
+When every tool in a round successfully requests native termination and its
+acknowledgement has been delivered, that acknowledgement completes the reply.
+The adapter removes temporary progress without inventing a missing final answer;
+empty or failed turns still retain their failure notice.
 See [Slack's response guidance](https://docs.slack.dev/ai/developing-agents/#responding-to-the-user).
 Final replies use Slack's Markdown blocks, matching the Markdown sent while
 streaming, so bold text, inline code and source links retain their formatting.
