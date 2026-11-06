@@ -10,6 +10,8 @@
   watchdog recovery, and a token-free Slack execution bridge.
 - Keep staged Nix closures unchanged when root fleet processes import Python
   modules by disabling runtime bytecode writes.
+- Allow the trusted root worker to verify its workspace firewall without
+  changing native agent or computer-service permissions.
 
 ## [0.6.0]
 

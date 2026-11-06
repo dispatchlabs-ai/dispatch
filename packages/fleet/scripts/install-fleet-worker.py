@@ -134,7 +134,8 @@ ReadWritePaths={ROOT} {RUNTIME} /run/private/dispatch-fleet /run/systemd/system 
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=120
-{common}CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_CHOWN CAP_FOWNER
+{common}CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_CHOWN CAP_FOWNER CAP_NET_ADMIN
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 [Install]
 WantedBy=multi-user.target
 ''',
