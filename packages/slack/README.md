@@ -165,7 +165,10 @@ hidden until more text arrives or the final answer commits. Private reasoning
 and raw tool output are never displayed. This
 avoids Slack's ten-minute stream expiry marking active work as failed.
 Final delivery replaces progress with
-the committed answer.
+the committed answer. An uninterrupted short stream includes its remaining text
+in the closing request, so the answer need not wait for the final formatting and
+metadata update. Recovery keeps that canonical update and never replays a tail
+whose closing request may already have reached Slack.
 When every tool in a round successfully requests native termination and its
 acknowledgement has been delivered, that acknowledgement completes the reply.
 The adapter removes temporary progress without inventing a missing final answer;

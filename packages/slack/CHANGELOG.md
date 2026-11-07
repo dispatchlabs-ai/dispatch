@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Include a known remaining answer suffix when closing an uninterrupted stream,
+  exposing the completed first message before its canonical update. Consume the
+  suffix durably before sending so uncertain stops and recovery cannot replay it.
+
 - Deliver initial partial text without waiting for a sentence or status API call.
   Renew and clear thread indicators in a recoverable native background task.
   Preserve ordered acknowledgements for successful tool-requested termination
