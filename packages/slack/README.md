@@ -190,7 +190,11 @@ hidden until more text arrives or the final answer commits. Private reasoning
 and raw tool output are never displayed. This
 avoids Slack's ten-minute stream expiry marking active work as failed.
 Final delivery replaces progress with
-the committed answer. When commentary is delivered as separate replies, the final
+the committed answer. An uninterrupted short stream includes its remaining text
+in the closing request, so the answer need not wait for the final formatting and
+metadata update. Recovery keeps that canonical update and never replays a tail
+whose closing request may already have reached Slack.
+When commentary is delivered as separate replies, the final
 answer follows it and the temporary progress message is removed afterward.
 Cleanup retries resume independently of answer delivery, preserving commentary
 and failure details without a redundant completion notice.

@@ -57,7 +57,7 @@ function validChannelRoute(route: unknown): route is string | SlackChannelProfil
 }
 type Incoming = SlackThreadInput & { previous: number | null };
 type Delivery = { indicator?: number } & ({ phase: "answer"; commentary?: boolean; admitted?: boolean } | {
-  phase: "deliver"; text: string; offset: number; retryAt: number; stream: string | null; after?: number; cleanup?: string;
+  phase: "deliver"; text: string; offset: number; retryAt: number; stream: string | null; after?: number; cleanup?: string; streamTail?: string;
 } | { phase: "cleanup"; stream: string; retryAt: number });
 
 function retryDelay(error: unknown) {
@@ -549,9 +549,15 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         // Keep commentary in order. Remove its temporary progress message only
         // after the complete final reply has been delivered.
         const cleanup = commentary?.lastTask ? stream : undefined;
+        const firstChunk = fallbackText(replyChunk(text, 0));
+        // Only this uninterrupted stream has a known, successfully sent prefix.
+        // Finish its first message while closing, before the canonical update.
+        const streamTail = stream && !cleanup && !ordinary && !closed && !missing && firstChunk.startsWith(sent)
+          ? firstChunk.slice(sent.length) : "";
         await runtime.commit((_tx, current) => ({
           status: "running", checkpoint: { phase: "deliver", text, offset: 0, retryAt: 0, indicator: current.state.checkpoint.indicator!,
             stream: cleanup ? null : stream ?? null, ...(cleanup ? { cleanup } : {}),
+            ...(streamTail ? { streamTail } : {}),
             ...(commentary?.lastTask ? { after: commentary.lastTask } : {}) },
         }), ctx);
       },
@@ -575,10 +581,22 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         const hash = createHash("sha256").update(`${task.input.key}:${checkpoint.offset}`).digest("hex");
         try {
           if (checkpoint.stream && checkpoint.offset === 0) {
+            const stream = checkpoint.stream;
+            const streamTail = checkpoint.streamTail;
+            if (streamTail) {
+              // A failed stop can have reached Slack. Consume the optional tail
+              // before sending; recovery always has the full canonical update.
+              const { streamTail: _tail, ...remaining } = checkpoint;
+              checkpoint = remaining;
+              await runtime.commit(() => ({ status: "running", checkpoint }), ctx);
+            }
             try {
               await client.chat.stopStream({
-                channel: task.input.channel, ts: checkpoint.stream,
-                chunks: [{ type: "task_update", id: "answer", title: "Done", status: "complete" }],
+                channel: task.input.channel, ts: stream,
+                chunks: [
+                  ...(streamTail ? [{ type: "markdown_text" as const, text: streamTail }] : []),
+                  { type: "task_update", id: "answer", title: "Done", status: "complete" },
+                ],
               });
             } catch (error) {
               if (slackError(error) !== "message_not_in_streaming_state") throw error;
@@ -586,7 +604,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
             // Replace partials with the committed answer, also after a restart
             // or model retry. Repeating this update does not duplicate text.
             await client.chat.update({
-              channel: task.input.channel, ts: checkpoint.stream, text: fallbackText(text),
+              channel: task.input.channel, ts: stream, text: fallbackText(text),
               blocks: replyBlocks(text, checkpoint.text, checkpoint.offset),
               metadata: { event_type: `${namespace}_agent_reply`, event_payload: { delivery: hash } },
               parse: "none", link_names: false,
