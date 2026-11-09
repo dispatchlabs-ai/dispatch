@@ -4,7 +4,7 @@ import { constants } from "node:fs";
 import { mkdir, open } from "node:fs/promises";
 import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { StorageRequestError, type Storage } from "@earendil-works/pi-durable";
+import { StorageRequestError, type Storage, type Seq } from "@earendil-works/pi-durable";
 import { SqliteStorage, type SqliteDatabase, type SqliteExecutor } from "@earendil-works/pi-durable/storage/sqlite";
 import { openNodeSqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite/node";
 import lockfile from "proper-lockfile";
@@ -26,6 +26,7 @@ class ReceiptedDatabase implements SqliteDatabase {
   }
   exec: SqliteDatabase["exec"] = sql => (this.scope.getStore() ?? this.db).exec(sql);
   run: SqliteDatabase["run"] = (sql, ...args) => (this.scope.getStore() ?? this.db).run(sql, ...args);
+  runCounted: SqliteDatabase["runCounted"] = (sql, ...args) => (this.scope.getStore() ?? this.db).runCounted(sql, ...args);
   get: SqliteDatabase["get"] = (sql, ...args) => (this.scope.getStore() ?? this.db).get(sql, ...args);
   all: SqliteDatabase["all"] = (sql, ...args) => (this.scope.getStore() ?? this.db).all(sql, ...args);
   close() { return this.db.close(); }
@@ -57,9 +58,18 @@ async function privateStore(directory: string) {
   }
 }
 
+/** Keep the native allocator ahead of acknowledged remote IDs, even without a commit. */
+async function reserveId(tx: SqliteExecutor, id: number) {
+  const changed = await tx.runCounted(
+    "UPDATE durable_metadata SET next_id=CAST(MAX(CAST(next_id AS INTEGER),CAST(? AS INTEGER)) AS TEXT) WHERE singleton=1",
+    String(id + 1),
+  );
+  if (changed !== 1) throw new Error("Durable SQLite metadata is missing.");
+}
+
 class Store {
   private tail: Promise<unknown> = Promise.resolve();
-  private failed?: unknown;
+  private failed = false;
   constructor(private db: ReceiptedDatabase, private pi: SqliteStorage, private release: () => Promise<void>,
     private guard: () => void, private report?: (error: unknown) => void) {}
   run<T>(work: () => Promise<T>): Promise<T> {
@@ -94,10 +104,21 @@ class Store {
         if (r.sequence !== undefined && r.sequence !== owner.sequence + 1)
           return { status: "conflict", error: "Storage requests arrived out of sequence." };
         let value: unknown;
-        if (r.method === "close") value = undefined;
+        if (r.method === "commit") {
+          const seqs: Seq[] = [];
+          const result = await this.pi.commit(r.args[0] as Parameters<Storage["commit"]>[0], (index, seq) => { seqs[index] = seq; }, context);
+          value = { stored: result.stored, seqs, ...("refused" in result
+            ? { refused: { message: result.refused instanceof Error ? result.refused.message : String(result.refused) } } : {}) };
+        } else if (r.method === "mintId") {
+          const id = await this.pi.mintId();
+          // Pi 1.5 mints in memory. Remote allocation and its replay receipt must
+          // survive a service restart even before any native commit uses the ID.
+          await reserveId(tx, id);
+          value = id;
+        } else if (r.method === "close") value = undefined;
         else {
           // The allowlist/arity were checked before indexing the native Storage interface.
-          const method = this.pi[r.method as keyof Storage] as (...args: unknown[]) => Promise<unknown>;
+          const method = this.pi[r.method] as (...args: unknown[]) => Promise<unknown>;
           value = await method.call(this.pi, ...r.args.map(arg => arg === null ? undefined : arg), context);
         }
         const reply: StorageReply = { status: "ok", ...(value === undefined ? {} : { value }) };
@@ -112,7 +133,7 @@ class Store {
         return { status: "rejected", error: error.message };
       // A failed mint can advance Pi's in-memory candidate counter. Never reuse this process's
       // storage after any unexpected failure, even when the outer transaction rolled back.
-      this.failed = error;
+      this.failed = true;
       this.report?.(error);
       return { status: "fatal", error: "Storage operation failed; operator recovery is required." };
     }
@@ -158,6 +179,17 @@ export class SqliteStorageService {
       await db.exec(`PRAGMA synchronous=FULL;
         CREATE TABLE IF NOT EXISTS remote_owner(singleton INTEGER PRIMARY KEY CHECK(singleton=1),session TEXT NOT NULL,sequence INTEGER NOT NULL,hash TEXT NOT NULL,reply TEXT NOT NULL,closed INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS remote_retired(session TEXT PRIMARY KEY,reason TEXT NOT NULL);`);
+      // Earlier services kept only an in-memory mint counter. Preserve any latest
+      // numeric receipt before Pi opens (old commit receipts may also be numeric;
+      // skipping an unused ID is harmless). Never rewrite ownership or receipts.
+      const owner = await db.get<Owner>("SELECT * FROM remote_owner WHERE singleton=1");
+      if (owner?.reply) {
+        const reply = JSON.parse(owner.reply) as StorageReply;
+        if (reply.status === "ok" && typeof reply.value === "number" && Number.isSafeInteger(reply.value) && reply.value >= 2) {
+          // Existing stores have Pi metadata; a new store has no owner receipt.
+          await reserveId(db, reply.value);
+        }
+      }
       const pi = await SqliteStorage.open(db);
       return new Store(db, pi, release, () => {
         if (compromised) throw new Error("Storage service lock was lost.");

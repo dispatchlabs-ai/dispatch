@@ -42,3 +42,25 @@ Files, tool execution environments and provider credentials remain on the
 runner. Changing machines also requires compatible definitions, namespace,
 workspace paths, tools and credentials. This first slice does not relax the
 runner's saved working-directory check or copy its workspaces.
+
+## Pi 1.5 compatibility
+
+`commit` carries one array of nonempty write batches, not one flat write list.
+One native transaction and its remote mutation receipt cover the whole group.
+A successful reply contains `{ stored, seqs, refused? }`: one increasing sequence
+per durable batch, with a message for the first refused batch when present.
+Only Pi's own semantic checks can refuse a suffix; driver or transaction failure
+is fatal, with no acknowledgement. The client validates the complete reply before
+calling `receive(index, seq)` synchronously in order. Callbacks run after the
+outer transaction, including its receipt, is durable. An identical retry returns
+the stored prefix and refusal without repeating writes or allocating new IDs.
+
+ID allocation persists its high-water mark with the receipt even before a native
+commit uses the ID. Opening an earlier service store conservatively reserves any
+latest numeric receipt before Pi loads its allocator. Existing owner/retirement
+records and reply hashes are retained; an active owner is never silently replaced.
+Old flat commits are rejected, not guessed or converted. Stop and back up both
+ends before upgrading together. SQLite's schema remains 2; native Pi document and
+task version upgrades are not backwards-resumable. Restore a closed pre-upgrade
+backup to roll back. No new protocol behavior has live runtime qualification from
+this source change alone.

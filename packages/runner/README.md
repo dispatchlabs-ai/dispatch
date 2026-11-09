@@ -305,9 +305,10 @@ handoff children; applications with pinned domain configurations use the
 `updateConversation(tx, id, setup)` callback to preserve or migrate their profiles before changing those definitions. Imported tool
 code is not transitively hashed.
 
-Source builds now use Pi 1.5.0. The current runner, Slack and email adapters must
-use matching Pi versions; Web, Observer and Remote retain their own installation
-pins. Custom storage providers must implement Pi 1.5 grouped commits before use
+Runner source builds now pin Pi 1.5.0, including the terminal UI dependency.
+Remote, Observer and the transport adapters also pin 1.5.0. Web remains on its
+separate Pi 1.4.0 dependencies; its upgrade is deferred. Custom storage providers
+must implement Pi 1.5 grouped commits before use
 with this runner. Pi 1.5 writes newer native live-document and task versions that
 Pi 1.4 cannot resume. Before upgrading, stop the owner and back up
 its complete state directory. Opening SQLite automatically migrates it to schema

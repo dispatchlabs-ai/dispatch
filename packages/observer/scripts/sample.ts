@@ -19,8 +19,10 @@ await mkdir(dirname(target), { recursive: true });
 const storage = await openNodeSqliteStorage(target);
 const context = BACKGROUND_CONTEXT;
 const started = Date.now() - 125_000;
-const write = (writes: unknown[]) =>
-  storage.commit(writes as StorageWrite[], context);
+const write = async (writes: unknown[]) => {
+  const result = await storage.commit([writes as StorageWrite[]], () => {}, context);
+  if ("refused" in result) throw result.refused;
+};
 const mint = () => storage.mintId();
 const root = await mint(),
   workflow = await mint(),

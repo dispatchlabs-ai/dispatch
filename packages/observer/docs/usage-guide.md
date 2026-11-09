@@ -474,10 +474,15 @@ replacement, and source isolation. Full-page layouts were reviewed at 1440×900,
 1280×720, 768×1024, and 390×844. Windows and Linux navigation remain unverified.
 
 The reader supports stock Pi Durable SQLite schema 1 as used by 1.1–1.3,
-schema 2 as used by 1.4, and Dispatch's `dispatch_pi` Postgres schema 1.
-The sample generator uses Pi Durable 1.4.0 and creates schema 2. The reader
+schema 2 as used by 1.4–1.5, and Dispatch's `dispatch_pi` Postgres schemas 1 and 2.
+The source sample generator uses Pi Durable 1.5.0 and creates schema 2. The reader
 never opens Pi's storage writer or migrates an existing database.
-These schema versions do not establish compatibility with future Pi releases.
+Pi 1.5 native live/task records remain generic read-only data here; the reader
+never opens a Harness or even a read-only Pi storage writer. Native run failures
+and compaction triggers remain available in document/task details, without
+executing recovery. Pi 1.5 source/type/build checks do not extend the dated
+interactive qualification below. These schema versions do not establish
+compatibility with future Pi releases.
 Custom entry/document kinds retain a generic
 record view. Documents are reconstructed from their latest retained base and deltas;
 retired contents that no longer exist are marked unavailable. Runner's storage

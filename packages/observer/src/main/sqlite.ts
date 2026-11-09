@@ -19,7 +19,7 @@ export async function readSqlite(path: string, request: RawReadRequest) {
       : undefined;
     if (schema?.version !== 1 && schema?.version !== 2)
       throw new Error(
-        "Unsupported SQLite schema. Observer reads Pi Durable schemas 1 and 2 (1.1–1.4); it never migrates a database.",
+        "Unsupported SQLite schema. Observer reads Pi Durable schemas 1 and 2 (1.1–1.5); it never migrates a database.",
       );
     return await readRecords(
       {

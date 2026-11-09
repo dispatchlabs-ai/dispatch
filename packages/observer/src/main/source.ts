@@ -90,9 +90,9 @@ export class Source {
       const schema = await client.query(
         "SELECT version FROM dispatch_pi.schema_version WHERE singleton=1",
       );
-      if (schema.rows[0]?.version !== 1)
+      if (schema.rows[0]?.version !== 1 && schema.rows[0]?.version !== 2)
         throw new Error(
-          "Unsupported Postgres schema. Observer supports dispatch_pi schema 1 and never creates or migrates it.",
+          "Unsupported Postgres schema. Observer supports dispatch_pi schemas 1 and 2 and never creates or migrates it.",
         );
       const stores = (
         await client.query(
@@ -132,9 +132,9 @@ export class Source {
       const schema = await client.query(
         "SELECT version FROM dispatch_pi.schema_version WHERE singleton=1",
       );
-      if (schema.rows[0]?.version !== 1)
+      if (schema.rows[0]?.version !== 1 && schema.rows[0]?.version !== 2)
         throw new Error(
-          "The Postgres schema changed. Observer supports dispatch_pi schema 1 and never migrates it.",
+          "The Postgres schema changed. Observer supports dispatch_pi schemas 1 and 2 and never migrates it.",
         );
       return await readRecords(
         {

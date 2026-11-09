@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Pi 1.5 source compatibility
+
+- Pin Chord and Pi Durable to 1.5.0, refresh the bundled license and seed synthetic examples with grouped commits.
+- Accept Dispatch PostgreSQL schema 2 alongside schema 1; retain direct read-only SQLite/schema inspection, generic native records and full paginated history without migration or execution ownership.
+- Existing interactive qualification is unchanged; type/build checks alone do not qualify Pi 1.5 desktop or remote operation.
+
 ### Processes and saved turns
 
 - Distinguish online services from agents with pending work or no active agents.

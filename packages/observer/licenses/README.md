@@ -1,8 +1,8 @@
 # Bundled license sources
 
-`@earendil-works/chord` 1.4.0 declares MIT in its npm manifest but omits the
-license file from that archive. [chord-1.4.0.txt](chord-1.4.0.txt) preserves the
-[upstream v1.4.0 license](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/LICENSE).
+`@earendil-works/chord` 1.5.0 declares MIT in its npm manifest but omits the
+license file from that archive. [chord-1.5.0.txt](chord-1.5.0.txt) preserves the
+[upstream v1.5.0 license](https://github.com/earendil-works/pi/blob/f9a26365568127461c47a07a37dcb42c140a3ac5/LICENSE).
 Recheck the source when changing that dependency.
 
 The build collects other runtime licenses from installed packages, combines them

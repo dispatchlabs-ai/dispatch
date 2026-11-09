@@ -30,6 +30,6 @@ export function parseRequest(value: unknown): StorageRequest {
   const mutation = ["commit", "mintId", "close"].includes(r.method);
   if (mutation ? !Number.isSafeInteger(r.sequence) || r.sequence! < 1 : r.sequence !== undefined)
     throw new Error("Invalid storage sequence.");
-  if (r.method === "commit" && !Array.isArray(r.args[0])) throw new Error("Invalid commit.");
+  if (r.method === "commit" && (!Array.isArray(r.args[0]) || !r.args[0].every(batch => Array.isArray(batch) && batch.length > 0))) throw new Error("Invalid commit.");
   return r;
 }

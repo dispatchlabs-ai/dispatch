@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Align the remaining terminal UI dependency to Pi 1.5.0 and refresh shared locked build inputs alongside Remote and Observer. Web retains its separate Pi 1.4.0 pins. Existing alpha archives and installed runtimes are unchanged.
+
 - Record accepted portable-agent principal, capability, conversation and package
   goals, with linked Remote, Fleet and Slack scope and Pi-based publishing
   guidance; this documentation does not implement or release those additions.
