@@ -11,6 +11,7 @@ buildNpmPackage {
   src = lib.fileset.toSource {
     root = ../../..;
     fileset = lib.fileset.unions ([
+      ../AGENT-CHAT-LICENSE
       ../../../LICENSE
       ../../../package.json
       ../../../package-lock.json
@@ -33,7 +34,7 @@ buildNpmPackage {
       ++ lib.optionals withSlack [ ../../slack/src ../../slack/tsconfig.json ]
       ++ lib.optionals withFleet [ ../../fleet/src ../../fleet/scripts ../../fleet/tsconfig.json ]);
   };
-  npmDepsHash = "sha256-5OmgTX2CvIP7lpD6yPEjXQwo30rUm407Y44JtR7gKI0=";
+  npmDepsHash = "sha256-YLW3zOBAdEC86SfPc78RWx9hsxqhGl2JSPye9rgjNuE=";
   npmInstallFlags = [ "--workspace=@dispatch/runner" "--include-workspace-root=false" ]
     ++ lib.optional withGoogleChat "--workspace=@dispatch/google-chat"
     ++ lib.optional withSlack "--workspace=@dispatch/slack"
@@ -48,6 +49,7 @@ buildNpmPackage {
     app="$out/lib/dispatch-runner"
     mkdir -p "$app/packages/runner" "$out/bin"
     cp package.json package-lock.json LICENSE "$app/"
+    cp packages/runner/AGENT-CHAT-LICENSE "$app/packages/runner/AGENT-CHAT-LICENSE"
     cp -R node_modules "$app/"
     cp packages/runner/package.json "$app/packages/runner/"
     cp -R packages/runner/{dist,native,scripts} "$app/packages/runner/"

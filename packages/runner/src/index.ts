@@ -64,3 +64,8 @@ export type Runner = ReturnType<typeof createRunner>;
 
 export { ThreadProcesses } from "./thread-processes.js";
 export type { ThreadInput, ThreadExecution, ThreadExecutor, ThreadLaunch } from "./thread-processes.js";
+
+export { prepareContent, ContentError } from "./chat-content.js";
+export type { AttachmentFile } from "./chat-content.js";
+export { projectChatTools } from "./chat-tools.js";
+export type { ChatToolCall } from "./chat-tools.js";

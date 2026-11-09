@@ -1,4 +1,4 @@
-export type WatchOptions = { stateRoot: string; namespace?: string; session?: string; signal?: AbortSignal };
+export type WatchOptions = { stateRoot: string; namespace?: string; session?: string; /** Include retained sessions with one process census per root. */ saved?: boolean; signal?: AbortSignal };
 export type WatchStore = { agent: string; path: string; namespace: string; pids: number[] };
 export type WatchRun = {
   key: string; path: string; session: string; pids: number[]; stores: WatchStore[];
@@ -25,3 +25,7 @@ export type WatchSnapshot = {
 export type WatchPage = {
   entries: WatchActivity[]; hasEarlier: boolean; before?: WatchCursor; observedAt: number;
 };
+
+/** Navigation metadata only; catalog reads do not infer execution status. */
+export type WatchCatalogConversation = Pick<WatchConversation, "key" | "agent" | "conversationId" | "title" | "parentKey" | "startedAt">;
+export type WatchCatalog = { conversations: WatchCatalogConversation[]; issues: string[] };

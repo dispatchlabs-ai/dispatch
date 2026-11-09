@@ -4,8 +4,8 @@ import { randomUUID, timingSafeEqual } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { PostgresStorage, PostgresStorageService } from "@dispatch/postgres";
 import { BACKGROUND_CONTEXT as context } from "@earendil-works/chord/context";
-import { projectChatMessages, type Chat as NativeChat } from "@dispatch/runner";
-import type { Storage, Cursor } from "@earendil-works/pi-durable";
+import { prepareContent, projectChatTools, type AttachmentFile, projectChatMessages, type Chat as NativeChat } from "@dispatch/runner";
+import type { Storage, Cursor, ConversationId } from "@earendil-works/pi-durable";
 import type { Chat, Snapshot, Agent } from "./contracts.js";
 import { AdmissionError } from "./config.js";
 export interface RunBinding {
@@ -213,6 +213,10 @@ export async function openCentralRuntime(config: CentralConfig) {
       action,
     );
   const namespace = "dispatch";
+  const absentStore = (error: unknown) => error instanceof Error && (
+    error.message === "PostgreSQL history store is unavailable." ||
+    ["42P01", "3F000"].includes((error as { code?: string }).code ?? "")
+  );
   async function list(): Promise<Chat[]> {
     const result: Chat[] = [];
     for (const run of config.runs)
@@ -260,12 +264,7 @@ export async function openCentralRuntime(config: CentralConfig) {
         } catch (error) {
           // Only a genuinely absent initial store is empty. Permissions, connection,
           // schema-version and corruption errors stay visible, never silently empty.
-          if (
-            !(error instanceof Error) ||
-            (error.message !== "PostgreSQL history store is unavailable." &&
-              (error as { code?: string }).code !== "42P01" &&
-              (error as { code?: string }).code !== "3F000")
-          )
+          if (!absentStore(error))
             throw error;
         }
       }
@@ -276,6 +275,7 @@ export async function openCentralRuntime(config: CentralConfig) {
     const conversation = Number(number);
     if (
       rest.length ||
+      String(conversation) !== number ||
       !bindings.get(run)?.agents.some((a) => a.id === agent) ||
       !Number.isSafeInteger(conversation) ||
       conversation < 1
@@ -296,9 +296,14 @@ export async function openCentralRuntime(config: CentralConfig) {
           chat: { ...live.chat, id, sourceLabel: item.run, session: item.run },
         };
     }
-    const chat = (await list()).find((chat) => chat.id === id);
-    if (!chat) throw new AdmissionError("Conversation not found.");
     return read(item.run, item.agent, async (db) => {
+      const conversation = await db.conversation(item.conversation as ConversationId, context);
+      if (!conversation) throw new AdmissionError("Conversation not found.");
+      const index = await readDocument(db, `${namespace}.chats`) as {byId?: Record<string, NativeChat>} | undefined;
+      const saved = index?.byId?.[item.native];
+      const chat: Chat = {id, agent:item.agent, conversationId:item.conversation, title:saved?.title ?? `Native conversation ${item.conversation}`,
+        source:saved?.source ?? "native", createdAt:saved?.createdAt ?? "", sourceLabel:item.run, session:item.run,
+        ...(conversation.owner ? {parentId:chatId(item.run,item.agent,conversation.owner.conversationId)} : {})};
       const entries = await pages((cursor) =>
         db.scanEntries(
           { conversationId: item.conversation as any, order: "ascending" },
@@ -334,6 +339,7 @@ export async function openCentralRuntime(config: CentralConfig) {
       return {
         chat,
         messages,
+        toolCalls: projectChatTools(entries, undefined, await pages(cursor => db.scanTasks({conversationId:item.conversation as ConversationId, kind:"pi.tool"},250,cursor,context))),
         running: false,
         queued: 0,
         partial: "",
@@ -362,6 +368,12 @@ export async function openCentralRuntime(config: CentralConfig) {
           : ["Worker offline; saved history remains available."],
       })),
     list,
+    async has(id: string) {
+      let item;
+      try { item = selection(id); } catch (error) { if (error instanceof AdmissionError) return false; throw error; }
+      try { return await read(item.run, item.agent, async db => !!await db.conversation(item.conversation as ConversationId, context)); }
+      catch (error) { if (absentStore(error)) return false; throw error; }
+    },
     async create(
       agent: string,
       source: NativeChat["source"],
@@ -387,7 +399,9 @@ export async function openCentralRuntime(config: CentralConfig) {
       requestId: string,
       mode: "followUp",
       source: NativeChat["source"],
+      files: AttachmentFile[] = [],
     ) {
+      prepareContent(text, files);
       const item = selection(id);
       return command(item.run, "submit", [
         item.native,
@@ -395,6 +409,7 @@ export async function openCentralRuntime(config: CentralConfig) {
         requestId,
         mode,
         source,
+        files,
       ]);
     },
     async stop(id: string) {

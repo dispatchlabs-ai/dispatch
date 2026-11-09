@@ -8,8 +8,8 @@ agents. Implementation/qualification limits are in the [usage guide](docs/usage-
 - **DSP-004 — Work with agents:** A person selects an authored agent and sends messages and follow-ups in independent native conversations.
 - **DSP-010 — Stop owned work:** A person stops the selected native conversation's owned work without cancelling independent recipients.
 - **DSP-011 — Resume observation:** A person reopens saved native history after disconnect without resending or resuming execution.
-- **DSP-013 — Inspect execution evidence:** A person sees attributed replies, streaming and native activity/failures.
-- **DSP-014 — Retrieve retained material:** A person downloads available native conversation artifacts.
+- **DSP-013 — Inspect execution evidence:** A person sees attributed replies, streaming and native tool identities, arguments/results, waits/cancellation and failures in expandable turn-scoped traces.
+- **DSP-014 — Retrieve retained material:** A person downloads available native conversation artifacts and supplies retained UTF-8 documents/images using native input blocks, with explicit unsupported formats/model capability.
 - **DSP-040 — Integrate a client:** An authorized Web, CLI or channel client uses shared operations and native request identities.
 - **DSP-042 — Operate an installation:** An operator composes consumer definitions, authorization and host bindings with Web and native workers.
 - **DSP-043 — Operate distributed work:** An operator connects native workers outbound to a central service that alone accesses PostgreSQL.

@@ -9,6 +9,7 @@ buildNpmPackage {
     fileset = lib.fileset.unions [
       ../../postgres/NOTICE ../../backend/AGENT-CHAT-LICENSE
       ../../../LICENSE ../../../package.json ../../../package-lock.json ../../../scripts
+      ../../runner/AGENT-CHAT-LICENSE
       ../../runner/package.json ../../runner/tsconfig.json ../../runner/src ../../runner/native
       ../../remote/package.json ../../remote/tsconfig.json ../../remote/src
       ../../postgres/package.json ../../postgres/tsconfig.json ../../postgres/src
@@ -25,7 +26,7 @@ buildNpmPackage {
       ../index.html ../src ../server ../openapi.yaml ../licenses ../LICENSE ../THIRD_PARTY.md
     ];
   };
-  npmDepsHash = "sha256-5OmgTX2CvIP7lpD6yPEjXQwo30rUm407Y44JtR7gKI0=";
+  npmDepsHash = "sha256-YLW3zOBAdEC86SfPc78RWx9hsxqhGl2JSPye9rgjNuE=";
   ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
   npmBuildScript = "build";
   doCheck = true;
@@ -44,6 +45,7 @@ buildNpmPackage {
       if test -d packages/$package/node_modules; then cp -R packages/$package/node_modules "$app/packages/$package/"; fi
     done
     cp -R packages/runner/native "$app/packages/runner/"
+    cp packages/runner/AGENT-CHAT-LICENSE "$app/packages/runner/"
     cp packages/web/openapi.yaml "$app/packages/web/"
     cp -R packages/web/licenses "$app/packages/web/"
     cp packages/web/LICENSE packages/web/THIRD_PARTY.md "$app/packages/web/"

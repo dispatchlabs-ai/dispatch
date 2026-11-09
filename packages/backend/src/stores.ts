@@ -1,10 +1,11 @@
-import { readdir, realpath, stat } from "node:fs/promises";
-import { dirname, join, relative } from "node:path";
+import { realpath } from "node:fs/promises";
+import { dirname } from "node:path";
 import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { lstatSync, realpathSync } from "node:fs";
 import type { Chat, ChatMessage, Snapshot, SourceStatus } from "./contracts.js";
-import type { Config, Source } from "./config.js";
+import { AdmissionError } from "./config.js";
+import type { LocalConfig, Source } from "./config.js";
 
 export interface Store {
   agent: string;
@@ -19,32 +20,38 @@ export interface Run {
   stores: Store[];
   issues: string[];
 }
-export interface Conversation {
+export interface CatalogConversation {
   key: string;
   agent: string;
   conversationId: number;
   title: string;
   parentKey?: string;
+  startedAt?: number;
+}
+export interface Conversation extends CatalogConversation {
   active: number;
   status: string;
   activity: string;
-  startedAt?: number;
   currentTools?: { title: string }[];
 }
 export interface Selection {
   chat: Chat;
   run: Run;
   store: Store;
-  conversation: Conversation;
+  conversation: CatalogConversation;
   source: Source;
 }
 export interface Reader {
   discoverWatchRuns(options: {
     stateRoot: string;
     session?: string;
+    saved?: boolean;
   }): Promise<{ runs: Run[]; issues: string[] }>;
+  readWatchChatProjection(run: Run, key: string): Promise<Pick<Snapshot, "messages" | "toolCalls">>;
+  readWatchCatalog(run: Run): Promise<{ conversations: CatalogConversation[]; issues: string[] }>;
   readWatchRun(
     run: Run,
+    key?: string,
   ): Promise<{ conversations: Conversation[]; issues: string[] }>;
   readWatchConversation(
     run: Run,
@@ -94,6 +101,67 @@ export function readStore<T>(path: string, read: (db: DatabaseSync) => T): T {
     db.close();
   }
 }
+// Read the native session document format for admission only. No writes, invented
+// chat-index admission, migrations or copied history. Unknown formats fail closed.
+export function sessionDocument(path: string, kind: string): any {
+  return readStore(path, (db) => {
+    const doc = db
+      .prepare("SELECT id FROM documents WHERE kind=? AND scope_kind='session'")
+      .get(JSON.stringify(kind));
+    if (!doc)
+      throw new AdmissionError(
+        `Missing ${kind} metadata. Recover with the original native runtime.`,
+      );
+    const rows = db
+      .prepare(
+        "SELECT kind,version,content FROM document_revisions WHERE document_id=? AND seq>=COALESCE((SELECT MAX(seq) FROM document_revisions WHERE document_id=? AND kind='base'),0) ORDER BY seq",
+      )
+      .all(doc.id!, doc.id!);
+    let value: any = {};
+    for (const row of rows) {
+      if (row.version !== 1)
+        throw new AdmissionError(
+          "Unsupported native metadata version. Use the original runtime.",
+        );
+      const content = JSON.parse(String(row.content));
+      if (row.kind === "base") {
+        value = content;
+        continue;
+      }
+      if (row.kind !== "delta" || !Array.isArray(content))
+        throw new AdmissionError("Unsupported native metadata delta.");
+      for (const op of content) {
+        if (!Array.isArray(op)) throw new AdmissionError("Unsupported native metadata operation.");
+        if (op[0] === "r") {
+          value = op[1];
+          continue;
+        }
+        const path = op[1];
+        if (
+          !Array.isArray(path) ||
+          !path.length ||
+          path.some((key) =>
+            ["__proto__", "constructor", "prototype"].includes(String(key)),
+          )
+        )
+          throw new AdmissionError("Unsupported native metadata path.");
+        let target = value;
+        for (const key of path.slice(0, -1)) {
+          if (!target || !Object.hasOwn(target, key)) throw new AdmissionError("Unsupported native metadata parent.");
+          target = target[key];
+        }
+        if (!target || typeof target !== "object") throw new AdmissionError("Unsupported native metadata target.");
+        const key = path.at(-1);
+        if (op[0] === "s") target[key] = op[2];
+        else if (op[0] === "d") delete target[key];
+        else if (op[0] === "a" && typeof target[key] === "string" && typeof op[2] === "string") target[key] += op[2];
+        else if (op[0] === "t" && typeof target[key] === "string" && Number.isSafeInteger(op[2]) && op[2] >= 0) target[key] = target[key].slice(0, op[2]);
+        else throw new AdmissionError("Unsupported native metadata operation.");
+      }
+    }
+    return value;
+  });
+}
 export function provenance(
   kind: string | undefined,
   data: any,
@@ -110,7 +178,7 @@ export function provenance(
     return { provenance: "agent", author: data?.from ?? "Agent message" };
   return { provenance: "runtime" };
 }
-export function createStores(config: Config, reader: Reader) {
+export function createStores(config: Pick<LocalConfig, "sources">, reader: Reader) {
   let selections = new Map<string, Selection>();
   let statuses: SourceStatus[] = [];
   let pending: Promise<void> | undefined;
@@ -128,78 +196,44 @@ export function createStores(config: Config, reader: Reader) {
       statuses.push(status);
       try {
         const root = await realpath(source.path);
-        if (!(await stat(root)).isDirectory())
-          throw new Error("Not a directory.");
         status.path = root;
-        const sessions = new Set<string>();
-        // Walk configured roots only. Native discovery requires an explicit session
-        // for retained (non-running) stores; enumerate those keys without a cap.
-        async function walk(path: string) {
-          let entries;
-          try {
-            entries = await readdir(path, { withFileTypes: true });
-          } catch {
-            status.issues.push(
-              `Cannot read ${relative(root, path) || "."}. Check directory permissions, then refresh.`,
-            );
-            return;
-          }
-          if (entries.some((item) => item.name === "session.sqlite")) {
-            sessions.add(
-              relative(root, dirname(path)).split("\\").join("/") || ".",
-            );
-            return;
-          }
-          for (const entry of entries)
-            if (
-              entry.isDirectory() &&
-              !entry.isSymbolicLink() &&
-              /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(entry.name)
-            )
-              await walk(join(path, entry.name));
-        }
-        await walk(root);
-        for (const session of sessions) {
-          const discovery = await reader.discoverWatchRuns({
-            stateRoot: root,
-            session,
-          });
-          status.issues.push(...discovery.issues);
-          for (const run of discovery.runs) {
-            // Canonical file identity also deduplicates overlapping configured roots.
-            run.stores = run.stores.filter((store) => !seen.has(store.path));
-            for (const store of run.stores) seen.add(store.path);
-            if (!run.stores.length) continue;
-            const snapshot = await reader.readWatchRun(run);
-            status.issues.push(...snapshot.issues);
-            for (const conversation of snapshot.conversations) {
-              const store = run.stores.find(
-                (item) => item.agent === conversation.agent,
-              )!;
-              const id = identity(store.path, conversation.conversationId);
-              const chat: Chat = {
-                id,
-                agent: conversation.agent,
-                conversationId: conversation.conversationId,
-                title: conversation.title,
-                source: source.id,
-                sourceLabel: source.label,
-                session: run.session,
-                createdAt: new Date(conversation.startedAt ?? 0).toISOString(),
-                ...(conversation.parentKey
-                  ? {
-                      parentId: identity(
-                        store.path,
-                        Number(conversation.parentKey.split(":").at(-1)),
-                      ),
-                    }
-                  : {}),
-              };
-              next.set(id, { chat, store, run, conversation, source });
-            }
+        const discovery = await reader.discoverWatchRuns({ stateRoot: root, saved: true });
+        status.issues.push(...discovery.issues);
+        for (const run of discovery.runs) {
+          status.issues.push(...run.issues);
+          // Canonical file identity also deduplicates overlapping configured roots.
+          run.stores = run.stores.filter((store) => !seen.has(store.path));
+          for (const store of run.stores) seen.add(store.path);
+          if (!run.stores.length) continue;
+          const snapshot = await reader.readWatchCatalog({ ...run, issues: [] });
+          status.issues.push(...snapshot.issues);
+          for (const conversation of snapshot.conversations) {
+            const store = run.stores.find(
+              (item) => item.agent === conversation.agent,
+            )!;
+            const id = identity(store.path, conversation.conversationId);
+            const chat: Chat = {
+              id,
+              agent: conversation.agent,
+              conversationId: conversation.conversationId,
+              title: conversation.title,
+              source: source.id,
+              sourceLabel: source.label,
+              session: run.session,
+              createdAt: new Date(conversation.startedAt ?? 0).toISOString(),
+              ...(conversation.parentKey
+                ? {
+                    parentId: identity(
+                      store.path,
+                      Number(conversation.parentKey.split(":").at(-1)),
+                    ),
+                  }
+                : {}),
+            };
+            next.set(id, { chat, store, run, conversation, source });
           }
         }
-        if (!sessions.size)
+        if (!discovery.runs.length && !discovery.issues.length)
           status.issues.push(
             "No native session.sqlite stores found. Choose an existing instances directory; new sessions are created only by New conversation.",
           );
@@ -238,6 +272,10 @@ export function createStores(config: Config, reader: Reader) {
             b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id),
         );
     },
+    has: async (id: string) => {
+      if (!selections.has(id)) await refresh();
+      return selections.has(id);
+    },
     get: async (id: string) => {
       if (!selections.has(id)) await refresh();
       const item = selections.get(id);
@@ -254,7 +292,7 @@ export function createStores(config: Config, reader: Reader) {
         throw new Error(
           "Conversation unavailable. Refresh sources and check their reported errors.",
         );
-      const current = await reader.readWatchRun(item.run);
+      const current = await reader.readWatchRun({ ...item.run, stores: [item.store] }, item.conversation.key);
       const conversation = current.conversations.find(
         (value) => value.key === item.conversation.key,
       );
@@ -262,79 +300,10 @@ export function createStores(config: Config, reader: Reader) {
         throw new Error(
           current.issues.join("\n") || "Conversation no longer readable.",
         );
-      const pages = [];
-      let before: unknown;
-      do {
-        const page = await reader.readWatchConversation(
-          item.run,
-          conversation.key,
-          before,
-        );
-        pages.unshift(page.entries);
-        before = page.hasEarlier ? page.before : undefined;
-      } while (before);
-      // Watch deliberately strips entry metadata. Read only kind/source and artifact
-      // records from the validated same store, never provider state or reasoning.
-      const records = readStore(
-        item.store.path,
-        (db) =>
-          new Map(
-            db
-              .prepare(
-                "SELECT id,json_extract(record,'$.kind') AS kind,json_extract(record,'$.data') AS data FROM entries WHERE conversation_id=?",
-              )
-              .all(conversation.conversationId)
-              .map((row) => [
-                Number(row.id),
-                {
-                  kind: String(row.kind),
-                  data: row.data ? JSON.parse(String(row.data)) : {},
-                },
-              ]),
-          ),
-      );
-      const messages: ChatMessage[] = pages
-        .flat()
-        .filter((entry) => entry.kind === "message")
-        .map((entry) => {
-          const record = records.get(entry.entryId);
-          return {
-            id: entry.id,
-            role: entry.role!,
-            text: entry.text,
-            at: entry.at,
-            ...(entry.role === "assistant"
-              ? { provenance: "agent" as const }
-              : provenance(record?.kind, record?.data, item.store.namespace)),
-          };
-        });
-      for (const [entryId, record] of records) {
-        if (record.kind === `${item.store.namespace}.background-reply`)
-          messages.push({
-            id: `${item.store.agent}:${entryId}:background`,
-            role: "assistant",
-            provenance: "agent",
-            text: record.data.text,
-            author: record.data.author,
-            background: true,
-          });
-        if (record.kind === `${item.store.namespace}.artifact`) {
-          const { deliveries: _, ...artifact } = record.data;
-          messages.push({
-            id: `${item.store.agent}:${entryId}:artifact`,
-            role: "assistant",
-            provenance: "agent",
-            text: "",
-            artifacts: [artifact],
-          });
-        }
-      }
-      messages.sort(
-        (a, b) => Number(a.id.split(":")[1]) - Number(b.id.split(":")[1]),
-      );
+      const projected = await reader.readWatchChatProjection(item.run, conversation.key);
       return {
         chat: item.chat,
-        messages,
+        ...projected,
         running: conversation.active > 0,
         queued: 0,
         partial: "",

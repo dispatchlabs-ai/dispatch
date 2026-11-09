@@ -407,3 +407,38 @@ filesystem or shell fallback. The host supplies it as an `env` factory.
 `projectChatMessages(namespace, entries)` is the public native transcript projection
 used by live ChatService and read-only backend consumers. It retains errors, public
 commentary, timestamps and artifacts without exposing reasoning/provider diagnostics.
+
+## Read-only retained navigation
+
+The supported `@dispatch/runner/watch-reader` API accepts
+`discoverWatchRuns({stateRoot, saved: true})` to include retained sessions with one
+process census for the root. Default terminal watch discovery stays running-only.
+`readWatchCatalog(run)` returns lightweight identity/title/parent/date metadata,
+not an execution-status claim. `readWatchRun(run, conversationKey)` reads activity
+for one selected conversation; omitting the key preserves the full-run API.
+`readWatchConversation` still pages complete authoritative history. These reads
+never migrate stores, open providers or resume native work. Committed WAL remains
+visible. Optional malformed chat-index metadata does not suppress readable child
+history; schema, I/O and actual identity failures are reported.
+
+## Chat content and tool projections
+
+`ChatService.submit(id,text,requestId,mode,source,attachments?)` admits optional
+`AttachmentFile {name,mimeType,data:base64}` bytes as native Pi input blocks and
+retains their source metadata in the same input entry. `prepareContent` validates
+UTF-8 documents and PNG/JPEG/WebP; `ContentError.status=409` is a definite rejection
+of that attempt. Images require the authored model's native `input` capability.
+Hosts using `ChatService.attach` pass its optional `models` catalog to enable
+image-capability admission; absence is not permission to silently drop images.
+Names never authorize a host path; PDF/Office/binary documents are unsupported.
+No application count/size cap. Native/provider context limits still apply.
+
+`projectChatMessages` preserves selected file metadata/download bytes and tool-only
+assistant anchors. `projectChatTools(entries,live?,tasks?)` joins actual native
+call/result IDs, diagnostics and task state; unknown payloads remain unavailable,
+not fabricated success. Native parentCallId/taskId are reported only when present.
+`ChatSnapshot.toolCalls` is additive; terminal/channel clients that only render
+text remain compatible. `watch-reader.readWatchChatProjection(run,key)` supplies
+the same retained projection without opening an owner/provider or resuming work.
+
+Generic chat input/projection patterns retain the [Agent Chat MIT notice](AGENT-CHAT-LICENSE).

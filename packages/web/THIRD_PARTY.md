@@ -1,22 +1,24 @@
 # Component notices
 
-Original app code is MIT. Installed dependencies retain their own licenses.
+Original Web code is MIT. Installed dependencies retain their own licenses.
 
-- `src/components/ui/button.tsx`: shadcn/ui, Copyright (c) 2023 shadcn,
-  [MIT](licenses/shadcn-MIT.txt). Retrieved from the
-  [new-york Button registry](https://ui.shadcn.com/r/styles/new-york/button.json).
-- `src/components/ai-elements/conversation.tsx` and `message.tsx`: AI Elements,
-  Copyright 2023 Vercel, Inc., [Apache-2.0](licenses/Apache-2.0.txt),
-  [upstream notice](licenses/ai-elements-NOTICE.txt). Retrieved from the
-  [Conversation](https://registry.ai-sdk.dev/conversation.json) and
-  [Message](https://registry.ai-sdk.dev/message.json) registries.
-  Conversation is retained; Message is reduced to Message, MessageContent and
-  MessageResponse. The role union is local rather than importing the entire AI
-  SDK for one type. Unused attachment, branching and action exports are omitted.
+- Current shared `src/components/ui/{message-scroller,message,bubble,input-group,
+  attachment,trace,code-block,collapsible,input,textarea,sidebar}.tsx`: adapted
+  from [shadcn/ui](https://github.com/shadcn-ui/ui/tree/8ab27715521cbd4f87ae6886cd989cbb678f6de7/apps/v4/registry/bases/radix/ui),
+  Copyright (c) 2023 shadcn, [MIT](licenses/shadcn-MIT.txt).
+  Source pin `8ab27715521cbd4f87ae6886cd989cbb678f6de7`, retrieved 2026-11-09.
+  Registry imports/icons are resolved locally; styling uses this app's neutral
+  tokens. Sidebar selects menu primitives and retains the app's accessible drawer
+  rather than adding cookie state. Scroller uses `@shadcn/react` **0.3.1**.
+- `src/components/ui/button.tsx`: shadcn/ui new-york Button (MIT), with current
+  icon size variants. Same upstream copyright/license.
+- The previous Vercel Conversation/Message copies have been replaced by current
+  [Chat](https://ui.shadcn.com/docs/ai-elements/base/chat) and
+  [Prompt Input](https://ui.shadcn.com/docs/ai-elements/base/prompt-input)
+  compositions. Historical Apache-2.0 license/notice files remain available.
+- Markdown uses Streamdown (its installed license), not an execution transport.
 
-Registry sources inspected and retrieved 2026-11-09. These are real component
-APIs composed around Dispatch snapshots, not the AI SDK execution protocol.
-
-The standalone frontend archive includes this attribution, the `licenses/` files
-and `THIRD-PARTY-NOTICES.md`, generated from the actual bundled dependencies by Vite.
-It does not rely on a server/node_modules installation carrying those notices.
+Official Tool composition uses Trace and Code Block. Native tool calls map to
+these APIs; no AI SDK, AI Gateway, synthetic tools or prose-parsed questionnaire.
+The chatbot template commit `4106041b1bc9bab44e81ffd2764aa2b6f100e2b0`
+was a reference only, not adopted as an execution backend.

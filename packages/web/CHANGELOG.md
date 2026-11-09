@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Port reviewed native chat improvements: installation-scoped routing and read-only catalogs, retained tool traces and UTF-8/image input/recovery through local and central workers; refresh current shadcn Web compositions.
+
 - Pin patched Zod 4.6.6; shared Backend no longer depends on unused Zod.
 
 - Ship standalone frontend copied-component licenses/attribution and bundled dependency notices.

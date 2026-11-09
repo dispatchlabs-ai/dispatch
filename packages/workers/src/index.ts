@@ -142,12 +142,13 @@ export async function startWorker(config: WorkerConfig) {
       calls.set(id, { resolve, reject, timer });
       socket.send(JSON.stringify({ type: "storage", id, agent, request }));
     });
+  let models: ReturnType<typeof createModels> | undefined;
   async function own() {
     if (service) return service;
     if (opening) return opening;
     opening = (async () => {
       process.env.DISPATCH_SESSION_STATE_ROOT = config.stateRoot;
-      const models = createModels({
+      models = createModels({
         authContext: {
           env: async () => undefined,
           fileExists: async () => false,
@@ -263,6 +264,15 @@ export async function startWorker(config: WorkerConfig) {
               : { agent, conversationId: Number(number) },
             value.method === "stop",
           );
+          if (value.method === "submit") {
+            const files = value.args[5] ?? [];
+            runner.prepareContent(value.args[1], files);
+            if (files.some((file: runner.AttachmentFile) => file.mimeType.startsWith("image/"))) {
+              const definition = owner.agents.find(agent => agent.id === value.args[0].split(":")[0])!;
+              if (!models?.getModel(definition.model.provider, definition.model.id)?.input.includes("image"))
+                throw Object.assign(new Error("This authored model does not accept images. Remove the image or choose an image-capable agent."), {status:409});
+            }
+          }
           if (value.method === "submit")
             for (const host of owner.hosts.values()) host.harness.resume();
           if (value.method === "create")
@@ -278,6 +288,7 @@ export async function startWorker(config: WorkerConfig) {
               value.args[2],
               value.args[3],
               value.args[4],
+              value.args[5] ?? [],
             );
           if (value.method === "stop") await owner.stop(value.args[0]);
         }
