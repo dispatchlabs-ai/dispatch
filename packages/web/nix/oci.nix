@@ -6,8 +6,8 @@ let
   entrypoint = writeShellScript "dispatch-container" ''
     set -eu
     umask 077
-    mkdir -p "$HOME" "$DISPATCH_DATA_DIR" "$DISPATCH_WORKSPACE_DIR"
-    cd "$DISPATCH_WORKSPACE_DIR"
+    mkdir -p "$HOME" "$DISPATCH_WORKSPACE_DIR"
+    cd /data
     exec "$@"
   '';
   runtime = buildEnv {
@@ -34,7 +34,7 @@ in dockerTools.buildLayeredImage {
     User = "65532:65532";
     WorkingDir = "/data";
     Entrypoint = [ entrypoint ];
-    Cmd = [ "${web}/bin/dispatch-web" ];
+    Cmd = [ (if disposableWorkspace then "${web}/bin/dispatch-worker" else "${web}/bin/dispatch-web") ];
     Env = [
       "PATH=/bin"
       "HOME=/data/home"
@@ -43,12 +43,12 @@ in dockerTools.buildLayeredImage {
       "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
       "DISPATCH_HOST=0.0.0.0"
       "DISPATCH_PORT=3001"
-      "DISPATCH_DATA_DIR=/data/state"
+      "DISPATCH_CONFIG=/data/config.json"
       "DISPATCH_WORKSPACE_DIR=/data/workspace"
     ];
     ExposedPorts."3001/tcp" = { };
-    # Native OCI retains its existing read-only-root convention. Conversation workers
-    # must not create anonymous volumes: their entire writable layer is disposable.
+    # Native OCI retains its read-only-root convention. Worker native metadata,
+    # workspace and artifacts require explicit persistent binds; no anonymous volumes.
     # Stable services using this variant can supply explicit tmpfs mounts in Compose.
     Volumes = lib.optionalAttrs (!disposableWorkspace) { "/tmp" = { }; };
     Labels = {

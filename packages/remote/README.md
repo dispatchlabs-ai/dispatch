@@ -6,7 +6,7 @@ outbound-connected storage service owns the SQLite files on another host.
 An application supplies pairing, authenticated WebSockets and identity.
 
 This is an initial integration package, not a hosted service or a cloud
-sandbox provisioner. Dispatch Web's PostgreSQL implementation is unchanged.
+sandbox provisioner. The separate [Postgres package](../postgres/README.md) provides central PostgreSQL storage using the same remote protocol.
 The SQLite service currently supports POSIX hosts with Node 24.
 
 Start with the [integration guide](docs/usage-guide.md), the

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Breaking replacement
+- Replace the old workspace UI and company/project/settings APIs with generic native agent chat, preserving request uncertainty, read-only histories, provenance and native ownership admission.
+- Extract Backend, Postgres and Workers; consumer configuration owns definitions, models, tools and hosted authorization. Retire old enrollment/capability/launcher artifacts without migration.
+
+
 - Remove the independently maintained inference gateway from the workspace and application distribution.
 
 - Sanitize public documentation and examples; replace the public Git history with a fresh snapshot and withdraw earlier tags/releases. Preserve private engineering records separately.
@@ -240,19 +245,19 @@
 - Align Pi packages at 1.1.0, including upstream context derivation and Anthropic system/tool cache fixes.
 - Align the shipped capability artifact’s exact Pi AI/Durable peers and host instructions with the 1.1.0 build.
 - Cache saved conversation history before the fresh shared-context suffix, preserving listening behavior and native provider credentials.
-- Support ordered PostgreSQL scans and cursor continuation, including inherited fork history. Scoped local SQLite/PostgreSQL tool-loop, reopen and live Claude cache-reuse observations are recorded in the [upgrade work package](docs/handoff.md#providers-and-native-runtimes); hosted worker and broad recovery qualification are not established.
+- Support ordered PostgreSQL scans and cursor continuation, including inherited fork history. Scoped local SQLite/PostgreSQL tool-loop, reopen and live Claude cache-reuse observations are recorded in the upgrade work package (retired Web documentation); hosted worker and broad recovery qualification are not established.
 
 ### Pierre source editor and project spec reading
 
 - Use the maintained Dispatch Pierre fork for chat file/diff presentation and the shared literal source editor, preserving historical excerpt semantics and React/worker import paths. Pin the immutable fork release with npm integrity and the Nix dependency hash; retain Apache notices.
-- Add project-spec Preview/Source and in-memory editing labelled Draft · not saved, without a Save action. Load configured public GitHub specs at a pinned commit with bounded UTF-8 reads and access/source-identity rechecks. Directory references remain configurable but unsupported by this reader; repository writes and durable draft recovery are deferred. See the [work package](docs/handoff.md#projects-and-specifications) for qualification limits.
+- Add project-spec Preview/Source and in-memory editing labelled Draft · not saved, without a Save action. Load configured public GitHub specs at a pinned commit with bounded UTF-8 reads and access/source-identity rechecks. Directory references remain configurable but unsupported by this reader; repository writes and durable draft recovery are deferred. See the work package (retired Web documentation) for qualification limits.
 
 ### Model provider setup
 
 - Remove the legacy Codex setup/model choice and reject new legacy-provider agent saves. Existing local OpenAI configurations were manually updated to the single OpenAI provider with the saved ChatGPT OAuth grant; no reusable migration code is shipped.
 - Add Settings → Model providers for OpenAI ChatGPT OAuth/API keys, Claude API keys and Fireworks API keys. Keep Pi responsible for authentication, refresh and model catalogs; show stored authorization separately from live verification and externally managed credentials.
 - Use encrypted application credential storage locally, preserving Pi `auth.json` without importing grants. Existing local credentials need a one-time application reconnect. Keep interrupted updates recoverable by explicit disconnect/reconnect and distinguish storage failure from an uncertain grant. Disconnect removes local credentials, not upstream authorization or operator-configured fallback credentials.
-- Integrated source/type/build and scoped disposable-key browser checks pass, including four responsive sizes and recovery/restart observations. Local OpenAI OAuth replies and tool use are also verified after the manual cutover; broader account lifecycle and deployment qualification remain unverified. See [cutover evidence](docs/handoff.md#providers-and-native-runtimes) and [original provider-package evidence](docs/handoff.md#providers-and-native-runtimes).
+- Integrated source/type/build and scoped disposable-key browser checks pass, including four responsive sizes and recovery/restart observations. Local OpenAI OAuth replies and tool use are also verified after the manual cutover; broader account lifecycle and deployment qualification remain unverified. See cutover evidence (retired Web documentation) and original provider-package evidence (retired Web documentation).
 
 ### Repository identity
 
@@ -261,7 +266,7 @@
 ### Project repositories and spec reference
 
 - Store manager-editable repository URLs and explicit directory-relative or repository-relative spec references. Directory specs need a saved project directory, not a repository URL; clearing their base or removing a selected repository requires clearing/reassigning the spec. No migration or legacy-source fallback. Preserve omitted metadata, manager/revision/retry checks and existing agent directories. Saving references does not clone repositories or verify access/spec-file existence.
-- Add responsive main-area Project settings with source-specific path labels, shared inline errors and retained drafts. Show the single directory input beside directory specs, under Advanced otherwise; switching source or clearing the spec retains it. Show saved bases/paths separately on the overview and warn when changing the directory base used by new local agents. Source review and type/build checks pass; browser/runtime qualification remains pending. See the [work package](docs/handoff.md#projects-and-specifications) for evidence.
+- Add responsive main-area Project settings with source-specific path labels, shared inline errors and retained drafts. Show the single directory input beside directory specs, under Advanced otherwise; switching source or clearing the spec retains it. Show saved bases/paths separately on the overview and warn when changing the directory base used by new local agents. Source review and type/build checks pass; browser/runtime qualification remains pending. See the work package (retired Web documentation) for evidence.
 
 ### operator idle sleep
 
@@ -270,7 +275,7 @@
 
 ### Single composer Send/Stop action
 
-- Replace the separate Stop all control with a single fixed-position Send/Stop button for main and thread composers, with draft presence separate from send eligibility and explicit whole-chat cancellation scope. Source/type/build and synthetic component visual reviews pass; authenticated integration remains unverified. See the [handoff](docs/handoff.md#ui-and-conversations).
+- Replace the separate Stop all control with a single fixed-position Send/Stop button for main and thread composers, with draft presence separate from send eligibility and explicit whole-chat cancellation scope. Source/type/build and synthetic component visual reviews pass; authenticated integration remains unverified. See the handoff (retired Web documentation).
 
 ### inline image attachments
 
@@ -279,15 +284,15 @@
 ### Conversation workers and shared service storage
 
 - Add opt-in per-conversation PostgreSQL workers with backend-owned authentication, catalogs and credential mediation, plus Docker/ECS launcher lifecycle and attempt-bound RPC/callback authorization. Preserve native single-runtime mode and Pi-owned execution/recovery; confirm old executors are stopped before replacement.
-- Add encrypted PostgreSQL authentication/provider/MCP persistence, routing/admission journals, backend-mediated attachments and S3 project archives. Existing SQLite installations are not automatically migrated. See [worker contracts and bounded observations](docs/conversation-workers.md) for installation, recovery and remaining qualification limits.
+- Add encrypted PostgreSQL authentication/provider/MCP persistence, routing/admission journals, backend-mediated attachments and S3 project archives. Existing SQLite installations are not automatically migrated. See worker contracts and bounded observations (retired Web documentation) for installation, recovery and remaining qualification limits.
 
 ### Named agent secrets
 
-- Extend Settings → Secrets with write-only named credentials and explicit per-definition grants checked at use time. Add metadata-only `secrets_list` and credential-internal GitHub HTTPS `git_clone`; imported definitions do not inherit grants. Scoped disposable storage/browser and Git observations pass; real private cloning and hosted secret-tool acceptance remain unverified. See [acceptance evidence](docs/handoff.md#tools-and-connections).
+- Extend Settings → Secrets with write-only named credentials and explicit per-definition grants checked at use time. Add metadata-only `secrets_list` and credential-internal GitHub HTTPS `git_clone`; imported definitions do not inherit grants. Scoped disposable storage/browser and Git observations pass; real private cloning and hosted secret-tool acceptance remain unverified. See acceptance evidence (retired Web documentation).
 
 ### Ubuntu worker environment
 
-- Add ARM64/AMD64 Ubuntu worker recipes retaining the pinned Nix application while allowing ordinary agent-shell package installation. Controllers remain non-root/read-only; coding workers are trusted environments, not hostile-code sandboxes. Bounded native and hosted new-chat installation observations pass; runtime-installed tools, local files and unpushed commits are not automatically restored. See [image acceptance](docs/handoff.md#workers-and-deployment).
+- Add ARM64/AMD64 Ubuntu worker recipes retaining the pinned Nix application while allowing ordinary agent-shell package installation. Controllers remain non-root/read-only; coding workers are trusted environments, not hostile-code sandboxes. Bounded native and hosted new-chat installation observations pass; runtime-installed tools, local files and unpushed commits are not automatically restored. See image acceptance (retired Web documentation).
 
 ### Standalone AWS module
 
@@ -301,7 +306,7 @@
 
 - Keep undispatched request expiry separate from controller failure; reject public traffic while a claimed local owner is unready without blocking authenticated startup maintenance.
 - Add opt-in backend/launcher listener overlap with identity-bound planned ownership transfer, fresh-state activation, private readiness, bounded undispatched waiting and response-body draining. Preserve worker executors and store recovery latches; do not replay dispatched mutations or take over on timeout.
-- Add explicit snapshot-checked controller recovery and generic managed-launcher ingress with rolling drain budgets. Source review is not deployed continuity; see the [handover package](docs/handoff.md#workers-and-deployment) for activation prerequisites, observed native replacements and coverage limits.
+- Add explicit snapshot-checked controller recovery and generic managed-launcher ingress with rolling drain budgets. Source review is not deployed continuity; see the handover package (retired Web documentation) for activation prerequisites, observed native replacements and coverage limits.
 
 ### live agent indicator
 
@@ -320,7 +325,7 @@
 ### composer typing isolation
 
 - Notify only the affected main/thread composer on draft edits rather than rerendering the workspace and unrelated chats; retain workspace-lifetime drafts, uploads and send/retry guards.
-- Avoid duplicate mention scans for the same editor state while retaining synchronous Markdown updates, initial imports and external replacements. See the [correction package](docs/handoff.md#ui-and-conversations) for evidence and limits.
+- Avoid duplicate mention scans for the same editor state while retaining synchronous Markdown updates, initial imports and external replacements. See the correction package (retired Web documentation) for evidence and limits.
 
 ### project participants and sign-in diagnostics
 
@@ -353,7 +358,7 @@
 - Replace unconditional image-directory retries with one exclusive creation and remove unused in-memory reference paths; retain audit metadata.
 - Project only transcript page candidates, compare window overlap with set membership, and avoid redundant history/connection reads; preserve page, ordering and authorization contracts. Share blob-download cleanup without changing output metadata.
 
-Integrated source/build checks passed; runtime/rendered qualification remains unverified. See [acceptance evidence](docs/handoff.md#checks-and-limitations).
+Integrated source/build checks passed; runtime/rendered qualification remains unverified. See acceptance evidence (retired Web documentation).
 
 ### five-finding simplification
 
@@ -361,13 +366,13 @@ Integrated source/build checks passed; runtime/rendered qualification remains un
 - Consolidate composer state and coordinate list refreshes with stale-response protection, preserving draft and retry safeguards.
 - Reconcile current agent-management status/default-target eligibility and link check guidance to the canonical testing policy.
 
-Integrated source review and TypeScript/application/Apple Silicon Nix checks passed; no deployment or new runtime/UI qualification is established. See [acceptance evidence](docs/handoff.md#checks-and-limitations).
+Integrated source review and TypeScript/application/Apple Silicon Nix checks passed; no deployment or new runtime/UI qualification is established. See acceptance evidence (retired Web documentation).
 
 ### chat presentation performance
 
 - Replace sidebar transcript projection with transactionally maintained public summaries and checkpointed existing-chat initialization.
 - Load recent chat/thread previews first, fetch older history on demand, stream delivered-state deltas, and virtualize transcript rows. Expand paired tool activity in pages; complete message/activity downloads retain access to oversized content.
-- Source-published at `e87c0ab`: scoped authenticated desktop/390 px presence-update measurements meet the <100 ms typing budget; native cancellation/paging/SSE and integrated Apple Silicon checks passed. Guarded local installation and source-equivalent authenticated desktop/390 px demonstrations are recorded. See the [performance package](docs/handoff.md#ui-and-conversations) for measurement limits; arbitrary model-output loads are not qualified.
+- Source-published at `e87c0ab`: scoped authenticated desktop/390 px presence-update measurements meet the <100 ms typing budget; native cancellation/paging/SSE and integrated Apple Silicon checks passed. Guarded local installation and source-equivalent authenticated desktop/390 px demonstrations are recorded. See the performance package (retired Web documentation) for measurement limits; arbitrary model-output loads are not qualified.
 
 ### chat criteria response
 
@@ -396,48 +401,48 @@ Integrated source review and TypeScript/application/Apple Silicon Nix checks pas
 ### starter and GitHub bundles
 
 - Add an explicit-model Developer starter through the existing archive preview/import path.
-- Add public GitHub commit-pinned imports and tracked updates with durable reviewed previews, conservative local-edit conflicts, retained removed entries and atomic retry receipts. Updated definitions follow the existing safe-idle adoption policy. Source/build checked; later bounded runtime/browser observations and remaining limits are recorded in [portability evidence](docs/handoff.md#portability-and-backups).
+- Add public GitHub commit-pinned imports and tracked updates with durable reviewed previews, conservative local-edit conflicts, retained removed entries and atomic retry receipts. Updated definitions follow the existing safe-idle adoption policy. Source/build checked; later bounded runtime/browser observations and remaining limits are recorded in portability evidence (retired Web documentation).
 
 ### portable agent and skill bundles
 
-- Add Agents import/export with bounded ZIP parsing, requirement preview, exact assigned skill revisions and independent local copies. Native atomic receipts preserve same-operation retries; connections, credentials and existing instances remain untouched. The initial slice excluded GitHub updates, starter distribution, project exports and backups; subsequent deliveries and bounded manual qualification are recorded in the [handoff](docs/handoff.md#portability-and-backups).
+- Add Agents import/export with bounded ZIP parsing, requirement preview, exact assigned skill revisions and independent local copies. Native atomic receipts preserve same-operation retries; connections, credentials and existing instances remain untouched. The initial slice excluded GitHub updates, starter distribution, project exports and backups; subsequent deliveries and bounded manual qualification are recorded in the handoff (retired Web documentation).
 
 ### separate web capabilities
 
-- Split Web research into independently assigned Web reading (`web_read`: open/find/click, no search key required) and Web search (`web_search`: search_query, requiring an Exa grant). Legacy combined assignments migrate to both without changing grants; saved evidence remains intact. Activation and full workflow qualification remain pending; see the [qualification overview](docs/handoff.md#tools-and-connections).
+- Split Web research into independently assigned Web reading (`web_read`: open/find/click, no search key required) and Web search (`web_search`: search_query, requiring an Exa grant). Legacy combined assignments migrate to both without changing grants; saved evidence remains intact. Activation and full workflow qualification remain pending; see the qualification overview (retired Web documentation).
 
 ### native web research
 
-- Add the Web research capability with native search, page reading, literal find and numbered-link traversal, durable instance-local evidence and source citations. Interrupted network batches are not automatically replayed. Qualification tracked in [WP-054](docs/handoff.md#tools-and-connections).
+- Add the Web research capability with native search, page reading, literal find and numbered-link traversal, durable instance-local evidence and source citations. Interrupted network batches are not automatically replayed. Qualification tracked in WP-054 (retired Web documentation).
 
 ### agent authoring design
 
-- Redesign agent overview, editor, sidebar and evaluation configuration around the approved concepts. Add section/case navigation, a persistent required evaluation change reason and shared Markdown formatting controls. Preserve existing draft, revision and profile-only boundaries. See [acceptance evidence](docs/handoff.md#agents-and-evaluations).
+- Redesign agent overview, editor, sidebar and evaluation configuration around the approved concepts. Add section/case navigation, a persistent required evaluation change reason and shared Markdown formatting controls. Preserve existing draft, revision and profile-only boundaries. See acceptance evidence (retired Web documentation).
 
 ### Developer default
 
-- Make Developer the company default and archive retired Dash/Dispatch without deleting revisions or changing existing conversation instances. Preserve Developer settings and migrate project defaults; new projects and implicit chat selections use Developer. Acceptance evidence and remaining qualification are tracked in the [handoff](docs/handoff.md#ui-and-conversations).
+- Make Developer the company default and archive retired Dash/Dispatch without deleting revisions or changing existing conversation instances. Preserve Developer settings and migrate project defaults; new projects and implicit chat selections use Developer. Acceptance evidence and remaining qualification are tracked in the handoff (retired Web documentation).
 
 ### browser skills
 
-- Add pinned agent-browser core and dogfood exploratory-QA guidance for explicit skill assignment, without installing browser tooling or changing existing instance snapshots. Checks and activation limits are recorded in [the handoff](docs/handoff.md#tools-and-connections).
+- Add pinned agent-browser core and dogfood exploratory-QA guidance for explicit skill assignment, without installing browser tooling or changing existing instance snapshots. Checks and activation limits are recorded in the handoff (retired Web documentation).
 
 ### project overview
 
-- Add project chat search, All chats/Active filters, status and last activity. Move members, default agents and existing settings into the contextual details panel, with adaptive desktop/phone rows. See [implementation evidence](docs/handoff.md#projects-and-specifications).
+- Add project chat search, All chats/Active filters, status and last activity. Move members, default agents and existing settings into the contextual details panel, with adaptive desktop/phone rows. See implementation evidence (retired Web documentation).
 
 ### in-place agent base upgrades
 
-- Apply saved base revisions to active instances at safe idle boundaries, preserving identity/history, instance supplements and workspace paths. Retain immutable revisions and explicit MCP assignment; display applied base revision separately from actual connections. Source/build candidate evidence and outstanding recovery/UI qualification are tracked in [the handoff](docs/handoff.md#agents-and-evaluations).
+- Apply saved base revisions to active instances at safe idle boundaries, preserving identity/history, instance supplements and workspace paths. Retain immutable revisions and explicit MCP assignment; display applied base revision separately from actual connections. Source/build candidate evidence and outstanding recovery/UI qualification are tracked in the handoff (retired Web documentation).
 
 ### project-row chat creation
 
 - Start a chat directly from a project row using its default agents, without a setup dialog; focus the new composer and retain existing drafts. Use Chat terminology in product controls.
-- Remove obsolete personal-project creation/listing/move paths; preserve ungrouped access and stored retry identities. Source/build checked; rendered and functional qualification remains outstanding in [WP-053](docs/handoff.md#ui-and-conversations).
+- Remove obsolete personal-project creation/listing/move paths; preserve ungrouped access and stored retry identities. Source/build checked; rendered and functional qualification remains outstanding in WP-053 (retired Web documentation).
 
 ### multiple agent instances
 
-- Add explicit same-definition instances with optional names and creation-only instruction supplements, immutable instance targeting and stable creation retries. Source/build checked; runtime and rendered UI remain unqualified. Evidence in [WP-050](docs/handoff.md#agents-and-evaluations).
+- Add explicit same-definition instances with optional names and creation-only instruction supplements, immutable instance targeting and stable creation retries. Source/build checked; runtime and rendered UI remain unqualified. Evidence in WP-050 (retired Web documentation).
 
 ### MCP credential renewal recovery
 
@@ -445,15 +450,15 @@ Integrated source review and TypeScript/application/Apple Silicon Nix checks pas
 
 ### conversation agent removal
 
-- Add per-instance removal: fence participation, cancel native work durably, preserve history and require explicit human re-addition as a fresh instance after cleanup. Source/build checked; runtime and rendered UI remain unqualified. Evidence and outstanding acceptance are tracked in [WP-049](docs/handoff.md#agents-and-evaluations).
+- Add per-instance removal: fence participation, cancel native work durably, preserve history and require explicit human re-addition as a fresh instance after cleanup. Source/build checked; runtime and rendered UI remain unqualified. Evidence and outstanding acceptance are tracked in WP-049 (retired Web documentation).
 
 ### inline agent invitations
 
-- Extend inline `@` selection to available company agents, inviting them only on Send. Resolve invitation mentions and save the message/deliveries in one native commit; preserve existing instances and unchanged-request retries. Implementation and local acceptance evidence are tracked in [WP-048](docs/handoff.md#agents-and-evaluations).
+- Extend inline `@` selection to available company agents, inviting them only on Send. Resolve invitation mentions and save the message/deliveries in one native commit; preserve existing instances and unchanged-request retries. Implementation and local acceptance evidence are tracked in WP-048 (retired Web documentation).
 
 ### agent evaluation profiles
 
-- Refine editing into a focused evaluation workspace with scannable expectations/cases, progressive disclosure, persistent save controls and profile history in context/phone Details. Gemini’s scoped designer-agent assessment is 91/100 (A−); human comprehension, broader accessibility and native-select arrow behavior remain unverified. See [WP-047](docs/handoff.md#agents-and-evaluations) for receipt-review limits.
+- Refine editing into a focused evaluation workspace with scannable expectations/cases, progressive disclosure, persistent save controls and profile history in context/phone Details. Gemini’s scoped designer-agent assessment is 91/100 (A−); human comprehension, broader accessibility and native-select arrow behavior remain unverified. See WP-047 (retired Web documentation) for receipt-review limits.
 
 - Add independently versioned evaluation profiles, criteria and standalone cases to saved agent definitions, with immutable history, conflict checks and retry receipts. Keep evaluator-only material out of operating instructions.
 - Preserve archived profile access and company boundaries. This slice edits evaluation definitions; it does not execute cases, assess real conversations or produce results.
@@ -512,7 +517,7 @@ Integrated source review and TypeScript/application/Apple Silicon Nix checks pas
 
 ### Fixed
 
-- Prevent unchanged parent drafts from rebuilding the Markdown editor during typing; isolate thread editor state by composer ID. The recorded stale-update path was source reviewed; post-fix typing and rendered UI remain unverified. See [composer regression evidence](docs/handoff.md#ui-and-conversations).
+- Prevent unchanged parent drafts from rebuilding the Markdown editor during typing; isolate thread editor state by composer ID. The recorded stale-update path was source reviewed; post-fix typing and rendered UI remain unverified. See composer regression evidence (retired Web documentation).
 
 ### Added
 
@@ -520,7 +525,7 @@ Integrated source review and TypeScript/application/Apple Silicon Nix checks pas
 
 - Backend dependency watching during local development, with graceful sequential restarts and unchanged frontend hot reload; documented background start, log and stop commands.
 
-- Composer + menu for files/images, pasted-image previews, independent main/thread attachment drafts and attachment-only messages. Uploads become shared conversation assets immediately; removing a preview does not delete them. Verified raster images use native delivery; UTF-8 text has scoped reads, while PDF/Office/binary files remain download-only. Implementation qualification is tracked in [WP-040](docs/handoff.md#ui-and-conversations).
+- Composer + menu for files/images, pasted-image previews, independent main/thread attachment drafts and attachment-only messages. Uploads become shared conversation assets immediately; removing a preview does not delete them. Verified raster images use native delivery; UTF-8 text has scoped reads, while PDF/Office/binary files remain download-only. Implementation qualification is tracked in WP-040 (retired Web documentation).
 
 - Optional conversation naming in the starting-agent chooser, retaining unnamed first-message previews and preserving explicit names on creation retries and subsequent messages.
 
@@ -532,7 +537,7 @@ Integrated source review and TypeScript/application/Apple Silicon Nix checks pas
 
 ### Changed
 
-- Memoized unchanged conversation transcripts and indexed replies once per message-array change, keeping synchronous draft and send-settlement behavior. Browser latency improvement remains unmeasured; see [WP-039](docs/handoff.md#ui-and-conversations).
+- Memoized unchanged conversation transcripts and indexed replies once per message-array change, keeping synchronous draft and send-settlement behavior. Browser latency improvement remains unmeasured; see WP-039 (retired Web documentation).
 
 - Removed obsolete single-agent snapshot consumers, consolidated company-scoped latest-agent lookups, and clarified watcher/speaking-turn transitions without changing API compatibility fields or durable execution policy.
 
@@ -644,4 +649,4 @@ Integrated source review and TypeScript/application/Apple Silicon Nix checks pas
 - Add bounded project-history JSON export/import with attachment checksums, manager export authorization, independent projects, inert history and atomic retry-safe admission.
 - Add restricted offline SQLite recovery tooling requiring stopped writers and fenced original ownership; restore never starts a service.
 - Package existing native capabilities for reviewed host installation on Pi Durable 1.0.4; bundle import never installs code.
-- Type/build checks passed; later bounded functional, disposable recovery and desktop/390 px evidence, plus remaining acceptance limits, are recorded in the [portability handoff](docs/handoff.md#portability-and-backups).
+- Type/build checks passed; later bounded functional, disposable recovery and desktop/390 px evidence, plus remaining acceptance limits, are recorded in the portability handoff (retired Web documentation).

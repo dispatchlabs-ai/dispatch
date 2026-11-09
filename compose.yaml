@@ -1,21 +1,21 @@
-# Dispatch on one desktop (for example Docker Desktop or Docker Engine in WSL2).
-# Plain HTTP on localhost only: the port is published on the host loopback, never
-# on other interfaces. To serve other machines, put HTTPS in front and set a
-# matching https:// DISPATCH_ORIGIN instead of using this container mode.
+# Hosted Web: consumer image includes trusted authorization module, definitions
+# and host providers. Provision /data/config.json and private files separately.
 services:
-  dispatch:
-    image: ${DISPATCH_IMAGE:?Set DISPATCH_IMAGE to the Dispatch controller image for your platform}
-    restart: unless-stopped
+  web:
+    image: ${DISPATCH_IMAGE:?Select an immutable image digest}
+    restart: "no"
     ports:
-      - "127.0.0.1:${DISPATCH_PORT:-3001}:3001"
+      - "127.0.0.1:3001:3001"
     environment:
-      DISPATCH_ORIGIN: http://localhost:${DISPATCH_PORT:-3001}
-      DISPATCH_CONTAINER_LOOPBACK_HTTP: "1"
-      DISPATCH_COMPANY_NAME: ${DISPATCH_COMPANY_NAME:-Dispatch}
+      DISPATCH_HOST: 0.0.0.0
+      DISPATCH_PORT: "3001"
+      DISPATCH_ORIGIN: ${DISPATCH_ORIGIN:?Supply an HTTPS browser origin}
+      DISPATCH_AUTH_MODULE: /data/authorize.mjs
+      DISPATCH_CONFIG: /data/config.json
     volumes:
-      - dispatch-data:/data
+      - type: bind
+        source: ${DISPATCH_STATE:?Supply a dedicated persistent state directory}
+        target: /data
     read_only: true
     tmpfs:
       - /tmp
-volumes:
-  dispatch-data:

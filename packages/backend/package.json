@@ -1,0 +1,63 @@
+{
+  "name": "@dispatch/backend",
+  "version": "0.6.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.22.1 <25"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts.d.ts",
+      "import": "./dist/contracts.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js"
+    },
+    "./central": {
+      "types": "./dist/central.d.ts",
+      "import": "./dist/central.js"
+    },
+    "./provenance": {
+      "types": "./dist/provenance.d.ts",
+      "import": "./dist/provenance.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "USE_CASES.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "NOTICE",
+    "AGENT-CHAT-LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@dispatch/runner": "0.6.0",
+    "@dispatch/remote": "0.6.0",
+    "@dispatch/postgres": "0.6.0",
+    "@earendil-works/pi-ai": "1.5.0",
+    "proper-lockfile": "4.1.2",
+    "ws": "8.22.0",
+    "zod": "4.6.5",
+    "@earendil-works/chord": "1.5.0",
+    "@earendil-works/pi-durable": "1.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "@types/ws": "8.18.1",
+    "@types/pg": "8.15.5",
+    "@types/proper-lockfile": "4.1.4",
+    "typescript": "6.0.3"
+  }
+}

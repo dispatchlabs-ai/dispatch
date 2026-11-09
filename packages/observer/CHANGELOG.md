@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Own the previously Web-imported UI primitive library and its MIT notices so replacing Web preserves Observer presentation/build independence.
+
+
 ### Pi 1.5 source compatibility
 
 - Pin Chord and Pi Durable to 1.5.0, refresh the bundled license and seed synthetic examples with grouped commits.

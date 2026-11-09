@@ -1,126 +1,63 @@
 # Dispatch
 
-**A self-hosted workspace where people and AI agents work together.**
+Durable agents independent of their user interfaces. [Pi Durable](https://github.com/earendil-works/pi)
+owns execution, task recovery and authoritative conversation history.
 
-Dispatch brings shared conversations, named agents, project tools and background work into a browser workspace. Invite your teammates, connect a model provider, and work with multiple agents in the same conversation. Your installation owns its accounts, credentials and conversation state.
+- [Web](packages/web/README.md): select an agent, reopen history, send/follow up,
+  observe streaming/activity and stop owned work. Replaces the former workspace UI.
+- [Backend](packages/backend/README.md): shared chat operations, read-only native
+  observation and a central service for outbound workers.
+- [Postgres](packages/postgres/README.md): Pi 1.5 Storage and receipted remote storage.
+- [Workers](packages/workers/README.md): outbound-connected native Runner owners;
+  only the central service accesses PostgreSQL.
+- [Runner](packages/runner/README.md): authored definitions, native agents and CLI.
+- [Remote](packages/remote/README.md): shared storage transport and remote SQLite.
+- [Fleet](packages/fleet/README.md): existing fenced EC2 run placement; not required
+  for the fixed-worker composition. No second Fleet coordinator is introduced.
+- [Slack](packages/slack/README.md), [Google Chat](packages/google-chat/README.md)
+  and [Email](packages/email/README.md): native channel integrations.
+- [Observer](packages/observer/README.md): read-only desktop native inspection.
 
-Dispatch is built on [Pi Durable](https://github.com/earendil-works/pi): Pi owns agent execution and recovery; Dispatch adds sign-in, collaboration and the browser experience.
+## First result
 
-For company agents that run independently of the browser,
-[Dispatch Runner](packages/runner/README.md) loads agent directories and owns
-native schedules and conversations. The optional
-[Slack package](packages/slack/README.md) connects shared threads and report
-discussions. The [Google Chat package](packages/google-chat/README.md) connects
-app interactions through Pub/Sub. The [Email package](packages/email/README.md) connects incoming work,
-replies and agent-initiated mail with explicit sending enablement. These source-alpha packages are installed as locally packed
-dependencies.
-
-[Dispatch Remote](packages/remote/README.md) supplies optional relay routing and
-remote SQLite storage for standalone runners. The storage host owns the files;
-models and tools execute on the runner. See its guide for ownership and recovery.
-
-[Dispatch Fleet](packages/fleet/README.md) hosts complete durable runs on
-replaceable EC2 workers, with coordinator-owned credentials and native SQLite.
-Applications supply their own transport and authority adapters.
-
-[Dispatch Observer](packages/observer/README.md) is the read-only Electron desktop
-package for inspecting those agents through SQLite or Postgres, locally or over
-a remote connection. It provides live following, saved-event playback, native
-task inspection, and a locally packaged macOS app. See its usage guide for
-qualified transports and remaining platform limits.
-
-## Distribution status
-
-This repository is a pre-1.0 source distribution. On October 21, 2026 its public
-history was replaced with a sanitized snapshot, and earlier release downloads
-were withdrawn. The package version remains `0.6.0`; the changelogs distinguish
-later unreleased work. Build this checkout rather than relying on old release
-links or commit hashes. Existing installations are not updated by this reset.
-
-## Choose your installation
-
-| Environment | Start here |
-| --- | --- |
-| Local development on macOS or Linux | [Run from source](#run-from-source) with the pinned Nix toolchain. |
-| Apple Silicon Mac package | Build `nix build .#macos-release`; the archive and checksums are in `result/`. The extracted package includes its runtime. |
-| Linux containers or Windows with WSL2 | Build `nix build .#oci` on the matching Linux platform, then use the [Compose setup](packages/web/docs/usage-guide.md#configuration). |
-| AWS | Use the [deployment module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) with your own verified application artifacts. Review installation qualification separately. |
-
-Historical platform checks and their limits are recorded in the
-[usage guide](packages/web/docs/usage-guide.md). They do not establish qualification
-of this source snapshot on every platform.
-
-## Run from source
-
-You need Git and [Nix](https://nixos.org/download/) with `nix-command` and `flakes` enabled. Nix supplies the Node toolchain.
+Requires Nix with flakes enabled. From a clean checkout:
 
 ```sh
-git clone https://github.com/dispatchlabs-ai/dispatch.git
-cd dispatch
 nix develop
 npm ci
-npm run dev
+npm run build
+node examples/chat/configure.mjs
+DISPATCH_CONFIG="$PWD/.local/chat-example/native.json" npm start
 ```
 
-Open **http://localhost:5173**. Keep that terminal running; Ctrl-C stops the application.
+Open **http://127.0.0.1:4319**, select helper, send Hello and observe a slowly
+streaming synthetic reply. This useful local example requires no credentials;
+it is not inference qualification. See [central PostgreSQL + worker composition](examples/chat/README.md).
+Production definitions, tools, models and credentials are consumer-owned, not Web settings.
 
-### Create your first account
+## Boundaries
 
-There is no default password or public signup. In a second terminal, enter the same checkout and create a private enrollment link:
+Local mode binds exact loopback Host/Origin. It is not hosted authentication.
+Hosted mode requires an HTTPS `DISPATCH_ORIGIN` and an absolute trusted
+`DISPATCH_AUTH_MODULE` exporting `authorize(request): Promise<boolean>`.
+That installation adapter must validate real sessions/credentials and authorize
+**all configured runs**; this first surface does not implement per-user grants or
+multi-human identity management. No fake login or exposed loopback adapter.
 
-```sh
-# Run in the cloned dispatch directory.
-nix develop
-npm run auth -- invite --email person@example.com --name "Person"
-```
+Native durable history is authoritative. The browser stores only selection and
+uncertain request identity/text, never a second transcript. Browsing/reconnecting
+never opens an owner, resumes tasks or resends input. Unknown native owners,
+uncertain effects and changed definitions fail closed; no timeout takeover.
+Independent conversations have no application concurrency cap.
 
-Replace the example email and name with your own. Open the generated link and enroll with a passkey or a password plus an authenticator app. The invitation expires after one hour by default; Dispatch does not send an email. Save any recovery codes in your password manager.
+## Distribution and development
 
-### Connect a model and start working
+Source alpha, lockstep 0.6.0 with unreleased changes; no npm/public artifact release
+is implied by a source commit. Build with `nix build`, `nix flake check`,
+`nix build .#frontend .#macos-release`; OCI outputs require matching Linux builders.
+The replacement retires old company/project/rooms/settings APIs, account enrollment,
+capability bundles and old worker launcher commands without compatibility machinery.
 
-1. Sign in and open **Settings → Model providers**.
-2. Connect an available provider: OpenAI supports ChatGPT OAuth or an API key; Claude and Fireworks use API keys.
-3. In **Agents**, configure Developer or create a named agent with a model your provider account can use.
-4. Select **New chat**, choose your agent, and send your first message.
-
-Provider credentials stay on the service and are shared by agents in this installation. See the [usage guide](packages/web/docs/usage-guide.md) for agent configuration, supported tools and account recovery.
-
-## Keep your work safe
-
-- Use trusted users, agents and tools. Coding tools execute with the service account's filesystem/process access; a project working directory is not a sandbox. Native Muse execution disables its sandbox and approval prompts. Disabling optional Dispatch tools does not confine native Muse access; see [Muse setup](packages/web/docs/usage-guide.md#muse-code-setup).
-- MCP connections can reach private-network services and the service host's loopback interface. Restrict the host's network access when those destinations must remain isolated; see [connection boundaries](packages/web/docs/usage-guide.md#connect-an-mcp-server).
-- Local development listens on your own machine. To serve other machines, use HTTPS and a matching `DISPATCH_ORIGIN`; do not expose a plaintext development server to the network.
-- Source-development state lives in `.local/state/dispatch` by default. Back up the complete state directory, including the authentication database and encryption keys, together.
-- Run only one application owner against a state directory. Stop it before activating a replacement. An older executable alone does not guarantee a safe rollback after state changes.
-
-The [usage guide](packages/web/docs/usage-guide.md) covers state locations, backups, launchers and troubleshooting. Keep private enrollment links, provider credentials and recovery codes out of issue reports.
-
-## Develop and contribute
-
-Builds run **locally with Nix**, not GitHub Actions:
-
-```sh
-npm run check
-nix build
-nix flake check
-```
-
-Run these from the repository's Nix shell. They check types and builds, not end-to-end behavior. Follow [CONTRIBUTING.md](CONTRIBUTING.md) for the current no-automated-tests policy, interactive verification and source publication.
-
-## Learn more
-
-- [Dispatch use cases](packages/web/USE_CASES.md) — browser workspace goals and approved additions
-- [Portable agent goals](packages/runner/USE_CASES.md#2-portable-agents-and-published-packages) — accepted principal, interface, runtime and published-package scope, with [ownership direction](packages/runner/docs/definition-workspaces.md#accepted-portable-agent-direction)
-- [Web package](packages/web/README.md) — implementation and documentation index
-- [Observer](packages/observer/README.md) — desktop agent inspection, connections, and recorded-event playback
-- [Usage guide](packages/web/docs/usage-guide.md) — detailed setup and operation
-- [Changelog](packages/web/CHANGELOG.md) — changes and release history
-- [Security policy](SECURITY.md) — private vulnerability reporting and execution trust boundaries
-- [Project spec access](packages/web/docs/spec.md) and [handoff](packages/web/docs/handoff.md) — database intent and public qualification boundaries
-- [AWS deployment module](https://github.com/dispatchlabs-ai/terraform-aws-dispatch) — infrastructure and AWS installation instructions
-
-## License
-
-[MIT](LICENSE).
-
-Created by Chris Reynolds, cofounder of Dispatch Labs AI.
+Read [contribution rules](CONTRIBUTING.md), [public-information boundary](OSS.md),
+[security policy](SECURITY.md), [Web goals](packages/web/USE_CASES.md) and
+[portable-agent direction](packages/runner/docs/definition-workspaces.md).

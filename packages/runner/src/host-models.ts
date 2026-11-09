@@ -5,17 +5,18 @@ import { getSupportedThinkingLevels, type MutableModels, type Provider } from "@
 import { refreshGatewayModels, type GatewayAliases } from "./gateway.js";
 
 export type HostModelsConfig = {
-  gateway: { origin: string; credentialFile: string; aliases?: GatewayAliases };
+  gateway?: { origin: string; credentialFile: string; aliases?: GatewayAliases };
   /** Trusted host modules returning native Pi providers; applied after gateway bindings. */
   modelProviders?: { module: string; export: string; id?: string; args?: unknown[]; closeSessionExport?: string }[];
 };
 
 export async function connectHostModels(config: HostModelsConfig, models: MutableModels) {
-  if (!config.gateway?.origin || !isAbsolute(config.gateway.credentialFile)) {
-    throw new Error("Supply gateway.origin and an absolute gateway.credentialFile.");
-  }
-  const { key } = JSON.parse(await readFile(config.gateway.credentialFile, "utf8"));
-  let choices = await refreshGatewayModels(config.gateway.origin, models, key, config.gateway.aliases);
+  let choices: import("./gateway.js").ModelChoice[] = [];
+  if (config.gateway) {
+    if (!config.gateway.origin || !isAbsolute(config.gateway.credentialFile)) throw new Error("Supply gateway.origin and an absolute gateway.credentialFile.");
+    const { key } = JSON.parse(await readFile(config.gateway.credentialFile, "utf8"));
+    choices = await refreshGatewayModels(config.gateway.origin, models, key, config.gateway.aliases);
+  } else if (!config.modelProviders?.length) throw new Error("Supply a gateway or trusted modelProviders.");
   const cleanups: (() => Promise<void>)[] = [];
   for (const binding of config.modelProviders ?? []) {
     if (!isAbsolute(binding.module) || !binding.export || (binding.id !== undefined && !binding.id.trim()) || !Array.isArray(binding.args ?? [])) {

@@ -1,0 +1,339 @@
+#!/usr/bin/env node
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
+import { readFile } from "node:fs/promises";
+import { resolve, extname, isAbsolute } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  openRuntime,
+  openCentralRuntime,
+  AdmissionError,
+} from "@dispatch/backend";
+
+process.umask(0o077);
+const port = Number(process.env.DISPATCH_PORT ?? 4319);
+if (!Number.isInteger(port) || port < 1 || port > 65535)
+  throw new Error("DISPATCH_PORT must be an integer from 1 to 65535.");
+const hosted = process.env.DISPATCH_ORIGIN !== undefined;
+const origin = process.env.DISPATCH_ORIGIN ?? `http://127.0.0.1:${port}`;
+if (hosted && !/^https:\/\/[^/]+$/.test(origin))
+  throw new Error("Hosted Web requires an HTTPS origin.");
+const authModule = process.env.DISPATCH_AUTH_MODULE;
+if (authModule && !isAbsolute(authModule)) throw new Error("DISPATCH_AUTH_MODULE must be an absolute trusted module path.");
+if (hosted && !authModule)
+  throw new Error(
+    "Hosted Web requires a trusted authorization module; loopback security is not hosted authentication.",
+  );
+const authorize = authModule ? (await import(authModule)).authorize : undefined;
+if (authModule && typeof authorize !== "function")
+  throw new Error("Authorization module must export authorize(request).");
+const webRoot = fileURLToPath(new URL("../../web/", import.meta.url));
+const specPath = fileURLToPath(
+  new URL("../../../openapi.yaml", import.meta.url),
+);
+class HttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+function json(response: ServerResponse, status: number, body: unknown) {
+  response
+    .writeHead(status, { "content-type": "application/json" })
+    .end(JSON.stringify(body));
+}
+function field(body: Record<string, unknown>, name: string): string {
+  const value = body[name];
+  if (typeof value !== "string" || !value.trim())
+    throw new HttpError(400, `${name} must be nonempty text.`);
+  return value;
+}
+async function bodyOf(request: IncomingMessage) {
+  if (request.headers["content-type"]?.split(";")[0] !== "application/json")
+    throw new HttpError(415, "Use application/json.");
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) {
+    chunks.push(chunk);
+  }
+  try {
+    const value = JSON.parse(Buffer.concat(chunks).toString());
+    if (!value || Array.isArray(value) || typeof value !== "object")
+      throw new Error();
+    return value as Record<string, unknown>;
+  } catch {
+    throw new HttpError(400, "Provide a JSON object.");
+  }
+}
+async function protect(request: IncomingMessage, path: string) {
+  if (request.headers.host !== new URL(origin).host)
+    throw new HttpError(403, `Use ${origin}.`);
+  if (request.headers.origin && request.headers.origin !== origin)
+    throw new HttpError(403, "Cross-origin access is not allowed.");
+  const shellNavigation =
+    request.method === "GET" &&
+    path === "/" &&
+    request.headers["sec-fetch-mode"] === "navigate" &&
+    request.headers["sec-fetch-dest"] === "document" &&
+    !request.headers.origin;
+  if (
+    !shellNavigation &&
+    request.headers["sec-fetch-site"] &&
+    !["same-origin", "none"].includes(String(request.headers["sec-fetch-site"]))
+  )
+    throw new HttpError(403, "Cross-site access is not allowed.");
+  if (request.method !== "GET" && request.headers.origin !== origin)
+    throw new HttpError(403, "Writes require the exact app Origin.");
+  if (authorize && !(await authorize(request)))
+    throw new HttpError(403, "Access denied.");
+}
+const central = process.env.DISPATCH_CENTRAL_CONFIG;
+const runtime = central
+  ? await openCentralRuntime(JSON.parse(await readFile(central, "utf8")))
+  : await openRuntime();
+const service = runtime.service;
+const streams = new Set<() => void>();
+const server = createServer(async (request, response) => {
+  response.setHeader("x-content-type-options", "nosniff");
+  response.setHeader("referrer-policy", "no-referrer");
+  response.setHeader("cross-origin-resource-policy", "same-origin");
+  response.setHeader("cache-control", "no-store");
+  response.setHeader(
+    "content-security-policy",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+  );
+  try {
+    const url = new URL(request.url ?? "/", origin);
+    const path = url.pathname;
+    const method = request.method;
+    if (path === "/health" && method === "GET") {
+      json(response, 200, { status: "ready" });
+      return;
+    }
+    await protect(request, path);
+    if (path === "/api/sources" && method === "GET") {
+      json(response, 200, await service.sources());
+      return;
+    }
+    if (path === "/api/agents" && method === "GET") {
+      json(
+        response,
+        200,
+        service.agents.map(({ id, description }) => ({ id, description })),
+      );
+      return;
+    }
+    if (path === "/api/chats" && method === "GET") {
+      json(response, 200, await service.list());
+      return;
+    }
+    if (path === "/api/chats" && method === "POST") {
+      const body = await bodyOf(request);
+      const agent = field(body, "agent");
+      if (!service.agents.some((item) => item.id === agent))
+        throw new HttpError(400, "Choose an installed agent.");
+      json(
+        response,
+        201,
+        await service.create(
+          agent,
+          "web",
+          field(body, "key"),
+          typeof body.source === "string" ? body.source : undefined,
+        ),
+      );
+      return;
+    }
+    const match = path.match(
+      /^\/api\/chats\/([^/]+)(?:\/(messages|stop|events|artifacts)(?:\/([^/]+))?)?$/,
+    );
+    if (match) {
+      const id = decodeURIComponent(match[1]);
+      const action = match[2];
+      const artifactId = match[3];
+      if (!(await service.list()).some((chat) => chat.id === id))
+        throw new HttpError(404, "Conversation not found.");
+      if (!action && method === "GET") {
+        json(response, 200, await runtime.presentation.snapshot(id));
+        return;
+      }
+      if (action === "messages" && !artifactId && method === "POST") {
+        const body = await bodyOf(request);
+        json(
+          response,
+          202,
+          await service.submit(
+            id,
+            field(body, "text"),
+            field(body, "requestId"),
+            "followUp",
+            "web",
+          ),
+        );
+        return;
+      }
+      if (action === "stop" && !artifactId && method === "POST") {
+        await bodyOf(request);
+        await service.stop(id);
+        json(response, 200, {});
+        return;
+      }
+      if (action === "artifacts" && artifactId && method === "GET") {
+        let value;
+        try {
+          value = await service.artifact(id, decodeURIComponent(artifactId));
+        } catch {
+          throw new HttpError(404, "Artifact not found.");
+        }
+        response
+          .writeHead(200, {
+            "content-type": "application/octet-stream",
+            "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(value.artifact.name)}`,
+          })
+          .end(value.bytes);
+        return;
+      }
+      if (action === "events" && !artifactId && method === "GET") {
+        response.writeHead(200, {
+          "content-type": "text/event-stream",
+          connection: "keep-alive",
+          "x-accel-buffering": "no",
+        });
+        response.flushHeaders();
+        let ended = false;
+        let watch:
+          Awaited<ReturnType<typeof runtime.presentation.watch>> | undefined;
+        let pending: string | undefined;
+        const flush = () => {
+          if (pending && !ended && !response.writableNeedDrain) {
+            const frame = pending;
+            pending = undefined;
+            response.write(frame);
+          }
+        };
+        const heartbeat = setInterval(() => {
+          if (!ended && !response.writableNeedDrain)
+            response.write(": keepalive\n\n");
+        }, 15000);
+        const close = () => {
+          if (ended) return;
+          ended = true;
+          clearInterval(heartbeat);
+          streams.delete(close);
+          void watch?.stop().catch(() => {});
+          response.end();
+        };
+        streams.add(close);
+        response.on("close", close);
+        response.on("drain", flush);
+        try {
+          watch = await runtime.presentation.watch(id, async (snapshot) => {
+            // Each frame is a full native projection: coalescing for a slow reader
+            // cannot drop history. Do not block the runtime behind a browser.
+            pending = `event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`;
+            flush();
+          });
+          if (ended) await watch.stop();
+          else void watch.closed.then(close, close);
+        } catch {
+          response.write(
+            'event: failure\ndata: {"error":"Observation failed. Reconnect to reload saved history."}\n\n',
+          );
+          close();
+        }
+        return;
+      }
+    }
+    if (path.startsWith("/api/"))
+      throw new HttpError(404, "API route not found.");
+    if (method !== "GET") throw new HttpError(404, "Route not found.");
+    if (path === "/openapi.yaml") {
+      response
+        .writeHead(200, { "content-type": "application/yaml" })
+        .end(await readFile(specPath));
+      return;
+    }
+    const asset =
+      path === "/"
+        ? "index.html"
+        : path.startsWith("/assets/") &&
+            /^\/assets\/[a-zA-Z0-9_.-]+$/.test(path)
+          ? path.slice(1)
+          : undefined;
+    if (!asset) throw new HttpError(404, "Page not found.");
+    const content = await readFile(resolve(webRoot, asset)).catch(() => {
+      throw new HttpError(404, "Asset not found.");
+    });
+    const mime: Record<string, string> = {
+      ".html": "text/html; charset=utf-8",
+      ".js": "text/javascript",
+      ".css": "text/css",
+    };
+    response
+      .writeHead(200, {
+        "content-type": mime[extname(asset)] ?? "application/octet-stream",
+      })
+      .end(content);
+  } catch (error) {
+    if (response.headersSent) {
+      response.end();
+      return;
+    }
+    const status =
+      error instanceof AdmissionError
+        ? error.status
+        : error instanceof HttpError
+          ? error.status
+          : error instanceof URIError
+            ? 400
+            : 500;
+    json(response, status, {
+      error:
+        error instanceof HttpError || error instanceof AdmissionError
+          ? error.message
+          : status === 400
+            ? "Invalid URL encoding."
+            : "Runtime request failed. Check the local server and configured provider; saved work is preserved.",
+    });
+  }
+});
+let closing = false;
+async function close() {
+  if (closing) return;
+  closing = true;
+  for (const end of streams) end();
+  server.close();
+  server.closeIdleConnections();
+  try {
+    await runtime.close();
+    process.exit(0);
+  } catch {
+    console.error(
+      "Runtime shutdown failed; preserve the store and inspect native recovery on restart.",
+    );
+    process.exit(1);
+  }
+}
+for (const signal of ["SIGINT", "SIGTERM"] as const)
+  process.once(signal, () => {
+    void close();
+  });
+server.on("error", async () => {
+  console.error(
+    "Cannot bind app port; the existing listener was not replaced.",
+  );
+  await runtime.close();
+  process.exit(1);
+});
+server.listen(
+  port,
+  hosted ? (process.env.DISPATCH_HOST ?? "127.0.0.1") : "127.0.0.1",
+  () =>
+    console.log(
+      `Web: ${origin} (PID ${process.pid}; native state ${runtime.stateRoot})`,
+    ),
+);

@@ -63,7 +63,7 @@ function main() {
   const updates = new Map<string, string>();
   const lock = readJson("package-lock.json");
   if (lock.version !== current) throw new Error("Root lockfile version is not in lockstep.");
-  for (const path of ["package.json", ...packages, "packages/web/capabilities/package.json"]) {
+  for (const path of ["package.json", ...packages]) {
     const pkg = readJson(path);
     if (pkg.version !== current) throw new Error(`${path} is not in lockstep with ${current}.`);
     pkg.version = next;
@@ -73,12 +73,10 @@ function main() {
       }
     }
     const key = path === "package.json" ? "" : relative(root, resolve(root, dirname(path)));
-    if (path !== "packages/web/capabilities/package.json") {
-      if (lock.packages[key]?.version !== current) throw new Error(`Lockfile version mismatch: ${path}`);
-      lock.packages[key].version = next;
-      for (const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
-        if (pkg[field]) lock.packages[key][field] = pkg[field];
-      }
+    if (lock.packages[key]?.version !== current) throw new Error(`Lockfile version mismatch: ${path}`);
+    lock.packages[key].version = next;
+    for (const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
+      if (pkg[field]) lock.packages[key][field] = pkg[field];
     }
     updates.set(path, `${JSON.stringify(pkg, null, 2)}\n`);
   }

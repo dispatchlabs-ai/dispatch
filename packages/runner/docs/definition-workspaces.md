@@ -91,7 +91,7 @@ published artifacts retain their own persistence contract.
 Principal identity does not determine the number of native stores or owners.
 Preserve Pi's ownership of each executing native session and task graph while
 allowing independent work to run concurrently. Reuse the existing
-[portable-worker protocol](../../web/docs/portable-workers.md),
+[outbound-worker contract](../../workers/README.md),
 [remote storage contract](../../remote/docs/spec.md) and
 [fleet recovery mechanisms](../../fleet/README.md#recovery-and-limits).
 The PostgreSQL protocol already has attempt ownership, atomic mutation receipts

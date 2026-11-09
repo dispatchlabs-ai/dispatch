@@ -401,11 +401,11 @@ the chosen read path actually enforces them.
 
 Existing source provides useful foundations:
 
-- [Dispatch's Postgres reader](../web/server/storage/postgres/storage.ts) includes
+- [Dispatch's Postgres reader](../postgres/src/storage.ts) includes
   `readSnapshot`, which does not acquire executor ownership or open a Harness.
-  Its [database layer](../web/server/storage/postgres/database.ts) opens a fixed
+  Its [database layer](../postgres/src/database.ts) opens a fixed
   read-only repeatable-read snapshot. Each refresh must open a new short snapshot.
-- The [schema](../web/server/storage/postgres/migrations.ts) stores conversations,
+- The [schema](../postgres/src/migrations.ts) stores conversations,
   entries, tasks, submissions, documents, and revisions under a logical store ID.
   The per-store commit sequence can signal change; it is not an append-only log
   of every task transition.
@@ -443,7 +443,7 @@ not require preserving every ephemeral frame or re-executing historical actions.
 ## Implementation and qualification
 
 The implementation stays in this package and imports shared UI primitives through
-`packages/web/src/components/ui.tsx`. It reads versioned storage records without
+`src/renderer/controls.tsx` and Observer-owned `src/renderer/ui/`. It reads versioned storage records without
 importing Web startup or Pi’s execution runtime. The background service owns
 connection lifetimes; the renderer receives redacted projections. The generic
 workflow view presents native task phase/attempt fields and retained documents;

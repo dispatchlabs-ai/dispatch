@@ -1,1 +1,1 @@
-export { UI } from "../../../web/src/components/ui";
+export * as UI from "./ui/index";

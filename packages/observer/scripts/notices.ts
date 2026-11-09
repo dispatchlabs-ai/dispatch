@@ -63,7 +63,7 @@ export async function writeNotices(builds: Metafile[]) {
   }
   sections.push(await readFile("dist/renderer/THIRD-PARTY-NOTICES.md", "utf8"));
   sections.push(
-    `## shadcn/ui and chatbot-template\n\n${await readFile("../web/src/components/ui/NOTICE.md", "utf8")}\n\n${await readFile("../web/src/components/ui/LICENSE", "utf8")}`,
+    `## shadcn/ui and chatbot-template\n\n${await readFile("src/renderer/ui/NOTICE.md", "utf8")}\n\n${await readFile("src/renderer/ui/LICENSE", "utf8")}`,
   );
   await writeFile("dist/THIRD-PARTY-NOTICES.md", `${sections.join("\n\n")}\n`);
 }

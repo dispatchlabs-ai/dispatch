@@ -16,3 +16,5 @@ result-*
 packages/runner/dist/
 packages/slack/dist/
 packages/google-chat/dist/
+
+packages/*/dist/

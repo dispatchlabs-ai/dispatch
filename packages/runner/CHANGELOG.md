@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Expose supported host-model, settings and read-only watch-reader subpaths; trusted provider-only hosts no longer require a gateway.
+
+
 - Align the remaining terminal UI dependency to Pi 1.5.0 and refresh shared locked build inputs alongside Remote and Observer. Web retains its separate Pi 1.4.0 pins. Existing alpha archives and installed runtimes are unchanged.
 
 - Record accepted portable-agent principal, capability, conversation and package

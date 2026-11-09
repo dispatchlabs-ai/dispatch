@@ -1,0 +1,1018 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Web API",
+    "version": "0.6.0",
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    },
+    "description": "Single-user loopback adapter to the consumer-configured native Dispatch runtime. Local mode has no login or bearer credential. Hosted mode requires HTTPS DISPATCH_ORIGIN and a trusted DISPATCH_AUTH_MODULE that validates actual credentials/session and authorizes all configured runs; exact configured Host/Origin apply, and API/SSE requests require that authorization. Health is unauthenticated and secret-free. No per-user grants UI is implemented. Local requests require Host 127.0.0.1:PORT; supplied Origin must equal the server origin; API Fetch Metadata must be same-origin or none; the shell navigation exception is described below. Every write requires the exact Origin header and application/json. No CORS. Cross-site API requests and DNS rebinding hosts receive 403. GET / permits external top-level navigation (Sec-Fetch-Mode navigate, Sec-Fetch-Dest document, no Origin) to the nonsensitive app shell only. Local native processes with the same user remain trusted. DISPATCH_PORT defaults to 4319. Unsupported routes/methods return 404 JSON Error. All responses disable caching, sniffing, framing and cross-origin resource embedding. No redirects. Request text and identities must contain non-whitespace characters. The app sets no character or body-byte cap; native/provider context constraints still apply. GET needs no Origin for browser navigation or native inspection."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:4319",
+      "description": "Local mode; hosted deployments use their configured HTTPS origin"
+    }
+  ],
+  "security": [],
+  "tags": [
+    {
+      "name": "Agents",
+      "description": "Installed authored agents"
+    },
+    {
+      "name": "Conversations",
+      "description": "Native durable chats"
+    },
+    {
+      "name": "Presentation",
+      "description": "Local static presentation and contract"
+    }
+  ],
+  "paths": {
+    "/api/agents": {
+      "get": {
+        "operationId": "listAgents",
+        "summary": "List installed agents",
+        "tags": [
+          "Agents"
+        ],
+        "responses": {
+          "200": {
+            "description": "Installed authored agent catalog.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Agent"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/chats": {
+      "get": {
+        "operationId": "listChats",
+        "summary": "List configured native histories, newest first",
+        "tags": [
+          "Conversations"
+        ],
+        "responses": {
+          "200": {
+            "description": "All configured native conversations, including retained CLI/workflow children. Local canonical store identity deduplicates overlapping roots. Central service projects native PostgreSQL stores. No count cap.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Chat"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createChat",
+        "summary": "Create or retrieve a conversation by stable key",
+        "tags": [
+          "Conversations"
+        ],
+        "responses": {
+          "201": {
+            "description": "Native conversation, including key replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Chat"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "JSON object. Writes require Origin equal to the server URL.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Stable client creation identity; reuse to retry the same creation."
+                  },
+                  "source": {
+                    "type": "string",
+                    "description": "Configured source ID. Defaults to startup config defaultSource. Creates a new native session only on explicit creation; stable key/agent replays creation."
+                  }
+                },
+                "required": [
+                  "agent",
+                  "key"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chats/{chatId}": {
+      "get": {
+        "operationId": "getSnapshot",
+        "summary": "Reload complete saved history and live activity",
+        "tags": [
+          "Conversations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Native snapshot; observation does not resubmit work.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/chatId"
+          }
+        ]
+      }
+    },
+    "/api/chats/{chatId}/messages": {
+      "post": {
+        "operationId": "sendMessage",
+        "summary": "Admit a message or queue a follow-up",
+        "tags": [
+          "Conversations"
+        ],
+        "responses": {
+          "202": {
+            "description": "Native admission; reuse the requestId on uncertain delivery to avoid duplicates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "submissionId": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "submissionId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/chatId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "JSON object. Writes require Origin equal to the server URL.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "requestId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Native idempotency identity, scoped to the conversation. Reuse with the same text on retry."
+                  }
+                },
+                "required": [
+                  "text",
+                  "requestId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chats/{chatId}/stop": {
+      "post": {
+        "operationId": "stopChat",
+        "summary": "Cancel running, queued and background conversation work",
+        "tags": [
+          "Conversations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Native cancellation recorded and background abort requested.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/chatId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "JSON object. Writes require Origin equal to the server URL.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chats/{chatId}/events": {
+      "get": {
+        "operationId": "watchChat",
+        "summary": "Stream full native snapshots using Server-Sent Events",
+        "tags": [
+          "Conversations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Long-lived SSE with full snapshot on attach and once per second, using committed native watch-reader history for external/unowned sessions and native live snapshots for app-owned chats. External provider partials are unavailable. Observation never opens an owner or resumes work. event: failure precedes observation failure close. Keepalive every 15 seconds; slow frames coalesce; reconnect reloads, never resubmits.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "example": "event: snapshot\ndata: {\"chat\": {\"id\":\"helper:9\"}, \"messages\": []}\n\n"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/chatId"
+          }
+        ]
+      }
+    },
+    "/api/chats/{chatId}/artifacts/{artifactId}": {
+      "get": {
+        "operationId": "downloadArtifact",
+        "summary": "Download immutable runtime-retained bytes",
+        "tags": [
+          "Conversations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Download only; never executed as app content.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Content-Disposition": {
+                "description": "attachment with RFC 5987 UTF-8 filename",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/chatId"
+          },
+          {
+            "$ref": "#/components/parameters/artifactId"
+          }
+        ]
+      }
+    },
+    "/": {
+      "get": {
+        "operationId": "getApp",
+        "summary": "Load the app shell",
+        "tags": [
+          "Presentation"
+        ],
+        "responses": {
+          "200": {
+            "description": "Built React app shell.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      }
+    },
+    "/assets/{asset}": {
+      "get": {
+        "operationId": "getAsset",
+        "summary": "Load a built static asset",
+        "tags": [
+          "Presentation"
+        ],
+        "responses": {
+          "200": {
+            "description": "Build-generated JS/CSS or other asset.",
+            "content": {
+              "text/javascript": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/css": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/asset"
+          }
+        ]
+      }
+    },
+    "/openapi.yaml": {
+      "get": {
+        "operationId": "getContract",
+        "summary": "Read this API contract",
+        "tags": [
+          "Presentation"
+        ],
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1 document (JSON is valid YAML).",
+            "content": {
+              "application/yaml": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/sources": {
+      "get": {
+        "operationId": "listSources",
+        "summary": "Report configured sources and actionable observation issues",
+        "tags": [
+          "Conversations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Startup-configured sources; errors do not hide usable sources. Config read once; restart after edits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Source"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "Secret-free process readiness",
+        "tags": [
+          "Presentation"
+        ],
+        "responses": {
+          "200": {
+            "description": "Ready"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "Agent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "description"
+        ],
+        "additionalProperties": false
+      },
+      "Chat": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "opaque-source-session-conversation-identity",
+            "description": "Opaque stable identity of canonical native database path and conversation ID; not a native agent:conversation ID."
+          },
+          "agent": {
+            "type": "string"
+          },
+          "conversationId": {
+            "type": "integer"
+          },
+          "source": {
+            "type": "string",
+            "description": "Configured source ID (not transport provenance)."
+          },
+          "title": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "origin": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "sourceLabel": {
+            "type": "string"
+          },
+          "session": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "agent",
+          "conversationId",
+          "source",
+          "title",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "Artifact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "mimeType",
+          "size",
+          "sha256",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "at": {
+            "type": "number"
+          },
+          "commentary": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "background": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Artifact"
+            }
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "user",
+              "agent",
+              "runtime"
+            ],
+            "description": "Derived from native entry kind/source, not text. Runtime continuation/context entries remain in snapshots but are not rendered as user bubbles."
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "text",
+          "provenance"
+        ],
+        "additionalProperties": false
+      },
+      "Retry": {
+        "type": "object",
+        "properties": {
+          "attempt": {
+            "type": "integer"
+          },
+          "at": {
+            "type": "number",
+            "description": "Epoch milliseconds"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "attempt",
+          "at",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "Snapshot": {
+        "type": "object",
+        "properties": {
+          "chat": {
+            "$ref": "#/components/schemas/Chat"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "queued": {
+            "type": "integer"
+          },
+          "partial": {
+            "type": "string"
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "demo": {
+            "type": "boolean"
+          },
+          "background": {
+            "type": "boolean"
+          },
+          "retry": {
+            "$ref": "#/components/schemas/Retry"
+          },
+          "compactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompactionStatus"
+            }
+          },
+          "compactionFailure": {
+            "$ref": "#/components/schemas/CompactionFailure"
+          },
+          "readOnlyReason": {
+            "type": "string",
+            "description": "Observed external owner and recovery. Other compatibility errors are returned on explicit admission."
+          },
+          "observation": {
+            "type": "string",
+            "description": "Native activity description for read-only history; no live provider partials from external owners."
+          }
+        },
+        "required": [
+          "chat",
+          "messages",
+          "running",
+          "queued",
+          "partial",
+          "tools",
+          "error",
+          "demo",
+          "background"
+        ],
+        "additionalProperties": false
+      },
+      "CompactionStatus": {
+        "type": "object",
+        "required": [
+          "taskId",
+          "trigger",
+          "blocking",
+          "attempt"
+        ],
+        "properties": {
+          "taskId": {
+            "type": "integer"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "threshold",
+              "overflow"
+            ]
+          },
+          "blocking": {
+            "type": "boolean"
+          },
+          "attempt": {
+            "type": "integer"
+          },
+          "retry": {
+            "type": "object",
+            "required": [
+              "at",
+              "error"
+            ],
+            "properties": {
+              "at": {
+                "type": "number"
+              },
+              "error": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompactionFailure": {
+        "type": "object",
+        "required": [
+          "taskId",
+          "trigger",
+          "error"
+        ],
+        "properties": {
+          "taskId": {
+            "type": "integer"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "threshold",
+              "overflow"
+            ]
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Source": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "issues"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "description": "Canonical directory, when available."
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "responses": {
+      "Error400": {
+        "description": "Invalid JSON object, field, URL encoding, or agent selection.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "Host, Origin or Fetch Metadata boundary rejected.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error404": {
+        "description": "Route, conversation or artifact not found.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error415": {
+        "description": "Content-Type must be application/json.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error500": {
+        "description": "Runtime or local file request failed. Saved native work is preserved; check the local server/provider configuration.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error409": {
+        "description": "Current attempt rejected before admission: native owner/lock, incompatible release/namespace/cwd/schema/adapter, suspended work outside the selected ownership tree, loop/calendar, missing recipient, unavailable creation source, or child/workflow not a native Chats entry. Recovery reason is included; viewing remains available. Send checks all paused messaging-closure harnesses; Stop checks its implicitly resumed harness under native owner locks. A 409 cannot disprove an earlier uncertain admission: retain that original requestId through refresh/recovery and retry until reconciled.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "chatId": {
+        "name": "chatId",
+        "in": "path",
+        "required": true,
+        "description": "URL-encoded opaque configured store/session/conversation identity.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "artifactId": {
+        "name": "artifactId",
+        "in": "path",
+        "required": true,
+        "description": "Immutable artifact ID from a message.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "asset": {
+        "name": "asset",
+        "in": "path",
+        "required": true,
+        "description": "Build-generated flat filename; letters, digits, underscore, dot and hyphen only.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        }
+      }
+    }
+  }
+}

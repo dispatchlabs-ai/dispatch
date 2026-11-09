@@ -3,29 +3,29 @@
   "version": "0.6.0",
   "private": true,
   "workspaces": [
-    "packages/web",
     "packages/runner",
     "packages/remote",
+    "packages/postgres",
+    "packages/backend",
+    "packages/workers",
     "packages/slack",
-    "packages/observer",
+    "packages/google-chat",
     "packages/email",
     "packages/fleet",
-    "packages/google-chat"
+    "packages/observer",
+    "packages/web"
   ],
   "engines": {
     "node": ">=24 <26"
   },
   "scripts": {
-    "dev": "tsx scripts/dev.ts",
+    "dev": "npm run build && npm start",
     "build": "npm run build --workspaces",
-    "preview": "tsx scripts/start.ts",
+    "preview": "npm start --workspace @dispatch/web",
     "typecheck": "npm run typecheck --workspaces",
     "check": "npm run typecheck && npm run build",
-    "start": "tsx scripts/start.ts",
-    "auth": "tsx scripts/auth.ts",
-    "release": "tsx scripts/release.ts",
-    "workshop": "npm run workshop --workspace @dispatch/web",
-    "build:workshop": "npm run build:workshop --workspace @dispatch/web"
+    "start": "npm start --workspace @dispatch/web",
+    "release": "tsx scripts/release.ts"
   },
   "type": "module"
 }

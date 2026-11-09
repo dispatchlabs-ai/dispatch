@@ -10,7 +10,7 @@ Dispatch is early `0.x` software. Maintainers review reports, but there is no gu
 
 ## Execution and trust boundaries
 
-Use trusted users, agents and tools. Coding tools run with the service account's filesystem, process and network authority. Working directories and separate agent contexts are not sandboxes. Native Muse execution disables its sandbox and approval prompts; optional Dispatch tool permissions do not confine native Muse access.
+Use trusted users, agents and tools. Coding tools run with the service account's filesystem, process and network authority. Working directories and separate agent contexts are not sandboxes. Host-defined tools and providers retain their real authority; Web does not sandbox them.
 
 MCP connections can reach private-network hosts and the service host's loopback interface. Protect the service and restrict its host/network access where isolation is required. Permission revocation applies to later permission-checked uses; Stop is an interruption request, not an undo or secure-erasure mechanism. Neither revokes credentials already obtained through host access.
 

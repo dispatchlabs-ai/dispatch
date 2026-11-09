@@ -1,32 +1,22 @@
 export class ApiError extends Error {
-  constructor(public status: number, public code: string, message: string) {
-    super(message);
-    this.name = "ApiError";
-  }
+  constructor(readonly status: number, message: string) { super(message); }
 }
 
-export async function request<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(path, {
-    method: body === undefined ? "GET" : "POST",
-    credentials: "same-origin",
-    headers: body === undefined ? { Accept: "application/json" } : { Accept: "application/json", ...(body instanceof FormData ? {} : { "Content-Type": "application/json" }) },
-    body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
-    signal,
+// A rejection proves only this attempt did not admit. It cannot disprove an
+// earlier uncertain admission with the same identity (including after refresh).
+// Retain 413 handling for pending requests rejected by the previous app build. A 500 can happen after native admission (e.g. rename failure),
+// so it and transport/response failures must retain the original requestId.
+export function isDefiniteRejection(error: unknown, previouslyUncertain = false): error is ApiError {
+  return !previouslyUncertain && error instanceof ApiError && [400, 403, 404, 409, 413, 415].includes(error.status);
+}
+
+export async function api<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(path, body === undefined ? undefined : {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
   });
-  const contentType = response.headers.get("Content-Type") || "";
-  if (!contentType.includes("application/json")) {
-    throw new ApiError(response.status, "INVALID_RESPONSE", "The service returned an unexpected response. Try again in a moment.");
-  }
-  const data = await response.json();
   if (!response.ok) {
-    throw new ApiError(response.status, data.error?.code || "REQUEST_FAILED", data.error?.message || "The request could not be completed.");
+    const value = await response.json().catch(() => ({}));
+    throw new ApiError(response.status, value.error ?? `Request failed (${response.status}).`);
   }
-  return data as T;
-}
-
-export function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
-  if (error instanceof Error && error.name === "NotAllowedError") return "The passkey request was cancelled or could not be verified. Try again when you’re ready.";
-  if (error instanceof Error && error.name === "InvalidStateError") return "This passkey is already registered. Try another passkey or sign in.";
-  return "Couldn’t connect. Check your connection and try again.";
+  return response.json();
 }

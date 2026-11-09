@@ -10,7 +10,7 @@
       forSystem = system:
         let
           pkgs = import nixpkgs { inherit system; };
-          web = pkgs.callPackage ./packages/web/nix/package.nix { };
+          web = pkgs.callPackage ./packages/web/nix/package.nix { inherit (runtime) nodejs_24; };
           runtime = import ./packages/runner/nix/runtime.nix { inherit pkgs; };
           runner = pkgs.callPackage ./packages/runner/nix/package.nix { inherit (runtime) nodejs_24; };
           runner-slack = pkgs.callPackage ./packages/runner/nix/package.nix { inherit (runtime) nodejs_24; withSlack = true; };
@@ -19,14 +19,16 @@
           claude-code-provider = pkgs.callPackage ./packages/runner/nix/claude-code-provider.nix { inherit (runtime) nodejs_24; inherit runner; };
         in {
           packages = { default = web; inherit runner runner-slack runner-fleet runner-google-chat claude-code-provider; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
-            macos-release = pkgs.callPackage ./packages/web/nix/macos-release.nix { inherit web; };
+            macos-release = pkgs.callPackage ./packages/web/nix/macos-release.nix { inherit web; inherit (runtime) nodejs_24; };
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             oci = pkgs.callPackage ./packages/web/nix/oci.nix {
               inherit web;
+              inherit (runtime) nodejs_24;
               sourceRevision = self.rev or self.dirtyRev or "uncommitted";
             };
             workers-oci = pkgs.callPackage ./packages/web/nix/oci.nix {
               inherit web;
+              inherit (runtime) nodejs_24;
               sourceRevision = self.rev or self.dirtyRev or "uncommitted";
               disposableWorkspace = true;
             };

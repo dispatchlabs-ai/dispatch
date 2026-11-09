@@ -1,6 +1,5 @@
 @import "tailwindcss";
-@source "../../../web/src/components/ui.tsx";
-@source "../../../web/src/components/ui";
+@source "./ui";
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {

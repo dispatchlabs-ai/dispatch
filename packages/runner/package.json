@@ -24,6 +24,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./watch-reader": {
+      "types": "./dist/watch-reader.d.ts",
+      "import": "./dist/watch-reader.js"
+    },
+    "./host-models": {
+      "types": "./dist/host-models.d.ts",
+      "import": "./dist/host-models.js"
+    },
+    "./settings": {
+      "types": "./dist/settings.d.ts",
+      "import": "./dist/settings.js"
     }
   },
   "bin": {
