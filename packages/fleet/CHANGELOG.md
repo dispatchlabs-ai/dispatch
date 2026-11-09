@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-09
+
 - Add immutable native run adapters, coordinator-owned Pi storage and run-bound
   relays for replaceable EC2 execution workers.
 - Preserve source and artifact bytes across fenced worker handoffs using an

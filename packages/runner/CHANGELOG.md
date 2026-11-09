@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-09
+
 - Share one supervised native owner with CLI and Backend clients; preserve native receipts, Stop, recovery, attachments and tool observations. Add explicit multi-adapter reply routing and conversation-only schedule policy.
 
 - Match JSON-encoded native SQLite tool-task kinds in read-only projection, restoring live task state and retained nested call identity without acquiring ownership.

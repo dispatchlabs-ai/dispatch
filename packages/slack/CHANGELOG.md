@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-09
+
 - Carry trusted common-client text/image bytes through existing native admission and delivery; declare explicit background reply transport.
 
 - Include a known remaining answer suffix when closing an uninterrupted stream,

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-09
+
 - Use location-neutral idle composer wording for local and central installations.
 
 - Claim browser outbox ownership before access so copied live tabs retain independent drafts, attachment bytes and uncertain request identities across reload.
