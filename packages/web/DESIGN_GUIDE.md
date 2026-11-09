@@ -1,20 +1,41 @@
-# Agent Chat design
+# Web chat design
 
-- Local-first, single-user chat. Dispatch/Pi Durable owns execution and authoritative history; this app owns presentation and its adapter.
-- Prioritize messages and primary actions: compact agent/conversation navigation, compact composer, useful running/tool/error states, and a visible stop action.
-- Use readable Markdown and code, restrained neutral colors, consistent spacing, accessible names and keyboard focus. Support narrow and desktop layouts without horizontal page overflow.
-- Prefer React and shared shadcn/ui primitives with suitable AI Elements conversation, message and prompt patterns; use actual component APIs, not copied speculative signatures.
-- The backend alone handles configuration and provider/tool credentials. Bind loopback and enforce same-origin and allowed-host boundaries on tool-capable requests.
-- Observe only startup-configured native stores without opening runtimes. Acquire a compatible native owner lazily on explicit create/send/stop; preserve historical stores and external owners. Browser reconnection observes rather than resubmits work; use native request identities for submission replay.
+- Consumer-authored native agents, credentials and authority stay outside Web.
+  Runner/Pi owns execution, durable conversations, content blocks and recovery.
+  Backend provides the same local and central PostgreSQL/outbound-worker operations.
+- Current official shadcn Chat/Message/Message Scroller, Bubble, Trace/Code Block,
+  Prompt Input/Input Group/Attachment and Sidebar menu primitives are composed
+  with real APIs. See [notices and immutable sources](THIRD_PARTY.md). No Next,
+  AI SDK, Gateway or second execution loop is imported.
+- Restrained neutral colors, readable streaming Markdown/code, compact searchable
+  history, circular Send and visible native Stop. Busy follow-ups remain available;
+  send/stop are not a cosmetic toggle that removes follow-up input.
+- Actual tool IDs/turns/assistant entries, retained arguments/results/errors and
+  native task/live state drive expandable activity. Missing result is unavailable,
+  not success; only native evidence establishes cancellation, waits or parentage.
+  No fake approvals or questionnaire parsed from ordinary prose.
+- Files show removable chips/image previews before admission and retained download
+  links afterward. Browser names are labels only. Supported UTF-8 documents and
+  PNG/JPEG/WebP images enter native Pi blocks, not a shadow transcript/blob DB.
+- Per-tab IndexedDB is only the local draft/uncertain delivery outbox. A lifetime
+  exclusive Web Lock claims its identity before reads/writes; copied live tabs
+  clone the record instead of overwriting it, while ordinary reload reclaims it. Preserve
+  text, bytes and requestId across reload/rejections; replay explicitly with the
+  original identity. Reconnect only observes. No arbitrary attachment/message caps;
+  format/model/provider constraints remain explicit.
+- Enter sends, Shift+Enter/IME do not. Focus restores after send without stealing
+  intentional navigation. Keyboard focus visible on search/tool/code controls;
+  mobile drawer traps focus, Escape restores it, hidden areas inert.
+- Configured installation/agent/conversation IDs stay exact. Compact visible
+  labels do not erase identity; source/session/native ID remain searchable or in
+  metadata. All native histories remain reachable, without truncation caps.
+- Observe configured native history without owners/providers/resume. Only explicit
+  compatible mutations acquire ownership; retain old definitions/host/state on
+  mismatch. Host/Origin/Fetch Metadata and real hosted authorization protect every
+  read/write/SSE operation, including new content. CSP allows same-origin/data
+  image previews, blocks remote images/connections and arbitrary HTML execution.
 
-Implementation must link its concrete component and token sources here as they are established.
-
-## Concrete sources
-- Shared [shadcn Button](src/components/ui/button.tsx) and [AI Elements
-  Conversation](src/components/ai-elements/conversation.tsx) / [Message](src/components/ai-elements/message.tsx), with source links and notices in [THIRD_PARTY.md](THIRD_PARTY.md).
-- [Tailwind theme tokens and responsive layout](src/styles.css): warm neutrals,
-  muted green primary, compact 60px desktop/52px mobile header, 820px reading
-  width, visible focus. Streamdown renders Markdown/code with HTML sanitization;
-  remote images and connections are blocked by the local Content Security Policy.
-- The composer is a native accessible form, not an AI SDK transport. Enter sends,
-  Shift+Enter adds a line, and IME composition does not submit. No parallel AI loop.
+Qualification is four viewports (1440×900,1280×720,768×1024,390×844) plus real
+keyboard/mobile/scroll/recovery and native local+PG/worker interaction, not visual
+resemblance or build success alone. Production tools/models/identity/TLS/cloud
+installation remain consumer qualification; no unrelated deployment claim.

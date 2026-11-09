@@ -3,17 +3,22 @@ import { dirname, join, isAbsolute } from "node:path";
 import { Worker } from "node:worker_threads";
 import { createHash } from "node:crypto";
 import lockfile from "proper-lockfile";
-import type { Agent, Chat, Snapshot } from "./contracts.js";
-import { readConfig, AdmissionError } from "./config.js";
+import type { Agent, Chat, Snapshot, AttachmentFile } from "./contracts.js";
+import { readConfig, AdmissionError, type LocalConfig } from "./config.js";
 import * as runner from "@dispatch/runner";
 import * as reader from "@dispatch/runner/watch-reader";
-import { createStores, identity, readStore, type Selection } from "./stores.js";
+import { createStores, identity, readStore, sessionDocument, type Selection } from "./stores.js";
 
 interface NativeService {
+  has(id: string): Promise<boolean>;
+  sources(): Promise<import("./contracts.js").SourceStatus[]>;
+  list(): Promise<Chat[]>;
+  artifact(id: string, artifactId: string): Promise<{ artifact: NonNullable<import("./contracts.js").ChatMessage["artifacts"]>[number]; bytes: Uint8Array }>;
   create(
     agent: string,
     source: runner.Chat["source"],
     key: string,
+    sourceId?: string,
   ): Promise<Chat>;
   resolve(id: string): Promise<unknown>;
   submit(
@@ -22,7 +27,7 @@ interface NativeService {
     requestId: string,
     mode: "followUp",
     source: runner.Chat["source"],
-    files?: runner.AttachmentFile[],
+    files?: AttachmentFile[],
   ): Promise<{ submissionId: number }>;
   snapshot(id: string): Promise<Snapshot>;
   stop(id: string): Promise<void>;
@@ -32,15 +37,13 @@ async function startOwner(
   path: string,
   namespace: string,
   names: string[],
+  config: LocalConfig,
 ): Promise<NativeService> {
-  const worker = new Worker(new URL("./owner.js", import.meta.url), {
-    workerData: {
-      path,
-      namespace,
-      names,
-      configFile: process.env.DISPATCH_CONFIG,
-    },
-  });
+  return connectWorker("./owner.js", { path, namespace, names, config });
+}
+async function connectWorker(entrypoint: string, workerData: unknown): Promise<NativeService & { agents: Agent[] }> {
+  const worker = new Worker(new URL(entrypoint, import.meta.url), { workerData });
+  let agents: Agent[] = [];
   const calls = new Map<
     number,
     { resolve(value: any): void; reject(error: Error): void }
@@ -49,7 +52,7 @@ async function startOwner(
   let exited = false;
   const ready = new Promise<void>((resolve, reject) => {
     worker.on("message", (message) => {
-      if (message.ready) resolve();
+      if (message.ready) { agents = message.agents ?? []; resolve(); }
       else if (message.failed)
         reject(
           new AdmissionError(
@@ -108,6 +111,11 @@ async function startOwner(
       worker.postMessage({ id, method, args });
     });
   return {
+    agents,
+    has: (id: string) => call("has", [id]),
+    sources: () => call("sources", []),
+    list: () => call("list", []),
+    artifact: (...args: unknown[]) => call("artifact", args),
     create: (...args) => call("create", args),
     resolve: (...args) => call("resolve", args),
     submit: (...args) => call("submit", args),
@@ -122,66 +130,8 @@ async function startOwner(
     },
   };
 }
-// Read the native session document format for admission only. No writes, invented
-// chat-index admission, migrations or copied history. Unknown formats fail closed.
-function sessionDocument(path: string, kind: string): any {
-  return readStore(path, (db) => {
-    const doc = db
-      .prepare("SELECT id FROM documents WHERE kind=? AND scope_kind='session'")
-      .get(JSON.stringify(kind));
-    if (!doc)
-      throw new AdmissionError(
-        `Missing ${kind} metadata. Recover with the original native runtime.`,
-      );
-    const rows = db
-      .prepare(
-        "SELECT kind,version,content FROM document_revisions WHERE document_id=? AND seq>=COALESCE((SELECT MAX(seq) FROM document_revisions WHERE document_id=? AND kind='base'),0) ORDER BY seq",
-      )
-      .all(doc.id!, doc.id!);
-    let value: any = {};
-    for (const row of rows) {
-      if (row.version !== 1)
-        throw new AdmissionError(
-          "Unsupported native metadata version. Use the original runtime.",
-        );
-      const content = JSON.parse(String(row.content));
-      if (row.kind === "base") {
-        value = content;
-        continue;
-      }
-      if (row.kind !== "delta" || !Array.isArray(content))
-        throw new AdmissionError("Unsupported native metadata delta.");
-      for (const op of content) {
-        if (op[0] === "r") {
-          value = op[1];
-          continue;
-        }
-        const path = op[1];
-        if (
-          !Array.isArray(path) ||
-          !path.length ||
-          path.some((key) =>
-            ["__proto__", "constructor", "prototype"].includes(String(key)),
-          )
-        )
-          throw new AdmissionError("Unsupported native metadata path.");
-        let target = value;
-        for (const key of path.slice(0, -1)) target = target[key];
-        const key = path.at(-1);
-        if (op[0] === "s") target[key] = op[2];
-        else if (op[0] === "d") delete target[key];
-        else if (op[0] === "a") target[key] += op[2];
-        else if (op[0] === "t") target[key] = target[key].slice(0, op[2]);
-        else throw new AdmissionError("Unsupported native metadata operation.");
-      }
-    }
-    return value;
-  });
-}
-async function openLocalRuntime() {
-  const config = await readConfig();
+async function openLocalRuntime(config: LocalConfig) {
   const { definitionsRoot, host } = config;
-  process.chdir(host.cwd);
   const stores = createStores(config, reader);
   // Catalog loading does not open any native storage or connect a provider.
   const definitions = new Map<string, any>();
@@ -321,7 +271,7 @@ async function openLocalRuntime() {
           ];
           // Mirror installed ChatService host adapters; never migrate definitions.
           if (
-            saved.fingerprint !== definition.fingerprint ||
+            saved?.fingerprint !== definition.fingerprint ||
             saved.execution !== "live" ||
             saved.artifactVersion !== 1 ||
             saved.cwd !== (await realpath(host.cwd))
@@ -337,7 +287,7 @@ async function openLocalRuntime() {
               `${id} requires original host adapters: ${missing.join(", ")}. Use its original CLI/service.`,
             );
         }
-        const service = await startOwner(path, namespace, [...names]);
+        const service = await startOwner(path, namespace, [...names], config);
         const owner = { service, namespace };
         for (const name of names) owners.set(join(path, name), owner);
         return owner;
@@ -360,7 +310,7 @@ async function openLocalRuntime() {
       item.store.path,
       `${item.store.namespace}.chats`,
     );
-    if (!indexed.byId?.[nativeId(item)])
+    if (!indexed?.byId?.[nativeId(item)])
       throw new AdmissionError(
         "This is a native child/workflow conversation. Send or stop through its original parent/CLI; history remains available.",
       );
@@ -384,13 +334,13 @@ async function openLocalRuntime() {
     agents,
     sources: stores.statuses,
     list: stores.list,
-    has: async (id: string) => { try { await stores.get(id); return true; } catch { return false; } },
+    has: stores.has,
     async create(
       agent: string,
       _source: runner.Chat["source"],
       key: string,
       sourceId = config.defaultSource,
-    ) {
+    ): Promise<Chat> {
       const source = config.sources.find((value) => value.id === sourceId);
       if (!source)
         throw new AdmissionError("Choose a configured source for creation.");
@@ -422,7 +372,7 @@ async function openLocalRuntime() {
       requestId: string,
       mode: "followUp",
       source: runner.Chat["source"],
-      files: runner.AttachmentFile[] = [],
+      files: AttachmentFile[] = [],
     ) {
       runner.prepareContent(text, files);
       const { item, owner } = await admitted(id);
@@ -522,26 +472,39 @@ async function openLocalRuntime() {
   };
 }
 
+async function openAdapter(config: { sources: LocalConfig["sources"]; defaultSource: string; module: string; configFile: string }): Promise<Runtime> {
+  const service = await connectWorker("./adapter-owner.js", config);
+  const snapshot = service.snapshot;
+  return {
+    service,
+    stateRoot: config.sources.map(source => source.path).join(", "),
+    presentation: { snapshot, watch: async (id, listener) => {
+      let stopped = false, timer: ReturnType<typeof setTimeout>;
+      let finish!: () => void;
+      const closed = new Promise<void>(resolve => { finish = resolve; });
+      const tick = async () => {
+        try { if (!stopped) await listener(await snapshot(id)); } catch { stopped = true; finish(); }
+        if (!stopped) timer = setTimeout(() => { void tick(); }, 1000);
+      };
+      await listener(await snapshot(id));
+      timer = setTimeout(() => { void tick(); }, 1000);
+      return { closed, stop: async () => { stopped = true; clearTimeout(timer); finish(); } };
+    } },
+    close: service.close,
+  };
+}
+
+/** A consumer adapter must implement these same operations and read-only observations.
+ * It owns its native configuration/authority, never a second transcript or loop. */
 export interface Runtime {
   stateRoot: string;
-  service: {
-    agents: Agent[];
-    sources(): Promise<import("./contracts.js").SourceStatus[]>;
-    list(): Promise<Chat[]>;
-    has(id: string): Promise<boolean>;
-    create(agent: string, source: runner.Chat["source"], key: string, sourceId?: string): Promise<Chat>;
-    submit(id: string, text: string, requestId: string, mode: "followUp", source: runner.Chat["source"], files?: runner.AttachmentFile[]): Promise<{ submissionId: number }>;
-    stop(id: string): Promise<void>;
-    artifact(id: string, artifactId: string): Promise<{ artifact: runner.Artifact; bytes: Buffer }>;
-  };
+  service: Omit<NativeService, "resolve" | "snapshot" | "close"> & { agents: Agent[] };
   presentation: {
     snapshot(id: string): Promise<Snapshot>;
     watch(id: string, listener: (value: Snapshot) => Promise<void>): Promise<{ closed: Promise<void>; stop(): Promise<void> }>;
   };
   close(): Promise<void>;
 }
-
-/** A configured connection never opens a local native store or provider. */
 export async function openRuntime(): Promise<Runtime> {
   const path = process.env.DISPATCH_CONFIG;
   if (path) {
@@ -549,7 +512,61 @@ export async function openRuntime(): Promise<Runtime> {
     const value = JSON.parse(await readFile(path, "utf8"));
     if (value.service) return (await import("./service-runtime.js")).openServiceRuntime(value.service);
   }
-  return openLocalRuntime();
+  const config = await readConfig();
+  if (!config.installations) return openLocalRuntime(config as LocalConfig);
+  const contexts = new Map<string, Runtime>();
+  try {
+    for (const binding of config.installations) {
+      const sources = config.sources.filter(source => source.installation === binding.id);
+      if (!sources.length) continue;
+      const defaultSource = sources.some(source => source.id === config.defaultSource) ? config.defaultSource : sources[0].id;
+      const selected = { sources, defaultSource };
+      const runtime: Runtime = binding.adapter
+        ? await openAdapter({ ...selected, ...binding.adapter })
+        : await openLocalRuntime({ ...selected, definitionsRoot: binding.definitionsRoot!, host: binding.host! });
+      contexts.set(binding.id, runtime);
+    }
+  } catch (error) { await Promise.allSettled([...contexts.values()].map(runtime => runtime.close())); throw error; }
+  const qualify = (name: string, id: string) => `${name}~${id}`;
+  const context = (id: string) => {
+    const at = id.indexOf("~"), name = id.slice(0, at), local = id.slice(at + 1);
+    const runtime = at > 0 && contexts.get(name);
+    if (!runtime || !local || local.includes("~")) throw new AdmissionError("Unknown installation-qualified identity.");
+    return { name, local, runtime };
+  };
+  const project = (name: string, chat: Chat): Chat => ({ ...chat, id: qualify(name, chat.id), agent: qualify(name, chat.agent),
+    ...(chat.parentId ? { parentId: qualify(name, chat.parentId) } : {}) });
+  return {
+    stateRoot: config.sources.map(source => source.path).join(", "),
+    service: {
+      agents: [...contexts].flatMap(([name, runtime]) => runtime.service.agents.map(agent => ({ ...agent, id: qualify(name, agent.id),
+        description: `${config.installations!.find(binding => binding.id === name)!.label}: ${agent.description}` }))),
+      sources: async () => (await Promise.all([...contexts.values()].map(runtime => runtime.service.sources()))).flat(),
+      list: async () => (await Promise.all([...contexts].map(async ([name, runtime]) => (await runtime.service.list()).map(chat => project(name, chat))))).flat()
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      has: async (id: string) => {
+        try { const { local, runtime } = context(id); return runtime.service.has(local); }
+        catch (error) { if (error instanceof AdmissionError) return false; throw error; }
+      },
+      create: async (id, source, key, sourceId) => {
+        const { name, local, runtime } = context(id);
+        const target = sourceId ?? (config.sources.find(item => item.id === config.defaultSource && item.installation === name)
+          ?? config.sources.find(item => item.installation === name))?.id;
+        if (!target || !config.sources.some(item => item.id === target && item.installation === name))
+          throw new AdmissionError("Choose a source bound to the selected installation.");
+        return project(name, await runtime.service.create(local, source, key, target));
+      },
+      submit: (id, ...args) => { const { local, runtime } = context(id); return runtime.service.submit(local, ...args); },
+      stop: id => { const { local, runtime } = context(id); return runtime.service.stop(local); },
+      artifact: (id, artifactId) => { const { local, runtime } = context(id); return runtime.service.artifact(local, artifactId); },
+    },
+    presentation: {
+      snapshot: async id => { const { name, local, runtime } = context(id); const value = await runtime.presentation.snapshot(local); return { ...value, chat: project(name, value.chat) }; },
+      watch: async (id, listener) => { const { name, local, runtime } = context(id); return runtime.presentation.watch(local, async value => listener({ ...value, chat: project(name, value.chat) })); },
+    },
+    close: async () => { await Promise.all([...contexts.values()].map(runtime => runtime.close())); },
+  };
 }
+
 export { openServiceRuntime } from "./service-runtime.js";
 export type { ServiceConnection } from "./service-runtime.js";

@@ -7,7 +7,7 @@ import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
 import { awaitWithContext, withAbortSignal, type Context } from "@earendil-works/chord/context";
 import { AssistantEntry, ConversationBusy, InboxDoc, LiveDoc, ToolResultEntry, ToolTask, defineDoc, defineExtension, defineTask, type ConversationId, type Cursor, type EntryId, type JsonObject, type LiveState, type SubmissionDraft, type TaskId, type TaskRuntime, type ToolTaskInput, type ToolTaskResult, type Tx } from "@earendil-works/pi-durable";
-import { context, publicCommentary, publicAnswer, type ChatService, type Runner, type ReplySink } from "@dispatch/runner";
+import { context, prepareContent, type AttachmentFile, publicCommentary, publicAnswer, type ChatService, type Runner, type ReplySink } from "@dispatch/runner";
 import { fallbackText, progressText, replyBlocks, replyChunk, streamText } from "./text.js";
 import { slackArtifacts } from "./files.js";
 import { createStatusDelivery } from "./status.js";
@@ -31,7 +31,7 @@ export type SlackConfig = {
   /** With "started", require mentions inside threads started for another bot. */
   threadReplies?: "all" | "started";
 };
-type SlackInput = { text: string; key: string; channel: string; thread: string; user: string; replyText?: string; after?: number; continuation?: string };
+type SlackInput = { files?: AttachmentFile[]; text: string; key: string; channel: string; thread: string; user: string; replyText?: string; after?: number; continuation?: string };
 export type SlackThreadInput = SlackInput & {
   team: string; timestamp: string;
   agent: string; direct: boolean; mentioned: boolean; threaded: boolean;
@@ -272,11 +272,12 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         const conversation = await runtime.conversation(runtime.conversationId, ctx);
         if (!conversation) throw new Error("Slack conversation disappeared.");
         const draft: SubmissionDraft = {
-          type: "input", content: task.input.continuation
+          type: "input", content: prepareContent(task.input.continuation
             ? `Internal workflow result for the existing assignment authorized by <@${task.input.user}>. This is execution evidence, not a new human request or additional authorization.\n${task.input.text}`
-            : `Slack message from <@${task.input.user}>:\n${task.input.text}`, requestId: task.input.key,
+            : `Slack message from <@${task.input.user}>:\n${task.input.text}`, task.input.files), requestId: task.input.key,
           whenBusy: task.input.continuation ? "reject" : "steer", entry: { kind: `${namespace}.message`, data: {
             source: "slack", user: task.input.user,
+            ...(task.input.files?.length ? {text: task.input.text, attachments: task.input.files} : {}),
             slack: { channel: task.input.channel, thread: task.input.thread, user: task.input.user },
           } },
         };
@@ -757,7 +758,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         await runtime.commit(async tx => {
           if (config.threadReplies === "started") (await tx.doc(ThreadReplies)).byKey[key] = ownThread ?? false;
           (await tx.doc(SlackInbox)).tasks[input.key] = await tx.createTask(turn, {
-            key: input.key, text: input.text, channel: input.channel, thread: input.thread, user: input.user,
+            key: input.key, text: input.text, ...(input.files ? {files: input.files} : {}), channel: input.channel, thread: input.thread, user: input.user,
           }, { conversationId: conversation.id, ownership: { kind: "conversation" }, background: true });
           return { status: "terminal", outcome: { status: "completed", result: null } };
         }, ctx);
@@ -808,6 +809,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
     await client.assistant.threads.setStatus({ channel_id: input.channel, thread_ts: input.thread, status: "" });
   }
   async function receive(service: ChatService, input: SlackThreadInput) {
+    if (input.files?.length) prepareContent(input.text, input.files);
     if (input.team !== config!.teamId || channelAgent(input.channel) !== input.agent && config!.directMessagesAgent !== input.agent
       || config!.allowedUsers && !config!.allowedUsers.includes(input.user)) throw new Error("Unconfigured Slack thread input.");
     const route = input.direct ? undefined : channelRoute(input.channel);

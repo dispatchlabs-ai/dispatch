@@ -74,7 +74,7 @@ try {
       if (config.socket && !workspaceAction) {
         if (values["update-definitions"]) throw new Error("Migrate idle definitions at service deployment, not from a client.");
         if (!isAbsolute(config.socket)) throw new Error("socket must be an absolute path.");
-        await connectInTerminal({ socket: config.socket, agent: values.agent, defaultAgent: await (await import("./definition.js")).defaultAgent(root),
+        await connectInTerminal({ socket: config.socket, agent: values.agent,
           session, prompt: values.prompt, history: values.history, requestId: values["request-id"] });
       } else {
         const settings = serviceSettings(config);

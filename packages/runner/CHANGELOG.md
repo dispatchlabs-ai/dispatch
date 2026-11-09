@@ -4,6 +4,10 @@
 
 - Share one supervised native owner with CLI and Backend clients; preserve native receipts, Stop, recovery, attachments and tool observations. Add explicit multi-adapter reply routing and conversation-only schedule policy.
 
+- Match JSON-encoded native SQLite tool-task kinds in read-only projection, restoring live task state and retained nested call identity without acquiring ownership.
+
+- Port reviewed native chat improvements: installation-scoped routing and read-only catalogs, retained tool traces and UTF-8/image input/recovery through local and central workers; refresh current shadcn Web compositions.
+
 - Prepare public npm metadata and the complete reusable runtime closure with dependency-order archives and a separately authorized publishing path.
 
 - Export the shared public native message projection for live and saved-history adapters, retaining errors/commentary/timestamps.

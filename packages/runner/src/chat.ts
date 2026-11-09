@@ -1,6 +1,6 @@
 import { prepareContent, ContentError, type AttachmentFile } from "./chat-content.js";
 import { projectChatTools, type ChatToolCall } from "./chat-tools.js";
-export type ChatMessage = { id: string; role: string; text: string; at?: number; commentary?: string; author?: string; background?: boolean; error?: string; attachments?: AttachmentFile[]; artifacts?: Artifact[] };
+export type ChatMessage = { provenance?: "user" | "agent" | "runtime"; id: string; role: string; text: string; at?: number; commentary?: string; author?: string; background?: boolean; error?: string; attachments?: AttachmentFile[]; artifacts?: Artifact[] };
 export type ChatSnapshot = {
   chat: Chat; messages: ChatMessage[]; toolCalls?: ChatToolCall[]; running: boolean; queued: number;
   partial: string; tools: string[]; error: string | null; demo: boolean;
@@ -46,11 +46,11 @@ export function projectChatMessages(namespace: string, entries: readonly EntryRe
   return entries.flatMap<ChatMessage>(entry => {
     if (entry.kind === `${namespace}.artifact`) {
       const { deliveries: _initialDeliveryTasks, ...artifact } = entry.data as ArtifactRecord;
-      return [{ id: `${entry.id}:artifact`, role: "assistant", text: "", artifacts: [artifact] }];
+      return [{ provenance: "agent", id: `${entry.id}:artifact`, role: "assistant", text: "", artifacts: [artifact] }];
     }
     if (entry.kind === `${namespace}.background-reply`) {
       const data = entry.data as { author: string; text: string };
-      return [{ id: `${entry.id}:background`, role: "assistant", text: data.text, author: data.author, background: true }];
+      return [{ provenance: "agent", id: `${entry.id}:background`, role: "assistant", text: data.text, author: data.author, background: true }];
     }
     return (entry.model ?? []).flatMap((message, index) => {
       if (message.role !== "user" && message.role !== "assistant") return [];
@@ -60,7 +60,10 @@ export function projectChatMessages(namespace: string, entries: readonly EntryRe
       const data = entry.data as { source?: string; text?: string; attachments?: AttachmentFile[] } | undefined;
       const attached = message.role === "user" && entry.kind === `${namespace}.message` && data?.attachments?.length ? data.attachments : undefined;
       const hasTools = message.role === "assistant" && Array.isArray(message.content) && message.content.some(part => part.type === "toolCall");
-      return text || error || attached || hasTools ? [{ id: `${entry.id}:${index}`, role: message.role, text: attached ? data?.text ?? "" : text, at,
+      const provenance = message.role !== "user" ? "agent" as const
+        : entry.kind === `${namespace}.message` && ["web", "cli", "slack", "google-chat", "phone", "email"].includes(data?.source ?? "") ? "user" as const
+          : entry.kind === `${namespace}.instance-message` ? "agent" as const : "runtime" as const;
+      return text || error || attached || hasTools ? [{ provenance, ...(entry.kind === `${namespace}.instance-message` ? {author: (entry.data as {from?: string})?.from} : {}), id: `${entry.id}:${index}`, role: message.role, text: attached ? data?.text ?? "" : text, at,
         ...(attached ? { attachments: attached } : {}),
         ...(message.role === "assistant" ? { commentary: publicCommentary(message) } : {}), ...(error ? { error } : {}) }] : [];
     });

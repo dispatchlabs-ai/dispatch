@@ -7,7 +7,7 @@
       "name": "MIT",
       "identifier": "MIT"
     },
-    "description": "Single-user loopback adapter to the consumer-configured native Dispatch runtime. Local mode has no login or bearer credential. Hosted mode requires HTTPS DISPATCH_ORIGIN and a trusted DISPATCH_AUTH_MODULE that validates actual credentials/session and authorizes all configured runs; exact configured Host/Origin apply, and API/SSE requests require that authorization. Health is unauthenticated and secret-free. No per-user grants UI is implemented. Local requests require Host 127.0.0.1:PORT; supplied Origin must equal the server origin; API Fetch Metadata must be same-origin or none; the shell navigation exception is described below. Every write requires the exact Origin header and application/json. No CORS. Cross-site API requests and DNS rebinding hosts receive 403. GET / permits external top-level navigation (Sec-Fetch-Mode navigate, Sec-Fetch-Dest document, no Origin) to the nonsensitive app shell only. Local native processes with the same user remain trusted. DISPATCH_PORT defaults to 4319. Unsupported routes/methods return 404 JSON Error. All responses disable caching, sniffing, framing and cross-origin resource embedding. No redirects. Request text and identities must contain non-whitespace characters. The app sets no character or body-byte cap; native/provider context constraints still apply. GET needs no Origin for browser navigation or native inspection."
+    "description": "Single-user loopback adapter to the consumer-configured native Dispatch runtime. Local mode has no login or bearer credential. Hosted mode requires HTTPS DISPATCH_ORIGIN and a trusted DISPATCH_AUTH_MODULE that validates actual credentials/session and authorizes all configured runs; exact configured Host/Origin apply, and API/SSE requests require that authorization. Health is unauthenticated and secret-free. No per-user grants UI is implemented. Local requests require Host 127.0.0.1:PORT; supplied Origin must equal the server origin; API Fetch Metadata must be same-origin or none; the shell navigation exception is described below. Every write requires the exact Origin header and application/json. No CORS. Cross-site API requests and DNS rebinding hosts receive 403. GET / permits external top-level navigation (Sec-Fetch-Mode navigate, Sec-Fetch-Dest document, no Origin) to the nonsensitive app shell only. Local native processes with the same user remain trusted. DISPATCH_PORT defaults to 4319. Unsupported routes/methods return 404 JSON Error. All responses disable caching, sniffing, framing and cross-origin resource embedding. No redirects. Request text and identities must contain non-whitespace characters. The app sets no character or body-byte cap; native/provider context constraints still apply. GET needs no Origin for browser navigation or native inspection. Named local installations use installation~localId identities; creation sources must belong to the selected installation. Legacy single-installation IDs remain unchanged. Catalogs are lightweight native read-only observations; selected routes use direct identity lookup. Browser IndexedDB stores only per-tab drafts/uncertain outbox, never authoritative conversation state."
   },
   "servers": [
     {
@@ -255,23 +255,29 @@
                 "properties": {
                   "text": {
                     "type": "string",
-                    "minLength": 1
+                    "description": "May be empty for attachment-only input. Text or at least one supported attachment is required."
                   },
                   "requestId": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "Native idempotency identity, scoped to the conversation. Reuse with the same text on retry."
+                    "description": "Native idempotency identity, scoped to the conversation. Reuse with identical text and file bytes on retry, including after uncertain admission/reload."
+                  },
+                  "attachments": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/AttachmentFile"
+                    }
                   }
                 },
                 "required": [
-                  "text",
                   "requestId"
                 ],
                 "additionalProperties": false
               }
             }
           }
-        }
+        },
+        "description": "Admit native text/image/document content. UTF-8 documents become native text blocks; images become native image blocks and require an image-capable authored model. Files and display metadata are retained in the same native input entry. No host-path upload, application count/size cap, shadow transcript or separate blob DB. Unsupported content409 is a rejection of this attempt only. Invalid202 bodies, network errors and server failures are uncertain; retain original identity/text/files and explicitly retry. Browser reconnection never resends."
       }
     },
     "/api/chats/{chatId}/stop": {
@@ -721,6 +727,12 @@
               "runtime"
             ],
             "description": "Derived from native entry kind/source, not text. Runtime continuation/context entries remain in snapshots but are not rendered as user bubbles."
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttachmentFile"
+            }
           }
         },
         "required": [
@@ -810,6 +822,13 @@
           "observation": {
             "type": "string",
             "description": "Native activity description for read-only history; no live provider partials from external owners."
+          },
+          "toolCalls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolCall"
+            },
+            "description": "Actual retained tool identities, arguments/results and native live/task state, grouped by native turn and assistant entry. Missing payload never implies success. No provider reasoning/raw provider diagnostics."
           }
         },
         "required": [
@@ -919,6 +938,87 @@
             }
           }
         },
+        "additionalProperties": false
+      },
+      "AttachmentFile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display/download name only; never authorizes a host path."
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "PNG/JPEG/WebP or UTF-8 text/document type. Unsupported binary/PDF/Office content rejects409."
+          },
+          "data": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "description": "Actual browser-selected bytes, retained in native input metadata and delivered as Pi content blocks."
+          }
+        },
+        "required": [
+          "name",
+          "mimeType",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ToolCall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "callId": {
+            "type": "string"
+          },
+          "entryId": {
+            "type": "integer"
+          },
+          "turnId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "input": {},
+          "output": {},
+          "details": {},
+          "progress": {},
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "pending",
+              "waiting",
+              "completed",
+              "failed",
+              "cancelled",
+              "unavailable"
+            ]
+          },
+          "afterMessageId": {
+            "type": "string"
+          },
+          "parentCallId": {
+            "type": "string",
+            "description": "Only when actual native nested task input establishes the parent."
+          },
+          "taskId": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "callId",
+          "entryId",
+          "turnId",
+          "name",
+          "status",
+          "afterMessageId"
+        ],
         "additionalProperties": false
       }
     },

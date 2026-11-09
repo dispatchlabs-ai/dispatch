@@ -1,3 +1,5 @@
+import type { AttachmentFile, ChatToolCall } from "@dispatch/runner";
+export type { AttachmentFile, ChatToolCall as ToolCall } from "@dispatch/runner";
 // Presentation projection of Dispatch's Chat and ChatSnapshot, not an execution model.
 export interface Agent {
   id: string;
@@ -24,7 +26,7 @@ export interface ChatMessage {
   author?: string;
   background?: boolean;
   error?: string;
-  attachments?: import("@dispatch/runner").AttachmentFile[];
+  attachments?: AttachmentFile[];
   artifacts?: {
     id: string;
     name: string;
@@ -41,11 +43,11 @@ export interface SourceStatus {
   issues: string[];
 }
 export interface Snapshot {
+  toolCalls?: ChatToolCall[];
   observation?: string;
   readOnlyReason?: string;
   chat: Chat;
   messages: ChatMessage[];
-  toolCalls?: import("@dispatch/runner").ChatToolCall[];
   running: boolean;
   queued: number;
   partial: string;

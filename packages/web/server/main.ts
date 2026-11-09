@@ -12,6 +12,7 @@ import {
   openCentralRuntime,
   AdmissionError,
 } from "@dispatch/backend";
+import { prepareContent, ContentError, type AttachmentFile } from "@dispatch/runner";
 
 process.umask(0o077);
 const port = Number(process.env.DISPATCH_PORT ?? 4319);
@@ -155,7 +156,7 @@ const server = createServer(async (request, response) => {
       const id = decodeURIComponent(match[1]);
       const action = match[2];
       const artifactId = match[3];
-      if (!(await service.list()).some((chat) => chat.id === id))
+      if (!(await service.has(id)))
         throw new HttpError(404, "Conversation not found.");
       if (!action && method === "GET") {
         json(response, 200, await runtime.presentation.snapshot(id));
@@ -163,15 +164,21 @@ const server = createServer(async (request, response) => {
       }
       if (action === "messages" && !artifactId && method === "POST") {
         const body = await bodyOf(request);
+        if (body.text !== undefined && typeof body.text !== "string") throw new HttpError(400, "text must be a string.");
+        if (body.attachments !== undefined && !Array.isArray(body.attachments)) throw new HttpError(400, "attachments must be an array.");
+        const text = typeof body.text === "string" ? body.text : "";
+        const files = (body.attachments ?? []) as AttachmentFile[];
+        prepareContent(text, files);
         json(
           response,
           202,
           await service.submit(
             id,
-            field(body, "text"),
+            text,
             field(body, "requestId"),
             "followUp",
             "web",
+            files,
           ),
         );
         return;
@@ -284,7 +291,7 @@ const server = createServer(async (request, response) => {
       return;
     }
     const status =
-      error instanceof AdmissionError
+      (error instanceof AdmissionError || error instanceof ContentError)
         ? error.status
         : error instanceof HttpError
           ? error.status
@@ -293,7 +300,7 @@ const server = createServer(async (request, response) => {
             : 500;
     json(response, status, {
       error:
-        error instanceof HttpError || error instanceof AdmissionError
+        error instanceof HttpError || error instanceof AdmissionError || error instanceof ContentError
           ? error.message
           : status === 400
             ? "Invalid URL encoding."

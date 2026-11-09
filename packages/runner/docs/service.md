@@ -347,8 +347,9 @@ console.log(await client.presentation.snapshot(chat.id));
 await client.close(); // disconnect, not Stop or owner shutdown
 ```
 
-Connection IDs are native `agent:conversationId`, not read-only SQLite catalog
-hashes. Clients can poll/watch live snapshots, including partial text, native tool
+Runner connection IDs are native `agent:conversationId`, not read-only SQLite
+catalog hashes. Company facades may use opaque IDs: clients must return them
+unchanged rather than parse them. Clients can poll/watch live snapshots, including partial text, native tool
 calls/results and attachment projections, and explicitly stop the same chat.
 Independent conversations remain independent Pi conversations in the owner's
 store. Watch loss ends that observation; reconnect explicitly. Reads do not open
@@ -358,10 +359,17 @@ Use separately authenticated and authorized adapters for remote clients.
 
 The public `@dispatch/runner/service` exports `serveService(service, socket)` for
 company applications that already compose `run({open})` or `ChatService.attach`.
-It binds that exact native service, including custom workflows; it opens no stores
+It accepts the structural `ServiceOperations` interface and binds that exact
+native service, including custom workflows; it opens no stores
 or model connections. Close the returned listener and then the company runtime
 on supervisor shutdown. Its optional third argument is the prepared adapters for
-busy status. Do not install two owners against the same native state.
+busy status. An optional fourth `ServiceMetadata` argument supplies `stateRoot`
+and `defaultAgent` for custom compositions. `info` exposes this trusted metadata;
+`startService` supplies its native state directory and optional authored default.
+A socket-only CLI configuration can create using the owner's default without a
+local definition checkout. Backend returns metadata `stateRoot` when available,
+otherwise the socket display path. Do not install two owners against the same
+native state.
 
 `serviceRequest(socket, command)` is typed by `ServiceCommand`/`ServiceResults`.
 Create accepts `source`; send accepts `source`, `mode` (`followUp` or `steer`) and
@@ -380,3 +388,8 @@ rejection; transport failure is not proof of rejection. Restart the compatible
 owner with the same state, namespace, definitions, provider and adapter bindings
 to recover admitted work; native Pi determines safe replay and cancellation.
 Keep complete closed-state backups before upgrades. Publication is not activation.
+
+Runner Nix outputs include Backend/Remote/Postgres and their exact dependencies
+in `lib/agent-node_modules` by default (`withBackend: false` is an optional small
+legacy closure). Consumers import the public `@dispatch/backend` entry using that
+explicit package context, never discover installed private dist filenames.

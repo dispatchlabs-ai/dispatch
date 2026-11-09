@@ -1,8 +1,9 @@
 import { createServer, request } from "node:http";
-import { chmod, mkdir, readFile, lstat, unlink } from "node:fs/promises";
+import { chmod, mkdir, readFile, lstat, unlink, realpath } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createModels } from "@earendil-works/pi-ai/models";
+import { defaultAgent } from "./definition.js";
 import { createRunner } from "./index.js";
 import { run, type Adapter } from "./run.js";
 import type { ModelChoice } from "./gateway.js";
@@ -29,8 +30,13 @@ export type ServiceAdapterContext = {
   cwd: string;
   connectModels: (models: ReturnType<typeof createModels>) => Promise<ModelChoice[]>;
 };
+export type ServiceOperations = Pick<ChatService, "list" | "create" | "snapshot" | "submit" | "stop" | "artifact"> &
+  Partial<Pick<ChatService, "find" | "activity" | "schedules" | "compact" | "receipt" | "message" | "messageStatus">> & {
+    agents: { id: string; description: string; model?: import("./definition.js").LoadedAgent["model"] }[];
+  };
+export type ServiceMetadata = { stateRoot?: string; defaultAgent?: string };
 export type ServiceCommand =
-  | { method: "agents" | "chats" | "status" | "schedules" }
+  | { method: "agents" | "chats" | "status" | "schedules" | "info" }
   | { method: "create"; agent: string; key: string; title?: string; source?: Chat["source"] }
   | { method: "snapshot" | "stop"; id: string }
   | { method: "find"; key: string; agent?: string }
@@ -41,38 +47,39 @@ export type ServiceCommand =
   | { method: "message-status"; from: string; taskId: number }
   | { method: "receipt"; id: string; submissionId: number };
 
-async function dispatch(service: ChatService, command: ServiceCommand) {
+async function dispatch(service: ServiceOperations, command: ServiceCommand) {
   switch (command.method) {
     case "agents": return service.agents.map(({ id, description, model }) => ({ id, description, model }));
     case "chats": return service.list();
-    case "schedules": return service.schedules();
+    case "schedules": return service.schedules?.() ?? [];
     case "create":
       if (typeof command.key !== "string" || !command.key.trim()) throw new Error("A stable conversation key is required.");
       return service.create(command.agent, command.source ?? "cli", command.key, command.title);
     case "find": {
+      if (!service.find) throw new ServiceError("This service does not support key lookup.", 409);
       if (command.agent) return await service.find(command.agent, command.key) ?? null;
-      const found = (await Promise.all(service.agents.map(agent => service.find(agent.id, command.key)))).filter(chat => chat !== undefined);
+      const found = (await Promise.all(service.agents.map(agent => service.find!(agent.id, command.key)))).filter(chat => chat !== undefined);
       if (found.length > 1) throw new Error("This session key selects multiple agents. Supply its original agent.");
       return found[0] ?? null;
     }
     case "snapshot": return service.snapshot(command.id);
-    case "compact": return service.compact(command.id, command.instructions);
+    case "compact": if (!service.compact) throw new ServiceError("Unsupported service operation.", 409); return service.compact(command.id, command.instructions);
     case "artifact": {
       const { artifact, bytes } = await service.artifact(command.id, command.artifactId);
       return { artifact, dataBase64: bytes.toString("base64") };
     }
     case "stop": await service.stop(command.id); return {};
     case "send": return service.submit(command.id, command.text, command.requestId, command.mode ?? "followUp", command.source ?? "cli", command.files);
-    case "receipt": return service.receipt(command.id, command.submissionId);
-    case "message": return service.message(command.from, command.message, command.requestId);
-    case "message-status": return service.messageStatus(command.from, command.taskId);
+    case "receipt": if (!service.receipt) throw new ServiceError("Unsupported service operation.", 409); return service.receipt(command.id, command.submissionId);
+    case "message": if (!service.message) throw new ServiceError("Unsupported service operation.", 409); return service.message(command.from, command.message, command.requestId);
+    case "message-status": if (!service.messageStatus) throw new ServiceError("Unsupported service operation.", 409); return service.messageStatus(command.from, command.taskId);
     default: throw new Error("Unknown service command.");
   }
 }
 
 /** Bind a company-owned ChatService without creating another native owner.
  * Closing the listener disconnects clients only; the caller still owns service.close(). */
-export async function serveService(owner: ChatService | (() => ChatService | undefined), socket: string, adapters: Awaited<ReturnType<typeof run>>["adapters"] = []) {
+export async function serveService(owner: ServiceOperations | (() => ServiceOperations | undefined), socket: string, adapters: Awaited<ReturnType<typeof run>>["adapters"] = [], metadata: ServiceMetadata = {}) {
   if (resolve(socket) !== socket) throw new Error("socket must be an absolute path.");
   const socketDirectory = dirname(socket);
   await mkdir(socketDirectory, { recursive: true, mode: 0o700 });
@@ -96,7 +103,9 @@ export async function serveService(owner: ChatService | (() => ChatService | und
       }
       const command = JSON.parse(Buffer.concat(chunks).toString());
       let result;
-      if (command.method === "status") {
+      if (command.method === "info") result = metadata;
+      else if (command.method === "status") {
+        if (!service.activity) throw new ServiceError("This service does not expose activity.", 409);
         const activity = await service.activity();
         const adapterBusy = (await Promise.all(adapters.map(adapter => adapter.busy?.() ?? false))).some(Boolean);
         result = { ...activity, adapterBusy, busy: activity.busy || adapterBusy };
@@ -167,7 +176,10 @@ export async function startService(config: ServiceConfig) {
       const options = JSON.parse(await readFile(adapter.optionsFile, "utf8"));
       adapters.push(await module.createAdapter(options, { cwd: config.cwd, connectModels } satisfies ServiceAdapterContext));
     }
-    listener = await serveService(() => runtime?.service, config.socket, preparedAdapters);
+    listener = await serveService(() => runtime?.service, config.socket, preparedAdapters, { stateRoot: await realpath(config.stateRoot).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+      return config.stateRoot;
+    }), defaultAgent: await defaultAgent(config.root).catch(() => undefined) });
     const runner = createRunner({ namespace: config.namespace });
     runtime = await run({ ...config, runner, models, adapters, settings });
     preparedAdapters.push(...runtime.adapters);
@@ -186,7 +198,8 @@ export async function startService(config: ServiceConfig) {
 }
 
 export type ServiceResults = {
-  agents: { id: string; description: string; model: import("./definition.js").LoadedAgent["model"] }[];
+  info: ServiceMetadata;
+  agents: { id: string; description: string; model?: import("./definition.js").LoadedAgent["model"] }[];
   chats: Chat[];
   find: Chat | null;
   create: Chat;

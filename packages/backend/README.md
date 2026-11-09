@@ -7,8 +7,8 @@ See the [runnable composition](../../examples/chat/README.md).
 
 ## Operations
 
-`service.agents`, `sources()`, `list()`, `create(agent, source, key, sourceId?)`,
-`submit(id,text,requestId,"followUp",source)`, `stop(id)` and `artifact(id,id)`.
+`service.agents`, `sources()`, `list()`, `has(id)`, `create(agent, source, key, sourceId?)`,
+`submit(id,text,requestId,"followUp",source,attachments?)`, `stop(id)` and `artifact(id,id)`.
 `presentation.snapshot(id)` and `watch(id,listener)` are read-only observations;
 watch returns `{closed,stop}`. API projections/types are exported at
 `@dispatch/backend/contracts`; worker provenance and central read helpers have
@@ -69,6 +69,71 @@ change is not a registry release. For dependency-order builds, reviewed archives
 external consumers and separately authorized publishing, follow the
 [package release path](https://github.com/dispatchlabs-ai/dispatch/blob/main/scripts/README.md).
 
+## Local installation bindings
+
+Existing single-installation `{definitionsRoot, host, sources, defaultSource}`
+configuration remains supported. For separate trusted installations, provide
+`installations` and bind **every** source with `installation`:
+
+```json
+{
+  "installations": [
+    {"id":"studio", "label":"Studio", "definitionsRoot":"/opt/studio/definitions", "host":{"cwd":"/srv/studio", "modelProviders":[{"module":"/opt/studio/provider.mjs", "export":"provider"}]}},
+    {"id":"research", "label":"Research", "definitionsRoot":"/opt/research/definitions", "host":{"cwd":"/srv/research", "modelProviders":[{"module":"/opt/research/provider.mjs", "export":"provider"}]}}
+  ],
+  "sources": [
+    {"id":"studio", "label":"Studio", "path":"/var/lib/studio/instances", "installation":"studio"},
+    {"id":"research", "label":"Research", "path":"/var/lib/research/instances", "installation":"research"}
+  ],
+  "defaultSource":"studio"
+}
+```
+
+Paths/modules are consumer-owned trusted bindings, not browser input. No default
+installation's definitions, host or provider is inherited by another installation.
+Each owner or trusted-adapter worker receives its own configuration, isolating
+process environment from other installations. Runtime dependencies resolve
+through supported package imports in the consumer's installation, never by
+searching another checkout's emitted files or switching a global runtime/profile.
+Agent and conversation IDs are qualified as `installation~localId`; callers must
+keep returned IDs intact. Creation rejects a source bound to another installation.
+Legacy single-installation IDs are unchanged. Named installation mode requires
+qualified IDs, rather than guessing an installation for an ambiguous old ID.
+
+A trusted installation may instead declare
+`adapter: {module: "/opt/example/adapter.mjs", configFile: "/etc/example/native.json"}`.
+Its exported `openRuntime({sources, defaultSource, configFile})` returns the supported
+Backend `Runtime` service/presentation/close seam. The adapter owns its native
+host and authority; configuration is never sent to the browser. It must retain
+native request replay, read-only observation, selected-conversation ownership and
+all authorization boundaries. This is not a domain workflow shipped by Backend.
+Adapters implement targeted `has(id)` so a request never enumerates all histories
+just to locate its installation. No adapter release/executable lookup is performed
+by Backend; the consumer owns any distinct-process runtime binding.
+
+Retained catalogs use public Runner saved discovery/catalog APIs, with one process
+census per configured root, not per saved session. Optional chat-index metadata
+cannot hide readable native histories. Actual file/schema/identity errors stay
+visible. Selected history reads target its store and conversation, retaining native
+uncapped paging; listing does not open owners/providers or construct tool activity.
+
+## Native content and projection
+
+Attachments `{name,mimeType,data:base64}` are actual bytes, not paths. Runner's
+`prepareContent` validates supported UTF-8 documents and PNG/JPEG/WebP, then native
+submission retains blocks and input metadata in the same request identity. Backend
+and central workers preserve the optional files argument end-to-end. No separate
+blob/transcript database or reconnect resend; old clients' plain-text calls remain
+compatible. Model capability rejection is409, not an uncertain ignored image.
+
+Runner `projectChatMessages`/`projectChatTools` are shared by live and saved local
+and PostgreSQL history. Read-only SQLite projection uses supported
+`readWatchChatProjection`; Backend does not reproduce another native SQL reader.
+Returned toolCalls retain actual turn/call/assistant-entry identity, inputs/results
+and native live/task state. No fake pending-question or subagent result. Native
+nested-call parent IDs are exposed only when recorded; missing retired payloads
+remain explicitly unavailable.
+
 ## Connect to an existing local service
 
 `openServiceRuntime({socket, sourceId?, label?})` connects to Runner's maintained
@@ -76,7 +141,9 @@ owner-only Unix API. It returns the same `{service,presentation,stateRoot,close}
 contract without opening a provider, worker or SQLite owner. `close()` stops client
 watches only; explicit `service.stop(id)` cancels work. Native chat IDs match the
 CLI. `submit` additionally accepts native `AttachmentFile[]` as its sixth argument.
-Live snapshot/watch includes native tool calls/results, attachments and partial
+Native `info.stateRoot` metadata is returned as `stateRoot` when supplied by the
+owner (otherwise the socket display path). Chat IDs are opaque; return them
+unchanged. Live snapshot/watch includes native tool calls/results, attachments and partial
 output; no shadow transcript or automatic command retry is introduced. Watch
 transport failure closes the watch; reconnect explicitly using the same request
 identity for an uncertain send.

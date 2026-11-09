@@ -5,18 +5,18 @@ import * as runner from "@dispatch/runner";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { connectHostModels } from "@dispatch/runner/host-models";
 import { serviceSettings } from "@dispatch/runner/settings";
-import { readConfig } from "./config.js";
+import type { LocalConfig } from "./config.js";
 import { createProvenance } from "./provenance.js";
 import { checkSuspendedWork } from "./admission.js";
 import { AdmissionError } from "./config.js";
 const port = parentPort!;
 const { path, namespace, names } = workerData;
-const { definitionsRoot, host } = await readConfig();
+const { definitionsRoot, host } = workerData.config as LocalConfig;
 process.env.DISPATCH_SESSION_STATE_ROOT = path;
 
-let service: any, connection: any;
+let service: any, connection: any, models: ReturnType<typeof createModels>;
 try {
-  const models = createModels({
+  models = createModels({
     authContext: { env: async () => undefined, fileExists: async () => false },
   });
   connection = await connectHostModels(host, models);
@@ -87,6 +87,15 @@ port.on("message", ({ id, method, args }) => {
             : paused,
           selected,
         );
+        if (method === "submit") {
+          const files = args[5] ?? [];
+          runner.prepareContent(args[1], files);
+          if (files.some((file: runner.AttachmentFile) => file.mimeType.startsWith("image/"))) {
+            const agent = service.agents.find((agent: any) => agent.id === selected?.agent);
+            if (!models.getModel(agent.model.provider, agent.model.id)?.input.includes("image"))
+              throw new AdmissionError("This authored model does not accept images. Remove the image or choose an image-capable agent.");
+          }
+        }
         if (method === "submit")
           for (const host of service.hosts.values()) host.harness.resume();
         result = await service[method](...args);

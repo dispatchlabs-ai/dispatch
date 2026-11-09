@@ -25,14 +25,15 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
     }
   };
   const agents = await call({ method: "agents" });
+  const metadata = await call({ method: "info" });
   const project = (chat: NativeChat): Chat => ({ ...chat, source, sourceLabel: label });
   const snapshot = async (id: string): Promise<Snapshot> => {
     const value = await call({ method: "snapshot", id });
     return { ...value, chat: project(value.chat), messages: value.messages.map(message => ({ ...message,
-      provenance: message.role === "user" ? "user" : message.role === "assistant" ? "agent" : "runtime" })) };
+      provenance: message.provenance ?? "runtime" })) };
   };
   return {
-    stateRoot: config.socket,
+    stateRoot: metadata.stateRoot ?? config.socket,
     service: {
       agents,
       sources: async () => [{ id: source, label, path: config.socket, issues: [] }],

@@ -4,6 +4,8 @@
 
 - Add public owner-only local service connections, live native observations and file inputs without opening a second storage owner.
 
+- Port reviewed native chat improvements: installation-scoped routing and read-only catalogs, retained tool traces and UTF-8/image input/recovery through local and central workers; refresh current shadcn Web compositions.
+
 - Prepare public npm metadata and the complete reusable runtime closure with dependency-order archives and a separately authorized publishing path.
 
 - Use Runner public native message projection for saved PostgreSQL history so failed generations remain visible without acquiring an owner.

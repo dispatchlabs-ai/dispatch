@@ -1,14 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUp, Check, Menu, Plus, Square, X } from 'lucide-react';
+import { ArrowUp, Check, Menu, Plus, Square, X, Paperclip, FileText, Search, LoaderCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from '@/components/ai-elements/conversation';
 import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
 import type { Agent, Chat, Snapshot, SourceStatus } from '@/lib/contracts';
 
 import { api, isDefiniteRejection } from '@/lib/api';
-interface Pending { chatId: string; text: string; requestId: string }
+import { loadDelivery, saveDelivery, type Pending } from '@/lib/delivery';
+import type { AttachmentFile } from '@/lib/contracts';
+import { MessageScrollerItem } from '@/components/ui/message-scroller';
+import { Bubble, BubbleContent } from '@/components/ui/bubble';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group';
+import { Attachment, AttachmentMedia, AttachmentContent, AttachmentTitle } from '@/components/ui/attachment';
+import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
+import { ToolTrace } from '@/components/tool-trace';
+const agentName = (id: string) => id.includes('~') ? id.split('~').slice(1).join('~') : id;
+const installationName = (id: string) => id.includes('~') ? id.split('~')[0] : 'native';
+const sessionName = (chat: Chat, chats: Chat[]) => {
+  const session = chat.session ?? '';
+  if (!/^web-[a-f0-9]{32,}$/.test(session)) return session;
+  let length = 12;
+  while (length < session.length && chats.some(other => other.session !== session && other.session?.slice(0, length) === session.slice(0, length))) length++;
+  return session.slice(0, length);
+};
 const route = (id: string) => `/api/chats/${encodeURIComponent(id)}`;
 export default function App() {
+  const [filter, setFilter] = useState('');
+  const [readingFiles, setReadingFiles] = useState(false);
+  const [files, setFiles] = useState<AttachmentFile[]>([]);
+  const [deliveryReady, setDeliveryReady] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
   const [sources, setSources] = useState<SourceStatus[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -25,7 +46,42 @@ export default function App() {
   const [pending, setPending] = useState<Pending | null>(() => {
     try { return JSON.parse(sessionStorage.getItem('dispatch-web:pending') ?? 'null'); } catch { return null; }
   });
+  useEffect(() => { void loadDelivery().then(value => {if(value){setDraft(value.text);setFiles(value.attachments);setPending(value.pending);if(value.pending)setSelected(value.pending.chatId);}setDeliveryReady(true);}).catch(() => setError('Local draft storage unavailable. Sending is disabled to preserve recovery.')); }, []);
+  useEffect(() => { if(deliveryReady) void saveDelivery({text:draft, attachments:files, pending}).catch(() => {setDeliveryReady(false);setError('Cannot retain draft/files locally. Free browser storage before sending.');}); }, [draft, files, pending, deliveryReady]);
+  async function selectFiles(list: FileList | null) {
+    if (!list) return;
+    setReadingFiles(true);
+    try {
+      const added = await Promise.all(Array.from(list).map(file => new Promise<AttachmentFile>((resolve,reject) => {const reader=new FileReader();reader.onload=()=>resolve({name:file.name,mimeType:file.type,data:String(reader.result).split(',')[1]});reader.onerror=()=>reject(new Error(`Cannot read ${file.name}`));reader.readAsDataURL(file);})));setFiles(current=>{const attachments=[...current,...added];void saveDelivery({text:draft,attachments,pending}).catch(()=>setDeliveryReady(false));return attachments;});
+    } catch(failure){setError((failure as Error).message);}
+    setReadingFiles(false);
+    if(fileInput.current)fileInput.current.value='';
+  }
   const [navigation, setNavigation] = useState(false);
+  const [narrow, setNarrow] = useState(() => matchMedia('(max-width: 700px)').matches);
+  const sidebar = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const media = matchMedia('(max-width: 700px)');
+    const change = () => { setNarrow(media.matches); setNavigation(false); };
+    media.addEventListener('change', change);
+    return () => media.removeEventListener('change', change);
+  }, []);
+  useEffect(() => {
+    if (!navigation || !narrow) return;
+    const before = document.activeElement as HTMLElement;
+    const controls = () => [...sidebar.current!.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input, select')];
+    controls()[0]?.focus();
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setNavigation(false); }
+      if (event.key === 'Tab') {
+        const items = controls(), first = items[0], last = items.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('keydown', key); if (sidebar.current?.contains(document.activeElement)) before?.focus(); };
+  }, [navigation, narrow]);
   const [ready, setReady] = useState(false);
   const composer = useRef<HTMLTextAreaElement>(null);
   const returnFocus = useRef(false);
@@ -87,14 +143,17 @@ export default function App() {
     const previouslyUncertain = pending?.requestId === value.requestId;
     setSending(true); setError('');
     try {
-      sessionStorage.setItem('dispatch-web:pending', JSON.stringify(value));
-      await api(`${route(value.chatId)}/messages`, { text: value.text, requestId: value.requestId });
+      await saveDelivery({text:value.text,attachments:value.attachments ?? [],pending:value});
+      const receipt = await api<{ submissionId: number }>(`${route(value.chatId)}/messages`, { text: value.text, requestId: value.requestId, attachments:value.attachments ?? [] });
+      if (!Number.isSafeInteger(receipt?.submissionId) || receipt.submissionId < 1) throw new Error('Invalid admission receipt.');
+      await saveDelivery({text:'',attachments:[],pending:null});
       sessionStorage.removeItem('dispatch-web:pending');
-      setPending(null); setDraft(''); void refresh();
+      setPending(null); setDraft(''); setFiles([]); void refresh();
     } catch (failure) {
       if (isDefiniteRejection(failure, previouslyUncertain)) {
+        await saveDelivery({text:value.text,attachments:value.attachments ?? [],pending:null});
         sessionStorage.removeItem('dispatch-web:pending');
-        setPending(null); setDraft(value.text);
+        setPending(null); setDraft(value.text); setFiles(value.attachments ?? []);
         setError(`${failure.message} Message was not admitted. Edit it or choose another conversation.`);
       } else {
         setPending(value);
@@ -104,7 +163,7 @@ export default function App() {
     finally { setSending(false); }
   }
   async function send() {
-    if (sending || !draft.trim() || pending) return;
+    if (sending || (!draft.trim() && !files.length) || pending || !deliveryReady || readingFiles) return;
     returnFocus.current = document.activeElement === composer.current;
     setSending(true); setError('');
     try {
@@ -114,7 +173,7 @@ export default function App() {
         const chat = await api<Chat>('/api/chats', { agent, key: crypto.randomUUID() });
         id = chat.id; setSelected(id); setChats(current => [chat, ...current]);
       }
-      await deliver({ chatId: id, text: draft, requestId });
+      await deliver({ chatId: id, text: draft, requestId, attachments: files });
     } catch (failure) { setError((failure as Error).message); }
     finally { setSending(false); setSendCompleted(value => value + 1); }
   }
@@ -131,25 +190,27 @@ export default function App() {
   const activity = snapshot?.observation ?? (snapshot?.retry ? `Retry ${snapshot.retry.attempt} scheduled for ${new Date(snapshot.retry.at).toLocaleTimeString()}` : snapshot?.tools.length ? `Using ${snapshot.tools.join(', ')}` : snapshot?.background ? 'Working in the background' : snapshot?.running ? 'Replying…' : snapshot?.queued ? 'Follow-up queued' : '');
   return <div className="app-shell">
     {navigation && <button className="nav-scrim" aria-label="Close conversation navigation" onClick={() => setNavigation(false)}/>}
-    <aside className={navigation ? 'sidebar open' : 'sidebar'} aria-label="Conversations">
+    <aside ref={sidebar} inert={narrow && !navigation} className={navigation ? 'sidebar open' : 'sidebar'} aria-label="Conversations">
       <div className="sidebar-heading"><strong>Web</strong><Button variant="ghost" size="icon" className="mobile-only" aria-label="Close navigation" onClick={() => setNavigation(false)}><X/></Button></div>
       <Button variant="outline" className="new-chat" disabled={sending || !!pending} onClick={() => choose(null)}><Plus/> New conversation</Button>
-      <nav aria-label="Saved conversations">
+      <label className="history-search"><Search size={14}/><input aria-label="Search conversations" placeholder="Search conversations" value={filter} onChange={event=>setFilter(event.target.value)}/></label><nav aria-label="Saved conversations" data-slot="sidebar-content">
         {!ready && <p className="nav-note">Loading conversations…</p>}
         {ready && !chats.length && <p className="nav-note">Your conversations will appear here.</p>}
-        {chats.map(chat => <button key={chat.id} className={`chat-item ${selected === chat.id ? 'selected' : ''}`} aria-current={selected === chat.id ? 'page' : undefined} disabled={sending || !!pending} onClick={() => choose(chat.id)}><span>{chat.title}</span><small>{chat.agent} · {chat.sourceLabel ?? chat.source} · {chat.session}{chat.parentId ? ' · child' : ''}</small></button>)}
+        <SidebarMenu>{chats.filter(chat => `${chat.title} ${chat.agent} ${chat.sourceLabel} ${chat.session} ${chat.id}`.toLowerCase().includes(filter.toLowerCase())).map(chat => <SidebarMenuItem key={chat.id}><SidebarMenuButton isActive={selected === chat.id} tooltip={`${chat.agent} · ${chat.source} · ${chat.session ?? ''} · ${chat.id}`} className={`chat-item ${selected === chat.id ? 'selected' : ''}`} aria-current={selected === chat.id ? 'page' : undefined} disabled={sending || !!pending} onClick={() => choose(chat.id)}><span>{chat.title}</span><small>{agentName(chat.agent)} · {installationName(chat.agent)} · {chat.sourceLabel ?? chat.source}</small><small className="chat-identity" title={`${chat.agent} · ${chat.source} · ${chat.session ?? ''} · ${chat.id}`}>{sessionName(chat, chats)} · #{chat.conversationId}{chat.parentId ? ' · child' : ''}</small></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
       </nav>
       <div className="sidebar-footer">Configured native stores{sources.flatMap(source => source.issues.map((issue, index) => <p key={`${source.id}:${index}`} role="status">{source.label}: {issue}</p>))}</div>
     </aside>
-    <main>
-      <header><Button variant="ghost" size="icon" className="mobile-only" aria-label="Open conversations" onClick={() => setNavigation(true)}><Menu/></Button><h1 title={title}>{title}</h1><span className="agent-name">{selected ? snapshot?.chat.agent ?? agent : 'Local'}</span></header>
-      {!selected && <div className="agent-picker"><label htmlFor="agent">Agent</label><select id="agent" value={agent} disabled={!ready || sending} onChange={event => setAgent(event.target.value)}>{agents.map(item => <option key={item.id} value={item.id}>{item.id}</option>)}</select><p>{agents.find(item => item.id === agent)?.description}</p></div>}
+    <main inert={narrow && navigation}>
+      <header><Button aria-expanded={navigation} variant="ghost" size="icon" className="mobile-only" aria-label="Open conversations" onClick={() => setNavigation(true)}><Menu/></Button><h1 title={title}>{title}</h1><span className="agent-name">{selected ? agentName(snapshot?.chat.agent ?? agent) : 'Local'}</span></header>
+      {!selected && <div className="agent-picker"><label htmlFor="agent">Agent</label><select id="agent" value={agent} disabled={!ready || sending} onChange={event => setAgent(event.target.value)}>{agents.map(item => <option key={item.id} value={item.id}>{agentName(item.id)} · {installationName(item.id)}</option>)}</select><p>{agents.find(item => item.id === agent)?.description}</p></div>}
       <Conversation key={selected ?? 'new'} className="conversation" aria-label="Message history" aria-busy={snapshot?.running ?? false}>
         <ConversationContent className="message-list">
-          {(!selected || snapshot && !snapshot.messages.length && !snapshot.partial) && <ConversationEmptyState title={selected ? `Message ${snapshot?.chat.agent}` : `What can ${agent || 'your agent'} help with?`} description="Same agents, tools and skills. A fresh conversation."/>}
+          {(!selected || snapshot && !snapshot.messages.length && !snapshot.partial) && <ConversationEmptyState title={`Message ${agentName(snapshot?.chat.agent ?? agent) || 'an agent'}`} description=""/>}
           {selected && !snapshot && <p className="empty-loading">{connection}</p>}
-          {snapshot?.messages.filter(message => message.provenance !== 'runtime').map(message => <Message key={message.id} from={message.provenance === 'user' ? 'user' : 'assistant'}><span className="message-author">{message.provenance === 'user' ? 'You' : message.author ?? snapshot.chat.agent}{message.background ? ' · background' : ''}</span><MessageContent>{message.commentary && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</MessageContent></Message>)}
-          {snapshot?.partial && <Message from="assistant"><span className="message-author">{snapshot.chat.agent}</span><MessageContent><MessageResponse>{snapshot.partial}</MessageResponse></MessageContent></Message>}
+          {snapshot?.messages.filter(message => message.provenance !== 'runtime').map(message => <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.provenance === 'user'}><Message align={message.provenance === 'user' ? 'end' : 'start'}><MessageContent><span className="message-author">{message.provenance === 'user' ? 'You' : message.author ?? agentName(snapshot.chat.agent)}{message.background ? ' · background' : ''}</span><Bubble align={message.provenance === 'user' ? 'end' : 'start'} variant={message.provenance === 'user' ? 'muted' : 'ghost'}><BubbleContent>{message.commentary && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{message.attachments?.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt={file.name} src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle><a download={file.name} href={`data:${file.mimeType || 'text/plain'};base64,${file.data}`}>{file.name}</a></AttachmentTitle></AttachmentContent></Attachment>)}{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</BubbleContent></Bubble></MessageContent></Message><ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.afterMessageId===message.id)}/></MessageScrollerItem>)}
+          {snapshot && <ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>!snapshot.messages.some(message=>message.id===call.afterMessageId && message.provenance!=='runtime'))}/>}
+
+          {snapshot?.partial && <Message align="start"><span className="message-author">{agentName(snapshot.chat.agent)}</span><MessageContent><MessageResponse>{snapshot.partial}</MessageResponse></MessageContent></Message>}
         </ConversationContent>
         <ConversationScrollButton aria-label="Scroll to latest message"/>
       </Conversation>
@@ -157,8 +218,12 @@ export default function App() {
         <div className="activity" role="status"><span>{activity || (selected ? connection === 'Connected' ? <><Check size={12}/> Saved</> : connection : '')}{snapshot?.queued ? ` · ${snapshot.queued} queued` : ''}</span>{busy && <Button variant="outline" size="sm" disabled={stopping} onClick={() => void stop()}><Square size={12}/>{stopping ? 'Stopping…' : 'Stop all work'}</Button>}</div>
         {snapshot?.readOnlyReason && <p className="pending-note" role="status">{snapshot.readOnlyReason}</p>}
         {(error || snapshot?.error) && <div className="error-banner" role="alert"><p>{error || snapshot?.error}</p>{!ready && <Button variant="outline" size="sm" onClick={() => { setError(''); void refresh(); }}>Reconnect</Button>}{pending && <Button size="sm" disabled={sending} onClick={() => void deliver(pending)}>Retry message</Button>}<Button variant="ghost" size="icon" aria-label="Dismiss error" onClick={() => setError('')}><X/></Button></div>}
-        {pending && <div className="pending-note">Message delivery is uncertain. Your text is preserved. <Button variant="outline" size="sm" disabled={sending} onClick={() => { setSelected(pending.chatId); void deliver(pending); }}>Retry message</Button></div>}
-        <form className="composer" onSubmit={event => { event.preventDefault(); void send(); }}><textarea ref={composer} aria-label="Message" placeholder={busy ? 'Send a follow-up…' : `Message ${agent || 'agent'}…`} rows={2} value={draft} disabled={sending || !!pending} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }}/><Button type="submit" size="icon" aria-label={sending ? 'Sending message' : 'Send message'} disabled={!draft.trim() || sending || !ready || !!pending}><ArrowUp/></Button></form>
+        {pending && <div className="pending-note">Message delivery is uncertain. Your text and files are preserved. <Button variant="outline" size="sm" disabled={sending} onClick={() => { setSelected(pending.chatId); void deliver(pending); }}>Retry message</Button></div>}
+        <form className="composer" onSubmit={event => { event.preventDefault(); void send(); }}><InputGroup>
+          {!!files.length && <InputGroupAddon align="block-start" className="attachment-list">{files.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt="" src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle>{file.name}</AttachmentTitle></AttachmentContent><Button type="button" variant="ghost" size="icon-xs" aria-label={`Remove ${file.name}`} disabled={sending || !!pending} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}><X/></Button></Attachment>)}</InputGroupAddon>}
+          <InputGroupTextarea ref={composer} aria-label="Message" placeholder={busy ? 'Send a follow-up…' : `Message ${agentName(agent) || 'agent'}…`} rows={2} value={draft} disabled={sending || !!pending || !deliveryReady} onChange={event => {const text=event.target.value;setDraft(text);void saveDelivery({text,attachments:files,pending}).catch(()=>setDeliveryReady(false));}} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) { event.preventDefault(); void send(); } }}/>
+          <InputGroupAddon align="block-end"><input hidden ref={fileInput} type="file" multiple aria-label="Select attachments" onChange={event=>void selectFiles(event.target.files)}/><InputGroupButton size="icon-sm" variant="ghost" className="rounded-full" aria-label="Attach files" disabled={sending || !!pending || !deliveryReady} onClick={()=>fileInput.current?.click()}><Paperclip/></InputGroupButton><span className="input-note">{readingFiles ? 'Reading files…' : busy ? 'Follow-up' : 'Agents'}</span><InputGroupButton type="submit" size="icon-sm" variant="default" className="send-button rounded-full" aria-label={sending ? 'Sending message' : 'Send message'} disabled={(!draft.trim() && !files.length) || sending || !ready || !!pending || !deliveryReady || readingFiles}>{sending ? <LoaderCircle className="animate-spin"/> : <ArrowUp/>}</InputGroupButton></InputGroupAddon>
+        </InputGroup></form>
         <p className="composer-hint">Enter to send · Shift+Enter for a new line{busy ? ' · Follow-ups wait for current work' : ''}</p>
       </div>
     </main>

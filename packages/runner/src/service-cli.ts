@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
-import { defaultAgent } from "./definition.js";
 import { randomUUID } from "node:crypto";
 import { startService, serviceRequest, type ServiceCommand, type ServiceConfig, connectInTerminal } from "./service.js";
 
@@ -17,8 +16,7 @@ try {
     });
     console.log(JSON.stringify({ event: "service-started", agents: service.service.agents.map(agent => agent.id) }));
   } else if (action === "connect") {
-    await connectInTerminal({ socket: config.socket, id: args[0],
-      defaultAgent: args[0] ? undefined : await defaultAgent(config.root) });
+    await connectInTerminal({ socket: config.socket, id: args[0] });
   } else if (action === "command") {
     // Machine callers retain their own native create/request identities and file bytes.
     if (args.length !== 1) throw new Error("Usage: command COMMAND.json");
