@@ -1,19 +1,53 @@
 import type { AttachmentFile } from './contracts';
 export interface Pending { chatId: string; text: string; requestId: string; attachments?: AttachmentFile[] }
 export interface DeliveryState { text: string; attachments: AttachmentFile[]; pending: Pending | null }
-const tabKey = sessionStorage.getItem('dispatch-web:outbox-key') ?? crypto.randomUUID();
-sessionStorage.setItem('dispatch-web:outbox-key', tabKey);
+const storageKey = 'dispatch-web:outbox-key';
 const database = new Promise<IDBDatabase>((resolve, reject) => {
   const request = indexedDB.open('dispatch-web-delivery', 1);
   request.onupgradeneeded = () => request.result.createObjectStore('draft');
   request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
 });
+
+// sessionStorage survives reload, but browsers can copy it into another live tab.
+// A lifetime Web Lock claims the record before any read/write. A copied tab gets
+// its own record, including the original pending identity/bytes, never a resend.
+const ownedKey = (async () => {
+  if (!navigator.locks) throw new Error('Exclusive browser draft ownership is unavailable.');
+  const original = sessionStorage.getItem(storageKey) ?? crypto.randomUUID();
+  let candidate = original;
+  for (;;) {
+    const key = candidate;
+    const claimed = await new Promise<boolean>((resolve, reject) => {
+      void navigator.locks.request(`dispatch-web:outbox:${key}`, { mode: 'exclusive', ifAvailable: true }, async lock => {
+        if (!lock) { resolve(false); return; }
+        try {
+          const db = await database;
+          if (key !== original) {
+            await new Promise<void>((done, failed) => {
+              const tx = db.transaction('draft', 'readwrite'), store = tx.objectStore('draft');
+              const source = store.get(original);
+              source.onsuccess = () => { if (source.result !== undefined) store.put(source.result, key); };
+              tx.oncomplete = () => done(); tx.onerror = () => failed(tx.error); tx.onabort = () => failed(tx.error);
+            });
+          }
+          sessionStorage.setItem(storageKey, key);
+          resolve(true);
+        } catch (error) { reject(error); return; }
+        // The browser releases this exclusive claim when the document goes away.
+        await new Promise<void>(() => {});
+      }).catch(reject);
+    });
+    if (claimed) return key;
+    candidate = crypto.randomUUID();
+  }
+})();
+
 // Local outbox only, never a conversation/transcript database. No count/byte cap.
 export async function saveDelivery(value: DeliveryState) {
-  const db = await database;
-  await new Promise<void>((resolve,reject) => { const tx=db.transaction('draft','readwrite');tx.objectStore('draft').put(value,tabKey);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error); });
+  const key = await ownedKey, db = await database;
+  await new Promise<void>((resolve,reject) => { const tx=db.transaction('draft','readwrite');tx.objectStore('draft').put(value,key);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error); });
 }
 export async function loadDelivery(): Promise<DeliveryState | undefined> {
-  const db=await database;
-  return new Promise((resolve,reject)=>{const request=db.transaction('draft').objectStore('draft').get(tabKey);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+  const key = await ownedKey, db=await database;
+  return new Promise((resolve,reject)=>{const request=db.transaction('draft').objectStore('draft').get(key);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
 }

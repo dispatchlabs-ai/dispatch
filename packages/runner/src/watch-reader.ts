@@ -436,7 +436,7 @@ export async function readWatchChatProjection(run: WatchRun, key: string) {
   if (!store || !Number.isSafeInteger(id) || id < 1 || String(id) !== key.slice(split + 1)) throw new Error("Unknown native conversation.");
   return withStore(store.path, db => {
     const entries = db.prepare("SELECT record FROM entries WHERE conversation_id=? ORDER BY commit_seq,id").all(id).map(row => parse(row.record) as EntryRecord);
-    const tasks = db.prepare("SELECT record FROM tasks WHERE conversation_id=? AND kind='pi.tool'").all(id).map(row => parse(row.record));
+    const tasks = db.prepare("SELECT record FROM tasks WHERE conversation_id=? AND kind=?").all(id, JSON.stringify("pi.tool")).map(row => parse(row.record));
     const byId = new Map(entries.map(entry => [Number(entry.id), entry]));
     const messages = projectChatMessages(store.namespace, entries).map(message => {
       const entry = byId.get(Number(message.id.split(":")[0]));

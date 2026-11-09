@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Claim browser outbox ownership before access so copied live tabs retain independent drafts, attachment bytes and uncertain request identities across reload.
+
 - Port reviewed native chat improvements: installation-scoped routing and read-only catalogs, retained tool traces and UTF-8/image input/recovery through local and central workers; refresh current shadcn Web compositions.
 
 - Pin patched Zod 4.6.6; shared Backend no longer depends on unused Zod.

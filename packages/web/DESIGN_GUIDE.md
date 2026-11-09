@@ -17,7 +17,9 @@
 - Files show removable chips/image previews before admission and retained download
   links afterward. Browser names are labels only. Supported UTF-8 documents and
   PNG/JPEG/WebP images enter native Pi blocks, not a shadow transcript/blob DB.
-- Per-tab IndexedDB is only the local draft/uncertain delivery outbox. Preserve
+- Per-tab IndexedDB is only the local draft/uncertain delivery outbox. A lifetime
+  exclusive Web Lock claims its identity before reads/writes; copied live tabs
+  clone the record instead of overwriting it, while ordinary reload reclaims it. Preserve
   text, bytes and requestId across reload/rejections; replay explicitly with the
   original identity. Reconnect only observes. No arbitrary attachment/message caps;
   format/model/provider constraints remain explicit.

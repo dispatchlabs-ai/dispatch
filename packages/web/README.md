@@ -30,7 +30,10 @@ entries retain the bytes and source metadata; saved history/downloads survive
 service/worker reconnection without a host-local upload pathname.
 
 Rejected sends retain editable text/files. Uncertain sends lock the original
-request identity/content in a per-tab browser outbox across reload; use Retry
+request identity/content in a per-tab browser outbox across reload. An exclusive
+browser Web Lock claims the outbox before access; copied/duplicated live tabs get
+independent records preserving the original pending identity and files. Browsers
+without Web Locks fail closed rather than risk shared-record overwrite; use Retry
 message explicitly. Reconnect never automatically resends. Clear local browser
 site data deliberately only when no uncertain delivery/draft needs recovery.
 Search histories by title/agent/source/session/ID; visible labels stay compact.
