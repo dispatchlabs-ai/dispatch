@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Allow trusted host-owned native Pi provider factories in the service and
+  on-demand CLI, including stable aliases for existing agent model selections.
+  Package a pinned experimental Claude Code subscription provider separately
+  through Nix; keep credentials with the official CLI and preserve native tools,
+  state and upstream billing guards.
+
 - Preserve the caller's abort signal across authenticated gateway requests and
   retries, including after response headers arrive and temporary requests expire.
 

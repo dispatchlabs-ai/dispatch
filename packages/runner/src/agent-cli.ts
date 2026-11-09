@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { catalog, loadAgent } from "./definition.js";
 import { createRunner } from "./index.js";
-import { refreshGatewayModels } from "./gateway.js";
+import { connectHostModels } from "./host-models.js";
 import { serviceSettings } from "./settings.js";
 import type { ServiceConfig } from "./service.js";
 import { chatInTerminal } from "./terminal.js";
@@ -64,7 +64,7 @@ try {
       }
       const session = values.session ?? randomUUID();
       if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(session)) throw new Error("Invalid session key.");
-      const config: Pick<ServiceConfig, "stateRoot" | "cwd" | "namespace" | "gateway" | "retry" | "compaction" | "afterFailedRun"> & {
+      const config: Pick<ServiceConfig, "stateRoot" | "cwd" | "namespace" | "gateway" | "modelProviders" | "retry" | "compaction" | "afterFailedRun"> & {
         workspace?: { agents: string[]; command: string[] };
         artifacts?: { module: string; export: string; args?: unknown[] };
       } =
@@ -127,9 +127,8 @@ try {
       };
       await include(agentId);
       const models = createModels({ authContext: { env: async () => undefined, fileExists: async () => false } });
-      const { key } = JSON.parse(await readFile(config.gateway.credentialFile, "utf8"));
-      await refreshGatewayModels(config.gateway.origin, models, key, config.gateway.aliases);
-      await chatInTerminal({
+      const modelConnection = await connectHostModels(config, models);
+      try { await chatInTerminal({
         root, stateRoot: join(config.stateRoot, session), cwd: workspace ? "/workspace" : config.cwd,
         env: workspace ? target => workspace.environment(target.cwd ?? "/workspace") : undefined,
         definitionResources: true,
@@ -152,7 +151,7 @@ try {
         runner: createRunner({ namespace: config.namespace }), models, names: [...names],
         agent: agentId, session, drain: !!workspace || names.size > 1, prompt: values.prompt, history: values.history,
         updateDefinitions: values["update-definitions"], settings,
-      });
+      }); } finally { await modelConnection.close(); }
     }
   }
 } catch (error) {

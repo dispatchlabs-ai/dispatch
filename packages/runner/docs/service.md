@@ -54,6 +54,46 @@ are not retried by this connector. Cancellation reaches the callback and request
 Credentials are sent only to the configured origin's `/v1/` paths; redirects are
 rejected. Static-key and native-keychain callers retain their existing auth flow.
 
+### Local model providers
+
+Both the service and on-demand CLI accept optional `modelProviders`. Each trusted
+host module exports a factory returning a native Pi `Provider`. Its optional
+`args` array is passed to that factory. An optional `closeSessionExport` names an
+async cleanup function in the same module. Runner calls it with each provider
+session ID used by that connection, after native work has stopped or suspended,
+and awaits it before exit. An optional `id` binds the provider to an existing
+authored provider name. These bindings replace the matching gateway provider;
+an error does not fall back to API billing. Modules run with the host's privileges.
+Keep secrets in the provider's credential store, not factory arguments.
+
+For the experimental [Earendil Claude Code provider](https://github.com/earendil-works/pi-claude-code),
+build the pinned module with `nix build .#claude-code-provider` and retain its
+store path in a Nix profile. Set `module` to its `lib/pi-claude-code/index.js`:
+
+```json
+{
+  "modelProviders": [{
+    "module": "/absolute/provider-installation/lib/pi-claude-code/index.js",
+    "export": "createClaudeCodeProvider",
+    "closeSessionExport": "closeClaudeProcesses",
+    "id": "anthropic"
+  }]
+}
+```
+
+Install the official Claude Code CLI on that host and sign into the intended
+subscription with `claude auth login`. The provider uses that login; Runner
+does not collect subscription tokens. Pi Durable still executes tools and owns
+history, cancellation and recovery. The upstream provider's billing guard is
+preserved: usage-credit responses fail unless its explicit opt-in is configured.
+Its token costs are list-price estimates, not proof of an API charge. Inspect
+the saved `claude-code.rate-limit` diagnostic for subscription/overage attribution.
+CLI availability, plan capacity and future provider billing changes still apply.
+
+The Nix output compiles the pinned upstream source without changing its behavior,
+retains its license and source revision, and shares Runner's Pi dependency tree.
+It does not install Claude Code, sign in, select a host route or start an agent.
+
 Paths are absolute. The socket's parent must be owned by the process user and
 mode `0700`; the socket itself is `0600`. This API serves the local account over
 a Unix socket. Remote clients use separately authenticated adapters; the service

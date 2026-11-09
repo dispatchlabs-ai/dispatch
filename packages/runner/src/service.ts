@@ -5,12 +5,13 @@ import { pathToFileURL } from "node:url";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { createRunner } from "./index.js";
 import { run, type Adapter } from "./run.js";
-import { refreshGatewayModels, type ModelChoice, type GatewayAliases } from "./gateway.js";
+import type { ModelChoice } from "./gateway.js";
+import { connectHostModels, type HostModelsConfig } from "./host-models.js";
 import type { ChatService } from "./chat.js";
 import type { InstanceMessage } from "./messages.js";
 import { serviceSettings, type ServicePolicy } from "./settings.js";
 
-export type ServiceConfig = ServicePolicy & {
+export type ServiceConfig = ServicePolicy & HostModelsConfig & {
   root: string;
   stateRoot: string;
   cwd: string;
@@ -18,7 +19,6 @@ export type ServiceConfig = ServicePolicy & {
   namespace?: string;
   names?: string[];
   updateDefinitions?: boolean;
-  gateway: { origin: string; credentialFile: string; aliases?: GatewayAliases };
   adapters?: { module: string; optionsFile: string }[];
 };
 export type ServiceAdapterContext = {
@@ -71,9 +71,16 @@ export async function startService(config: ServiceConfig) {
   if ((directory.mode & 0o077) || directory.uid !== process.getuid?.()) {
     throw new Error("The service socket needs an owner-only directory.");
   }
+  const modelConnections: Awaited<ReturnType<typeof connectHostModels>>[] = [];
   const connectModels: ServiceAdapterContext["connectModels"] = async models => {
-    const { key } = JSON.parse(await readFile(config.gateway.credentialFile, "utf8"));
-    return refreshGatewayModels(config.gateway.origin, models, key, config.gateway.aliases);
+    const connection = await connectHostModels(config, models);
+    modelConnections.push(connection);
+    return connection.choices;
+  };
+  const closeModels = async () => {
+    const results = await Promise.allSettled(modelConnections.map(connection => connection.close()));
+    const errors = results.filter(result => result.status === "rejected").map(result => result.reason);
+    if (errors.length) throw new AggregateError(errors, "Could not close service model providers.");
   };
   const models = createModels({ authContext: { env: async () => undefined, fileExists: async () => false } });
   await connectModels(models);
@@ -137,13 +144,16 @@ export async function startService(config: ServiceConfig) {
     listening = true;
     await chmod(config.socket, 0o600);
     runtime = await run({ ...config, runner, models, adapters, settings });
-  } catch (error) { await runtime?.close(); if (listening) server.close(); throw error; }
+  } catch (error) {
+    try { await runtime?.close(); } finally { if (listening) server.close(); await closeModels(); }
+    throw error;
+  }
   let closing: Promise<void> | undefined;
   return {
     ...runtime,
     close: () => closing ??= (async () => {
       await new Promise<void>((accept, reject) => server.close(error => error ? reject(error) : accept()));
-      await runtime!.close();
+      try { await runtime!.close(); } finally { await closeModels(); }
     })(),
   };
 }

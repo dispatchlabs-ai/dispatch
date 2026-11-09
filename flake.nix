@@ -16,8 +16,9 @@
           runner-slack = pkgs.callPackage ./packages/runner/nix/package.nix { inherit (runtime) nodejs_24; withSlack = true; };
           runner-google-chat = pkgs.callPackage ./packages/runner/nix/package.nix { inherit (runtime) nodejs_24; withGoogleChat = true; };
           runner-fleet = pkgs.callPackage ./packages/runner/nix/package.nix { inherit (runtime) nodejs_24; withSlack = true; withFleet = true; };
+          claude-code-provider = pkgs.callPackage ./packages/runner/nix/claude-code-provider.nix { inherit (runtime) nodejs_24; inherit runner; };
         in {
-          packages = { default = web; inherit runner runner-slack runner-fleet runner-google-chat; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
+          packages = { default = web; inherit runner runner-slack runner-fleet runner-google-chat claude-code-provider; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
             macos-release = pkgs.callPackage ./packages/web/nix/macos-release.nix { inherit web; };
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             oci = pkgs.callPackage ./packages/web/nix/oci.nix {
@@ -38,6 +39,7 @@
           checks.runner-slack = runner-slack;
           checks.runner-fleet = runner-fleet;
           checks.runner-google-chat = runner-google-chat;
+          checks.claude-code-provider = claude-code-provider;
           devShells.default = pkgs.mkShell {
             packages = [ runtime.nodejs_24 ];
           };

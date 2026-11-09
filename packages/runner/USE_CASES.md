@@ -25,7 +25,9 @@
 - **RUN-008 — Use host-owned credentials:** configure a native store or trusted
   vault helper, resolve API keys directly into Pi, inspect only source metadata,
   and explicitly select session/environment compatibility without plaintext
-  fallback. This does not supply isolation for untrusted code or OAuth storage.
+  fallback; bind trusted native providers to existing agent model names, including
+  a locally authenticated Claude Code subscription. This does not supply isolation
+  for untrusted code or OAuth storage.
 - **RUN-009 — Work in a repository:** supply each agent with repository instructions
   and its own role instructions, select a saved working directory, and delegate
   bounded assignments to named agents with native ownership and recovery.

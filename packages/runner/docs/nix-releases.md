@@ -117,7 +117,8 @@ instruction, role or skill changes continue to require it.
 `watch --config HOST.json` discovers running sessions without opening a runtime;
 `watch --session KEY` also inspects stopped work. Viewer exit leaves owners running.
 
-HOST.json contains `stateRoot`, `cwd`, `namespace`, `gateway` and optional `retry`,
+HOST.json contains `stateRoot`, `cwd`, `namespace`, `gateway`, optional
+[`modelProviders`](service.md#local-model-providers), and optional `retry`,
 `compaction` and `afterFailedRun` [host policies](service.md#compaction-and-queued-input-recovery)
 from the [service configuration](service.md). State and working-directory paths
 are absolute. The definition root is supplied by the immutable release.
