@@ -24,6 +24,7 @@ export interface ChatMessage {
   author?: string;
   background?: boolean;
   error?: string;
+  attachments?: import("@dispatch/runner").AttachmentFile[];
   artifacts?: {
     id: string;
     name: string;
@@ -44,6 +45,7 @@ export interface Snapshot {
   readOnlyReason?: string;
   chat: Chat;
   messages: ChatMessage[];
+  toolCalls?: import("@dispatch/runner").ChatToolCall[];
   running: boolean;
   queued: number;
   partial: string;

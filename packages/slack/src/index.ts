@@ -845,6 +845,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
       await bindThread(service, { ...report, thread: report.thread ?? result.ts });
       return result.ts;
     },
+    transport: "slack",
     extension,
     queueReply,
     queueContinuation,

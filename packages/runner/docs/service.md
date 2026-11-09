@@ -8,8 +8,10 @@ defaults, skills and domain tools belong to the definition repository.
 The installation contains one locked dependency tree and an independent
 definition checkout below it. Follow [definition workspaces](definition-workspaces.md).
 The service discovers runnable definitions unless `names` selects a subset.
-`factory.yaml` still controls autonomous schedules; use `agents: []` for a
-conversation-only installation.
+`factory.yaml` controls autonomous schedules by default. Set `schedules: false`
+in the service configuration for a conversation-only installation: admitted native
+work still recovers, but factory calendars/loops are not enabled. Select a new
+state root or deliberately retire saved schedules before changing this policy.
 
 ```json
 {
@@ -18,6 +20,8 @@ conversation-only installation.
   "cwd": "/srv/work",
   "socket": "/srv/agents/run/service.sock",
   "namespace": "company",
+  "schedules": false,
+  "definitionResources": true,
   "gateway": {
     "origin": "https://models.example.com",
     "credentialFile": "/srv/agents/private/gateway.json",
@@ -95,7 +99,8 @@ retains its license and source revision, and shares Runner's Pi dependency tree.
 It does not install Claude Code, sign in, select a host route or start an agent.
 
 Paths are absolute. The socket's parent must be owned by the process user and
-mode `0700`; the socket itself is `0600`. This API serves the local account over
+mode `0700`; the socket itself is `0600`. Keep the complete socket path short
+enough for the platform Unix-socket limit (about 104 bytes on macOS). This API serves the local account over
 a Unix socket. Remote clients use separately authenticated adapters; the service
 does not expose a public TCP listener.
 
@@ -106,6 +111,12 @@ attach to the same `ChatService`; they must not open another writer for its
 agents. Their `prepare` phase declares extensions, `start` receives the service,
 and `close` releases transport resources before the service closes native stores.
 An optional `busy()` reports unfinished adapter-owned compatibility work.
+Prepared adapters declare `transport` (for example `slack`, `google-chat`, `email`).
+Background reply destinations can carry that explicit `transport`; Runner selects
+exactly one matching adapter, never broadcasts. Untagged saved destinations work
+only with one adapter. A company composition can supply `run({replySink})` to
+resolve its own retained routes. Multiple accounts of one transport also need
+that explicit company routing; no channel/user is guessed.
 
 The optional [Gmail adapter](gmail.md) receives alias-addressed email and sends
 threaded final replies through this same owner.
@@ -299,3 +310,73 @@ remained unchanged and usage appeared in the native ledger. Type/build checks
 passed. No automated tests were added or run. Direct provider-length responses,
 terminal cancellation, abrupt process loss and other platforms were not exercised
 by this replay.
+
+## Shared clients and company compositions
+
+Start one supervised native Node owner:
+
+```sh
+dispatch-service /srv/agents/config.json serve
+```
+
+From other terminals, `dispatch-service CONFIG connect CHAT` opens the exact
+native conversation (for example `helper:2`); omit CHAT to create one using the
+definitions' default agent. `/history`, `/stop` and `/quit` are explicit commands.
+EOF, `/quit` and Ctrl-C disconnect **only the client**; Ctrl-C exits 130. Interactive
+messages return admission immediately while observation continues, so Stop and
+follow-ups remain available during work. No client enables schedules or providers.
+
+A configured `dispatch-agent --root DEFINITIONS run --config HOST.json --session
+KEY --prompt TEXT` also connects when HOST contains `socket`. Named keys use the
+existing `terminal:KEY` native creation key. A retained agent is preserved when
+no `--agent` override is given; `--request-id ID` permits explicit retry after
+uncertain admission. Prompt mode waits for that native receipt and exits nonzero
+on an unanswered turn. Legacy configurations without `socket` retain direct-owned
+terminal/workspace behavior. They cannot be hot-attached or silently migrated:
+finish/suspend old owners and deliberately deploy compatible bindings. Never
+remove a live store lock. No historical store is copied into a client database.
+
+For a consumer application:
+
+```ts
+import { openServiceRuntime } from "@dispatch/backend";
+const client = await openServiceRuntime({ socket: "/srv/agents/run/service.sock" });
+const chat = await client.service.create("helper", "web", "example-discussion");
+await client.service.submit(chat.id, "Hello", "example-request-1", "followUp", "web");
+console.log(await client.presentation.snapshot(chat.id));
+await client.close(); // disconnect, not Stop or owner shutdown
+```
+
+Connection IDs are native `agent:conversationId`, not read-only SQLite catalog
+hashes. Clients can poll/watch live snapshots, including partial text, native tool
+calls/results and attachment projections, and explicitly stop the same chat.
+Independent conversations remain independent Pi conversations in the owner's
+store. Watch loss ends that observation; reconnect explicitly. Reads do not open
+another Harness. This owner-only local socket grants the local account the service's
+configured authority, not a multi-tenant principal/participant permission system.
+Use separately authenticated and authorized adapters for remote clients.
+
+The public `@dispatch/runner/service` exports `serveService(service, socket)` for
+company applications that already compose `run({open})` or `ChatService.attach`.
+It binds that exact native service, including custom workflows; it opens no stores
+or model connections. Close the returned listener and then the company runtime
+on supervisor shutdown. Its optional third argument is the prepared adapters for
+busy status. Do not install two owners against the same native state.
+
+`serviceRequest(socket, command)` is typed by `ServiceCommand`/`ServiceResults`.
+Create accepts `source`; send accepts `source`, `mode` (`followUp` or `steer`) and
+`files: [{name,mimeType,data}]` with base64 bytes. Native validation admits UTF-8
+text documents and PNG/JPEG/WebP images only for image-capable authored models.
+There is no application request-byte ceiling; hosts must provision memory/disk
+for JSON/base64 requests. No filename is interpreted as a host path. `find` looks
+up a stable native creation key (optionally scoped by agent). Artifact downloads
+return retained verified bytes as base64. Receipts remain Pi submission records.
+
+Use `dispatch-service CONFIG command COMMAND.json` to send a precise command,
+including files, stable create key or stable requestId. Preserve the original
+identity and payload after an uncertain transport failure. The client never
+resends automatically. `ServiceError.status` preserves a definite native 409
+rejection; transport failure is not proof of rejection. Restart the compatible
+owner with the same state, namespace, definitions, provider and adapter bindings
+to recover admitted work; native Pi determines safe replay and cancellation.
+Keep complete closed-state backups before upgrades. Publication is not activation.

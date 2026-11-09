@@ -10,6 +10,8 @@ import type { ArtifactOptions, ArtifactSink } from "./artifacts.js";
 
 export type PreparedAdapter = {
   extension: Extension;
+  /** Required for explicit multi-transport reply routing. */
+  transport?: string;
   queueReply: ReplySink;
   queueArtifact?: ArtifactSink;
   start(service: ChatService): Promise<void>;
@@ -36,6 +38,8 @@ export type RunOptions = {
   resume?: boolean;
   initialize?: ChatInitializer;
   adapters?: Adapter[];
+  replySink?: ReplySink;
+  schedules?: boolean;
   artifacts?: ArtifactOptions;
   /** Attach domain workflows to the same host before adapters begin receiving. */
   open?: (options: { extensions: Extension[]; replySink?: ReplySink; settings?: OpenOptions["settings"]; artifacts?: ArtifactOptions }) => Promise<ChatService>;
@@ -60,9 +64,16 @@ export async function run(options: RunOptions = {}) {
   try {
     for (const adapter of options.adapters ?? []) adapters.push(await adapter.prepare({ root, runner }));
     const extensions = adapters.map(adapter => adapter.extension);
-    // A transport destination is opaque to the runner. Adapters select their
-    // destinations; applications using multiple transports provide their sink.
-    const replySink = adapters.length === 1 ? adapters[0].queueReply : undefined;
+    // Never broadcast a reply or guess between transports. Legacy destinations
+    // without a transport remain supported with exactly one adapter.
+    const replySink: ReplySink = options.replySink ?? (async (...args) => {
+      const destination = args[2];
+      const targets = destination.transport
+        ? adapters.filter(adapter => adapter.transport === destination.transport)
+        : adapters.length === 1 ? adapters : [];
+      if (targets.length !== 1) throw new Error("Reply destination needs exactly one configured transport.");
+      await targets[0].queueReply(...args);
+    });
     const artifacts: ArtifactOptions = { ...options.artifacts, sink: options.artifacts?.sink ?? (async (tx, id, artifact) =>
       (await Promise.all(adapters.map(adapter => adapter.queueArtifact?.(tx, id, artifact) ?? []))).flat()) };
     if (options.open) service = await options.open({ extensions, replySink, settings: options.settings, artifacts });
@@ -72,7 +83,7 @@ export async function run(options: RunOptions = {}) {
         root, stateRoot: resolve(options.stateRoot ?? resolve(root, ".state")),
         models: options.models, demo: options.demo ?? false, names: options.names,
         updateDefinitions: options.updateDefinitions, initialize: options.initialize,
-        resume: options.resume,
+        resume: options.resume, schedules: options.schedules,
         deferResume: true,
         cwd: options.cwd, env: options.env, storage: options.storage, settings: options.settings,
         definitionResources: options.definitionResources,

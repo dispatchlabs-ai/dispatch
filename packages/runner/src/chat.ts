@@ -1,6 +1,8 @@
-export type ChatMessage = { id: string; role: string; text: string; at?: number; commentary?: string; author?: string; background?: boolean; error?: string; artifacts?: Artifact[] };
+import { prepareContent, ContentError, type AttachmentFile } from "./chat-content.js";
+import { projectChatTools, type ChatToolCall } from "./chat-tools.js";
+export type ChatMessage = { id: string; role: string; text: string; at?: number; commentary?: string; author?: string; background?: boolean; error?: string; attachments?: AttachmentFile[]; artifacts?: Artifact[] };
 export type ChatSnapshot = {
-  chat: Chat; messages: ChatMessage[]; running: boolean; queued: number;
+  chat: Chat; messages: ChatMessage[]; toolCalls?: ChatToolCall[]; running: boolean; queued: number;
   partial: string; tools: string[]; error: string | null; demo: boolean;
   background: boolean;
   /** Native pending retry; at is an epoch-millisecond deadline. */
@@ -15,7 +17,7 @@ import { join, resolve } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import {
   configure, defineDoc, LiveDoc, type ConversationId, type ConversationView, type Cursor,
-  type EntryRecord, type Extension, type LiveState, type SubmissionId, type Tx, type JsonObject,
+  type EntryRecord, type TaskRecord, type Extension, type LiveState, type SubmissionId, type Tx, type JsonObject,
 } from "@earendil-works/pi-durable";
 import { catalog, enabledAgents, loadAgent, type LoadedAgent } from "./definition.js";
 import type { Models } from "@earendil-works/pi-ai/models";
@@ -55,7 +57,11 @@ export function projectChatMessages(namespace: string, entries: readonly EntryRe
       const text = messageText(message.content);
       const error = message.role === "assistant" ? message.errorMessage : undefined;
       const at = message.timestamp + (message.role === "assistant" ? message.durationMs ?? 0 : 0);
-      return text || error ? [{ id: `${entry.id}:${index}`, role: message.role, text, at,
+      const data = entry.data as { source?: string; text?: string; attachments?: AttachmentFile[] } | undefined;
+      const attached = message.role === "user" && entry.kind === `${namespace}.message` && data?.attachments?.length ? data.attachments : undefined;
+      const hasTools = message.role === "assistant" && Array.isArray(message.content) && message.content.some(part => part.type === "toolCall");
+      return text || error || attached || hasTools ? [{ id: `${entry.id}:${index}`, role: message.role, text: attached ? data?.text ?? "" : text, at,
+        ...(attached ? { attachments: attached } : {}),
         ...(message.role === "assistant" ? { commentary: publicCommentary(message) } : {}), ...(error ? { error } : {}) }] : [];
     });
   });
@@ -77,6 +83,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
   }
 
   const admissions = new WeakMap<object, Map<string, Promise<unknown>>>();
+  const modelCatalogs = new WeakMap<object, Models>();
   async function admit<T>(service: object, id: string, operation: () => Promise<T>): Promise<T> {
     const pending = admissions.get(service) ?? new Map<string, Promise<unknown>>();
     admissions.set(service, pending);
@@ -94,8 +101,9 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     readonly enabled = new Set<string>();
     private constructor(agents: LoadedAgent[], demo: boolean, readonly initialize?: ChatInitializer) { this.agents = agents; this.demo = demo; }
 
-    static attach(options: { agents: LoadedAgent[]; hosts: Map<string, AgentHost>; demo?: boolean; initialize?: ChatInitializer }) {
+    static attach(options: { agents: LoadedAgent[]; hosts: Map<string, AgentHost>; demo?: boolean; initialize?: ChatInitializer; models?: Models }) {
       const service = new ChatService(options.agents, options.demo ?? false, options.initialize);
+      if (options.models) modelCatalogs.set(service, options.models);
       for (const [id, host] of options.hosts) service.hosts.set(id, host);
       return service;
     }
@@ -106,6 +114,8 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       resume?: boolean;
       /** The host starts recovery after its adapters and bindings are ready. */
       deferResume?: boolean;
+      /** Calendar policy only; native admitted tasks still recover. */
+      schedules?: boolean;
       cwd?: string;
       env?: OpenOptions["env"];
       definitionResources?: OpenOptions["definitionResources"];
@@ -127,7 +137,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       };
       const agents = await Promise.all(names.map(async name => prepare(await loadAgent(options.root, name))));
       const service = new ChatService(agents, options.demo, options.initialize);
-      const enabled = await enabledAgents(options.root);
+      const enabled = options.schedules === false ? [] : await enabledAgents(options.root);
       for (const id of enabled) service.enabled.add(id);
       for (const agent of agents) for (const recipient of agent.messages ?? []) {
         if (!agents.some(candidate => candidate.id === recipient)) {
@@ -135,6 +145,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
         }
       }
       const models = options.models;
+      modelCatalogs.set(service, models);
       if (!options.demo && agents.some(agent => !models.getProvider(agent.model.provider))) throw new Error("Register every agent's provider in the supplied Models catalog.");
       try {
         await privateStateDirectory(stateRoot);
@@ -312,15 +323,21 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       }, context);
     }
 
-    async submit(id: string, text: string, requestId: string, mode: "followUp" | "steer" = "followUp", source: Chat["source"] = "web") {
-      if (!text.trim() || !requestId.trim()) throw new Error("A message and request ID are required.");
+    async submit(id: string, text: string, requestId: string, mode: "followUp" | "steer" = "followUp", source: Chat["source"] = "web", files: AttachmentFile[] = []) {
+      const content = prepareContent(text, files);
+      if (!requestId.trim()) throw new Error("A request ID is required.");
       return admit(this, id, async () => {
         const { chat, conversation } = await this.resolve(id);
+        if (files.some(file => file.mimeType.startsWith("image/"))) {
+          const agent = this.agents.find(agent => agent.id === chat.agent)!;
+          if (!modelCatalogs.get(this)?.getModel(agent.model.provider, agent.model.id)?.input.includes("image"))
+            throw new ContentError("This authored model does not accept images. Remove the image or choose an image-capable agent.");
+        }
         const submission = await conversation.submit({
-          type: "input", content: text, requestId, whenBusy: mode,
-          entry: { kind: `${namespace}.message`, data: { source } },
+          type: "input", content, requestId, whenBusy: mode,
+          entry: { kind: `${namespace}.message`, data: { source, ...(files.length ? {text, attachments: files} : {}) } },
         }, context);
-        if (chat.title === "New chat") await this.rename(id, text);
+        if (chat.title === "New chat") await this.rename(id, text || files[0]?.name || "Attachment");
         return { submissionId: submission.id };
       });
     }
@@ -390,10 +407,18 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
         const inbox = view.docs["pi.inbox"] as { items?: unknown[] } | undefined;
         // Pi's structural view mounts only its built-in documents.
         const handoffs = handoffWatch?.value;
-        const deliveries = (await host.harness.inspect(context)).tasks.some(({ record }) =>
+        const inspection = await host.harness.inspect(context);
+        const toolTasks: TaskRecord<unknown, unknown, unknown>[] = [];
+        let toolCursor: Cursor | undefined;
+        do {
+          const page = await host.storage.scanTasks({conversationId: conversation.id, kind:"pi.tool"}, 250, toolCursor, context);
+          toolTasks.push(...page.items); toolCursor = page.next;
+        } while (toolCursor);
+        const deliveries = inspection.tasks.some(({ record }) =>
           record.conversationId === conversation.id && record.kind === `${namespace}.instance-message`);
         return {
           chat, messages: projectChatMessages(namespace, [...saved.values()].sort((a, b) => a.id - b.id)),
+          toolCalls: projectChatTools([...saved.values()], live, toolTasks),
           running: !!live?.run, queued: inbox?.items?.length ?? 0,
           partial: messageText(live?.generation?.message?.content),
           tools: live?.tools?.filter(tool => tool.status !== "done").map(tool => tool.name) ?? [],

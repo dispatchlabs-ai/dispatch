@@ -1,5 +1,5 @@
 import { readFile, realpath, stat } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, isAbsolute } from "node:path";
 import { Worker } from "node:worker_threads";
 import { createHash } from "node:crypto";
 import lockfile from "proper-lockfile";
@@ -22,6 +22,7 @@ interface NativeService {
     requestId: string,
     mode: "followUp",
     source: runner.Chat["source"],
+    files?: runner.AttachmentFile[],
   ): Promise<{ submissionId: number }>;
   snapshot(id: string): Promise<Snapshot>;
   stop(id: string): Promise<void>;
@@ -177,7 +178,7 @@ function sessionDocument(path: string, kind: string): any {
     return value;
   });
 }
-export async function openRuntime() {
+async function openLocalRuntime() {
   const config = await readConfig();
   const { definitionsRoot, host } = config;
   process.chdir(host.cwd);
@@ -383,6 +384,7 @@ export async function openRuntime() {
     agents,
     sources: stores.statuses,
     list: stores.list,
+    has: async (id: string) => { try { await stores.get(id); return true; } catch { return false; } },
     async create(
       agent: string,
       _source: runner.Chat["source"],
@@ -420,7 +422,9 @@ export async function openRuntime() {
       requestId: string,
       mode: "followUp",
       source: runner.Chat["source"],
+      files: runner.AttachmentFile[] = [],
     ) {
+      runner.prepareContent(text, files);
       const { item, owner } = await admitted(id);
       // Resume only on explicit admission, never on observation/startup/restart.
       return owner.service.submit(
@@ -429,6 +433,7 @@ export async function openRuntime() {
         requestId,
         mode,
         source,
+        files,
       );
     },
     async stop(id: string) {
@@ -516,3 +521,35 @@ export async function openRuntime() {
     },
   };
 }
+
+export interface Runtime {
+  stateRoot: string;
+  service: {
+    agents: Agent[];
+    sources(): Promise<import("./contracts.js").SourceStatus[]>;
+    list(): Promise<Chat[]>;
+    has(id: string): Promise<boolean>;
+    create(agent: string, source: runner.Chat["source"], key: string, sourceId?: string): Promise<Chat>;
+    submit(id: string, text: string, requestId: string, mode: "followUp", source: runner.Chat["source"], files?: runner.AttachmentFile[]): Promise<{ submissionId: number }>;
+    stop(id: string): Promise<void>;
+    artifact(id: string, artifactId: string): Promise<{ artifact: runner.Artifact; bytes: Buffer }>;
+  };
+  presentation: {
+    snapshot(id: string): Promise<Snapshot>;
+    watch(id: string, listener: (value: Snapshot) => Promise<void>): Promise<{ closed: Promise<void>; stop(): Promise<void> }>;
+  };
+  close(): Promise<void>;
+}
+
+/** A configured connection never opens a local native store or provider. */
+export async function openRuntime(): Promise<Runtime> {
+  const path = process.env.DISPATCH_CONFIG;
+  if (path) {
+    if (!isAbsolute(path)) throw new Error("DISPATCH_CONFIG must be an absolute path.");
+    const value = JSON.parse(await readFile(path, "utf8"));
+    if (value.service) return (await import("./service-runtime.js")).openServiceRuntime(value.service);
+  }
+  return openLocalRuntime();
+}
+export { openServiceRuntime } from "./service-runtime.js";
+export type { ServiceConnection } from "./service-runtime.js";

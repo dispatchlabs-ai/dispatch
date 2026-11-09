@@ -68,3 +68,29 @@ The reusable runtime closure is prepared for public npm publication; this source
 change is not a registry release. For dependency-order builds, reviewed archives,
 external consumers and separately authorized publishing, follow the
 [package release path](https://github.com/dispatchlabs-ai/dispatch/blob/main/scripts/README.md).
+
+## Connect to an existing local service
+
+`openServiceRuntime({socket, sourceId?, label?})` connects to Runner's maintained
+owner-only Unix API. It returns the same `{service,presentation,stateRoot,close}`
+contract without opening a provider, worker or SQLite owner. `close()` stops client
+watches only; explicit `service.stop(id)` cancels work. Native chat IDs match the
+CLI. `submit` additionally accepts native `AttachmentFile[]` as its sixth argument.
+Live snapshot/watch includes native tool calls/results, attachments and partial
+output; no shadow transcript or automatic command retry is introduced. Watch
+transport failure closes the watch; reconnect explicitly using the same request
+identity for an uncertain send.
+
+`openRuntime()` also accepts a service-only `DISPATCH_CONFIG`:
+
+```json
+{"service":{"socket":"/srv/agents/run/service.sock","sourceId":"native","label":"Native agents"}}
+```
+
+This selects only that service's catalog. Historical read-only SQLite sources
+remain a separate local/consumer composition; never claim another live owner's
+store. Trusted multi-installation adapters can return `openServiceRuntime` and
+qualify native IDs at their existing installation boundary. Use the public
+[Runner startup/client contract](../runner/docs/service.md#shared-clients-and-company-compositions)
+for supervision, retries, attachments, permissions and deliberate old-owner
+migration. The socket is same-account authority, not hosted multi-user auth.

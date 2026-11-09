@@ -344,6 +344,7 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
     connected = true;
   }
   return {
+    transport: "google-chat",
     extension: defineExtension({ name: `${namespace}.google-chat`, tasks: [incoming, turn, statusTask] }),
     receive, queueStatus,
     queueReply: (async (tx, id, destination, text, key) => { await enqueue(tx, id, { ...destination, text, replyText: text, key }); }) as ReplySink,

@@ -1,7 +1,7 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ConversationId, Tx } from "@earendil-works/pi-durable";
 
-export type ReplyDestination = { channel: string; thread: string; user: string };
+export type ReplyDestination = { channel: string; thread: string; user: string; transport?: string };
 export type ReplySink = (
   tx: Tx, conversationId: ConversationId, destination: ReplyDestination, text: string, key: string,
 ) => Promise<void>;

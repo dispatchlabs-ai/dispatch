@@ -206,7 +206,10 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
         const result = await api.commit(async tx => {
           const entries = await tx.scanEntries({ conversationId: api.conversationId, order: "descending" }, 30);
           const latest = entries.items.find(entry => entry.kind === `${namespace}.message`);
-          const data = latest?.data as { slack?: ReplyDestination } | undefined;
+          const data = latest?.data as { destination?: ReplyDestination; slack?: ReplyDestination;
+            googleChat?: { space: string; thread: string; user: string } } | undefined;
+          const destination = data?.destination ?? (data?.slack ? { ...data.slack, transport: "slack" } :
+            data?.googleChat ? { channel: data.googleChat.space, thread: data.googleChat.thread, user: data.googleChat.user, transport: "google-chat" } : undefined);
           const hasAcknowledgement = await acknowledged(tx, api.taskId, api.callId);
           const state = await tx.doc(Handoffs, api.conversationId);
           const existing = state.jobs[String(api.taskId)];
@@ -223,7 +226,7 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
           }, background);
           state.stopping = false;
           state.jobs[String(api.taskId)] = {
-            taskId, question, status: "working", ...(data?.slack ? { destination: data.slack } : {}),
+            taskId, question, status: "working", ...(destination ? { destination } : {}),
           };
           if (state.monitor === null) {
             state.monitor = await tx.createTask(monitor, { firstAt: api.now() + options.progressEveryMs }, background);

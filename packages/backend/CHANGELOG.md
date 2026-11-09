@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Add public owner-only local service connections, live native observations and file inputs without opening a second storage owner.
+
 - Prepare public npm metadata and the complete reusable runtime closure with dependency-order archives and a separately authorized publishing path.
 
 - Use Runner public native message projection for saved PostgreSQL history so failed generations remain visible without acquiring an owner.

@@ -535,6 +535,7 @@ export function createAdapter(options: GmailOptions): Adapter {
           active.artifacts[artifact.id] = artifact;
           return [{ transport: "email", taskId, afterResponse: true }];
         },
+        transport: "email",
         async queueReply(tx, conversationId, destination, text, key) {
           const route = routeFor(destination.channel);
           const identity = await tx.doc(Identity);

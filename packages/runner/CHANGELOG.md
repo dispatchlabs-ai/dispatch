@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Share one supervised native owner with CLI and Backend clients; preserve native receipts, Stop, recovery, attachments and tool observations. Add explicit multi-adapter reply routing and conversation-only schedule policy.
+
 - Prepare public npm metadata and the complete reusable runtime closure with dependency-order archives and a separately authorized publishing path.
 
 - Export the shared public native message projection for live and saved-history adapters, retaining errors/commentary/timestamps.

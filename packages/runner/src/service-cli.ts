@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
+import { defaultAgent } from "./definition.js";
 import { randomUUID } from "node:crypto";
-import { startService, serviceRequest, type ServiceCommand, type ServiceConfig } from "./service.js";
+import { startService, serviceRequest, type ServiceCommand, type ServiceConfig, connectInTerminal } from "./service.js";
 
 const [configPath, action, ...args] = process.argv.slice(2);
 try {
-  if (!configPath || !action) throw new Error("Usage: dispatch-service CONFIG serve|agents|chats|schedules|status|idle|create AGENT [TITLE]|send CHAT TEXT|message FROM TO TEXT|ask FROM TO TEXT|message-status FROM TASK|snapshot CHAT|compact CHAT [INSTRUCTIONS]|download CHAT ARTIFACT DESTINATION|stop CHAT|receipt CHAT SUBMISSION");
+  if (!configPath || !action) throw new Error("Usage: dispatch-service CONFIG serve|connect [CHAT]|command COMMAND.json|agents|chats|schedules|status|idle|create AGENT [TITLE]|send CHAT TEXT|message FROM TO TEXT|ask FROM TO TEXT|message-status FROM TASK|snapshot CHAT|compact CHAT [INSTRUCTIONS]|download CHAT ARTIFACT DESTINATION|stop CHAT|receipt CHAT SUBMISSION");
   const config: ServiceConfig = JSON.parse(await readFile(configPath, "utf8"));
   if (action === "serve") {
     // Provider subprocesses inherit the service directory; keep it the configured workspace.
@@ -15,6 +16,14 @@ try {
       void service.close().then(() => process.exit(0), error => { console.error(String(error)); process.exit(1); });
     });
     console.log(JSON.stringify({ event: "service-started", agents: service.service.agents.map(agent => agent.id) }));
+  } else if (action === "connect") {
+    await connectInTerminal({ socket: config.socket, id: args[0],
+      defaultAgent: args[0] ? undefined : await defaultAgent(config.root) });
+  } else if (action === "command") {
+    // Machine callers retain their own native create/request identities and file bytes.
+    if (args.length !== 1) throw new Error("Usage: command COMMAND.json");
+    const command = JSON.parse(await readFile(args[0], "utf8")) as ServiceCommand;
+    console.log(JSON.stringify(await serviceRequest(config.socket, command), null, 2));
   } else {
     let command: ServiceCommand;
     switch (action) {

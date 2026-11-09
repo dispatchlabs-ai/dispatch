@@ -96,7 +96,7 @@ port.on("message", ({ id, method, args }) => {
     } catch (error) {
       port.postMessage({
         id,
-        ...(error instanceof AdmissionError
+        ...((error instanceof AdmissionError || error instanceof runner.ContentError)
           ? { error: error.message, status: 409 }
           : {
               error:
