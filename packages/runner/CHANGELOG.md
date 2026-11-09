@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Record accepted portable-agent principal, capability, conversation and package
+  goals, with linked Remote, Fleet and Slack scope and Pi-based publishing
+  guidance; this documentation does not implement or release those additions.
+
 - Run the on-demand launcher and service from their configured host directory,
   so provider subprocesses survive removal of the caller's directory. Watch
   reports a settled unanswered turn as Not answered with its native reason.

@@ -110,6 +110,7 @@ Run these from the repository's Nix shell. They check types and builds, not end-
 ## Learn more
 
 - [Dispatch use cases](packages/web/USE_CASES.md) — browser workspace goals and approved additions
+- [Portable agent goals](packages/runner/USE_CASES.md#2-portable-agents-and-published-packages) — accepted principal, interface, runtime and published-package scope, with [ownership direction](packages/runner/docs/definition-workspaces.md#accepted-portable-agent-direction)
 - [Web package](packages/web/README.md) — implementation and documentation index
 - [Observer](packages/observer/README.md) — desktop agent inspection, connections, and recorded-event playback
 - [Usage guide](packages/web/docs/usage-guide.md) — detailed setup and operation

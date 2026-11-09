@@ -1,5 +1,10 @@
 # Runner use cases
 
+This catalog records intended actor goals, including accepted additions; it does
+not certify implementation, package publication or installation qualification.
+
+## 1. Existing execution and application goals
+
 - **RUN-001 — Start company definitions:** discover agent folders and run manual,
   continuous or interval work without a browser or customer-specific service.
 - **RUN-002 — Recover work:** preserve native tasks, conversations and submissions
@@ -58,7 +63,7 @@
   [email package](../email/USE_CASES.md), sharing conversations, tasks and recovery
   rather than embedding email policy or a second runtime in Runner.
 
-- [x] **RUN-013 — Schedule agent-local assignments:** define named schedules and
+- **RUN-013 — Schedule agent-local assignments:** define named schedules and
   predefined prompts beside an agent, including daily calendar-time execution
   in an explicit timezone, with shared Runner admission and native Pi recovery.
   See the [calendar contract and recovery](docs/schedules.md).
@@ -94,6 +99,43 @@
 - **RUN-025 — Watch local sessions:** An operator can discover running application sessions, follow agent activity, inspect retained conversations and matching tool results, and leave the terminal viewer without affecting execution.
   Keep the latest public update visible, browse compact action groups, search
   loaded history, and inspect tool errors through keyboard or mouse navigation.
+
+## 2. Portable agents and published packages
+
+Accepted November 9, 2026. These additions require integration and qualification;
+the [ownership direction](docs/definition-workspaces.md#accepted-portable-agent-direction)
+records the agreed boundaries and existing foundations.
+
+- **RUN-026 — Act as an agent principal:** An agent acts through its own service
+  identities and granted authority, with actions attributed to that principal
+  and the executing instance.
+- **RUN-027 — Run the same agent anywhere:** An operator runs an agent locally,
+  on a server or in an ephemeral sandbox with the selected definition, runtime,
+  model configuration, skills, tools and authority preserved.
+- **RUN-028 — Authorize runtime instances:** An operator enrolls, renews and
+  revokes an instance's access to an agent principal independently of other
+  instances of that agent.
+- **RUN-029 — Use portable capabilities:** An agent uses its authorized services
+  from any supported execution location through consistent tool interfaces and
+  centrally managed service credentials.
+- **RUN-030 — Continue across interfaces:** An authorized participant discovers,
+  inspects and continues the same durable conversation from web, CLI or messaging
+  clients with consistent access, authorship and explicit reply destinations.
+- **RUN-031 — Work concurrently as one agent:** Participants collaborate in shared
+  conversations while the same agent principal handles independent conversations
+  and tasks concurrently without mixing their context or ownership.
+- **RUN-032 — Validate before rollout:** An operator exercises an agent release
+  locally against an explicit target environment with the same capability
+  contracts, then deploys that selected release.
+- **RUN-033 — Build an independent agent application:** A developer composes an
+  application from published, versioned Dispatch packages using its own agent
+  definitions and interfaces without a Dispatch source checkout or the full
+  browser application.
+
+Remote persistence and connectivity belong to
+[Remote's goals](../remote/USE_CASES.md#2-portable-service-additions);
+provider placement and reusable infrastructure consumption belong to
+[Fleet's goals](../fleet/USE_CASES.md#2-portable-deployment-additions).
 
 ## Availability
 

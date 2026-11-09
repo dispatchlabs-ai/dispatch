@@ -58,3 +58,66 @@ recovery against a private copy before changing a live installation.
 Opt-in development agents can use [disposable workspaces](disposable-workspaces.md)
 with a prepared image and a pinned per-run release. This keeps their editable
 source separate from the immutable definition/runtime installation.
+
+## Accepted portable-agent direction
+
+Accepted November 9, 2026. [RUN-026 through RUN-033](../USE_CASES.md#2-portable-agents-and-published-packages)
+record the intended outcomes; this section records ownership and integration
+direction, not a claim of working APIs, published packages or migrated deployments.
+
+An agent principal has its own authority and service identities. A runtime
+instance authenticates to act as that principal and retains separate execution
+attribution. Its definition and selected release determine instructions, skills,
+model configuration and tool contracts. Interface choice and execution location
+must preserve those choices for the same release and authorized scope; consistent
+behavior does not mean identical model-generated text.
+
+A principal can participate in many independent conversations and tasks. Multiple
+people can share one conversation, retaining individual authorship. A messaging
+thread maps to a durable conversation that authorized web or terminal clients can
+also address. Separate threads retain separate context; using one principal does
+not automatically create cross-conversation memory. That memory policy remains a
+separate design decision. Reply destinations and audiences remain explicit.
+
+The shared service provides authenticated access to conversations, execution and
+capabilities. A worker on a local machine, server or ephemeral sandbox initiates
+its connection to that service. Central PostgreSQL state stays behind the service;
+workers need neither database credentials nor an inbound application listener.
+Instance credentials and centrally managed service bindings let the same agent
+use its own capabilities wherever it runs. One instance's access can be revoked
+without changing the principal or unrelated instances. Workspace files and
+published artifacts retain their own persistence contract.
+
+Principal identity does not determine the number of native stores or owners.
+Preserve Pi's ownership of each executing native session and task graph while
+allowing independent work to run concurrently. Reuse the existing
+[portable-worker protocol](../../web/docs/portable-workers.md),
+[remote storage contract](../../remote/docs/spec.md) and
+[fleet recovery mechanisms](../../fleet/README.md#recovery-and-limits).
+The PostgreSQL protocol already has attempt ownership, atomic mutation receipts
+and confirmed worker retirement; extracting and adapting it to shared packages
+still requires current Pi storage compatibility and integration verification.
+Storage receipts do not establish exactly-once external actions, and a lost
+connection alone does not prove that an earlier worker stopped.
+
+| Owner | Responsibility |
+| --- | --- |
+| Dispatch packages | Published libraries, service components, channel adapters, client APIs and reusable UI components that independent applications can compose. |
+| Shared infrastructure repositories | Centrally maintained, versioned Terraform/OpenTofu modules for deploying those components and their supporting infrastructure. |
+| Consumer agent/application repository | Agent definitions, skills, domain workflows, company integrations and application composition from selected packages. |
+| Consumer infrastructure repository | Module calls, installation configuration, version selections, secret references, deployment state and rollout. |
+
+Each consumer owns its installation's principals, credentials and data. Local
+validation uses the selected agent release and capability contracts against an
+explicit target environment before that release is deployed. Existing local
+SQLite and parent-installation workflows remain supported; the new goals do not
+make a hosted service mandatory for every use.
+
+Use [Pi as the packaging reference](../../../CONTRIBUTING.md#pi-as-the-packaging-reference).
+The consumer outcome is an independent repository that installs released packages,
+defines and runs an agent, and deploys through shared modules without checking out
+Dispatch source or copying runtime implementation. Reusable UI and service APIs
+must be consumable without requiring the complete Dispatch Web application.
+Exact package extraction boundaries, public API shapes, credential enrollment and
+existing-store migration procedures remain implementation decisions. This
+direction does not replace Dispatch Web's database-owned product specification.

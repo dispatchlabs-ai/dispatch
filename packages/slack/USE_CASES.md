@@ -1,10 +1,15 @@
 # Slack use cases
 
+This catalog records intended actor goals; accepted additions do not establish
+implementation or deployment.
+
+## 1. Existing Slack goals
+
 - **SLK-001 — Connect:** install optional transport dependencies and configure a
   workspace/channel/agent binding with host-supplied secret names.
 - **SLK-002 — Converse:** handle mentions and replies in established threads,
   including replies broadcast to the channel, attributing each human in one
-  persistent conversation per thread.
+  persistent conversation per thread while independent threads proceed concurrently.
 - **SLK-003 — Discuss reports:** publish a report carrying an origin reference,
   retain its thread binding and backfill existing roots without rerunning work.
 - **SLK-004 — Recover delivery:** deduplicate incoming event copies and resume
@@ -37,6 +42,19 @@
   executor may place the whole native thread remotely while one coordinator keeps
   Socket Mode, release pins and stream receipts; worker Web API calls use a scoped
   host relay without Slack tokens.
+
+## 2. Shared service additions
+
+Accepted November 9, 2026; integration with other clients remains to be qualified.
+
+- **SLK-008 — Continue a shared thread elsewhere:** An authorized participant
+  opens the same thread's durable conversation in another client while preserving
+  human authorship, the agent principal, audience permissions and reply routing.
+
+See [Runner's cross-interface goal](../runner/USE_CASES.md#2-portable-agents-and-published-packages)
+and the [ownership direction](../runner/docs/definition-workspaces.md#accepted-portable-agent-direction).
+
+## 3. Administrative boundaries
 
 Slack app creation, workspace invitations, company policy and business research
 belong to administrators or company definitions. The package does not infer those

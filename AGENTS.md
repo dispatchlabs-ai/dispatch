@@ -1,6 +1,7 @@
 # Repository guidance
 
 - Read [OSS.md](OSS.md) when developing, documenting or preparing a release of any package.
+- For repository/package structure and publishing work, use [Pi as the packaging reference](CONTRIBUTING.md#pi-as-the-packaging-reference), inspecting current source and recording the revision and material differences.
 - Before committing or publishing, review staged changes, outgoing commits/messages and artifacts for secrets and private operational or personal information, including image content and metadata. Use synthetic examples and private evidence storage; follow the [public information boundary](OSS.md#public-information-boundary). A clean secret scan does not establish privacy.
 - Use the startup and check commands in [CONTRIBUTING.md](CONTRIBUTING.md).
 - Follow the [testing policy](CONTRIBUTING.md#testing-policy): do not add or run automated tests. AI-agent interactive verification using `agent-browser` is permitted; use source review, TypeScript and build checks too. Future coverage prioritizes stable end-to-end and API behavior.

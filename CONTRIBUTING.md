@@ -109,6 +109,35 @@ For a local development task, synchronize the checked revision into the clean ca
 
 **Accepted October 10, 2026:** release builds run locally with Nix, not GitHub Actions. Keep the exact source revision, reproducible commands and artifact checksums/digests in build receipts; local builds do not replace installation acceptance. CI and automatic release publication are not configured; an empty workflow directory does not enable GitHub Actions.
 
+## Pi as the packaging reference
+
+Use the current [Pi repository](https://github.com/earendil-works/pi) as the primary
+reference when designing or changing package boundaries, dependency declarations,
+public entry points, artifacts and publishing. Read its actual manifests and
+release implementation, record the source revision examined, and explain any
+material differences needed by Dispatch.
+
+The November 9, 2026 review used Pi
+[`2cac4f1`](https://github.com/earendil-works/pi/tree/2cac4f1a934cdc4a80b05a7d8ff2543cf5ee623c):
+
+- [Durable's package manifest](https://github.com/earendil-works/pi/blob/2cac4f1a934cdc4a80b05a7d8ff2543cf5ee623c/packages/durable/package.json)
+  defines public exports, emitted TypeScript declarations, shipped files and
+  exact runtime dependencies independently of the private workspace root.
+- [Package selection and publishing](https://github.com/earendil-works/pi/blob/2cac4f1a934cdc4a80b05a7d8ff2543cf5ee623c/scripts/publish.mjs)
+  select public packages, check lockstep versions, pack artifacts and reconcile
+  already-published versions before retrying publication.
+- [Isolated package consumers](https://github.com/earendil-works/pi/blob/2cac4f1a934cdc4a80b05a7d8ff2543cf5ee623c/scripts/check-package-install.mjs)
+  exercise packed packages outside the source tree so workspace resolution cannot
+  hide missing files or dependencies.
+- [The release procedure](https://github.com/earendil-works/pi/blob/2cac4f1a934cdc4a80b05a7d8ff2543cf5ee623c/.pi/skills/release.md)
+  distinguishes local artifact checks, publication, registry verification and
+  release announcement.
+
+Apply those consumer and release principles using Dispatch's permitted checks.
+This reference does not adopt Pi's automated test suite, CI publishing mechanism
+or version-number policy; the Dispatch policies below and the existing release
+runbook remain authoritative. Document any later policy change explicitly.
+
 ## Versioning and releases
 
 **Accepted October 12, 2026:** a human request to make a release is authorization to prepare, verify, commit/push, tag, publish public archives/registry images using available credentials, and update documentation. Do not request approval again for those ordinary steps. Missing access is an action-specific blocker, not an approval gate; report it and continue unblocked channels. Live customer deployment/data changes are separate from making a release. The [release runbook](.pi/skills/release.md) is the canonical procedure for a fresh chat, without prior transcripts or ignored scripts.
