@@ -7,7 +7,7 @@ export type WatchRun = {
 export type WatchCursor = { sequence: number; entryId: number };
 export type WatchConversation = {
   key: string; agent: string; conversationId: number; title: string; parentKey?: string;
-  active: number; failed: number; status: "working" | "waiting" | "idle" | "unavailable";
+  active: number; failed: number; status: "working" | "waiting" | "idle" | "unanswered" | "unavailable";
   activity: string; updatedAt?: number; startedAt?: number; entryCount: number;
   latestMessage?: WatchActivity;
   currentTools?: WatchActivity[];

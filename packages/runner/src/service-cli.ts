@@ -8,6 +8,8 @@ try {
   if (!configPath || !action) throw new Error("Usage: dispatch-service CONFIG serve|agents|chats|schedules|status|idle|create AGENT [TITLE]|send CHAT TEXT|message FROM TO TEXT|ask FROM TO TEXT|message-status FROM TASK|snapshot CHAT|compact CHAT [INSTRUCTIONS]|download CHAT ARTIFACT DESTINATION|stop CHAT|receipt CHAT SUBMISSION");
   const config: ServiceConfig = JSON.parse(await readFile(configPath, "utf8"));
   if (action === "serve") {
+    // Provider subprocesses inherit the service directory; keep it the configured workspace.
+    process.chdir(config.cwd);
     const service = await startService(config);
     for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => {
       void service.close().then(() => process.exit(0), error => { console.error(String(error)); process.exit(1); });

@@ -122,6 +122,10 @@ HOST.json contains `stateRoot`, `cwd`, `namespace`, `gateway`, optional
 `compaction` and `afterFailedRun` [host policies](service.md#compaction-and-queued-input-recovery)
 from the [service configuration](service.md). State and working-directory paths
 are absolute. The definition root is supplied by the immutable release.
+The launcher changes its process directory to `cwd` (or the session state
+directory for a container workspace) before opening agents, so host-side
+provider subprocesses do not depend on the caller's directory. A task may remove
+the worktree it was launched from without breaking later turns.
 Each session stores agents under `stateRoot/KEY/`; do not aim this launcher at
 an existing service's stores. The selected agent and its transitive
 `message_agent` recipients share one native service in that process. Separate

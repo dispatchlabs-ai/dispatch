@@ -17,7 +17,8 @@ const markdownTheme: MarkdownTheme = { heading: bold, link: accent, linkUrl: mut
 const prose = (text: string, width: number) => new Markdown(clean(text), 0, 0, markdownTheme, undefined, { renderLatex: false }).render(Math.max(1, width));
 const rule = (width: number) => muted("─".repeat(Math.max(1, width)));
 const status = (value: WatchConversation["status"]) => value === "working" ? accent("● Working")
-  : value === "waiting" ? warning("◷ Waiting") : value === "unavailable" ? warning("○ Not running") : muted("○ Idle");
+  : value === "waiting" ? warning("◷ Waiting") : value === "unavailable" ? warning("○ Not running")
+    : value === "unanswered" ? failure("✕ Not answered") : muted("○ Idle");
 const component = (render: (width: number) => string[], handleMouse?: Component["handleMouse"]): Component => ({ render, handleMouse, invalidate() {} });
 type Hit = { top: number; bottom: number; key: string };
 
@@ -381,7 +382,7 @@ export async function watchInTerminal(options: WatchOptions): Promise<void> {
         lines.push(muted(rendered.length > limit ? "  … u Read full update" : "  u Read full update"));
       } else lines.push(muted("  No public update recorded yet."));
       lines.push("", fit(`${status(c.status)}${c.startedAt ? `  ·  ${age(c.startedAt)} elapsed` : ""}`, width));
-      const current = c.currentTools?.map(actionTitle).join(" · ") || (c.active ? c.activity : "No unfinished tasks recorded");
+      const current = c.currentTools?.map(actionTitle).join(" · ") || (c.active || c.status === "unanswered" ? c.activity : "No unfinished tasks recorded");
       lines.push(fit(`Now  ${oneLine(current)}`, width), "");
       return lines;
     }

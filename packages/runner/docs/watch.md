@@ -21,6 +21,8 @@ The latest public agent update stays above the history, alongside current activi
 and elapsed time. Wide terminals also show a clickable agent sidebar. Narrower
 terminals use the same views without the sidebar; **a** opens the agent list.
 Process presence and recorded task state remain separate from reported outcomes.
+A conversation with no unfinished work whose latest native turn settled
+`unanswered` shows **Not answered** with the recorded reason, rather than Idle.
 
 **Updates** groups consecutive tool activity between messages. Each group shows
 how many calls returned, reported errors, or have no recorded result. Open the

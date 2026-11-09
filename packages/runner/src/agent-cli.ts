@@ -117,6 +117,11 @@ try {
         }
         if (!values.history) await workspace.request({ op: "ensure" });
       }
+      // Host-side children such as model provider CLIs inherit this process's
+      // directory. Leave the caller's directory, which may be a disposable task
+      // worktree, for the configured host directory (or this session's state
+      // for container workspaces, whose host cwd need not exist).
+      process.chdir(workspace ? join(config.stateRoot, session) : config.cwd);
       const names = new Set<string>();
       // A trusted per-process binding for definition-owned inspection tools.
       process.env.DISPATCH_SESSION_STATE_ROOT = join(config.stateRoot, session);

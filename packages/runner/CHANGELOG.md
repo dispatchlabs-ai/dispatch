@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Run the on-demand launcher and service from their configured host directory,
+  so provider subprocesses survive removal of the caller's directory. Watch
+  reports a settled unanswered turn as Not answered with its native reason.
+
 - Allow trusted host-owned native Pi provider factories in the service and
   on-demand CLI, including stable aliases for existing agent model selections.
   Package a pinned experimental Claude Code subscription provider separately

@@ -299,15 +299,22 @@ export async function readWatchRun(run: WatchRun): Promise<WatchSnapshot> {
           });
           const agentWait = toolCalls.length > 0 && toolCalls.every(call => ["clone_agent", "delegate", "wait_for_agent"].includes(call.title));
           const hasWork = active.some(task => ["running", "runnable"].includes(task.state?.status));
+          // A settled turn's native outcome, not process liveness, says whether it was answered.
+          const settled = active.length ? undefined : db.prepare(`SELECT record FROM submissions
+            WHERE conversation_id=? AND json_extract(record,'$.type') IN ('input','continue') ORDER BY id DESC LIMIT 1`).get(id);
+          const outcome = settled && parse(settled.record);
+          const unanswered = outcome?.status === "unanswered";
           const status: WatchConversation["status"] = !store.pids.length && active.length ? "unavailable"
-            : agentWait || active.length && !hasWork ? "waiting" : hasWork ? "working" : "idle";
+            : agentWait || active.length && !hasWork ? "waiting" : hasWork ? "working" : unanswered ? "unanswered" : "idle";
           const generation = active.find(task => task.kind === "pi.generation");
           const detail = !store.pids.length && active.length ? "Unfinished native work; no process observed"
             : agentWait ? `Waiting for ${toolCalls.length} agent ${toolCalls.length === 1 ? "result" : "results"}`
             : toolCalls.length ? toolCalls.map(call => call.text).join(" · ")
               : generation ? generation.state?.checkpoint?.phase === "tools" ? "Running tools" : "Generating response"
                 : active.some(task => /compaction/.test(task.kind)) ? "Compacting context"
-                  : hasWork ? "Running native work" : active.length ? "Waiting on native work" : last?.text ?? "No recorded activity";
+                  : hasWork ? "Running native work" : active.length ? "Waiting on native work"
+                    : unanswered ? `Last turn not answered (${String(outcome.reason)})${typeof outcome.detail === "string" ? `: ${redact(outcome.detail)}` : ""}`
+                      : last?.text ?? "No recorded activity";
           const first = row.first_entry ? parse(row.first_entry) : undefined;
           const firstMessage = first && messages(first)[0];
           conversations.push({ key: `${store.agent}:${id}`, agent: store.agent, conversationId: id,
