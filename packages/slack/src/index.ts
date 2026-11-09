@@ -356,7 +356,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
                 const message = entry.model?.[0];
                 if (message?.role !== "assistant" || !completedResponse(message) || !responseText(message).trim()) continue;
                 // The evidence gate suppresses speculative live prose, not completed public output.
-                const lastResponse = await responses.queue(tx, runtime.conversationId, { ...task.input,
+                const lastResponse = await responses.queue(tx, runtime.conversationId, { channel: task.input.channel, thread: task.input.thread, user: task.input.user,
                   first: checkpoint.first!, entry: entry.id, ...(entry.byTaskId ? { generation: entry.byTaskId } : {}) });
                 checkpoint = { ...checkpoint, lastResponse: Math.max(checkpoint.lastResponse ?? 0, lastResponse) };
               }
@@ -366,7 +366,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
           } while (cursor);
           if (active && allowed && live?.generation?.message) {
             await runtime.commit(async tx => {
-              const lastResponse = await responses.queue(tx, runtime.conversationId, { ...task.input,
+              const lastResponse = await responses.queue(tx, runtime.conversationId, { channel: task.input.channel, thread: task.input.thread, user: task.input.user,
                 first: checkpoint.first!, generation: live.run!.taskId });
               checkpoint = { ...checkpoint, lastResponse: Math.max(checkpoint.lastResponse ?? 0, lastResponse) };
               return { status: "running", checkpoint };
