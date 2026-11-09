@@ -1,7 +1,6 @@
 {
   "name": "@dispatch/workers",
   "version": "0.6.0",
-  "private": true,
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -22,9 +21,7 @@
     "README.md",
     "USE_CASES.md",
     "CHANGELOG.md",
-    "LICENSE",
-    "NOTICE",
-    "AGENT-CHAT-LICENSE"
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -48,5 +45,21 @@
   },
   "bin": {
     "dispatch-worker": "./dist/main.js"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dispatchlabs-ai/dispatch.git",
+    "directory": "packages/workers"
+  },
+  "homepage": "https://github.com/dispatchlabs-ai/dispatch/tree/main/packages/workers#readme",
+  "bugs": {
+    "url": "https://github.com/dispatchlabs-ai/dispatch/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "description": "Outbound-connected native Runner owners for Dispatch central services"
 }

@@ -13,7 +13,8 @@ Storage interface and an explicit isolated execution environment. The optional
 tasks and exposes persistent shared conversations without a web server.
 
 This is a source-alpha package. Its current 0.6.0 manifest follows the repository
-version; it is not published to the npm registry. The
+version; registry publication is prepared, not claimed. See the
+[package release path](https://github.com/dispatchlabs-ai/dispatch/blob/main/scripts/README.md). The
 [agent scaffold](https://github.com/dispatchlabs-ai/agent-scaffold) provides a
 complete terminal example with an integrity-pinned public runner archive.
 For source builds, pack a reviewed revision as below. See the
@@ -46,7 +47,8 @@ conversation-scoped downloads and transport receipts.
 
 Keep the resulting lockfile. Snapshot updates use a new immutable tag and URL;
 published assets are never replaced. This distribution does not change the
-repository's lockstep version policy or publish private workspaces to npm.
+repository's lockstep version policy. Applications and channel adapters remain
+private; the reusable runtime closure is prepared for separate npm publication.
 
 ## Try it without credentials
 

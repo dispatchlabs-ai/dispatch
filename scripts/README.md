@@ -1,0 +1,95 @@
+# Reusable npm package release
+
+This prepares reusable packages, not an application deployment. Publication needs
+separate explicit authority. The root, Web, Observer, Fleet and channel adapters
+remain private; Web retains the `@dispatch/web` application identity. The public
+closure is Runner and Remote, Remote → Postgres, Runner/Remote/Postgres → Backend,
+and Runner/Remote/Backend → Workers. Runner's `./gmail`
+compatibility factory needs the separately installed Email adapter; it is not
+required by the shared Backend/Worker runtime.
+
+Node 24.22.1 and the repository Nix shell are the supported preparation environment.
+All packages remain lockstep at the source version until a release is authorized.
+No registry publication is claimed by this source change. Registry ownership of
+`@dispatch`, login/2FA and package-name/version availability must be checked by the
+release operator; metadata does not grant access. Never republish a used version.
+
+## Prepare and qualify
+
+1. Follow [CONTRIBUTING](../CONTRIBUTING.md), prepare the authorized lockstep version
+   with `npm run release -- VERSION`, commit it, then check/build from a clean tree.
+2. In `nix develop`, run `npm ci`, `npm run check`, measured dependency-hash builds
+   and the affected release artifacts. Do not run automated tests.
+3. `npm run pack:packages -- --out /tmp/dispatch-packages-RELEASE` builds the public
+   workspaces in dependency order, checks exact public internal dependencies and
+   shipped export/type/bin files, then writes tarballs and `manifest.json` with
+   source identity, SHA-256 and npm SHA-512 integrity. The directory must be new.
+   Use a **clean** source for a release; `source.dirty: true` is development evidence
+   only. Failures leave incomplete output for inspection, not publication.
+4. Inspect the actual tar contents, notices, metadata, declarations and files for
+   privacy and licensing. Compare `sha256sum *.tgz` with the manifest. Install all
+   tarballs together into a fresh ESM directory **outside** this checkout:
+
+   ```sh
+   npm init -y
+   npm pkg set type=module
+   npm install /tmp/dispatch-packages-RELEASE/*.tgz
+   npm install --save-dev typescript@6.0.3 @types/node@24.19.1
+   ```
+
+   Type-build real imports with NodeNext/strict, `lib: ["ES2024", "DOM",
+   "DOM.Iterable"]` and `skipLibCheck: false`. Pi Chord declarations need ES2024
+   Promise types. Pi AI 1.5.0 exposes Google GenAI 2.21.0 declarations, which
+   reference an optional MCP peer even without MCP use: for full upstream library
+   checking install a compatible `@modelcontextprotocol/sdk` (1.32.2 qualified) as
+   a consumer dev dependency. This is not a Dispatch runtime requirement. Record
+   the audit both before and after installing this optional upstream peer.
+   Resolve the documented public subpaths and use the non-mutating bin usage commands.
+   Check `npm ls` and `npm audit --omit=dev`, recording unresolved advisories
+   honestly. Do not patch package manifests or rely on workspace symlinks.
+
+## Publish only with separate authority
+
+The preparation command deliberately never invokes `npm publish`. After independent
+review and explicit release authorization, from the **retained, reviewed** artifact
+directory (do not rebuild different bytes):
+
+```sh
+npm whoami --registry=https://registry.npmjs.org/
+# Verify org/scope authority and absent versions with npm view before proceeding.
+# Dry-run each reviewed archive first, then inspect npm's package file list.
+node --input-type=module -e '
+import {readFileSync} from "node:fs";
+import {execFileSync} from "node:child_process";
+const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
+if (manifest.source.dirty) throw new Error("Release source must be clean");
+for (const pkg of manifest.packages) {
+  execFileSync("npm", ["publish", pkg.tarball, "--access", "public", "--ignore-scripts", "--registry=https://registry.npmjs.org/", "--dry-run"], {stdio:"inherit"});
+}
+'
+```
+
+For authorized actual publication remove **only** `"--dry-run"` from the reviewed
+command, retaining manifest order. This is a manual authenticated release, not
+Pi's CI provenance/OIDC flow; do not claim npm provenance without its supported
+trusted environment. No GitHub Actions or persistent credential setup is added.
+
+Before each actual publish verify the tarball integrity against the retained
+manifest and that `npm view NAME@VERSION` reports an absent version, not an auth or
+network error. If resuming a partial release, compare published
+`npm view NAME@VERSION dist.integrity` against that manifest entry before skipping
+it; a mismatch is a stop, not permission to replace bytes. Record each npm receipt.
+Afterward, verify every registry `dist.integrity`, install the versioned registry
+packages in another external consumer and repeat import/type checks without local
+tarballs. Publish immutable source tags/assets only under that separate authority.
+This does not deploy or change an installed application.
+
+## Pi reference and deliberate differences
+
+Based on Pi `bd0d815c3197e75323f6db60ee3ad1f73d5280d7` package-artifact,
+public-workspace selection, publishing and external-consumer practices; runtime
+pins stay released Pi 1.5.0 (`f9a26365568127461c47a07a37dcb42c140a3ac5`).
+Dispatch uses a small artifact preparer and the manual npm commands above instead
+of Pi's larger release framework, tests or provenance automation. Exact internal
+versions, emitted types, dependency order, reviewed tarball bytes and independent
+consumer installation are retained. Version preparation remains `release.ts`.

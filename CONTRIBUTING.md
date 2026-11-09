@@ -64,9 +64,11 @@ Read its Durable manifest (exports/types/files/exact dependencies),
 `scripts/publish.mjs`, `scripts/check-package-install.mjs` and release procedure.
 Current main refactors SQLite internals after the release; do not depend on them.
 Dispatch follows packed, external consumer checks and emitted types/files, not
-Pi tests or CI. Packages remain private source distribution; no registry publishing
-is added. The PostgreSQL implementation uses the **released public Storage**
-contract, including grouped commit receipts, not copied unreleased SQLite internals.
+Pi tests or CI. The reusable Runner/Remote/Postgres/Backend/Workers closure is
+prepared for public npm distribution; root and applications remain private. Follow
+[scripts/README.md](scripts/README.md) for reviewed tarball preparation, external
+consumers and separately authorized publication. The PostgreSQL implementation
+uses the **released public Storage** contract, including grouped commit receipts, not copied unreleased SQLite internals.
 
 ## Versioning and releases
 

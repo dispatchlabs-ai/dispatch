@@ -1,7 +1,6 @@
 {
   "name": "@dispatch/backend",
   "version": "0.6.0",
-  "private": true,
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -35,7 +34,6 @@
     "USE_CASES.md",
     "CHANGELOG.md",
     "LICENSE",
-    "NOTICE",
     "AGENT-CHAT-LICENSE"
   ],
   "scripts": {
@@ -49,7 +47,6 @@
     "@earendil-works/pi-ai": "1.5.0",
     "proper-lockfile": "4.1.2",
     "ws": "8.22.0",
-    "zod": "4.6.5",
     "@earendil-works/chord": "1.5.0",
     "@earendil-works/pi-durable": "1.5.0"
   },
@@ -59,5 +56,21 @@
     "@types/pg": "8.15.5",
     "@types/proper-lockfile": "4.1.4",
     "typescript": "6.0.3"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dispatchlabs-ai/dispatch.git",
+    "directory": "packages/backend"
+  },
+  "homepage": "https://github.com/dispatchlabs-ai/dispatch/tree/main/packages/backend#readme",
+  "bugs": {
+    "url": "https://github.com/dispatchlabs-ai/dispatch/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "description": "Shared native chat operations and central service for Dispatch clients"
 }

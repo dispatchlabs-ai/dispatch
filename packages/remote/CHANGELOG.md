@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Prepare public npm metadata and the complete reusable runtime closure with dependency-order archives and a separately authorized publishing path.
+
 - Export the shared StorageRequest parser/allowlist for service-side PostgreSQL composition; existing SQLite relay semantics remain unchanged.
 
 

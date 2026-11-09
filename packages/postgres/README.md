@@ -36,3 +36,10 @@ plain URLs without CA are for an isolated local database only.
 Source/type/build and interactive synthetic central composition are distinct from
 full storage conformance or production-recovery qualification. No automated tests
 are added or run in Dispatch. [Upstream MIT notice](NOTICE).
+
+## Package distribution
+
+The reusable runtime closure is prepared for public npm publication; this source
+change is not a registry release. For dependency-order builds, reviewed archives,
+external consumers and separately authorized publishing, follow the
+[package release path](https://github.com/dispatchlabs-ai/dispatch/blob/main/scripts/README.md).

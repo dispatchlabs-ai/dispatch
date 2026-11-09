@@ -23,7 +23,7 @@
     "use-stick-to-bottom": "^1.1.1",
     "@dispatch/backend": "0.6.0",
     "@dispatch/workers": "0.6.0",
-    "zod": "4.6.5"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.0",

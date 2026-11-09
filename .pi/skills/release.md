@@ -18,7 +18,9 @@ feature assignment does not authorize tags, registries or live deployment.
    and `.#workers-oci`. The removed Ubuntu worker assembly/old launcher/enrollment
    commands are not release inputs. Consumer definitions/authorization/providers
    are separate application releases, never copied from a maintainer installation.
-4. Pack reusable packages and install/type-build outside the monorepo; inspect
+4. Use `npm run pack:packages -- --out NEW_DIRECTORY` and the
+   [package release path](../../scripts/README.md); install/type-build outside
+   the monorepo; inspect
    exports, declaration paths, files and exact Pi 1.5.0 dependencies. Inspect actual
    archives and images for private information and upstream notices. Scan with
    `scripts/scan-release-artifact.py` as supplementary evidence, never privacy proof.
@@ -26,7 +28,8 @@ feature assignment does not authorize tags, registries or live deployment.
    Do not claim Linux/live/hosted qualification from a Mac build or synthetic model.
 6. Only within release authority, fetch/reconcile, inspect outgoing commits,
    publish normal source, create a new immutable tag and upload checksum-verified
-   artifacts. Private workspace packages are not npm targets. Verify remote bytes,
+   artifacts. Publish only the prepared public closure under the package release
+   path; private applications are not npm targets. Verify remote bytes,
    tag and publication receipts; report unavailable channels specifically.
 
 Never move released tags, blindly overwrite assets or treat a release as permission

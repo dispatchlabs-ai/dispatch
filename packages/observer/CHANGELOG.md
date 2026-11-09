@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Pin patched Zod 4.6.6; shared Backend no longer depends on unused Zod.
+
 - Own the previously Web-imported UI primitive library and its MIT notices so replacing Web preserves Observer presentation/build independence.
 
 

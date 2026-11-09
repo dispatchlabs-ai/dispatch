@@ -61,3 +61,10 @@ MIT generic adapter notice: [Agent Chat](AGENT-CHAT-LICENSE).
 Saved PostgreSQL observations share Runner `projectChatMessages` with live chat,
 including assistant error-only messages, safe public commentary and native timestamps.
 No provider reasoning/raw diagnostics are projected or owner resumed for this read.
+
+## Package distribution
+
+The reusable runtime closure is prepared for public npm publication; this source
+change is not a registry release. For dependency-order builds, reviewed archives,
+external consumers and separately authorized publishing, follow the
+[package release path](https://github.com/dispatchlabs-ai/dispatch/blob/main/scripts/README.md).

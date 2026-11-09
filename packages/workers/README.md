@@ -35,3 +35,10 @@ central storage service. Otherwise native close may remain unable to reach its
 remote storage; that live process/lock is not a replacement invitation. Wait for
 or deliberately terminate only the confirmed old executor, reconcile effects and
 retained receipts, then recover. Never remove an active local owner lock.
+
+## Package distribution
+
+The reusable runtime closure is prepared for public npm publication; this source
+change is not a registry release. For dependency-order builds, reviewed archives,
+external consumers and separately authorized publishing, follow the
+[package release path](https://github.com/dispatchlabs-ai/dispatch/blob/main/scripts/README.md).

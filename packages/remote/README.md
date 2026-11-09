@@ -27,3 +27,10 @@ The relay routes operations, never raw SQL. Its route table maps a runner
 identity and alias to a storage identity and store. A phone grant alone
 confers no storage-service access. TLS protects each hop; relay operators
 can inspect traffic. End-to-end encryption is not implemented.
+
+## Package distribution
+
+The reusable runtime closure is prepared for public npm publication; this source
+change is not a registry release. For dependency-order builds, reviewed archives,
+external consumers and separately authorized publishing, follow the
+[package release path](https://github.com/dispatchlabs-ai/dispatch/blob/main/scripts/README.md).
