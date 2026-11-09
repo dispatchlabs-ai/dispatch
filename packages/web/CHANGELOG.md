@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Ship standalone frontend copied-component licenses/attribution and bundled dependency notices.
+
 ### Breaking replacement
 - Replace the old workspace UI and company/project/settings APIs with generic native agent chat, preserving request uncertainty, read-only histories, provenance and native ownership admission.
 - Extract Backend, Postgres and Workers; consumer configuration owns definitions, models, tools and hosted authorization. Retire old enrollment/capability/launcher artifacts without migration.

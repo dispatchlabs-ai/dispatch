@@ -16,3 +16,7 @@ Original app code is MIT. Installed dependencies retain their own licenses.
 
 Registry sources inspected and retrieved 2026-11-09. These are real component
 APIs composed around Dispatch snapshots, not the AI SDK execution protocol.
+
+The standalone frontend archive includes this attribution, the `licenses/` files
+and `THIRD-PARTY-NOTICES.md`, generated from the actual bundled dependencies by Vite.
+It does not rely on a server/node_modules installation carrying those notices.

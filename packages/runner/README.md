@@ -401,3 +401,7 @@ primary definitions, named delegates and legacy handoff children. Hosts can
 filter unavailable optional delegates before binding. `WorkspaceEnvironment`
 accepts a `WorkspaceTransport` for a host-authenticated broker, with no local
 filesystem or shell fallback. The host supplies it as an `env` factory.
+
+`projectChatMessages(namespace, entries)` is the public native transcript projection
+used by live ChatService and read-only backend consumers. It retains errors, public
+commentary, timestamps and artifacts without exposing reasoning/provider diagnostics.

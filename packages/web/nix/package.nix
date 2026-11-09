@@ -47,6 +47,7 @@ buildNpmPackage {
     cp packages/web/openapi.yaml "$app/packages/web/"
     cp -R packages/web/licenses "$app/packages/web/"
     cp packages/web/LICENSE packages/web/THIRD_PARTY.md "$app/packages/web/"
+    cp packages/web/THIRD_PARTY.md "$out/share/dispatch-web/THIRD_PARTY.md"
     cp LICENSE "$out/share/dispatch-web/LICENSE"
     cp packages/postgres/NOTICE "$out/share/dispatch-web/postgres-storage-NOTICE"
     cp packages/backend/AGENT-CHAT-LICENSE "$out/share/dispatch-web/AGENT-CHAT-LICENSE"

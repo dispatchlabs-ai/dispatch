@@ -4,7 +4,7 @@ import { randomUUID, timingSafeEqual } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { PostgresStorage, PostgresStorageService } from "@dispatch/postgres";
 import { BACKGROUND_CONTEXT as context } from "@earendil-works/chord/context";
-import type { Chat as NativeChat } from "@dispatch/runner";
+import { projectChatMessages, type Chat as NativeChat } from "@dispatch/runner";
 import type { Storage, Cursor } from "@earendil-works/pi-durable";
 import type { Chat, Snapshot, Agent } from "./contracts.js";
 import { AdmissionError } from "./config.js";
@@ -307,70 +307,30 @@ export async function openCentralRuntime(config: CentralConfig) {
           context,
         ),
       );
-      const messages: Snapshot["messages"] = entries.flatMap((entry) =>
-        (entry.model ?? []).flatMap((message: any, index: number) => {
-          if (!["user", "assistant"].includes(message.role)) return [];
-          const data = entry.data as any;
-          const provenance =
-            message.role === "assistant"
+      const byId = new Map(entries.map((entry) => [Number(entry.id), entry]));
+      const messages: Snapshot["messages"] = projectChatMessages(
+        namespace,
+        entries,
+      ).map((message) => {
+        if (message.role !== "user") return { ...message, provenance: "agent" };
+        const entry = byId.get(Number(message.id.split(":")[0]));
+        const data = entry?.data as
+          { source?: string; from?: string } | undefined;
+        const human =
+          entry?.kind === `${namespace}.message` &&
+          ["web", "cli", "slack", "google-chat", "phone", "email"].includes(
+            data?.source ?? "",
+          );
+        return {
+          ...message,
+          provenance: human
+            ? "user"
+            : entry?.kind === `${namespace}.instance-message`
               ? "agent"
-              : entry.kind === `${namespace}.message` &&
-                  [
-                    "web",
-                    "cli",
-                    "slack",
-                    "google-chat",
-                    "phone",
-                    "email",
-                  ].includes(data?.source)
-                ? "user"
-                : entry.kind === `${namespace}.instance-message`
-                  ? "agent"
-                  : "runtime";
-          return [
-            {
-              id: `${entry.id}:${index}`,
-              role: message.role,
-              text:
-                typeof message.content === "string"
-                  ? message.content
-                  : (message.content
-                      ?.filter((part: any) => part.type === "text")
-                      .map((part: any) => part.text)
-                      .join("\n") ?? ""),
-              provenance,
-              author: data?.from,
-            },
-          ];
-        }),
-      );
-      for (const entry of entries) {
-        if (entry.kind === `${namespace}.background-reply`) {
-          const data = entry.data as { text: string; author: string };
-          messages.push({
-            id: `${entry.id}:background`,
-            role: "assistant",
-            provenance: "agent",
-            text: data.text,
-            author: data.author,
-            background: true,
-          });
-        }
-        if (entry.kind === `${namespace}.artifact`) {
-          const { deliveries: _, ...artifact } =
-            entry.data as unknown as import("@dispatch/runner").ArtifactRecord;
-          messages.push({
-            id: `${entry.id}:artifact`,
-            role: "assistant",
-            provenance: "agent",
-            text: "",
-            artifacts: [artifact],
-          });
-        }
-      }
-      messages.sort(
-        (a, b) => Number(a.id.split(":")[0]) - Number(b.id.split(":")[0]),
-      );
+              : "runtime",
+          author: data?.from,
+        };
+      });
       return {
         chat,
         messages,

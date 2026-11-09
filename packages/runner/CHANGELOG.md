@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Export the shared public native message projection for live and saved-history adapters, retaining errors/commentary/timestamps.
+
 - Expose supported host-model, settings and read-only watch-reader subpaths; trusted provider-only hosts no longer require a gateway.
 
 

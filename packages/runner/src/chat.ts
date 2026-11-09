@@ -34,6 +34,33 @@ export type Chat = {
   id: string; agent: string; conversationId: number; title: string;
   source: "cli" | "web" | "slack" | "google-chat" | "phone" | "email" | "agent" | "schedule"; createdAt: string; origin?: JsonObject;
 };
+function messageText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.flatMap(part => part.type === "text" ? [part.text] : []).join("\n");
+}
+
+export function projectChatMessages(namespace: string, entries: readonly EntryRecord[]): ChatMessage[] {
+  return entries.flatMap<ChatMessage>(entry => {
+    if (entry.kind === `${namespace}.artifact`) {
+      const { deliveries: _initialDeliveryTasks, ...artifact } = entry.data as ArtifactRecord;
+      return [{ id: `${entry.id}:artifact`, role: "assistant", text: "", artifacts: [artifact] }];
+    }
+    if (entry.kind === `${namespace}.background-reply`) {
+      const data = entry.data as { author: string; text: string };
+      return [{ id: `${entry.id}:background`, role: "assistant", text: data.text, author: data.author, background: true }];
+    }
+    return (entry.model ?? []).flatMap((message, index) => {
+      if (message.role !== "user" && message.role !== "assistant") return [];
+      const text = messageText(message.content);
+      const error = message.role === "assistant" ? message.errorMessage : undefined;
+      const at = message.timestamp + (message.role === "assistant" ? message.durationMs ?? 0 : 0);
+      return text || error ? [{ id: `${entry.id}:${index}`, role: message.role, text, at,
+        ...(message.role === "assistant" ? { commentary: publicCommentary(message) } : {}), ...(error ? { error } : {}) }] : [];
+    });
+  });
+}
+
 export function createChats(namespace: string, openAgent: ReturnType<typeof createRuntime>["openAgent"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"], Artifacts: ReturnType<typeof createArtifacts>["Artifacts"]) {
   const Chats = defineDoc<{
     byId: Record<string, Chat>; keys: Record<string, string>;
@@ -42,33 +69,6 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     checkpointWhen: () => false,
     initial: () => ({ byId: {}, keys: {} }),
   });
-
-  function messageText(content: unknown): string {
-    if (typeof content === "string") return content;
-    if (!Array.isArray(content)) return "";
-    return content.flatMap(part => part.type === "text" ? [part.text] : []).join("\n");
-  }
-
-  function messages(entries: readonly EntryRecord[]): ChatMessage[] {
-    return entries.flatMap<ChatMessage>(entry => {
-      if (entry.kind === `${namespace}.artifact`) {
-        const { deliveries: _initialDeliveryTasks, ...artifact } = entry.data as ArtifactRecord;
-        return [{ id: `${entry.id}:artifact`, role: "assistant", text: "", artifacts: [artifact] }];
-      }
-      if (entry.kind === `${namespace}.background-reply`) {
-        const data = entry.data as { author: string; text: string };
-        return [{ id: `${entry.id}:background`, role: "assistant", text: data.text, author: data.author, background: true }];
-      }
-      return (entry.model ?? []).flatMap((message, index) => {
-        if (message.role !== "user" && message.role !== "assistant") return [];
-        const text = messageText(message.content);
-        const error = message.role === "assistant" ? message.errorMessage : undefined;
-        const at = message.timestamp + (message.role === "assistant" ? message.durationMs ?? 0 : 0);
-        return text || error ? [{ id: `${entry.id}:${index}`, role: message.role, text, at,
-          ...(message.role === "assistant" ? { commentary: publicCommentary(message) } : {}), ...(error ? { error } : {}) }] : [];
-      });
-    });
-  }
 
   function messaging(service: ChatService, from: string) {
     const agent = service.agents.find(candidate => candidate.id === from.split(":")[0]);
@@ -393,7 +393,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
         const deliveries = (await host.harness.inspect(context)).tasks.some(({ record }) =>
           record.conversationId === conversation.id && record.kind === `${namespace}.instance-message`);
         return {
-          chat, messages: messages([...saved.values()].sort((a, b) => a.id - b.id)),
+          chat, messages: projectChatMessages(namespace, [...saved.values()].sort((a, b) => a.id - b.id)),
           running: !!live?.run, queued: inbox?.items?.length ?? 0,
           partial: messageText(live?.generation?.message?.content),
           tools: live?.tools?.filter(tool => tool.status !== "done").map(tool => tool.name) ?? [],

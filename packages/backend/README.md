@@ -57,3 +57,7 @@ Node 24.22.1+, Pi 1.5.0; build dependencies first, then `npm run build --workspa
 Local synthetic-provider interaction qualifies native/transport/storage behavior,
 not production models, real host tools, hosted identity or cloud installation.
 MIT generic adapter notice: [Agent Chat](AGENT-CHAT-LICENSE).
+
+Saved PostgreSQL observations share Runner `projectChatMessages` with live chat,
+including assistant error-only messages, safe public commentary and native timestamps.
+No provider reasoning/raw diagnostics are projected or owner resumed for this read.

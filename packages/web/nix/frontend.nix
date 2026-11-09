@@ -14,6 +14,14 @@ runCommand "dispatch-frontend" {
   cp -R "$client/." "$bundle/"
   chmod -R u+w "$bundle"
   cp ${web}/share/dispatch-web/LICENSE "$bundle/LICENSE.txt"
+  # The standalone frontend has no node_modules alongside it. Keep copied
+  # component copyright/licenses plus Vite's bundled-dependency license report.
+  cp -R ${web}/share/dispatch-web/licenses "$bundle/licenses"
+  cp ${web}/share/dispatch-web/THIRD_PARTY.md "$bundle/THIRD_PARTY.md"
+  test -s "$bundle/THIRD-PARTY-NOTICES.md"
+  test -s "$bundle/licenses/Apache-2.0.txt"
+  test -s "$bundle/licenses/ai-elements-NOTICE.txt"
+  test -s "$bundle/licenses/shadcn-MIT.txt"
   mkdir -p "$out"
   # Normalize ordering, timestamps and ownership; gzip embeds no clock/filename.
   tar --sort=name --mtime=@1 --owner=0 --group=0 --numeric-owner \

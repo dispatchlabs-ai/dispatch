@@ -33,7 +33,7 @@ export type { AgentHost, OpenOptions, RunnerState, StatusFile, StartOptions, Sto
 export type { AgentSetup } from "./configuration.js";
 export type { Chat, ChatInitializer, ChatMessage, ChatService, ChatSnapshot } from "./chat.js";
 export type { ReplyDestination, ReplySink, StatusSink } from "./replies.js";
-export { context } from "./chat.js";
+export { context, projectChatMessages } from "./chat.js";
 export { run } from "./run.js";
 export type { Adapter, PreparedAdapter, RunOptions } from "./run.js";
 export { ProcessScope, serveProcess, cancelService } from "./process-scope.js";
