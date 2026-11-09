@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Carry trusted common-client text/image bytes through existing native admission and delivery; declare explicit background reply transport.
+
 - Include a known remaining answer suffix when closing an uninterrupted stream,
   exposing the completed first message before its canonical update. Consume the
   suffix durably before sending so uncertain stops and recovery cannot replay it.

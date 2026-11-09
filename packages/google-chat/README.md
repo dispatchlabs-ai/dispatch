@@ -91,3 +91,21 @@ Incoming attachment names are identified, but file bytes are not downloaded.
 
 See [use cases](USE_CASES.md) and [changes](CHANGELOG.md). Source/build verification
 is separate from live Google app and installation acceptance.
+
+## Trusted common-client input
+
+The prepared transport's `receive(input)` accepts optional `files` containing
+Runner `AttachmentFile` values (`name`, `mimeType`, base64 `data`). This is a
+trusted host binding for actual bytes, not permission to download arbitrary URLs
+or filenames from channel events. It validates native text/image content and
+carries it through the existing incoming/turn/delivery tasks, retaining
+`text`/`attachments` in native message metadata. Admission/user/channel policy,
+native request keys, retries, cancellation and delivery remain unchanged. Company
+facades must bind the authenticated requester and original thread; never accept
+a caller's source/user claim as authority. Validate authored model image support
+before admitting an image in a custom channel facade.
+
+Prepared transports declare their explicit `transport` for Runner multi-adapter
+background reply routing. Multiple accounts of the same transport require the
+company's trusted `run({replySink})` routing; untagged destinations are supported
+only with one adapter. This does not merge unrelated channel threads.

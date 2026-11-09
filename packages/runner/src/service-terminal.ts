@@ -37,6 +37,7 @@ export async function connectInTerminal(options: ServiceTerminalOptions) {
       const saved = await call({ method: "find", key, agent: options.agent });
       if (saved && (!options.agent || saved.agent === options.agent)) id = saved.id;
       else {
+        if (options.history) throw new Error("No retained conversation matches this session. History never creates one.");
         const info = await call({ method: "info" });
         const agent = options.agent ?? options.defaultAgent ?? info.defaultAgent;
         if (!agent) throw new Error("Choose an agent for a new session.");
