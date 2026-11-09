@@ -28,8 +28,11 @@ export async function connectInTerminal(options: ServiceTerminalOptions) {
   process.on("SIGINT", interrupt);
   process.on("SIGTERM", interrupt);
   try {
+    const info = await serviceRequest(options.socket, {method: "info"}, {signal: controller.signal});
+    const expected = info.identity !== undefined ? {identity: info.identity} : info.stateRoot !== undefined ? {stateRoot: info.stateRoot} : undefined;
+    if (!expected) throw new Error("The service must expose a stable stateRoot or installation identity.");
     const call = <C extends import("./service.js").ServiceCommand>(command: C) =>
-      serviceRequest(options.socket, command, { signal: controller.signal });
+      serviceRequest(options.socket, command, { signal: controller.signal, expected });
     let id = options.id;
     if (!id) {
       const session = options.session ?? randomUUID();
@@ -38,7 +41,6 @@ export async function connectInTerminal(options: ServiceTerminalOptions) {
       if (saved && (!options.agent || saved.agent === options.agent)) id = saved.id;
       else {
         if (options.history) throw new Error("No retained conversation matches this session. History never creates one.");
-        const info = await call({ method: "info" });
         const agent = options.agent ?? options.defaultAgent ?? info.defaultAgent;
         if (!agent) throw new Error("Choose an agent for a new session.");
         id = (await call({ method: "create", agent, key, source: "cli" })).id;
@@ -85,6 +87,12 @@ export async function connectInTerminal(options: ServiceTerminalOptions) {
     if (options.prompt !== undefined || options.files?.length) {
       const { submissionId } = await send(options.prompt ?? "", options.requestId, options.files);
       process.stderr.write(`Submission: ${submissionId}\n`);
+      // A retry can reattach to an already completed submission. Its native
+      // answer was in the initial snapshot, but is still owed to this invocation.
+      const initialReceipt = await call({ method: "receipt", id: chatId, submissionId });
+      if (initialReceipt.status === "done" && initialReceipt.type === "input") {
+        for (const id of seen) if (id.startsWith(`${initialReceipt.answer}:`)) seen.delete(id);
+      }
       while (!controller.signal.aborted) {
         render(await snapshot());
         const receipt = await call({ method: "receipt", id: chatId, submissionId });

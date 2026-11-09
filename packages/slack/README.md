@@ -5,14 +5,12 @@
 admission, shared thread routing, streaming receipts and durable reply delivery.
 No web server or public webhook is required.
 
-Completed public commentary is retained as ordered thread replies while work
-continues. Provider commentary labels are respected; providers without them can
-publish prose accompanying tool calls. Thinking blocks, failed partial responses
-and tool output are never commentary. The final answer follows those replies.
-Native entry cursors and delivery dependencies survive restart. The editable
-working message supplies current activity during quiet periods.
-Follow-ups joining active work share its reply; native message identities prevent
-duplicate commentary and final answers across observers and recovery.
+Each public assistant response has its own chronological Slack message/stream.
+Completed text is retained across tools, steering and native completion-hook
+continuations, including intermediate `final_answer` responses. The eventual final
+uses its existing response identity, not a second copy. Private thinking and raw
+tool payloads are never included. Native completion tracking remains independent.
+
 
 Hosts observing external workflows can pass `transport.queueStatus` as Runner's
 `createWorkflowProgress.statusSink`. Its stable key selects one editable message;
@@ -170,38 +168,33 @@ Slack's indicator, so a completed or queued turn cannot clear active work.
 The loading indicator runs in a separate native background task, so status API
 requests never hold text delivery. It resumes after restart and clears after the
 reply task settles, rechecking the current thread before each status write.
-Short answers stream partial text as it arrives. Once the model starts tools, or before an initial
-stream reaches eight minutes, the adapter closes the stream and updates the same
-message with the latest public response and execution-derived progress: the
-current operation, model retry or context preparation, and elapsed time in
-ten-second increments. The same activity supplies Slack's loading messages.
-Hosts can provide `describeTool({ name, arguments })` in `SlackOptions`, returning
-`{ label, subject? }` for public display, such as `Searching the knowledge base`
-and `release history`. It reads native tool intent, including repaired arguments
-and nested calls. Select safe fields; never return credentials or raw commands.
-Without a formatter, generic operation labels reveal no arguments or tool output.
-The last selected subject remains visible while the model reviews results or
-prepares its answer; that wording does not assert tool success. These updates do
-not require model narration or invent a percentage complete. Slack updates are
-paced and may lag during API failures.
-Later public model responses replace the progress text, including after restart.
-Editable tool progress waits for a sentence or line boundary; unfinished fragments remain
-hidden until more text arrives or the final answer commits. Private reasoning
-and raw tool output are never displayed. This
-avoids Slack's ten-minute stream expiry marking active work as failed.
-Final delivery replaces progress with
-the committed answer. An uninterrupted short stream includes its remaining text
-in the closing request, so the answer need not wait for the final formatting and
-metadata update. Recovery keeps that canonical update and never replays a tail
-whose closing request may already have reached Slack.
-When commentary is delivered as separate replies, the final
-answer follows it and the temporary progress message is removed afterward.
-Cleanup retries resume independently of answer delivery, preserving commentary
-and failure details without a redundant completion notice.
-When every tool in a round successfully requests native termination and its
-acknowledgement has been delivered, that acknowledgement completes the reply.
-The adapter removes temporary progress without inventing a missing final answer;
-empty or failed turns still retain their failure notice.
+Each native assistant generation gets its own public response task. Its stream
+shows only public text blocks; tools and thinking never enter that prose. Once
+committed, the response is finalized in place, preserved, and followed by a NEW
+message for the next response. Completion-hook continuations, commentary, tool
+rounds and steering cannot replace a completed response. The eventual final is
+not duplicated. Identical text in distinct native responses is retained twice.
+A successful tool-only termination does not invent an empty-answer warning.
+
+Native generation/entry identities, response ownership, chunk offsets and ordered
+predecessor tasks survive restart. Coalesced observations scan committed entries
+so fast intermediate final answers are not lost. Streaming touches only the
+current unfinished response. Retry/restart may correct that response's partial;
+it never writes later generations into an earlier response. At eight minutes it
+closes that current stream before continuing to edit its unfinished partial;
+committed long responses split into ordered Slack-sized messages without an
+application response-length limit. Stop closes current streams without replacing
+their text or deleting prior responses, with a separate keyed acknowledgement.
+
+Tool activity stays in the independent native thread loading indicator. Hosts
+can supply `describeTool({name,arguments})` for safe labels/subjects. Select only
+public fields; never credentials, raw commands or tool output. No extra model
+summary pass or raw private reasoning is exposed.
+
+This changes the native `slack-turn` task to version2. Upgrade an old owner only
+at native idle with no unfinished version1 deliveries; retain its original
+runtime for existing tasks rather than reinterpret old run-wide stream memos.
+Back up the complete closed state before changing release selection.
 See [Slack's response guidance](https://docs.slack.dev/ai/developing-agents/#responding-to-the-user).
 Final replies use Slack's Markdown blocks, matching the Markdown sent while
 streaming, so bold text, inline code and source links retain their formatting.
@@ -213,19 +206,21 @@ Other control syntax, including broadcast tags, stays literal. Partly generated
 mentions wait for completion before streaming, and delivery chunks keep complete
 mentions together. No directory lookup or `users:read` permission is required.
 
-Slack delivery is at least once. A crash after Slack accepts a post but before
-its local receipt/binding is committed can duplicate it. Delivery metadata and
-stable report IDs aid reconciliation, but are not a transactional guarantee.
-Streaming failure preserves the final reply, which retries through the native
-outbox. If a stream message was deleted, delivery clears its saved timestamp and
-posts the completed answer as an ordinary thread reply. The package imposes no
-global inference concurrency limit.
+Slack posts are reconciled with deterministic native response/chunk metadata;
+initial streams carry a deterministic public block marker because Slack's
+supported startStream API has no idempotency-key parameter. Intent is committed
+before opening. After uncertain creation, history lookup recovers the timestamp;
+if no marker is visible the task stays pending rather than blindly creating a
+duplicate stream. Resolve access/history failures and inspect native delivery
+before retrying. Canonical current-response edits are idempotent. Slack history
+and effect/receipt persistence are not one transaction, so this is not a global
+external exactly-once guarantee. Definite deleted-message errors permit recovery;
+uncertain creation remains explicit. The package has no inference concurrency cap.
 
 ## Thread processes and steering
 
 Additional messages use native in-run steering, not after-completion follow-ups.
-They share the active run's answer; a separate response is produced only for a
-new run. Native tool boundaries still determine when steering is consumed.
+They share native execution, but each public response is retained independently. Native tool boundaries still determine when steering is consumed.
 `onInput` lets a trusted host wake an owned observation without cancelling work.
 Exact authenticated `stop` or `cancel` messages bypass ordinary admission waits.
 

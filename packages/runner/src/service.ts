@@ -34,7 +34,11 @@ export type ServiceOperations = Pick<ChatService, "list" | "create" | "snapshot"
   Partial<Pick<ChatService, "find" | "activity" | "schedules" | "compact" | "receipt" | "message" | "messageStatus">> & {
     agents: { id: string; description: string; model?: import("./definition.js").LoadedAgent["model"] }[];
   };
-export type ServiceMetadata = { stateRoot?: string; defaultAgent?: string };
+export type ServiceMetadata = { stateRoot?: string; defaultAgent?: string;
+  /** Stable trusted installation identity for opaque/custom facades without one native root. */
+  identity?: string;
+};
+export type ServiceExpectation = { stateRoot?: string; identity?: string };
 export type ServiceCommand =
   | { method: "agents" | "chats" | "status" | "schedules" | "info" }
   | { method: "create"; agent: string; key: string; title?: string; source?: Chat["source"] }
@@ -101,7 +105,14 @@ export async function serveService(owner: ServiceOperations | (() => ServiceOper
       for await (const chunk of incoming) {
         chunks.push(chunk);
       }
-      const command = JSON.parse(Buffer.concat(chunks).toString());
+      const payload = JSON.parse(Buffer.concat(chunks).toString());
+      const command = payload.command ?? payload;
+      const expected: ServiceExpectation | undefined = payload.expected;
+      // Compare in this same request before dispatch. A separate info preflight
+      // cannot bind a Unix pathname that another installation may replace.
+      if (expected && ((expected.stateRoot !== undefined && expected.stateRoot !== metadata.stateRoot) ||
+          (expected.identity !== undefined && expected.identity !== metadata.identity)))
+        throw new ServiceError("The service owner identity changed. Reconnect using the intended installation; no command was dispatched.", 409);
       let result;
       if (command.method === "info") result = metadata;
       else if (command.method === "status") {
@@ -220,7 +231,7 @@ export class ServiceError extends Error {
 }
 
 /** Local CLI/API access never opens a second session writer. */
-export function serviceRequest<C extends ServiceCommand>(socketPath: string, command: C, options: { signal?: AbortSignal } = {}): Promise<ServiceResults[C["method"]]> {
+export function serviceRequest<C extends ServiceCommand>(socketPath: string, command: C, options: { signal?: AbortSignal; expected?: ServiceExpectation } = {}): Promise<ServiceResults[C["method"]]> {
   return new Promise((accept, reject) => {
     const outgoing = request({ socketPath, signal: options.signal, path: "/v1/commands", method: "POST", headers: { "content-type": "application/json" } }, response => {
       const chunks: Buffer[] = [];
@@ -234,7 +245,7 @@ export function serviceRequest<C extends ServiceCommand>(socketPath: string, com
       });
     });
     outgoing.on("error", reject);
-    outgoing.end(JSON.stringify(command));
+    outgoing.end(JSON.stringify(options.expected ? { command, expected: options.expected } : command));
   });
 }
 

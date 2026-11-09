@@ -161,3 +161,11 @@ qualify native IDs at their existing installation boundary. Use the public
 [Runner startup/client contract](../runner/docs/service.md#shared-clients-and-company-compositions)
 for supervision, retries, attachments, permissions and deliberate old-owner
 migration. The socket is same-account authority, not hosted multi-user auth.
+
+Shared connections accept trusted `expectedStateRoot` and/or `expectedIdentity`.
+Without them the client binds to its first `info` identity/root. Every HTTP
+command carries that expectation and the owner validates it atomically before
+observation or effect. A reused socket serving a different root cannot receive
+Send/Stop or history reads through the cached connection. Custom facades MUST
+supply stable `serveService` metadata identity/root; absent both, connection fails.
+Same installation restarts retain their identity. This does not grant authority.

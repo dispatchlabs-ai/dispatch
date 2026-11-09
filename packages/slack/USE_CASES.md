@@ -18,14 +18,14 @@ implementation or deployment.
   with explicit at-least-once posting. Keep long-running work visibly active
   beyond Slack's stream lifetime, renew the native loading indicator during quiet
   execution, and show safe execution-derived progress without requiring model
-  narration. Retain completed public commentary in order across model rounds and
-  process restarts, followed by the final answer. Stream initial response text
-  without waiting for status writes; buffer unfinished sentences in editable
-  tool progress. Recognize successful native termination with a delivered
-  acknowledgement without a duplicate reply or false failure notice.
-  Keep unchanged external-workflow heartbeats in one editable status. Allow trusted hosts to describe the
-  actual operation and select public subjects for both the progress message and
-  loading text; completion of an earlier turn must not clear a later active turn.
+  narration. Retain EACH public response in chronological messages, including
+  intermediate final answers before native completion continuations, tools and
+  steering; never replace completed prose with a later response. Deduplicate by
+  native response identity, not text or whole-run answer. Stream only the current
+  response, recover ordered chunks/receipts, and preserve completed messages on
+  Stop. Public tool labels remain independent from prose and private thinking.
+  Keep unchanged external-workflow heartbeats in one editable status. Hosts select
+  safe public operation labels; earlier completion must not clear later activity.
 - **SLK-005 — Share a workspace:** allow an agent in invited channels and DMs;
   direct explicit mentions to the intended bot and keep another bot's threads
   from becoming competing automatic conversations. One app can select trusted

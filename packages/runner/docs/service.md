@@ -393,3 +393,21 @@ Runner Nix outputs include Backend/Remote/Postgres and their exact dependencies
 in `lib/agent-node_modules` by default (`withBackend: false` is an optional small
 legacy closure). Consumers import the public `@dispatch/backend` entry using that
 explicit package context, never discover installed private dist filenames.
+
+### Binding a socket to an installation
+
+A Unix pathname can be reused by another owner. `info` metadata includes the
+actual `stateRoot`, or a company facade's explicit stable `identity`. Trusted
+custom `serveService` compositions must provide one in the fourth argument.
+Choose a stable installation identity for a multi-store facade, not a PID or a
+conversation ID; different authorized installations must not share it.
+
+`serviceRequest(socket, command, {expected:{stateRoot?,identity?},signal?})` sends
+an expectation envelope. The same server handler validates it before dispatching
+ANY command, including reads. Mismatch is409 with no operation; an info preflight
+alone would leave a socket replacement race. Legacy direct commands still work,
+but clients holding cached/projected identities must bind their expectation.
+Compatible restart retains the expected root/identity. Backend accepts explicit
+`expectedStateRoot`/`expectedIdentity`, or binds to the first info result; it fails
+startup if neither identity field exists. Terminal connections bind identically.
+This is installation selection safety, not a new authorization registry.

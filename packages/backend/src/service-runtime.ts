@@ -1,12 +1,12 @@
 import { isAbsolute } from "node:path";
 import { serviceRequest, ServiceError } from "@dispatch/runner/service";
-import type { ServiceCommand, ServiceResults } from "@dispatch/runner/service";
+import type { ServiceCommand, ServiceResults, ServiceExpectation } from "@dispatch/runner/service";
 import type { Chat as NativeChat } from "@dispatch/runner";
 import { AdmissionError } from "./config.js";
 import type { Runtime } from "./runtime.js";
 import type { Chat, Snapshot } from "./contracts.js";
 
-export interface ServiceConnection { socket: string; sourceId?: string; label?: string }
+export interface ServiceConnection { socket: string; sourceId?: string; label?: string; expectedStateRoot?: string; expectedIdentity?: string }
 
 /** Connect to the authorized local native owner; closing this client never stops it. */
 export async function openServiceRuntime(config: ServiceConnection): Promise<Runtime> {
@@ -15,17 +15,25 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
   const source = config.sourceId ?? "service", label = config.label ?? "Native service";
   let closed = false;
   const watches = new Set<() => Promise<void>>();
+  let expected: ServiceExpectation | undefined = (config.expectedStateRoot !== undefined || config.expectedIdentity !== undefined)
+    ? { ...(config.expectedStateRoot !== undefined ? {stateRoot: config.expectedStateRoot} : {}),
+      ...(config.expectedIdentity !== undefined ? {identity: config.expectedIdentity} : {}) } : undefined;
   const call = async <C extends ServiceCommand>(command: C): Promise<ServiceResults[C["method"]]> => {
     if (closed) throw new Error("Service connection is closed.");
-    try { return await serviceRequest(config.socket, command); }
+    try { return await serviceRequest(config.socket, command, { expected }); }
     catch (error) {
       if (error instanceof ServiceError && error.status === 409) throw new AdmissionError(error.message);
       // Transport failures remain uncertain: do not resend or change request IDs.
       throw error;
     }
   };
-  const agents = await call({ method: "agents" });
   const metadata = await call({ method: "info" });
+  // Bind all later operations, including reads, to this owner selection. Same
+  // root/identity survives compatible restarts; socket reuse by another root does not.
+  if (!expected) expected = metadata.identity !== undefined ? { identity: metadata.identity }
+    : metadata.stateRoot !== undefined ? { stateRoot: metadata.stateRoot } : undefined;
+  if (!expected) throw new Error("The service must expose a stable stateRoot or installation identity for safe client binding.");
+  const agents = await call({ method: "agents" });
   const project = (chat: NativeChat): Chat => ({ ...chat, source, sourceLabel: label });
   const snapshot = async (id: string): Promise<Snapshot> => {
     const value = await call({ method: "snapshot", id });
