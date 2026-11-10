@@ -42,3 +42,11 @@ Qualification is four viewports (1440×900,1280×720,768×1024,390×844) plus re
 keyboard/mobile/scroll/recovery and native local+PG/worker interaction, not visual
 resemblance or build success alone. Production tools/models/identity/TLS/cloud
 installation remain consumer qualification; no unrelated deployment claim.
+
+- Narrow/touch composers use 16px inputs and visual-viewport sizing for software
+  keyboards; no zoom disabling. Compact title, messages and reachable Send take
+  priority over desktop hints/idle bookkeeping. Request-status-only native calls
+  stay inspectable under Request details without an empty assistant bubble.
+- Streamdown utilities are scanned from the workspace-hoisted dependency for both
+  dev and Nix builds. External links use a focus-trapping native dialog, not an
+  inline imitation; code/table/image controls retain actual behavior and CSP.

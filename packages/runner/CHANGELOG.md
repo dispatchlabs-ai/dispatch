@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- End status-only completion bookkeeping through native tool termination after a delivered answer, without suppressing unfinished work or new input responses.
+
 - Always steer active work for ordinary user chat input at native boundaries; keep internal peer/schedule policies and explicit Stop unchanged.
 - Use released Pi 1.5.2 for native Claude Fable 5.2 metadata, thinking levels and pricing. Preserve the Claude Code provider source pin, existing release pins and native session state; live discovery selects the current Fable model. Move Chord foundation types to their public subpaths.
 

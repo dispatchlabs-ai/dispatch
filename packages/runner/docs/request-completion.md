@@ -25,6 +25,14 @@ and there is no pass limit, second scheduler or new submission per continuation.
 New native input invalidates an earlier assessment, including input admitted at
 the final-answer boundary. Pi retains ownership of steering and cancellation.
 
+When an answer was already delivered but its assessment is missing, continuation
+asks for the status tool only, not another user-facing bookkeeping reply. A terminal
+status update returns Pi's native `control.terminate` only when committed history
+contains a text answer in this run after its latest placed input. An assessment
+before the answer does not suppress that answer; active work still continues.
+Web keeps these real calls/arguments/results under compact Request details rather
+than manufacturing an extra conversation turn. Other clients retain native entries.
+
 `complete` requires no remaining work. `needs_input` retains unfinished work and
 requires a specific external dependency; the agent must first establish that no
 useful authorized work remains possible. `cancelled` records a user cancellation

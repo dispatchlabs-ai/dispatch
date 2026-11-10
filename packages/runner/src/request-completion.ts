@@ -57,7 +57,7 @@ export async function recordRequestCancellation(harness: Pick<Harness, "snapshot
 const cancelledInput = (state: RequestState, inputs: readonly number[]) =>
   state.status === "cancelled" && inputs.every(input => state.inputs.split(",").includes(String(input)));
 
-const instruction = `Track the user's original request with request_status. Keep it active until its requested outcomes are verified. A diagnosis, progress report, saved notes, or returned worker is not completion. Continue useful authorized work when other parts are blocked. Before your final answer, record the remaining work and evidence. Use needs_input only after establishing that every remaining path requires unavailable external input or access; state exactly what is needed and the evidence for that conclusion. Use cancelled only when the user stops or replaces the request. Follow-up questions and status requests do not cancel unfinished work. A factual question can be complete once answered with appropriate evidence.`;
+const instruction = `Track the user's original request with request_status. Keep it active until its requested outcomes are verified. A diagnosis, progress report, saved notes, or returned worker is not completion. Continue useful authorized work when other parts are blocked. Before your final answer, record the remaining work and evidence. Use needs_input only after establishing that every remaining path requires unavailable external input or access; state exactly what is needed and the evidence for that conclusion. Use cancelled only when the user stops or replaces the request. Follow-up questions and status requests do not cancel unfinished work. A factual question can be complete once answered with appropriate evidence. If you already delivered the answer and only need to record request_status, make that tool call without another user-facing message. Do not announce bookkeeping or repeat the answer.`;
 
 /** A completion record and Pi's native continuation hook, without a second run loop. */
 export const RequestCompletion = defineExtension({
@@ -83,7 +83,7 @@ export const RequestCompletion = defineExtension({
     }),
     replay: "safe",
     async execute({ update }, api, ctx) {
-      const state = await api.commit(async tx => {
+      const result = await api.commit(async tx => {
         const live = await tx.doc(LiveDoc, api.conversationId);
         const state = await tx.doc(RequestWork, api.conversationId);
         if (update && !(update.status === "cancelled" && cancelledInput(state, live.run?.inputs ?? []))) {
@@ -109,9 +109,25 @@ export const RequestCompletion = defineExtension({
             inputs, needsInput: update.needsInput ?? "",
           });
         }
-        return JSON.parse(JSON.stringify(state)) as RequestState;
+        let answered = false;
+        // Only terminate bookkeeping after a real answer within this same native run.
+        // Earlier requests' answers must never suppress the current request's response.
+        if (update && state.inputs === (live.run?.inputs ?? []).join(",") && state.status !== "active" && live.run?.first !== undefined) {
+          const placed = await Promise.all((live.run.inputs ?? []).map(id => tx.submission(id)));
+          const latestInput = placed.reduce((latest, input) => input?.entry !== undefined && input.entry > latest ? input.entry : latest, live.run.first);
+          let cursor: Cursor | undefined;
+          do {
+            const page = await tx.scanEntries({ conversationId: api.conversationId, minEntryId: latestInput }, 100, cursor);
+            answered = page.items.some(entry => entry.model?.some(message => message.role === "assistant"
+              && message.stopReason === "stop" && message.content.some(block => block.type === "text" && block.text.trim())
+              && !message.content.some(block => block.type === "toolCall")));
+            cursor = page.next;
+          } while (!answered && cursor);
+        }
+        return { state: JSON.parse(JSON.stringify(state)) as RequestState, answered };
       }, ctx);
-      return { output: [{ type: "text", text: JSON.stringify(state) }], details: state };
+      return { output: [{ type: "text", text: JSON.stringify(result.state) }], details: result.state,
+        ...(result.answered ? { control: { terminate: true } } : {}) };
     },
   })],
   hooks: [hook(GenerationTask, {
@@ -121,7 +137,7 @@ export const RequestCompletion = defineExtension({
       if (state?.request && (cancelledInput(state, inputs) || state.inputs === inputs.join(",") && state.status !== "active")) return;
       return { continue: `${instruction}\n\n${state?.request
         ? `The original request remains: ${state.request}\nRemaining work: ${JSON.stringify(state.remaining)}\nLast evidence: ${state.evidence}`
-        : "Record the original user request now."}\nYour response reached the end, but the current request has no final completion assessment. Check the requested outcomes, continue any unfinished work, and update request_status before concluding.` };
+        : "Record the original user request now."}\nThe answer above has already been delivered. Check its requested outcomes and record request_status. If nothing remains, make only that status tool call, with no repeated answer or bookkeeping announcement. If work remains, keep it active and continue the authorized work.` };
     },
   })],
 });
