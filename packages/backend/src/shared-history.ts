@@ -77,6 +77,12 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
   const catalog = async () => await read(runtime => runtime.catalog?.() ?? Promise.resolve(runtime.service.agents)) ?? [];
   const agents = await catalog();
   return {
+    openKeyedChat: (key, title, installation) => mutate(async runtime => {
+      if (installation !== undefined) throw new AdmissionError("Keyed conversation links require a named installation binding.");
+      const chat = await runtime.openKeyedChat!(key, title);
+      stores.invalidate();
+      return project(chat);
+    }),
     resolveChat: async id => {
       const chat = (await chats()).find(chat => chat.id === id);
       if (!chat) throw new AdmissionError("Linked conversation is unavailable in this installation.");

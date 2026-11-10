@@ -161,3 +161,7 @@ header { border: 0; height: 64px; }
 }
 [data-slot=code-block-content][data-wrap] { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
 [data-slot=code-block-content][data-wrap] > [data-slot=code-block-code] { min-width: 0; overflow-wrap: anywhere; }
+
+.link-context { margin-bottom: 10px; padding: 10px 12px; border: 1px solid #e5e5e5; border-radius: 10px; font-size: 12px; }
+.link-context strong { font-weight: 500; }
+.link-context p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 18dvh; overflow-y: auto; }

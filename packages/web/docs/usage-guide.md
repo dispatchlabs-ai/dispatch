@@ -128,3 +128,29 @@ linked conversation. Existing draft text/files are retained. Selecting a sidebar
 conversation leaves the link and resumes ordinary selection behavior. A service
 configured without creation hides New conversation and is excluded from the new
 conversation agent picker; existing histories/replies and Stop remain available.
+
+### Keyed item links
+
+An installation can explicitly enable keyed chat links while ordinary creation
+remains disabled. For example, set its trusted service binding to
+`"keyedCreation":{"agent":"helper","keyPrefix":"attention-item:"}` alongside
+`"capabilities":{"create":false,"attachments":false,"artifacts":false}`.
+Use `https://chat.example.com/?installation=studio&key=attention-item%3Aitem-42&title=Review+report&context=Choose+a+report+format`.
+Build URLs with `URLSearchParams`; keep the exact stable item key on every open.
+The item ID suffix uses ASCII letters, digits, dots, underscores or hyphens and
+starts with a letter or digit. Native `chat` and keyed `key` fields cannot be mixed.
+
+After sign-in the explicit keyed link POSTs to `/api/chat-link`, opening the
+configured agent's native conversation with that key/title. Native key replay
+keeps reopen/reload/two tabs on one conversation; no browser or Backend deduplication
+store is added. Ordinary page loads and GET APIs never create a conversation.
+The native owner must support idempotent create by key and title. Unsupported or
+disallowed installations/keys fail explicitly; New conversation stays disabled.
+
+`context` is a local, non-model note above the composer, retained in the URL through
+sign-in and reload. It is **not model context** unless you supply it in a message.
+Nothing is automatically sent, no model is invoked by the link, and the composer
+starts empty unless this tab already has a retained draft. Existing drafts and
+uncertain deliveries are preserved; resolve a pending message before opening a
+keyed link. The note disappears on ordinary sidebar selection. Avoid secrets in
+URLs: browser history and operator access logs may retain link fields.

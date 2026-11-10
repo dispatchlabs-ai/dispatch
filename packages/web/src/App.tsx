@@ -27,7 +27,7 @@ const route = (id: string) => `/api/chats/${encodeURIComponent(id)}`;
 export default function App() {
   const [link, setLink] = useState(() => {
     const query = new URLSearchParams(location.search);
-    return query.has('installation') || query.has('chat') ? query : null;
+    return query.has('installation') || query.has('chat') || query.has('key') ? query : null;
   });
   const [linkReady, setLinkReady] = useState(false);
   const [linkError, setLinkError] = useState('');
@@ -59,7 +59,16 @@ export default function App() {
     if (!link || !deliveryReady) return;
     let active = true;
     setLinkReady(false); setLinkError('');
-    void api<Chat>(`/api/chat-link?${link}`).then(chat => {
+    if (link.has('key') && (link.has('chat') || !link.get('installation') || !link.get('title') || !/^attention-item:[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(link.get('key')!))) {
+      setLinkError('Invalid keyed conversation link.'); setLinkReady(true); return;
+    }
+    if (link.has('key') && pending) {
+      setLinkError('Resolve the pending message before opening this conversation link.'); setLinkReady(true); return;
+    }
+    const request = link.has('key')
+      ? api<Chat>('/api/chat-link', { installation: link.get('installation'), key: link.get('key'), title: link.get('title') })
+      : api<Chat>(`/api/chat-link?${link}`);
+    void request.then(chat => {
       if (!active) return;
       if (pending && pending.chatId !== chat.id) {
         setLinkError('Resolve the pending message before opening this conversation link.');
@@ -242,6 +251,7 @@ export default function App() {
         <ConversationScrollButton aria-label="Scroll to latest message"/>
       </Conversation>
       <div className="composer-region">
+        {link?.has('key') && link.get('context') && <aside className="link-context" aria-label="Item context"><strong>Item context · not sent to agent</strong><p>{link.get('context')}</p></aside>}
         <div className="activity" role="status"><span>{(busy ? activity : turnOutcome) || activity || (selected ? connection === 'Connected' ? <><Check size={12}/> Saved</> : connection : '')}{snapshot?.queued ? ` · ${snapshot.queued} pending` : ''}</span>{busy && <Button variant="outline" size="sm" disabled={stopping} onClick={() => void stop()}><Square size={12}/>{stopping ? 'Stopping…' : 'Stop this conversation'}</Button>}</div>
         {linkError && <div className="error-banner" role="alert"><p>{linkError}</p><Button variant="outline" size="sm" onClick={() => setLink(new URLSearchParams(link!))}>Retry link</Button></div>}
         {stopNotice?.id === selected && <p className="pending-note" role="status">{stopNotice.text}</p>}

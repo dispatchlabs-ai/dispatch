@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Open keyed item links through sign-in with native idempotent creation and a local-only context note; never automatically send link content.
+
 - Always steer active work for ordinary user chat input at native boundaries; keep internal peer/schedule policies and explicit Stop unchanged.
 
 - Show retained artifact metadata without a download link when the selected installation disables artifacts.

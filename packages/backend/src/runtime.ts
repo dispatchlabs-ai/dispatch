@@ -528,6 +528,17 @@ async function openLocalRuntime(config: LocalConfig) {
     },
   };
   return {
+    openKeyedChat: config.service ? async (key: string, title: string, installation?: string) => {
+      if (installation !== undefined) throw new AdmissionError("Keyed conversation links require a named installation binding.");
+      const runtime = await openServiceRuntime({ ...config.service!, expectedStateRoot: configuredServiceRoot });
+      try {
+        const chat = await runtime.openKeyedChat!(key, title);
+        stores.invalidate();
+        const source = config.sources.find(source => source.id === config.service!.sourceId)!;
+        return { ...chat, id: identity(join(configuredServiceRoot!, chat.agent, "session.sqlite"), chat.conversationId),
+          source: source.id, sourceLabel: source.label, session: relative(await realpath(source.path), configuredServiceRoot!) || "." };
+      } finally { await runtime.close(); }
+    } : undefined,
     resolveChat: async (id: string, installation?: string) => {
       if (installation !== undefined) throw new AdmissionError("Native conversation links require a named installation binding.");
       const matches = (await stores.list()).filter(chat => `${chat.agent}:${chat.conversationId}` === id);
@@ -576,6 +587,8 @@ export interface Runtime {
   stateRoot: string;
   /** Refresh a connected owner's current catalog without creating a writer. */
   catalog?(): Promise<Agent[]>;
+  /** Open only explicitly opted-in native keyed conversations, without submitting input. */
+  openKeyedChat?(key: string, title: string, installation?: string): Promise<Chat>;
   /** Resolve an exact native ID within a named installation, without creating work. */
   resolveChat?(nativeId: string, installation?: string): Promise<Chat>;
   service: Omit<NativeService, "resolve" | "snapshot" | "close"> & { agents: Agent[] };
@@ -623,6 +636,12 @@ export async function openRuntime(): Promise<Runtime> {
   return {
     stateRoot: config.sources.map(source => source.path).join(", "),
     catalog,
+    openKeyedChat: async (key, title, installation) => {
+      const runtime = installation && contexts.get(installation);
+      if (!runtime) throw new AdmissionError("Unknown linked installation.");
+      if (!runtime.openKeyedChat) throw new AdmissionError("This installation does not allow keyed conversation links.");
+      return project(installation!, await runtime.openKeyedChat(key, title));
+    },
     resolveChat: async (id, installation) => {
       const runtime = installation && contexts.get(installation);
       if (!runtime) throw new AdmissionError("Unknown linked installation.");

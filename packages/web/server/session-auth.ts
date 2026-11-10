@@ -22,7 +22,7 @@ function linkTarget(value: string | null) {
   const url = new URL(value, "https://session.invalid");
   if (url.pathname !== "/") return "/";
   const query = new URLSearchParams();
-  for (const field of ["installation", "chat"])
+  for (const field of ["installation", "chat", "key", "title", "context"])
     if (url.searchParams.has(field)) query.set(field, url.searchParams.get(field)!);
   // Retain incomplete links too, so sign-in cannot silently turn one into New conversation.
   return query.size ? `/?${query}` : "/";
