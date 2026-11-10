@@ -1,24 +1,23 @@
-const labels = ['Title', 'Summary', 'Source', 'Source URL'] as const;
-type Label = typeof labels[number];
-
-/** Shows a keyed item's context as readable content: its title, summary and source. */
+/**
+ * Shows a keyed item's context as readable content: its title, summary and source.
+ * Attention writes `Title:`, then `Summary:` (possibly multi-line), then `Source:`
+ * and `Source URL:` last, so the source is read from the end and summary text
+ * cannot supply it. Any other shape is shown as plain text.
+ */
 export function ItemContext({title, context}: {title: string; context: string}) {
-  const fields = new Map<Label, string>();
-  const other: string[] = [];
-  let current: Label | undefined;
-  for (const line of context.split('\n')) {
-    const match = /^(Title|Summary|Source|Source URL):\s?(.*)$/.exec(line);
-    if (match && !fields.has(match[1] as Label)) { current = match[1] as Label; fields.set(current, match[2]); }
-    else if (current) fields.set(current, `${fields.get(current)}\n${line}`);
-    else other.push(line);
-  }
-  const value = (label: Label) => { const text = fields.get(label)?.trim(); return text && text !== 'None' ? text : undefined; };
-  const href = value('Source URL');
-  const source = value('Source');
-  const body = [value('Summary'), other.join('\n').trim()].filter(Boolean);
+  const lines = context.split('\n');
+  const field = (index: number, label: string) => lines[index]?.startsWith(`${label}: `) ? lines[index].slice(label.length + 2).trim() : undefined;
+  const shown = (text?: string) => text && text !== 'None' ? text : undefined;
+  const last = lines.length - 1;
+  const structured = lines.length >= 4 && field(0, 'Title') !== undefined && field(1, 'Summary') !== undefined
+    && field(last - 1, 'Source') !== undefined && field(last, 'Source URL') !== undefined;
+  if (!structured) return <section className="item-context" aria-label="About this item"><h2>{title}</h2><p>{context}</p></section>;
+  const summary = [field(1, 'Summary'), ...lines.slice(2, last - 1)].join('\n').trim();
+  const source = shown(field(last - 1, 'Source'));
+  const href = shown(field(last, 'Source URL'));
   return <section className="item-context" aria-label="About this item">
-    <h2>{value('Title') ?? title}</h2>
-    {body.map((text, index) => <p key={index}>{text}</p>)}
+    <h2>{shown(field(0, 'Title')) ?? title}</h2>
+    {summary && <p>{summary}</p>}
     {(source || href) && <p className="item-source">{href?.startsWith('https://') ? <a href={href} target="_blank" rel="noreferrer">{source ?? href}</a> : source ?? href}</p>}
   </section>;
 }

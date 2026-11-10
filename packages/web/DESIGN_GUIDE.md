@@ -48,7 +48,8 @@ installation remain consumer qualification; no unrelated deployment claim.
   priority over desktop hints/idle bookkeeping. Request-status-only native calls
   stay inspectable under Request details on wide pointer layouts, hidden on
   narrow/touch, without an empty assistant bubble. Keyed item context is
-  conversation content, not a composer banner. No forced-visible hover controls.
+  conversation content, not a composer banner. Hover-only image download is
+  removed on no-hover devices rather than forced visible or left as an invisible target.
 - Streamdown utilities are scanned from the workspace-hoisted dependency for both
   dev and Nix builds. External links use a focus-trapping native dialog, not an
   inline imitation; code/table/image controls retain actual behavior and CSP.
