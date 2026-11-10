@@ -14,6 +14,7 @@ import { Bubble, BubbleContent } from '@/components/ui/bubble';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group';
 import { Attachment, AttachmentMedia, AttachmentContent, AttachmentTitle } from '@/components/ui/attachment';
 import { ToolTrace, TaskInput } from '@/components/tool-trace';
+import { ItemContext } from '@/components/item-context';
 import { ConversationSidebar } from '@/components/conversation-sidebar';
 import { agentName, installationName } from '@/lib/names';
 const authorAgent = (agent: string, author?: string) => {
@@ -24,6 +25,10 @@ const authorAgent = (agent: string, author?: string) => {
 };
 // Consecutive messages from one author share a header; task inputs do not break a group.
 const authorKey = (message: Snapshot['messages'][number]) => message.provenance === 'user' ? 'user' : `agent:${message.author ?? ''}`;
+// Task inputs render as collapsed rows; other entries need visible content (no empty turns).
+const visibleMessage = (message: Snapshot['messages'][number]) => message.provenance === 'runtime' ? !!message.text : !!(message.text || message.commentary || message.error || message.attachments?.length || message.artifacts?.length);
+// Touch keyboards have no Shift+Enter, so Return adds a line there and Send sends.
+const softKeyboard = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 const route = (id: string) => `/api/chats/${encodeURIComponent(id)}`;
 export default function App() {
   const [link, setLink] = useState(() => {
@@ -32,6 +37,17 @@ export default function App() {
   });
   const [linkReady, setLinkReady] = useState(false);
   const [linkError, setLinkError] = useState('');
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const resize = () => {
+      document.documentElement.style.setProperty('--app-height', `${viewport.height}px`);
+      document.documentElement.style.setProperty('--app-top', `${viewport.offsetTop}px`);
+    };
+    resize(); viewport.addEventListener('resize', resize); viewport.addEventListener('scroll', resize);
+    window.addEventListener('resize', resize); document.addEventListener('focusin', resize);
+    return () => { viewport.removeEventListener('resize', resize); viewport.removeEventListener('scroll', resize); window.removeEventListener('resize', resize); document.removeEventListener('focusin', resize); };
+  }, []);
   const [readingFiles, setReadingFiles] = useState(false);
   const [files, setFiles] = useState<AttachmentFile[]>([]);
   const [deliveryReady, setDeliveryReady] = useState(false);
@@ -259,14 +275,16 @@ export default function App() {
   const busy = !!snapshot && (snapshot.running || snapshot.background || snapshot.queued > 0 || snapshot.tools.length > 0);
   // The sidebar and selected stream can observe a generated title in either order.
   const title = (listedChat?.nativeTitle ? listedChat : snapshot?.chat ?? listedChat)?.title ?? (link ? 'Linked conversation' : 'New conversation');
-  const activity = snapshot?.observation ?? (snapshot?.retry ? `Retry ${snapshot.retry.attempt} scheduled for ${new Date(snapshot.retry.at).toLocaleTimeString()}` : snapshot?.tools.length ? `Using ${snapshot.tools.join(', ')}` : snapshot?.background ? 'Working in the background' : snapshot?.running ? 'Replying…' : snapshot?.queued ? 'Input pending' : '');
+  // Before the first message, keyed item context is the conversation's content; afterwards the first message carries it.
+  const itemContext = link?.has('key') && linkReady && !linkError && snapshot && !snapshot.messages.some(message => message.provenance === 'user') && !snapshot.partial ? link.get('context') : null;
+  const activity = snapshot?.observation ?? (snapshot?.retry ? `Retry ${snapshot.retry.attempt} scheduled for ${new Date(snapshot.retry.at).toLocaleTimeString()}` : snapshot?.tools.length ? `Using ${snapshot.tools.join(', ')}` : snapshot?.background ? 'Working…' : snapshot?.running ? 'Replying…' : snapshot?.queued ? 'Input pending' : '');
   const stale = ready && sidebarConnection !== 'Live';
   const lastTurn = snapshot?.turns?.at(-1);
   // Stopped/unanswered outcomes stay visible when idle; completion needs no status.
   const outcome = lastTurn?.status === 'unanswered' ? lastTurn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${lastTurn.reason})` : '';
   const status = readingFiles ? 'Reading files…' : busy ? `${activity}${stopNotice?.id === selected ? ' · Stop requested' : ''}${snapshot?.queued ? ` · ${snapshot.queued} pending` : ''}` : selected && snapshot && connection !== 'Connected' ? connection : outcome;
   const failure = error || snapshot?.error;
-  const visible = (snapshot?.messages ?? []).map((message, index, all) => {
+  const visible = (snapshot?.messages ?? []).filter(visibleMessage).map((message, index, all) => {
     let previous = index - 1;
     while (previous >= 0 && all[previous].provenance === 'runtime') previous--;
     return { message, continued: message.provenance === 'runtime' ? index > 0 : previous >= 0 && authorKey(all[previous]) === authorKey(message) };
@@ -293,21 +311,22 @@ export default function App() {
       {!selected && !link && <div className="agent-picker"><label htmlFor="agent">Agent</label><select id="agent" value={agent} disabled={!ready || sending} onChange={event => setAgent(event.target.value)}>{agents.filter(item => item.capabilities?.create !== false).map(item => <option key={item.id} value={item.id}>{agentName(item.id)} · {installationName(item.id)}</option>)}</select><p>{agents.find(item => item.id === agent)?.description}</p></div>}
       <Conversation key={selected ?? 'new'} className="conversation" aria-label="Message history" aria-busy={snapshot?.running ?? false}>
         <ConversationContent className="message-list">
-          {(!selected && !link || snapshot && !snapshot.messages.length && !snapshot.partial) && <ConversationEmptyState title={`Message ${agentName(snapshot?.chat.agent ?? agent) || 'an agent'}`} description=""/>}
+          {itemContext && <ItemContext title={link!.get('title') ?? ''} context={itemContext}/>}
+          {(!selected && !link || snapshot && !snapshot.messages.length && !snapshot.partial && !itemContext) && <ConversationEmptyState title={`Message ${agentName(snapshot?.chat.agent ?? agent) || 'an agent'}`} description=""/>}
           {link && !linkReady && <p className="empty-loading">Opening linked conversation…</p>}
           {selected && !snapshot && <p className="empty-loading">{connection}</p>}
           {snapshot && visible.map(({ message, continued }) => message.provenance === 'runtime'
-            ? <MessageScrollerItem key={message.id} messageId={message.id} className={continued ? 'continued' : undefined}><TaskInput text={message.text}/><ToolTrace calls={(snapshot.toolCalls ?? []).filter(call => call.afterMessageId === message.id)}/></MessageScrollerItem>
+            ? <MessageScrollerItem key={message.id} messageId={message.id} className={continued ? 'continued' : undefined}><TaskInput text={message.text}/><ToolTrace calls={(snapshot.toolCalls ?? []).filter(call => call.afterMessageId === message.id && call.name !== 'request_status')}/></MessageScrollerItem>
             : <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.provenance === 'user'} className={continued ? 'continued' : undefined}><Message align={message.provenance === 'user' ? 'end' : 'start'}><MessageContent>
               {!continued && <span className="message-author"><Avatar user={message.provenance === 'user'} identity={authorAgent(snapshot.chat.agent, message.author)} available={avatars}/>{message.provenance === 'user' ? 'You' : message.author ?? agentName(snapshot.chat.agent)}</span>}
-              <Bubble align={message.provenance === 'user' ? 'end' : 'start'} variant={message.provenance === 'user' ? 'muted' : 'ghost'}><BubbleContent>{message.background && <p className="commentary">Background</p>}{message.commentary && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{snapshot.turns?.filter(turn => turn.status === 'unanswered' && String(turn.entryId) === message.id.split(':')[0]).map(turn => <p key={turn.submissionId} className="message-note">{turn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${turn.reason})`}</p>)}{message.attachments?.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt={file.name} src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle><a download={file.name} href={`data:${file.mimeType || 'text/plain'};base64,${file.data}`}>{file.name}</a></AttachmentTitle></AttachmentContent></Attachment>)}{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => snapshot.chat.capabilities?.artifacts === false ? <span key={artifact.id} className="artifact-link">{artifact.name} · Download unavailable</span> : <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</BubbleContent></Bubble></MessageContent></Message><ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.afterMessageId===message.id)}/></MessageScrollerItem>)}
-          {snapshot && <ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>!snapshot.messages.some(message=>message.id===call.afterMessageId))}/>}
+              <Bubble align={message.provenance === 'user' ? 'end' : 'start'} variant={message.provenance === 'user' ? 'muted' : 'ghost'}><BubbleContent>{message.background && <p className="commentary">Background</p>}{message.commentary && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{snapshot.turns?.filter(turn => turn.status === 'unanswered' && String(turn.entryId) === message.id.split(':')[0]).map(turn => <p key={turn.submissionId} className="message-note">{turn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${turn.reason})`}</p>)}{message.attachments?.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt={file.name} src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle><a download={file.name} href={`data:${file.mimeType || 'text/plain'};base64,${file.data}`}>{file.name}</a></AttachmentTitle></AttachmentContent></Attachment>)}{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => snapshot.chat.capabilities?.artifacts === false ? <span key={artifact.id} className="artifact-link">{artifact.name} · Download unavailable</span> : <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</BubbleContent></Bubble></MessageContent></Message><ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.afterMessageId===message.id && call.name!=='request_status')}/></MessageScrollerItem>)}
+          {snapshot && <ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.name!=='request_status' && !snapshot.messages.some(message=>message.id===call.afterMessageId && visibleMessage(message)))}/>}
           {snapshot?.partial && <Message align="start"><MessageContent><span className="message-author"><Avatar identity={snapshot.chat.agent} available={avatars}/>{agentName(snapshot.chat.agent)}</span><MessageResponse>{snapshot.partial}</MessageResponse></MessageContent></Message>}
         </ConversationContent>
         <ConversationScrollButton aria-label="Scroll to latest message"/>
       </Conversation>
       <div className="composer-region">
-        {link?.has('key') && link.get('context') && <aside className="link-context" aria-label="Item context"><strong>Item context · included with your first message</strong><p>{link.get('context')}</p></aside>}
+        {!!snapshot?.toolCalls?.some(call => call.name === 'request_status') && <details className="request-activity"><summary>Request details</summary><ToolTrace calls={snapshot.toolCalls.filter(call => call.name === 'request_status')}/></details>}
         <div className="activity" role="status">{busy && <i className="dot working"/>}{status}</div>
         {failure ? <div className="error-banner" role="alert"><p>{failure}</p>{!ready && <Button variant="outline" size="sm" onClick={() => { setError(''); void refresh(); }}>Reconnect</Button>}{pending && <Button size="sm" disabled={sending} onClick={() => void deliver(pending)}>Retry message</Button>}{error && <Button variant="ghost" size="icon-sm" aria-label="Dismiss error" onClick={() => setError('')}><X/></Button>}</div>
           : pending ? <div className="notice-banner" role="status"><p>Message delivery is uncertain. Your text and files are preserved.</p><Button variant="outline" size="sm" disabled={sending} onClick={() => { setSelected(pending.chatId); void deliver(pending); }}>Retry message</Button></div>
@@ -315,10 +334,10 @@ export default function App() {
         {readOnly && !pending ? <div className="read-only-bar" role="status"><Lock/><p>{readOnly === 'worker' && parent?.addressable === false ? 'Worker conversation run by a task.' : snapshot?.readOnlyReason ?? 'Read-only conversation.'}</p>{parent && <Button variant="outline" size="sm" onClick={() => choose(parent.id)}>Open parent</Button>}</div> : <>
         <form className="composer" onSubmit={event => { event.preventDefault(); void send(); }}><InputGroup>
           {!!files.length && <InputGroupAddon align="block-start" className="attachment-list">{files.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt="" src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle>{file.name}</AttachmentTitle></AttachmentContent><Button type="button" variant="ghost" size="icon-xs" aria-label={`Remove ${file.name}`} disabled={sending || !!pending} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}><X/></Button></Attachment>)}</InputGroupAddon>}
-          <InputGroupTextarea ref={composer} aria-label="Message" placeholder={busy ? 'Steer active work…' : `Message ${agentName(chatAgent) || 'agent'}…`} rows={2} value={draft} disabled={sending || !!pending || !deliveryReady || linkBlocked || !!selected && !snapshot} onChange={event => {const text=event.target.value;setDraft(text);void saveDelivery({text,attachments:files,pending}).catch(()=>setDeliveryReady(false));}} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) { event.preventDefault(); void send(); } }}/>
+          <InputGroupTextarea ref={composer} aria-label="Message" placeholder={busy ? 'Steer active work…' : `Message ${agentName(chatAgent) || 'agent'}…`} rows={2} value={draft} disabled={sending || !!pending || !deliveryReady || linkBlocked || !!selected && !snapshot} onChange={event => {const text=event.target.value;setDraft(text);void saveDelivery({text,attachments:files,pending}).catch(()=>setDeliveryReady(false));}} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229 && !softKeyboard()) { event.preventDefault(); void send(); } }}/>
           <InputGroupAddon align="block-end"><input hidden ref={fileInput} type="file" multiple aria-label="Select attachments" onChange={event=>void selectFiles(event.target.files)}/><InputGroupButton size="icon-sm" variant="ghost" className="rounded-full" aria-label="Attach files" disabled={sending || !!pending || !deliveryReady || !canAttach || linkBlocked} onClick={()=>fileInput.current?.click()}><Paperclip/></InputGroupButton>
             <span className="composer-actions">{busy && <InputGroupButton type="button" size="icon-sm" variant="outline" aria-label={stopping ? 'Stopping' : 'Stop'} title="Stop" disabled={stopping} onClick={() => void stop()}><Square className="fill-current"/></InputGroupButton>}
-            <InputGroupButton type="submit" size="icon-sm" variant="default" className="rounded-full" aria-label={sending ? 'Sending message' : 'Send message'} disabled={(!draft.trim() && !files.length) || sending || !ready || !!pending || !deliveryReady || readingFiles || linkBlocked || !!selected && !snapshot || !selected && !canCreate}>{sending ? <LoaderCircle className="animate-spin"/> : <ArrowUp/>}</InputGroupButton></span></InputGroupAddon>
+            <InputGroupButton type="submit" size="icon-sm" variant="default" className="send-button rounded-full" aria-label={sending ? 'Sending message' : 'Send message'} disabled={(!draft.trim() && !files.length) || sending || !ready || !!pending || !deliveryReady || readingFiles || linkBlocked || !!selected && !snapshot || !selected && !canCreate}>{sending ? <LoaderCircle className="animate-spin"/> : <ArrowUp/>}</InputGroupButton></span></InputGroupAddon>
         </InputGroup></form>
         <p className="composer-hint">Enter to send · Shift+Enter for a new line{busy ? ' · Messages steer at the next tool boundary' : ''}</p></>}
       </div>

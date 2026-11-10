@@ -7,6 +7,12 @@
 - Replace the generic red ownership warning with a neutral read-only bar stating the actual reason; show task inputs as collapsed rows; group consecutive messages; one status line with Stop beside Send.
 - Skip unchanged chat stream frames and cache avatar artwork for a day.
 
+- On touch-only devices Return adds a new line; Send sends.
+
+- Show keyed item context as readable content at the top of an empty conversation; hide request-status details on narrow/touch layouts.
+
+- Repair hoisted Streamdown styling, compact phone/keyboard layout and external-link dialog; retain request-status evidence without empty chat turns.
+
 - Live native sidebar summaries, remembered drag/keyboard resizing, approved consumer avatar bindings and persisted AI presentation titles compatible with existing owners.
 
 - Keep bounded sign-in uploads and password verification outside session-state serialization so reads, logout and stream expiry remain responsive.

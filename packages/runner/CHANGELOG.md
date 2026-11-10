@@ -4,6 +4,10 @@
 
 - Avoid sorting entry payloads during saved conversation discovery and selected-history polling, reducing large-history loading cost without truncating history. Catalog entries report chat-index registration and originating transport.
 
+- Restrict bookkeeping termination to the immediate native answer/continuation/status-only sequence, so earlier progress cannot suppress findings after work.
+
+- End status-only completion bookkeeping through native tool termination after a delivered answer, without suppressing unfinished work or new input responses.
+
 - Expose read-only task/submission sidebar states without fetching conversation transcripts.
 
 - Always steer active work for ordinary user chat input at native boundaries; keep internal peer/schedule policies and explicit Stop unchanged.

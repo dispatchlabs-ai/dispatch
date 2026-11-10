@@ -219,7 +219,9 @@ store is added. Ordinary page loads and GET APIs never create a conversation.
 The native owner must support idempotent create by key and title. Unsupported or
 disallowed installations/keys fail explicitly; New conversation stays disabled.
 
-`context` is a visible note above the composer, retained in the URL through sign-in
+Until the first message, `context` is shown as the item's title, summary and source
+at the top of the conversation (labelled `Title:`, `Summary:`, `Source:` and
+`Source URL:` lines are displayed as content), retained in the URL through sign-in
 and reload. On your first explicit send, if a fresh native snapshot has no user
 message, Web prepends an “About this Attention item” block containing title/context
 to your text in one normal message. The transcript shows that complete text.
@@ -229,5 +231,5 @@ Same-origin tabs serialize first-send observation/admission; external clients ca
 still race that observation. Uncertain retries use the exact retained composed
 payload and request ID, never prepend context again. Existing drafts and
 uncertain deliveries are preserved; resolve a pending message before opening a
-keyed link. The note disappears on ordinary sidebar selection. Avoid secrets in
+keyed link. The context disappears on ordinary sidebar selection. Avoid secrets in
 URLs: browser history and operator access logs may retain link fields.
