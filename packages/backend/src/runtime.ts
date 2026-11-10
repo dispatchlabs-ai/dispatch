@@ -44,7 +44,7 @@ async function startOwner(
 ): Promise<NativeService> {
   return connectWorker("./owner.js", { path, namespace, names, config });
 }
-async function connectWorker(entrypoint: string, workerData: unknown): Promise<NativeService & { agents: Agent[]; catalog(): Promise<Agent[]> }> {
+async function connectWorker(entrypoint: string, workerData: unknown): Promise<NativeService & { agents: Agent[]; catalog(): Promise<Agent[]>; resolveChat(id: string): Promise<Chat> }> {
   const worker = new Worker(new URL(entrypoint, import.meta.url), { workerData });
   let agents: Agent[] = [];
   const calls = new Map<
@@ -116,6 +116,7 @@ async function connectWorker(entrypoint: string, workerData: unknown): Promise<N
   return {
     agents,
     catalog: () => call("agents", []),
+    resolveChat: id => call("resolveChat", [id]),
     has: (id: string) => call("has", [id]),
     sources: () => call("sources", []),
     list: () => call("list", []),
@@ -168,7 +169,7 @@ async function openLocalRuntime(config: LocalConfig) {
     const previous = connections.get(path);
     if (previous?.endpoint === key) return previous.service;
     const runtime = await openServiceRuntime({ socket: endpoint.socket, expectedStateRoot: endpoint.stateRoot,
-      expectedIdentity: "identity" in endpoint ? endpoint.identity : configured?.expectedIdentity });
+      expectedIdentity: "identity" in endpoint ? endpoint.identity : configured?.expectedIdentity, capabilities: configured?.capabilities });
     // The socket exposes the original native IDs. Projection happens only at
     // this Backend boundary; no new host, Harness or writable store is opened.
     const service: NativeService = {
@@ -512,6 +513,12 @@ async function openLocalRuntime(config: LocalConfig) {
     },
   };
   return {
+    resolveChat: async (id: string, installation?: string) => {
+      if (installation !== undefined) throw new AdmissionError("Native conversation links require a named installation binding.");
+      const matches = (await stores.list()).filter(chat => `${chat.agent}:${chat.conversationId}` === id);
+      if (matches.length !== 1) throw new AdmissionError("Linked conversation is unavailable or ambiguous in this installation.");
+      return matches[0];
+    },
     service,
     presentation,
     stateRoot: config.sources.map((source) => source.path).join(", "),
@@ -530,6 +537,7 @@ async function openAdapter(config: { sources: LocalConfig["sources"]; defaultSou
   return {
     service,
     catalog: service.catalog,
+    resolveChat: service.resolveChat,
     stateRoot: config.sources.map(source => source.path).join(", "),
     presentation: { snapshot, watch: async (id, listener) => {
       let stopped = false, timer: ReturnType<typeof setTimeout>;
@@ -553,6 +561,8 @@ export interface Runtime {
   stateRoot: string;
   /** Refresh a connected owner's current catalog without creating a writer. */
   catalog?(): Promise<Agent[]>;
+  /** Resolve an exact native ID within a named installation, without creating work. */
+  resolveChat?(nativeId: string, installation?: string): Promise<Chat>;
   service: Omit<NativeService, "resolve" | "snapshot" | "close"> & { agents: Agent[] };
   presentation: {
     snapshot(id: string): Promise<Snapshot>;
@@ -597,6 +607,12 @@ export async function openRuntime(): Promise<Runtime> {
   return {
     stateRoot: config.sources.map(source => source.path).join(", "),
     catalog,
+    resolveChat: async (id, installation) => {
+      const runtime = installation && contexts.get(installation);
+      if (!runtime) throw new AdmissionError("Unknown linked installation.");
+      if (!runtime.resolveChat) throw new AdmissionError("This installation does not support native conversation links.");
+      return project(installation!, await runtime.resolveChat(id));
+    },
     service: {
       agents: [...contexts].flatMap(([name, runtime]) => runtime.service.agents.map(agent => ({ ...agent, id: qualify(name, agent.id),
         description: `${config.installations!.find(binding => binding.id === name)!.label}: ${agent.description}` }))),

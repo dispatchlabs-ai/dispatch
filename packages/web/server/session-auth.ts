@@ -16,19 +16,34 @@ let attempts: number[] = [];
 function redirect(response: ServerResponse, location: string) {
   response.writeHead(303, { location }).end();
 }
-function page(response: ServerResponse, message = "", status = 200, signedIn = false) {
+function linkTarget(value: string | null) {
+  // Only the app shell and its link fields are return destinations, never an external URL.
+  if (!value?.startsWith("/?")) return "/";
+  const url = new URL(value, "https://session.invalid");
+  if (url.pathname !== "/") return "/";
+  const query = new URLSearchParams();
+  for (const field of ["installation", "chat"])
+    if (url.searchParams.has(field)) query.set(field, url.searchParams.get(field)!);
+  // Retain incomplete links too, so sign-in cannot silently turn one into New conversation.
+  return query.size ? `/?${query}` : "/";
+}
+const escapeHtml = (value: string) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+function page(response: ServerResponse, message = "", status = 200, signedIn = false, target = "/") {
+  const action = `/login?${new URLSearchParams({returnTo: target})}`;
   response.writeHead(status, { "content-type": "text/html; charset=utf-8" }).end(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · Web</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#fafafa;color:#171717;font:16px system-ui;min-height:100dvh;display:grid;place-items:center;padding:24px}main{width:100%;max-width:380px;padding:32px;border:1px solid #e5e5e5;border-radius:12px;background:white}h1{font-size:24px;letter-spacing:-.5px;margin:0 0 24px}label{display:block;font-size:14px;margin-top:20px}input,button{width:100%;font:inherit;border-radius:6px;padding:10px 12px}input{margin-top:8px;border:1px solid #d4d4d4;background:white;color:#171717}button{margin-top:24px;border:1px solid #171717;background:#171717;color:white;cursor:pointer}input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid #525252;outline-offset:3px}[role=alert]{font-size:14px;color:#b91c1c}a{color:inherit}
 </style></head><body><main><h1>${signedIn ? "Signed in" : "Sign in to Web"}</h1>
 ${message ? `<p role="alert">${message}</p>` : ""}
-${signedIn ? '<a href="/">Open conversations</a><form method="post" action="/logout"><button>Sign out</button></form>' : '<form method="post" action="/login"><label>Username<input name="username" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button>Sign in</button></form>'}
+${signedIn ? `<a href="${escapeHtml(target)}">Open conversations</a><form method="post" action="/logout"><button>Sign out</button></form>` : `<form method="post" action="${escapeHtml(action)}"><label>Username<input name="username" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button>Sign in</button></form>`}
 </main></body></html>`);
 }
 export async function authorize(request: IncomingMessage, response: ServerResponse) {
   // main.ts enforces exact Host/Origin/Fetch Metadata before calling this module.
-  const path = new URL(request.url ?? "/", "https://session.invalid").pathname;
+  const url = new URL(request.url ?? "/", "https://session.invalid");
+  const path = url.pathname;
+  const target = linkTarget(url.searchParams.get("returnTo"));
   const time = Date.now();
   for (const [key, session] of sessions) if (session.expires <= time) revoke(key);
   const token = (request.headers.cookie ?? "").split(";").map(v => v.trim())
@@ -36,18 +51,18 @@ export async function authorize(request: IncomingMessage, response: ServerRespon
   const key = digest(token);
   const signedIn = sessions.has(key);
   if (path === "/login" && request.method === "GET") {
-    page(response, "", 200, signedIn);
+    page(response, "", 200, signedIn, target);
     return false;
   }
   if (path === "/login" && request.method === "POST") {
     if (request.headers["content-type"]?.split(";")[0] !== "application/x-www-form-urlencoded") {
-      page(response, "Use the sign-in form.", 415);
+      page(response, "Use the sign-in form.", 415, false, target);
       return false;
     }
     attempts = attempts.filter(t => time - t < 60000);
     if (attempts.length >= 6) {
       response.setHeader("retry-after", "60");
-      page(response, "Please wait a minute and try again.", 429);
+      page(response, "Please wait a minute and try again.", 429, false, target);
       return false;
     }
     attempts.push(time);
@@ -56,7 +71,7 @@ export async function authorize(request: IncomingMessage, response: ServerRespon
     for await (const chunk of request) {
       length += chunk.length;
       if (length > 8192) {
-        page(response, "Sign-in request is too large.", 413);
+        page(response, "Sign-in request is too large.", 413, false, target);
         return false;
       }
       chunks.push(chunk);
@@ -64,14 +79,14 @@ export async function authorize(request: IncomingMessage, response: ServerRespon
     const form = new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
     const username = form.get("username") ?? "", password = form.get("password") ?? "";
     if (!username || !password || !await verify(username, password)) {
-      page(response, "Username or password was incorrect.", 401);
+      page(response, "Username or password was incorrect.", 401, false, target);
       return false;
     }
     revoke(key);
     const session = randomBytes(32).toString("hex");
     sessions.set(digest(session), { expires: time + lifetime, streams: new Set() });
     response.setHeader("set-cookie", `${cookieName}=${session}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${lifetime / 1000}`);
-    redirect(response, "/");
+    redirect(response, target);
     return false;
   }
   if (path === "/logout" && request.method === "POST") {
@@ -93,7 +108,7 @@ export async function authorize(request: IncomingMessage, response: ServerRespon
     }
     return true;
   }
-  if (path === "/" && request.method === "GET") redirect(response, "/login");
+  if (path === "/" && request.method === "GET") redirect(response, `/login?${new URLSearchParams({returnTo: linkTarget(request.url ?? "/")})}`);
   else response.writeHead(401, { "content-type": "application/json" })
     .end(JSON.stringify({ error: "Sign in at /login to continue." }));
   return false;

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Resolve native conversation links within exact named installations; expose explicit service restrictions and exclude nested sessions from saved discovery.
+
 - Discover ordinary CLI native owners before writer admission, preserving canonical history IDs and explicit service bindings alongside ordinary sources.
 - Compose shared native owners with read-only saved history, canonical identities and live catalogs; support trusted workflow factories without opening replacement owners.
 

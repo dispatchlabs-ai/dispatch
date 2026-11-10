@@ -1,11 +1,14 @@
 import type { AttachmentFile, ChatToolCall, ChatTurn } from "@dispatch/runner";
 export type { AttachmentFile, ChatToolCall as ToolCall } from "@dispatch/runner";
 // Presentation projection of Dispatch's Chat and ChatSnapshot, not an execution model.
+export interface Capabilities { create?: boolean; attachments?: boolean; artifacts?: boolean }
 export interface Agent {
+  capabilities?: Capabilities;
   id: string;
   description: string;
 }
 export interface Chat {
+  capabilities?: Capabilities;
   id: string;
   agent: string;
   conversationId: number;

@@ -121,6 +121,13 @@ const server = createServer(async (request, response) => {
       return;
     }
     if (!(await protect(request, response, path))) return;
+    if (path === "/api/chat-link" && method === "GET") {
+      const installation = url.searchParams.get("installation"), chat = url.searchParams.get("chat");
+      if (!installation || !chat) throw new HttpError(400, "A conversation link requires installation and chat.");
+      if (!runtime.resolveChat) throw new HttpError(409, "This runtime does not support native conversation links.");
+      json(response, 200, await runtime.resolveChat(chat, installation));
+      return;
+    }
     if (path === "/api/sources" && method === "GET") {
       json(response, 200, await service.sources());
       return;
@@ -129,7 +136,7 @@ const server = createServer(async (request, response) => {
       json(
         response,
         200,
-        (await (runtime.catalog?.() ?? Promise.resolve(service.agents))).map(({ id, description }) => ({ id, description })),
+        (await (runtime.catalog?.() ?? Promise.resolve(service.agents))).map(({ id, description, capabilities }) => ({ id, description, capabilities })),
       );
       return;
     }

@@ -1,5 +1,5 @@
 import { realpath } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, isAbsolute, relative } from "node:path";
 import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { lstatSync, realpathSync } from "node:fs";
@@ -197,9 +197,14 @@ export function createStores(config: Pick<LocalConfig, "sources">, reader: Reade
       try {
         const root = await realpath(source.path);
         status.path = root;
+        const excluded = await Promise.all((source.exclude ?? []).map(path => realpath(path)));
         const discovery = await reader.discoverWatchRuns({ stateRoot: root, saved: true });
         status.issues.push(...discovery.issues);
         for (const run of discovery.runs) {
+          if (excluded.some(path => {
+            const child = relative(path, run.path);
+            return !child || child !== ".." && !child.startsWith("../") && !isAbsolute(child);
+          })) continue;
           status.issues.push(...run.issues);
           // Canonical file identity also deduplicates overlapping configured roots.
           run.stores = run.stores.filter((store) => !seen.has(store.path));

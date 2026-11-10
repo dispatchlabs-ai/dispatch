@@ -185,7 +185,9 @@ For native SQLite installations, combine that owner with saved discovery:
 }
 ```
 
-`stateRoot` is the canonical native session directory inside that source.
+`stateRoot` is the canonical native session directory at or inside that source.
+For a dedicated installation, set its source `path` to that exact `stateRoot` to
+avoid discovering sibling installations.
 Live/saved IDs deduplicate by native file and conversation. Offline histories stay
 viewable; create/send/stop never claim a replacement writer. Catalog refresh uses
 the owner's current agents. Child/foreign histories remain observation-only.
@@ -224,3 +226,23 @@ applicable, otherwise its first non-service source. Explicit source selection
 still wins; selecting the explicit service source creates in that owner's exact
 session, not a new sibling writer.
 No changes to Web login, cookies, TLS or installation authorization are required.
+
+## Native conversation links and restricted services
+
+`runtime.resolveChat(nativeId, installation)` resolves an exact native conversation
+within a named installation to its existing public Chat identity, without creation
+or submission. Shared services resolve only IDs listed by that owner; ordinary
+SQLite installations reject unavailable or ambiguous native IDs across sessions.
+Unsupported custom adapters must explicitly implement this optional Runtime seam.
+
+A trusted `service` binding may set
+`"capabilities":{"create":false,"attachments":false,"artifacts":false}`.
+Omitted fields default to supported; Stop is unchanged. Backend rejects disabled
+operations before sending a command, and projects the restrictions on agents and
+live chats for clients. No failed-command capability probing is performed.
+
+A source may set `"exclude":["/var/lib/example/instances/special"]` to exclude
+canonical session directories and their descendants from saved discovery. This
+is useful when a parent instances source belongs to one installation while a
+nested native owner belongs to another. Excluded directories must exist; path
+errors are visible source issues. Existing canonical chat IDs remain unchanged.
