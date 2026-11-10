@@ -1,10 +1,11 @@
 import { readFile, realpath, stat } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, relative } from "node:path";
 import { Worker } from "node:worker_threads";
 import { createHash } from "node:crypto";
 import lockfile from "proper-lockfile";
 import type { Agent, Chat, Snapshot, AttachmentFile } from "./contracts.js";
 import { readConfig, AdmissionError, type LocalConfig } from "./config.js";
+import { discoverSessionService } from "@dispatch/runner/service";
 import { openServiceRuntime } from "./service-runtime.js";
 import { openSharedHistory } from "./shared-history.js";
 import * as runner from "@dispatch/runner";
@@ -136,6 +137,15 @@ async function connectWorker(entrypoint: string, workerData: unknown): Promise<N
 async function openLocalRuntime(config: LocalConfig) {
   const { definitionsRoot, host } = config;
   const stores = createStores(config, reader);
+  let configuredServiceRoot: string | undefined;
+  if (config.service) {
+    const source = config.sources.find(source => source.id === config.service!.sourceId);
+    if (!source) throw new Error("service.sourceId must select a configured source.");
+    configuredServiceRoot = await realpath(config.service.stateRoot);
+    const session = relative(await realpath(source.path), configuredServiceRoot);
+    if (!session || session === ".." || session.startsWith("../") || isAbsolute(session))
+      throw new Error("service.stateRoot must be a native session directory within its configured source.");
+  }
   // Catalog loading does not open any native storage or connect a provider.
   const definitions = new Map<string, any>();
   const agents: Agent[] = [];
@@ -149,6 +159,31 @@ async function openLocalRuntime(config: LocalConfig) {
     string,
     { service: NativeService; namespace: string }
   >();
+  const connections = new Map<string, { endpoint: string; service: NativeService }>();
+  async function discovered(path: string) {
+    const configured = config.service && configuredServiceRoot === path ? config.service : undefined;
+    const endpoint = configured ?? await discoverSessionService(path);
+    if (!endpoint) return;
+    const key = JSON.stringify(endpoint);
+    const previous = connections.get(path);
+    if (previous?.endpoint === key) return previous.service;
+    const runtime = await openServiceRuntime({ socket: endpoint.socket, expectedStateRoot: endpoint.stateRoot,
+      expectedIdentity: "identity" in endpoint ? endpoint.identity : configured?.expectedIdentity });
+    // The socket exposes the original native IDs. Projection happens only at
+    // this Backend boundary; no new host, Harness or writable store is opened.
+    const service: NativeService = {
+      ...runtime.service,
+      resolve: async id => {
+        if (!(await runtime.service.list()).some(chat => chat.id === id))
+          throw new AdmissionError("This is not an independently addressable chat. Use its native parent.");
+      },
+      snapshot: runtime.presentation.snapshot,
+      close: runtime.close,
+    };
+    await previous?.service.close();
+    connections.set(path, { endpoint: key, service });
+    return service;
+  }
   const claiming = new Set<string>();
   const opening = new Map<
     string,
@@ -160,6 +195,10 @@ async function openLocalRuntime(config: LocalConfig) {
     agent: string,
     create = false,
   ) {
+    // A retained endpoint is a routing commitment, including when disconnected.
+    // Never fall back to a second writer after an uncertain transport failure.
+    const shared = await discovered(path);
+    if (shared) return { service: shared, namespace };
     const ownerKey = join(path, agent);
     if (owners.has(ownerKey)) return owners.get(ownerKey)!;
     if (opening.has(ownerKey)) return opening.get(ownerKey)!;
@@ -356,7 +395,9 @@ async function openLocalRuntime(config: LocalConfig) {
           "Creation source is unavailable. Fix its configured directory and restart; no DB was created.",
         );
       }
-      const session = `web-${createHash("sha256").update(`${agent}\0${key}`).digest("hex")}`;
+      const session = sourceId === config.service?.sourceId && configuredServiceRoot
+        ? relative(root, configuredServiceRoot)
+        : `web-${createHash("sha256").update(`${agent}\0${key}`).digest("hex")}`;
       const path = join(root, session);
       const owner = await own(path, host.namespace ?? "dispatch", agent, true);
       const chat = await owner.service.create(agent, _source, key);
@@ -411,7 +452,12 @@ async function openLocalRuntime(config: LocalConfig) {
   };
   async function snapshot(id: string) {
     const item = await stores.get(id);
-    const owner = owners.get(join(item.run.path, item.chat.agent));
+    let shared: NativeService | undefined;
+    try { shared = await discovered(item.run.path); }
+    catch {
+      return { ...await stores.snapshot(id), readOnlyReason: "Native service unavailable. Reconnect its original launcher; no work was resent or resumed." };
+    }
+    const owner = shared ? { service: shared } : owners.get(join(item.run.path, item.chat.agent));
     if (owner) {
       try {
         const snapshot = await owner.service.snapshot(nativeId(item));
@@ -420,6 +466,9 @@ async function openLocalRuntime(config: LocalConfig) {
           chat: { ...item.chat, title: snapshot.chat.title },
         };
       } catch {
+        // A disconnected native chat stays observational; never create a writer.
+        if (shared && sessionDocument(item.store.path, `${item.store.namespace}.chats`)?.byId?.[nativeId(item)])
+          return { ...await stores.snapshot(id), readOnlyReason: "Native service unavailable. Reconnect its original launcher; no work was resent or resumed." };
         /* Non-index children still use the native read-only reader. */
       }
     }
@@ -469,7 +518,7 @@ async function openLocalRuntime(config: LocalConfig) {
     close: async () => {
       await Promise.allSettled([...opening.values()]);
       await Promise.all(
-        [...new Set(owners.values())].map((owner) => owner.service.close()),
+        [...new Set([...owners.values(), ...connections.values()])].map((owner) => owner.service.close()),
       );
     },
   };
@@ -523,7 +572,9 @@ export async function openRuntime(): Promise<Runtime> {
       const defaultSource = sources.some(source => source.id === config.defaultSource) ? config.defaultSource : sources[0].id;
       const selected = { sources, defaultSource };
       const runtime: Runtime = binding.service
-        ? await openSharedHistory(binding.service, sources)
+        ? binding.definitionsRoot && binding.host
+          ? await openLocalRuntime({ ...selected, definitionsRoot: binding.definitionsRoot, host: binding.host, service: binding.service })
+          : await openSharedHistory(binding.service, sources)
         : binding.adapter
         ? await openAdapter({ ...selected, ...binding.adapter })
         : await openLocalRuntime({ ...selected, definitionsRoot: binding.definitionsRoot!, host: binding.host! });
@@ -558,7 +609,9 @@ export async function openRuntime(): Promise<Runtime> {
       },
       create: async (id, source, key, sourceId) => {
         const { name, local, runtime } = context(id);
-        const target = sourceId ?? config.installations!.find(binding => binding.id === name)!.service?.sourceId ?? (config.sources.find(item => item.id === config.defaultSource && item.installation === name)
+        const binding = config.installations!.find(binding => binding.id === name)!;
+        const target = sourceId ?? (binding.service && !binding.definitionsRoot ? binding.service.sourceId : undefined) ?? (config.sources.find(item => item.id === config.defaultSource && item.installation === name)
+          ?? config.sources.find(item => item.installation === name && item.id !== binding.service?.sourceId)
           ?? config.sources.find(item => item.installation === name))?.id;
         if (!target || !config.sources.some(item => item.id === target && item.installation === name))
           throw new AdmissionError("Choose a source bound to the selected installation.");

@@ -200,3 +200,27 @@ factory must return the same Runtime contract. This supports consumer-owned
 workflow composition without a Web-specific domain adapter or installed-file search.
 The optional `catalog()` Runtime method refreshes live agents; `service.agents`
 remains the initial catalog for existing consumers.
+
+## Ordinary CLI discovery
+
+A local installation (`definitionsRoot`, `host`, configured `sources`) discovers
+Runner's private native session endpoints before considering writer admission.
+It connects to the original owner, preserving the existing canonical
+DB/conversation-derived public chat ID, live partials, tools, files, native receipts
+and Stop. Disconnected endpoints never fall back to another writer. Legacy active
+owners without endpoints retain the read-only ownership guard; cold recovery must
+be deliberate in the native launcher. Backend shutdown closes clients, not these
+external owners. Unindexed native children remain read-only and use their parent
+for commands.
+
+A named installation may retain its explicit `service` binding **and** supply
+`definitionsRoot` plus `host` to enable discovery for its other ordinary sources.
+The explicit service still owns its exact canonical `service.stateRoot` and
+`sourceId`; other sessions are discovered locally, never routed to that singleton.
+Existing source IDs, `unqualifiedChats` and history projection remain unchanged.
+With `service` alone, the original shared-history-only behavior remains available.
+For a combined binding, new work defaults to its configured global source when
+applicable, otherwise its first non-service source. Explicit source selection
+still wins; selecting the explicit service source creates in that owner's exact
+session, not a new sibling writer.
+No changes to Web login, cookies, TLS or installation authorization are required.

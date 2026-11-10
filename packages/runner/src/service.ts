@@ -31,7 +31,7 @@ export type ServiceAdapterContext = {
   connectModels: (models: ReturnType<typeof createModels>) => Promise<ModelChoice[]>;
 };
 export type ServiceOperations = Pick<ChatService, "list" | "create" | "snapshot" | "submit" | "stop" | "artifact"> &
-  Partial<Pick<ChatService, "find" | "activity" | "schedules" | "compact" | "receipt" | "message" | "messageStatus">> & {
+  Partial<Pick<ChatService, "find" | "activity" | "schedules" | "compact" | "receipt" | "message" | "messageStatus" | "waitForIdle">> & {
     agents: { id: string; description: string; model?: import("./definition.js").LoadedAgent["model"] }[];
   };
 export type ServiceMetadata = { stateRoot?: string; defaultAgent?: string;
@@ -43,6 +43,7 @@ export type ServiceCommand =
   | { method: "agents" | "chats" | "status" | "schedules" | "info" }
   | { method: "create"; agent: string; key: string; title?: string; source?: Chat["source"] }
   | { method: "snapshot" | "stop"; id: string }
+  | { method: "drain" }
   | { method: "find"; key: string; agent?: string }
   | { method: "compact"; id: string; instructions?: string }
   | { method: "artifact"; id: string; artifactId: string }
@@ -51,7 +52,7 @@ export type ServiceCommand =
   | { method: "message-status"; from: string; taskId: number }
   | { method: "receipt"; id: string; submissionId: number };
 
-async function dispatch(service: ServiceOperations, command: ServiceCommand) {
+async function dispatch(service: ServiceOperations, command: ServiceCommand, signal?: AbortSignal) {
   switch (command.method) {
     case "agents": return service.agents.map(({ id, description, model }) => ({ id, description, model }));
     case "chats": return service.list();
@@ -72,6 +73,7 @@ async function dispatch(service: ServiceOperations, command: ServiceCommand) {
       const { artifact, bytes } = await service.artifact(command.id, command.artifactId);
       return { artifact, dataBase64: bytes.toString("base64") };
     }
+    case "drain": if (!service.waitForIdle) throw new ServiceError("This owner does not support drain.", 409); await service.waitForIdle(signal); return {};
     case "stop": await service.stop(command.id); return {};
     case "send": return service.submit(command.id, command.text, command.requestId, command.mode ?? "followUp", command.source ?? "cli", command.files);
     case "receipt": if (!service.receipt) throw new ServiceError("Unsupported service operation.", 409); return service.receipt(command.id, command.submissionId);
@@ -120,7 +122,13 @@ export async function serveService(owner: ServiceOperations | (() => ServiceOper
         const activity = await service.activity();
         const adapterBusy = (await Promise.all(adapters.map(adapter => adapter.busy?.() ?? false))).some(Boolean);
         result = { ...activity, adapterBusy, busy: activity.busy || adapterBusy };
-      } else result = await dispatch(service, command);
+      } else {
+        const observation = new AbortController();
+        const disconnected = () => observation.abort();
+        response.once("close", disconnected);
+        try { result = await dispatch(service, command, observation.signal); }
+        finally { response.off("close", disconnected); }
+      }
       response.end(JSON.stringify({ result }));
     } catch (error) {
       const status = (error as { status?: number }).status === 409 ? 409 : 400;
@@ -210,6 +218,7 @@ export async function startService(config: ServiceConfig) {
 
 export type ServiceResults = {
   info: ServiceMetadata;
+  drain: Record<string, never>;
   agents: { id: string; description: string; model?: import("./definition.js").LoadedAgent["model"] }[];
   chats: Chat[];
   find: Chat | null;
@@ -251,3 +260,6 @@ export function serviceRequest<C extends ServiceCommand>(socketPath: string, com
 
 export { connectInTerminal } from "./service-terminal.js";
 export type { ServiceTerminalOptions } from "./service-terminal.js";
+
+export { discoverSessionService } from "./session-service.js";
+export type { SessionEndpoint } from "./session-service.js";

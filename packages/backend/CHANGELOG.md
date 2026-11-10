@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Discover ordinary CLI native owners before writer admission, preserving canonical history IDs and explicit service bindings alongside ordinary sources.
 - Compose shared native owners with read-only saved history, canonical identities and live catalogs; support trusted workflow factories without opening replacement owners.
 
 ## [0.7.0] - 2026-11-09

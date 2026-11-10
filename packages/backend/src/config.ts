@@ -4,6 +4,8 @@ import type { HostModelsConfig } from "@dispatch/runner/host-models";
 import type { ServicePolicy } from "@dispatch/runner/settings";
 export interface Source { id: string; label: string; path: string; installation?: string }
 export interface LocalConfig {
+  /** Optional pre-existing service alongside discoverable ordinary sessions. */
+  service?: import("./shared-history.js").SharedHistoryConnection;
   definitionsRoot: string;
   host: HostModelsConfig & ServicePolicy & {
     cwd: string; namespace?: string; workspace?: { agents?: string[] }; artifacts?: unknown;
@@ -51,7 +53,8 @@ export async function readConfig(): Promise<Config> {
   } else {
     if (!Array.isArray(value.installations) || !value.installations.length || value.installations.some(binding =>
       !binding || binding.unqualifiedChats !== undefined && typeof binding.unqualifiedChats !== "boolean" || !identifier(binding.id) || typeof binding.label !== "string" || !binding.label.trim() ||
-      (binding.service ? !absolute(binding.service.socket) || !absolute(binding.service.stateRoot) || !value.sources.some(source => source.id === binding.service!.sourceId && source.installation === binding.id) || !!binding.adapter
+      (binding.service ? !absolute(binding.service.socket) || !absolute(binding.service.stateRoot) || !value.sources.some(source => source.id === binding.service!.sourceId && source.installation === binding.id) || !!binding.adapter ||
+          ((binding.definitionsRoot !== undefined || binding.host !== undefined) && (!absolute(binding.definitionsRoot) || !absolute(binding.host?.cwd)))
         : binding.adapter ? !absolute(binding.adapter.module) || !absolute(binding.adapter.configFile)
         : !absolute(binding.definitionsRoot) || !absolute(binding.host?.cwd))) ||
       new Set(value.installations.map(binding => binding.id)).size !== value.installations.length ||

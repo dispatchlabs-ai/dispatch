@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
 import { setTimeout as delay } from "node:timers/promises";
@@ -17,6 +18,10 @@ export type ServiceTerminalOptions = {
   history?: boolean;
   requestId?: string;
   files?: AttachmentFile[];
+  drain?: boolean;
+  /** Local ordinary owner artifact root; never inferred for opaque facades. */
+  artifactDirectory?: string;
+  expected?: import("./service.js").ServiceExpectation;
 };
 
 /** A terminal connection is not an execution owner. Disconnect never sends Stop. */
@@ -28,8 +33,8 @@ export async function connectInTerminal(options: ServiceTerminalOptions) {
   process.on("SIGINT", interrupt);
   process.on("SIGTERM", interrupt);
   try {
-    const info = await serviceRequest(options.socket, {method: "info"}, {signal: controller.signal});
-    const expected = info.identity !== undefined ? {identity: info.identity} : info.stateRoot !== undefined ? {stateRoot: info.stateRoot} : undefined;
+    const info = await serviceRequest(options.socket, {method: "info"}, {signal: controller.signal, expected: options.expected});
+    const expected = options.expected ?? (info.identity !== undefined ? {identity: info.identity} : info.stateRoot !== undefined ? {stateRoot: info.stateRoot} : undefined);
     if (!expected) throw new Error("The service must expose a stable stateRoot or installation identity.");
     const call = <C extends import("./service.js").ServiceCommand>(command: C) =>
       serviceRequest(options.socket, command, { signal: controller.signal, expected });
@@ -47,7 +52,7 @@ export async function connectInTerminal(options: ServiceTerminalOptions) {
       }
       process.stderr.write(terminalText(`Session: ${session}\n`));
     }
-    const chatId = id;
+    let chatId = id;
     process.stderr.write(terminalText(`Conversation: ${chatId}\nDisconnect leaves work running. Use /stop to cancel.\n`));
     const snapshot = () => call({ method: "snapshot", id: chatId });
     const history = async () => {
@@ -61,13 +66,18 @@ export async function connectInTerminal(options: ServiceTerminalOptions) {
     const seen = new Set((await snapshot()).messages.map(message => message.id));
     let partial = "", tools = "";
     const render = (value: ChatSnapshot) => {
+      if (value.chat.id !== chatId) return;
       for (const message of value.messages) {
         if (seen.has(message.id)) continue;
         seen.add(message.id);
         if (message.role !== "assistant") continue;
         process.stdout.write(terminalText(message.text.startsWith(partial) ? message.text.slice(partial.length) : `\n${message.text}`));
         process.stdout.write("\n");
-        for (const file of message.artifacts ?? []) process.stdout.write(terminalText(`Attachment: ${file.name} (${file.id})\n`));
+        for (const file of message.artifacts ?? []) {
+          process.stdout.write(terminalText(`Attachment: ${file.name} (${file.id})\n`));
+          if (options.artifactDirectory) process.stdout.write(terminalText(
+            `${join(options.artifactDirectory, String(value.chat.conversationId), "files", file.id)}\n`));
+        }
         if (message.error) process.stderr.write(terminalText(`${message.error}\n`));
         partial = "";
       }
@@ -99,6 +109,20 @@ export async function connectInTerminal(options: ServiceTerminalOptions) {
         if (receipt.status === "done" || receipt.status === "unanswered") {
           render(await snapshot());
           if (receipt.status !== "done") throw new Error(`Turn did not complete: ${receipt.reason}. Inspect the receipt and history.`);
+          if (options.drain) {
+            let drained = false;
+            let failure: unknown;
+            const pending = call({ method: "drain" }).catch(error => { failure = error; }).finally(() => { drained = true; });
+            while (!drained && !controller.signal.aborted) {
+              render(await snapshot());
+              await Promise.race([pending, delay(200, undefined, { signal: controller.signal })]);
+            }
+            await pending;
+            if (failure) throw failure;
+            const value = await snapshot(); render(value);
+            const last = value.messages.findLast(message => message.role === "assistant");
+            if (last?.error) throw new Error(`Follow-up did not complete: ${last.error}. Use --history for details.`);
+          }
           return;
         }
         await delay(200, undefined, { signal: controller.signal });
@@ -107,7 +131,7 @@ export async function connectInTerminal(options: ServiceTerminalOptions) {
     }
     input = createInterface({ input: process.stdin, output: process.stdout, terminal: !!process.stdin.isTTY });
     input.on("SIGINT", interrupt);
-    process.stderr.write("Commands: /history, /stop, /quit. Messages queue without waiting for a reply.\n");
+    process.stderr.write("Commands: /new, /history, /stop, /quit. Messages queue without waiting for a reply.\n");
     let observationError: unknown;
     const observing = (async () => {
       while (!controller.signal.aborted) {
@@ -119,7 +143,12 @@ export async function connectInTerminal(options: ServiceTerminalOptions) {
       for await (const line of input) {
         const text = line.trim();
         if (text === "/quit") break;
-        if (text === "/history") await history();
+        if (text === "/new") {
+          const agent = options.agent ?? (await snapshot()).chat.agent;
+          chatId = (await call({ method: "create", agent, key: `terminal:${randomUUID()}`, source: "cli" })).id;
+          seen.clear(); partial = ""; tools = "";
+          process.stderr.write(terminalText(`Conversation: ${chatId}\n`));
+        } else if (text === "/history") await history();
         else if (text === "/stop") await call({ method: "stop", id: chatId });
         else if (text) {
           const receipt = await send(text);

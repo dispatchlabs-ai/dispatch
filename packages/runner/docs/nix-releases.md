@@ -126,17 +126,22 @@ The launcher changes its process directory to `cwd` (or the session state
 directory for a container workspace) before opening agents, so host-side
 provider subprocesses do not depend on the caller's directory. A task may remove
 the worktree it was launched from without breaking later turns.
-Each session stores agents under `stateRoot/KEY/`; do not aim this launcher at
-an existing service's stores. The selected agent and its transitive
-`message_agent` recipients share one native service in that process. Separate
-sessions run concurrently; same-store locking remains authoritative.
+Each session stores agents under `stateRoot/KEY/`. The selected agent and its
+transitive `message_agent` recipients share one detached native owner in that
+exact directory. Reopening the same session joins its owner; separate sessions
+remain independent. Do not aim this launcher at another service's stores.
+Native same-store locking remains authoritative.
 Every participant can read its packaged instructions and linked workflow
 references through `read_definition_resource`, including host-bound sessions.
 
-No socket, scheduled work or transport adapter is started. Output streams through
-the existing terminal client. SIGINT/SIGTERM suspend native work; restarting
-resumes admitted work, not calendars. Sessions with messaging recipients drain
-admitted peer work and replies before exiting, including on host-bound desktops.
+Normal `run` starts or discovers an owner-only local socket automatically. No
+factory schedules, calendar reconciliation or transport adapters are started.
+The CLI is a client: exit or SIGINT/SIGTERM disconnects without stopping execution.
+Prompt mode waits for the native receipt and drains admitted peer work and replies,
+including on host-bound desktops. The detached owner remains available afterward.
+Use explicit `/stop` (or Web Stop) to cancel native work. `--history` reads the
+retained terminal key without starting an owner, including for legacy sessions.
+See [ordinary session ownership and controlled recovery](service.md#ordinary-session-owners).
 The trusted process binding `DISPATCH_SESSION_STATE_ROOT` gives definition-owned
 inspection tools the selected session directory; it grants no new permissions.
 This is not a scheduler,

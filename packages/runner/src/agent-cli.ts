@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { randomUUID } from "node:crypto";
-import { readFile, realpath } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, resolve, posix } from "node:path";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
@@ -9,8 +9,9 @@ import { catalog, loadAgent } from "./definition.js";
 import { createRunner } from "./index.js";
 import { connectHostModels } from "./host-models.js";
 import { serviceSettings } from "./settings.js";
-import { connectInTerminal, type ServiceConfig } from "./service.js";
-import { chatInTerminal } from "./terminal.js";
+import { connectInTerminal, serveService, type ServiceConfig } from "./service.js";
+import { run, type RunOptions } from "./run.js";
+import { ensureSessionService, sessionServiceIdentity, sessionServiceSocket, publishSessionService } from "./session-service.js";
 import { getOrThrow } from "@earendil-works/pi-durable/env";
 import { WorkspaceClient, type WorkspaceRecord, type WorkspaceRelease } from "./workspace.js";
 import { terminalError } from "./terminal-output.js";
@@ -20,26 +21,29 @@ import { sessionAgent } from "./session-agent.js";
 const usage = `dispatch-agent --root DEFINITIONS catalog
 dispatch-agent --root DEFINITIONS run --config HOST.json [--agent AGENT] [--session KEY] [--request-id ID] --prompt TEXT
 dispatch-agent --root DEFINITIONS run --config HOST.json [--agent AGENT] --session KEY --history
+dispatch-agent --root DEFINITIONS run --config HOST.json --agent AGENT --session KEY --resume-only [--replace-owner]
 dispatch-agent --root DEFINITIONS watch --config HOST.json [--session KEY] [--json]
 
 With config.socket, run connects to the supervised service; disconnect leaves work running.
-Without socket, legacy sessions own separate process state directories. No listener or schedules.
+Without socket, run starts or joins a detached owner in the exact ordinary session directory. No factory schedules.
 New sessions use factory.yaml defaultAgent unless --agent is supplied; retained selections stay fixed.
 Use --update-definitions only for an explicit idle definition migration.
 dispatch-agent --root DEFINITIONS workspace --config HOST.json --agent AGENT --session KEY --action ensure|status|checkpoint|suspend|finish
-SIGINT/SIGTERM suspend native work; they do not undo external effects.`;
+Client SIGINT/SIGTERM disconnect only. Owner SIGINT/SIGTERM suspend native work, not external effects.`;
 
 try {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
     options: {
       root: { type: "string" }, config: { type: "string" }, agent: { type: "string" },
+      "session-owner": { type: "boolean" }, "owner-identity": { type: "string" }, "resume-only": { type: "boolean" }, "replace-owner": { type: "boolean" },
       "request-id": { type: "string" },
       session: { type: "string" }, prompt: { type: "string" }, history: { type: "boolean" },
       action: { type: "string" }, "release-manifest": { type: "string" },
       "update-definitions": { type: "boolean" }, help: { type: "boolean" }, json: { type: "boolean" },
     },
   });
+  if (values["session-owner"] && !process.connected) throw new Error("--session-owner is internal; use ordinary run or --resume-only.");
   if (values.help) console.log(usage);
   else {
     if (!values.root || positionals.length !== 1) throw new Error(usage);
@@ -61,9 +65,11 @@ try {
       const workspaceAction = positionals[0] === "workspace";
       if ((!workspaceAction && positionals[0] !== "run") || !values.config
         || (workspaceAction ? !values.session || !values.action :
-          values.history ? values.prompt !== undefined || !values.session : !values.prompt?.trim())) {
+          values["resume-only"] ? !values.session || values.prompt !== undefined || values.history :
+          values.history ? values.prompt !== undefined || !values.session : !values["session-owner"] && values.prompt !== undefined && !values.prompt.trim())) {
         throw new Error(usage);
       }
+      if (values["replace-owner"] && !values["resume-only"]) throw new Error("--replace-owner requires --resume-only, never a new prompt.");
       const session = values.session ?? randomUUID();
       if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(session)) throw new Error("Invalid session key.");
       const config: Pick<ServiceConfig, "socket" | "stateRoot" | "cwd" | "namespace" | "gateway" | "modelProviders" | "retry" | "compaction" | "afterFailedRun"> & {
@@ -72,6 +78,7 @@ try {
       } =
         JSON.parse(await readFile(values.config, "utf8"));
       if (config.socket && !workspaceAction) {
+        if (values["resume-only"]) throw new Error("--resume-only requires an ordinary native session, not config.socket.");
         if (values["update-definitions"]) throw new Error("Migrate idle definitions at service deployment, not from a client.");
         if (!isAbsolute(config.socket)) throw new Error("socket must be an absolute path.");
         await connectInTerminal({ socket: config.socket, agent: values.agent,
@@ -81,12 +88,34 @@ try {
         for (const field of ["stateRoot", "cwd"] as const) {
           if (typeof config[field] !== "string" || !isAbsolute(config[field])) throw new Error(`${field} must be an absolute path.`);
         }
-        if (!config.gateway?.origin || !isAbsolute(config.gateway.credentialFile)) throw new Error("Supply gateway.origin and an absolute gateway.credentialFile.");
-        const agentId = await sessionAgent(root, join(config.stateRoot, session), values.agent);
+
+        const stateRoot = join(config.stateRoot, session);
+        // History never opens/resumes an owner merely to observe saved work.
+        if (values.history) {
+          const { discoverWatchRuns, readWatchChatProjection, readWatchChat } = await import("./watch-reader.js");
+          const { terminalText } = await import("./terminal-output.js");
+          const found = await discoverWatchRuns({ stateRoot: config.stateRoot, session, saved: true });
+          const candidates = found.runs.flatMap(run => run.stores.filter(store => !values.agent || store.agent === values.agent).map(store => ({run, store})));
+          const selected = values.agent ?? JSON.parse(await readFile(join(stateRoot, "conversation-agent.json"), "utf8")).agent;
+          const item = candidates.find(item => item.store.agent === selected);
+          if (!item) throw new Error("Saved session is unavailable; history did not create or resume native work.");
+          const chat = await readWatchChat(item.run, selected, `terminal:${session}`);
+          if (!chat) throw new Error("No retained conversation matches this session. History never creates one.");
+          for (const message of (await readWatchChatProjection(item.run, chat.id)).messages) {
+            console.log(terminalText(`${message.role}: ${message.text}${message.error ? `\nError: ${message.error}` : ""}`));
+            for (const file of message.artifacts ?? []) console.log(terminalText(`Attachment: ${file.name} (${file.size} bytes)\n${join(stateRoot, selected, "artifacts", String(chat.conversationId), "files", file.id)}`));
+          }
+          process.exit(0);
+        }
+        if (values["resume-only"]) {
+          if (!values.agent || !/^[a-z][a-z0-9-]*$/.test(values.agent)) throw new Error("--resume-only requires the original --agent.");
+          await stat(join(stateRoot, values.agent, "session.sqlite"));
+        }
+        const agentId = await sessionAgent(root, stateRoot, values.agent);
         const workspace = config.workspace?.agents.includes(agentId) ? new WorkspaceClient(config.workspace.command, session) : undefined;
+        if (config.artifacts && workspace) throw new Error("Choose a workspace or an artifact source module, not both.");
         let artifactSource: ArtifactSource | undefined;
-        if (config.artifacts) {
-          if (workspace) throw new Error("Choose a workspace or an artifact source module, not both.");
+        if (config.artifacts && values["session-owner"]) {
           const { module, export: name, args = [] } = config.artifacts;
           if (typeof module !== "string" || !isAbsolute(module) || typeof name !== "string" || !name || !Array.isArray(args)) {
             throw new Error("Supply an absolute artifacts.module, its factory export, and optional args array.");
@@ -125,6 +154,21 @@ try {
           }
           if (!values.history) await workspace.request({ op: "ensure" });
         }
+        const identity = await sessionServiceIdentity(root, config, agentId);
+        if (values["session-owner"] && identity !== values["owner-identity"])
+          throw new Error("Launcher selection changed during startup. No native work was opened; retry with the intended immutable release/configuration.");
+        if (!workspaceAction && !values["session-owner"]) {
+          const agent = agentId;
+          const args = ["--root", root, "run", "--config", resolve(values.config), "--agent", agent, "--session", session,
+            ...(values["release-manifest"] ? ["--release-manifest", resolve(values["release-manifest"])] : []),
+            ...(values["update-definitions"] ? ["--update-definitions"] : [])];
+          const endpoint = await ensureSessionService({ stateRoot, identity, args, replaceOwner: values["replace-owner"] || values["update-definitions"] });
+          if (values["resume-only"]) console.log(JSON.stringify(endpoint));
+          else await connectInTerminal({ socket: endpoint.socket, agent, session, prompt: values.prompt, requestId: values["request-id"],
+            expected: { stateRoot: endpoint.stateRoot, identity: endpoint.identity }, drain: true,
+            artifactDirectory: join(stateRoot, agent, "artifacts") });
+          process.exit(process.exitCode ?? 0);
+        }
         // Host-side children such as model provider CLIs inherit this process's
         // directory. Leave the caller's directory, which may be a disposable task
         // worktree, for the configured host directory (or this session's state
@@ -141,34 +185,48 @@ try {
         await include(agentId);
         const models = createModels({ authContext: { env: async () => undefined, fileExists: async () => false } });
         const modelConnection = await connectHostModels(config, models);
-        try { await chatInTerminal({
-          root, stateRoot: join(config.stateRoot, session), cwd: workspace ? "/workspace" : config.cwd,
-          env: workspace ? target => workspace.environment(target.cwd ?? "/workspace") : undefined,
-          definitionResources: true,
-          artifacts: workspace ? { source: async (path, _api, context) => {
-            const env = workspace.environment();
-            const canonical = getOrThrow(await env.canonicalPath(path, context));
-            if (!canonical.startsWith("/workspace/")) throw new Error("Publish a file inside /workspace.");
-            const reader = getOrThrow(await env.openBinaryReader(canonical, { noFollow: true }, context));
-            const info = getOrThrow(await reader.info(context));
-            return { name: posix.basename(canonical), size: info.size, chunks: (async function* () {
-              try {
-                for (let offset = 0; offset < info.size;) {
-                  const chunk = getOrThrow(await reader.read(offset, 1024 * 1024, context));
-                  if (!chunk.length) throw new Error("Workspace artifact ended unexpectedly.");
-                  offset += chunk.length; yield chunk;
-                }
-              } finally { await reader.close(context); }
-            })() };
-          } } : artifactSource ? { source: artifactSource } : undefined,
-          runner: createRunner({ namespace: config.namespace }), models, names: [...names],
-          agent: agentId, session, drain: !!workspace || names.size > 1, prompt: values.prompt, history: values.history,
-          updateDefinitions: values["update-definitions"], settings,
-        }); } finally { await modelConnection.close(); }
+        try {
+          const options: RunOptions = {
+            root, stateRoot: join(config.stateRoot, session), cwd: workspace ? "/workspace" : config.cwd,
+            env: workspace ? target => workspace.environment(target.cwd ?? "/workspace") : undefined,
+            definitionResources: true,
+            artifacts: workspace ? { source: async (path, _api, context) => {
+              const env = workspace.environment();
+              const canonical = getOrThrow(await env.canonicalPath(path, context));
+              if (!canonical.startsWith("/workspace/")) throw new Error("Publish a file inside /workspace.");
+              const reader = getOrThrow(await env.openBinaryReader(canonical, { noFollow: true }, context));
+              const info = getOrThrow(await reader.info(context));
+              return { name: posix.basename(canonical), size: info.size, chunks: (async function* () {
+                try {
+                  for (let offset = 0; offset < info.size;) {
+                    const chunk = getOrThrow(await reader.read(offset, 1024 * 1024, context));
+                    if (!chunk.length) throw new Error("Workspace artifact ended unexpectedly.");
+                    offset += chunk.length; yield chunk;
+                  }
+                } finally { await reader.close(context); }
+              })() };
+            } } : artifactSource ? { source: artifactSource } : undefined,
+            runner: createRunner({ namespace: config.namespace }), models, names: [...names],
+            updateDefinitions: values["update-definitions"], settings,
+          };
+          // Open exactly the ordinary session, never enable its factory jobs.
+          const app = await run({ ...options, schedules: false, resume: false });
+          let listener: Awaited<ReturnType<typeof serveService>> | undefined;
+          try {
+            const socket = await sessionServiceSocket(stateRoot);
+            await app.service.start();
+            listener = await serveService(app.service, socket, app.adapters, { stateRoot: await realpath(stateRoot), identity, defaultAgent: agentId });
+            const endpoint = { version: 1 as const, socket, stateRoot: await realpath(stateRoot), identity, pid: process.pid };
+            await publishSessionService(endpoint);
+            if (process.connected) process.send?.({ ready: endpoint, info: { stateRoot: endpoint.stateRoot, identity, defaultAgent: agentId } }, () => {});
+            await new Promise<void>(done => { process.once("SIGTERM", done); process.once("SIGINT", done); });
+          } finally { try { await listener?.close(); } finally { await app.close(); } }
+        } finally { await modelConnection.close(); }
       }
     }
   }
 } catch (error) {
+  if (process.connected) process.send?.({ error: terminalError(error).message }, () => {});
   console.error(terminalError(error).message);
   process.exitCode = 1;
 }

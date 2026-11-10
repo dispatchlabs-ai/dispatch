@@ -416,3 +416,80 @@ Snapshots additionally expose optional `turns`: native submission IDs, input ent
 IDs, lifecycle status and unanswered reason. `done` means an answered turn, not
 completed project work; `unanswered/aborted` means stopped, never success inferred
 from a tool result. This projection also applies to saved read-only history.
+
+## Ordinary session owners
+
+The installed `dispatch-agent ... run --config HOST.json --agent helper
+--session KEY --prompt "..."` path without `config.socket` now starts or connects
+to a detached native owner in exactly `HOST.stateRoot/KEY`. It retains the native
+`terminal:KEY` creation key, conversation, submissions, tools and history. A CLI
+exit never sends Stop. Prompt mode waits for its native receipt and drains peer
+work; the owner stays listening after completion. Native watches/history remain
+read-only. No factory calendars are reconciled and no autonomous loop is started;
+previously admitted tasks recover only through Pi. The embedded `chatInTerminal`
+API retains its caller-owned lifecycle and continuous-loop options.
+
+The public `discoverSessionService(sessionDirectory)` export in
+`@dispatch/runner/service` returns `undefined` or a `SessionEndpoint` observation:
+`{version:1,socket,stateRoot,identity,pid}`. `stateRoot` is canonical; the private
+`service-endpoint.json` resides in the actual session directory. The socket is a
+short hashed pathname below owner-only `/tmp/dispatch-UID` (canonicalized on
+macOS). `service.log` is private owner diagnostics, not a transcript export.
+The endpoint is not a writer lease, queue or second ownership database. Native
+locks remain authoritative. Consumers must bind both `stateRoot` and `identity`
+as `serviceRequest` expectations on every operation, not trust a PID or pathname.
+Backend local sources perform this discovery automatically and retain their
+canonical database/conversation-based public IDs. A retained but unavailable
+endpoint never permits Backend to fall back to opening another writer.
+
+The selected Node/runtime module, canonical definition root, authored messaging
+closure fingerprints and host JSON determine the stable installation identity.
+A changed active selection is rejected, never silently repinned. Use immutable
+releases and preserve original host environment/provider/tool bindings. Existing
+native fingerprint, execution, extension and cwd checks still apply to cold starts.
+The startup lock only serializes concurrent launch attempts; it never substitutes
+for native ownership. POSIX process detachment and Unix sockets are required.
+There is no automatic restart daemon: a later ordinary run, or explicit recovery
+below, reconnects/starts the maintained owner. Existing external supervisors may
+keep using `dispatch-service`/`serveService`; this does not replace them.
+
+### Controlled recovery without another prompt
+
+An old live CLI without an endpoint cannot be hot-attached. Read history without
+opening a writer; never delete its locks, clone its DB or resubmit its original
+prompt. With explicit operator authority, identify the current native owner and
+its task/tool state, then send SIGINT or SIGTERM to **that owner**, not Stop (native
+cancellation), SIGKILL or an arbitrary stale PID. Wait for graceful native close,
+process exit and native lock release. Preserve the original definitions, cwd,
+namespace, providers, extensions, environment and workspace release bindings.
+Native `Harness.close` joins invocations and writes them pending without a terminal
+outcome; it cannot undo external effects. Pi's tool recovery reruns only a safe
+replayable tool; an unsafe interrupted execution yields an interrupted result
+rather than blindly repeating an external side effect. Inspect tool/task outcomes
+before and after handoff. Suspension is not a guarantee that an in-flight shell
+command or external action finished successfully.
+
+Run the reviewed compatible launcher with original definitions and host bindings:
+
+```sh
+dispatch-agent --root /srv/definitions run --config /srv/private/host.json \
+  --agent helper --session original-key --resume-only
+```
+
+This prints the endpoint and resumes existing native work only: no create/find,
+new prompt, submission or conversation is admitted. It requires an existing native
+store and explicit original agent. If a previously shared, **stopped** owner has a
+different selection identity, add `--replace-owner` to acknowledge that deliberate
+transition. It never replaces a live incompatible owner and never bypasses native
+compatibility checks. `--update-definitions` also explicitly permits a stopped
+owner's selection change, but only when native idle migration checks pass. Do not
+use it on pending work; idle migration remains an explicit separate action. A compatible runtime with original
+definitions is required for active legacy work. Keep old releases available for
+recovery. Installed consumer and hosted browser qualification are separate from
+source compatibility.
+
+`connectInTerminal` accepts optional `expected: {stateRoot,identity}` for an
+already-discovered owner and `drain: true` to wait for native idle after the
+submission receipt. The `drain` service command is optional for custom facades;
+an unsupported owner rejects it rather than claiming completion. Closing a
+waiting client only cancels its observation, not the admitted work.

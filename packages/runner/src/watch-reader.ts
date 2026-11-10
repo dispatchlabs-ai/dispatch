@@ -82,7 +82,7 @@ async function withStore<T>(path: string, read: (db: DatabaseSync) => T): Promis
 }
 
 /** Narrow reconstruction for the Runner chat index, never provider/live documents. */
-function chats(db: DatabaseSync, namespace: string): Map<number, Data> {
+function chats(db: DatabaseSync, namespace: string, key?: string): Map<number, Data> {
   const doc = db.prepare("SELECT id FROM documents WHERE kind=? AND scope_kind='session'")
     .get(JSON.stringify(`${namespace}.chats`));
   if (!doc) return new Map();
@@ -116,7 +116,7 @@ function chats(db: DatabaseSync, namespace: string): Map<number, Data> {
     }
   }
   return new Map(Object.values(value?.byId ?? {}).filter((chat: any) =>
-    chat && Number.isSafeInteger(chat.conversationId) && chat.id === `${chat.agent}:${chat.conversationId}`)
+    chat && (key === undefined || value.keys?.[key] === chat.id) && Number.isSafeInteger(chat.conversationId) && chat.id === `${chat.agent}:${chat.conversationId}`)
     .map((chat: any) => [chat.conversationId, chat]));
 }
 
@@ -429,6 +429,13 @@ export async function readWatchActivity(run: WatchRun, activity: WatchActivity):
     if (item) attachResults(db, [item]);
     return item;
   });
+}
+
+/** Retained terminal-key lookup; never opens a writer or creates a chat. */
+export async function readWatchChat(run: WatchRun, agent: string, key: string) {
+  const store = run.stores.find(store => store.agent === agent);
+  if (!store) return;
+  return withStore(store.path, db => [...chats(db, store.namespace, key).values()][0] as import("./chat.js").Chat | undefined);
 }
 
 /** Full retained public chat projection from the selected native store; no owner. */
