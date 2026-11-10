@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Support browser authentication challenges from trusted hosted authorization modules; ship a single-participant HTTPS Basic module with consumer-owned scrypt credentials.
+
 - Attach shared owners through Backend; distinguish accepted Stop, native stopped turns and completed tools/turns. Preserve same-origin Agent Chat selection and uncertain draft/file outboxes.
 
 ## [0.7.0] - 2026-11-09

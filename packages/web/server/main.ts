@@ -71,7 +71,7 @@ async function bodyOf(request: IncomingMessage) {
     throw new HttpError(400, "Provide a JSON object.");
   }
 }
-async function protect(request: IncomingMessage, path: string) {
+async function protect(request: IncomingMessage, response: ServerResponse, path: string) {
   if (request.headers.host !== new URL(origin).host)
     throw new HttpError(403, `Use ${origin}.`);
   if (request.headers.origin && request.headers.origin !== origin)
@@ -90,8 +90,11 @@ async function protect(request: IncomingMessage, path: string) {
     throw new HttpError(403, "Cross-site access is not allowed.");
   if (request.method !== "GET" && request.headers.origin !== origin)
     throw new HttpError(403, "Writes require the exact app Origin.");
-  if (authorize && !(await authorize(request)))
+  if (authorize && !(await authorize(request, response))) {
+    if (response.writableEnded) return false;
     throw new HttpError(403, "Access denied.");
+  }
+  return true;
 }
 const central = process.env.DISPATCH_CENTRAL_CONFIG;
 const runtime: Runtime = central
@@ -116,7 +119,7 @@ const server = createServer(async (request, response) => {
       json(response, 200, { status: "ready" });
       return;
     }
-    await protect(request, path);
+    if (!(await protect(request, response, path))) return;
     if (path === "/api/sources" && method === "GET") {
       json(response, 200, await service.sources());
       return;

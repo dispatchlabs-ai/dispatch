@@ -18,11 +18,26 @@ No personal paths, host wrappers, release manifests or platform defaults.
 Only the service reads PostgreSQL secrets; workers initiate authenticated connections.
 
 Hosted use additionally sets HTTPS `DISPATCH_ORIGIN` and absolute
-`DISPATCH_AUTH_MODULE`. The ESM module exports async `authorize(request)` and
-must validate credentials/session and authorize every configured run. Return true
-only for authorized participants. There is no per-user grant product in this UI.
-The adapter receives Node's IncomingMessage (cookie/authorization headers) before
-any API request or shell is served. Do not send API credentials in URL query strings.
+`DISPATCH_AUTH_MODULE`. The ESM module exports async `authorize(request, response)`
+and must validate credentials/session and authorize every configured run. Return
+true only for authorized participants. Existing request-only modules remain
+compatible. To challenge a browser, end the response (for example with 401 and
+`WWW-Authenticate`) and return false; otherwise false produces 403. There is no
+per-user grant product in this UI. The adapter receives Node's IncomingMessage
+(cookie/authorization headers) and ServerResponse before any API request or shell
+is served. Do not send API credentials in URL query strings.
+
+For a single trusted participant, the shipped `basic-auth.js` module beside
+`main.js` supports the browser's native HTTP Basic sign-in dialog over HTTPS.
+Set `DISPATCH_BASIC_AUTH_FILE` to a private absolute JSON file with `username`,
+`salt` (16 random bytes, lowercase hex) and `hash` (64-byte Node scrypt result,
+lowercase hex). Generate the hash using `scrypt(password, Buffer.from(salt, "hex"),
+64, callback)` with Node defaults; keep the original password in your private
+credential manager. Every protected request, including SSE, validates it. All
+configured runs share that participant's authority. The proxy must pass
+Authorization unchanged and must not log it. Basic auth has no app logout button;
+close the browser session to forget cached credentials, or rotate the credential
+file and restart Web to revoke access. Never reuse a provider/service credential.
 TLS termination/proxy must preserve exact Host/Origin; backend binds loopback by
 default, or explicit `DISPATCH_HOST` in hosted mode. `/health` reveals readiness
 only and is unauthenticated. Browser SSE uses the same cookie authorization.
