@@ -3,7 +3,7 @@ import type { Runtime } from "./runtime.js";
 
 export function snapshotActivity(value: Snapshot): NonNullable<Chat["activity"]> {
   if (value.activity) return value.activity;
-  if (value.readOnlyReason?.includes("unavailable")) return "unavailable";
+  if (value.readOnly === "unavailable" || value.readOnlyReason?.includes("unavailable")) return "unavailable";
   if (value.retry || value.toolCalls?.some(call => call.status === "waiting") || value.toolCalls?.some(call => ["delegate", "clone_agent", "wait_for_agent"].includes(call.name) && ["running", "pending"].includes(call.status))) return "waiting";
   if (value.running || value.background || value.queued > 0) return "working";
   return value.turns?.at(-1)?.status === "unanswered" ? "unanswered" : "idle";

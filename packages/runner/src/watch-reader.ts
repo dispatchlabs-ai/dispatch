@@ -292,8 +292,10 @@ export async function readWatchCatalog(run: WatchRun): Promise<WatchCatalog> {
   for (const store of run.stores) try {
     conversations.push(...await withStore(store.path, db => {
       const registered = chats(db, store.namespace);
+      // Sort identifiers only, then fetch the winning record. Sorting full entry
+      // payloads spills large histories to temporary storage on every refresh.
       return db.prepare(`SELECT c.id,c.record,
-        (SELECT e.record FROM entries e WHERE e.conversation_id=c.id ORDER BY e.commit_seq,e.id LIMIT 1) AS first_entry,
+        (SELECT record FROM entries WHERE id=(SELECT e.id FROM entries e WHERE e.conversation_id=c.id ORDER BY e.commit_seq,e.id LIMIT 1)) AS first_entry,
         EXISTS(SELECT 1 FROM tasks t WHERE t.conversation_id=c.id AND t.status<>'terminal') AS active
         FROM conversations c ORDER BY c.id`).all().flatMap(row => {
           const record = parse(row.record), id = number(record.id), chat = registered.get(id);
@@ -304,7 +306,8 @@ export async function readWatchCatalog(run: WatchRun): Promise<WatchCatalog> {
           return [{ key: `${store.agent}:${id}`, agent: store.agent, conversationId: id,
             title: redact(chat?.title) || openingTitle(first) || store.agent,
             parentKey: Number.isSafeInteger(record.owner?.conversationId) ? `${store.agent}:${record.owner.conversationId}` : undefined,
-            startedAt: timestamp(chat?.createdAt) ?? timestamp(firstMessage?.timestamp) }];
+            startedAt: timestamp(chat?.createdAt) ?? timestamp(firstMessage?.timestamp),
+            registered: Boolean(chat), ...(typeof chat?.source === "string" ? { transport: chat.source } : {}) }];
         });
     }));
   } catch (error) { issues.push(`${store.agent}: ${errorText(error)}`); }
@@ -328,7 +331,7 @@ export async function readWatchRun(run: WatchRun, key?: string): Promise<WatchSn
           .all(...(selected === undefined ? [] : [selected])).map(row => parse(row.record));
         const rows = db.prepare(`SELECT c.record,
           (SELECT COUNT(*) FROM entries e WHERE e.conversation_id=c.id) AS entry_count,
-          (SELECT e.record FROM entries e WHERE e.conversation_id=c.id ORDER BY e.commit_seq,e.id LIMIT 1) AS first_entry,
+          (SELECT record FROM entries WHERE id=(SELECT e.id FROM entries e WHERE e.conversation_id=c.id ORDER BY e.commit_seq,e.id LIMIT 1)) AS first_entry,
           (SELECT COUNT(*) FROM tasks t WHERE t.conversation_id=c.id AND t.status='terminal' AND json_extract(t.record,'$.state.outcome.status')='failed') AS failed
           FROM conversations c ${selected === undefined ? "" : "WHERE c.id=?"} ORDER BY c.id`)
           .all(...(selected === undefined ? [] : [selected]));

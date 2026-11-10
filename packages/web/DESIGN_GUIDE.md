@@ -7,9 +7,18 @@
   Prompt Input/Input Group/Attachment and Sidebar menu primitives are composed
   with real APIs. See [notices and immutable sources](THIRD_PARTY.md). No Next,
   AI SDK, Gateway or second execution loop is imported.
-- Restrained neutral colors, readable streaming Markdown/code, compact searchable
-  history, circular Send and visible native Stop. Busy steering input remains available;
-  send/stop are not a cosmetic toggle that removes steering input.
+- Stock shadcn neutral tokens and the vendored registry style (`src/shadcn-style.css`)
+  style every primitive; `styles.css` holds app layout only. Readable streaming
+  Markdown/code (wrapped, no line numbers), circular Send with a square Stop beside
+  it while busy. Busy steering input remains available; send/stop are not a
+  cosmetic toggle that removes steering input. One status line, at most one banner.
+  The destructive colour is reserved for actual errors.
+- Kinds: a **chat** was started by a person (human transport) and always steers;
+  a **run** is agent/scheduled or unindexed work; a **worker** has a parent and is
+  read-only. Sidebar has Chats/Runs tabs with live badges, two-line rows, and
+  workers nested under their parent. A read-only conversation replaces the
+  composer with one neutral bar stating why, plus Open parent for workers. Never
+  redirect a message to another conversation while implying the worker got it.
 - Actual tool IDs/turns/assistant entries, retained arguments/results/errors and
   native task/live state drive expandable activity. Missing result is unavailable,
   not success; only native evidence establishes cancellation, waits or parentage.

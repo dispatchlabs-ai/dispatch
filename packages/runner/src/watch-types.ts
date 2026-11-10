@@ -27,5 +27,10 @@ export type WatchPage = {
 };
 
 /** Navigation metadata only; catalog reads do not infer execution status. */
-export type WatchCatalogConversation = Pick<WatchConversation, "key" | "agent" | "conversationId" | "title" | "parentKey" | "startedAt">;
+export type WatchCatalogConversation = Pick<WatchConversation, "key" | "agent" | "conversationId" | "title" | "parentKey" | "startedAt"> & {
+  /** Present in the native chat index (an addressable chat), not only a stored conversation. */
+  registered: boolean;
+  /** Indexed chat's originating transport, e.g. cli, web, slack, agent or schedule. */
+  transport?: string;
+};
 export type WatchCatalog = { conversations: WatchCatalogConversation[]; issues: string[] };

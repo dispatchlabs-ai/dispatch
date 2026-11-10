@@ -1,4 +1,5 @@
-import { Check, Clock, LoaderCircle, CircleAlert, Terminal, CircleStop } from 'lucide-react';
+import { useState } from 'react';
+import { Check, Clock, LoaderCircle, CircleAlert, Terminal, CircleStop, FileInput } from 'lucide-react';
 import { Trace, TraceLine, TraceIcon, TraceTitle, TraceDescription, TraceCollapsible, TraceCollapsibleTrigger, TraceCollapsibleContent } from './ui/trace';
 import { CodeBlock, CodeBlockContent } from './ui/code-block';
 import type { ToolCall } from '@/lib/contracts';
@@ -7,4 +8,9 @@ const formatted = (value: unknown) => typeof value === 'string' ? value : JSON.s
 export function ToolTrace({calls}: {calls: ToolCall[]}) {
   if (!calls.length) return null;
   return <Trace className="tool-trace" aria-label="Native tool calls">{calls.map(call => <TraceCollapsible key={call.id}><TraceCollapsibleTrigger><TraceLine status={call.status === 'failed' ? 'error' : call.status === 'running' ? 'running' : undefined}><TraceIcon>{call.status === 'completed' ? <Check/> : call.status === 'running' ? <LoaderCircle className="animate-spin"/> : call.status === 'cancelled' ? <CircleStop/> : call.status === 'pending' || call.status === 'waiting' ? <Clock/> : call.status === 'failed' ? <CircleAlert/> : <Terminal/>}</TraceIcon><TraceTitle title={title(call)}>{title(call)}</TraceTitle><TraceDescription>{call.status === 'unavailable' ? 'No retained result' : call.status === 'completed' ? 'Tool completed' : call.status}</TraceDescription></TraceLine></TraceCollapsibleTrigger><TraceCollapsibleContent><small>Call {call.callId} · native entry {call.entryId} · turn {call.turnId}{call.parentCallId ? ` · child of ${call.parentCallId}` : ""}</small>{[['Input',call.input],['Result',call.output],['Details',call.details],['Live output',call.progress]].map(([title,value]) => value !== undefined && <CodeBlock key={title as string}><strong>{title as string}</strong><CodeBlockContent wrap>{formatted(value)}</CodeBlockContent></CodeBlock>)}{call.output === undefined && <p>{call.status === 'running' || call.status === 'pending' || call.status === 'waiting' ? 'Awaiting a native result.' : 'Result payload unavailable. This does not establish success or cancellation.'}</p>}</TraceCollapsibleContent></TraceCollapsible>)}</Trace>;
+}
+/** Task-submitted prompt: collapsed by default; its text mounts only when opened. */
+export function TaskInput({text}: {text: string}) {
+  const [open, setOpen] = useState(false);
+  return <Trace className="tool-trace"><TraceCollapsible open={open} onOpenChange={setOpen}><TraceCollapsibleTrigger><TraceLine><TraceIcon><FileInput/></TraceIcon><TraceTitle>Task input</TraceTitle><TraceDescription>{text.length.toLocaleString()} characters</TraceDescription></TraceLine></TraceCollapsibleTrigger><TraceCollapsibleContent>{open && <pre className="task-input">{text}</pre>}</TraceCollapsibleContent></TraceCollapsible></Trace>;
 }

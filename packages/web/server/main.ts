@@ -133,7 +133,8 @@ const server = createServer(async (request, response) => {
     if (path.startsWith("/api/avatars/") && method === "GET") {
       const image = avatars.get(decodeURIComponent(path.slice("/api/avatars/".length)));
       if (!image) throw new HttpError(404, "Artwork unavailable.");
-      response.writeHead(200, { "content-type": image.mime }).end(image.bytes);
+      // Artwork is fixed per configuration; avoid refetching large images on every reload.
+      response.writeHead(200, { "content-type": image.mime, "cache-control": "private, max-age=86400" }).end(image.bytes);
       return;
     }
     if (path === "/api/sidebar/events" && method === "GET") {
@@ -299,10 +300,13 @@ const server = createServer(async (request, response) => {
         response.on("close", close);
         response.on("drain", flush);
         try {
+          let last = "";
           watch = await runtime.presentation.watch(id, async (snapshot) => {
             // Each frame is a full native projection: coalescing for a slow reader
             // cannot drop history. Do not block the runtime behind a browser.
-            pending = `event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`;
+            const frame = `event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`;
+            if (frame === last) return;
+            last = pending = frame;
             flush();
           });
           if (ended) await watch.stop();

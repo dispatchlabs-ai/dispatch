@@ -1,0 +1,254 @@
+/* shadcn/ui registry style "vega" (MIT), un-nested from `.style-vega { }` at
+   https://github.com/shadcn-ui/ui/blob/8ab27715521cbd4f87ae6886cd989cbb678f6de7/apps/v4/registry/styles/style-vega.css
+   Only rules for the cn-* classes used by src/components/ui are copied, verbatim.
+   See THIRD_PARTY.md. Do not edit locally; app layout lives in styles.css. */
+/* Layered so utility classes passed by components still override these defaults. */
+@layer components {
+/* Input */
+.cn-input {
+  @apply dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 h-9 rounded-md border bg-transparent px-2.5 py-1 text-base shadow-xs transition-[color,box-shadow] file:h-7 file:text-sm file:font-medium focus-visible:ring-3 aria-invalid:ring-3 md:text-sm;
+}
+
+/* Sidebar */
+.cn-sidebar-menu {
+  @apply gap-1;
+}
+.cn-sidebar-menu-button {
+  @apply ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground gap-2 rounded-md p-2 text-left text-sm transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! focus-visible:ring-2 data-active:font-medium;
+}
+.cn-sidebar-menu-button-variant-default {
+  @apply hover:bg-sidebar-accent hover:text-sidebar-accent-foreground;
+}
+.cn-sidebar-menu-button-variant-outline {
+  @apply bg-background hover:bg-sidebar-accent hover:text-sidebar-accent-foreground shadow-[0_0_0_1px_var(--sidebar-border)] hover:shadow-[0_0_0_1px_var(--sidebar-accent)];
+}
+.cn-sidebar-menu-button-size-default {
+  @apply h-8 text-sm;
+}
+.cn-sidebar-menu-button-size-sm {
+  @apply h-7 text-xs;
+}
+.cn-sidebar-menu-button-size-lg {
+  @apply h-12 text-sm group-data-[collapsible=icon]:p-0!;
+}
+
+/* Textarea */
+.cn-textarea {
+  @apply border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-md border bg-transparent px-2.5 py-2 text-base shadow-xs transition-[color,box-shadow] focus-visible:ring-3 aria-invalid:ring-3 md:text-sm;
+}
+
+/* Input Group */
+.cn-input-group {
+  @apply border-input dark:bg-input/30 has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50 has-[[data-slot][aria-invalid=true]]:ring-destructive/20 has-[[data-slot][aria-invalid=true]]:border-destructive dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40 h-9 rounded-md border shadow-xs transition-[color,box-shadow] in-data-[slot=combobox-content]:focus-within:border-inherit in-data-[slot=combobox-content]:focus-within:ring-0 has-[[data-slot=input-group-control]:focus-visible]:ring-3 has-[[data-slot][aria-invalid=true]]:ring-3 has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>[data-align=block-end]]:[&>input]:pt-3 has-[>[data-align=block-start]]:[&>input]:pb-3 has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5;
+}
+.cn-input-group-addon {
+  @apply text-muted-foreground h-auto gap-2 py-1.5 text-sm font-medium group-data-[disabled=true]/input-group:opacity-50 [&>kbd]:rounded-[calc(var(--radius)-5px)] [&>svg:not([class*='size-'])]:size-4;
+}
+.cn-input-group-addon-align-inline-start {
+  @apply pl-2 has-[>button]:-ml-1 has-[>kbd]:ml-[-0.15rem];
+}
+.cn-input-group-addon-align-inline-end {
+  @apply pr-2 has-[>button]:-mr-1 has-[>kbd]:mr-[-0.15rem];
+}
+.cn-input-group-addon-align-block-start {
+  @apply px-2.5 pt-2 group-has-[>input]/input-group:pt-2 [.border-b]:pb-2;
+}
+.cn-input-group-addon-align-block-end {
+  @apply px-2.5 pb-2 group-has-[>input]/input-group:pb-2 [.border-t]:pt-2;
+}
+.cn-input-group-button {
+  @apply gap-2 text-sm;
+}
+.cn-input-group-button-size-xs {
+  @apply h-6 gap-1 rounded-[calc(var(--radius)-5px)] px-1.5 [&>svg:not([class*='size-'])]:size-3.5;
+}
+.cn-input-group-button-size-icon-xs {
+  @apply size-6 rounded-[calc(var(--radius)-5px)] p-0 has-[>svg]:p-0;
+}
+.cn-input-group-button-size-icon-sm {
+  @apply size-8 p-0 has-[>svg]:p-0;
+}
+.cn-input-group-text {
+  @apply text-muted-foreground gap-2 text-sm [&_svg:not([class*='size-'])]:size-4;
+}
+.cn-input-group-input {
+  @apply rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:ring-0 aria-invalid:ring-0 dark:bg-transparent;
+}
+.cn-input-group-textarea {
+  @apply rounded-none border-0 bg-transparent py-2 shadow-none ring-0 focus-visible:ring-0 aria-invalid:ring-0 dark:bg-transparent;
+}
+
+/* Bubble */
+.cn-bubble {
+  @apply gap-1 data-[align=end]:self-end max-w-[80%] data-[variant=ghost]:max-w-full group-data-[align=end]/message:self-end;
+}
+.cn-bubble-content {
+  @apply rounded-xl border border-transparent px-3 py-2 text-sm leading-relaxed [button,a]:outline-none [button,a]:focus-visible:border-ring [button,a]:focus-visible:ring-3 [button,a]:focus-visible:ring-ring/50 group-data-[align=end]/bubble:self-end;
+}
+.cn-bubble-variant-default {
+  @apply *:data-[slot=bubble-content]:bg-primary *:data-[slot=bubble-content]:text-primary-foreground [&>[data-slot=bubble-content]:is(button,a):hover]:bg-primary/80;
+}
+.cn-bubble-variant-secondary {
+  @apply *:data-[slot=bubble-content]:bg-secondary *:data-[slot=bubble-content]:text-secondary-foreground [&>[data-slot=bubble-content]:is(button,a):hover]:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)];
+}
+.cn-bubble-variant-muted {
+  @apply *:data-[slot=bubble-content]:bg-muted [&>[data-slot=bubble-content]:is(button,a):hover]:bg-[color-mix(in_oklch,var(--muted),var(--foreground)_5%)];
+}
+.cn-bubble-variant-tinted {
+  @apply *:data-[slot=bubble-content]:bg-[oklch(from_var(--primary)_0.93_calc(c*0.4)_h)] dark:*:data-[slot=bubble-content]:bg-[oklch(from_var(--primary)_0.3_calc(c*0.4)_h)] *:data-[slot=bubble-content]:text-foreground [&>[data-slot=bubble-content]:is(button,a):hover]:bg-[oklch(from_var(--primary)_0.88_calc(c*0.5)_h)] dark:[&>[data-slot=bubble-content]:is(button,a):hover]:bg-[oklch(from_var(--primary)_0.35_calc(c*0.5)_h)];
+}
+.cn-bubble-variant-outline {
+  @apply *:data-[slot=bubble-content]:bg-background *:data-[slot=bubble-content]:border-border [&>[data-slot=bubble-content]:is(button,a):hover]:bg-muted [&>[data-slot=bubble-content]:is(button,a):hover]:text-foreground dark:[&>[data-slot=bubble-content]:is(button,a):hover]:bg-input/30;
+}
+.cn-bubble-variant-ghost {
+  @apply *:data-[slot=bubble-content]:rounded-none *:data-[slot=bubble-content]:bg-transparent *:data-[slot=bubble-content]:p-0 [&>[data-slot=bubble-content]:is(button,a):hover]:bg-muted [&>[data-slot=bubble-content]:is(button,a):hover]:text-foreground dark:[&>[data-slot=bubble-content]:is(button,a):hover]:bg-muted/50 border-none;
+}
+.cn-bubble-variant-destructive {
+  @apply *:data-[slot=bubble-content]:bg-destructive/10 dark:*:data-[slot=bubble-content]:bg-destructive/20 *:data-[slot=bubble-content]:text-destructive [&>[data-slot=bubble-content]:is(button,a):hover]:bg-destructive/20 dark:[&>[data-slot=bubble-content]:is(button,a):hover]:bg-destructive/30;
+}
+.cn-bubble-reactions {
+  @apply rounded-full ring-3 ring-card bg-muted shrink-0 gap-1 px-1.5 py-0.5 has-[button]:p-0 text-sm;
+}
+.cn-bubble-reactions-side-top {
+  @apply top-0 -translate-y-3/4;
+}
+.cn-bubble-reactions-side-bottom {
+  @apply bottom-0 translate-y-3/4;
+}
+.cn-bubble-reactions-align-start {
+  @apply left-3;
+}
+.cn-bubble-reactions-align-end {
+  @apply right-3;
+}
+.cn-bubble-group {
+  @apply gap-2;
+}
+
+/* Attachment */
+.cn-attachment {
+  @apply rounded-xl w-fit focus-within:ring-1 focus-within:ring-ring/50;
+}
+.cn-attachment-orientation-horizontal {
+  @apply min-w-40;
+}
+.cn-attachment-orientation-vertical {
+  @apply w-24 has-data-[slot=attachment-content]:w-30;
+}
+.cn-attachment-size-default {
+  @apply gap-2 has-data-[slot=attachment-content]:px-2.5 has-data-[slot=attachment-content]:py-2 has-data-[slot=attachment-media]:p-2 text-sm;
+}
+.cn-attachment-size-sm {
+  @apply gap-2.5 has-data-[slot=attachment-content]:px-2 has-data-[slot=attachment-content]:py-1.5 has-data-[slot=attachment-media]:p-1.5 text-xs;
+}
+.cn-attachment-size-xs {
+  @apply gap-1.5 has-data-[slot=attachment-content]:px-1.5 has-data-[slot=attachment-content]:py-1 has-data-[slot=attachment-media]:p-1 text-xs rounded-lg;
+}
+.cn-attachment-media {
+  @apply bg-muted text-foreground w-10 rounded-lg group-data-[size=sm]/attachment:w-8 group-data-[size=xs]/attachment:w-7 group-data-[size=xs]/attachment:rounded-md [&_svg:not([class*='size-'])]:size-4 group-data-[size=xs]/attachment:[&_svg:not([class*='size-'])]:size-3.5 group-data-[orientation=vertical]/attachment:w-full group-data-[orientation=vertical]/attachment:[&_svg:not([class*='size-'])]:size-6 group-data-[orientation=vertical]/attachment:*:data-[slot=spinner]:size-6!;
+}
+.cn-attachment-media-variant-image {
+  @apply opacity-60 group-data-[state=idle]/attachment:opacity-100 group-data-[state=done]/attachment:opacity-100;
+}
+.cn-attachment-content {
+  @apply leading-tight group-data-[orientation=vertical]/attachment:px-1;
+}
+.cn-attachment-title {
+  @apply font-medium;
+}
+.cn-attachment-description {
+  @apply mt-0.5 text-xs;
+}
+.cn-attachment-actions {
+  @apply group-data-[orientation=vertical]/attachment:absolute group-data-[orientation=vertical]/attachment:top-3 group-data-[orientation=vertical]/attachment:right-3 relative z-20 group-data-[orientation=vertical]/attachment:gap-1;
+}
+.cn-attachment-group {
+  @apply gap-3 scroll-px-1 py-1;
+}
+.cn-attachment-trigger {
+  @apply absolute inset-0 z-10 outline-none;
+}
+
+/* Trace */
+.cn-trace {
+  @apply gap-2 *:has-[>[data-slot=trace-line]]:rounded-md *:has-[>[data-slot=trace-line]]:focus-visible:ring-3 *:has-[>[data-slot=trace-line]]:focus-visible:ring-ring/50;
+}
+.cn-trace-collapsible-trigger {
+  @apply gap-1 rounded-md focus-visible:ring-3 focus-visible:ring-ring/50;
+}
+.cn-trace-line {
+  @apply gap-2 text-sm;
+}
+.cn-trace-icon {
+  @apply size-4 [&_svg:not([class*='size-'])]:size-4 [[data-slot=trace-title]~&]:-ml-1;
+}
+.cn-trace-collapsible-content {
+  @apply duration-200;
+}
+.cn-trace-collapsible-content-inner {
+  @apply mt-2 mb-1 ml-[calc(--spacing(2)-1px)] border-l pr-1 pl-4 leading-relaxed;
+}
+
+/* Code Block */
+.cn-code-block {
+  @apply rounded-lg text-sm data-[size=sm]:text-xs has-[>[data-slot=code-block-content]:focus-visible]:ring-3 has-[>[data-slot=code-block-content]:focus-visible]:ring-ring/50;
+}
+.cn-code-block-variant-default {
+  @apply border border-input text-foreground dark:bg-input/30 has-[>[data-slot=code-block-content]:focus-visible]:border-ring;
+}
+.cn-code-block-variant-destructive {
+  @apply border border-destructive/30 text-destructive dark:border-destructive/40;
+}
+.cn-code-block-header {
+  @apply gap-2 px-4 pt-4 text-muted-foreground group-data-[variant=destructive]/code-block:text-destructive group-data-[size=sm]/code-block:px-3 group-data-[size=sm]/code-block:pt-3;
+}
+.cn-code-block-footer {
+  @apply gap-2 px-4 pb-4 text-muted-foreground group-data-[size=sm]/code-block:px-3 group-data-[size=sm]/code-block:pb-3;
+}
+.cn-code-block-title {
+  @apply font-sans text-sm font-medium text-foreground group-data-[variant=destructive]/code-block:text-destructive *:[svg]:me-1.5 [&_svg:not([class*='size-'])]:size-4 group-data-[size=sm]/code-block:text-xs group-data-[size=sm]/code-block:[&_svg:not([class*='size-'])]:size-3.5;
+}
+.cn-code-block-actions {
+  @apply -my-1 -me-1.5 gap-1 [[data-slot=code-block]>&]:m-0 [[data-slot=code-block]>&]:top-3 [[data-slot=code-block]>&]:end-3 group-data-[size=sm]/code-block:[[data-slot=code-block]>&]:top-2 group-data-[size=sm]/code-block:[[data-slot=code-block]>&]:end-2 [[data-slot=code-block]>&]:*:[button]:bg-background [[data-slot=code-block]>&]:*:[button]:ring-1 [[data-slot=code-block]>&]:*:[button]:ring-foreground/10;
+}
+.cn-code-block-content {
+  @apply px-4 py-4 leading-relaxed group-has-data-[slot=code-block-header]/code-block:pt-2 group-has-data-[slot=code-block-footer]/code-block:pb-2 group-data-[size=sm]/code-block:px-3 group-data-[size=sm]/code-block:py-3 group-data-[size=sm]/code-block:group-has-data-[slot=code-block-header]/code-block:pt-1.5;
+}
+.cn-code-block-line {
+  @apply -mx-4 px-4 in-data-numbered:gap-x-3 before:min-w-6 before:text-end before:text-muted-foreground after:start-1 after:text-muted-foreground group-data-[size=sm]/code-block:-mx-3 group-data-[size=sm]/code-block:px-3;
+}
+.cn-code-block-line-variant-highlighted {
+  @apply bg-muted;
+}
+.cn-code-block-line-variant-added {
+  @apply bg-muted after:content-['+'];
+}
+.cn-code-block-line-variant-removed {
+  @apply bg-destructive/10 after:text-destructive after:content-['−'];
+}
+
+/* Message Scroller */
+.cn-message-scroller-content {
+  @apply gap-8;
+}
+
+/* Message */
+.cn-message {
+  @apply text-sm gap-2;
+}
+.cn-message-avatar {
+  @apply min-w-8 group-has-data-[slot=message-footer]/message:-translate-y-8;
+}
+.cn-message-content {
+  @apply gap-2.5 group-data-[align=end]/message:*:data-slot:self-end;
+}
+.cn-message-header {
+  @apply text-xs font-medium text-muted-foreground px-3 group-has-data-[variant=ghost]/message:px-0;
+}
+.cn-message-footer {
+  @apply text-xs font-medium text-muted-foreground px-3 group-has-data-[variant=ghost]/message:px-0;
+}
+.cn-message-group {
+  @apply gap-2;
+}
+}

@@ -24,7 +24,7 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
     throw new Error("service.stateRoot must be a native session directory at or within its configured source.");
   const stores = createStores({ sources }, reader);
   const idFor = (chat: Chat) => identity(join(root, chat.agent, "session.sqlite"), chat.conversationId);
-  const project = (chat: Chat): Chat => ({ ...chat, capabilities: config.capabilities, id: idFor(chat), source: source.id, sourceLabel: source.label, session,
+  const project = (chat: Chat): Chat => ({ ...chat, capabilities: config.capabilities, addressable: true, id: idFor(chat), source: source.id, sourceLabel: source.label, session,
     ...(chat.parentId ? { parentId: identity(join(root, chat.agent, "session.sqlite"), Number(chat.parentId.split(":").at(-1))) } : {}) });
   let connected: Runtime | undefined;
   let connecting: Promise<Runtime> | undefined;
@@ -67,7 +67,13 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
     });
     if (!value) {
       const saved = await stores.snapshot(id);
-      return { ...saved, chat: { ...saved.chat, capabilities: config.capabilities } };
+      const chat = { ...saved.chat, capabilities: config.capabilities, addressable: false };
+      if (saved.readOnly === "worker") return { ...saved, chat };
+      // `read` records an issue only when the service did not answer.
+      if (issue) return { ...saved, chat, readOnly: "unavailable", readOnlyReason: issue };
+      // Another session's live CLI owner is the actual route; otherwise the service chose not to list it.
+      if (saved.readOnly === "owner" && (await stores.get(id)).run.path !== root) return { ...saved, chat };
+      return { ...saved, chat, readOnly: "internal", readOnlyReason: "Not exposed by this installation's service." };
     }
     // Older owners may omit optional turn projections. Read the same native
     // records without resuming them; never derive cancellation from idle state.
@@ -91,7 +97,7 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
     summary: async () => {
       const saved = await stores.summary();
       const live = await read(async runtime => runtime.summary!());
-      const all = new Map<string, Chat>(saved.map(chat => [chat.id, { ...chat, capabilities: config.capabilities }]));
+      const all = new Map<string, Chat>(saved.map(chat => [chat.id, { ...chat, capabilities: config.capabilities, addressable: false }]));
       for (const chat of live?.chats ?? []) { const value = project(chat); all.set(value.id, value); }
       return { agents: live?.agents ?? agents, chats: [...all.values()], sources: (await stores.statuses()).map(status => ({ ...status, issues: [...status.issues, ...(live?.sources.find(source => source.id === status.id)?.issues ?? []), ...(status.id === source.id && issue ? [issue] : [])] })) };
     },
@@ -104,7 +110,7 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
         return (await stores.statuses()).map(status => status.id === source.id && issue ? { ...status, issues: [...status.issues, issue] } : status);
       },
       async list() {
-        const all = new Map<string, Chat>((await stores.list()).map(chat => [chat.id, { ...chat, capabilities: config.capabilities }]));
+        const all = new Map<string, Chat>((await stores.list()).map(chat => [chat.id, { ...chat, capabilities: config.capabilities, addressable: false }]));
         for (const chat of await chats()) { const value = project(chat); all.set(value.id, value); }
         return [...all.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       },

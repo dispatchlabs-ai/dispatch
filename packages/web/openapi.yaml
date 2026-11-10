@@ -945,7 +945,17 @@
             "type": "string"
           },
           "parentId": {
-            "type": "string"
+            "type": "string",
+            "description": "Owning conversation of a task-run worker. Workers are read-only; steer the parent."
+          },
+          "transport": {
+            "type": "string",
+            "enum": ["cli", "web", "slack", "google-chat", "phone", "email", "agent", "schedule"],
+            "description": "Native transport that started an indexed chat. Absent for conversations outside the chat index."
+          },
+          "addressable": {
+            "type": "boolean",
+            "description": "Whether this installation can currently send to the conversation."
           },
           "capabilities": {
             "$ref": "#/components/schemas/Capabilities"
@@ -1137,9 +1147,14 @@
           "compactionFailure": {
             "$ref": "#/components/schemas/CompactionFailure"
           },
+          "readOnly": {
+            "type": "string",
+            "enum": ["worker", "internal", "owner", "unavailable"],
+            "description": "Why sending is unavailable: task-run worker, internal service conversation, another process owns it, or the service is unreachable."
+          },
           "readOnlyReason": {
             "type": "string",
-            "description": "Observed external owner and recovery. Other compatibility errors are returned on explicit admission."
+            "description": "Display sentence for readOnly. Other compatibility errors are returned on explicit admission."
           },
           "observation": {
             "type": "string",

@@ -225,7 +225,7 @@ export async function openCentralRuntime(config: CentralConfig) {
         try {
           await read(run.id, agent.id, async (db) => {
             const doc = (await readDocument(db, `${namespace}.chats`)) as
-              { byId?: Record<string, Chat> } | undefined;
+              { byId?: Record<string, NativeChat> } | undefined;
             const indexed = new Map(
               Object.values(doc?.byId ?? {}).map((chat) => [
                 chat.conversationId,
@@ -246,6 +246,7 @@ export async function openCentralRuntime(config: CentralConfig) {
                 conversationId: conversation.id,
                 title: saved?.title ?? `Native conversation ${conversation.id}`,
                 source: saved?.source ?? "native",
+                ...(saved?.source ? { transport: saved.source } : {}),
                 createdAt: saved?.createdAt ?? "",
                 sourceLabel: run.id,
                 session: run.id,
@@ -293,7 +294,7 @@ export async function openCentralRuntime(config: CentralConfig) {
       if (live)
         return {
           ...live,
-          chat: { ...live.chat, id, sourceLabel: item.run, session: item.run },
+          chat: { ...live.chat, id, transport: live.chat.source, sourceLabel: item.run, session: item.run },
         };
     }
     return read(item.run, item.agent, async (db) => {
@@ -302,7 +303,7 @@ export async function openCentralRuntime(config: CentralConfig) {
       const index = await readDocument(db, `${namespace}.chats`) as {byId?: Record<string, NativeChat>} | undefined;
       const saved = index?.byId?.[item.native];
       const chat: Chat = {id, agent:item.agent, conversationId:item.conversation, title:saved?.title ?? `Native conversation ${item.conversation}`,
-        source:saved?.source ?? "native", createdAt:saved?.createdAt ?? "", sourceLabel:item.run, session:item.run,
+        source:saved?.source ?? "native", ...(saved?.source ? {transport:saved.source} : {}), createdAt:saved?.createdAt ?? "", sourceLabel:item.run, session:item.run,
         ...(conversation.owner ? {parentId:chatId(item.run,item.agent,conversation.owner.conversationId)} : {})};
       const entries = await pages((cursor) =>
         db.scanEntries(

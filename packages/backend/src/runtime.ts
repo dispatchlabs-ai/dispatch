@@ -386,6 +386,11 @@ async function openLocalRuntime(config: LocalConfig) {
     const item = await stores.get(id);
     return { ...await stores.snapshot(id), chat: projectChat(item) };
   };
+  const unavailableSnapshot = async (id: string): Promise<Snapshot> => {
+    const saved = await savedSnapshot(id);
+    return saved.readOnly === "worker" ? saved : { ...saved, readOnly: "unavailable",
+      readOnlyReason: "Native service unavailable. Reconnect its original launcher; no work was resent or resumed." };
+  };
   const service = {
     agents,
     sources: stores.statuses,
@@ -472,9 +477,7 @@ async function openLocalRuntime(config: LocalConfig) {
     const item = await stores.get(id);
     let shared: NativeService | undefined;
     try { shared = await discovered(item.run.path); }
-    catch {
-      return { ...await savedSnapshot(id), readOnlyReason: "Native service unavailable. Reconnect its original launcher; no work was resent or resumed." };
-    }
+    catch { return unavailableSnapshot(id); }
     const owner = shared ? { service: shared } : owners.get(join(item.run.path, item.chat.agent));
     if (owner) {
       try {
@@ -486,7 +489,7 @@ async function openLocalRuntime(config: LocalConfig) {
       } catch {
         // A disconnected native chat stays observational; never create a writer.
         if (shared && sessionDocument(item.store.path, `${item.store.namespace}.chats`)?.byId?.[nativeId(item)])
-          return { ...await savedSnapshot(id), readOnlyReason: "Native service unavailable. Reconnect its original launcher; no work was resent or resumed." };
+          return unavailableSnapshot(id);
         /* Non-index children still use the native read-only reader. */
       }
     }

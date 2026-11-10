@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Style every shadcn primitive from the pinned registry style with standard neutral tokens; fix Streamdown code block frames and controls; wrap JSON without line numbers.
+- Split the sidebar into Chats and Runs with live badges, two-line rows, nested read-only workers with Open parent, dated history and search across every kind; keep New conversation available whatever is selected.
+- Replace the generic red ownership warning with a neutral read-only bar stating the actual reason; show task inputs as collapsed rows; group consecutive messages; one status line with Stop beside Send.
+- Skip unchanged chat stream frames and cache avatar artwork for a day.
+
 - Live native sidebar summaries, remembered drag/keyboard resizing, approved consumer avatar bindings and persisted AI presentation titles compatible with existing owners.
 
 - Keep bounded sign-in uploads and password verification outside session-state serialization so reads, logout and stream expiry remain responsive.

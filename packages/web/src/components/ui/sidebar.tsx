@@ -68,7 +68,8 @@ function SidebarMenuButton({
       data-slot="sidebar-menu-button"
       data-sidebar="menu-button"
       data-size={size}
-      data-active={isActive}
+      // Tailwind's data-active: variant matches presence, so omit it when inactive.
+      data-active={isActive || undefined}
       className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
       title={tooltip}
       {...props}

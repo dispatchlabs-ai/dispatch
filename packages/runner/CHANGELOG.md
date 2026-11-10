@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Avoid sorting entry payloads during saved conversation discovery and selected-history polling, reducing large-history loading cost without truncating history. Catalog entries report chat-index registration and originating transport.
+
 - Expose read-only task/submission sidebar states without fetching conversation transcripts.
 
 - Always steer active work for ordinary user chat input at native boundaries; keep internal peer/schedule policies and explicit Stop unchanged.

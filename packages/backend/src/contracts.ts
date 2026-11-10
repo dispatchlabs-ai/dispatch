@@ -19,7 +19,12 @@ export interface Chat {
   createdAt: string;
   sourceLabel?: string;
   session?: string;
+  /** Owning conversation of a task-run worker. Workers are observable, not steerable. */
   parentId?: string;
+  /** Native transport that started an indexed chat; absent for unindexed conversations. */
+  transport?: "cli" | "web" | "slack" | "google-chat" | "phone" | "email" | "agent" | "schedule";
+  /** Whether this Web installation can currently send to the conversation. */
+  addressable?: boolean;
 }
 export interface ChatMessage {
   provenance: "user" | "agent" | "runtime";
@@ -53,6 +58,8 @@ export interface Snapshot {
   turns?: ChatTurn[];
   toolCalls?: ChatToolCall[];
   observation?: string;
+  /** Why sending is unavailable; readOnlyReason carries the display sentence. */
+  readOnly?: "worker" | "internal" | "owner" | "unavailable";
   readOnlyReason?: string;
   chat: Chat;
   messages: ChatMessage[];

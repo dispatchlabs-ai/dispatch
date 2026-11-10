@@ -28,6 +28,8 @@ export interface CatalogConversation {
   title: string;
   parentKey?: string;
   startedAt?: number;
+  registered?: boolean;
+  transport?: string;
 }
 export interface Conversation extends CatalogConversation {
   active: number;
@@ -180,6 +182,26 @@ export function provenance(
     return { provenance: "agent", author: data?.from ?? "Agent message" };
   return { provenance: "runtime" };
 }
+const transports = new Set<string>(["cli", "web", "slack", "google-chat", "phone", "email", "agent", "schedule"]);
+function catalogChat(conversation: CatalogConversation, store: Store, run: Run, source: Source): Chat {
+  const id = identity(store.path, conversation.conversationId);
+  return {
+    id,
+    agent: conversation.agent,
+    conversationId: conversation.conversationId,
+    title: conversation.title,
+    source: source.id,
+    sourceLabel: source.label,
+    session: run.session,
+    createdAt: new Date(conversation.startedAt ?? 0).toISOString(),
+    addressable: conversation.registered === true,
+    ...(conversation.transport && transports.has(conversation.transport)
+      ? { transport: conversation.transport as Chat["transport"] } : {}),
+    ...(conversation.parentKey
+      ? { parentId: identity(store.path, Number(conversation.parentKey.split(":").at(-1))) }
+      : {}),
+  };
+}
 export function createStores(config: Pick<LocalConfig, "sources">, reader: Reader) {
   let selections = new Map<string, Selection>();
   let statuses: SourceStatus[] = [];
@@ -237,26 +259,8 @@ export function createStores(config: Pick<LocalConfig, "sources">, reader: Reade
             const store = run.stores.find(
               (item) => item.agent === conversation.agent,
             )!;
-            const id = identity(store.path, conversation.conversationId);
-            const chat: Chat = {
-              id,
-              agent: conversation.agent,
-              conversationId: conversation.conversationId,
-              title: conversation.title,
-              source: source.id,
-              sourceLabel: source.label,
-              session: run.session,
-              createdAt: new Date(conversation.startedAt ?? 0).toISOString(),
-              ...(conversation.parentKey
-                ? {
-                    parentId: identity(
-                      store.path,
-                      Number(conversation.parentKey.split(":").at(-1)),
-                    ),
-                  }
-                : {}),
-            };
-            next.set(id, { chat, store, run, conversation, source });
+            const chat = catalogChat(conversation, store, run, source);
+            next.set(chat.id, { chat, store, run, conversation, source });
           }
         }
         if (!discovery.runs.length && !discovery.issues.length)
@@ -290,13 +294,11 @@ export function createStores(config: Pick<LocalConfig, "sources">, reader: Reade
           if (catalog.issues.length) { invalidated = true; continue; }
           for (const conversation of catalog.conversations) {
             const store = run.stores.find(store => store.agent === conversation.agent)!;
-            const id = identity(store.path, conversation.conversationId);
-            const previous = selections.get(id);
-            const chat: Chat = { ...(previous?.chat ?? { id, agent: conversation.agent, conversationId: conversation.conversationId,
-              source: source.id, sourceLabel: source.label, session: run.session,
-              createdAt: new Date(conversation.startedAt ?? 0).toISOString(),
-              ...(conversation.parentKey ? { parentId: identity(store.path, Number(conversation.parentKey.split(":").at(-1))) } : {}) }), title: conversation.title };
-            selections.set(id, { chat, store, run, conversation, source });
+            const fresh = catalogChat(conversation, store, run, source);
+            const previous = selections.get(fresh.id);
+            // Keep the first observed creation time; index metadata may arrive later.
+            const chat: Chat = previous ? { ...fresh, createdAt: previous.chat.createdAt } : fresh;
+            selections.set(chat.id, { chat, store, run, conversation, source });
           }
         }
       })().finally(() => { pending = undefined; });
@@ -383,9 +385,10 @@ export function createStores(config: Pick<LocalConfig, "sources">, reader: Reade
         demo: false,
         background: false,
         observation: conversation.activity,
-        readOnlyReason: item.store.pids.length
-          ? `Owned by native process ${item.store.pids.join(", ")}. Finish/suspend it in its original CLI or service before sending here. History remains available.`
-          : undefined,
+        ...(item.conversation.parentKey ? { readOnly: "worker" as const, readOnlyReason: "Worker conversation run by a task. Steer its parent." }
+          : !item.conversation.registered ? { readOnly: "internal" as const, readOnlyReason: "Internal service conversation." }
+          : item.store.pids.length ? { readOnly: "owner" as const, readOnlyReason: `Owned by native process ${item.store.pids.join(", ")}. Send from that process's CLI.` }
+          : {}),
       };
     },
   };

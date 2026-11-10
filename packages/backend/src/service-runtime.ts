@@ -46,7 +46,8 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
   const catalog = async () => (await call({ method: "agents" })).map(agent => ({ ...agent, capabilities }));
   const agents = await catalog();
   let lastChats: Chat[] = [];
-  const project = (chat: NativeChat): Chat => ({ ...chat, source, sourceLabel: label, capabilities });
+  // Chat.source names the configured source; the native value is the starting transport.
+  const project = (chat: NativeChat): Chat => ({ ...chat, transport: chat.source, source, sourceLabel: label, capabilities, addressable: true });
   const snapshot = async (id: string): Promise<Snapshot> => {
     const value = await call({ method: "snapshot", id });
     return { ...value, chat: project(value.chat), messages: value.messages.map(message => ({ ...message,

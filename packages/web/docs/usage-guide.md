@@ -90,7 +90,11 @@ start normally. There is no queue/steer selector; Stop remains explicit.
 Browsing includes configured CLI/workflow-child SQLite histories and committed
 WAL without acquiring native locks, opening Harness, connecting models, migrating
 or resuming work. Canonical file identity deduplicates overlapping sources.
-Send/Stop require a native Chats entry. Child work is controlled through its parent.
+Send/Stop require a native Chats entry. Task-run workers (conversations with a
+parent) are read-only: their owning task parses their output, so a human message
+would break its contract. Open the parent and steer it instead. The read-only bar
+states the actual reason: worker, internal service conversation, another process
+owns it, or the service is unreachable.
 Definitions, namespace, execution mode, cwd, host adapters and schema must match.
 Workspace/custom artifact host bindings require their original configured CLI.
 
@@ -147,16 +151,26 @@ linked conversation. Existing draft text/files are retained. Selecting a sidebar
 conversation leaves the link and resumes ordinary selection behavior. A service
 configured without creation hides New conversation and is excluded from the new
 conversation agent picker; existing histories/replies and Stop remain available.
+New conversation stays visible while any agent allows creation, whatever is selected.
 
 ## Live navigation and presentation bindings
 
 The sidebar subscribes to authenticated `/api/sidebar/events`. Initial and reconnect
 frames contain the full agent/history/source catalog; later frames coalesce native
-observations shared by all browser clients. Active work stays above saved history,
-ordered by conversation creation (not streaming chunks). Working/Waiting come from
-native tasks. Unavailable is not completed; Saved means retained history, not a
-successful project outcome. Search also matches exact agent, source, session,
-native title and conversation IDs. Source issues remain visible.
+observations shared by all browser clients. **Chats** lists conversations started
+by a person (CLI, Web, Slack and other human transports); **Runs** lists agent and
+scheduled work and anything outside the chat index. Each tab badge counts its
+working or waiting conversations. Workers nest under their parent (expand the
+count); the selected conversation's ancestors open automatically. Active work stays
+above history grouped Today/Yesterday/Earlier, ordered by creation (not streaming
+chunks); "Show older" limits rendering only. Working/Waiting come from native
+tasks; a hollow dot means unconfirmed while the stream reconnects. Search covers
+every kind, labels workers "worker of …" and also matches exact agent, source,
+session, native title and conversation IDs. Source issues remain visible.
+
+Prompts submitted by a task appear as collapsed "Task input" rows; their text
+loads only when expanded. An unchanged selected conversation sends one frame, then
+keepalives only.
 
 Drag the desktop divider to resize navigation; Left/Right, Home and End work when
 it has keyboard focus. Width is remembered locally and constrained only to leave
