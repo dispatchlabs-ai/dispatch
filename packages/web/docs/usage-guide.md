@@ -27,8 +27,23 @@ per-user grant product in this UI. The adapter receives Node's IncomingMessage
 (cookie/authorization headers) and ServerResponse before any API request or shell
 is served. Do not send API credentials in URL query strings.
 
-For a single trusted participant, the shipped `basic-auth.js` module beside
-`main.js` supports the browser's native HTTP Basic sign-in dialog over HTTPS.
+For normal browser sign-in, select shipped `session-auth.js` beside `main.js`
+and set `DISPATCH_SESSION_AUTH_FILE` to the same credential format described
+below. Anonymous page visits redirect to `/login`, a native HTML form; API/SSE
+requests return 401 without a Basic challenge. Sign-in sets a host-only
+`__Host-dispatch_session` cookie (Secure, HttpOnly, SameSite=Strict) for twelve
+hours. Sessions are memory-only, revoked on Web restart; POST `/logout` revokes
+that session. Visit `/login` while signed in to open the sign-out control.
+The server uses `Referrer-Policy: same-origin` so native form POSTs retain the
+exact Origin required by the existing protections; proxies must preserve that
+policy. Login requires the exact Origin and form encoding, with a small bounded
+credential body and six attempts/minute across the single participant. No return
+URL is accepted. Sessions do not transfer drafts or native state, and sign-out
+does not clear browser drafts or stop agent work.
+
+For non-browser clients that explicitly support HTTP Basic, the optional
+`basic-auth.js` module beside `main.js` remains available. Some embedded browsers
+do not expose its challenge dialog; prefer session authentication for browser use.
 Set `DISPATCH_BASIC_AUTH_FILE` to a private absolute JSON file with `username`,
 `salt` (16 random bytes, lowercase hex) and `hash` (64-byte Node scrypt result,
 lowercase hex). Generate the hash using `scrypt(password, Buffer.from(salt, "hex"),

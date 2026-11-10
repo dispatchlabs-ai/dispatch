@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Offer normal hosted HTML sign-in and expiring, revocable protected session cookies without browser Basic-auth dialogs; preserve exact-origin form protection.
+
 - Support browser authentication challenges from trusted hosted authorization modules; ship a single-participant HTTPS Basic module with consumer-owned scrypt credentials.
 
 - Attach shared owners through Backend; distinguish accepted Stop, native stopped turns and completed tools/turns. Preserve same-origin Agent Chat selection and uncertain draft/file outboxes.

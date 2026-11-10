@@ -78,7 +78,7 @@ async function protect(request: IncomingMessage, response: ServerResponse, path:
     throw new HttpError(403, "Cross-origin access is not allowed.");
   const shellNavigation =
     request.method === "GET" &&
-    path === "/" &&
+    ["/", "/login"].includes(path) &&
     request.headers["sec-fetch-mode"] === "navigate" &&
     request.headers["sec-fetch-dest"] === "document" &&
     !request.headers.origin;
@@ -104,7 +104,8 @@ const service = runtime.service;
 const streams = new Set<() => void>();
 const server = createServer(async (request, response) => {
   response.setHeader("x-content-type-options", "nosniff");
-  response.setHeader("referrer-policy", "no-referrer");
+  // Native same-origin form POSTs must retain their exact Origin, not Origin:null.
+  response.setHeader("referrer-policy", "same-origin");
   response.setHeader("cross-origin-resource-policy", "same-origin");
   response.setHeader("cache-control", "no-store");
   response.setHeader(

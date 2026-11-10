@@ -7,7 +7,7 @@
       "name": "MIT",
       "identifier": "MIT"
     },
-    "description": "Single-user loopback adapter to the consumer-configured native Dispatch runtime. Local mode has no login or bearer credential. Hosted mode requires HTTPS DISPATCH_ORIGIN and a trusted DISPATCH_AUTH_MODULE exporting authorize(request, response) that validates actual credentials/session and authorizes all configured runs; exact configured Host/Origin apply, and API/SSE requests require that authorization. Request-only authorization modules remain compatible. Denied modules may end a 401 browser challenge response and return false; otherwise denial is 403. Health is unauthenticated and secret-free. No per-user grants UI is implemented. Local requests require Host 127.0.0.1:PORT; supplied Origin must equal the server origin; API Fetch Metadata must be same-origin or none; the shell navigation exception is described below. Every write requires the exact Origin header and application/json. No CORS. Cross-site API requests and DNS rebinding hosts receive 403. GET / permits external top-level navigation (Sec-Fetch-Mode navigate, Sec-Fetch-Dest document, no Origin) to the nonsensitive app shell only. Local native processes with the same user remain trusted. DISPATCH_PORT defaults to 4319. Unsupported routes/methods return 404 JSON Error. All responses disable caching, sniffing, framing and cross-origin resource embedding. No redirects. Request text and identities must contain non-whitespace characters. The app sets no character or body-byte cap; native/provider context constraints still apply. GET needs no Origin for browser navigation or native inspection. Named local installations use installation~localId identities; creation sources must belong to the selected installation. Legacy single-installation IDs remain unchanged; one explicitly configured primary named installation may preserve unqualified conversation IDs. Catalogs are lightweight native read-only observations; selected routes use direct identity lookup. Browser IndexedDB stores only per-tab drafts/uncertain outbox, never authoritative conversation state."
+    "description": "Single-user loopback adapter to the consumer-configured native Dispatch runtime. Local mode has no login or bearer credential. Hosted mode requires HTTPS DISPATCH_ORIGIN and a trusted DISPATCH_AUTH_MODULE exporting authorize(request, response) that validates actual credentials/session and authorizes all configured runs; exact configured Host/Origin apply, and API/SSE requests require that authorization. Request-only authorization modules remain compatible. Denied modules may end a 401 browser challenge response and return false; otherwise denial is 403. Health is unauthenticated and secret-free. No per-user grants UI is implemented. Local requests require Host 127.0.0.1:PORT; supplied Origin must equal the server origin; API Fetch Metadata must be same-origin or none; the shell navigation exception is described below. Every write requires the exact Origin header and application/json. No CORS. Cross-site API requests and DNS rebinding hosts receive 403. GET / permits external top-level navigation (Sec-Fetch-Mode navigate, Sec-Fetch-Dest document, no Origin) to the nonsensitive app shell only. Local native processes with the same user remain trusted. DISPATCH_PORT defaults to 4319. Unsupported routes/methods return 404 JSON Error. All responses disable caching, sniffing, framing and cross-origin resource embedding. The optional session-auth module redirects anonymous shell visits to /login and successful form submissions to /. Request text and identities must contain non-whitespace characters. The app sets no character or body-byte cap; native/provider context constraints still apply. GET needs no Origin for browser navigation or native inspection. Named local installations use installation~localId identities; creation sources must belong to the selected installation. Legacy single-installation IDs remain unchanged; one explicitly configured primary named installation may preserve unqualified conversation IDs. Catalogs are lightweight native read-only observations; selected routes use direct identity lookup. Browser IndexedDB stores only per-tab drafts/uncertain outbox, never authoritative conversation state. Optional session-auth.js provides GET/POST /login and POST /logout with a Secure HttpOnly SameSite=Strict host-only session cookie; native form writes require the exact Origin. Referrer-Policy is same-origin. External top-level GET /login is allowed by the same document-navigation exception as GET /."
   },
   "servers": [
     {
@@ -605,6 +605,88 @@
         "responses": {
           "200": {
             "description": "Ready"
+          }
+        }
+      }
+    },
+    "/login": {
+      "get": {
+        "summary": "Sign in or manage the current session (optional session authorization module)",
+        "responses": {
+          "200": {
+            "description": "HTML sign-in or session page (GET login)"
+          },
+          "303": {
+            "description": "Fixed same-origin redirect after sign-in/sign-out"
+          },
+          "401": {
+            "description": "Incorrect or missing credential"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "413": {
+            "description": "Credential form exceeds 8192 bytes"
+          },
+          "415": {
+            "description": "Use application/x-www-form-urlencoded"
+          },
+          "429": {
+            "description": "Sign-in attempt limit; Retry-After provided"
+          }
+        }
+      },
+      "post": {
+        "summary": "Sign in or manage the current session (optional session authorization module)",
+        "responses": {
+          "200": {
+            "description": "HTML sign-in or session page (GET login)"
+          },
+          "303": {
+            "description": "Fixed same-origin redirect after sign-in/sign-out"
+          },
+          "401": {
+            "description": "Incorrect or missing credential"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "413": {
+            "description": "Credential form exceeds 8192 bytes"
+          },
+          "415": {
+            "description": "Use application/x-www-form-urlencoded"
+          },
+          "429": {
+            "description": "Sign-in attempt limit; Retry-After provided"
+          }
+        }
+      }
+    },
+    "/logout": {
+      "post": {
+        "summary": "Revoke the current session (optional session authorization module)",
+        "responses": {
+          "200": {
+            "description": "HTML sign-in or session page (GET login)"
+          },
+          "303": {
+            "description": "Fixed same-origin redirect after sign-in/sign-out"
+          },
+          "401": {
+            "description": "Incorrect or missing credential"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "413": {
+            "description": "Credential form exceeds 8192 bytes"
+          },
+          "415": {
+            "description": "Use application/x-www-form-urlencoded"
+          },
+          "429": {
+            "description": "Sign-in attempt limit; Retry-After provided"
           }
         }
       }
