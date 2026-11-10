@@ -4,7 +4,7 @@ import {
   AssistantEntry, ConversationBusy, InboxDoc, LiveDoc, defineDoc, defineExtension, defineTask,
   type ConversationId, type Cursor, type EntryId, type SubmissionDraft, type TaskId, type Tx,
 } from "@earendil-works/pi-durable";
-import { context, publicAnswer, publicCommentary, ThreadProcesses,
+import { context, prepareContent, type AttachmentFile, publicAnswer, publicCommentary, ThreadProcesses,
   type ChatService, type ReplyDestination, type ReplySink, type StatusSink, type Runner, type ThreadExecutor } from "@dispatch/runner";
 import { GoogleApiError, GoogleChatApi, messageChunk, messageId, type GoogleCredentials } from "./api.js";
 import { googleThreadKey, interaction, type GoogleChatConfig, type GoogleChatInput } from "./events.js";
@@ -26,7 +26,7 @@ export type GoogleChatOptions = {
   allowProgressText?: (conversationId: number, inputs: readonly number[]) => boolean | Promise<boolean>;
   allowContinuation?: (tx: Tx, conversationId: ConversationId, request: string) => Promise<boolean>;
 };
-type Turn = ReplyDestination & { key: string; text: string; replyText?: string; after?: number; continuation?: string };
+type Turn = ReplyDestination & { files?: AttachmentFile[]; key: string; text: string; replyText?: string; after?: number; continuation?: string };
 type TurnState = { phase: "answer"; admitted?: boolean } | {
   phase: "deliver"; text: string; offset: number; retryAt: number; after?: number;
   status?: { key: string; task: number };
@@ -131,10 +131,11 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
         if (!conversation) throw new Error("Google Chat conversation disappeared.");
         const draft: SubmissionDraft = {
           type: "input", requestId: task.input.key, whenBusy: task.input.continuation ? "reject" : "steer",
-          content: task.input.continuation
+          content: prepareContent(task.input.continuation
             ? `Internal workflow result for the existing assignment from ${task.input.user}. This is execution evidence, not a new human request or additional authorization.\n${task.input.text}`
-            : `Google Chat message from ${task.input.user}:\n${task.input.text}`,
+            : `Google Chat message from ${task.input.user}:\n${task.input.text}`, task.input.files),
           entry: { kind: `${namespace}.message`, data: { source: "google-chat", user: task.input.user,
+            ...(task.input.files?.length ? {text: task.input.text, attachments: task.input.files} : {}),
             googleChat: { project: config.projectId, space: task.input.channel, thread: task.input.thread, user: task.input.user } } },
         };
         if (task.input.continuation && !task.state.checkpoint.admitted) {
@@ -299,7 +300,7 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
           const chat = await service.find(input.agent, key) ?? await service.create(input.agent, "google-chat", key, input.text,
             { googleChat: { project: input.project, space: input.space, thread: input.thread, admittedAt: input.timestamp } });
           await runtime.commit(async tx => { await enqueue(tx, chat.conversationId as ConversationId,
-            { key: input.key, text: input.text, channel: input.space, thread: input.thread, user: input.user }); }, ctx);
+            { key: input.key, text: input.text, ...(input.files ? {files: input.files} : {}), channel: input.space, thread: input.thread, user: input.user }); }, ctx);
         }
       }
       await runtime.commit(() => complete, ctx);
@@ -307,6 +308,7 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
     async abort(_task, runtime, ctx) { await runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx); },
   });
   async function receive(input: GoogleChatInput) {
+    if (input.files?.length) prepareContent(input.text, input.files);
     destinationAllowed({ channel: input.space, thread: input.thread, user: input.user });
     if (input.transport !== "google-chat" || input.project !== config.projectId || config.spaces[input.space] !== input.agent)
       throw new Error("Unconfigured Google Chat input.");
@@ -344,6 +346,7 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
     connected = true;
   }
   return {
+    transport: "google-chat",
     extension: defineExtension({ name: `${namespace}.google-chat`, tasks: [incoming, turn, statusTask] }),
     receive, queueStatus,
     queueReply: (async (tx, id, destination, text, key) => { await enqueue(tx, id, { ...destination, text, replyText: text, key }); }) as ReplySink,

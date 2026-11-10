@@ -1,3 +1,4 @@
+import type { AttachmentFile } from "@dispatch/runner";
 export type GoogleChatConfig = {
   projectId: string;
   subscription: string;
@@ -6,6 +7,8 @@ export type GoogleChatConfig = {
   allowedUsers?: string[];
 };
 export type GoogleChatInput = {
+  /** Actual bytes supplied only by a trusted local transport binding. */
+  files?: AttachmentFile[];
   transport: "google-chat"; project: string; space: string; thread: string; user: string;
   message: string; timestamp: string; key: string; text: string; agent: string;
 };

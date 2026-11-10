@@ -1,10 +1,10 @@
 # Changelog
 
-## Unreleased
+## [Unreleased]
 
 - Attach shared owners through Backend; distinguish accepted Stop, native stopped turns and completed tools/turns. Preserve same-origin Agent Chat selection and uncertain draft/file outboxes.
 
-## [Unreleased]
+## [0.7.0] - 2026-11-09
 
 - Use location-neutral idle composer wording for local and central installations.
 

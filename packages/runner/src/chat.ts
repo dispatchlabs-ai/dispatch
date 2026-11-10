@@ -118,6 +118,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       resume?: boolean;
       /** The host starts recovery after its adapters and bindings are ready. */
       deferResume?: boolean;
+      /** Calendar policy only; native admitted tasks still recover. */
       schedules?: boolean;
       cwd?: string;
       env?: OpenOptions["env"];

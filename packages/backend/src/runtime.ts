@@ -575,3 +575,6 @@ export async function openRuntime(): Promise<Runtime> {
     close: async () => { await Promise.all([...contexts.values()].map(runtime => runtime.close())); },
   };
 }
+
+export { openServiceRuntime } from "./service-runtime.js";
+export type { ServiceConnection } from "./service-runtime.js";

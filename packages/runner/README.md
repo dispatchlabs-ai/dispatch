@@ -150,6 +150,10 @@ adapters share one native harness; never open a second writer to the same store.
 
 ## Terminal conversations
 
+For persistent work shared with other clients, use the
+[supervised service and connecting terminal](docs/service.md#shared-clients-and-company-compositions).
+The direct-owned terminal API below remains available for isolated legacy runs.
+
 Use the separate [terminal watcher](docs/watch.md) to discover existing local
 sessions and inspect their agent conversations and tool results without starting
 or controlling work. An application release exposes `NAME watch --config HOST.json`;

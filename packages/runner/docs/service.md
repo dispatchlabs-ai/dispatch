@@ -8,8 +8,10 @@ defaults, skills and domain tools belong to the definition repository.
 The installation contains one locked dependency tree and an independent
 definition checkout below it. Follow [definition workspaces](definition-workspaces.md).
 The service discovers runnable definitions unless `names` selects a subset.
-`factory.yaml` still controls autonomous schedules; use `agents: []` for a
-conversation-only installation.
+`factory.yaml` controls autonomous schedules by default. Set `schedules: false`
+in the service configuration for a conversation-only installation: admitted native
+work still recovers, but factory calendars/loops are not enabled. Select a new
+state root or deliberately retire saved schedules before changing this policy.
 
 ```json
 {
@@ -18,6 +20,8 @@ conversation-only installation.
   "cwd": "/srv/work",
   "socket": "/srv/agents/run/service.sock",
   "namespace": "company",
+  "schedules": false,
+  "definitionResources": true,
   "gateway": {
     "origin": "https://models.example.com",
     "credentialFile": "/srv/agents/private/gateway.json",
@@ -95,7 +99,8 @@ retains its license and source revision, and shares Runner's Pi dependency tree.
 It does not install Claude Code, sign in, select a host route or start an agent.
 
 Paths are absolute. The socket's parent must be owned by the process user and
-mode `0700`; the socket itself is `0600`. This API serves the local account over
+mode `0700`; the socket itself is `0600`. Keep the complete socket path short
+enough for the platform Unix-socket limit (about 104 bytes on macOS). This API serves the local account over
 a Unix socket. Remote clients use separately authenticated adapters; the service
 does not expose a public TCP listener.
 
@@ -106,6 +111,12 @@ attach to the same `ChatService`; they must not open another writer for its
 agents. Their `prepare` phase declares extensions, `start` receives the service,
 and `close` releases transport resources before the service closes native stores.
 An optional `busy()` reports unfinished adapter-owned compatibility work.
+Prepared adapters declare `transport` (for example `slack`, `google-chat`, `email`).
+Background reply destinations can carry that explicit `transport`; Runner selects
+exactly one matching adapter, never broadcasts. Untagged saved destinations work
+only with one adapter. A company composition can supply `run({replySink})` to
+resolve its own retained routes. Multiple accounts of one transport also need
+that explicit company routing; no channel/user is guessed.
 
 The optional [Gmail adapter](gmail.md) receives alias-addressed email and sends
 threaded final replies through this same owner.
@@ -302,24 +313,106 @@ by this replay.
 
 ## Shared clients and company compositions
 
-`dispatch-service CONFIG connect CHAT` attaches a terminal to an existing opaque
-conversation ID. `/history` observes, `/stop` cancels that conversation, `/quit`,
-EOF and signals detach without cancelling the owner. `command COMMAND.json`
-accepts a native command with a caller-retained key/requestId and optional files.
-The public `connectInTerminal` API also supports named sessions and bounded prompts.
+Start one supervised native Node owner:
 
-`serveService(service, socket, adapters?, metadata)` exposes the existing owner's
-operations without constructing a second Harness. Metadata must include a stable
-canonical `stateRoot` and/or trusted installation `identity`; optional `defaultAgent`
-selects new CLI sessions. Consumer-owned workflow/provider/tool authority stays in
-that service. `serviceRequest(socket, command, {expected, signal})` validates the
-expected root/identity in the same request before dispatch, including reads.
-Different owners cannot reuse an identity. Older owners without this protocol
-are not safe shared-client targets. Do not weaken binding with a separate preflight.
+```sh
+dispatch-service /srv/agents/config.json serve
+```
 
-Create/send accept the originating native channel; send retains optional
-`AttachmentFile[]`. Service config `schedules:false` disables calendar selection,
-not recovery of admitted native work. Snapshots include native message provenance
-and optional `turns`: submission IDs, input entry IDs, lifecycle status and an
-unanswered reason. `done` means an answered turn, not completed project work;
-`unanswered/aborted` means stopped, never success inferred from a tool result.
+From other terminals, `dispatch-service CONFIG connect CHAT` opens the exact
+native conversation (for example `helper:2`); omit CHAT to create one using the
+definitions' default agent. `/history`, `/stop` and `/quit` are explicit commands.
+EOF, `/quit` and Ctrl-C disconnect **only the client**; Ctrl-C exits 130. Interactive
+messages return admission immediately while observation continues, so Stop and
+follow-ups remain available during work. No client enables schedules or providers.
+
+A configured `dispatch-agent --root DEFINITIONS run --config HOST.json --session
+KEY --prompt TEXT` also connects when HOST contains `socket`. Named keys use the
+existing `terminal:KEY` native creation key. A retained agent is preserved when
+no `--agent` override is given; `--request-id ID` permits explicit retry after
+uncertain admission. Prompt mode waits for that native receipt and exits nonzero
+on an unanswered turn. Legacy configurations without `socket` retain direct-owned
+terminal/workspace behavior. They cannot be hot-attached or silently migrated:
+finish/suspend old owners and deliberately deploy compatible bindings. Never
+remove a live store lock. No historical store is copied into a client database.
+
+For a consumer application:
+
+```ts
+import { openServiceRuntime } from "@dispatch/backend";
+const client = await openServiceRuntime({ socket: "/srv/agents/run/service.sock" });
+const chat = await client.service.create("helper", "web", "example-discussion");
+await client.service.submit(chat.id, "Hello", "example-request-1", "followUp", "web");
+console.log(await client.presentation.snapshot(chat.id));
+await client.close(); // disconnect, not Stop or owner shutdown
+```
+
+Runner connection IDs are native `agent:conversationId`, not read-only SQLite
+catalog hashes. Company facades may use opaque IDs: clients must return them
+unchanged rather than parse them. Clients can poll/watch live snapshots, including partial text, native tool
+calls/results and attachment projections, and explicitly stop the same chat.
+Independent conversations remain independent Pi conversations in the owner's
+store. Watch loss ends that observation; reconnect explicitly. Reads do not open
+another Harness. This owner-only local socket grants the local account the service's
+configured authority, not a multi-tenant principal/participant permission system.
+Use separately authenticated and authorized adapters for remote clients.
+
+The public `@dispatch/runner/service` exports `serveService(service, socket)` for
+company applications that already compose `run({open})` or `ChatService.attach`.
+It accepts the structural `ServiceOperations` interface and binds that exact
+native service, including custom workflows; it opens no stores
+or model connections. Close the returned listener and then the company runtime
+on supervisor shutdown. Its optional third argument is the prepared adapters for
+busy status. An optional fourth `ServiceMetadata` argument supplies `stateRoot`
+and `defaultAgent` for custom compositions. `info` exposes this trusted metadata;
+`startService` supplies its native state directory and optional authored default.
+A socket-only CLI configuration can create using the owner's default without a
+local definition checkout. Backend returns metadata `stateRoot` when available,
+otherwise the socket display path. Do not install two owners against the same
+native state.
+
+`serviceRequest(socket, command)` is typed by `ServiceCommand`/`ServiceResults`.
+Create accepts `source`; send accepts `source`, `mode` (`followUp` or `steer`) and
+`files: [{name,mimeType,data}]` with base64 bytes. Native validation admits UTF-8
+text documents and PNG/JPEG/WebP images only for image-capable authored models.
+There is no application request-byte ceiling; hosts must provision memory/disk
+for JSON/base64 requests. No filename is interpreted as a host path. `find` looks
+up a stable native creation key (optionally scoped by agent). Artifact downloads
+return retained verified bytes as base64. Receipts remain Pi submission records.
+
+Use `dispatch-service CONFIG command COMMAND.json` to send a precise command,
+including files, stable create key or stable requestId. Preserve the original
+identity and payload after an uncertain transport failure. The client never
+resends automatically. `ServiceError.status` preserves a definite native 409
+rejection; transport failure is not proof of rejection. Restart the compatible
+owner with the same state, namespace, definitions, provider and adapter bindings
+to recover admitted work; native Pi determines safe replay and cancellation.
+Keep complete closed-state backups before upgrades. Publication is not activation.
+
+Runner Nix outputs include Backend/Remote/Postgres and their exact dependencies
+in `lib/agent-node_modules` by default (`withBackend: false` is an optional small
+legacy closure). Consumers import the public `@dispatch/backend` entry using that
+explicit package context, never discover installed private dist filenames.
+
+### Binding a socket to an installation
+
+A Unix pathname can be reused by another owner. `info` metadata includes the
+actual `stateRoot`, or a company facade's explicit stable `identity`. Trusted
+custom `serveService` compositions must provide one in the fourth argument.
+Choose a stable installation identity for a multi-store facade, not a PID or a
+conversation ID; different authorized installations must not share it.
+
+`serviceRequest(socket, command, {expected:{stateRoot?,identity?},signal?})` sends
+an expectation envelope. The same server handler validates it before dispatching
+ANY command, including reads. Mismatch is409 with no operation; an info preflight
+alone would leave a socket replacement race. Legacy direct commands still work,
+but clients holding cached/projected identities must bind their expectation.
+Compatible restart retains the expected root/identity. Backend accepts explicit
+`expectedStateRoot`/`expectedIdentity`, or binds to the first info result; it fails
+startup if neither identity field exists. Terminal connections bind identically.
+This is installation selection safety, not a new authorization registry.
+
+Snapshots additionally expose optional `turns`: native submission IDs, input entry
+IDs, lifecycle status and unanswered reason. `done` means an answered turn, not
+completed project work; `unanswered/aborted` means stopped, never success inferred
+from a tool result. This projection also applies to saved read-only history.

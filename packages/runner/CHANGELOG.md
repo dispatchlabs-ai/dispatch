@@ -1,10 +1,14 @@
 # Changelog
 
-## Unreleased
-
-- Expose shared owner transport, bound client/terminal attachment and native turn outcomes; retain channel/file provenance and explicit calendar policy.
-
 ## [Unreleased]
+
+- Project native input/continue submission lifecycle in live and retained chat snapshots, distinguishing stopped turns from tool or request narration.
+
+## [0.7.0] - 2026-11-09
+
+- Bind local commands atomically to expected installation metadata and render retained prompt answers on request replay without resubmitting.
+
+- Share one supervised native owner with CLI and Backend clients; preserve native receipts, Stop, recovery, attachments and tool observations. Add explicit multi-adapter reply routing and conversation-only schedule policy.
 
 - Match JSON-encoded native SQLite tool-task kinds in read-only projection, restoring live task state and retained nested call identity without acquiring ownership.
 

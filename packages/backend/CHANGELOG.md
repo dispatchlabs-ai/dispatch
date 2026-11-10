@@ -1,10 +1,14 @@
 # Changelog
 
-## Unreleased
+## [Unreleased]
 
 - Compose shared native owners with read-only saved history, canonical identities and live catalogs; support trusted workflow factories without opening replacement owners.
 
-## [Unreleased]
+## [0.7.0] - 2026-11-09
+
+- Bind each shared service command/read to its expected native root or stable installation identity, rejecting mismatched socket replacement before dispatch.
+
+- Add public owner-only local service connections, live native observations and file inputs without opening a second storage owner.
 
 - Port reviewed native chat improvements: installation-scoped routing and read-only catalogs, retained tool traces and UTF-8/image input/recovery through local and central workers; refresh current shadcn Web compositions.
 

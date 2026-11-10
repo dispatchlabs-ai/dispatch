@@ -134,15 +134,43 @@ and native live/task state. No fake pending-question or subagent result. Native
 nested-call parent IDs are exposed only when recorded; missing retired payloads
 remain explicitly unavailable.
 
-## Shared local owners and retained history
+## Connect to an existing local service
 
-`openServiceRuntime({socket, sourceId?, label?, expectedStateRoot?, expectedIdentity?})`
-connects to Runner's owner-only Unix service API. `close()` detaches observations,
-never stops the owner. Native IDs, request IDs and file bytes pass unchanged.
-Every command carries its expected native root/installation identity; a service
-must support atomic expectation validation (older owners fail closed). A service-only
-`DISPATCH_CONFIG` may contain `{"service":{"socket":"/srv/agents/run/service.sock"}}`.
-No local owner or automatic mutation retry is used on connection loss.
+`openServiceRuntime({socket, sourceId?, label?})` connects to Runner's maintained
+owner-only Unix API. It returns the same `{service,presentation,stateRoot,close}`
+contract without opening a provider, worker or SQLite owner. `close()` stops client
+watches only; explicit `service.stop(id)` cancels work. Native chat IDs match the
+CLI. `submit` additionally accepts native `AttachmentFile[]` as its sixth argument.
+Native `info.stateRoot` metadata is returned as `stateRoot` when supplied by the
+owner (otherwise the socket display path). Chat IDs are opaque; return them
+unchanged. Live snapshot/watch includes native tool calls/results, attachments and partial
+output; no shadow transcript or automatic command retry is introduced. Watch
+transport failure closes the watch; reconnect explicitly using the same request
+identity for an uncertain send.
+
+`openRuntime()` also accepts a service-only `DISPATCH_CONFIG`:
+
+```json
+{"service":{"socket":"/srv/agents/run/service.sock","sourceId":"native","label":"Native agents"}}
+```
+
+This selects only that service's catalog. Historical read-only SQLite sources
+remain a separate local/consumer composition; never claim another live owner's
+store. Trusted multi-installation adapters can return `openServiceRuntime` and
+qualify native IDs at their existing installation boundary. Use the public
+[Runner startup/client contract](../runner/docs/service.md#shared-clients-and-company-compositions)
+for supervision, retries, attachments, permissions and deliberate old-owner
+migration. The socket is same-account authority, not hosted multi-user auth.
+
+Shared connections accept trusted `expectedStateRoot` and/or `expectedIdentity`.
+Without them the client binds to its first `info` identity/root. Every HTTP
+command carries that expectation and the owner validates it atomically before
+observation or effect. A reused socket serving a different root cannot receive
+Send/Stop or history reads through the cached connection. Custom facades MUST
+supply stable `serveService` metadata identity/root; absent both, connection fails.
+Same installation restarts retain their identity. This does not grant authority.
+
+## Shared local owners and retained history
 
 For native SQLite installations, combine that owner with saved discovery:
 
