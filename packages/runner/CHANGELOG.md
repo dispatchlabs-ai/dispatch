@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Restrict bookkeeping termination to the immediate native answer/continuation/status-only sequence, so earlier progress cannot suppress findings after work.
+
 - End status-only completion bookkeeping through native tool termination after a delivered answer, without suppressing unfinished work or new input responses.
 
 - Always steer active work for ordinary user chat input at native boundaries; keep internal peer/schedule policies and explicit Stop unchanged.

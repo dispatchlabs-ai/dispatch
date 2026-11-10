@@ -1,6 +1,6 @@
 import { Type } from "typebox";
-import { defineDoc, defineExtension, defineTool, GenerationTask, hook, InboxDoc, LiveDoc,
-  type ConversationId, type Cursor, type Harness } from "@earendil-works/pi-durable";
+import { AssistantEntry, SystemEntry, UserEntry, defineDoc, defineExtension, defineTool, GenerationTask, hook, InboxDoc, LiveDoc,
+  type ConversationId, type Cursor, type EntryRecord, type Harness } from "@earendil-works/pi-durable";
 import type { Context } from "@earendil-works/chord/context";
 
 export type RequestState = {
@@ -110,19 +110,31 @@ export const RequestCompletion = defineExtension({
           });
         }
         let answered = false;
-        // Only terminate bookkeeping after a real answer within this same native run.
-        // Earlier requests' answers must never suppress the current request's response.
+        // Only the immediate answer -> native continuation -> status-only round
+        // can terminate. An older progress answer cannot suppress findings after work.
         if (update && state.inputs === (live.run?.inputs ?? []).join(",") && state.status !== "active" && live.run?.first !== undefined) {
           const placed = await Promise.all((live.run.inputs ?? []).map(id => tx.submission(id)));
           const latestInput = placed.reduce((latest, input) => input?.entry !== undefined && input.entry > latest ? input.entry : latest, live.run.first);
           let cursor: Cursor | undefined;
+          const preceding: EntryRecord[] = [];
+          let current: EntryRecord | undefined;
           do {
             const page = await tx.scanEntries({ conversationId: api.conversationId, minEntryId: latestInput }, 100, cursor);
-            answered = page.items.some(entry => entry.model?.some(message => message.role === "assistant"
-              && message.stopReason === "stop" && message.content.some(block => block.type === "text" && block.text.trim())
-              && !message.content.some(block => block.type === "toolCall")));
+            for (const entry of page.items) {
+              if (!current) {
+                if (entry.model?.some(message => message.role === "assistant" && message.content.some(block => block.type === "toolCall" && block.id === api.callId)))
+                  current = entry;
+              } else if (!SystemEntry.is(entry)) preceding.push(entry);
+              if (preceding.length === 2) break;
+            }
             cursor = page.next;
-          } while (!answered && cursor);
+          } while (preceding.length < 2 && cursor);
+          const round = current?.model?.find(message => message.role === "assistant");
+          const answer = preceding[1]?.model?.find(message => message.role === "assistant");
+          answered = !!round && round.content.every(block => block.type === "toolCall" && block.name === "request_status")
+            && UserEntry.is(preceding[0]) && AssistantEntry.is(preceding[1])
+            && answer?.stopReason === "stop" && answer.content.some(block => block.type === "text" && block.text.trim())
+            && !answer.content.some(block => block.type === "toolCall");
         }
         return { state: JSON.parse(JSON.stringify(state)) as RequestState, answered };
       }, ctx);
