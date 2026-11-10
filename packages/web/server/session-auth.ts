@@ -6,7 +6,12 @@ const verify = await passwordVerifier(process.env.DISPATCH_SESSION_AUTH_FILE);
 const cookieName = "__Host-dispatch_session";
 const lifetime = 12 * 60 * 60 * 1000;
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
-const sessions = new Map<string, number>();
+const sessions = new Map<string, { expires: number; streams: Set<ServerResponse> }>();
+function revoke(key: string) {
+  const session = sessions.get(key);
+  sessions.delete(key);
+  for (const stream of session?.streams ?? []) stream.end();
+}
 let attempts: number[] = [];
 function redirect(response: ServerResponse, location: string) {
   response.writeHead(303, { location }).end();
@@ -25,7 +30,7 @@ export async function authorize(request: IncomingMessage, response: ServerRespon
   // main.ts enforces exact Host/Origin/Fetch Metadata before calling this module.
   const path = new URL(request.url ?? "/", "https://session.invalid").pathname;
   const time = Date.now();
-  for (const [key, expiry] of sessions) if (expiry <= time) sessions.delete(key);
+  for (const [key, session] of sessions) if (session.expires <= time) revoke(key);
   const token = (request.headers.cookie ?? "").split(";").map(v => v.trim())
     .find(v => v.startsWith(cookieName + "="))?.slice(cookieName.length + 1) ?? "";
   const key = digest(token);
@@ -62,20 +67,32 @@ export async function authorize(request: IncomingMessage, response: ServerRespon
       page(response, "Username or password was incorrect.", 401);
       return false;
     }
-    sessions.delete(key);
+    revoke(key);
     const session = randomBytes(32).toString("hex");
-    sessions.set(digest(session), time + lifetime);
+    sessions.set(digest(session), { expires: time + lifetime, streams: new Set() });
     response.setHeader("set-cookie", `${cookieName}=${session}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${lifetime / 1000}`);
     redirect(response, "/");
     return false;
   }
   if (path === "/logout" && request.method === "POST") {
-    sessions.delete(key);
+    revoke(key);
     response.setHeader("set-cookie", `${cookieName}=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0`);
     redirect(response, "/login");
     return false;
   }
-  if (signedIn) return true;
+  if (signedIn) {
+    if (request.method === "GET" && /^\/api\/chats\/[^/]+\/events$/.test(path)) {
+      const session = sessions.get(key)!;
+      session.streams.add(response);
+      const expiry = setTimeout(() => revoke(key), session.expires - time);
+      expiry.unref();
+      response.once("close", () => {
+        clearTimeout(expiry);
+        session.streams.delete(response);
+      });
+    }
+    return true;
+  }
   if (path === "/" && request.method === "GET") redirect(response, "/login");
   else response.writeHead(401, { "content-type": "application/json" })
     .end(JSON.stringify({ error: "Sign in at /login to continue." }));
