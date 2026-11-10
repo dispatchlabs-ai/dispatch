@@ -1,0 +1,51 @@
+diff --git a/src/claude-cli.ts b/src/claude-cli.ts
+index b883a3f..5b992de 100644
+--- a/src/claude-cli.ts
++++ b/src/claude-cli.ts
+@@ -805,6 +805,38 @@ function restoreCanonicalUserContent(messages: NativeRequestMessage[], frames: N
+   });
+ }
+ 
++/**
++ * Replace every native assistant message's content with Pi's canonical content for it.
++ * Claude Code's history replay omits signed thinking from prior assistant turns, so the
++ * next request would lose the model's earlier reasoning at every tool-use boundary.
++ */
++function restoreCanonicalAssistantContent(messages: NativeRequestMessage[], frames: NativeFrame[]): void {
++  const canonical = frames.filter((frame) => frame.type === "assistant");
++  const native = messages.filter((message) => message.role === "assistant");
++  if (native.length !== canonical.length) {
++    throw new Error(
++      `Claude Code request has ${native.length} assistant messages where Pi's history has ${canonical.length}`,
++    );
++  }
++  native.forEach((message, index) => {
++    const wire = Array.isArray(message.content) ? message.content : [];
++    const marker = (wire.findLast((block) => isBlock(block) && block.cache_control) as ContentBlock | undefined)
++      ?.cache_control;
++    const toolIds = (blocks: unknown[]) =>
++      blocks.filter((block) => isBlock(block) && block.type === "tool_use").map((block) => (block as ContentBlock).id);
++    if (JSON.stringify(toolIds(wire)) !== JSON.stringify(toolIds(canonical[index]!.message.content))) {
++      throw new Error(`Claude Code request has different tool calls in assistant message ${index}`);
++    }
++    const content = structuredClone(canonical[index]!.message.content) as ContentBlock[];
++    // Thinking blocks cannot carry a cache breakpoint; keep it on the last eligible block.
++    const target = content.findLastIndex(
++      (block) => isBlock(block) && block.type !== "thinking" && block.type !== "redacted_thinking",
++    );
++    if (marker && target >= 0) content[target] = { ...content[target]!, cache_control: structuredClone(marker) };
++    message.content = content;
++  });
++}
++
+ function injectNativeSystemMessages(
+   messages: NativeRequestMessage[],
+   injections: NativeSystemInjection[],
+@@ -863,6 +895,7 @@ export function rewriteInitialRequest(
+     throw new Error("Claude Code request is missing its initial user message");
+   }
+   if (messages) restoreCanonicalUserContent(messages, frames);
++  if (messages) restoreCanonicalAssistantContent(messages, frames);
+ 
+   if (initialSystemMessages?.length && messages) {
+     let systemEnd = 1;

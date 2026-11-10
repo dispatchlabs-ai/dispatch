@@ -72,7 +72,8 @@ Keep secrets in the provider's credential store, not factory arguments.
 
 For the experimental [Earendil Claude Code provider](https://github.com/earendil-works/pi-claude-code),
 build the pinned module with `nix build .#claude-code-provider` and retain its
-store path in a Nix profile. Set `module` to its `lib/pi-claude-code/index.js`:
+store path in a Nix profile. The package applies one source patch that restores
+signed thinking from earlier assistant turns in each replayed request. Set `module` to its `lib/pi-claude-code/index.js`:
 
 ```json
 {

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Patch the packaged Claude Code provider so replayed requests keep signed thinking from earlier assistant turns. Claude Code's history replay dropped it at every tool-use boundary; the same upstream revision is retained with one source patch.
+
 - Avoid sorting entry payloads during saved conversation discovery and selected-history polling, reducing large-history loading cost without truncating history. Catalog entries report chat-index registration and originating transport.
 
 - Restrict bookkeeping termination to the immediate native answer/continuation/status-only sequence, so earlier progress cannot suppress findings after work.
