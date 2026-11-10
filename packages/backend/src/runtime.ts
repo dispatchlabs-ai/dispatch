@@ -436,7 +436,9 @@ async function openLocalRuntime(config: LocalConfig) {
       requireCapability(path, "create");
       const owner = await own(path, host.namespace ?? "dispatch", agent, true);
       const chat = await owner.service.create(agent, _source, key);
-      stores.invalidate();
+      // The caller sends next; its admission must find this chat, so the returned
+      // ID needs a discovery pass that began after the native create committed.
+      await stores.sync();
       return {
         ...chat,
         id: identity(join(path, agent, "session.sqlite"), chat.conversationId),
@@ -566,7 +568,7 @@ async function openLocalRuntime(config: LocalConfig) {
       const runtime = await openServiceRuntime({ ...config.service!, expectedStateRoot: configuredServiceRoot });
       try {
         const chat = await runtime.openKeyedChat!(key, title);
-        stores.invalidate();
+        await stores.sync();
         const source = config.sources.find(source => source.id === config.service!.sourceId)!;
         return { ...chat, id: identity(join(configuredServiceRoot!, chat.agent, "session.sqlite"), chat.conversationId),
           source: source.id, sourceLabel: source.label, session: relative(await realpath(source.path), configuredServiceRoot!) || "." };

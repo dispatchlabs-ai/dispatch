@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Return a newly created or keyed chat only after a discovery pass that started after its native create, so the first message sent right after creation is admitted instead of reported as not found.
+
 - Report each conversation's native `transport`, `addressable` and a typed snapshot `readOnly` reason (worker, internal, owner, unavailable) instead of a generic owner-process warning; do not generate titles for task-run workers. Addressability reflects observed access (worker, unregistered, live legacy owner or unreachable endpoint), including PostgreSQL workers and offline saved snapshots.
 
 - Add lightweight native sidebar summaries and optional persistent AI title metadata without native ownership changes.

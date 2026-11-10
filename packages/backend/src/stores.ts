@@ -309,8 +309,17 @@ export function createStores(config: Pick<LocalConfig, "sources">, reader: Reade
     });
     return pending;
   };
+  /** Complete a discovery that starts after this call. An in-flight pass may predate
+   * a just-created store, so wait it out rather than reusing its result. */
+  const sync = async () => {
+    // Loop: another caller may start a catalog-only pass between the await and here.
+    while (pending) await pending.catch(() => {});
+    pending = discover().finally(() => { pending = undefined; });
+    await pending;
+  };
   return {
     refresh,
+    sync,
     close: () => { for (const observer of watchers.values()) observer.close(); watchers.clear(); },
     summary: async (): Promise<Chat[]> => {
       await refresh();
