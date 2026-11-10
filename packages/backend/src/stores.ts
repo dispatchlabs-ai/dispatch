@@ -183,15 +183,18 @@ export function provenance(
 export function createStores(config: Pick<LocalConfig, "sources">, reader: Reader) {
   let selections = new Map<string, Selection>();
   let statuses: SourceStatus[] = [];
+  let inventory = new Map<Run, Source>();
   let pending: Promise<void> | undefined;
   let observedAt = 0;
   let invalidated = true;
   let catalogChanged = false;
+  let catalogObservedAt = 0;
   const watchers = new Map<string, FSWatcher>();
   let watchUnavailable = false;
   async function discover() {
     invalidated = false;
     const next = new Map<string, Selection>();
+    const discovered = new Map<Run, Source>();
     const seen = new Set<string>();
     statuses = [];
     for (const source of config.sources) {
@@ -227,6 +230,7 @@ export function createStores(config: Pick<LocalConfig, "sources">, reader: Reade
           run.stores = run.stores.filter((store) => !seen.has(store.path));
           for (const store of run.stores) seen.add(store.path);
           if (!run.stores.length) continue;
+          discovered.set(run, source);
           const snapshot = await reader.readWatchCatalog({ ...run, issues: [] });
           status.issues.push(...snapshot.issues);
           for (const conversation of snapshot.conversations) {
@@ -267,17 +271,21 @@ export function createStores(config: Pick<LocalConfig, "sources">, reader: Reade
       }
     }
     selections = next;
+    inventory = discovered;
     observedAt = Date.now();
   }
   const refresh = async (fresh = false) => {
     if (pending) return pending;
     if (!fresh && !invalidated && (!watchUnavailable || Date.now() - observedAt < 5000)) {
-      if (!catalogChanged) return;
+      // Some native filesystems coalesce WAL notifications. Refresh known
+      // catalogs on the shared observation cadence even without a file event.
+      if (!catalogChanged && Date.now() - catalogObservedAt < 2000) return;
       catalogChanged = false;
+      catalogObservedAt = Date.now();
       pending = (async () => {
-        const groups = new Map<Run, Selection>();
-        for (const item of selections.values()) groups.set(item.run, item);
-        for (const [run, example] of groups) {
+        // A valid empty store must remain discoverable when its first chat is
+        // committed to an already-existing WAL, without a rename/status event.
+        for (const [run, source] of inventory) {
           const catalog = await reader.readWatchCatalog(run);
           if (catalog.issues.length) { invalidated = true; continue; }
           for (const conversation of catalog.conversations) {
@@ -285,10 +293,10 @@ export function createStores(config: Pick<LocalConfig, "sources">, reader: Reade
             const id = identity(store.path, conversation.conversationId);
             const previous = selections.get(id);
             const chat: Chat = { ...(previous?.chat ?? { id, agent: conversation.agent, conversationId: conversation.conversationId,
-              source: example.source.id, sourceLabel: example.source.label, session: run.session,
+              source: source.id, sourceLabel: source.label, session: run.session,
               createdAt: new Date(conversation.startedAt ?? 0).toISOString(),
               ...(conversation.parentKey ? { parentId: identity(store.path, Number(conversation.parentKey.split(":").at(-1))) } : {}) }), title: conversation.title };
-            selections.set(id, { chat, store, run, conversation, source: example.source });
+            selections.set(id, { chat, store, run, conversation, source });
           }
         }
       })().finally(() => { pending = undefined; });

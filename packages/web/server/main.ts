@@ -141,7 +141,14 @@ const server = createServer(async (request, response) => {
       response.flushHeaders();
       let pending: string | undefined;
       let ended = false;
-      const flush = () => { if (pending && !ended && !response.writableNeedDrain) { const frame = pending; pending = undefined; response.write(frame); } };
+      const flush = () => {
+        if (!pending || ended || response.writableNeedDrain) return;
+        const frame = pending;
+        // write() accepts this frame even when it backpressures. A later drain
+        // may send a newer pending frame, never resend this accepted one.
+        pending = undefined;
+        response.write(frame);
+      };
       const unsubscribe = sidebar.subscribe(value => {
         pending = value ? `event: snapshot\ndata: ${JSON.stringify({ ...value, avatars: [...avatars.keys()] })}\n\n`
           : 'event: failure\ndata: {"error":"Sidebar observation unavailable."}\n\n';
