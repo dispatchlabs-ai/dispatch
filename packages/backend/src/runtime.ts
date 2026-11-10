@@ -390,7 +390,7 @@ async function openLocalRuntime(config: LocalConfig) {
   };
   const unavailableSnapshot = async (id: string): Promise<Snapshot> => {
     const saved = await savedSnapshot(id);
-    return saved.readOnly === "worker" ? saved : { ...saved, readOnly: "unavailable",
+    return saved.readOnly === "worker" ? saved : { ...saved, chat: { ...saved.chat, addressable: false }, readOnly: "unavailable",
       readOnlyReason: "Native service unavailable. Reconnect its original launcher; no work was resent or resumed." };
   };
   /** Observed send access for the sidebar, matching the selected snapshot's reason.
