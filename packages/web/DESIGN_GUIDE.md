@@ -26,7 +26,8 @@
   text, bytes and requestId across reload/rejections; replay explicitly with the
   original identity. Reconnect only observes. No arbitrary attachment/message caps;
   format/model/provider constraints remain explicit.
-- Enter sends, Shift+Enter/IME do not. Focus restores after send without stealing
+- Enter sends, Shift+Enter/IME do not. On touch-only devices Return adds a line
+  and the Send button sends. Focus restores after send without stealing
   intentional navigation. Keyboard focus visible on search/tool/code controls;
   mobile drawer traps focus, Escape restores it, hidden areas inert.
 - Configured installation/agent/conversation IDs stay exact. Compact visible

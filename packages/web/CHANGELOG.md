@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- On touch-only devices Return adds a new line; Send sends.
+
 - Show keyed item context as readable content at the top of an empty conversation; hide request-status details on narrow/touch layouts.
 
 - Repair hoisted Streamdown styling, compact phone/keyboard layout and external-link dialog; retain request-status evidence without empty chat turns.
