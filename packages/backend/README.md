@@ -261,8 +261,8 @@ sibling source. Exact-session source roots are supported for both binding forms.
 `service.keyedCreation: {agent:"helper", keyPrefix:"attention-item:"}` explicitly
 opts a native owner into item-key creation, independently of general `create:false`.
 `runtime.openKeyedChat(key,title,installation)` routes only to that named service;
-it validates the configured prefix and an alphanumeric/dot/underscore/hyphen suffix
-before native `{method:"create",agent,key,title,source:"web"}`. No send/context is
+it validates the literal configured prefix and a nonempty opaque suffix (no C0/C1
+control characters, no trimming or normalization) before native `{method:"create",agent,key,title,source:"web"}`. No send/context is
 included. Shared-history and combined service bindings preserve their existing
 canonical public IDs. No opt-in means a definite rejection, not ordinary creation
 fallback. The native owner owns atomic key replay, even across concurrent clients.

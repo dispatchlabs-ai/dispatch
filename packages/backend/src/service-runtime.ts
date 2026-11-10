@@ -57,7 +57,7 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
     openKeyedChat: async (key, title, installation) => {
       if (installation !== undefined) throw new AdmissionError("Keyed conversation links require a named installation binding.");
       if (!keyed) throw new AdmissionError("This installation does not allow keyed conversation links.");
-      if (!key.startsWith(keyed.keyPrefix) || !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(key.slice(keyed.keyPrefix.length)))
+      if (!key.startsWith(keyed.keyPrefix) || key.length === keyed.keyPrefix.length || /[\u0000-\u001f\u007f-\u009f]/.test(key))
         throw new AdmissionError("Invalid conversation link key.");
       if (!title.trim()) throw new AdmissionError("A conversation link title is required.");
       return project(await call({ method: "create", agent: keyed.agent, key, title, source: "web" }));
