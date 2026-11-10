@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Avatar } from '@/components/avatar';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, Menu, Plus, Square, X, Paperclip, FileText, Search, LoaderCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from '@/components/ai-elements/conversation';
 import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
-import type { Agent, Chat, Snapshot, SourceStatus } from '@/lib/contracts';
+import type { Agent, Chat, Snapshot, SourceStatus, SidebarSnapshot } from '@/lib/contracts';
 
 import { api, isDefiniteRejection } from '@/lib/api';
 import { loadDelivery, saveDelivery, type Pending } from '@/lib/delivery';
@@ -16,6 +17,12 @@ import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui
 import { ToolTrace } from '@/components/tool-trace';
 const agentName = (id: string) => id.includes('~') ? id.split('~').slice(1).join('~') : id;
 const installationName = (id: string) => id.includes('~') ? id.split('~')[0] : 'native';
+const authorAgent = (agent: string, author?: string) => {
+  if (!author) return agent;
+  // Native peer authors are instance IDs; artwork belongs to their role.
+  const role = author.replace(/:([1-9][0-9]*)$/, '');
+  return role.includes('~') || !agent.includes('~') ? role : `${installationName(agent)}~${role}`;
+};
 const sessionName = (chat: Chat, chats: Chat[]) => {
   const session = chat.session ?? '';
   if (!/^web-[a-f0-9]{32,}$/.test(session)) return session;
@@ -50,6 +57,19 @@ export default function App() {
   const fileInput = useRef<HTMLInputElement>(null);
   const [sources, setSources] = useState<SourceStatus[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [avatars, setAvatars] = useState<string[]>([]);
+  const [sidebarConnection, setSidebarConnection] = useState('Connecting…');
+  const [sidebarRetry, setSidebarRetry] = useState(0);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = Number(localStorage.getItem('dispatch-web:sidebar-width'));
+    return Number.isFinite(saved) && saved >= 220 ? saved : 300;
+  });
+  const [viewportWidth, setViewportWidth] = useState(innerWidth);
+  const resizeWidth = (width: number) => {
+    const value = Math.max(220, Math.min(width, innerWidth - 360));
+    setSidebarWidth(value); localStorage.setItem('dispatch-web:sidebar-width', String(value));
+  };
+  useEffect(() => { const resize = () => setViewportWidth(innerWidth); addEventListener('resize', resize); return () => removeEventListener('resize', resize); }, []);
   const [chats, setChats] = useState<Chat[]>([]);
   const [agent, setAgent] = useState('');
   const [selected, setSelected] = useState<string | null>(() => link ? null : localStorage.getItem('dispatch-web:selected') ?? localStorage.getItem('agent-chat:selected'));
@@ -152,15 +172,19 @@ export default function App() {
       composer.current?.focus();
     }
   }, [sending, pending, sendCompleted]);
-  const refresh = useCallback(async () => {
-    try {
-      const [available, history, configured] = await Promise.all([api<Agent[]>('/api/agents'), api<Chat[]>('/api/chats'), api<SourceStatus[]>('/api/sources')]);
-      setSources(configured);
-      setAgents(available); setChats(history); setReady(true);
-      setAgent(current => available.some(a => a.id === current) ? current : available.find(a => a.capabilities?.create !== false)?.id ?? available[0]?.id ?? '');
-    } catch (failure) { setError((failure as Error).message); }
-  }, []);
-  useEffect(() => { void refresh(); const timer = setInterval(() => void refresh(), 15000); return () => clearInterval(timer); }, [refresh]);
+  const refresh = () => setSidebarRetry(value => value + 1);
+  useEffect(() => {
+    const events = new EventSource('/api/sidebar/events');
+    events.addEventListener('snapshot', event => {
+      const value = JSON.parse((event as MessageEvent).data) as SidebarSnapshot;
+      setSources(value.sources); setAgents(value.agents); setChats(value.chats); setAvatars(value.avatars ?? []);
+      setReady(true); setSidebarConnection('Live');
+      setAgent(current => value.agents.some(agent => agent.id === current) ? current : value.agents.find(agent => agent.capabilities?.create !== false)?.id ?? '');
+    });
+    const disconnected = () => { setSidebarConnection('Reconnecting…'); setChats(current => current.map(chat => ({ ...chat, activity: 'unavailable' }))); };
+    events.addEventListener('failure', disconnected); events.onerror = disconnected;
+    return () => events.close();
+  }, [sidebarRetry]);
   useEffect(() => {
     if (!selected) { if (link) { setSnapshot(null); setConnection(''); return; } localStorage.removeItem('dispatch-web:selected'); localStorage.removeItem('agent-chat:selected'); setSnapshot(null); setConnection(''); return; }
     localStorage.setItem('dispatch-web:selected', selected); setSnapshot(null); setConnection('Connecting…');
@@ -170,7 +194,6 @@ export default function App() {
       if (!active) return;
       const value = JSON.parse((event as MessageEvent).data) as Snapshot;
       setSnapshot(value); setAgent(value.chat.agent); setConnection('Connected');
-      setChats(current => [value.chat, ...current.filter(chat => chat.id !== value.chat.id)].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
     });
     events.addEventListener('failure', () => { if (active) setConnection('Observation interrupted. Reconnecting…'); });
     events.onerror = () => { if (active) setConnection('Disconnected. Reconnecting to saved history…'); };
@@ -189,7 +212,7 @@ export default function App() {
       if (!Number.isSafeInteger(receipt?.submissionId) || receipt.submissionId < 1) throw new Error('Invalid admission receipt.');
       await saveDelivery({text:'',attachments:[],pending:null});
       sessionStorage.removeItem('dispatch-web:pending'); sessionStorage.removeItem('agent-chat:pending');
-      setPending(null); setDraft(''); setFiles([]); setStopNotice(null); void refresh();
+      setPending(null); setDraft(''); setFiles([]); setStopNotice(null);
     } catch (failure) {
       if (isDefiniteRejection(failure, previouslyUncertain)) {
         await saveDelivery({text:value.draftText ?? value.text,attachments:value.attachments ?? [],pending:null});
@@ -248,18 +271,30 @@ export default function App() {
   const lastTurn = snapshot?.turns?.at(-1);
   const turnOutcome = lastTurn?.status === 'unanswered' ? lastTurn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${lastTurn.reason})` : '';
   const activity = snapshot?.observation ?? (snapshot?.retry ? `Retry ${snapshot.retry.attempt} scheduled for ${new Date(snapshot.retry.at).toLocaleTimeString()}` : snapshot?.tools.length ? `Using ${snapshot.tools.join(', ')}` : snapshot?.background ? 'Working…' : snapshot?.running ? 'Replying…' : snapshot?.queued ? 'Input pending' : '');
+
+  const filtered = chats.filter(chat => `${chat.title} ${chat.nativeTitle ?? ''} ${chat.agent} ${chat.source} ${chat.sourceLabel} ${chat.session} ${chat.id} ${chat.conversationId}`.toLowerCase().includes(filter.toLowerCase()));
+  const activeChat = (chat: Chat) => chat.activity === 'working' || chat.activity === 'waiting';
+  const groups = [ { title: 'Active', chats: filtered.filter(activeChat) }, { title: 'History', chats: filtered.filter(chat => !activeChat(chat)) } ];
+  for (const group of groups) group.chats.sort((a,b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
+  const statusLabel = (chat: Chat) => ({ working: 'Working', waiting: 'Waiting', idle: 'Saved', unanswered: 'Unanswered', unavailable: 'Unavailable' })[chat.activity ?? 'unavailable'];
   return <div className="app-shell">
     {navigation && <button className="nav-scrim" aria-label="Close conversation navigation" onClick={() => setNavigation(false)}/>}
-    <aside ref={sidebar} inert={narrow && !navigation} className={navigation ? 'sidebar open' : 'sidebar'} aria-label="Conversations">
+    <aside style={narrow ? undefined : { width: Math.max(220, Math.min(sidebarWidth, viewportWidth - 360)) }} ref={sidebar} inert={narrow && !navigation} className={navigation ? 'sidebar open' : 'sidebar'} aria-label="Conversations">
       <div className="sidebar-heading"><strong>Web</strong><Button variant="ghost" size="icon" className="mobile-only" aria-label="Close navigation" onClick={() => setNavigation(false)}><X/></Button></div>
       {ready && canCreate && !linkBlocked && <Button variant="outline" className="new-chat" disabled={sending || !!pending} onClick={() => choose(null)}><Plus/> New conversation</Button>}
       <label className="history-search"><Search size={14}/><input aria-label="Search conversations" placeholder="Search conversations" value={filter} onChange={event=>setFilter(event.target.value)}/></label><nav aria-label="Saved conversations" data-slot="sidebar-content">
         {!ready && <p className="nav-note">Loading conversations…</p>}
         {ready && !chats.length && <p className="nav-note">Your conversations will appear here.</p>}
-        <SidebarMenu>{chats.filter(chat => `${chat.title} ${chat.agent} ${chat.sourceLabel} ${chat.session} ${chat.id}`.toLowerCase().includes(filter.toLowerCase())).map(chat => <SidebarMenuItem key={chat.id}><SidebarMenuButton isActive={selected === chat.id} tooltip={`${chat.agent} · ${chat.source} · ${chat.session ?? ''} · ${chat.id}`} className={`chat-item ${selected === chat.id ? 'selected' : ''}`} aria-current={selected === chat.id ? 'page' : undefined} disabled={sending || !!pending} onClick={() => choose(chat.id)}><span>{chat.title}</span><small>{agentName(chat.agent)} · {installationName(chat.agent)} · {chat.sourceLabel ?? chat.source}</small><small className="chat-identity" title={`${chat.agent} · ${chat.source} · ${chat.session ?? ''} · ${chat.id}`}>{sessionName(chat, chats)} · #{chat.conversationId}{chat.parentId ? ' · child' : ''}</small></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
+        {groups.map(group => !!group.chats.length && <section key={group.title} aria-label={group.title}><h2 className="history-group">{group.title}<span>{group.chats.length}</span></h2><SidebarMenu>{group.chats.map(chat => <SidebarMenuItem key={chat.id}><SidebarMenuButton isActive={selected === chat.id} tooltip={`${chat.agent} · ${chat.source} · ${chat.session ?? ''} · ${chat.id}`} className={`chat-item ${selected === chat.id ? 'selected' : ''}`} aria-current={selected === chat.id ? 'page' : undefined} disabled={sending || !!pending} onClick={() => choose(chat.id)}><Avatar identity={chat.agent} available={avatars}/><span className="chat-copy"><span className="chat-title">{chat.title === 'New chat' ? 'New conversation' : chat.title}</span><small>{agentName(chat.agent)} · {chat.sourceLabel ?? chat.source}</small><small className={`chat-state ${chat.activity ?? 'unavailable'}`}><i/>{statusLabel(chat)}</small><small className="chat-identity">{sessionName(chat, chats)} · #{chat.conversationId}</small></span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></section>)}
+        {ready && chats.length > 0 && !filtered.length && <p className="nav-note">No matching conversations.</p>}
       </nav>
-      <div className="sidebar-footer">Configured native stores{sources.flatMap(source => source.issues.map((issue, index) => <p key={`${source.id}:${index}`} role="status">{source.label}: {issue}</p>))}</div>
+      <div className="sidebar-footer"><span role="status">{sidebarConnection}</span>{sidebarConnection !== 'Live' && <button onClick={refresh}>Reconnect</button>}{sources.flatMap(source => source.issues.map((issue, index) => <p key={`${source.id}:${index}`} role="status">{source.label}: {issue}</p>))}</div>
     </aside>
+    {!narrow && <div className="sidebar-resizer" role="separator" aria-label="Resize conversation sidebar" aria-orientation="vertical" aria-valuemin={220} aria-valuemax={Math.max(220, viewportWidth - 360)} aria-valuenow={Math.max(220, Math.min(sidebarWidth, viewportWidth - 360))} tabIndex={0}
+      onKeyDown={event => { if (['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) { event.preventDefault(); resizeWidth(event.key === 'Home' ? 220 : event.key === 'End' ? innerWidth - 360 : Math.min(sidebarWidth, innerWidth - 360) + (event.key === 'ArrowLeft' ? -20 : 20)); } }}
+      onPointerDown={event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); }}
+      onPointerMove={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) resizeWidth(event.clientX); }}
+      onPointerUp={event => event.currentTarget.releasePointerCapture(event.pointerId)}/>}
     <main inert={narrow && navigation}>
       <header><Button aria-expanded={navigation} variant="ghost" size="icon" className="mobile-only" aria-label="Open conversations" onClick={() => setNavigation(true)}><Menu/></Button><h1 title={title}>{title}</h1><span className="agent-name">{selected ? agentName(snapshot?.chat.agent ?? agent) : 'Local'}</span></header>
       {!selected && !link && <div className="agent-picker"><label htmlFor="agent">Agent</label><select id="agent" value={agent} disabled={!ready || sending} onChange={event => setAgent(event.target.value)}>{agents.filter(item => item.capabilities?.create !== false).map(item => <option key={item.id} value={item.id}>{agentName(item.id)} · {installationName(item.id)}</option>)}</select><p>{agents.find(item => item.id === agent)?.description}</p></div>}
@@ -268,10 +303,10 @@ export default function App() {
           {(!selected && !link || snapshot && !snapshot.messages.length && !snapshot.partial) && <ConversationEmptyState title={`Message ${agentName(snapshot?.chat.agent ?? agent) || 'an agent'}`} description=""/>}
           {link && !linkReady && <p className="empty-loading">Opening linked conversation…</p>}
           {selected && !snapshot && <p className="empty-loading">{connection}</p>}
-          {snapshot?.messages.filter(visibleMessage).map(message => <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.provenance === 'user'}><Message align={message.provenance === 'user' ? 'end' : 'start'}><MessageContent><span className="message-author">{message.provenance === 'user' ? 'You' : message.author ?? agentName(snapshot.chat.agent)}</span><Bubble align={message.provenance === 'user' ? 'end' : 'start'} variant={message.provenance === 'user' ? 'muted' : 'ghost'}><BubbleContent>{message.commentary && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{snapshot.turns?.filter(turn => turn.status === 'unanswered' && String(turn.entryId) === message.id.split(':')[0]).map(turn => <p key={turn.submissionId} className="pending-note">{turn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${turn.reason})`}</p>)}{message.attachments?.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt={file.name} src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle><a download={file.name} href={`data:${file.mimeType || 'text/plain'};base64,${file.data}`}>{file.name}</a></AttachmentTitle></AttachmentContent></Attachment>)}{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => snapshot.chat.capabilities?.artifacts === false ? <span key={artifact.id} className="artifact-link">{artifact.name} · Download unavailable</span> : <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</BubbleContent></Bubble></MessageContent></Message><ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.afterMessageId===message.id && call.name!=='request_status')}/></MessageScrollerItem>)}
+          {snapshot?.messages.filter(visibleMessage).map(message => <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.provenance === 'user'}><Message align={message.provenance === 'user' ? 'end' : 'start'}><MessageContent><span className="message-author"><Avatar user={message.provenance === 'user'} identity={authorAgent(snapshot.chat.agent, message.author)} available={avatars}/>{message.provenance === 'user' ? 'You' : message.author ?? agentName(snapshot.chat.agent)}</span><Bubble align={message.provenance === 'user' ? 'end' : 'start'} variant={message.provenance === 'user' ? 'muted' : 'ghost'}><BubbleContent>{message.commentary && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{snapshot.turns?.filter(turn => turn.status === 'unanswered' && String(turn.entryId) === message.id.split(':')[0]).map(turn => <p key={turn.submissionId} className="pending-note">{turn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${turn.reason})`}</p>)}{message.attachments?.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt={file.name} src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle><a download={file.name} href={`data:${file.mimeType || 'text/plain'};base64,${file.data}`}>{file.name}</a></AttachmentTitle></AttachmentContent></Attachment>)}{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => snapshot.chat.capabilities?.artifacts === false ? <span key={artifact.id} className="artifact-link">{artifact.name} · Download unavailable</span> : <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</BubbleContent></Bubble></MessageContent></Message><ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.afterMessageId===message.id && call.name!=='request_status')}/></MessageScrollerItem>)}
           {snapshot && <ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.name!=='request_status' && !snapshot.messages.some(message=>message.id===call.afterMessageId && visibleMessage(message)))}/>}
 
-          {snapshot?.partial && <Message align="start"><span className="message-author">{agentName(snapshot.chat.agent)}</span><MessageContent><MessageResponse>{snapshot.partial}</MessageResponse></MessageContent></Message>}
+          {snapshot?.partial && <Message align="start"><MessageContent><span className="message-author"><Avatar identity={snapshot.chat.agent} available={avatars}/>{agentName(snapshot.chat.agent)}</span><MessageResponse>{snapshot.partial}</MessageResponse></MessageContent></Message>}
         </ConversationContent>
         <ConversationScrollButton aria-label="Scroll to latest message"/>
       </Conversation>

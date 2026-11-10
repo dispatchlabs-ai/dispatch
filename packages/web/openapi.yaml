@@ -813,6 +813,67 @@
           }
         }
       }
+    },
+    "/api/sidebar/events": {
+      "get": {
+        "operationId": "watchSidebar",
+        "summary": "Observe shared native navigation summaries",
+        "tags": [
+          "Conversations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Authenticated SSE. Initial/reconnect snapshot contains full agents, chats, sources and approved avatar keys. Changes coalesce; failure means observation unavailable, never completion. Native working/waiting versus saved/unanswered/unavailable states do not derive from service liveness.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        }
+      }
+    },
+    "/api/avatars/{key}": {
+      "get": {
+        "operationId": "getAvatar",
+        "summary": "Read explicitly approved consumer artwork",
+        "tags": [
+          "Presentation"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact advertised key: agent:PUBLIC_AGENT_ID or user; never a filesystem path."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authenticated PNG/JPEG/WebP bytes loaded from trusted startup bindings."
+          },
+          "404": {
+            "description": "No approved artwork; clients use the placeholder."
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -888,6 +949,20 @@
           },
           "capabilities": {
             "$ref": "#/components/schemas/Capabilities"
+          },
+          "activity": {
+            "type": "string",
+            "enum": [
+              "working",
+              "waiting",
+              "idle",
+              "unanswered",
+              "unavailable"
+            ]
+          },
+          "nativeTitle": {
+            "type": "string",
+            "description": "Original native title when an AI presentation title is configured."
           }
         },
         "required": [

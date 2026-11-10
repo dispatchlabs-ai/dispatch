@@ -1,3 +1,4 @@
+import { runtimeSummary, snapshotActivity } from "./summary.js";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import { Worker } from "node:worker_threads";
@@ -44,7 +45,7 @@ async function startOwner(
 ): Promise<NativeService> {
   return connectWorker("./owner.js", { path, namespace, names, config });
 }
-async function connectWorker(entrypoint: string, workerData: unknown): Promise<NativeService & { agents: Agent[]; catalog(): Promise<Agent[]>; resolveChat(id: string): Promise<Chat> }> {
+async function connectWorker(entrypoint: string, workerData: unknown): Promise<NativeService & { agents: Agent[]; catalog(): Promise<Agent[]>; summary(): Promise<import("./contracts.js").SidebarSnapshot>; resolveChat(id: string): Promise<Chat> }> {
   const worker = new Worker(new URL(entrypoint, import.meta.url), { workerData });
   let agents: Agent[] = [];
   const calls = new Map<
@@ -116,6 +117,7 @@ async function connectWorker(entrypoint: string, workerData: unknown): Promise<N
   return {
     agents,
     catalog: () => call("agents", []),
+    summary: () => call("summary", []),
     resolveChat: id => call("resolveChat", [id]),
     has: (id: string) => call("has", [id]),
     sources: () => call("sources", []),
@@ -528,6 +530,15 @@ async function openLocalRuntime(config: LocalConfig) {
     },
   };
   return {
+    summary: async () => ({ agents, chats: await Promise.all((await stores.summary()).map(async chat => {
+      const item = await stores.get(chat.id);
+      const owner = owners.get(join(item.run.path, item.chat.agent));
+      if (owner) {
+        try { const value = await owner.service.snapshot(nativeId(item)); return { ...projectChat(item), title: value.chat.title, activity: snapshotActivity(value) }; }
+        catch { return { ...projectChat(item), activity: "unavailable" as const }; }
+      }
+      return { ...projectChat(item), title: chat.title, activity: chat.activity };
+    })), sources: await stores.statuses() }),
     openKeyedChat: config.service ? async (key: string, title: string, installation?: string) => {
       if (installation !== undefined) throw new AdmissionError("Keyed conversation links require a named installation binding.");
       const runtime = await openServiceRuntime({ ...config.service!, expectedStateRoot: configuredServiceRoot });
@@ -549,6 +560,7 @@ async function openLocalRuntime(config: LocalConfig) {
     presentation,
     stateRoot: config.sources.map((source) => source.path).join(", "),
     close: async () => {
+      stores.close();
       await Promise.allSettled([...opening.values()]);
       await Promise.all(
         [...new Set([...owners.values(), ...connections.values()])].map((owner) => owner.service.close()),
@@ -563,6 +575,7 @@ async function openAdapter(config: { sources: LocalConfig["sources"]; defaultSou
   return {
     service,
     catalog: service.catalog,
+    summary: service.summary,
     resolveChat: service.resolveChat,
     stateRoot: config.sources.map(source => source.path).join(", "),
     presentation: { snapshot, watch: async (id, listener) => {
@@ -585,6 +598,7 @@ async function openAdapter(config: { sources: LocalConfig["sources"]; defaultSou
  * It owns its native configuration/authority, never a second transcript or loop. */
 export interface Runtime {
   stateRoot: string;
+  summary?(): Promise<import("./contracts.js").SidebarSnapshot>;
   /** Refresh a connected owner's current catalog without creating a writer. */
   catalog?(): Promise<Agent[]>;
   /** Open only explicitly opted-in native keyed conversations, without submitting input. */
@@ -635,6 +649,13 @@ export async function openRuntime(): Promise<Runtime> {
       description: `${config.installations!.find(binding => binding.id === name)!.label}: ${agent.description}` }))))).flat();
   return {
     stateRoot: config.sources.map(source => source.path).join(", "),
+    summary: async () => {
+      const values = await Promise.all([...contexts].map(async ([name, runtime]) => {
+        const value = await runtimeSummary(runtime);
+        return { ...value, agents: value.agents.map(agent => ({ ...agent, id: qualify(name, agent.id), description: `${config.installations!.find(binding => binding.id === name)!.label}: ${agent.description}` })), chats: value.chats.map(chat => project(name, chat)) };
+      }));
+      return { agents: values.flatMap(value => value.agents), chats: values.flatMap(value => value.chats), sources: values.flatMap(value => value.sources) };
+    },
     catalog,
     openKeyedChat: async (key, title, installation) => {
       const runtime = installation && contexts.get(installation);

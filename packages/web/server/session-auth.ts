@@ -161,7 +161,7 @@ async function authorizeSerial(request: IncomingMessage, response: ServerRespons
     return false;
   }
   if (signedIn) {
-    if (request.method === "GET" && /^\/api\/chats\/[^/]+\/events$/.test(path)) {
+    if (request.method === "GET" && (path === "/api/sidebar/events" || /^\/api\/chats\/[^/]+\/events$/.test(path))) {
       const active = streams.get(key) ?? new Set<ServerResponse>();
       streams.set(key, active); active.add(response);
       response.once("close", () => { active.delete(response); if (!active.size) streams.delete(key); });

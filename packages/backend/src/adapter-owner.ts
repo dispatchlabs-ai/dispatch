@@ -1,3 +1,4 @@
+import { runtimeSummary } from "./summary.js";
 // Trusted consumer adapters are isolated from other installations' process state.
 import { parentPort, workerData } from "node:worker_threads";
 import { pathToFileURL } from "node:url";
@@ -16,6 +17,7 @@ port.on("message", async ({ id, method, args }) => {
       if (!runtime.resolveChat) throw new Error("This installation does not support native conversation links.");
       result = await runtime.resolveChat(args[0]);
     }
+    else if (method === "summary") result = await runtimeSummary(runtime);
     else if (method === "snapshot") result = await runtime.presentation.snapshot(...args as [string]);
     else if (method === "close") await runtime.close();
     else if (method === "has" && !runtime.service.has) result = (await runtime.service.list()).some(chat => chat.id === args[0]);

@@ -427,6 +427,27 @@ export async function openCentralRuntime(config: CentralConfig) {
     },
   };
   return {
+    summary: async () => {
+      const chats = await list();
+      const observed: Chat[] = [];
+      for (const run of config.runs) for (const agent of run.agents) {
+        const selected = chats.filter(chat => chat.session === run.id && chat.agent === agent.id);
+        if (!selected.length) continue;
+        try {
+          await read(run.id, agent.id, async db => {
+            const tasks = await pages(cursor => db.scanTasks({}, 250, cursor, context));
+            const submissions = await pages(cursor => db.scanSubmissions({}, 250, cursor, context));
+            for (const chat of selected) {
+              const active = tasks.filter(task => task.conversationId === chat.conversationId && task.state.status !== "terminal");
+              const last = submissions.filter(item => item.conversationId === chat.conversationId).at(-1);
+              const activity = active.length && !sessions.has(run.id) ? "unavailable" : active.some(task => ["running", "runnable"].includes(task.state.status)) ? "working" : active.length ? "waiting" : last?.status === "unanswered" ? "unanswered" : "idle";
+              observed.push({ ...chat, activity });
+            }
+          });
+        } catch { observed.push(...selected.map(chat => ({ ...chat, activity: "unavailable" as const }))); }
+      }
+      return { agents: service.agents, chats: observed, sources: await service.sources() };
+    },
     service,
     presentation: {
       snapshot,

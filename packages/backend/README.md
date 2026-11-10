@@ -258,6 +258,23 @@ Sibling sessions keep ordinary capabilities. The agent catalog reflects the defa
 creation source: restricted when it targets the service, ordinary when it targets a
 sibling source. Exact-session source roots are supported for both binding forms.
 
+## Sidebar observations and conversation titles
+
+Optional `runtime.summary()` returns `{agents,chats,sources}` without creating
+owners. `Chat.activity` is working/waiting/idle/unanswered/unavailable, not process
+liveness or project completion. `runtimeSummary(runtime)` preserves trusted legacy
+adapters via read-only snapshots; batch-capable adapters should implement summary
+without fetching transcripts. Local SQLite uses public Runner `readWatchStates`
+(task/submission state only) and filesystem-invalidated discovery. Shared service
+summaries use its public status operation; central mode uses public Storage scans.
+
+`withConversationTitles(runtime, {directory,host,model:{provider,id}})` is an optional
+consumer-configured AI presentation wrapper. It uses existing HostModelsConfig,
+not agent/provider changes or native ownership migration. Atomic private title-only
+metadata is keyed to public conversation ID and shared across clients/restarts;
+original titles remain `nativeTitle`. No shadow transcript is stored. Native APIs,
+request identities, author/source/session metadata and Stop remain unchanged.
+
 `service.keyedCreation: {agent:"helper", keyPrefix:"attention-item:"}` explicitly
 opts a native owner into item-key creation, independently of general `create:false`.
 `runtime.openKeyedChat(key,title,installation)` routes only to that named service;

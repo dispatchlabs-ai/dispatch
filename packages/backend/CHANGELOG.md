@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Add lightweight native sidebar summaries and optional persistent AI title metadata without native ownership changes.
+
 - Allow explicitly configured service item-key creation without enabling ordinary creation or submitting messages.
 
 - Always steer active work for ordinary user chat input at native boundaries; keep internal peer/schedule policies and explicit Stop unchanged.

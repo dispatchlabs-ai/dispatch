@@ -4,6 +4,8 @@
 
 - Repair hoisted Streamdown styling, compact phone/keyboard layout and external-link dialog; retain request-status evidence without empty chat turns.
 
+- Live native sidebar summaries, remembered drag/keyboard resizing, approved consumer avatar bindings and persisted AI presentation titles compatible with existing owners.
+
 - Keep bounded sign-in uploads and password verification outside session-state serialization so reads, logout and stream expiry remain responsive.
 
 - Persist private digest-only hosted sessions across redeploys with 30-day sliding expiry, durable logout and unchanged Strict secure cookies.

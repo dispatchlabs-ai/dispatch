@@ -1,3 +1,4 @@
+import { watch, type FSWatcher } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { dirname, isAbsolute, relative } from "node:path";
 import { createHash } from "node:crypto";
@@ -48,6 +49,7 @@ export interface Reader {
     saved?: boolean;
   }): Promise<{ runs: Run[]; issues: string[] }>;
   readWatchChatProjection(run: Run, key: string): Promise<Pick<Snapshot, "messages" | "toolCalls" | "turns">>;
+  readWatchStates(run: Run): Promise<{ key: string; status: Chat["activity"] }[]>;
   readWatchCatalog(run: Run): Promise<{ conversations: CatalogConversation[]; issues: string[] }>;
   readWatchRun(
     run: Run,
@@ -181,10 +183,18 @@ export function provenance(
 export function createStores(config: Pick<LocalConfig, "sources">, reader: Reader) {
   let selections = new Map<string, Selection>();
   let statuses: SourceStatus[] = [];
+  let inventory = new Map<Run, Source>();
   let pending: Promise<void> | undefined;
   let observedAt = 0;
+  let invalidated = true;
+  let catalogChanged = false;
+  let catalogObservedAt = 0;
+  const watchers = new Map<string, FSWatcher>();
+  let watchUnavailable = false;
   async function discover() {
+    invalidated = false;
     const next = new Map<string, Selection>();
+    const discovered = new Map<Run, Source>();
     const seen = new Set<string>();
     statuses = [];
     for (const source of config.sources) {
@@ -197,6 +207,16 @@ export function createStores(config: Pick<LocalConfig, "sources">, reader: Reade
       try {
         const root = await realpath(source.path);
         status.path = root;
+        if (!watchers.has(root)) {
+          try {
+            const observer = watch(root, { recursive: true }, (event, path) => {
+              if (event === "rename" || String(path).endsWith("status.json")) invalidated = true;
+              else if (/session\.sqlite(?:-wal)?$/.test(String(path))) catalogChanged = true;
+            });
+            observer.on("error", () => { invalidated = true; watchUnavailable = true; });
+            watchers.set(root, observer);
+          } catch { watchUnavailable = true; }
+        }
         const excluded = await Promise.all((source.exclude ?? []).map(path => realpath(path)));
         const discovery = await reader.discoverWatchRuns({ stateRoot: root, saved: true });
         status.issues.push(...discovery.issues);
@@ -210,6 +230,7 @@ export function createStores(config: Pick<LocalConfig, "sources">, reader: Reade
           run.stores = run.stores.filter((store) => !seen.has(store.path));
           for (const store of run.stores) seen.add(store.path);
           if (!run.stores.length) continue;
+          discovered.set(run, source);
           const snapshot = await reader.readWatchCatalog({ ...run, issues: [] });
           status.issues.push(...snapshot.issues);
           for (const conversation of snapshot.conversations) {
@@ -243,17 +264,44 @@ export function createStores(config: Pick<LocalConfig, "sources">, reader: Reade
             "No native session.sqlite stores found. Choose an existing instances directory; new sessions are created only by New conversation.",
           );
       } catch (error) {
+        watchUnavailable = true;
         status.issues.push(
           `Cannot read configured source: ${(error as Error).message} Check the path/permissions in DISPATCH_CONFIG and restart.`,
         );
       }
     }
     selections = next;
+    inventory = discovered;
     observedAt = Date.now();
   }
   const refresh = async (fresh = false) => {
     if (pending) return pending;
-    if (!fresh && Date.now() - observedAt < 60000) return;
+    if (!fresh && !invalidated && (!watchUnavailable || Date.now() - observedAt < 5000)) {
+      // Some native filesystems coalesce WAL notifications. Refresh known
+      // catalogs on the shared observation cadence even without a file event.
+      if (!catalogChanged && Date.now() - catalogObservedAt < 2000) return;
+      catalogChanged = false;
+      catalogObservedAt = Date.now();
+      pending = (async () => {
+        // A valid empty store must remain discoverable when its first chat is
+        // committed to an already-existing WAL, without a rename/status event.
+        for (const [run, source] of inventory) {
+          const catalog = await reader.readWatchCatalog(run);
+          if (catalog.issues.length) { invalidated = true; continue; }
+          for (const conversation of catalog.conversations) {
+            const store = run.stores.find(store => store.agent === conversation.agent)!;
+            const id = identity(store.path, conversation.conversationId);
+            const previous = selections.get(id);
+            const chat: Chat = { ...(previous?.chat ?? { id, agent: conversation.agent, conversationId: conversation.conversationId,
+              source: source.id, sourceLabel: source.label, session: run.session,
+              createdAt: new Date(conversation.startedAt ?? 0).toISOString(),
+              ...(conversation.parentKey ? { parentId: identity(store.path, Number(conversation.parentKey.split(":").at(-1))) } : {}) }), title: conversation.title };
+            selections.set(id, { chat, store, run, conversation, source });
+          }
+        }
+      })().finally(() => { pending = undefined; });
+      return pending;
+    }
     pending = discover().finally(() => {
       pending = undefined;
     });
@@ -261,8 +309,25 @@ export function createStores(config: Pick<LocalConfig, "sources">, reader: Reade
   };
   return {
     refresh,
+    close: () => { for (const observer of watchers.values()) observer.close(); watchers.clear(); },
+    summary: async (): Promise<Chat[]> => {
+      await refresh();
+      const runs = new Map<Run, Selection[]>();
+      for (const item of selections.values()) { const group = runs.get(item.run) ?? []; group.push(item); runs.set(item.run, group); }
+      const result: Chat[] = [];
+      for (const [run, items] of runs) {
+        try {
+          const observed = await reader.readWatchStates(run);
+          for (const item of items) {
+            const current = observed.find(value => value.key === item.conversation.key);
+            result.push({ ...item.chat, activity: current?.status ?? "unavailable" });
+          }
+        } catch { result.push(...items.map(item => ({ ...item.chat, activity: "unavailable" as const }))); }
+      }
+      return result;
+    },
     invalidate: () => {
-      observedAt = 0;
+      invalidated = true;
     },
     statuses: async () => {
       await refresh();
@@ -309,7 +374,8 @@ export function createStores(config: Pick<LocalConfig, "sources">, reader: Reade
       return {
         chat: item.chat,
         ...projected,
-        running: conversation.active > 0,
+        activity: conversation.status as Chat["activity"],
+        running: conversation.status === "working",
         queued: 0,
         partial: "",
         tools: conversation.currentTools?.map((tool) => tool.title) ?? [],

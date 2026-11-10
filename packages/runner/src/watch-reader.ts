@@ -395,6 +395,34 @@ export async function readWatchRun(run: WatchRun, key?: string): Promise<WatchSn
   return { run, conversations, activity: activity.slice(-20), unavailableAgents, issues, observedAt: Date.now() };
 }
 
+/** Lightweight sidebar state: native tasks/submissions, no transcript or owner. */
+export async function readWatchStates(run: WatchRun): Promise<{ key: string; status: WatchConversation["status"] }[]> {
+  const result: { key: string; status: WatchConversation["status"] }[] = [];
+  for (const store of run.stores) {
+    const current = await withStore(store.path, db => {
+      const tasks = db.prepare("SELECT record FROM tasks WHERE status<>'terminal'").all().map(row => parse(row.record));
+      const conversations = db.prepare("SELECT id FROM conversations").all();
+      const alive = store.pids.some(pid => { try { process.kill(pid, 0); return true; } catch { return false; } });
+      return conversations.map(row => {
+        const id = number(row.id), active = tasks.filter(task => task.conversationId === id);
+        const calls = active.filter(task => task.kind === "pi.tool").flatMap(task => {
+          if (!Number.isSafeInteger(task.input?.assistant)) return [];
+          const row = db.prepare("SELECT record,commit_seq FROM entries WHERE id=? AND conversation_id=?").get(task.input.assistant, id);
+          return row ? projectEntries(store, [row]).filter(item => item.kind === "tool-call" && item.toolCallId === task.input.callId) : [];
+        });
+        const agentWait = calls.length > 0 && calls.every(call => ["clone_agent", "delegate", "wait_for_agent"].includes(call.title));
+        const settled = active.length ? undefined : db.prepare("SELECT record FROM submissions WHERE conversation_id=? AND json_extract(record,'$.type') IN ('input','continue') ORDER BY id DESC LIMIT 1").get(id);
+        const status: WatchConversation["status"] = !alive && active.length ? "unavailable"
+          : agentWait || active.length && !active.some(task => ["running", "runnable"].includes(task.state?.status)) ? "waiting"
+          : active.length ? "working" : settled && parse(settled.record).status === "unanswered" ? "unanswered" : "idle";
+        return { key: `${store.agent}:${id}`, status };
+      });
+    });
+    result.push(...current);
+  }
+  return result;
+}
+
 export async function readWatchConversation(run: WatchRun, key: string, before?: WatchCursor): Promise<WatchPage> {
   const split = key.lastIndexOf(":"), agent = key.slice(0, split), conversationId = Number(key.slice(split + 1));
   const store = run.stores.find(item => item.agent === agent);
