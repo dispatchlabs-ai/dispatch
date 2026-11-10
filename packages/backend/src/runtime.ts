@@ -382,14 +382,29 @@ async function openLocalRuntime(config: LocalConfig) {
     if (path === configuredServiceRoot && config.service?.capabilities?.[key] === false)
       throw new AdmissionError(`This installation does not support ${key}.`);
   };
+  // Saved history is sendable only when no read-only reason applies; then explicit
+  // admission may acquire an owner. Registration alone is not current access.
   const savedSnapshot = async (id: string): Promise<Snapshot> => {
-    const item = await stores.get(id);
-    return { ...await stores.snapshot(id), chat: projectChat(item) };
+    const item = await stores.get(id), saved = await stores.snapshot(id);
+    return { ...saved, chat: { ...projectChat(item), addressable: !saved.readOnly } };
   };
   const unavailableSnapshot = async (id: string): Promise<Snapshot> => {
     const saved = await savedSnapshot(id);
     return saved.readOnly === "worker" ? saved : { ...saved, readOnly: "unavailable",
       readOnlyReason: "Native service unavailable. Reconnect its original launcher; no work was resent or resumed." };
+  };
+  /** Observed send access for the sidebar, matching the selected snapshot's reason.
+   * Reads the endpoint file and lists an existing service; never acquires an owner or sends. */
+  const access = async (item: Selection, listed: Map<string, Promise<Set<string> | undefined>>) => {
+    if (item.conversation.parentKey || !item.conversation.registered) return false;
+    if (owners.has(join(item.run.path, item.chat.agent))) return true;
+    if (!listed.has(item.run.path)) listed.set(item.run.path, (async () => {
+      const shared = await discovered(item.run.path);
+      return shared && new Set((await shared.list()).map(chat => chat.id));
+    })().catch(() => new Set<string>()));
+    const ids = await listed.get(item.run.path);
+    // An endpoint answers for its chats; without one a live legacy owner blocks Web.
+    return ids ? ids.has(nativeId(item)) : !item.store.pids.length;
   };
   const service = {
     agents,
@@ -484,7 +499,7 @@ async function openLocalRuntime(config: LocalConfig) {
         const snapshot = await owner.service.snapshot(nativeId(item));
         return {
           ...snapshot,
-          chat: { ...projectChat(item), title: snapshot.chat.title },
+          chat: { ...projectChat(item), title: snapshot.chat.title, addressable: !snapshot.readOnly },
         };
       } catch {
         // A disconnected native chat stays observational; never create a writer.
@@ -533,15 +548,19 @@ async function openLocalRuntime(config: LocalConfig) {
     },
   };
   return {
-    summary: async () => ({ agents, chats: await Promise.all((await stores.summary()).map(async chat => {
-      const item = await stores.get(chat.id);
-      const owner = owners.get(join(item.run.path, item.chat.agent));
-      if (owner) {
-        try { const value = await owner.service.snapshot(nativeId(item)); return { ...projectChat(item), title: value.chat.title, activity: snapshotActivity(value) }; }
-        catch { return { ...projectChat(item), activity: "unavailable" as const }; }
-      }
-      return { ...projectChat(item), title: chat.title, activity: chat.activity };
-    })), sources: await stores.statuses() }),
+    summary: async () => {
+      const listed = new Map<string, Promise<Set<string> | undefined>>();
+      return { agents, chats: await Promise.all((await stores.summary()).map(async chat => {
+        const item = await stores.get(chat.id);
+        const addressable = await access(item, listed);
+        const owner = owners.get(join(item.run.path, item.chat.agent));
+        if (owner) {
+          try { const value = await owner.service.snapshot(nativeId(item)); return { ...projectChat(item), addressable, title: value.chat.title, activity: snapshotActivity(value) }; }
+          catch { return { ...projectChat(item), addressable: false, activity: "unavailable" as const }; }
+        }
+        return { ...projectChat(item), addressable, title: chat.title, activity: chat.activity };
+      })), sources: await stores.statuses() };
+    },
     openKeyedChat: config.service ? async (key: string, title: string, installation?: string) => {
       if (installation !== undefined) throw new AdmissionError("Keyed conversation links require a named installation binding.");
       const runtime = await openServiceRuntime({ ...config.service!, expectedStateRoot: configuredServiceRoot });

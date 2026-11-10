@@ -250,6 +250,8 @@ export async function openCentralRuntime(config: CentralConfig) {
                 createdAt: saved?.createdAt ?? "",
                 sourceLabel: run.id,
                 session: run.id,
+                // Observed, not probed: an indexed root chat with a connected worker.
+                addressable: !!saved && !conversation.owner && sessions.get(run.id)?.readyState === WebSocket.OPEN,
                 ...(conversation.owner
                   ? {
                       parentId: chatId(
@@ -294,7 +296,7 @@ export async function openCentralRuntime(config: CentralConfig) {
       if (live)
         return {
           ...live,
-          chat: { ...live.chat, id, transport: live.chat.source, sourceLabel: item.run, session: item.run },
+          chat: { ...live.chat, id, transport: live.chat.source, sourceLabel: item.run, session: item.run, addressable: true },
         };
     }
     return read(item.run, item.agent, async (db) => {
@@ -302,7 +304,12 @@ export async function openCentralRuntime(config: CentralConfig) {
       if (!conversation) throw new AdmissionError("Conversation not found.");
       const index = await readDocument(db, `${namespace}.chats`) as {byId?: Record<string, NativeChat>} | undefined;
       const saved = index?.byId?.[item.native];
-      const chat: Chat = {id, agent:item.agent, conversationId:item.conversation, title:saved?.title ?? `Native conversation ${item.conversation}`,
+      // Same access reasons as local stores; mutation admission is unchanged.
+      const access: Pick<Snapshot, "readOnly" | "readOnlyReason"> = conversation.owner ? { readOnly: "worker", readOnlyReason: "Worker conversation run by a task. Steer its parent." }
+        : !saved ? { readOnly: "internal", readOnlyReason: "Internal service conversation." }
+        : sessions.get(item.run)?.readyState !== WebSocket.OPEN ? { readOnly: "unavailable", readOnlyReason: "Bound worker is offline. Reconnect its original native owner; saved history remains available." }
+        : {};
+      const chat: Chat = {id, agent:item.agent, conversationId:item.conversation, title:saved?.title ?? `Native conversation ${item.conversation}`, addressable: !access.readOnly,
         source:saved?.source ?? "native", ...(saved?.source ? {transport:saved.source} : {}), createdAt:saved?.createdAt ?? "", sourceLabel:item.run, session:item.run,
         ...(conversation.owner ? {parentId:chatId(item.run,item.agent,conversation.owner.conversationId)} : {})};
       const entries = await pages((cursor) =>
@@ -350,6 +357,7 @@ export async function openCentralRuntime(config: CentralConfig) {
         demo: false,
         background: false,
         observation: "Saved native history",
+        ...access,
       } as Snapshot;
     });
   }

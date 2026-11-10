@@ -170,6 +170,13 @@ export default function App() {
     }
   }, [sending, pending, sendCompleted]);
   const refresh = () => setSidebarRetry(value => value + 1);
+  // A new conversation needs an agent that permits creation. Selecting a restricted
+  // agent's chat sets `agent`; replace it (drafts/files untouched) once composing anew.
+  useEffect(() => {
+    if (selected || link || agents.some(item => item.id === agent && item.capabilities?.create !== false)) return;
+    const eligible = agents.find(item => item.capabilities?.create !== false)?.id;
+    if (eligible) setAgent(eligible);
+  }, [selected, link, agents, agent]);
   useEffect(() => {
     const events = new EventSource('/api/sidebar/events');
     events.addEventListener('snapshot', event => {
