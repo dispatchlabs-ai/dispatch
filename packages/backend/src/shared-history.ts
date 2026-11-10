@@ -82,6 +82,13 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
       if (!chat) throw new AdmissionError("Linked conversation is unavailable in this installation.");
       return project(chat);
     },
+    summary: async () => {
+      const saved = await stores.summary();
+      const live = await read(async runtime => runtime.summary!());
+      const all = new Map<string, Chat>(saved.map(chat => [chat.id, { ...chat, capabilities: config.capabilities }]));
+      for (const chat of live?.chats ?? []) { const value = project(chat); all.set(value.id, value); }
+      return { agents: live?.agents ?? agents, chats: [...all.values()], sources: (await stores.statuses()).map(status => ({ ...status, issues: [...status.issues, ...(live?.sources.find(source => source.id === status.id)?.issues ?? []), ...(status.id === source.id && issue ? [issue] : [])] })) };
+    },
     stateRoot: root,
     service: {
       // Catalogs are loaded afresh by the service client, not authored by Web.
@@ -125,7 +132,7 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
       watches.add(stop); void watch.closed.then(() => watches.delete(stop));
       return { ...watch, stop };
     } },
-    close: async () => { closed = true; await Promise.all([...watches].map(stop => stop())); await connecting?.catch(() => {}); await connected?.close(); },
+    close: async () => { stores.close(); closed = true; await Promise.all([...watches].map(stop => stop())); await connecting?.catch(() => {}); await connected?.close(); },
   };
 }
 

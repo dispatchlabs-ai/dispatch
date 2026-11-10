@@ -128,3 +128,41 @@ linked conversation. Existing draft text/files are retained. Selecting a sidebar
 conversation leaves the link and resumes ordinary selection behavior. A service
 configured without creation hides New conversation and is excluded from the new
 conversation agent picker; existing histories/replies and Stop remain available.
+
+## Live navigation and presentation bindings
+
+The sidebar subscribes to authenticated `/api/sidebar/events`. Initial and reconnect
+frames contain the full agent/history/source catalog; later frames coalesce native
+observations shared by all browser clients. Active work stays above saved history,
+ordered by conversation creation (not streaming chunks). Working/Waiting come from
+native tasks. Unavailable is not completed; Saved means retained history, not a
+successful project outcome. Search also matches exact agent, source, session,
+native title and conversation IDs. Source issues remain visible.
+
+Drag the desktop divider to resize navigation; Left/Right, Home and End work when
+it has keyboard focus. Width is remembered locally and constrained only to leave
+a usable message pane. Small screens keep the focus-trapped drawer.
+
+Optional trusted server bindings, never browser-supplied paths:
+
+- `DISPATCH_AVATARS`: absolute JSON file with `agents` mapping **exact public agent
+  IDs** to approved absolute PNG/JPEG/WebP paths, plus optional `user` artwork.
+  For example `{"agents":{"studio~helper":"/opt/studio/art/helper.png"}}`.
+  Explicit maps work with service-only installations. Files are loaded at startup,
+  served same-origin under existing authorization, and never copied into public
+  Dispatch packages. Missing/failed images use the same placeholder. A background
+  author's role resolves in the conversation's installation, not the main agent.
+- `DISPATCH_TITLES`: absolute private JSON file with `directory` (persistent private
+  metadata directory), `host` (the supported Backend/Runner `HostModelsConfig`
+  gateway or modelProviders binding), and `model: {provider,id}`. Select an existing
+  authorized small inference model. Only the first retained request is sent for
+  title inference, without tools or binary attachments. Generated short titles
+  are persisted by exact public conversation ID, shared by browser/API clients and
+  retained across Web restarts. They stay stable during later work. Original
+  titles remain `nativeTitle` metadata/search input. Failure retains the native
+  title and retries later; truncation is never presented as AI summarization.
+  This binding is compatible with existing owners: it never rewrites native
+  transcripts, opens a writer, resumes work or changes an agent's model. Keep the
+  metadata directory when upgrading/rolling back Web. Absence leaves native titles
+  unchanged. Inference is background presentation work and is cancelled on Web
+  shutdown, independently of explicit native Stop.

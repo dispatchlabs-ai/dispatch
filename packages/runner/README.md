@@ -417,6 +417,7 @@ commentary, timestamps and artifacts without exposing reasoning/provider diagnos
 The supported `@dispatch/runner/watch-reader` API accepts
 `discoverWatchRuns({stateRoot, saved: true})` to include retained sessions with one
 process census for the root. Default terminal watch discovery stays running-only.
+`readWatchStates(run)` returns native task/submission status per conversation without transcript projection.
 `readWatchCatalog(run)` returns lightweight identity/title/parent/date metadata,
 not an execution-status claim. `readWatchRun(run, conversationKey)` reads activity
 for one selected conversation; omitting the key preserves the full-run API.

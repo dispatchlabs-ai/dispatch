@@ -161,3 +161,24 @@ header { border: 0; height: 64px; }
 }
 [data-slot=code-block-content][data-wrap] { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
 [data-slot=code-block-content][data-wrap] > [data-slot=code-block-code] { min-width: 0; overflow-wrap: anywhere; }
+
+.avatar { width: 30px; height: 30px; flex: 0 0 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: #ededed; color: #7b7b7b; overflow: hidden; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar svg { width: 16px; height: 16px; }
+.message-author { display: flex; align-items: center; gap: 8px; }
+.message-author .avatar { width: 26px; height: 26px; flex-basis: 26px; }
+[data-slot=sidebar-menu-button].chat-item { display: flex; align-items: flex-start; gap: 10px; }
+.chat-item .avatar { margin-top: 2px; }
+.chat-item .chat-copy { flex: 1; min-width: 0; font-weight: normal; }
+.chat-item .chat-title { font-size: 12px; font-weight: 500; }
+.chat-item .chat-state { display: flex; align-items: center; gap: 5px; font-size: 10px; }
+.chat-state i { width: 5px; height: 5px; border-radius: 50%; background: #aaa; }
+.chat-state.working i { background: #42735a; }
+.chat-state.waiting i { background: #aa7b30; }
+.chat-state.unavailable i, .chat-state.unanswered i { background: #999; border: 1px solid #777; }
+.history-group { font-size: 10px; color: #888; font-weight: 500; display: flex; gap: 8px; padding: 12px 12px 5px; margin: 0; }
+.history-group span { color: #aaa; }
+.sidebar-resizer { flex: 0 0 6px; margin-left: -3px; margin-right: -3px; z-index: 10; cursor: col-resize; touch-action: none; }
+.sidebar-resizer:hover, .sidebar-resizer:focus-visible { background: #ccc8; }
+.sidebar-resizer:focus-visible { outline-offset: -2px; }
+.sidebar-footer > button { margin-left: 8px; text-decoration: underline; }

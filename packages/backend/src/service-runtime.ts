@@ -42,6 +42,7 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
   if (!expected) throw new Error("The service must expose a stable stateRoot or installation identity for safe client binding.");
   const catalog = async () => (await call({ method: "agents" })).map(agent => ({ ...agent, capabilities }));
   const agents = await catalog();
+  let lastChats: Chat[] = [];
   const project = (chat: NativeChat): Chat => ({ ...chat, source, sourceLabel: label, capabilities });
   const snapshot = async (id: string): Promise<Snapshot> => {
     const value = await call({ method: "snapshot", id });
@@ -51,6 +52,27 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
   return {
     stateRoot: metadata.stateRoot ?? config.socket,
     catalog,
+    summary: async () => {
+      let currentAgents, chats;
+      try { [currentAgents, chats] = await Promise.all([catalog(), call({ method: "chats" })]); lastChats = chats.map(project); }
+      catch { return { agents, chats: lastChats.map(chat => ({ ...chat, activity: "unavailable" as const })), sources: [{ id: source, label, issues: ["Native service unavailable. Reconnect its original owner."] }] }; }
+      // A healthy service is not evidence of active work. Native task states are.
+      let activity: Awaited<ReturnType<typeof call<{method: "status"}>>> | undefined;
+      try { activity = await call({ method: "status" }); } catch { /* Older trusted facades may not expose status. */ }
+      return { agents: currentAgents, sources: [{ id: source, label, path: config.socket, issues: [] }], chats: await Promise.all(chats.map(async chat => {
+        const work = activity?.hosts.flatMap(host => host.conversations).find(item => item.id === chat.id);
+        const host = activity?.hosts.find(host => host.conversations.some(item => item.id === chat.id));
+        let state = !activity || host?.scheduling === "paused" || work?.tasks.some(task => task.state === "blocked") ? "unavailable" : work?.held ? "unavailable" : work?.tasks.some(task => ["running", "pending"].includes(task.state)) ? "working" : work?.tasks.length || work?.queued ? "waiting" : "idle";
+        if (state === "working" && work?.tasks.some(task => task.kind === "pi.tool")) {
+          try {
+            const live = await snapshot(chat.id);
+            const calls = live.toolCalls?.filter(call => ["running", "pending", "waiting"].includes(call.status)) ?? [];
+            if (calls.length && calls.every(call => ["delegate", "clone_agent", "wait_for_agent"].includes(call.name))) state = "waiting";
+          } catch { state = "unavailable"; }
+        }
+        return { ...project(chat), activity: state as Chat["activity"] };
+      })) };
+    },
     resolveChat: async (id, installation) => {
       if (installation !== undefined) throw new AdmissionError("Native conversation links require a named installation binding.");
       const chat = (await call({ method: "chats" })).find(chat => chat.id === id);

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { observeSidebar } from "./sidebar.js";
+import { loadAvatars } from "./avatars.js";
 import {
   createServer,
   type IncomingMessage,
@@ -9,6 +11,7 @@ import { resolve, extname, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   openRuntime,
+  withConversationTitles,
   openCentralRuntime,
   AdmissionError,
   type Runtime,
@@ -97,10 +100,16 @@ async function protect(request: IncomingMessage, response: ServerResponse, path:
   return true;
 }
 const central = process.env.DISPATCH_CENTRAL_CONFIG;
-const runtime: Runtime = central
+let runtime: Runtime = central
   ? await openCentralRuntime(JSON.parse(await readFile(central, "utf8")))
   : await openRuntime();
+if (process.env.DISPATCH_TITLES) {
+  if (!isAbsolute(process.env.DISPATCH_TITLES)) throw new Error("DISPATCH_TITLES must be an absolute trusted JSON configuration path.");
+  runtime = await withConversationTitles(runtime, JSON.parse(await readFile(process.env.DISPATCH_TITLES, "utf8")));
+}
 const service = runtime.service;
+const sidebar = observeSidebar(runtime);
+const avatars = await loadAvatars();
 const streams = new Set<() => void>();
 const server = createServer(async (request, response) => {
   response.setHeader("x-content-type-options", "nosniff");
@@ -121,6 +130,28 @@ const server = createServer(async (request, response) => {
       return;
     }
     if (!(await protect(request, response, path))) return;
+    if (path.startsWith("/api/avatars/") && method === "GET") {
+      const image = avatars.get(decodeURIComponent(path.slice("/api/avatars/".length)));
+      if (!image) throw new HttpError(404, "Artwork unavailable.");
+      response.writeHead(200, { "content-type": image.mime }).end(image.bytes);
+      return;
+    }
+    if (path === "/api/sidebar/events" && method === "GET") {
+      response.writeHead(200, { "content-type": "text/event-stream", connection: "keep-alive", "x-accel-buffering": "no" });
+      response.flushHeaders();
+      let pending: string | undefined;
+      let ended = false;
+      const flush = () => { if (pending && !ended && !response.writableNeedDrain) { const frame = pending; pending = undefined; response.write(frame); } };
+      const unsubscribe = sidebar.subscribe(value => {
+        pending = value ? `event: snapshot\ndata: ${JSON.stringify({ ...value, avatars: [...avatars.keys()] })}\n\n`
+          : 'event: failure\ndata: {"error":"Sidebar observation unavailable."}\n\n';
+        flush();
+      });
+      const heartbeat = setInterval(() => { if (!response.writableNeedDrain) response.write(": keepalive\n\n"); }, 15000);
+      const close = () => { if (ended) return; ended = true; unsubscribe(); clearInterval(heartbeat); streams.delete(close); response.end(); };
+      streams.add(close); response.on("close", close); response.on("drain", flush);
+      return;
+    }
     if (path === "/api/chat-link" && method === "GET") {
       const installation = url.searchParams.get("installation"), chat = url.searchParams.get("chat");
       if (!installation || !chat) throw new HttpError(400, "A conversation link requires installation and chat.");
@@ -159,6 +190,7 @@ const server = createServer(async (request, response) => {
           typeof body.source === "string" ? body.source : undefined,
         ),
       );
+      void sidebar.refresh();
       return;
     }
     const match = path.match(
@@ -193,11 +225,13 @@ const server = createServer(async (request, response) => {
             files,
           ),
         );
+        void sidebar.refresh();
         return;
       }
       if (action === "stop" && !artifactId && method === "POST") {
         await bodyOf(request);
         await service.stop(id);
+        void sidebar.refresh();
         json(response, 200, {});
         return;
       }

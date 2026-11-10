@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Live native sidebar summaries, remembered drag/keyboard resizing, approved consumer avatar bindings and persisted AI presentation titles compatible with existing owners.
+
 - Always steer active work for ordinary user chat input at native boundaries; keep internal peer/schedule policies and explicit Stop unchanged.
 
 - Show retained artifact metadata without a download link when the selected installation disables artifacts.

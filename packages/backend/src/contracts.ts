@@ -8,11 +8,13 @@ export interface Agent {
   description: string;
 }
 export interface Chat {
+  activity?: "working" | "waiting" | "idle" | "unanswered" | "unavailable";
   capabilities?: Capabilities;
   id: string;
   agent: string;
   conversationId: number;
   title: string;
+  nativeTitle?: string;
   source: string;
   createdAt: string;
   sourceLabel?: string;
@@ -45,7 +47,9 @@ export interface SourceStatus {
   path?: string;
   issues: string[];
 }
+export interface SidebarSnapshot { avatars?: string[]; agents: Agent[]; chats: Chat[]; sources: SourceStatus[] }
 export interface Snapshot {
+  activity?: Chat["activity"];
   turns?: ChatTurn[];
   toolCalls?: ChatToolCall[];
   observation?: string;
