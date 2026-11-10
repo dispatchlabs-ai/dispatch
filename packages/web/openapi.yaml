@@ -57,6 +57,9 @@
           },
           "500": {
             "$ref": "#/components/responses/Error500"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
           }
         }
       }
@@ -87,6 +90,9 @@
           },
           "500": {
             "$ref": "#/components/responses/Error500"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
           }
         }
       },
@@ -121,6 +127,9 @@
           },
           "409": {
             "$ref": "#/components/responses/Error409"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
           }
         },
         "requestBody": {
@@ -185,6 +194,9 @@
           },
           "404": {
             "$ref": "#/components/responses/Error404"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
           }
         },
         "parameters": [
@@ -238,6 +250,9 @@
           },
           "409": {
             "$ref": "#/components/responses/Error409"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
           }
         },
         "parameters": [
@@ -316,6 +331,9 @@
           },
           "409": {
             "$ref": "#/components/responses/Error409"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
           }
         },
         "parameters": [
@@ -367,6 +385,9 @@
           },
           "404": {
             "$ref": "#/components/responses/Error404"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
           }
         },
         "parameters": [
@@ -414,6 +435,9 @@
           },
           "404": {
             "$ref": "#/components/responses/Error404"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
           }
         },
         "parameters": [
@@ -452,6 +476,9 @@
           },
           "404": {
             "$ref": "#/components/responses/Error404"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
           }
         }
       }
@@ -492,6 +519,9 @@
           },
           "404": {
             "$ref": "#/components/responses/Error404"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
           }
         },
         "parameters": [
@@ -525,6 +555,9 @@
           },
           "500": {
             "$ref": "#/components/responses/Error500"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
           }
         }
       }
@@ -555,6 +588,9 @@
           },
           "500": {
             "$ref": "#/components/responses/Error500"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
           }
         }
       }
@@ -1106,6 +1142,16 @@
       },
       "Error409": {
         "description": "Current attempt rejected before admission: native owner/lock, incompatible release/namespace/cwd/schema/adapter, suspended work outside the selected ownership tree, loop/calendar, missing recipient, unavailable creation source, or child/workflow not a native Chats entry. Recovery reason is included; viewing remains available. Send checks all paused messaging-closure harnesses; Stop checks its implicitly resumed harness under native owner locks. A 409 cannot disprove an earlier uncertain admission: retain that original requestId through refresh/recovery and retry until reconciled.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "Hosted authentication required; the trusted module may provide WWW-Authenticate for browser sign-in.",
         "content": {
           "application/json": {
             "schema": {
