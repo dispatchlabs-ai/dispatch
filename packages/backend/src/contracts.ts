@@ -1,4 +1,4 @@
-import type { AttachmentFile, ChatToolCall } from "@dispatch/runner";
+import type { AttachmentFile, ChatToolCall, ChatTurn } from "@dispatch/runner";
 export type { AttachmentFile, ChatToolCall as ToolCall } from "@dispatch/runner";
 // Presentation projection of Dispatch's Chat and ChatSnapshot, not an execution model.
 export interface Agent {
@@ -43,6 +43,7 @@ export interface SourceStatus {
   issues: string[];
 }
 export interface Snapshot {
+  turns?: ChatTurn[];
   toolCalls?: ChatToolCall[];
   observation?: string;
   readOnlyReason?: string;

@@ -3,14 +3,18 @@ import { parentPort, workerData } from "node:worker_threads";
 import { pathToFileURL } from "node:url";
 import type { Runtime } from "./runtime.js";
 const port = parentPort!;
-const { module, configFile, sources, defaultSource } = workerData;
-const runtime: Runtime = await (await import(pathToFileURL(module).href)).openRuntime({ configFile, sources, defaultSource });
+const { module, configFile, sources, defaultSource, export: factory = "openRuntime", options } = workerData;
+const create = (await import(pathToFileURL(module).href))[factory];
+if (typeof create !== "function") throw new Error("Trusted adapter must export its configured runtime factory.");
+const runtime: Runtime = await create({ ...options, configFile, sources, defaultSource });
 port.postMessage({ ready: true, agents: runtime.service.agents });
 port.on("message", async ({ id, method, args }) => {
   try {
     let result;
-    if (method === "snapshot") result = await runtime.presentation.snapshot(...args as [string]);
+    if (method === "agents") result = await (runtime.catalog?.() ?? Promise.resolve(runtime.service.agents));
+    else if (method === "snapshot") result = await runtime.presentation.snapshot(...args as [string]);
     else if (method === "close") await runtime.close();
+    else if (method === "has" && !runtime.service.has) result = (await runtime.service.list()).some(chat => chat.id === args[0]);
     else if (["has", "sources", "list", "create", "submit", "stop", "artifact"].includes(method))
       result = await (runtime.service as any)[method](...args);
     else throw new Error("Unsupported adapter operation.");

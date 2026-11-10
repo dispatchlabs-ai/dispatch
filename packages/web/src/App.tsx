@@ -34,17 +34,18 @@ export default function App() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
   const [agent, setAgent] = useState('');
-  const [selected, setSelected] = useState<string | null>(() => localStorage.getItem('dispatch-web:selected'));
+  const [selected, setSelected] = useState<string | null>(() => localStorage.getItem('dispatch-web:selected') ?? localStorage.getItem('agent-chat:selected'));
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [connection, setConnection] = useState('Connecting…');
   const [error, setError] = useState('');
   const [draft, setDraft] = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem('dispatch-web:pending') ?? 'null')?.text ?? ''; } catch { return ''; }
+    try { return JSON.parse(sessionStorage.getItem('dispatch-web:pending') ?? sessionStorage.getItem('agent-chat:pending') ?? 'null')?.text ?? ''; } catch { return ''; }
   });
   const [sending, setSending] = useState(false);
   const [stopping, setStopping] = useState(false);
+  const [stopNotice, setStopNotice] = useState<{id: string; text: string} | null>(null);
   const [pending, setPending] = useState<Pending | null>(() => {
-    try { return JSON.parse(sessionStorage.getItem('dispatch-web:pending') ?? 'null'); } catch { return null; }
+    try { return JSON.parse(sessionStorage.getItem('dispatch-web:pending') ?? sessionStorage.getItem('agent-chat:pending') ?? 'null'); } catch { return null; }
   });
   useEffect(() => { void loadDelivery().then(value => {if(value){setDraft(value.text);setFiles(value.attachments);setPending(value.pending);if(value.pending)setSelected(value.pending.chatId);}setDeliveryReady(true);}).catch(() => setError('Local draft storage unavailable. Sending is disabled to preserve recovery.')); }, []);
   useEffect(() => { if(deliveryReady) void saveDelivery({text:draft, attachments:files, pending}).catch(() => {setDeliveryReady(false);setError('Cannot retain draft/files locally. Free browser storage before sending.');}); }, [draft, files, pending, deliveryReady]);
@@ -121,7 +122,7 @@ export default function App() {
   }, []);
   useEffect(() => { void refresh(); const timer = setInterval(() => void refresh(), 15000); return () => clearInterval(timer); }, [refresh]);
   useEffect(() => {
-    if (!selected) { localStorage.removeItem('dispatch-web:selected'); setSnapshot(null); setConnection(''); return; }
+    if (!selected) { localStorage.removeItem('dispatch-web:selected'); localStorage.removeItem('agent-chat:selected'); setSnapshot(null); setConnection(''); return; }
     localStorage.setItem('dispatch-web:selected', selected); setSnapshot(null); setConnection('Connecting…');
     let active = true;
     const events = new EventSource(`${route(selected)}/events`);
@@ -147,12 +148,12 @@ export default function App() {
       const receipt = await api<{ submissionId: number }>(`${route(value.chatId)}/messages`, { text: value.text, requestId: value.requestId, attachments:value.attachments ?? [] });
       if (!Number.isSafeInteger(receipt?.submissionId) || receipt.submissionId < 1) throw new Error('Invalid admission receipt.');
       await saveDelivery({text:'',attachments:[],pending:null});
-      sessionStorage.removeItem('dispatch-web:pending');
-      setPending(null); setDraft(''); setFiles([]); void refresh();
+      sessionStorage.removeItem('dispatch-web:pending'); sessionStorage.removeItem('agent-chat:pending');
+      setPending(null); setDraft(''); setFiles([]); setStopNotice(null); void refresh();
     } catch (failure) {
       if (isDefiniteRejection(failure, previouslyUncertain)) {
         await saveDelivery({text:value.text,attachments:value.attachments ?? [],pending:null});
-        sessionStorage.removeItem('dispatch-web:pending');
+        sessionStorage.removeItem('dispatch-web:pending'); sessionStorage.removeItem('agent-chat:pending');
         setPending(null); setDraft(value.text); setFiles(value.attachments ?? []);
         setError(`${failure.message} Message was not admitted. Edit it or choose another conversation.`);
       } else {
@@ -180,13 +181,15 @@ export default function App() {
   async function stop() {
     if (!selected) return;
     setStopping(true); setError('');
-    try { await api(`${route(selected)}/stop`, {}); }
+    try { await api(`${route(selected)}/stop`, {}); setStopNotice({id: selected, text: "Stop accepted for this conversation’s work."}); }
     catch (failure) { setError((failure as Error).message); }
     finally { setStopping(false); }
   }
   function choose(id: string | null) { setSelected(id); setError(''); setNavigation(false); composer.current?.focus(); }
   const busy = !!snapshot && (snapshot.running || snapshot.background || snapshot.queued > 0 || snapshot.tools.length > 0);
   const title = snapshot?.chat.title ?? chats.find(chat => chat.id === selected)?.title ?? 'New conversation';
+  const lastTurn = snapshot?.turns?.at(-1);
+  const turnOutcome = lastTurn?.status === 'unanswered' ? lastTurn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${lastTurn.reason})` : lastTurn?.status === 'done' ? 'Turn completed' : '';
   const activity = snapshot?.observation ?? (snapshot?.retry ? `Retry ${snapshot.retry.attempt} scheduled for ${new Date(snapshot.retry.at).toLocaleTimeString()}` : snapshot?.tools.length ? `Using ${snapshot.tools.join(', ')}` : snapshot?.background ? 'Working in the background' : snapshot?.running ? 'Replying…' : snapshot?.queued ? 'Follow-up queued' : '');
   return <div className="app-shell">
     {navigation && <button className="nav-scrim" aria-label="Close conversation navigation" onClick={() => setNavigation(false)}/>}
@@ -207,7 +210,7 @@ export default function App() {
         <ConversationContent className="message-list">
           {(!selected || snapshot && !snapshot.messages.length && !snapshot.partial) && <ConversationEmptyState title={`Message ${agentName(snapshot?.chat.agent ?? agent) || 'an agent'}`} description=""/>}
           {selected && !snapshot && <p className="empty-loading">{connection}</p>}
-          {snapshot?.messages.filter(message => message.provenance !== 'runtime').map(message => <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.provenance === 'user'}><Message align={message.provenance === 'user' ? 'end' : 'start'}><MessageContent><span className="message-author">{message.provenance === 'user' ? 'You' : message.author ?? agentName(snapshot.chat.agent)}{message.background ? ' · background' : ''}</span><Bubble align={message.provenance === 'user' ? 'end' : 'start'} variant={message.provenance === 'user' ? 'muted' : 'ghost'}><BubbleContent>{message.commentary && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{message.attachments?.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt={file.name} src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle><a download={file.name} href={`data:${file.mimeType || 'text/plain'};base64,${file.data}`}>{file.name}</a></AttachmentTitle></AttachmentContent></Attachment>)}{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</BubbleContent></Bubble></MessageContent></Message><ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.afterMessageId===message.id)}/></MessageScrollerItem>)}
+          {snapshot?.messages.filter(message => message.provenance !== 'runtime').map(message => <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.provenance === 'user'}><Message align={message.provenance === 'user' ? 'end' : 'start'}><MessageContent><span className="message-author">{message.provenance === 'user' ? 'You' : message.author ?? agentName(snapshot.chat.agent)}{message.background ? ' · background' : ''}</span><Bubble align={message.provenance === 'user' ? 'end' : 'start'} variant={message.provenance === 'user' ? 'muted' : 'ghost'}><BubbleContent>{message.commentary && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{snapshot.turns?.filter(turn => turn.status === 'unanswered' && String(turn.entryId) === message.id.split(':')[0]).map(turn => <p key={turn.submissionId} className="pending-note">{turn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${turn.reason})`}</p>)}{message.attachments?.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt={file.name} src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle><a download={file.name} href={`data:${file.mimeType || 'text/plain'};base64,${file.data}`}>{file.name}</a></AttachmentTitle></AttachmentContent></Attachment>)}{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</BubbleContent></Bubble></MessageContent></Message><ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.afterMessageId===message.id)}/></MessageScrollerItem>)}
           {snapshot && <ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>!snapshot.messages.some(message=>message.id===call.afterMessageId && message.provenance!=='runtime'))}/>}
 
           {snapshot?.partial && <Message align="start"><span className="message-author">{agentName(snapshot.chat.agent)}</span><MessageContent><MessageResponse>{snapshot.partial}</MessageResponse></MessageContent></Message>}
@@ -215,7 +218,8 @@ export default function App() {
         <ConversationScrollButton aria-label="Scroll to latest message"/>
       </Conversation>
       <div className="composer-region">
-        <div className="activity" role="status"><span>{activity || (selected ? connection === 'Connected' ? <><Check size={12}/> Saved</> : connection : '')}{snapshot?.queued ? ` · ${snapshot.queued} queued` : ''}</span>{busy && <Button variant="outline" size="sm" disabled={stopping} onClick={() => void stop()}><Square size={12}/>{stopping ? 'Stopping…' : 'Stop all work'}</Button>}</div>
+        <div className="activity" role="status"><span>{(busy ? activity : turnOutcome) || activity || (selected ? connection === 'Connected' ? <><Check size={12}/> Saved</> : connection : '')}{snapshot?.queued ? ` · ${snapshot.queued} queued` : ''}</span>{busy && <Button variant="outline" size="sm" disabled={stopping} onClick={() => void stop()}><Square size={12}/>{stopping ? 'Stopping…' : 'Stop this conversation'}</Button>}</div>
+        {stopNotice?.id === selected && <p className="pending-note" role="status">{stopNotice.text}</p>}
         {snapshot?.readOnlyReason && <p className="pending-note" role="status">{snapshot.readOnlyReason}</p>}
         {(error || snapshot?.error) && <div className="error-banner" role="alert"><p>{error || snapshot?.error}</p>{!ready && <Button variant="outline" size="sm" onClick={() => { setError(''); void refresh(); }}>Reconnect</Button>}{pending && <Button size="sm" disabled={sending} onClick={() => void deliver(pending)}>Retry message</Button>}<Button variant="ghost" size="icon" aria-label="Dismiss error" onClick={() => setError('')}><X/></Button></div>}
         {pending && <div className="pending-note">Message delivery is uncertain. Your text and files are preserved. <Button variant="outline" size="sm" disabled={sending} onClick={() => { setSelected(pending.chatId); void deliver(pending); }}>Retry message</Button></div>}

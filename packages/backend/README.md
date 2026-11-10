@@ -7,7 +7,7 @@ See the [runnable composition](../../examples/chat/README.md).
 
 ## Operations
 
-`service.agents`, `sources()`, `list()`, `has(id)`, `create(agent, source, key, sourceId?)`,
+`service.agents` (initial catalog), optional `catalog()` (fresh), `sources()`, `list()`, `has(id)`, `create(agent, source, key, sourceId?)`,
 `submit(id,text,requestId,"followUp",source,attachments?)`, `stop(id)` and `artifact(id,id)`.
 `presentation.snapshot(id)` and `watch(id,listener)` are read-only observations;
 watch returns `{closed,stop}`. API projections/types are exported at
@@ -133,3 +133,42 @@ Returned toolCalls retain actual turn/call/assistant-entry identity, inputs/resu
 and native live/task state. No fake pending-question or subagent result. Native
 nested-call parent IDs are exposed only when recorded; missing retired payloads
 remain explicitly unavailable.
+
+## Shared local owners and retained history
+
+`openServiceRuntime({socket, sourceId?, label?, expectedStateRoot?, expectedIdentity?})`
+connects to Runner's owner-only Unix service API. `close()` detaches observations,
+never stops the owner. Native IDs, request IDs and file bytes pass unchanged.
+Every command carries its expected native root/installation identity; a service
+must support atomic expectation validation (older owners fail closed). A service-only
+`DISPATCH_CONFIG` may contain `{"service":{"socket":"/srv/agents/run/service.sock"}}`.
+No local owner or automatic mutation retry is used on connection loss.
+
+For native SQLite installations, combine that owner with saved discovery:
+
+```json
+{
+  "installations": [{"id":"studio", "label":"Studio", "service":{
+    "socket":"/srv/agents/run/service.sock", "sourceId":"studio",
+    "stateRoot":"/srv/agents/instances/main"
+  }}],
+  "sources":[{"id":"studio", "label":"Studio", "installation":"studio", "path":"/srv/agents/instances"}],
+  "defaultSource":"studio"
+}
+```
+
+`stateRoot` is the canonical native session directory inside that source.
+Live/saved IDs deduplicate by native file and conversation. Offline histories stay
+viewable; create/send/stop never claim a replacement writer. Catalog refresh uses
+the owner's current agents. Child/foreign histories remain observation-only.
+One named installation may explicitly set `unqualifiedChats:true` to retain an
+existing client's unqualified conversation IDs; agents remain qualified. Default
+named-installation behavior remains fully qualified.
+
+Opaque/custom-store services use a trusted adapter, not the SQLite composition.
+An adapter may select `export` (default `openRuntime`) and trusted `options` for
+its factory; Backend supplies `configFile`, `sources` and `defaultSource`. The
+factory must return the same Runtime contract. This supports consumer-owned
+workflow composition without a Web-specific domain adapter or installed-file search.
+The optional `catalog()` Runtime method refreshes live agents; `service.agents`
+remains the initial catalog for existing consumers.

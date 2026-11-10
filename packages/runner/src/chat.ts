@@ -1,8 +1,9 @@
 import { prepareContent, ContentError, type AttachmentFile } from "./chat-content.js";
+import { projectChatTurns, type ChatTurn } from "./chat-turns.js";
 import { projectChatTools, type ChatToolCall } from "./chat-tools.js";
-export type ChatMessage = { id: string; role: string; text: string; at?: number; commentary?: string; author?: string; background?: boolean; error?: string; attachments?: AttachmentFile[]; artifacts?: Artifact[] };
+export type ChatMessage = { provenance?: "user" | "agent" | "runtime"; id: string; role: string; text: string; at?: number; commentary?: string; author?: string; background?: boolean; error?: string; attachments?: AttachmentFile[]; artifacts?: Artifact[] };
 export type ChatSnapshot = {
-  chat: Chat; messages: ChatMessage[]; toolCalls?: ChatToolCall[]; running: boolean; queued: number;
+  chat: Chat; messages: ChatMessage[]; turns?: ChatTurn[]; toolCalls?: ChatToolCall[]; running: boolean; queued: number;
   partial: string; tools: string[]; error: string | null; demo: boolean;
   background: boolean;
   /** Native pending retry; at is an epoch-millisecond deadline. */
@@ -46,11 +47,11 @@ export function projectChatMessages(namespace: string, entries: readonly EntryRe
   return entries.flatMap<ChatMessage>(entry => {
     if (entry.kind === `${namespace}.artifact`) {
       const { deliveries: _initialDeliveryTasks, ...artifact } = entry.data as ArtifactRecord;
-      return [{ id: `${entry.id}:artifact`, role: "assistant", text: "", artifacts: [artifact] }];
+      return [{ provenance: "agent", id: `${entry.id}:artifact`, role: "assistant", text: "", artifacts: [artifact] }];
     }
     if (entry.kind === `${namespace}.background-reply`) {
       const data = entry.data as { author: string; text: string };
-      return [{ id: `${entry.id}:background`, role: "assistant", text: data.text, author: data.author, background: true }];
+      return [{ provenance: "agent", id: `${entry.id}:background`, role: "assistant", text: data.text, author: data.author, background: true }];
     }
     return (entry.model ?? []).flatMap((message, index) => {
       if (message.role !== "user" && message.role !== "assistant") return [];
@@ -60,7 +61,10 @@ export function projectChatMessages(namespace: string, entries: readonly EntryRe
       const data = entry.data as { source?: string; text?: string; attachments?: AttachmentFile[] } | undefined;
       const attached = message.role === "user" && entry.kind === `${namespace}.message` && data?.attachments?.length ? data.attachments : undefined;
       const hasTools = message.role === "assistant" && Array.isArray(message.content) && message.content.some(part => part.type === "toolCall");
-      return text || error || attached || hasTools ? [{ id: `${entry.id}:${index}`, role: message.role, text: attached ? data?.text ?? "" : text, at,
+      const provenance = message.role !== "user" ? "agent" as const
+        : entry.kind === `${namespace}.message` && ["web", "cli", "slack", "google-chat", "phone", "email"].includes(data?.source ?? "") ? "user" as const
+          : entry.kind === `${namespace}.instance-message` ? "agent" as const : "runtime" as const;
+      return text || error || attached || hasTools ? [{ provenance, ...(entry.kind === `${namespace}.instance-message` ? {author: (entry.data as {from?: string})?.from} : {}), id: `${entry.id}:${index}`, role: message.role, text: attached ? data?.text ?? "" : text, at,
         ...(attached ? { attachments: attached } : {}),
         ...(message.role === "assistant" ? { commentary: publicCommentary(message) } : {}), ...(error ? { error } : {}) }] : [];
     });
@@ -114,6 +118,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       resume?: boolean;
       /** The host starts recovery after its adapters and bindings are ready. */
       deferResume?: boolean;
+      schedules?: boolean;
       cwd?: string;
       env?: OpenOptions["env"];
       definitionResources?: OpenOptions["definitionResources"];
@@ -135,7 +140,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       };
       const agents = await Promise.all(names.map(async name => prepare(await loadAgent(options.root, name))));
       const service = new ChatService(agents, options.demo, options.initialize);
-      const enabled = await enabledAgents(options.root);
+      const enabled = options.schedules === false ? [] : await enabledAgents(options.root);
       for (const id of enabled) service.enabled.add(id);
       for (const agent of agents) for (const recipient of agent.messages ?? []) {
         if (!agents.some(candidate => candidate.id === recipient)) {
@@ -412,11 +417,18 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
           const page = await host.storage.scanTasks({conversationId: conversation.id, kind:"pi.tool"}, 250, toolCursor, context);
           toolTasks.push(...page.items); toolCursor = page.next;
         } while (toolCursor);
+        const submissions = [];
+        let submissionCursor: Cursor | undefined;
+        do {
+          const page = await host.storage.scanSubmissions({ conversationId: conversation.id }, 250, submissionCursor, context);
+          submissions.push(...page.items); submissionCursor = page.next;
+        } while (submissionCursor);
         const deliveries = inspection.tasks.some(({ record }) =>
           record.conversationId === conversation.id && record.kind === `${namespace}.instance-message`);
         return {
           chat, messages: projectChatMessages(namespace, [...saved.values()].sort((a, b) => a.id - b.id)),
           toolCalls: projectChatTools([...saved.values()], live, toolTasks),
+          turns: projectChatTurns(submissions),
           running: !!live?.run, queued: inbox?.items?.length ?? 0,
           partial: messageText(live?.generation?.message?.content),
           tools: live?.tools?.filter(tool => tool.status !== "done").map(tool => tool.name) ?? [],

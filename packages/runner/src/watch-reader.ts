@@ -1,5 +1,7 @@
 import type { EntryRecord, TaskRecord } from "@earendil-works/pi-durable";
 import { projectChatMessages } from "./chat.js";
+import { projectChatTurns } from "./chat-turns.js";
+import type { SubmissionRecord } from "@earendil-works/pi-durable";
 import { projectChatTools } from "./chat-tools.js";
 import { execFile } from "node:child_process";
 import { lstat, readFile, readdir, realpath } from "node:fs/promises";
@@ -451,7 +453,8 @@ export async function readWatchChatProjection(run: WatchRun, key: string) {
     // them byte-for-byte for downloads/replay rather than redacting base64 text.
     return { messages: messages.map(message => ({...redact({...message, attachments: undefined}),
       ...(message.attachments ? {attachments:message.attachments} : {})})),
-      toolCalls: redact(projectChatTools(entries, undefined, tasks as TaskRecord<unknown, unknown, unknown>[])) };
+      toolCalls: redact(projectChatTools(entries, undefined, tasks as TaskRecord<unknown, unknown, unknown>[])),
+      turns: projectChatTurns(db.prepare("SELECT record FROM submissions WHERE conversation_id=? ORDER BY id").all(id).map(row => parse(row.record) as SubmissionRecord)) };
 
   });
 }

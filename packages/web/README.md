@@ -38,3 +38,19 @@ message explicitly. Reconnect never automatically resends. Clear local browser
 site data deliberately only when no uncertain delivery/draft needs recovery.
 Search histories by title/agent/source/session/ID; visible labels stay compact.
 Named installation bindings are documented in [Backend](../backend/README.md).
+
+## Shared service replacement
+
+Use Backend's [shared-owner configuration](../backend/README.md#shared-local-owners-and-retained-history)
+to attach Web and CLI to one maintained owner while browsing native history.
+Stop explicitly targets this conversation. Accepted Stop feedback is distinct from
+native `unanswered/aborted` turn markers, which remain visible after reopening;
+`Turn completed` means a native answered turn, not a claim that project work is done.
+Tool completion is labeled separately.
+
+At the same browser origin Web adopts Agent Chat's selected conversation and
+per-tab IndexedDB draft/uncertain outbox once, preserving original IDs and bytes.
+The legacy record is retained, not deleted. Keep the primary installation's
+conversation IDs unchanged with `unqualifiedChats:true` when needed. Do not clear
+site storage or change origin before resolving pending delivery. Do not run both
+frontends concurrently against the same tab's legacy draft during cutover.

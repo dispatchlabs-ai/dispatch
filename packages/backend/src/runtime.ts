@@ -5,6 +5,8 @@ import { createHash } from "node:crypto";
 import lockfile from "proper-lockfile";
 import type { Agent, Chat, Snapshot, AttachmentFile } from "./contracts.js";
 import { readConfig, AdmissionError, type LocalConfig } from "./config.js";
+import { openServiceRuntime } from "./service-runtime.js";
+import { openSharedHistory } from "./shared-history.js";
 import * as runner from "@dispatch/runner";
 import * as reader from "@dispatch/runner/watch-reader";
 import { createStores, identity, readStore, sessionDocument, type Selection } from "./stores.js";
@@ -41,7 +43,7 @@ async function startOwner(
 ): Promise<NativeService> {
   return connectWorker("./owner.js", { path, namespace, names, config });
 }
-async function connectWorker(entrypoint: string, workerData: unknown): Promise<NativeService & { agents: Agent[] }> {
+async function connectWorker(entrypoint: string, workerData: unknown): Promise<NativeService & { agents: Agent[]; catalog(): Promise<Agent[]> }> {
   const worker = new Worker(new URL(entrypoint, import.meta.url), { workerData });
   let agents: Agent[] = [];
   const calls = new Map<
@@ -112,6 +114,7 @@ async function connectWorker(entrypoint: string, workerData: unknown): Promise<N
     });
   return {
     agents,
+    catalog: () => call("agents", []),
     has: (id: string) => call("has", [id]),
     sources: () => call("sources", []),
     list: () => call("list", []),
@@ -472,11 +475,12 @@ async function openLocalRuntime(config: LocalConfig) {
   };
 }
 
-async function openAdapter(config: { sources: LocalConfig["sources"]; defaultSource: string; module: string; configFile: string }): Promise<Runtime> {
+async function openAdapter(config: { sources: LocalConfig["sources"]; defaultSource: string; module: string; configFile: string; export?: string; options?: Record<string, unknown> }): Promise<Runtime> {
   const service = await connectWorker("./adapter-owner.js", config);
   const snapshot = service.snapshot;
   return {
     service,
+    catalog: service.catalog,
     stateRoot: config.sources.map(source => source.path).join(", "),
     presentation: { snapshot, watch: async (id, listener) => {
       let stopped = false, timer: ReturnType<typeof setTimeout>;
@@ -498,6 +502,8 @@ async function openAdapter(config: { sources: LocalConfig["sources"]; defaultSou
  * It owns its native configuration/authority, never a second transcript or loop. */
 export interface Runtime {
   stateRoot: string;
+  /** Refresh a connected owner's current catalog without creating a writer. */
+  catalog?(): Promise<Agent[]>;
   service: Omit<NativeService, "resolve" | "snapshot" | "close"> & { agents: Agent[] };
   presentation: {
     snapshot(id: string): Promise<Snapshot>;
@@ -507,6 +513,7 @@ export interface Runtime {
 }
 export async function openRuntime(): Promise<Runtime> {
   const config = await readConfig();
+  if (config.service) return openServiceRuntime(config.service);
   if (!config.installations) return openLocalRuntime(config as LocalConfig);
   const contexts = new Map<string, Runtime>();
   try {
@@ -515,7 +522,9 @@ export async function openRuntime(): Promise<Runtime> {
       if (!sources.length) continue;
       const defaultSource = sources.some(source => source.id === config.defaultSource) ? config.defaultSource : sources[0].id;
       const selected = { sources, defaultSource };
-      const runtime: Runtime = binding.adapter
+      const runtime: Runtime = binding.service
+        ? await openSharedHistory(binding.service, sources)
+        : binding.adapter
         ? await openAdapter({ ...selected, ...binding.adapter })
         : await openLocalRuntime({ ...selected, definitionsRoot: binding.definitionsRoot!, host: binding.host! });
       contexts.set(binding.id, runtime);
@@ -523,15 +532,20 @@ export async function openRuntime(): Promise<Runtime> {
   } catch (error) { await Promise.allSettled([...contexts.values()].map(runtime => runtime.close())); throw error; }
   const qualify = (name: string, id: string) => `${name}~${id}`;
   const context = (id: string) => {
-    const at = id.indexOf("~"), name = id.slice(0, at), local = id.slice(at + 1);
-    const runtime = at > 0 && contexts.get(name);
+    const at = id.indexOf("~"), name = at > 0 ? id.slice(0, at) : config.installations!.find(binding => binding.unqualifiedChats)?.id, local = at > 0 ? id.slice(at + 1) : id;
+    const runtime = name && contexts.get(name);
     if (!runtime || !local || local.includes("~")) throw new AdmissionError("Unknown installation-qualified identity.");
-    return { name, local, runtime };
+    return { name: name!, local, runtime };
   };
-  const project = (name: string, chat: Chat): Chat => ({ ...chat, id: qualify(name, chat.id), agent: qualify(name, chat.agent),
-    ...(chat.parentId ? { parentId: qualify(name, chat.parentId) } : {}) });
+  const chatId = (name: string, id: string) => config.installations!.find(binding => binding.id === name)!.unqualifiedChats ? id : qualify(name, id);
+  const project = (name: string, chat: Chat): Chat => ({ ...chat, id: chatId(name, chat.id), agent: qualify(name, chat.agent),
+    ...(chat.parentId ? { parentId: chatId(name, chat.parentId) } : {}) });
+  const catalog = async () => (await Promise.all([...contexts].map(async ([name, runtime]) =>
+    (await (runtime.catalog?.() ?? Promise.resolve(runtime.service.agents))).map(agent => ({ ...agent, id: qualify(name, agent.id),
+      description: `${config.installations!.find(binding => binding.id === name)!.label}: ${agent.description}` }))))).flat();
   return {
     stateRoot: config.sources.map(source => source.path).join(", "),
+    catalog,
     service: {
       agents: [...contexts].flatMap(([name, runtime]) => runtime.service.agents.map(agent => ({ ...agent, id: qualify(name, agent.id),
         description: `${config.installations!.find(binding => binding.id === name)!.label}: ${agent.description}` }))),
@@ -544,7 +558,7 @@ export async function openRuntime(): Promise<Runtime> {
       },
       create: async (id, source, key, sourceId) => {
         const { name, local, runtime } = context(id);
-        const target = sourceId ?? (config.sources.find(item => item.id === config.defaultSource && item.installation === name)
+        const target = sourceId ?? config.installations!.find(binding => binding.id === name)!.service?.sourceId ?? (config.sources.find(item => item.id === config.defaultSource && item.installation === name)
           ?? config.sources.find(item => item.installation === name))?.id;
         if (!target || !config.sources.some(item => item.id === target && item.installation === name))
           throw new AdmissionError("Choose a source bound to the selected installation.");

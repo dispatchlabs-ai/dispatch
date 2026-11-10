@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Expose shared owner transport, bound client/terminal attachment and native turn outcomes; retain channel/file provenance and explicit calendar policy.
+
 ## [Unreleased]
 
 - Match JSON-encoded native SQLite tool-task kinds in read-only projection, restoring live task state and retained nested call identity without acquiring ownership.

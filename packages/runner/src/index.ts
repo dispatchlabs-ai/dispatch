@@ -69,3 +69,6 @@ export { prepareContent, ContentError } from "./chat-content.js";
 export type { AttachmentFile } from "./chat-content.js";
 export { projectChatTools } from "./chat-tools.js";
 export type { ChatToolCall } from "./chat-tools.js";
+
+export { projectChatTurns } from "./chat-turns.js";
+export type { ChatTurn } from "./chat-turns.js";

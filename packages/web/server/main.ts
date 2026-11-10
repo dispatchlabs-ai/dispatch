@@ -11,6 +11,7 @@ import {
   openRuntime,
   openCentralRuntime,
   AdmissionError,
+  type Runtime,
 } from "@dispatch/backend";
 import { prepareContent, ContentError, type AttachmentFile } from "@dispatch/runner";
 
@@ -93,7 +94,7 @@ async function protect(request: IncomingMessage, path: string) {
     throw new HttpError(403, "Access denied.");
 }
 const central = process.env.DISPATCH_CENTRAL_CONFIG;
-const runtime = central
+const runtime: Runtime = central
   ? await openCentralRuntime(JSON.parse(await readFile(central, "utf8")))
   : await openRuntime();
 const service = runtime.service;
@@ -124,7 +125,7 @@ const server = createServer(async (request, response) => {
       json(
         response,
         200,
-        service.agents.map(({ id, description }) => ({ id, description })),
+        (await (runtime.catalog?.() ?? Promise.resolve(service.agents))).map(({ id, description }) => ({ id, description })),
       );
       return;
     }
@@ -135,7 +136,7 @@ const server = createServer(async (request, response) => {
     if (path === "/api/chats" && method === "POST") {
       const body = await bodyOf(request);
       const agent = field(body, "agent");
-      if (!service.agents.some((item) => item.id === agent))
+      if (!(await (runtime.catalog?.() ?? Promise.resolve(service.agents))).some((item) => item.id === agent))
         throw new HttpError(400, "Choose an installed agent.");
       json(
         response,

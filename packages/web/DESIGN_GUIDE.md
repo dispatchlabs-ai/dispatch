@@ -17,6 +17,9 @@
 - Files show removable chips/image previews before admission and retained download
   links afterward. Browser names are labels only. Supported UTF-8 documents and
   PNG/JPEG/WebP images enter native Pi blocks, not a shadow transcript/blob DB.
+- Native submission lifecycle distinguishes completed versus stopped/unanswered turns,
+  retained at their input and in idle activity. Stop acknowledgement is not a
+  fabricated outcome; completed tools are not completed requests.
 - Per-tab IndexedDB is only the local draft/uncertain delivery outbox. A lifetime
   exclusive Web Lock claims its identity before reads/writes; copied live tabs
   clone the record instead of overwriting it, while ordinary reload reclaims it. Preserve

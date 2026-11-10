@@ -299,3 +299,27 @@ remained unchanged and usage appeared in the native ledger. Type/build checks
 passed. No automated tests were added or run. Direct provider-length responses,
 terminal cancellation, abrupt process loss and other platforms were not exercised
 by this replay.
+
+## Shared clients and company compositions
+
+`dispatch-service CONFIG connect CHAT` attaches a terminal to an existing opaque
+conversation ID. `/history` observes, `/stop` cancels that conversation, `/quit`,
+EOF and signals detach without cancelling the owner. `command COMMAND.json`
+accepts a native command with a caller-retained key/requestId and optional files.
+The public `connectInTerminal` API also supports named sessions and bounded prompts.
+
+`serveService(service, socket, adapters?, metadata)` exposes the existing owner's
+operations without constructing a second Harness. Metadata must include a stable
+canonical `stateRoot` and/or trusted installation `identity`; optional `defaultAgent`
+selects new CLI sessions. Consumer-owned workflow/provider/tool authority stays in
+that service. `serviceRequest(socket, command, {expected, signal})` validates the
+expected root/identity in the same request before dispatch, including reads.
+Different owners cannot reuse an identity. Older owners without this protocol
+are not safe shared-client targets. Do not weaken binding with a separate preflight.
+
+Create/send accept the originating native channel; send retains optional
+`AttachmentFile[]`. Service config `schedules:false` disables calendar selection,
+not recovery of admitted native work. Snapshots include native message provenance
+and optional `turns`: submission IDs, input entry IDs, lifecycle status and an
+unanswered reason. `done` means an answered turn, not completed project work;
+`unanswered/aborted` means stopped, never success inferred from a tool result.

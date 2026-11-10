@@ -13,7 +13,7 @@ const database = new Promise<IDBDatabase>((resolve, reject) => {
 // its own record, including the original pending identity/bytes, never a resend.
 const ownedKey = (async () => {
   if (!navigator.locks) throw new Error('Exclusive browser draft ownership is unavailable.');
-  const original = sessionStorage.getItem(storageKey) ?? crypto.randomUUID();
+  const original = sessionStorage.getItem(storageKey) ?? sessionStorage.getItem('agent-chat:outbox-key') ?? crypto.randomUUID();
   let candidate = original;
   for (;;) {
     const key = candidate;
@@ -49,5 +49,23 @@ export async function saveDelivery(value: DeliveryState) {
 }
 export async function loadDelivery(): Promise<DeliveryState | undefined> {
   const key = await ownedKey, db=await database;
-  return new Promise((resolve,reject)=>{const request=db.transaction('draft').objectStore('draft').get(key);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+  const value = await new Promise<DeliveryState | undefined>((resolve,reject)=>{const request=db.transaction('draft').objectStore('draft').get(key);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+  if (value !== undefined) return value;
+  // One-time browser outbox adoption when replacing Agent Chat at the same
+  // origin. Never alter the legacy record, pending request identity or file bytes.
+  const legacyKey = sessionStorage.getItem('agent-chat:outbox-key');
+  if (!legacyKey) return undefined;
+  const legacy = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open('agent-chat-delivery', 1);
+    request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+  });
+  try {
+    if (!legacy.objectStoreNames.contains('draft')) return undefined;
+    const imported = await new Promise<DeliveryState | undefined>((resolve, reject) => {
+      const request = legacy.transaction('draft').objectStore('draft').get(legacyKey);
+      request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+    });
+    if (imported !== undefined) await saveDelivery(imported);
+    return imported;
+  } finally { legacy.close(); }
 }

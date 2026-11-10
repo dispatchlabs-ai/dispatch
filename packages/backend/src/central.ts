@@ -4,7 +4,7 @@ import { randomUUID, timingSafeEqual } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { PostgresStorage, PostgresStorageService } from "@dispatch/postgres";
 import { BACKGROUND_CONTEXT as context } from "@earendil-works/chord/context";
-import { prepareContent, projectChatTools, type AttachmentFile, projectChatMessages, type Chat as NativeChat } from "@dispatch/runner";
+import { prepareContent, projectChatTurns, projectChatTools, type AttachmentFile, projectChatMessages, type Chat as NativeChat } from "@dispatch/runner";
 import type { Storage, Cursor, ConversationId } from "@earendil-works/pi-durable";
 import type { Chat, Snapshot, Agent } from "./contracts.js";
 import { AdmissionError } from "./config.js";
@@ -339,6 +339,7 @@ export async function openCentralRuntime(config: CentralConfig) {
       return {
         chat,
         messages,
+        turns: projectChatTurns(await pages(cursor => db.scanSubmissions({conversationId:item.conversation as ConversationId},250,cursor,context))),
         toolCalls: projectChatTools(entries, undefined, await pages(cursor => db.scanTasks({conversationId:item.conversation as ConversationId, kind:"pi.tool"},250,cursor,context))),
         running: false,
         queued: 0,

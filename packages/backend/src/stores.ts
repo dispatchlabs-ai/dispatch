@@ -47,7 +47,7 @@ export interface Reader {
     session?: string;
     saved?: boolean;
   }): Promise<{ runs: Run[]; issues: string[] }>;
-  readWatchChatProjection(run: Run, key: string): Promise<Pick<Snapshot, "messages" | "toolCalls">>;
+  readWatchChatProjection(run: Run, key: string): Promise<Pick<Snapshot, "messages" | "toolCalls" | "turns">>;
   readWatchCatalog(run: Run): Promise<{ conversations: CatalogConversation[]; issues: string[] }>;
   readWatchRun(
     run: Run,

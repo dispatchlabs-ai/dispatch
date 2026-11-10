@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Compose shared native owners with read-only saved history, canonical identities and live catalogs; support trusted workflow factories without opening replacement owners.
+
 ## [Unreleased]
 
 - Port reviewed native chat improvements: installation-scoped routing and read-only catalogs, retained tool traces and UTF-8/image input/recovery through local and central workers; refresh current shadcn Web compositions.

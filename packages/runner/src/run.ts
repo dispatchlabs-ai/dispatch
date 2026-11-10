@@ -36,6 +36,7 @@ export type RunOptions = {
   resume?: boolean;
   initialize?: ChatInitializer;
   adapters?: Adapter[];
+  schedules?: boolean;
   artifacts?: ArtifactOptions;
   /** Attach domain workflows to the same host before adapters begin receiving. */
   open?: (options: { extensions: Extension[]; replySink?: ReplySink; settings?: OpenOptions["settings"]; artifacts?: ArtifactOptions }) => Promise<ChatService>;
@@ -72,7 +73,7 @@ export async function run(options: RunOptions = {}) {
         root, stateRoot: resolve(options.stateRoot ?? resolve(root, ".state")),
         models: options.models, demo: options.demo ?? false, names: options.names,
         updateDefinitions: options.updateDefinitions, initialize: options.initialize,
-        resume: options.resume,
+        resume: options.resume, schedules: options.schedules,
         deferResume: true,
         cwd: options.cwd, env: options.env, storage: options.storage, settings: options.settings,
         definitionResources: options.definitionResources,
