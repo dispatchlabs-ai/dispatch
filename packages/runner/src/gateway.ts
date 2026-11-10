@@ -8,6 +8,14 @@ export type GatewayAuthorization = (options?: { forceRefresh?: boolean; signal?:
 const filtered = (options: any) => Object.fromEntries(Object.entries(options ?? {}).filter(([key, value]) =>
   value !== undefined && !['model','toolExecution','apiKey','headers','env','signal','fetch','onPayload','onResponse','onProviderStreamEvent','identity','telemetry','telemetryContext','transformHeaders'].includes(key)));
 
+// A gateway request whose stream shows no progress for this long is abandoned so Pi's retry policy sends a fresh one.
+// Observed on the Codex route: stalled requests ended only at the gateway's 900 s upstream limit with
+// provider_connection_error, and their retries completed in seconds. The slowest healthy whole responses observed
+// were 55 s (low), 90 s (medium), 228 s (high) and 418 s (max) thinking, so each limit stays well above any
+// healthy silence. xhigh/max and an unstated level keep the gateway's own limit.
+const STALL_SECONDS: Record<string, number> = { minimal: 180, low: 180, medium: 300, high: 600 };
+export const stallMs = (reasoning?: string) => (reasoning === undefined ? 0 : STALL_SECONDS[reasoning] ?? 0) * 1000;
+
 export async function refreshGatewayModels(origin: string, models: any, key?: string | GatewayAuthorization, aliases: GatewayAliases = {}, options: { signal?: AbortSignal } = {}): Promise<ModelChoice[]> {
   const gatewayOrigin = new URL(origin).origin;
   const authorizedFetch: typeof fetch = async (input, init) => {
@@ -62,33 +70,54 @@ export async function refreshGatewayModels(origin: string, models: any, key?: st
       id: m.id, name: m.name ?? m.id, levels: getSupportedThinkingLevels(m), images: m.input?.includes('image') === true, ...(hidden ? { hidden } : {}) })));
     const stream = (operation: string) => (model: any, transcript: any, options: any) => {
       const output = new AssistantMessageEventStream();
-      void (async () => {
-        let terminal: any;
-        const responses = group ? await import('@earendil-works/pi-ai/api/openai-responses') : undefined;
-        const upstream = responses ? (operation === 'streamSimple' ? responses.streamSimple : responses.stream)(
-          { ...model, api: 'openai-responses', baseUrl: `${origin}/v1` }, transcript, {
-            ...options, apiKey: typeof key === 'string' ? key : 'native-keychain',
-            fetch: authorizedFetch,
-            onPayload: (payload: any) => ({ ...payload, model: `${group}/${model.id}` }),
-          }) : piStream({ ...model, api: 'pi-messages', baseUrl: `${origin}/v1/connections/${connection.id}` }, transcript, {
-          apiKey: typeof key === 'string' ? key : 'native-keychain', signal: options?.signal, fetch: authorizedFetch,
-          onPayload: () => ({ model: model.id, context: transcript, operation, options: filtered(options) }),
-          onProviderStreamEvent: (event: any) => { if (event.message) terminal = event.message; },
-        });
-        for await (const event of upstream) {
-          const message = event.type === 'done' ? event.message : event.type === 'error' ? event.error : event.partial;
-          if ((event.type === 'done' || event.type === 'error') && terminal) Object.assign(message, terminal);
-          message.api = model.api; message.provider = provider;
-          output.push(event);
-        }
-      })().catch(error => {
+      const limit = stallMs(options?.reasoning);
+      const stall = new AbortController();
+      const signal = options?.signal ? AbortSignal.any([options.signal, stall.signal]) : stall.signal;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let ended = false;
+      const fail = (errorMessage: string) => {
+        if (ended) return;
+        ended = true;
         output.push({ type: 'error', reason: 'error', error: {
           role: 'assistant', content: [], api: model.api, provider, model: model.id,
           timestamp: Date.now(), usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
             cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-          stopReason: 'error', errorMessage: String(error),
+          stopReason: 'error', errorMessage,
         } });
-      });
+      };
+      // "timed out" is retryable in Pi; the caller's own abort is never relabelled as a stall.
+      const stalled = () => `Model stream stalled: no progress for ${limit / 1000} s at ${options?.reasoning} thinking; the request timed out and is retried.`;
+      const arm = () => {
+        if (!limit) return;
+        clearTimeout(timer);
+        timer = setTimeout(() => { if (!options?.signal?.aborted) stall.abort(new Error(stalled())); }, limit);
+      };
+      void (async () => {
+        let terminal: any;
+        arm();
+        const responses = group ? await import('@earendil-works/pi-ai/api/openai-responses') : undefined;
+        const upstream = responses ? (operation === 'streamSimple' ? responses.streamSimple : responses.stream)(
+          { ...model, api: 'openai-responses', baseUrl: `${origin}/v1` }, transcript, {
+            ...options, signal, apiKey: typeof key === 'string' ? key : 'native-keychain',
+            fetch: authorizedFetch,
+            onPayload: (payload: any) => ({ ...payload, model: `${group}/${model.id}` }),
+          }) : piStream({ ...model, api: 'pi-messages', baseUrl: `${origin}/v1/connections/${connection.id}` }, transcript, {
+          apiKey: typeof key === 'string' ? key : 'native-keychain', signal, fetch: authorizedFetch,
+          onPayload: () => ({ model: model.id, context: transcript, operation, options: filtered(options) }),
+          onProviderStreamEvent: (event: any) => { if (event.message) terminal = event.message; },
+        });
+        for await (const event of upstream) {
+          if (stall.signal.aborted) break;
+          arm();
+          const message = event.type === 'done' ? event.message : event.type === 'error' ? event.error : event.partial;
+          if ((event.type === 'done' || event.type === 'error') && terminal) Object.assign(message, terminal);
+          message.api = model.api; message.provider = provider;
+          if (event.type === 'done' || event.type === 'error') ended = true;
+          output.push(event);
+        }
+        if (stall.signal.aborted) fail(stalled());
+      })().catch(error => fail(stall.signal.aborted ? stalled() : String(error)))
+        .finally(() => clearTimeout(timer));
       return output;
     };
     models.setProvider({ id: provider, name,

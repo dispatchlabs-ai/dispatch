@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Abandon a gateway model request whose stream shows no progress for 3 minutes (minimal/low), 5 minutes (medium) or 10 minutes (high thinking) and let Pi's retry send a fresh one. Stalled Codex requests previously waited for the gateway's 900-second upstream limit; xhigh/max and unstated levels keep that limit.
+
 - Patch the packaged Claude Code provider so replayed requests keep signed thinking from earlier assistant turns. Claude Code's history replay dropped it at every tool-use boundary; the same upstream revision is retained with one source patch.
 
 - Avoid sorting entry payloads during saved conversation discovery and selected-history polling, reducing large-history loading cost without truncating history. Catalog entries report chat-index registration and originating transport.
