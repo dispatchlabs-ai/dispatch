@@ -54,7 +54,9 @@ the sign-out control.
 The server uses `Referrer-Policy: same-origin` so native form POSTs retain the
 exact Origin required by the existing protections; proxies must preserve that
 policy. Login requires the exact Origin and form encoding, with a small bounded
-credential body and six attempts/minute across the single participant. Only an
+credential body, 15-second upload deadline and six attempts/minute across the single
+participant. Upload/credential verification never holds the durable-state queue;
+only fresh session reads/updates are serialized. Only an
 app-shell conversation link is accepted as a return destination; arbitrary return
 URLs are not accepted. Sessions do not transfer drafts or native state, and sign-out
 does not clear browser drafts or stop agent work.

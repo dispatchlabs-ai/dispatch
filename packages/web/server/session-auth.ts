@@ -53,9 +53,65 @@ async function durable<T>(operation: () => Promise<T>) {
     throw new Error("Session authentication unavailable. Inspect private state before restarting.");
   }
 }
-export function authorize(request: IncomingMessage, response: ServerResponse) {
+function loginBody(request: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let length = 0;
+    const finish = (error?: Error) => {
+      clearTimeout(timer);
+      request.off("data", data); request.off("end", end);
+      request.off("error", failed); request.off("aborted", aborted);
+      if (error) { request.pause(); reject(error); }
+      else resolve(Buffer.concat(chunks).toString("utf8"));
+    };
+    const data = (chunk: Buffer) => {
+      length += chunk.length;
+      if (length > 8192) finish(Object.assign(new Error("Sign-in request is too large."), { status: 413 }));
+      else chunks.push(chunk);
+    };
+    const end = () => finish();
+    const failed = (error: Error) => finish(error);
+    const aborted = () => finish(new Error("Sign-in upload disconnected."));
+    const timer = setTimeout(() => finish(Object.assign(new Error("Sign-in upload timed out."), { status: 408 })), 15_000);
+    request.on("data", data); request.once("end", end);
+    request.once("error", failed); request.once("aborted", aborted);
+  });
+}
+export async function authorize(request: IncomingMessage, response: ServerResponse) {
+  // main.ts validates Host/Origin/Fetch Metadata before any upload admission.
+  const url = new URL(request.url ?? "/", "https://session.invalid");
+  const login = url.pathname === "/login" && request.method === "POST";
+  if (login) {
+    const target = linkTarget(url.searchParams.get("returnTo"));
+    if (request.headers["content-type"]?.split(";")[0] !== "application/x-www-form-urlencoded") {
+      page(response, "Use the sign-in form.", 415, false, target); return false;
+    }
+    const time = Date.now();
+    // Synchronous admission bounds uploads and credential hashing independently of state I/O.
+    attempts = attempts.filter(t => time - t < 60000);
+    if (attempts.length >= 6) {
+      response.setHeader("retry-after", "60");
+      page(response, "Please wait a minute and try again.", 429, false, target); return false;
+    }
+    attempts.push(time);
+    let body: string;
+    try { body = await loginBody(request); }
+    catch (error) {
+      response.setHeader("connection", "close");
+      response.once("finish", () => request.destroy());
+      page(response, (error as {status?: number}).status === 413 ? "Sign-in request is too large." : "Sign-in upload timed out.",
+        (error as {status?: number}).status ?? 400, false, target);
+      return false;
+    }
+    const form = new URLSearchParams(body);
+    const username = form.get("username") ?? "", password = form.get("password") ?? "";
+    if (!username || !password || !await verify(username, password)) {
+      page(response, "Username or password was incorrect.", 401, false, target); return false;
+    }
+  }
   const operation = serial.then(() => {
     if (unavailable) throw new Error("Session authentication unavailable.");
+    // Read current state only after verification; never commit a pre-upload snapshot.
     return authorizeSerial(request, response);
   });
   serial = operation.then(() => {}, () => {});
@@ -87,33 +143,6 @@ async function authorizeSerial(request: IncomingMessage, response: ServerRespons
     return false;
   }
   if (path === "/login" && request.method === "POST") {
-    if (request.headers["content-type"]?.split(";")[0] !== "application/x-www-form-urlencoded") {
-      page(response, "Use the sign-in form.", 415, false, target);
-      return false;
-    }
-    attempts = attempts.filter(t => time - t < 60000);
-    if (attempts.length >= 6) {
-      response.setHeader("retry-after", "60");
-      page(response, "Please wait a minute and try again.", 429, false, target);
-      return false;
-    }
-    attempts.push(time);
-    const chunks: Buffer[] = [];
-    let length = 0;
-    for await (const chunk of request) {
-      length += chunk.length;
-      if (length > 8192) {
-        page(response, "Sign-in request is too large.", 413, false, target);
-        return false;
-      }
-      chunks.push(chunk);
-    }
-    const form = new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
-    const username = form.get("username") ?? "", password = form.get("password") ?? "";
-    if (!username || !password || !await verify(username, password)) {
-      page(response, "Username or password was incorrect.", 401, false, target);
-      return false;
-    }
     delete saved.sessions[key];
     const session = randomBytes(32).toString("hex");
     saved.sessions[digest(session)] = time + lifetime;
