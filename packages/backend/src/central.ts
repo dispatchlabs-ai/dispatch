@@ -398,7 +398,7 @@ export async function openCentralRuntime(config: CentralConfig) {
       id: string,
       text: string,
       requestId: string,
-      mode: "followUp",
+      _mode: "steer",
       source: NativeChat["source"],
       files: AttachmentFile[] = [],
     ) {
@@ -408,7 +408,7 @@ export async function openCentralRuntime(config: CentralConfig) {
         item.native,
         text,
         requestId,
-        mode,
+        "steer",
         source,
         files,
       ]);

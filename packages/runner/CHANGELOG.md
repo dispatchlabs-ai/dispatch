@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Always steer active work for ordinary user chat input at native boundaries; keep internal peer/schedule policies and explicit Stop unchanged.
+
 - Make ordinary CLI sessions detached shared owners in their exact native state; discover safely, preserve native receipt/drain/history/replay, and recover existing work without another prompt.
 - Project native input/continue submission lifecycle in live and retained chat snapshots, distinguishing stopped turns from tool or request narration.
 

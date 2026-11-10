@@ -181,7 +181,7 @@ const server = createServer(async (request, response) => {
             id,
             text,
             field(body, "requestId"),
-            "followUp",
+            "steer",
             "web",
             files,
           ),

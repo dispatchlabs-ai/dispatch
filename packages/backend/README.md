@@ -8,13 +8,18 @@ See the [runnable composition](../../examples/chat/README.md).
 ## Operations
 
 `service.agents` (initial catalog), optional `catalog()` (fresh), `sources()`, `list()`, `has(id)`, `create(agent, source, key, sourceId?)`,
-`submit(id,text,requestId,"followUp",source,attachments?)`, `stop(id)` and `artifact(id,id)`.
+`submit(id,text,requestId,"steer",source,attachments?)`, `stop(id)` and `artifact(id,id)`.
 `presentation.snapshot(id)` and `watch(id,listener)` are read-only observations;
 watch returns `{closed,stop}`. API projections/types are exported at
 `@dispatch/backend/contracts`; worker provenance and central read helpers have
 explicit exported subpaths. `AdmissionError.status=409` is a definite rejection
 of **this attempt only**; a previous uncertain attempt keeps its original identity.
-Native receipts, not Web, determine admission/replay.
+Native receipts, not Web, determine admission/replay. User sends always use native
+`whenBusy: "steer"`: idle input starts normally; busy input joins active work at
+the next native boundary rather than waiting for a final answer. A temporary
+`queued` native status means pending boundary placement, not a follow-up policy.
+Trusted custom adapters must honor the `"steer"` submit contract all the way to
+native admission; ignoring the argument and using `followUp` is incompatible.
 
 ## Central configuration
 

@@ -92,7 +92,7 @@ export async function connectInTerminal(options: ServiceTerminalOptions) {
     const send = async (text: string, requestId: string = randomUUID(), files: AttachmentFile[] = []) => {
       // Print before admission so an uncertain transport can be retried explicitly.
       process.stderr.write(terminalText(`Request: ${requestId}\n`));
-      return call({ method: "send", id: chatId, text, requestId, files, source: "cli" });
+      return call({ method: "send", id: chatId, text, requestId, files, mode: "steer", source: "cli" });
     };
     if (options.prompt !== undefined || options.files?.length) {
       const { submissionId } = await send(options.prompt ?? "", options.requestId, options.files);
@@ -131,7 +131,7 @@ export async function connectInTerminal(options: ServiceTerminalOptions) {
     }
     input = createInterface({ input: process.stdin, output: process.stdout, terminal: !!process.stdin.isTTY });
     input.on("SIGINT", interrupt);
-    process.stderr.write("Commands: /new, /history, /stop, /quit. Messages queue without waiting for a reply.\n");
+    process.stderr.write("Commands: /new, /history, /stop, /quit. Messages steer active work at its next native boundary.\n");
     let observationError: unknown;
     const observing = (async () => {
       while (!controller.signal.aborted) {

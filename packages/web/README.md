@@ -11,7 +11,7 @@ First useful result: [synthetic local composition](../../examples/chat/README.md
 be built first. Current shadcn Chat/Prompt Input/Trace/Sidebar and Streamdown own presentation;
 Runner/Pi own all execution and history. No AI SDK execution loop.
 
-Selection/history/send/follow-up/streaming/activity/stop, native read-only histories,
+Selection/history/send/steering/streaming/activity/stop, native read-only histories,
 uncertain request retention and reconnection are current scope. Retired workspace
 screens, account management, projects and company settings are not hidden options.
 Hosted authorization is a required installation binding, not a bundled identity UI.

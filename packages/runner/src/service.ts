@@ -75,7 +75,11 @@ async function dispatch(service: ServiceOperations, command: ServiceCommand, sig
     }
     case "drain": if (!service.waitForIdle) throw new ServiceError("This owner does not support drain.", 409); await service.waitForIdle(signal); return {};
     case "stop": await service.stop(command.id); return {};
-    case "send": return service.submit(command.id, command.text, command.requestId, command.mode ?? "followUp", command.source ?? "cli", command.files);
+    case "send": {
+      const source = command.source ?? "cli";
+      const mode = source === "agent" || source === "schedule" ? command.mode ?? "followUp" : "steer";
+      return service.submit(command.id, command.text, command.requestId, mode, source, command.files);
+    }
     case "receipt": if (!service.receipt) throw new ServiceError("Unsupported service operation.", 409); return service.receipt(command.id, command.submissionId);
     case "message": if (!service.message) throw new ServiceError("Unsupported service operation.", 409); return service.message(command.from, command.message, command.requestId);
     case "message-status": if (!service.messageStatus) throw new ServiceError("Unsupported service operation.", 409); return service.messageStatus(command.from, command.taskId);

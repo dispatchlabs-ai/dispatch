@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Always steer active work for ordinary user chat input at native boundaries; keep internal peer/schedule policies and explicit Stop unchanged.
+
 - Offer normal hosted HTML sign-in and expiring, revocable protected session cookies without browser Basic-auth dialogs; preserve exact-origin form protection.
 
 - Support browser authentication challenges from trusted hosted authorization modules; ship a single-participant HTTPS Basic module with consumer-owned scrypt credentials.

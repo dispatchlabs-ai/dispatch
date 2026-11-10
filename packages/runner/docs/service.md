@@ -324,7 +324,7 @@ native conversation (for example `helper:2`); omit CHAT to create one using the
 definitions' default agent. `/history`, `/stop` and `/quit` are explicit commands.
 EOF, `/quit` and Ctrl-C disconnect **only the client**; Ctrl-C exits 130. Interactive
 messages return admission immediately while observation continues, so Stop and
-follow-ups remain available during work. No client enables schedules or providers.
+steering messages remain available during work. No client enables schedules or providers.
 
 A configured `dispatch-agent --root DEFINITIONS run --config HOST.json --session
 KEY --prompt TEXT` also connects when HOST contains `socket`. Named keys use the
@@ -342,7 +342,7 @@ For a consumer application:
 import { openServiceRuntime } from "@dispatch/backend";
 const client = await openServiceRuntime({ socket: "/srv/agents/run/service.sock" });
 const chat = await client.service.create("helper", "web", "example-discussion");
-await client.service.submit(chat.id, "Hello", "example-request-1", "followUp", "web");
+await client.service.submit(chat.id, "Hello", "example-request-1", "steer", "web");
 console.log(await client.presentation.snapshot(chat.id));
 await client.close(); // disconnect, not Stop or owner shutdown
 ```
@@ -372,11 +372,20 @@ otherwise the socket display path. Do not install two owners against the same
 native state.
 
 `serviceRequest(socket, command)` is typed by `ServiceCommand`/`ServiceResults`.
-Create accepts `source`; send accepts `source`, `mode` (`followUp` or `steer`) and
+Create accepts `source`; send accepts `source`, legacy `mode` and
 `files: [{name,mimeType,data}]` with base64 bytes. Native validation admits UTF-8
 text documents and PNG/JPEG/WebP images only for image-capable authored models.
 There is no application request-byte ceiling; hosts must provision memory/disk
-for JSON/base64 requests. No filename is interpreted as a host path. `find` looks
+for JSON/base64 requests. Ordinary user sends always steer active work using native
+`whenBusy: "steer"`,
+including when a legacy caller supplies `mode: "followUp"`. Idle input starts
+normally. Internal `agent`/`schedule` sources retain explicit mode semantics;
+peer messages and schedules are not changed. Native steering waits for the next
+tool/final boundary, does not abort an in-flight tool, and can briefly report
+`queued` before placement. `ChatService.submit` applies the same user policy.
+Custom `serveService` facades must honor the supplied steering mode in native
+admission rather than replacing it with follow-up behavior.
+No filename is interpreted as a host path. `find` looks
 up a stable native creation key (optionally scoped by agent). Artifact downloads
 return retained verified bytes as base64. Receipts remain Pi submission records.
 

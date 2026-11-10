@@ -57,6 +57,14 @@ TLS termination/proxy must preserve exact Host/Origin; backend binds loopback by
 default, or explicit `DISPATCH_HOST` in hosted mode. `/health` reveals readiness
 only and is unauthenticated. Browser SSE uses the same cookie authorization.
 
+## Messages during work
+
+Messages always steer active work, like native Slack input. Send a correction
+while the agent is busy; it reaches the model at the next native tool boundary,
+not only after its final answer. In-flight tools are not interrupted. Pending
+input may briefly have native status `queued` until that boundary. Idle messages
+start normally. There is no queue/steer selector; Stop remains explicit.
+
 ## Native ownership and recovery
 
 Browsing includes configured CLI/workflow-child SQLite histories and committed

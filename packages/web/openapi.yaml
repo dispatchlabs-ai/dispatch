@@ -209,13 +209,13 @@
     "/api/chats/{chatId}/messages": {
       "post": {
         "operationId": "sendMessage",
-        "summary": "Admit a message or queue a follow-up",
+        "summary": "Steer active work or start an idle turn",
         "tags": [
           "Conversations"
         ],
         "responses": {
           "202": {
-            "description": "Native admission; reuse the requestId on uncertain delivery to avoid duplicates.",
+            "description": "Native steering admission; busy input joins work at the next native boundary, not after the final answer. Reuse the requestId on uncertain delivery to avoid duplicates.",
             "content": {
               "application/json": {
                 "schema": {

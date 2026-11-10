@@ -338,7 +338,9 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
             throw new ContentError("This authored model does not accept images. Remove the image or choose an image-capable agent.");
         }
         const submission = await conversation.submit({
-          type: "input", content, requestId, whenBusy: mode,
+          // Human chat always steers; only internal agent/schedule work may
+          // deliberately wait for a final boundary.
+          type: "input", content, requestId, whenBusy: source === "agent" || source === "schedule" ? mode : "steer",
           entry: { kind: `${namespace}.message`, data: { source, ...(files.length ? {text, attachments: files} : {}) } },
         }, context);
         if (chat.title === "New chat") await this.rename(id, text || files[0]?.name || "Attachment");

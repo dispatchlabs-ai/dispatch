@@ -94,7 +94,7 @@ export async function chatInTerminal(options: TerminalOptions): Promise<void> {
     };
 
     const submit = (text: string) => observe(async () => {
-      const { submissionId } = await app.service.submit(chat.id, text, randomUUID(), "followUp", "cli");
+      const { submissionId } = await app.service.submit(chat.id, text, randomUUID(), "steer", "cli");
       const submission = await app.service.host(chat.agent).harness.submission(submissionId, context);
       if (!submission) throw new Error("Submitted turn is missing.");
       const receipt = await submission.wait(context);

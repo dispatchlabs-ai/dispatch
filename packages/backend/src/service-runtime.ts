@@ -52,7 +52,7 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
         if (sourceId !== source) throw new AdmissionError("Choose this service's configured source.");
         return project(await call({ method: "create", agent, source: transport, key }));
       },
-      submit: (id, text, requestId, mode, transport, files = []) => call({ method: "send", id, text, requestId, mode, source: transport, files }),
+      submit: (id, text, requestId, _mode, transport, files = []) => call({ method: "send", id, text, requestId, mode: "steer", source: transport, files }),
       stop: async id => { await call({ method: "stop", id }); },
       artifact: async (id, artifactId) => {
         const value = await call({ method: "artifact", id, artifactId });

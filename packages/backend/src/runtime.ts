@@ -28,7 +28,7 @@ interface NativeService {
     id: string,
     text: string,
     requestId: string,
-    mode: "followUp",
+    mode: "steer",
     source: runner.Chat["source"],
     files?: AttachmentFile[],
   ): Promise<{ submissionId: number }>;
@@ -122,7 +122,7 @@ async function connectWorker(entrypoint: string, workerData: unknown): Promise<N
     artifact: (...args: unknown[]) => call("artifact", args),
     create: (...args) => call("create", args),
     resolve: (...args) => call("resolve", args),
-    submit: (...args) => call("submit", args),
+    submit: (id, text, requestId, _mode, source, files) => call("submit", [id, text, requestId, "steer", source, files]),
     snapshot: (...args) => call("snapshot", args),
     stop: (...args) => call("stop", args),
     close: async () => {
@@ -414,7 +414,7 @@ async function openLocalRuntime(config: LocalConfig) {
       id: string,
       text: string,
       requestId: string,
-      mode: "followUp",
+      _mode: "steer",
       source: runner.Chat["source"],
       files: AttachmentFile[] = [],
     ) {
@@ -425,7 +425,7 @@ async function openLocalRuntime(config: LocalConfig) {
         nativeId(item),
         text,
         requestId,
-        mode,
+        "steer",
         source,
         files,
       );
@@ -617,7 +617,7 @@ export async function openRuntime(): Promise<Runtime> {
           throw new AdmissionError("Choose a source bound to the selected installation.");
         return project(name, await runtime.service.create(local, source, key, target));
       },
-      submit: (id, ...args) => { const { local, runtime } = context(id); return runtime.service.submit(local, ...args); },
+      submit: (id, text, requestId, _mode, source, files) => { const { local, runtime } = context(id); return runtime.service.submit(local, text, requestId, "steer", source, files); },
       stop: id => { const { local, runtime } = context(id); return runtime.service.stop(local); },
       artifact: (id, artifactId) => { const { local, runtime } = context(id); return runtime.service.artifact(local, artifactId); },
     },

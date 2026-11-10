@@ -94,7 +94,7 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
         stores.invalidate();
         return project(chat);
       }),
-      submit: (id, ...args) => mutate(async runtime => runtime.service.submit(await owned(runtime, id), ...args)),
+      submit: (id, text, requestId, _mode, source, files) => mutate(async runtime => runtime.service.submit(await owned(runtime, id), text, requestId, "steer", source, files)),
       stop: id => mutate(async runtime => runtime.service.stop(await owned(runtime, id))),
       async artifact(id, artifactId) {
         const value = await read(async runtime => {

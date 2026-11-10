@@ -8,8 +8,8 @@
   with real APIs. See [notices and immutable sources](THIRD_PARTY.md). No Next,
   AI SDK, Gateway or second execution loop is imported.
 - Restrained neutral colors, readable streaming Markdown/code, compact searchable
-  history, circular Send and visible native Stop. Busy follow-ups remain available;
-  send/stop are not a cosmetic toggle that removes follow-up input.
+  history, circular Send and visible native Stop. Busy steering input remains available;
+  send/stop are not a cosmetic toggle that removes steering input.
 - Actual tool IDs/turns/assistant entries, retained arguments/results/errors and
   native task/live state drive expandable activity. Missing result is unavailable,
   not success; only native evidence establishes cancellation, waits or parentage.
