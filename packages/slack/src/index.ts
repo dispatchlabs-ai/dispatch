@@ -434,7 +434,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
       await runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx);
     },
   });
-  const incoming = defineTask<Incoming, { phase: "admit"; retryAt: number }, null>({
+  const incoming = defineTask<Incoming, { phase: "admit"; retryAt: number; cancelled?: boolean }, null>({
     name: `${namespace}.slack-incoming`, version: 1,
     initial: () => ({ phase: "admit", retryAt: 0 }),
     phases: {
@@ -444,17 +444,22 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         const input = task.input;
         // Only an exact authenticated command is control, never quoted/retrieved prose.
         if (/^(?:\/?stop|cancel)[.!]?$/i.test(input.text.trim())) {
+          let checkpoint = task.state.checkpoint;
           try {
-            if (options.threads) await options.threads.stop(input);
-            else {
-              const chat = await service.find(input.agent, threadKey(config.teamId, input.channel, input.thread));
-              if (chat) await service.stop(chat.id);
-              await stopStreams(input, []);
+            if (!checkpoint.cancelled) {
+              if (options.threads) await options.threads.stop(input);
+              else {
+                const chat = await service.find(input.agent, threadKey(config.teamId, input.channel, input.thread));
+                if (chat) await service.stop(chat.id);
+              }
+              checkpoint = { ...checkpoint, cancelled: true };
+              await runtime.commit(() => ({ status: "running", checkpoint }), ctx);
             }
+            if (!options.threads) await stopStreams(input, []);
             await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), ctx);
           } catch (error) {
             runtime.signal.throwIfAborted(); runtime.report(error);
-            await runtime.sleepUntil(runtime.now() + retryDelay(error), task.state.checkpoint, ctx);
+            await runtime.sleepUntil(runtime.now() + retryDelay(error), checkpoint, ctx);
           }
           return;
         }
@@ -535,7 +540,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
       await runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx);
     },
   });
-  const extension = defineExtension({ name: `${namespace}.slack`, tasks: [turn, responses.task, indicator, incoming, artifacts.task, statusDelivery.task] });
+
   const queueReply: ReplySink = async (tx, conversationId, destination, text, key) => {
     await tx.createTask(turn, { ...destination, text, replyText: text, key }, {
       conversationId, ownership: { kind: "conversation" }, background: true,
@@ -566,22 +571,58 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
     }
     return service.create(report.agent, "slack", threadKey(config.teamId, report.channel, report.thread), report.title ?? "Report discussion", report.origin);
   };
-  async function stopStreams(input: Pick<SlackInput, "channel" | "thread"> & { key?: string }, streams: string[]) {
-    await Promise.all(streams.map(async ts => {
-      try { await client.chat.stopStream({ channel: input.channel, ts }); }
-      catch (error) { if (!["message_not_in_streaming_state", "message_not_found"].includes(slackError(error) ?? "")) throw error; }
-
-    }));
-    if (input.key) {
-      const hash = createHash("sha256").update(`stop:${input.channel}:${input.thread}:${input.key}`).digest("hex");
-      if (!await findDelivery(client, namespace, input, hash)) await client.chat.postMessage({
-        channel: input.channel, thread_ts: input.thread, text: "Stopped.", blocks: replyBlocks("Stopped."),
-        metadata: { event_type: `${namespace}_agent_reply`, event_payload: { delivery: hash } },
-        parse: "none", unfurl_links: false, unfurl_media: false,
-      });
-    }
-    await client.assistant.threads.setStatus({ channel_id: input.channel, thread_ts: input.thread, status: "" });
+  const StopAcks = defineDoc<Record<string, number>>({
+    kind: `${namespace}.slack-stop-acks`, version: 1, scope: "session",
+    initial: () => ({}), checkpointWhen: () => false,
+  });
+  const stopAck = defineTask<{ channel: string; thread: string; key: string; streams: string[] },
+    { phase: "acknowledge"; retryAt: number }, null>({
+    name: `${namespace}.slack-stop-ack`, version: 1,
+    initial: () => ({ phase: "acknowledge", retryAt: 0 }),
+    phases: { async acknowledge(task, runtime, ctx) {
+      if (task.state.checkpoint.retryAt > runtime.now())
+        return runtime.sleepUntil(task.state.checkpoint.retryAt, task.state.checkpoint, ctx);
+      try {
+        await Promise.all(task.input.streams.map(async ts => {
+          try { await client.chat.stopStream({ channel: task.input.channel, ts }); }
+          catch (error) { if (!["message_not_in_streaming_state", "message_not_found"].includes(slackError(error) ?? "")) throw error; }
+        }));
+        if (task.input.key) {
+          const hash = createHash("sha256").update(`stop:${task.input.channel}:${task.input.thread}:${task.input.key}`).digest("hex");
+          if (!await findDelivery(client, namespace, task.input, hash)) await client.chat.postMessage({
+            channel: task.input.channel, thread_ts: task.input.thread, text: "Stopped.", blocks: replyBlocks("Stopped."),
+            metadata: { event_type: `${namespace}_agent_reply`, event_payload: { delivery: hash } },
+            parse: "none", unfurl_links: false, unfurl_media: false,
+          });
+        }
+        await client.assistant.threads.setStatus({ channel_id: task.input.channel, thread_ts: task.input.thread, status: "" });
+        await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), ctx);
+      } catch (error) {
+        runtime.signal.throwIfAborted(); runtime.report(error);
+        await runtime.sleepUntil(runtime.now() + retryDelay(error), task.state.checkpoint, ctx);
+      }
+    } },
+    async abort(_task, runtime, ctx) {
+      await runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx);
+    },
+  });
+  async function stopStreams(input: Pick<SlackInput, "channel" | "thread"> & { key?: string; agent?: string }, streams: string[]) {
+    // Cancellation belongs to the caller/native supervisor. Only the presentation
+    // task retries Slack I/O, never the cancelled conversation or its new inputs.
+    const service = await ready;
+    const agent = input.agent ?? channelAgent(input.channel) ?? config!.directMessagesAgent;
+    if (!agent) throw new Error("No configured agent owns this Stop acknowledgement.");
+    const host = service.host(agent);
+    const key = input.key ?? `streams:${streams.join(",")}`;
+    await host.conversation.commit(async tx => {
+      const acks = await tx.doc(StopAcks);
+      const id = `${input.channel}:${input.thread}:${key}`;
+      acks[id] ??= await tx.createTask(stopAck, { channel: input.channel, thread: input.thread, key, streams },
+        { ownership: { kind: "conversation" }, background: true });
+    }, context);
+    host.harness.resume();
   }
+  const extension = defineExtension({ name: `${namespace}.slack`, tasks: [turn, responses.task, indicator, incoming, stopAck, artifacts.task, statusDelivery.task] });
   async function receive(service: ChatService, input: SlackThreadInput) {
     if (input.files?.length) prepareContent(input.text, input.files);
     if (input.team !== config!.teamId || channelAgent(input.channel) !== input.agent && config!.directMessagesAgent !== input.agent

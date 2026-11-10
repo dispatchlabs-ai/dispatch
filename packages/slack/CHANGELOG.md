@@ -4,6 +4,8 @@
 
 ## [0.7.0] - 2026-11-09
 
+- Separate durable Stop cancellation progress from retryable acknowledgement delivery, so transport failures cannot cancel newer common-client input.
+
 - Preserve every public native assistant response separately across tools, steering, completion continuations and restart. Replace run-wide mutable progress prose with ordered response identities; Stop closes only current streams. Native slack-turn task version2 requires idle upgrade from version1.
 
 - Carry trusted common-client text/image bytes through existing native admission and delivery; declare explicit background reply transport.

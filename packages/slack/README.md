@@ -324,3 +324,12 @@ Prepared transports declare their explicit `transport` for Runner multi-adapter
 background reply routing. Multiple accounts of the same transport require the
 company's trusted `run({replySink})` routing; untagged destinations are supported
 only with one adapter. This does not merge unrelated channel threads.
+
+Stop acknowledgement I/O is queued as a separate native presentation task in the
+transport host. Its history lookup, message and status retries never invoke native
+Stop again. Incoming Stop records cancellation completion before acknowledgement
+admission; crashes during unfinished cancellation still recover it, while admitted
+acknowledgements survive restart independently. ThreadProcesses retains its
+original cancellation cutoff and workspace cleanup boundary. `stopStreams` now
+returns after durable acknowledgement admission, not external delivery; inspect
+native acknowledgement task outcome for actual delivery.
