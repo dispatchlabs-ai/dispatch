@@ -144,8 +144,8 @@ async function openLocalRuntime(config: LocalConfig) {
     if (!source) throw new Error("service.sourceId must select a configured source.");
     configuredServiceRoot = await realpath(config.service.stateRoot);
     const session = relative(await realpath(source.path), configuredServiceRoot);
-    if (!session || session === ".." || session.startsWith("../") || isAbsolute(session))
-      throw new Error("service.stateRoot must be a native session directory within its configured source.");
+    if (session === ".." || session.startsWith("../") || isAbsolute(session))
+      throw new Error("service.stateRoot must be a native session directory at or within its configured source.");
   }
   // Catalog loading does not open any native storage or connect a provider.
   const definitions = new Map<string, any>();
@@ -154,7 +154,8 @@ async function openLocalRuntime(config: LocalConfig) {
     if (entry.runnable) {
       const definition = await runner.loadAgent(definitionsRoot, entry.id);
       definitions.set(entry.id, definition);
-      agents.push({ id: entry.id, description: definition.description });
+      agents.push({ id: entry.id, description: definition.description,
+        ...(config.defaultSource === config.service?.sourceId ? { capabilities: config.service.capabilities } : {}) });
     }
   const owners = new Map<
     string,
@@ -373,10 +374,20 @@ async function openLocalRuntime(config: LocalConfig) {
     }
     return { item, owner };
   }
+  const projectChat = (item: Selection): Chat => ({ ...item.chat,
+    ...(item.run.path === configuredServiceRoot ? { capabilities: config.service?.capabilities } : {}) });
+  const requireCapability = (path: string, key: keyof import("./contracts.js").Capabilities) => {
+    if (path === configuredServiceRoot && config.service?.capabilities?.[key] === false)
+      throw new AdmissionError(`This installation does not support ${key}.`);
+  };
+  const savedSnapshot = async (id: string): Promise<Snapshot> => {
+    const item = await stores.get(id);
+    return { ...await stores.snapshot(id), chat: projectChat(item) };
+  };
   const service = {
     agents,
     sources: stores.statuses,
-    list: stores.list,
+    list: async () => Promise.all((await stores.list()).map(async chat => projectChat(await stores.get(chat.id)))),
     has: stores.has,
     async create(
       agent: string,
@@ -400,6 +411,7 @@ async function openLocalRuntime(config: LocalConfig) {
         ? relative(root, configuredServiceRoot)
         : `web-${createHash("sha256").update(`${agent}\0${key}`).digest("hex")}`;
       const path = join(root, session);
+      requireCapability(path, "create");
       const owner = await own(path, host.namespace ?? "dispatch", agent, true);
       const chat = await owner.service.create(agent, _source, key);
       stores.invalidate();
@@ -408,7 +420,8 @@ async function openLocalRuntime(config: LocalConfig) {
         id: identity(join(path, agent, "session.sqlite"), chat.conversationId),
         source: source.id,
         sourceLabel: source.label,
-        session,
+        session: session || ".",
+        ...(path === configuredServiceRoot ? { capabilities: config.service?.capabilities } : {}),
       };
     },
     async submit(
@@ -420,6 +433,7 @@ async function openLocalRuntime(config: LocalConfig) {
       files: AttachmentFile[] = [],
     ) {
       runner.prepareContent(text, files);
+      if (files.length) requireCapability((await stores.get(id)).run.path, "attachments");
       const { item, owner } = await admitted(id);
       // Resume only on explicit admission, never on observation/startup/restart.
       return owner.service.submit(
@@ -437,6 +451,7 @@ async function openLocalRuntime(config: LocalConfig) {
     },
     async artifact(id: string, artifactId: string) {
       const item = await stores.get(id);
+      requireCapability(item.run.path, "artifacts");
       const snapshot = await stores.snapshot(id);
       const artifact = snapshot.messages
         .flatMap((message) => message.artifacts ?? [])
@@ -456,7 +471,7 @@ async function openLocalRuntime(config: LocalConfig) {
     let shared: NativeService | undefined;
     try { shared = await discovered(item.run.path); }
     catch {
-      return { ...await stores.snapshot(id), readOnlyReason: "Native service unavailable. Reconnect its original launcher; no work was resent or resumed." };
+      return { ...await savedSnapshot(id), readOnlyReason: "Native service unavailable. Reconnect its original launcher; no work was resent or resumed." };
     }
     const owner = shared ? { service: shared } : owners.get(join(item.run.path, item.chat.agent));
     if (owner) {
@@ -464,16 +479,16 @@ async function openLocalRuntime(config: LocalConfig) {
         const snapshot = await owner.service.snapshot(nativeId(item));
         return {
           ...snapshot,
-          chat: { ...item.chat, title: snapshot.chat.title },
+          chat: { ...projectChat(item), title: snapshot.chat.title },
         };
       } catch {
         // A disconnected native chat stays observational; never create a writer.
         if (shared && sessionDocument(item.store.path, `${item.store.namespace}.chats`)?.byId?.[nativeId(item)])
-          return { ...await stores.snapshot(id), readOnlyReason: "Native service unavailable. Reconnect its original launcher; no work was resent or resumed." };
+          return { ...await savedSnapshot(id), readOnlyReason: "Native service unavailable. Reconnect its original launcher; no work was resent or resumed." };
         /* Non-index children still use the native read-only reader. */
       }
     }
-    return stores.snapshot(id);
+    return savedSnapshot(id);
   }
   const presentation = {
     snapshot,
@@ -517,7 +532,7 @@ async function openLocalRuntime(config: LocalConfig) {
       if (installation !== undefined) throw new AdmissionError("Native conversation links require a named installation binding.");
       const matches = (await stores.list()).filter(chat => `${chat.agent}:${chat.conversationId}` === id);
       if (matches.length !== 1) throw new AdmissionError("Linked conversation is unavailable or ambiguous in this installation.");
-      return matches[0];
+      return projectChat(await stores.get(matches[0].id));
     },
     service,
     presentation,
@@ -579,7 +594,8 @@ export async function openRuntime(): Promise<Runtime> {
     for (const binding of config.installations) {
       const sources = config.sources.filter(source => source.installation === binding.id);
       if (!sources.length) continue;
-      const defaultSource = sources.some(source => source.id === config.defaultSource) ? config.defaultSource : sources[0].id;
+      const defaultSource = sources.some(source => source.id === config.defaultSource) ? config.defaultSource
+        : (binding.service && binding.definitionsRoot ? sources.find(source => source.id !== binding.service!.sourceId) : undefined)?.id ?? sources[0].id;
       const selected = { sources, defaultSource };
       const runtime: Runtime = binding.service
         ? binding.definitionsRoot && binding.host

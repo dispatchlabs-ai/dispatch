@@ -246,3 +246,9 @@ canonical session directories and their descendants from saved discovery. This
 is useful when a parent instances source belongs to one installation while a
 nested native owner belongs to another. Excluded directories must exist; path
 errors are visible source issues. Existing canonical chat IDs remain unchanged.
+
+Combined service/definitions bindings apply service restrictions only to the exact
+canonical service session, including saved/offline history and artifact reads.
+Sibling sessions keep ordinary capabilities. The agent catalog reflects the default
+creation source: restricted when it targets the service, ordinary when it targets a
+sibling source. Exact-session source roots are supported for both binding forms.

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Show retained artifact metadata without a download link when the selected installation disables artifacts.
+
 - Open exact installation/native-conversation links through sign-in without creating or resending work; respect restricted service creation and attachment controls.
 
 - Offer normal hosted HTML sign-in and expiring, revocable protected session cookies without browser Basic-auth dialogs; preserve exact-origin form protection.
