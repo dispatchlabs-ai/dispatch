@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { scrypt, timingSafeEqual } from "node:crypto";
+import { createHash, scrypt, timingSafeEqual } from "node:crypto";
 import { isAbsolute } from "node:path";
 
 export async function passwordVerifier(path: string | undefined) {
@@ -13,11 +13,13 @@ export async function passwordVerifier(path: string | undefined) {
     !/^[a-f0-9]{128}$/.test(credential.hash)
   ) throw new Error("Invalid authentication credential file.");
   const expected = Buffer.from(credential.hash, "hex");
-  return async (username: string, password: string) => {
+  const verify = async (username: string, password: string) => {
     const derived = await new Promise<Buffer>((resolve, reject) => {
       scrypt(password, Buffer.from(credential.salt, "hex"), 64,
         (error, key) => error ? reject(error) : resolve(key));
     });
     return timingSafeEqual(derived, expected) && username === credential.username;
   };
+  return Object.assign(verify, { credentialDigest: createHash("sha256")
+    .update(JSON.stringify([credential.username, credential.salt, credential.hash])).digest("hex") });
 }

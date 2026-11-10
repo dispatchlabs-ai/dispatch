@@ -29,11 +29,28 @@ is served. Do not send API credentials in URL query strings.
 
 For normal browser sign-in, select shipped `session-auth.js` beside `main.js`
 and set `DISPATCH_SESSION_AUTH_FILE` to the same credential format described
-below. Anonymous page visits redirect to `/login`, a native HTML form; API/SSE
+below. Also set `DISPATCH_SESSION_STATE_FILE` to a stable absolute state file, for
+example `/var/lib/example/web-auth/sessions.json`, outside the deployment/Nix tree.
+Create its canonical, owned parent directory with mode 0700; Web atomically creates
+and maintains an owned regular 0600 file. Run only one hosted Web writer.
+Anonymous page visits redirect to `/login`, a native HTML form; API/SSE
 requests return 401 without a Basic challenge. Sign-in sets a host-only
-`__Host-dispatch_session` cookie (Secure, HttpOnly, SameSite=Strict) for twelve
-hours. Sessions are memory-only, revoked on Web restart; POST `/logout` revokes
-that session. Visit `/login` while signed in to open the sign-out control.
+`__Host-dispatch_session` cookie (Secure, HttpOnly, SameSite=Strict) for thirty
+days. Authenticated requests renew durable expiry and the cookie at most once per
+day; SSE observation alone does not renew. This gives roughly 29–30 days of
+inactivity before another sign-in, not everlasting access. Sessions survive Web
+restart/redeploy when the same state file, credential values and origin remain.
+POST `/logout` durably revokes that session and closes its streams. Expired streams
+close within a minute, using current durable expiry rather than an old timer.
+Only SHA-256 token digests/expiry and a credential/origin binding are persisted,
+never raw tokens. State is sensitive: keep it private and do not restore an old
+backup (which can restore old sessions). Corrupt/insecure/missing-at-runtime or
+unwritable state fails closed; repair deliberately before restarting. Credential
+or origin changes discard saved sessions at startup. Rotate credentials and restart
+to revoke all sessions. Deleting state deliberately while Web is stopped also
+revokes all sessions. Existing pre-persistence in-memory sessions cannot migrate;
+one next sign-in is needed after rollout. Visit `/login` while signed in to open
+the sign-out control.
 The server uses `Referrer-Policy: same-origin` so native form POSTs retain the
 exact Origin required by the existing protections; proxies must preserve that
 policy. Login requires the exact Origin and form encoding, with a small bounded

@@ -1,16 +1,21 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createHash, randomBytes } from "node:crypto";
+import { sessionState, sessionLifetime as lifetime, sessionRenewal } from "./session-state.js";
 import { passwordVerifier } from "./password-verifier.js";
 
 const verify = await passwordVerifier(process.env.DISPATCH_SESSION_AUTH_FILE);
 const cookieName = "__Host-dispatch_session";
-const lifetime = 12 * 60 * 60 * 1000;
-const digest = (value: string) => createHash("sha256").update(value).digest("hex");
-const sessions = new Map<string, { expires: number; streams: Set<ServerResponse> }>();
+const state = await sessionState(process.env.DISPATCH_SESSION_STATE_FILE, digest(`${verify.credentialDigest}\0${process.env.DISPATCH_ORIGIN ?? "loopback"}`));
+function digest(value: string) { return createHash("sha256").update(value).digest("hex"); }
+const streams = new Map<string, Set<ServerResponse>>();
+let unavailable = false;
+let serial = Promise.resolve();
+const cookie = (response: ServerResponse, token: string) => response.setHeader("set-cookie",
+  `${cookieName}=${token}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${lifetime / 1000}`);
 function revoke(key: string) {
-  const session = sessions.get(key);
-  sessions.delete(key);
-  for (const stream of session?.streams ?? []) stream.end();
+  const active = streams.get(key);
+  streams.delete(key);
+  for (const stream of active ?? []) stream.end();
 }
 let attempts: number[] = [];
 function redirect(response: ServerResponse, location: string) {
@@ -39,17 +44,44 @@ ${message ? `<p role="alert">${message}</p>` : ""}
 ${signedIn ? `<a href="${escapeHtml(target)}">Open conversations</a><form method="post" action="/logout"><button>Sign out</button></form>` : `<form method="post" action="${escapeHtml(action)}"><label>Username<input name="username" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button>Sign in</button></form>`}
 </main></body></html>`);
 }
-export async function authorize(request: IncomingMessage, response: ServerResponse) {
+async function durable<T>(operation: () => Promise<T>) {
+  try { return await operation(); }
+  catch {
+    // A failed durable revocation/admission cannot leave usable memory-only auth.
+    unavailable = true;
+    for (const key of streams.keys()) revoke(key);
+    throw new Error("Session authentication unavailable. Inspect private state before restarting.");
+  }
+}
+export function authorize(request: IncomingMessage, response: ServerResponse) {
+  const operation = serial.then(() => {
+    if (unavailable) throw new Error("Session authentication unavailable.");
+    return authorizeSerial(request, response);
+  });
+  serial = operation.then(() => {}, () => {});
+  return operation;
+}
+async function authorizeSerial(request: IncomingMessage, response: ServerResponse) {
   // main.ts enforces exact Host/Origin/Fetch Metadata before calling this module.
   const url = new URL(request.url ?? "/", "https://session.invalid");
   const path = url.pathname;
   const target = linkTarget(url.searchParams.get("returnTo"));
   const time = Date.now();
-  for (const [key, session] of sessions) if (session.expires <= time) revoke(key);
+  const saved = await durable(() => state.read());
+  let dirty = false;
+  for (const [key, expires] of Object.entries(saved.sessions)) if (expires <= time) {
+    delete saved.sessions[key]; revoke(key); dirty = true;
+  }
+  if (dirty) await durable(() => state.write(saved));
   const token = (request.headers.cookie ?? "").split(";").map(v => v.trim())
     .find(v => v.startsWith(cookieName + "="))?.slice(cookieName.length + 1) ?? "";
   const key = digest(token);
-  const signedIn = sessions.has(key);
+  const signedIn = Object.hasOwn(saved.sessions, key);
+  if (signedIn && saved.sessions[key] <= time + lifetime - sessionRenewal) {
+    saved.sessions[key] = time + lifetime;
+    await durable(() => state.write(saved));
+    cookie(response, token);
+  }
   if (path === "/login" && request.method === "GET") {
     page(response, "", 200, signedIn, target);
     return false;
@@ -82,14 +114,18 @@ export async function authorize(request: IncomingMessage, response: ServerRespon
       page(response, "Username or password was incorrect.", 401, false, target);
       return false;
     }
-    revoke(key);
+    delete saved.sessions[key];
     const session = randomBytes(32).toString("hex");
-    sessions.set(digest(session), { expires: time + lifetime, streams: new Set() });
-    response.setHeader("set-cookie", `${cookieName}=${session}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${lifetime / 1000}`);
+    saved.sessions[digest(session)] = time + lifetime;
+    await durable(() => state.write(saved));
+    revoke(key);
+    cookie(response, session);
     redirect(response, target);
     return false;
   }
   if (path === "/logout" && request.method === "POST") {
+    delete saved.sessions[key];
+    await durable(() => state.write(saved));
     revoke(key);
     response.setHeader("set-cookie", `${cookieName}=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0`);
     redirect(response, "/login");
@@ -97,14 +133,9 @@ export async function authorize(request: IncomingMessage, response: ServerRespon
   }
   if (signedIn) {
     if (request.method === "GET" && /^\/api\/chats\/[^/]+\/events$/.test(path)) {
-      const session = sessions.get(key)!;
-      session.streams.add(response);
-      const expiry = setTimeout(() => revoke(key), session.expires - time);
-      expiry.unref();
-      response.once("close", () => {
-        clearTimeout(expiry);
-        session.streams.delete(response);
-      });
+      const active = streams.get(key) ?? new Set<ServerResponse>();
+      streams.set(key, active); active.add(response);
+      response.once("close", () => { active.delete(response); if (!active.size) streams.delete(key); });
     }
     return true;
   }
@@ -113,3 +144,14 @@ export async function authorize(request: IncomingMessage, response: ServerRespon
     .end(JSON.stringify({ error: "Sign in at /login to continue." }));
   return false;
 }
+
+// Re-read durable expiry so sliding renewal never leaves an old SSE expiry timer.
+// Observation alone does not renew a session; normal authenticated requests do.
+const expiry = setInterval(() => {
+  const operation = serial.then(async () => {
+    const saved = await durable(() => state.read()), now = Date.now();
+    for (const key of streams.keys()) if (!saved.sessions[key] || saved.sessions[key] <= now) revoke(key);
+  });
+  serial = operation.catch(() => { unavailable = true; for (const key of streams.keys()) revoke(key); });
+}, 60_000);
+expiry.unref();
