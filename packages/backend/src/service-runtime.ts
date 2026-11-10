@@ -6,12 +6,15 @@ import { AdmissionError } from "./config.js";
 import type { Runtime } from "./runtime.js";
 import type { Capabilities, Chat, Snapshot } from "./contracts.js";
 
-export interface ServiceConnection { socket: string; sourceId?: string; label?: string; expectedStateRoot?: string; expectedIdentity?: string; capabilities?: Capabilities }
+export interface ServiceConnection { socket: string; sourceId?: string; label?: string; expectedStateRoot?: string; expectedIdentity?: string; capabilities?: Capabilities; keyedCreation?: { agent: string; keyPrefix: string } }
 
 /** Connect to the authorized local native owner; closing this client never stops it. */
 export async function openServiceRuntime(config: ServiceConnection): Promise<Runtime> {
   if (!config || typeof config.socket !== "string" || !isAbsolute(config.socket))
     throw new Error("Provide an absolute service.socket in trusted installation configuration.");
+  const keyed = config.keyedCreation;
+  if (keyed && (!/^[a-zA-Z0-9_-]+$/.test(keyed.agent) || !/^[a-z][a-z0-9-]*:$/.test(keyed.keyPrefix)))
+    throw new Error("Provide keyedCreation agent and keyPrefix in trusted service configuration.");
   const capabilities = config.capabilities;
   if (capabilities && (typeof capabilities !== "object" || Object.entries(capabilities).some(([key, value]) =>
     !["create", "attachments", "artifacts"].includes(key) || typeof value !== "boolean")))
@@ -72,6 +75,14 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
         }
         return { ...project(chat), activity: state as Chat["activity"] };
       })) };
+    },
+    openKeyedChat: async (key, title, installation) => {
+      if (installation !== undefined) throw new AdmissionError("Keyed conversation links require a named installation binding.");
+      if (!keyed) throw new AdmissionError("This installation does not allow keyed conversation links.");
+      if (!key.startsWith(keyed.keyPrefix) || key.length === keyed.keyPrefix.length || /[\u0000-\u001f\u007f-\u009f]/.test(key))
+        throw new AdmissionError("Invalid conversation link key.");
+      if (!title.trim()) throw new AdmissionError("A conversation link title is required.");
+      return project(await call({ method: "create", agent: keyed.agent, key, title, source: "web" }));
     },
     resolveChat: async (id, installation) => {
       if (installation !== undefined) throw new AdmissionError("Native conversation links require a named installation binding.");

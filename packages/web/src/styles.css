@@ -182,3 +182,7 @@ header { border: 0; height: 64px; }
 .sidebar-resizer:hover, .sidebar-resizer:focus-visible { background: #ccc8; }
 .sidebar-resizer:focus-visible { outline-offset: -2px; }
 .sidebar-footer > button { margin-left: 8px; text-decoration: underline; }
+
+.link-context { margin-bottom: 10px; padding: 10px 12px; border: 1px solid #e5e5e5; border-radius: 10px; font-size: 12px; }
+.link-context strong { font-weight: 500; }
+.link-context p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 18dvh; overflow-y: auto; }

@@ -152,6 +152,14 @@ const server = createServer(async (request, response) => {
       streams.add(close); response.on("close", close); response.on("drain", flush);
       return;
     }
+    if (path === "/api/chat-link" && method === "POST") {
+      const body = await bodyOf(request);
+      if (Object.keys(body).some(key => !["installation", "key", "title"].includes(key)))
+        throw new HttpError(400, "Use only installation, key and title for keyed conversation links.");
+      if (!runtime.openKeyedChat) throw new HttpError(409, "This runtime does not allow keyed conversation links.");
+      json(response, 200, await runtime.openKeyedChat(field(body, "key"), field(body, "title"), field(body, "installation")));
+      return;
+    }
     if (path === "/api/chat-link" && method === "GET") {
       const installation = url.searchParams.get("installation"), chat = url.searchParams.get("chat");
       if (!installation || !chat) throw new HttpError(400, "A conversation link requires installation and chat.");

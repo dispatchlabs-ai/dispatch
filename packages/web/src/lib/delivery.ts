@@ -1,5 +1,5 @@
 import type { AttachmentFile } from './contracts';
-export interface Pending { chatId: string; text: string; requestId: string; attachments?: AttachmentFile[] }
+export interface Pending { chatId: string; text: string; draftText?: string; requestId: string; attachments?: AttachmentFile[] }
 export interface DeliveryState { text: string; attachments: AttachmentFile[]; pending: Pending | null }
 const storageKey = 'dispatch-web:outbox-key';
 const database = new Promise<IDBDatabase>((resolve, reject) => {

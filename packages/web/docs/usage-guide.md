@@ -166,3 +166,35 @@ Optional trusted server bindings, never browser-supplied paths:
   metadata directory when upgrading/rolling back Web. Absence leaves native titles
   unchanged. Inference is background presentation work and is cancelled on Web
   shutdown, independently of explicit native Stop.
+
+### Keyed item links
+
+An installation can explicitly enable keyed chat links while ordinary creation
+remains disabled. For example, set its trusted service binding to
+`"keyedCreation":{"agent":"helper","keyPrefix":"attention-item:"}` alongside
+`"capabilities":{"create":false,"attachments":false,"artifacts":false}`.
+Use `https://chat.example.com/?installation=studio&key=attention-item%3Aitem-42&title=Review+report&context=Choose+a+report+format`.
+Build URLs with `URLSearchParams`; keep the exact stable item key on every open.
+The item ID suffix is opaque and nonempty: punctuation, slashes, spaces and Unicode
+are preserved exactly, without trimming or normalization. C0/C1 control characters
+are rejected. Native `chat` and keyed `key` fields cannot be mixed.
+
+After sign-in the explicit keyed link POSTs to `/api/chat-link`, opening the
+configured agent's native conversation with that key/title. Native key replay
+keeps reopen/reload/two tabs on one conversation; no browser or Backend deduplication
+store is added. Ordinary page loads and GET APIs never create a conversation.
+The native owner must support idempotent create by key and title. Unsupported or
+disallowed installations/keys fail explicitly; New conversation stays disabled.
+
+`context` is a visible note above the composer, retained in the URL through sign-in
+and reload. On your first explicit send, if a fresh native snapshot has no user
+message, Web prepends an “About this Attention item” block containing title/context
+to your text in one normal message. The transcript shows that complete text.
+Later messages are unchanged. Nothing is sent or modeled on open/reload/reconnect;
+the composer starts empty unless this tab already has a retained draft.
+Same-origin tabs serialize first-send observation/admission; external clients can
+still race that observation. Uncertain retries use the exact retained composed
+payload and request ID, never prepend context again. Existing drafts and
+uncertain deliveries are preserved; resolve a pending message before opening a
+keyed link. The note disappears on ordinary sidebar selection. Avoid secrets in
+URLs: browser history and operator access logs may retain link fields.

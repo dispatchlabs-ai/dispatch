@@ -28,7 +28,7 @@ const route = (id: string) => `/api/chats/${encodeURIComponent(id)}`;
 export default function App() {
   const [link, setLink] = useState(() => {
     const query = new URLSearchParams(location.search);
-    return query.has('installation') || query.has('chat') ? query : null;
+    return query.has('installation') || query.has('chat') || query.has('key') ? query : null;
   });
   const [linkReady, setLinkReady] = useState(false);
   const [linkError, setLinkError] = useState('');
@@ -73,7 +73,16 @@ export default function App() {
     if (!link || !deliveryReady) return;
     let active = true;
     setLinkReady(false); setLinkError('');
-    void api<Chat>(`/api/chat-link?${link}`).then(chat => {
+    if (link.has('key') && (link.has('chat') || !link.get('installation') || !link.get('title') || !link.get('key')?.startsWith('attention-item:') || link.get('key') === 'attention-item:' || /[\u0000-\u001f\u007f-\u009f]/.test(link.get('key')!))) {
+      setLinkError('Invalid keyed conversation link.'); setLinkReady(true); return;
+    }
+    if (link.has('key') && pending) {
+      setLinkError('Resolve the pending message before opening this conversation link.'); setLinkReady(true); return;
+    }
+    const request = link.has('key')
+      ? api<Chat>('/api/chat-link', { installation: link.get('installation'), key: link.get('key'), title: link.get('title') })
+      : api<Chat>(`/api/chat-link?${link}`);
+    void request.then(chat => {
       if (!active) return;
       if (pending && pending.chatId !== chat.id) {
         setLinkError('Resolve the pending message before opening this conversation link.');
@@ -180,7 +189,7 @@ export default function App() {
     const previouslyUncertain = pending?.requestId === value.requestId;
     setSending(true); setError('');
     try {
-      await saveDelivery({text:value.text,attachments:value.attachments ?? [],pending:value});
+      await saveDelivery({text:value.draftText ?? value.text,attachments:value.attachments ?? [],pending:value});
       const receipt = await api<{ submissionId: number }>(`${route(value.chatId)}/messages`, { text: value.text, requestId: value.requestId, attachments:value.attachments ?? [] });
       if (!Number.isSafeInteger(receipt?.submissionId) || receipt.submissionId < 1) throw new Error('Invalid admission receipt.');
       await saveDelivery({text:'',attachments:[],pending:null});
@@ -188,9 +197,9 @@ export default function App() {
       setPending(null); setDraft(''); setFiles([]); setStopNotice(null);
     } catch (failure) {
       if (isDefiniteRejection(failure, previouslyUncertain)) {
-        await saveDelivery({text:value.text,attachments:value.attachments ?? [],pending:null});
+        await saveDelivery({text:value.draftText ?? value.text,attachments:value.attachments ?? [],pending:null});
         sessionStorage.removeItem('dispatch-web:pending'); sessionStorage.removeItem('agent-chat:pending');
-        setPending(null); setDraft(value.text); setFiles(value.attachments ?? []);
+        setPending(null); setDraft(value.draftText ?? value.text); setFiles(value.attachments ?? []);
         setError(`${failure.message} Message was not admitted. Edit it or choose another conversation.`);
       } else {
         setPending(value);
@@ -210,7 +219,20 @@ export default function App() {
         const chat = await api<Chat>('/api/chats', { agent, key: crypto.randomUUID() });
         id = chat.id; setSelected(id); setChats(current => [chat, ...current]);
       }
-      await deliver({ chatId: id, text: draft, requestId, attachments: files });
+      const chatId = id;
+      const submit = async () => {
+        let text = draft;
+        if (link?.has('key')) {
+          const current = await api<Snapshot>(route(chatId));
+          if (!current.messages.some(message => message.provenance === 'user'))
+            text = `About this Attention item: ${link.get('title')}\n${link.get('context') ?? ''}\n\n${draft}`;
+        }
+        await deliver({ chatId, text, draftText: draft, requestId, attachments: files });
+      };
+      // Serialize native first-message observation/admission across this origin's tabs.
+      // The retained payload, not this composition step, is used for uncertain retries.
+      if (link?.has('key')) await navigator.locks.request(`dispatch-web:first-message:${chatId}`, submit);
+      else await submit();
     } catch (failure) { setError((failure as Error).message); }
     finally { setSending(false); setSendCompleted(value => value + 1); }
   }
@@ -270,6 +292,7 @@ export default function App() {
         <ConversationScrollButton aria-label="Scroll to latest message"/>
       </Conversation>
       <div className="composer-region">
+        {link?.has('key') && link.get('context') && <aside className="link-context" aria-label="Item context"><strong>Item context · included with your first message</strong><p>{link.get('context')}</p></aside>}
         <div className="activity" role="status"><span>{(busy ? activity : turnOutcome) || activity || (selected ? connection === 'Connected' ? <><Check size={12}/> Saved</> : connection : '')}{snapshot?.queued ? ` · ${snapshot.queued} pending` : ''}</span>{busy && <Button variant="outline" size="sm" disabled={stopping} onClick={() => void stop()}><Square size={12}/>{stopping ? 'Stopping…' : 'Stop this conversation'}</Button>}</div>
         {linkError && <div className="error-banner" role="alert"><p>{linkError}</p><Button variant="outline" size="sm" onClick={() => setLink(new URLSearchParams(link!))}>Retry link</Button></div>}
         {stopNotice?.id === selected && <p className="pending-note" role="status">{stopNotice.text}</p>}
