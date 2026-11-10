@@ -19,12 +19,12 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
   const source = sources.find(source => source.id === config.sourceId);
   if (!source) throw new Error("service.sourceId must select a configured source.");
   const root = await realpath(config.stateRoot);
-  const session = relative(await realpath(source.path), root);
-  if (!session || session === ".." || session.startsWith("../") || isAbsolute(session))
-    throw new Error("service.stateRoot must be a native session directory within its configured source.");
+  const session = relative(await realpath(source.path), root) || ".";
+  if (session === ".." || session.startsWith("../") || isAbsolute(session))
+    throw new Error("service.stateRoot must be a native session directory at or within its configured source.");
   const stores = createStores({ sources }, reader);
   const idFor = (chat: Chat) => identity(join(root, chat.agent, "session.sqlite"), chat.conversationId);
-  const project = (chat: Chat): Chat => ({ ...chat, id: idFor(chat), source: source.id, sourceLabel: source.label, session,
+  const project = (chat: Chat): Chat => ({ ...chat, capabilities: config.capabilities, id: idFor(chat), source: source.id, sourceLabel: source.label, session,
     ...(chat.parentId ? { parentId: identity(join(root, chat.agent, "session.sqlite"), Number(chat.parentId.split(":").at(-1))) } : {}) });
   let connected: Runtime | undefined;
   let connecting: Promise<Runtime> | undefined;
@@ -65,7 +65,10 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
       const native = nativeId(id, await runtime.service.list());
       return native ? runtime.presentation.snapshot(native) : undefined;
     });
-    if (!value) return stores.snapshot(id);
+    if (!value) {
+      const saved = await stores.snapshot(id);
+      return { ...saved, chat: { ...saved.chat, capabilities: config.capabilities } };
+    }
     // Older owners may omit optional turn projections. Read the same native
     // records without resuming them; never derive cancellation from idle state.
     const turns = value.turns ?? (await stores.snapshot(id)).turns;
@@ -74,6 +77,11 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
   const catalog = async () => await read(runtime => runtime.catalog?.() ?? Promise.resolve(runtime.service.agents)) ?? [];
   const agents = await catalog();
   return {
+    resolveChat: async id => {
+      const chat = (await chats()).find(chat => chat.id === id);
+      if (!chat) throw new AdmissionError("Linked conversation is unavailable in this installation.");
+      return project(chat);
+    },
     stateRoot: root,
     service: {
       // Catalogs are loaded afresh by the service client, not authored by Web.
@@ -83,7 +91,7 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
         return (await stores.statuses()).map(status => status.id === source.id && issue ? { ...status, issues: [...status.issues, issue] } : status);
       },
       async list() {
-        const all = new Map((await stores.list()).map(chat => [chat.id, chat]));
+        const all = new Map<string, Chat>((await stores.list()).map(chat => [chat.id, { ...chat, capabilities: config.capabilities }]));
         for (const chat of await chats()) { const value = project(chat); all.set(value.id, value); }
         return [...all.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       },
@@ -97,6 +105,7 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
       submit: (id, text, requestId, _mode, source, files) => mutate(async runtime => runtime.service.submit(await owned(runtime, id), text, requestId, "steer", source, files)),
       stop: id => mutate(async runtime => runtime.service.stop(await owned(runtime, id))),
       async artifact(id, artifactId) {
+        if (config.capabilities?.artifacts === false) throw new AdmissionError("This installation does not support artifacts.");
         const value = await read(async runtime => {
           const native = nativeId(id, await runtime.service.list());
           return native ? runtime.service.artifact(native, artifactId) : undefined;

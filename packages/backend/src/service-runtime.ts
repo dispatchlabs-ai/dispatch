@@ -4,14 +4,21 @@ import type { ServiceCommand, ServiceResults, ServiceExpectation } from "@dispat
 import type { Chat as NativeChat } from "@dispatch/runner";
 import { AdmissionError } from "./config.js";
 import type { Runtime } from "./runtime.js";
-import type { Chat, Snapshot } from "./contracts.js";
+import type { Capabilities, Chat, Snapshot } from "./contracts.js";
 
-export interface ServiceConnection { socket: string; sourceId?: string; label?: string; expectedStateRoot?: string; expectedIdentity?: string }
+export interface ServiceConnection { socket: string; sourceId?: string; label?: string; expectedStateRoot?: string; expectedIdentity?: string; capabilities?: Capabilities }
 
 /** Connect to the authorized local native owner; closing this client never stops it. */
 export async function openServiceRuntime(config: ServiceConnection): Promise<Runtime> {
   if (!config || typeof config.socket !== "string" || !isAbsolute(config.socket))
     throw new Error("Provide an absolute service.socket in trusted installation configuration.");
+  const capabilities = config.capabilities;
+  if (capabilities && (typeof capabilities !== "object" || Object.entries(capabilities).some(([key, value]) =>
+    !["create", "attachments", "artifacts"].includes(key) || typeof value !== "boolean")))
+    throw new Error("Service capabilities must contain boolean create, attachments or artifacts fields.");
+  const requireCapability = (key: keyof Capabilities) => {
+    if (capabilities?.[key] === false) throw new AdmissionError(`This installation does not support ${key}.`);
+  };
   const source = config.sourceId ?? "service", label = config.label ?? "Native service";
   let closed = false;
   const watches = new Set<() => Promise<void>>();
@@ -33,8 +40,9 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
   if (!expected) expected = metadata.identity !== undefined ? { identity: metadata.identity }
     : metadata.stateRoot !== undefined ? { stateRoot: metadata.stateRoot } : undefined;
   if (!expected) throw new Error("The service must expose a stable stateRoot or installation identity for safe client binding.");
-  const agents = await call({ method: "agents" });
-  const project = (chat: NativeChat): Chat => ({ ...chat, source, sourceLabel: label });
+  const catalog = async () => (await call({ method: "agents" })).map(agent => ({ ...agent, capabilities }));
+  const agents = await catalog();
+  const project = (chat: NativeChat): Chat => ({ ...chat, source, sourceLabel: label, capabilities });
   const snapshot = async (id: string): Promise<Snapshot> => {
     const value = await call({ method: "snapshot", id });
     return { ...value, chat: project(value.chat), messages: value.messages.map(message => ({ ...message,
@@ -42,19 +50,30 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
   };
   return {
     stateRoot: metadata.stateRoot ?? config.socket,
-    catalog: () => call({ method: "agents" }),
+    catalog,
+    resolveChat: async (id, installation) => {
+      if (installation !== undefined) throw new AdmissionError("Native conversation links require a named installation binding.");
+      const chat = (await call({ method: "chats" })).find(chat => chat.id === id);
+      if (!chat) throw new AdmissionError("Linked conversation is unavailable in this installation.");
+      return project(chat);
+    },
     service: {
       agents,
       sources: async () => [{ id: source, label, path: config.socket, issues: [] }],
       list: async () => (await call({ method: "chats" })).map(project),
       has: async id => (await call({ method: "chats" })).some(chat => chat.id === id),
       create: async (agent, transport, key, sourceId = source) => {
+        requireCapability("create");
         if (sourceId !== source) throw new AdmissionError("Choose this service's configured source.");
         return project(await call({ method: "create", agent, source: transport, key }));
       },
-      submit: (id, text, requestId, _mode, transport, files = []) => call({ method: "send", id, text, requestId, mode: "steer", source: transport, files }),
+      submit: async (id, text, requestId, _mode, transport, files = []) => {
+        if (files.length) requireCapability("attachments");
+        return call({ method: "send", id, text, requestId, mode: "steer", source: transport, files });
+      },
       stop: async id => { await call({ method: "stop", id }); },
       artifact: async (id, artifactId) => {
+        requireCapability("artifacts");
         const value = await call({ method: "artifact", id, artifactId });
         return { artifact: value.artifact, bytes: Buffer.from(value.dataBase64, "base64") };
       },

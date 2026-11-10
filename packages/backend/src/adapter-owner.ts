@@ -12,6 +12,10 @@ port.on("message", async ({ id, method, args }) => {
   try {
     let result;
     if (method === "agents") result = await (runtime.catalog?.() ?? Promise.resolve(runtime.service.agents));
+    else if (method === "resolveChat") {
+      if (!runtime.resolveChat) throw new Error("This installation does not support native conversation links.");
+      result = await runtime.resolveChat(args[0]);
+    }
     else if (method === "snapshot") result = await runtime.presentation.snapshot(...args as [string]);
     else if (method === "close") await runtime.close();
     else if (method === "has" && !runtime.service.has) result = (await runtime.service.list()).some(chat => chat.id === args[0]);

@@ -37,8 +37,9 @@ that session. Visit `/login` while signed in to open the sign-out control.
 The server uses `Referrer-Policy: same-origin` so native form POSTs retain the
 exact Origin required by the existing protections; proxies must preserve that
 policy. Login requires the exact Origin and form encoding, with a small bounded
-credential body and six attempts/minute across the single participant. No return
-URL is accepted. Sessions do not transfer drafts or native state, and sign-out
+credential body and six attempts/minute across the single participant. Only an
+app-shell conversation link is accepted as a return destination; arbitrary return
+URLs are not accepted. Sessions do not transfer drafts or native state, and sign-out
 does not clear browser drafts or stop agent work.
 
 For non-browser clients that explicitly support HTTP Basic, the optional
@@ -110,3 +111,20 @@ synthetic provider on Apple Silicon. Matching Linux OCI build/install, real host
 authorization adapters and external provider/tool execution require separate
 consumer qualification. Existing dependency audit findings remain in the private
 task report; a passing build is not a security review.
+
+## Open a conversation link
+
+Use `https://chat.example.com/?installation=studio&chat=helper%3A42` with the
+exact configured installation name and URL-encoded native chat ID. Sign-in with
+the shipped session module retains these fields through success or a rejected
+password. An unavailable installation/conversation shows an explicit error and
+Retry link, never a replacement conversation. Links only observe: opening,
+reloading or reconnecting never creates work or resends a message. Reply uses the
+existing native conversation and request identity. Unsupported custom runtime
+adapters report an explicit link error.
+
+A pending uncertain outbox takes priority; resolve it before opening a different
+linked conversation. Existing draft text/files are retained. Selecting a sidebar
+conversation leaves the link and resumes ordinary selection behavior. A service
+configured without creation hides New conversation and is excluded from the new
+conversation agent picker; existing histories/replies and Stop remain available.

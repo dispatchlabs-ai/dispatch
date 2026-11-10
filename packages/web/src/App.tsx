@@ -25,6 +25,12 @@ const sessionName = (chat: Chat, chats: Chat[]) => {
 };
 const route = (id: string) => `/api/chats/${encodeURIComponent(id)}`;
 export default function App() {
+  const [link, setLink] = useState(() => {
+    const query = new URLSearchParams(location.search);
+    return query.has('installation') || query.has('chat') ? query : null;
+  });
+  const [linkReady, setLinkReady] = useState(false);
+  const [linkError, setLinkError] = useState('');
   const [filter, setFilter] = useState('');
   const [readingFiles, setReadingFiles] = useState(false);
   const [files, setFiles] = useState<AttachmentFile[]>([]);
@@ -34,7 +40,7 @@ export default function App() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
   const [agent, setAgent] = useState('');
-  const [selected, setSelected] = useState<string | null>(() => localStorage.getItem('dispatch-web:selected') ?? localStorage.getItem('agent-chat:selected'));
+  const [selected, setSelected] = useState<string | null>(() => link ? null : localStorage.getItem('dispatch-web:selected') ?? localStorage.getItem('agent-chat:selected'));
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [connection, setConnection] = useState('Connecting…');
   const [error, setError] = useState('');
@@ -49,6 +55,19 @@ export default function App() {
   });
   useEffect(() => { void loadDelivery().then(value => {if(value){setDraft(value.text);setFiles(value.attachments);setPending(value.pending);if(value.pending)setSelected(value.pending.chatId);}setDeliveryReady(true);}).catch(() => setError('Local draft storage unavailable. Sending is disabled to preserve recovery.')); }, []);
   useEffect(() => { if(deliveryReady) void saveDelivery({text:draft, attachments:files, pending}).catch(() => {setDeliveryReady(false);setError('Cannot retain draft/files locally. Free browser storage before sending.');}); }, [draft, files, pending, deliveryReady]);
+  useEffect(() => {
+    if (!link || !deliveryReady) return;
+    let active = true;
+    setLinkReady(false); setLinkError('');
+    void api<Chat>(`/api/chat-link?${link}`).then(chat => {
+      if (!active) return;
+      if (pending && pending.chatId !== chat.id) {
+        setLinkError('Resolve the pending message before opening this conversation link.');
+      } else setSelected(chat.id);
+      setLinkReady(true);
+    }).catch(failure => { if (active) { setLinkError(`Conversation link unavailable. ${(failure as Error).message}`); setLinkReady(true); } });
+    return () => { active = false; };
+  }, [link, deliveryReady, pending]);
   async function selectFiles(list: FileList | null) {
     if (!list) return;
     setReadingFiles(true);
@@ -117,12 +136,12 @@ export default function App() {
       const [available, history, configured] = await Promise.all([api<Agent[]>('/api/agents'), api<Chat[]>('/api/chats'), api<SourceStatus[]>('/api/sources')]);
       setSources(configured);
       setAgents(available); setChats(history); setReady(true);
-      setAgent(current => available.some(a => a.id === current) ? current : available[0]?.id ?? '');
+      setAgent(current => available.some(a => a.id === current) ? current : available.find(a => a.capabilities?.create !== false)?.id ?? available[0]?.id ?? '');
     } catch (failure) { setError((failure as Error).message); }
   }, []);
   useEffect(() => { void refresh(); const timer = setInterval(() => void refresh(), 15000); return () => clearInterval(timer); }, [refresh]);
   useEffect(() => {
-    if (!selected) { localStorage.removeItem('dispatch-web:selected'); localStorage.removeItem('agent-chat:selected'); setSnapshot(null); setConnection(''); return; }
+    if (!selected) { if (link) { setSnapshot(null); setConnection(''); return; } localStorage.removeItem('dispatch-web:selected'); localStorage.removeItem('agent-chat:selected'); setSnapshot(null); setConnection(''); return; }
     localStorage.setItem('dispatch-web:selected', selected); setSnapshot(null); setConnection('Connecting…');
     let active = true;
     const events = new EventSource(`${route(selected)}/events`);
@@ -137,7 +156,7 @@ export default function App() {
     // A missing saved selection is actionable; EventSource does not expose HTTP errors.
     void api<Snapshot>(route(selected)).catch(failure => { if (active) setError((failure as Error).message); });
     return () => { active = false; events.close(); };
-  }, [selected]);
+  }, [selected, link]);
   async function deliver(value: Pending) {
     // Existing pending state is already uncertain. Never discard its identity on
     // a later ownership/validation rejection: an earlier owner may have admitted.
@@ -164,7 +183,7 @@ export default function App() {
     finally { setSending(false); }
   }
   async function send() {
-    if (sending || (!draft.trim() && !files.length) || pending || !deliveryReady || readingFiles) return;
+    if (linkBlocked || selected && !snapshot || !selected && !canCreate || sending || (!draft.trim() && !files.length) || pending || !deliveryReady || readingFiles) return;
     returnFocus.current = document.activeElement === composer.current;
     setSending(true); setError('');
     try {
@@ -185,9 +204,13 @@ export default function App() {
     catch (failure) { setError((failure as Error).message); }
     finally { setStopping(false); }
   }
-  function choose(id: string | null) { setSelected(id); setError(''); setNavigation(false); composer.current?.focus(); }
+  function choose(id: string | null) { history.replaceState(null, '', location.pathname); setLink(null); setLinkError(''); setSelected(id); setError(''); setNavigation(false); composer.current?.focus(); }
+  const selectedChat = snapshot?.chat ?? chats.find(chat => chat.id === selected);
+  const canCreate = (selectedChat ?? agents.find(item => item.id === agent))?.capabilities?.create !== false;
+  const canAttach = (selectedChat ?? agents.find(item => item.id === agent))?.capabilities?.attachments !== false;
+  const linkBlocked = !!link && (!linkReady || !!linkError);
   const busy = !!snapshot && (snapshot.running || snapshot.background || snapshot.queued > 0 || snapshot.tools.length > 0);
-  const title = snapshot?.chat.title ?? chats.find(chat => chat.id === selected)?.title ?? 'New conversation';
+  const title = snapshot?.chat.title ?? chats.find(chat => chat.id === selected)?.title ?? (link ? 'Linked conversation' : 'New conversation');
   const lastTurn = snapshot?.turns?.at(-1);
   const turnOutcome = lastTurn?.status === 'unanswered' ? lastTurn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${lastTurn.reason})` : lastTurn?.status === 'done' ? 'Turn completed' : '';
   const activity = snapshot?.observation ?? (snapshot?.retry ? `Retry ${snapshot.retry.attempt} scheduled for ${new Date(snapshot.retry.at).toLocaleTimeString()}` : snapshot?.tools.length ? `Using ${snapshot.tools.join(', ')}` : snapshot?.background ? 'Working in the background' : snapshot?.running ? 'Replying…' : snapshot?.queued ? 'Input pending' : '');
@@ -195,7 +218,7 @@ export default function App() {
     {navigation && <button className="nav-scrim" aria-label="Close conversation navigation" onClick={() => setNavigation(false)}/>}
     <aside ref={sidebar} inert={narrow && !navigation} className={navigation ? 'sidebar open' : 'sidebar'} aria-label="Conversations">
       <div className="sidebar-heading"><strong>Web</strong><Button variant="ghost" size="icon" className="mobile-only" aria-label="Close navigation" onClick={() => setNavigation(false)}><X/></Button></div>
-      <Button variant="outline" className="new-chat" disabled={sending || !!pending} onClick={() => choose(null)}><Plus/> New conversation</Button>
+      {ready && canCreate && !linkBlocked && <Button variant="outline" className="new-chat" disabled={sending || !!pending} onClick={() => choose(null)}><Plus/> New conversation</Button>}
       <label className="history-search"><Search size={14}/><input aria-label="Search conversations" placeholder="Search conversations" value={filter} onChange={event=>setFilter(event.target.value)}/></label><nav aria-label="Saved conversations" data-slot="sidebar-content">
         {!ready && <p className="nav-note">Loading conversations…</p>}
         {ready && !chats.length && <p className="nav-note">Your conversations will appear here.</p>}
@@ -205,12 +228,13 @@ export default function App() {
     </aside>
     <main inert={narrow && navigation}>
       <header><Button aria-expanded={navigation} variant="ghost" size="icon" className="mobile-only" aria-label="Open conversations" onClick={() => setNavigation(true)}><Menu/></Button><h1 title={title}>{title}</h1><span className="agent-name">{selected ? agentName(snapshot?.chat.agent ?? agent) : 'Local'}</span></header>
-      {!selected && <div className="agent-picker"><label htmlFor="agent">Agent</label><select id="agent" value={agent} disabled={!ready || sending} onChange={event => setAgent(event.target.value)}>{agents.map(item => <option key={item.id} value={item.id}>{agentName(item.id)} · {installationName(item.id)}</option>)}</select><p>{agents.find(item => item.id === agent)?.description}</p></div>}
+      {!selected && !link && <div className="agent-picker"><label htmlFor="agent">Agent</label><select id="agent" value={agent} disabled={!ready || sending} onChange={event => setAgent(event.target.value)}>{agents.filter(item => item.capabilities?.create !== false).map(item => <option key={item.id} value={item.id}>{agentName(item.id)} · {installationName(item.id)}</option>)}</select><p>{agents.find(item => item.id === agent)?.description}</p></div>}
       <Conversation key={selected ?? 'new'} className="conversation" aria-label="Message history" aria-busy={snapshot?.running ?? false}>
         <ConversationContent className="message-list">
-          {(!selected || snapshot && !snapshot.messages.length && !snapshot.partial) && <ConversationEmptyState title={`Message ${agentName(snapshot?.chat.agent ?? agent) || 'an agent'}`} description=""/>}
+          {(!selected && !link || snapshot && !snapshot.messages.length && !snapshot.partial) && <ConversationEmptyState title={`Message ${agentName(snapshot?.chat.agent ?? agent) || 'an agent'}`} description=""/>}
+          {link && !linkReady && <p className="empty-loading">Opening linked conversation…</p>}
           {selected && !snapshot && <p className="empty-loading">{connection}</p>}
-          {snapshot?.messages.filter(message => message.provenance !== 'runtime').map(message => <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.provenance === 'user'}><Message align={message.provenance === 'user' ? 'end' : 'start'}><MessageContent><span className="message-author">{message.provenance === 'user' ? 'You' : message.author ?? agentName(snapshot.chat.agent)}{message.background ? ' · background' : ''}</span><Bubble align={message.provenance === 'user' ? 'end' : 'start'} variant={message.provenance === 'user' ? 'muted' : 'ghost'}><BubbleContent>{message.commentary && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{snapshot.turns?.filter(turn => turn.status === 'unanswered' && String(turn.entryId) === message.id.split(':')[0]).map(turn => <p key={turn.submissionId} className="pending-note">{turn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${turn.reason})`}</p>)}{message.attachments?.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt={file.name} src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle><a download={file.name} href={`data:${file.mimeType || 'text/plain'};base64,${file.data}`}>{file.name}</a></AttachmentTitle></AttachmentContent></Attachment>)}{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</BubbleContent></Bubble></MessageContent></Message><ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.afterMessageId===message.id)}/></MessageScrollerItem>)}
+          {snapshot?.messages.filter(message => message.provenance !== 'runtime').map(message => <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.provenance === 'user'}><Message align={message.provenance === 'user' ? 'end' : 'start'}><MessageContent><span className="message-author">{message.provenance === 'user' ? 'You' : message.author ?? agentName(snapshot.chat.agent)}{message.background ? ' · background' : ''}</span><Bubble align={message.provenance === 'user' ? 'end' : 'start'} variant={message.provenance === 'user' ? 'muted' : 'ghost'}><BubbleContent>{message.commentary && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{snapshot.turns?.filter(turn => turn.status === 'unanswered' && String(turn.entryId) === message.id.split(':')[0]).map(turn => <p key={turn.submissionId} className="pending-note">{turn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${turn.reason})`}</p>)}{message.attachments?.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt={file.name} src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle><a download={file.name} href={`data:${file.mimeType || 'text/plain'};base64,${file.data}`}>{file.name}</a></AttachmentTitle></AttachmentContent></Attachment>)}{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => snapshot.chat.capabilities?.artifacts === false ? <span key={artifact.id} className="artifact-link">{artifact.name} · Download unavailable</span> : <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</BubbleContent></Bubble></MessageContent></Message><ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.afterMessageId===message.id)}/></MessageScrollerItem>)}
           {snapshot && <ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>!snapshot.messages.some(message=>message.id===call.afterMessageId && message.provenance!=='runtime'))}/>}
 
           {snapshot?.partial && <Message align="start"><span className="message-author">{agentName(snapshot.chat.agent)}</span><MessageContent><MessageResponse>{snapshot.partial}</MessageResponse></MessageContent></Message>}
@@ -219,14 +243,15 @@ export default function App() {
       </Conversation>
       <div className="composer-region">
         <div className="activity" role="status"><span>{(busy ? activity : turnOutcome) || activity || (selected ? connection === 'Connected' ? <><Check size={12}/> Saved</> : connection : '')}{snapshot?.queued ? ` · ${snapshot.queued} pending` : ''}</span>{busy && <Button variant="outline" size="sm" disabled={stopping} onClick={() => void stop()}><Square size={12}/>{stopping ? 'Stopping…' : 'Stop this conversation'}</Button>}</div>
+        {linkError && <div className="error-banner" role="alert"><p>{linkError}</p><Button variant="outline" size="sm" onClick={() => setLink(new URLSearchParams(link!))}>Retry link</Button></div>}
         {stopNotice?.id === selected && <p className="pending-note" role="status">{stopNotice.text}</p>}
         {snapshot?.readOnlyReason && <p className="pending-note" role="status">{snapshot.readOnlyReason}</p>}
         {(error || snapshot?.error) && <div className="error-banner" role="alert"><p>{error || snapshot?.error}</p>{!ready && <Button variant="outline" size="sm" onClick={() => { setError(''); void refresh(); }}>Reconnect</Button>}{pending && <Button size="sm" disabled={sending} onClick={() => void deliver(pending)}>Retry message</Button>}<Button variant="ghost" size="icon" aria-label="Dismiss error" onClick={() => setError('')}><X/></Button></div>}
         {pending && <div className="pending-note">Message delivery is uncertain. Your text and files are preserved. <Button variant="outline" size="sm" disabled={sending} onClick={() => { setSelected(pending.chatId); void deliver(pending); }}>Retry message</Button></div>}
         <form className="composer" onSubmit={event => { event.preventDefault(); void send(); }}><InputGroup>
           {!!files.length && <InputGroupAddon align="block-start" className="attachment-list">{files.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt="" src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle>{file.name}</AttachmentTitle></AttachmentContent><Button type="button" variant="ghost" size="icon-xs" aria-label={`Remove ${file.name}`} disabled={sending || !!pending} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}><X/></Button></Attachment>)}</InputGroupAddon>}
-          <InputGroupTextarea ref={composer} aria-label="Message" placeholder={busy ? 'Steer active work…' : `Message ${agentName(agent) || 'agent'}…`} rows={2} value={draft} disabled={sending || !!pending || !deliveryReady} onChange={event => {const text=event.target.value;setDraft(text);void saveDelivery({text,attachments:files,pending}).catch(()=>setDeliveryReady(false));}} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) { event.preventDefault(); void send(); } }}/>
-          <InputGroupAddon align="block-end"><input hidden ref={fileInput} type="file" multiple aria-label="Select attachments" onChange={event=>void selectFiles(event.target.files)}/><InputGroupButton size="icon-sm" variant="ghost" className="rounded-full" aria-label="Attach files" disabled={sending || !!pending || !deliveryReady} onClick={()=>fileInput.current?.click()}><Paperclip/></InputGroupButton><span className="input-note">{readingFiles ? 'Reading files…' : busy ? 'Steer' : 'Agents'}</span><InputGroupButton type="submit" size="icon-sm" variant="default" className="send-button rounded-full" aria-label={sending ? 'Sending message' : 'Send message'} disabled={(!draft.trim() && !files.length) || sending || !ready || !!pending || !deliveryReady || readingFiles}>{sending ? <LoaderCircle className="animate-spin"/> : <ArrowUp/>}</InputGroupButton></InputGroupAddon>
+          <InputGroupTextarea ref={composer} aria-label="Message" placeholder={busy ? 'Steer active work…' : `Message ${agentName(agent) || 'agent'}…`} rows={2} value={draft} disabled={sending || !!pending || !deliveryReady || linkBlocked || !!selected && !snapshot} onChange={event => {const text=event.target.value;setDraft(text);void saveDelivery({text,attachments:files,pending}).catch(()=>setDeliveryReady(false));}} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) { event.preventDefault(); void send(); } }}/>
+          <InputGroupAddon align="block-end"><input hidden ref={fileInput} type="file" multiple aria-label="Select attachments" onChange={event=>void selectFiles(event.target.files)}/><InputGroupButton size="icon-sm" variant="ghost" className="rounded-full" aria-label="Attach files" disabled={sending || !!pending || !deliveryReady || !canAttach || linkBlocked} onClick={()=>fileInput.current?.click()}><Paperclip/></InputGroupButton><span className="input-note">{readingFiles ? 'Reading files…' : busy ? 'Steer' : 'Agents'}</span><InputGroupButton type="submit" size="icon-sm" variant="default" className="send-button rounded-full" aria-label={sending ? 'Sending message' : 'Send message'} disabled={(!draft.trim() && !files.length) || sending || !ready || !!pending || !deliveryReady || readingFiles || linkBlocked || !!selected && !snapshot || !selected && !canCreate}>{sending ? <LoaderCircle className="animate-spin"/> : <ArrowUp/>}</InputGroupButton></InputGroupAddon>
         </InputGroup></form>
         <p className="composer-hint">Enter to send · Shift+Enter for a new line{busy ? ' · Messages steer at the next tool boundary' : ''}</p>
       </div>

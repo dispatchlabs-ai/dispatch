@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import type { HostModelsConfig } from "@dispatch/runner/host-models";
 import type { ServicePolicy } from "@dispatch/runner/settings";
-export interface Source { id: string; label: string; path: string; installation?: string }
+export interface Source { id: string; label: string; path: string; installation?: string; exclude?: string[] }
 export interface LocalConfig {
   /** Optional pre-existing service alongside discoverable ordinary sessions. */
   service?: import("./shared-history.js").SharedHistoryConnection;
@@ -43,7 +43,7 @@ export async function readConfig(): Promise<Config> {
     return value;
   }
   if (!value || !Array.isArray(value.sources) || !value.sources.length || value.sources.some(source =>
-    !source || !identifier(source.id) || typeof source.label !== "string" || !source.label.trim() || !absolute(source.path)) ||
+    !source || !identifier(source.id) || typeof source.label !== "string" || !source.label.trim() || !absolute(source.path) || source.exclude !== undefined && (!Array.isArray(source.exclude) || source.exclude.some(path => !absolute(path)))) ||
     new Set(value.sources.map(source => source.id)).size !== value.sources.length ||
     !value.sources.some(source => source.id === value.defaultSource))
     throw new Error("Provide unique sources [{id,label,path}] with absolute paths and matching defaultSource.");
