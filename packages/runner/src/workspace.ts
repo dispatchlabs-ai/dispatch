@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { posix } from "node:path";
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 import {
   ExecutionError, FileError, LineScanner, err, ok,
   type BinaryReader, type DirReader, type ExecutionEnv, type FileInfo, type Result,

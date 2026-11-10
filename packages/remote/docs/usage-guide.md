@@ -2,7 +2,7 @@
 
 Use Node 24 on both machines. Build and install the runner and remote packages
 from the same Dispatch source revision. Keep deployment credentials and live
-state outside the source tree. Source builds require Pi 1.5.0 on both ends; stop
+state outside the source tree. Source builds require Pi 1.5.2 on both ends; stop
 owners and retain complete closed backups before upgrading. Do not mix the old
 flat-commit client with the grouped-commit service. See the
 [compatibility contract](spec.md#pi-15-compatibility).

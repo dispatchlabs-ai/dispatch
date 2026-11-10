@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Align shared Pi dependencies with Runner at 1.5.2 for native Fable 5.2 support; existing installations remain pinned.
+
 ## [0.7.0] - 2026-11-09
 
 - Pin patched Zod 4.6.6; shared Backend no longer depends on unused Zod.

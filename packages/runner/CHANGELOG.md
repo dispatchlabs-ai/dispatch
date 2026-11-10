@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Always steer active work for ordinary user chat input at native boundaries; keep internal peer/schedule policies and explicit Stop unchanged.
+- Use released Pi 1.5.2 for native Claude Fable 5.2 metadata, thinking levels and pricing. Preserve the Claude Code provider source pin, existing release pins and native session state; live discovery selects the current Fable model. Move Chord foundation types to their public subpaths.
 
 - Make ordinary CLI sessions detached shared owners in their exact native state; discover safely, preserve native receipt/drain/history/replay, and recover existing work without another prompt.
 - Project native input/continue submission lifecycle in live and retained chat snapshots, distinguishing stopped turns from tool or request narration.

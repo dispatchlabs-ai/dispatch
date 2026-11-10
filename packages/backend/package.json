@@ -44,11 +44,11 @@
     "@dispatch/runner": "0.7.0",
     "@dispatch/remote": "0.7.0",
     "@dispatch/postgres": "0.7.0",
-    "@earendil-works/pi-ai": "1.5.0",
+    "@earendil-works/pi-ai": "1.5.2",
     "proper-lockfile": "4.1.2",
     "ws": "8.22.0",
-    "@earendil-works/chord": "1.5.0",
-    "@earendil-works/pi-durable": "1.5.0"
+    "@earendil-works/chord": "1.5.2",
+    "@earendil-works/pi-durable": "1.5.2"
   },
   "devDependencies": {
     "@types/node": "24.19.1",

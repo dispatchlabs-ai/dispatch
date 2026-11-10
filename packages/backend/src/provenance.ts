@@ -1,7 +1,7 @@
 import type { Snapshot } from "./contracts.js";
 import type { ChatSnapshot } from "@dispatch/runner";
 import type { Cursor } from "@earendil-works/pi-durable";
-import type { Context } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
 
 export interface NativeEntry {
   id: number;

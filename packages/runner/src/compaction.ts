@@ -137,7 +137,8 @@ export function compactionExtension(namespace: string, host: () => Harness) {
         // Split children carry the same pinned selection. Merge only a smaller
         // source, so another split/merge cannot repeat the original workload.
         const first = await runtime.getTask(task.state.checkpoint.children[0], ctx);
-        const selection = (first!.input as Input).selection!;
+        // This child was created from Summary above; getTask erases its input type.
+        const selection = (first!.input as unknown as Input).selection!;
         await runtime.commit(async tx => {
           const child = await tx.createTask(Summary, { ...task.input, source, selection }, { ownership: { kind: "task", taskId: runtime.taskId } });
           return { status: "waiting", on: [child], policy: "allSettled", checkpoint: { phase: "merge", child } };

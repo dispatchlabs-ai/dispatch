@@ -1,6 +1,6 @@
 # Postgres
 
-A service-only implementation of Pi Durable **1.5.0 public Storage**. Native
+A service-only implementation of Pi Durable **1.5.2 public Storage**. Native
 conversation/task/entry/document/submission records remain authoritative. No Web
 company/project schema. [Runnable composition](../../examples/chat/README.md).
 

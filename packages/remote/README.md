@@ -1,6 +1,6 @@
 # Dispatch Remote
 
-Optional remote SQLite storage for stock Pi Durable 1.5.0 and the standalone
+Optional remote SQLite storage for stock Pi Durable 1.5.2 and the standalone
 Dispatch Runner. A runner executes models and tools on its host while an
 outbound-connected storage service owns the SQLite files on another host.
 An application supplies pairing, authenticated WebSockets and identity.

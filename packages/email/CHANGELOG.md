@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Align shared Pi dependencies with Runner at 1.5.2 for native Fable 5.2 support; existing installations remain pinned.
+
 ## [0.7.0] - 2026-11-09
 
 - Use Pi 1.5 for native execution and transport integration; upgrade the runner and adapters together. Preserve TypeBox tool schemas through a direct dependency.

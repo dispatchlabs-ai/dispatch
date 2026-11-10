@@ -6,7 +6,7 @@ Agent definitions and their command-line operation remain independent.
 
 ## Host integration
 
-Install this package with `@dispatch/runner`, Pi Durable and Chord 1.5.0. Build
+Install this package with `@dispatch/runner`, Pi Durable and Chord 1.5.2. Build
 from this workspace with `npm ci` and `npm run check`. The host supplies its
 existing model catalog and agent repository:
 

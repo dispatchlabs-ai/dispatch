@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Align shared Pi dependencies with Runner at 1.5.2 for native Fable 5.2 support; existing installations remain pinned.
+
 ## [0.7.0] - 2026-11-09
 
 - Prepare public npm metadata and the complete reusable runtime closure with dependency-order archives and a separately authorized publishing path.

@@ -9,7 +9,7 @@ Storage interface and an explicit isolated execution environment. The optional
 [Fleet package](../fleet/README.md) binds complete runs to replaceable workers.
 
 `@dispatch/runner` runs directory-defined company agents with stock Pi Durable
-1.5.0. It loads trusted definitions, owns each SQLite session, schedules native
+1.5.2. It loads trusted definitions, owns each SQLite session, schedules native
 tasks and exposes persistent shared conversations without a web server.
 
 This is a source-alpha package. Its current 0.6.0 manifest follows the repository
@@ -311,8 +311,8 @@ handoff children; applications with pinned domain configurations use the
 `updateConversation(tx, id, setup)` callback to preserve or migrate their profiles before changing those definitions. Imported tool
 code is not transitively hashed.
 
-Runner source builds now pin Pi 1.5.0, including the terminal UI dependency.
-Remote, Observer and the transport adapters also pin 1.5.0. Web remains on its
+Runner source builds now pin Pi 1.5.2, including the terminal UI dependency.
+Remote, Observer and the transport adapters also pin 1.5.2. Web remains on its
 separate Pi 1.4.0 dependencies; its upgrade is deferred. Custom storage providers
 must implement Pi 1.5 grouped commits before use
 with this runner. Pi 1.5 writes newer native live-document and task versions that

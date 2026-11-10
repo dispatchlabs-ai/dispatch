@@ -1,5 +1,6 @@
 // Adapted from @earendil-works/pi-durable 1.1.0 (MIT); see NOTICE.
-import type { Context, JsonValue } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
+import type { JsonValue } from "@earendil-works/chord/json";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { apply, type Op } from "@earendil-works/chord/delta";
 import { createHash } from "node:crypto";

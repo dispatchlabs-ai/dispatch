@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Always steer active work for ordinary user chat input at native boundaries; keep internal peer/schedule policies and explicit Stop unchanged.
+- Align shared Pi dependencies with Runner at 1.5.2 for native Fable 5.2 support; existing installations remain pinned.
 
 - Retain exact-session service restrictions in combined local bindings, including offline snapshots and artifact reads; accept exact-session source roots consistently.
 

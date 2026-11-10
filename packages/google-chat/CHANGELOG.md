@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Align shared Pi dependencies with Runner at 1.5.2 for native Fable 5.2 support; existing installations remain pinned.
+
 ## [0.7.0] - 2026-11-09
 
 - Carry trusted common-client text/image bytes through existing native admission and delivery; declare explicit background reply transport.
