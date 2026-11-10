@@ -183,9 +183,10 @@ header { border: 0; height: 64px; }
 .sidebar-resizer:focus-visible { outline-offset: -2px; }
 .sidebar-footer > button { margin-left: 8px; text-decoration: underline; }
 
-.link-context { margin-bottom: 10px; padding: 10px 12px; border: 1px solid #e5e5e5; border-radius: 10px; font-size: 12px; }
-.link-context strong { font-weight: 500; }
-.link-context p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 18dvh; overflow-y: auto; }
+.item-context { padding: 14px 16px; border: 1px solid #e5e8e0; border-radius: 12px; background: #f7f8f5; overflow-wrap: anywhere; }
+.item-context h2 { font-size: 15px; font-weight: 600; line-height: 1.4; margin: 0; }
+.item-context p { margin: 6px 0 0; white-space: pre-wrap; line-height: 1.55; }
+.item-context .item-source { font-size: 13px; color: #6c7269; }
 
 /* The visual viewport shrinks for iOS software keyboards without disabling zoom. */
 .app-shell { position: fixed; inset-inline: 0; top: var(--app-top, 0px); }
@@ -201,9 +202,7 @@ header { border: 0; height: 64px; }
   .send-button { width: 40px; height: 40px; }
   .activity { min-height: 0; margin: 3px 0; }
   .message-list { gap: 20px; padding: 16px 14px; }
-  .link-context { margin-bottom: 4px; padding: 6px 10px; }
-  .link-context p { max-height: 12dvh; }
-  [data-streamdown=image-wrapper] button { opacity: 1; }
+  .request-activity { display: none; }
 }
 .request-activity { margin: 6px 0; font-size: 12px; color: #737373; }
 .request-activity > summary { cursor: pointer; width: fit-content; padding: 4px 0; }

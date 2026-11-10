@@ -46,7 +46,9 @@ installation remain consumer qualification; no unrelated deployment claim.
 - Narrow/touch composers use 16px inputs and visual-viewport sizing for software
   keyboards; no zoom disabling. Compact title, messages and reachable Send take
   priority over desktop hints/idle bookkeeping. Request-status-only native calls
-  stay inspectable under Request details without an empty assistant bubble.
+  stay inspectable under Request details on wide pointer layouts, hidden on
+  narrow/touch, without an empty assistant bubble. Keyed item context is
+  conversation content, not a composer banner. No forced-visible hover controls.
 - Streamdown utilities are scanned from the workspace-hoisted dependency for both
   dev and Nix builds. External links use a focus-trapping native dialog, not an
   inline imitation; code/table/image controls retain actual behavior and CSP.

@@ -15,6 +15,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } fro
 import { Attachment, AttachmentMedia, AttachmentContent, AttachmentTitle } from '@/components/ui/attachment';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { ToolTrace } from '@/components/tool-trace';
+import { ItemContext } from '@/components/item-context';
 const agentName = (id: string) => id.includes('~') ? id.split('~').slice(1).join('~') : id;
 const installationName = (id: string) => id.includes('~') ? id.split('~')[0] : 'native';
 const authorAgent = (agent: string, author?: string) => {
@@ -268,6 +269,8 @@ export default function App() {
   const linkBlocked = !!link && (!linkReady || !!linkError);
   const busy = !!snapshot && (snapshot.running || snapshot.background || snapshot.queued > 0 || snapshot.tools.length > 0);
   const title = snapshot?.chat.title ?? chats.find(chat => chat.id === selected)?.title ?? (link ? 'Linked conversation' : 'New conversation');
+  // Before the first message, keyed item context is the conversation's content; afterwards the first message carries it.
+  const itemContext = link?.has('key') && linkReady && !linkError && snapshot && !snapshot.messages.some(message => message.provenance === 'user') && !snapshot.partial ? link.get('context') : null;
   const lastTurn = snapshot?.turns?.at(-1);
   const turnOutcome = lastTurn?.status === 'unanswered' ? lastTurn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${lastTurn.reason})` : '';
   const activity = snapshot?.observation ?? (snapshot?.retry ? `Retry ${snapshot.retry.attempt} scheduled for ${new Date(snapshot.retry.at).toLocaleTimeString()}` : snapshot?.tools.length ? `Using ${snapshot.tools.join(', ')}` : snapshot?.background ? 'Working…' : snapshot?.running ? 'Replying…' : snapshot?.queued ? 'Input pending' : '');
@@ -300,7 +303,8 @@ export default function App() {
       {!selected && !link && <div className="agent-picker"><label htmlFor="agent">Agent</label><select id="agent" value={agent} disabled={!ready || sending} onChange={event => setAgent(event.target.value)}>{agents.filter(item => item.capabilities?.create !== false).map(item => <option key={item.id} value={item.id}>{agentName(item.id)} · {installationName(item.id)}</option>)}</select><p>{agents.find(item => item.id === agent)?.description}</p></div>}
       <Conversation key={selected ?? 'new'} className="conversation" aria-label="Message history" aria-busy={snapshot?.running ?? false}>
         <ConversationContent className="message-list">
-          {(!selected && !link || snapshot && !snapshot.messages.length && !snapshot.partial) && <ConversationEmptyState title={`Message ${agentName(snapshot?.chat.agent ?? agent) || 'an agent'}`} description=""/>}
+          {itemContext && <ItemContext title={link!.get('title') ?? ''} context={itemContext}/>}
+          {(!selected && !link || snapshot && !snapshot.messages.length && !snapshot.partial && !itemContext) && <ConversationEmptyState title={`Message ${agentName(snapshot?.chat.agent ?? agent) || 'an agent'}`} description=""/>}
           {link && !linkReady && <p className="empty-loading">Opening linked conversation…</p>}
           {selected && !snapshot && <p className="empty-loading">{connection}</p>}
           {snapshot?.messages.filter(visibleMessage).map(message => <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.provenance === 'user'}><Message align={message.provenance === 'user' ? 'end' : 'start'}><MessageContent><span className="message-author"><Avatar user={message.provenance === 'user'} identity={authorAgent(snapshot.chat.agent, message.author)} available={avatars}/>{message.provenance === 'user' ? 'You' : message.author ?? agentName(snapshot.chat.agent)}</span><Bubble align={message.provenance === 'user' ? 'end' : 'start'} variant={message.provenance === 'user' ? 'muted' : 'ghost'}><BubbleContent>{message.commentary && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{snapshot.turns?.filter(turn => turn.status === 'unanswered' && String(turn.entryId) === message.id.split(':')[0]).map(turn => <p key={turn.submissionId} className="pending-note">{turn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${turn.reason})`}</p>)}{message.attachments?.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt={file.name} src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle><a download={file.name} href={`data:${file.mimeType || 'text/plain'};base64,${file.data}`}>{file.name}</a></AttachmentTitle></AttachmentContent></Attachment>)}{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => snapshot.chat.capabilities?.artifacts === false ? <span key={artifact.id} className="artifact-link">{artifact.name} · Download unavailable</span> : <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</BubbleContent></Bubble></MessageContent></Message><ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.afterMessageId===message.id && call.name!=='request_status')}/></MessageScrollerItem>)}
@@ -312,7 +316,6 @@ export default function App() {
       </Conversation>
       <div className="composer-region">
         {!!snapshot?.toolCalls?.some(call => call.name === 'request_status') && <details className="request-activity"><summary>Request details</summary><ToolTrace calls={snapshot.toolCalls.filter(call => call.name === 'request_status')}/></details>}
-        {link?.has('key') && link.get('context') && <aside className="link-context" aria-label="Item context"><strong>Item context · included with your first message</strong><p>{link.get('context')}</p></aside>}
         <div className="activity" role="status"><span>{(busy ? activity : turnOutcome) || (selected && connection !== 'Connected' ? connection : '')}{snapshot?.queued ? ` · ${snapshot.queued} pending` : ''}</span>{busy && <Button variant="outline" size="sm" disabled={stopping} onClick={() => void stop()}><Square size={12}/>{stopping ? 'Stopping…' : 'Stop this conversation'}</Button>}</div>
         {linkError && <div className="error-banner" role="alert"><p>{linkError}</p><Button variant="outline" size="sm" onClick={() => setLink(new URLSearchParams(link!))}>Retry link</Button></div>}
         {stopNotice?.id === selected && <p className="pending-note" role="status">{stopNotice.text}</p>}
