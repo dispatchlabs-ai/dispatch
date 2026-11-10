@@ -4,6 +4,10 @@
 
 - Live native sidebar summaries, remembered drag/keyboard resizing, approved consumer avatar bindings and persisted AI presentation titles compatible with existing owners.
 
+- Keep bounded sign-in uploads and password verification outside session-state serialization so reads, logout and stream expiry remain responsive.
+
+- Persist private digest-only hosted sessions across redeploys with 30-day sliding expiry, durable logout and unchanged Strict secure cookies.
+
 - Open keyed item links through sign-in with native idempotent creation and a visible context note; include context only with the first explicit user message, preserving exact uncertain retries.
 
 - Always steer active work for ordinary user chat input at native boundaries; keep internal peer/schedule policies and explicit Stop unchanged.
