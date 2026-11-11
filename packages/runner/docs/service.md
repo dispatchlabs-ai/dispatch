@@ -464,22 +464,32 @@ using `dispatch-service`/`serveService`.
 ### One Pi Durable per state root
 
 `stateRoot/.runtime.json` records the Pi Durable version that owns the
-installation's stores. It only moves forward:
+installation's stores. Every decision about it is made under one lock
+(`.runtime.lock`), by the CLI before it creates or joins a session and by
+`ChatService.open`/`run` when given `runtimeRoot` (`ServiceConfig.runtimeRoot`
+for a supervised service or Web backend that shares the root):
 
-- A launcher or service carrying an **older** Pi Durable refuses to start and
-  opens no store. Roll forward, or restore the state root with the older release.
-- A launcher carrying a **newer** version takes the root over. Before opening
-  anything it closes every live session owner on another version with the
-  owner's normal shutdown (SIGTERM: native work stays pending, nothing is
-  cancelled), and resumes the ones that had unfinished work on itself.
-- `ChatService.open`/`run` enforce the same record when given `runtimeRoot`
-  (`ServiceConfig.runtimeRoot` for a supervised service that shares the root).
+- A runtime carrying an **older** Pi Durable refuses and opens no store. Roll
+  forward, or restore the state root with the older release.
+- Any other runtime first finds every live process of another version that owns
+  stores under the root: processes registered in `.runtime-holders/` and session
+  owners started before holders were recorded. It asks all of them to close with
+  their normal shutdown (SIGTERM: native work stays pending, nothing is
+  cancelled) and waits until **all** are gone. Only then does it record its
+  version and open. If one does not close within a minute, nothing is selected
+  or opened.
+- Session owners that had unfinished work are listed in
+  `.runtime-interrupted.json` and resumed on the selected runtime by the next
+  CLI run, after the takeover has finished.
 
-Two versions therefore never own stores under one root at the same time.
-Closing an owner cannot undo external effects: Pi reruns only replay-safe tools
-and reports an interrupted unsafe call as interrupted. Workspace sessions pin
-their release's runtime; finish or suspend them before installing a release
-with a newer Pi Durable, because the pinned runtime will refuse to open.
+Two guarded versions therefore never own stores under one root at the same
+time, including when they start concurrently. Closing an owner cannot undo
+external effects: Pi reruns only replay-safe tools and reports an interrupted
+unsafe call as interrupted. Releases built before this record existed do not
+check it; do not keep them installed or selected. A current run still closes
+their session owners. Workspace sessions pin their release's runtime; finish or
+suspend them before installing a release with a newer Pi Durable, because the
+pinned runtime will refuse to open.
 
 ### A session follows the selected release
 
@@ -488,9 +498,10 @@ An ordinary session is not tied to the release that created it:
 - Its owner exits after `ownerIdleMinutes` (host JSON, default 60, `0` keeps
   it) without unfinished native work, a waiting client or an admitted command.
   Reads such as a watching Web client do not keep it alive.
-- A run that finds a live owner with a different identity on the same Pi
-  Durable attaches to it while it has unfinished work, and otherwise closes it
-  and starts the selected release.
+- A run that finds a live owner with a different identity replaces it when it
+  has no unfinished work. If it has unfinished work and differs only in
+  definitions, the run attaches to it. If its host configuration differs, the
+  run is refused: that owner is never joined or replaced while it has work.
 - Changed definitions apply when the saved work is idle. While work is
   unfinished the store opens with its stored conversation configuration, the
   work finishes, and the owner exits as soon as it is idle so the next start

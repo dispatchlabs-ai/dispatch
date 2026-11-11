@@ -156,7 +156,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       modelCatalogs.set(service, models);
       if (!options.demo && agents.some(agent => !models.getProvider(agent.model.provider))) throw new Error("Register every agent's provider in the supplied Models catalog.");
       try {
-        if (options.runtimeRoot) await selectRuntime(resolve(options.runtimeRoot));
+        if (options.runtimeRoot) await selectRuntime(resolve(options.runtimeRoot), { hold: true });
         await privateStateDirectory(stateRoot);
         const results = await Promise.allSettled(agents.map(async agent => {
           const calendar = createSchedules(namespace, agent, service, options.resume !== false);

@@ -1,18 +1,16 @@
 import { createHash, randomUUID } from "node:crypto";
-import { execFile, fork } from "node:child_process";
-import { createRequire } from "node:module";
+import { fork } from "node:child_process";
 import { constants } from "node:fs";
-import { open, readdir, readFile, realpath, rename, unlink } from "node:fs/promises";
+import { open, readFile, realpath, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import lockfile from "proper-lockfile";
 import { loadAgent } from "./definition.js";
 import { privateStateDirectory } from "./private-state.js";
 import { serviceRequest, type ServiceMetadata } from "./service.js";
-import { piDurableVersion } from "./runtime-version.js";
 
 export type SessionEndpoint = { version: 1; socket: string; stateRoot: string; identity: string; pid: number;
-  /** Pi Durable loaded by this owner. Absent on owners started before this field existed. */
-  piDurable?: string };
+  /** Pi Durable loaded by this owner, and a digest of its host configuration. Absent on owners started before these existed. */
+  piDurable?: string; host?: string };
 export const sessionEndpointFile = (stateRoot: string) => join(stateRoot, "service-endpoint.json");
 
 /** Observation only. Native SQLite locks, not this file, determine ownership. */
@@ -78,36 +76,6 @@ async function retireOwner(endpoint: SessionEndpoint) {
   throw new Error("The session's owner from an earlier release did not exit within 60 seconds. Nothing was replaced; retry, or inspect its private service.log.");
 }
 
-/** Pi Durable loaded by a live owner. Owners started before endpoints recorded it are
- * resolved from their running module; an unresolvable owner counts as another version. */
-async function ownerPiDurable(endpoint: SessionEndpoint) {
-  if (endpoint.piDurable) return endpoint.piDurable;
-  try {
-    const args = await new Promise<string>((resolve, reject) => execFile("/bin/ps", ["-o", "args=", "-p", String(endpoint.pid)], (error, out) => error ? reject(error) : resolve(out)));
-    const module = args.split(/\s+/).find(part => part.endsWith("/agent-cli.js"));
-    if (!module) return;
-    return (createRequire(module)("@earendil-works/pi-durable/package.json") as { version: string }).version;
-  } catch { return; }
-}
-
-/** Close every live session owner under this installation's state root that runs another
- * (or an unrecorded) Pi Durable, so versions never run side by side. Owners with unfinished
- * work are handed to `resume`, which restarts them on the calling launcher. */
-export async function closeOtherRuntimeOwners(runtimeRoot: string, resume: (session: string) => void | Promise<void>) {
-  const sessions = (await readdir(runtimeRoot, { withFileTypes: true })).filter(entry => entry.isDirectory());
-  await Promise.all(sessions.map(async entry => {
-    const endpoint = await discoverSessionService(join(runtimeRoot, entry.name)).catch(() => undefined);
-    if (!endpoint) return;
-    let unfinished: boolean;
-    // Liveness first: most retained endpoint files belong to owners that already exited.
-    try { unfinished = (await serviceRequest(endpoint.socket, { method: "status" }, { expected: { stateRoot: endpoint.stateRoot, identity: endpoint.identity } })).busy; }
-    catch { return; }
-    if (await ownerPiDurable(endpoint) === piDurableVersion) return;
-    await retireOwner(endpoint);
-    if (unfinished) await resume(entry.name);
-  }));
-}
-
 /** Remove this process's own endpoint record after a deliberate idle exit, so the
  * next client starts the session on whichever release is then selected. */
 export async function retireSessionService(endpoint: SessionEndpoint) {
@@ -120,7 +88,7 @@ export async function retireSessionService(endpoint: SessionEndpoint) {
 
 /** Start or join the selected ordinary session. No prompt crosses this startup
  * boundary, and no uncertain command is resent. */
-export async function ensureSessionService(options: { stateRoot: string; identity: string; args: string[] }) {
+export async function ensureSessionService(options: { stateRoot: string; identity: string; host: string; args: string[] }) {
   await privateStateDirectory(options.stateRoot);
   const release = await lockfile.lock(options.stateRoot, { lockfilePath: join(options.stateRoot, ".service-start.lock"),
     retries: { retries: 30, minTimeout: 100, maxTimeout: 1000 } });
@@ -131,10 +99,12 @@ export async function ensureSessionService(options: { stateRoot: string; identit
         const expected = { stateRoot: endpoint.stateRoot, identity: endpoint.identity };
         const info = await serviceRequest(endpoint.socket, { method: "info" }, { expected });
         if (endpoint.identity === options.identity) return { ...endpoint, info };
-        // A live owner from another release or host configuration. An owner on
-        // another Pi Durable always closes: versions never run side by side.
-        // On the same Pi Durable, unfinished work keeps its owner until idle.
-        if (await ownerPiDurable(endpoint) === piDurableVersion && (await serviceRequest(endpoint.socket, { method: "status" }, { expected })).busy) {
+        // A live owner with another identity, already on this Pi Durable (the caller selected
+        // the runtime first). If it differs only in definitions, its unfinished work keeps it
+        // until idle. A different host configuration is a deliberate boundary: it is never
+        // joined, and replaces the owner only when no work is unfinished.
+        if ((await serviceRequest(endpoint.socket, { method: "status" }, { expected })).busy) {
+          if (endpoint.host !== options.host) throw new Error("This session has unfinished work under a different host configuration. Finish or stop it with that configuration; no owner was replaced.");
           process.stderr.write("This session has unfinished work under its earlier definitions; attached to that owner. It follows the selected release once idle.\n");
           return { ...endpoint, info };
         }

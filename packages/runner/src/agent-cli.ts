@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, resolve, posix } from "node:path";
 import { parseArgs } from "node:util";
@@ -11,8 +11,8 @@ import { connectHostModels } from "./host-models.js";
 import { serviceSettings } from "./settings.js";
 import { connectInTerminal, serveService, type ServiceConfig } from "./service.js";
 import { run, type RunOptions } from "./run.js";
-import { closeOtherRuntimeOwners, ensureSessionService, retireSessionService, sessionServiceIdentity, sessionServiceSocket, publishSessionService } from "./session-service.js";
-import { piDurableVersion, selectRuntime } from "./runtime-version.js";
+import { ensureSessionService, retireSessionService, sessionServiceIdentity, sessionServiceSocket, publishSessionService } from "./session-service.js";
+import { piDurableVersion, selectRuntime, takeInterruptedSessions } from "./runtime-version.js";
 import { deferredDefinitionUpdates } from "./runtime.js";
 import { spawn } from "node:child_process";
 import { getOrThrow } from "@earendil-works/pi-durable/env";
@@ -42,7 +42,7 @@ try {
     allowPositionals: true,
     options: {
       root: { type: "string" }, config: { type: "string" }, agent: { type: "string" },
-      "session-owner": { type: "boolean" }, "owner-identity": { type: "string" }, "resume-only": { type: "boolean" }, "replace-owner": { type: "boolean" },
+      "session-owner": { type: "boolean" }, "owner-identity": { type: "string" }, "owner-host": { type: "string" }, "resume-only": { type: "boolean" }, "replace-owner": { type: "boolean" },
       "request-id": { type: "string" },
       session: { type: "string" }, prompt: { type: "string" }, history: { type: "boolean" },
       action: { type: "string" }, "release-manifest": { type: "string" },
@@ -169,14 +169,17 @@ try {
           const agent = agentId;
           const args = ["--root", root, "run", "--config", resolve(values.config), "--agent", agent, "--session", session,
             ...(values["release-manifest"] ? ["--release-manifest", resolve(values["release-manifest"])] : [])];
-          await closeOtherRuntimeOwners(config.stateRoot, async other => {
-            if (other === session) return;
+          // The runtime was selected above, so every owner another version had is closed.
+          // Resume the ones a takeover interrupted, now that none of them is left running.
+          for (const other of await takeInterruptedSessions(config.stateRoot)) {
+            if (other === session) continue;
             const saved = await readFile(join(config.stateRoot, other, "conversation-agent.json"), "utf8").then(text => JSON.parse(text).agent as string, () => undefined);
-            if (!saved) { console.error(`Session ${other} was closed with unfinished work; resume it with --session ${other} --resume-only and its agent.`); return; }
+            if (!saved) { console.error(`Session ${other} was closed for the runtime change; resume it with --session ${other} --resume-only and its agent.`); continue; }
             spawn(process.execPath, [process.argv[1], "--root", resolve(values.root!), "run", "--config", resolve(values.config!), "--agent", saved, "--session", other, "--resume-only"],
               { detached: true, stdio: "ignore", env: process.env }).unref();
-          });
-          const endpoint = await ensureSessionService({ stateRoot, identity, args });
+          }
+          const host = createHash("sha256").update(JSON.stringify(config)).digest("hex");
+          const endpoint = await ensureSessionService({ stateRoot, identity, host, args: [...args, "--owner-host", host] });
           if (values["resume-only"]) console.log(JSON.stringify(endpoint));
           else await connectInTerminal({ socket: endpoint.socket, agent, session, prompt: values.prompt, requestId: values["request-id"],
             expected: { stateRoot: endpoint.stateRoot, identity: endpoint.identity }, drain: true,
@@ -240,7 +243,7 @@ try {
             const used = new Set(["create", "send", "message", "stop", "compact", "drain"]);
             listener = await serveService(app.service, socket, app.adapters, { stateRoot: await realpath(stateRoot), identity, defaultAgent: agentId },
               { onCommand: (method, phase) => { if (used.has(method)) { waiting += phase === "start" ? 1 : -1; lastUse = Date.now(); } } });
-            const endpoint = { version: 1 as const, socket, stateRoot: await realpath(stateRoot), identity, pid: process.pid, piDurable: piDurableVersion };
+            const endpoint = { version: 1 as const, socket, stateRoot: await realpath(stateRoot), identity, pid: process.pid, piDurable: piDurableVersion, host: values["owner-host"] };
             await publishSessionService(endpoint);
             if (process.connected) process.send?.({ ready: endpoint, info: { stateRoot: endpoint.stateRoot, identity, defaultAgent: agentId } }, () => {});
             let idle = false;
