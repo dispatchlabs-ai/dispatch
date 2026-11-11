@@ -48,6 +48,8 @@ Local native adapter additionally discovers configured read-only SQLite sources,
 including CLI/workflow children and WAL, with canonical-path deduplication.
 Native locks, compatibility and paused-work admission checks are retained from
 the generic Agent Chat adapter. No private host launcher is shipped.
+Local owners adopt the selected agent definitions when saved work is idle,
+matching the CLI. Unfinished work retains its stored configuration during recovery.
 
 Hosted authorization is supplied by Web's trusted consumer adapter and must cover
 all configured runs; future participant/principal grants are not implemented here.

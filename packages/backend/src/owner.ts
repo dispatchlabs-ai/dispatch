@@ -29,6 +29,7 @@ try {
     stateRoot: path,
     // Web shares the installation's session root with the CLI: same single Pi Durable.
     runtimeRoot: dirname(path),
+    updateDefinitions: "when-idle",
     cwd: host.cwd,
     names,
     models,
