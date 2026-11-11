@@ -190,7 +190,8 @@ h1 { font-weight: 600; font-size: 14px; margin: 0; white-space: nowrap; overflow
 .composer [data-slot=input-group] { background: var(--background); border-radius: calc(var(--radius) + 8px); }
 .composer [data-slot=input-group-control] { min-height: 52px; max-height: 180px; field-sizing: content; padding: 12px 14px 4px; }
 .composer [data-slot=input-group-addon][data-align=block-end] { justify-content: flex-start; width: 100%; padding: 4px 8px 8px; }
-.composer-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.composer-actions { margin-left: auto; display: flex; align-items: center; }
+.composer-actions button { width: 32px; height: 32px; padding: 0; }
 .attachment-list { flex-wrap: wrap; max-height: 24dvh; overflow: auto; justify-content: flex-start; width: 100%; }
 [data-slot=attachment-title] { overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
 [data-slot=attachment-media] img { width: 100%; height: 100%; object-fit: cover; }

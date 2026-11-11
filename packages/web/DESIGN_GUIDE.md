@@ -9,9 +9,11 @@
   AI SDK, Gateway or second execution loop is imported.
 - Stock shadcn neutral tokens and the vendored registry style (`src/shadcn-style.css`)
   style every primitive; `styles.css` holds app layout only. Readable streaming
-  Markdown/code (wrapped, no line numbers), circular Send with a square Stop beside
-  it while busy. Busy steering input remains available; send/stop are not a
-  cosmetic toggle that removes steering input. One status line, at most one banner.
+  Markdown/code (wrapped, no line numbers), one circular composer action: Send,
+  replaced by a circular Stop while work is active and nothing is drafted. Text
+  or files bring Send back so steering stays available; the swap never stops
+  work, and Stop ignores its first half second on screen so a repeated Send tap
+  cannot cancel it. One status line, at most one banner.
   The destructive colour is reserved for actual errors.
 - Kinds: a **chat** was started by a person (human transport) and always steers;
   a **run** is agent/scheduled or unindexed work; a **worker** has a parent and is

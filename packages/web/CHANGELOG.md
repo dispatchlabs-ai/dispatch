@@ -4,8 +4,10 @@
 
 - Style every shadcn primitive from the pinned registry style with standard neutral tokens; fix Streamdown code block frames and controls; wrap JSON without line numbers.
 - Split the sidebar into Chats and Runs with live badges, two-line rows, nested read-only workers with Open parent, dated history and search across every kind; keep New conversation available whatever is selected.
-- Replace the generic red ownership warning with a neutral read-only bar stating the actual reason; show task inputs as collapsed rows; group consecutive messages; one status line with Stop beside Send.
+- Replace the generic red ownership warning with a neutral read-only bar stating the actual reason; show task inputs as collapsed rows; group consecutive messages; one status line.
 - Skip unchanged chat stream frames and cache avatar artwork for a day.
+
+- Use one round composer action: Stop takes Send's place while work is active and the composer is empty; drafting text or files brings Send back for steering.
 
 - On touch-only devices Return adds a new line; Send sends.
 

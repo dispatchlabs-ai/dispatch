@@ -83,7 +83,9 @@ Messages always steer active work, like native Slack input. Send a correction
 while the agent is busy; it reaches the model at the next native tool boundary,
 not only after its final answer. In-flight tools are not interrupted. Pending
 input may briefly have native status `queued` until that boundary. Idle messages
-start normally. There is no queue/steer selector; Stop remains explicit.
+start normally. There is no queue/steer selector; Stop remains explicit. While
+work is active and the composer is empty, Stop takes Send's place; start typing
+or attach a file and Send returns. Clear the draft to reach Stop again.
 
 ## Native ownership and recovery
 

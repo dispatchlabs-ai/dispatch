@@ -260,7 +260,7 @@ export default function App() {
     finally { setSending(false); setSendCompleted(value => value + 1); }
   }
   async function stop() {
-    if (!selected) return;
+    if (!selected || performance.now() - stopShownAt.current < 500) return;
     setStopping(true); setError('');
     try { await api(`${route(selected)}/stop`, {}); setStopNotice({id: selected, text: "Stop accepted for this conversation’s work."}); }
     catch (failure) { setError((failure as Error).message); }
@@ -280,6 +280,11 @@ export default function App() {
   const canAttach = (selectedChat ?? agents.find(item => item.id === agent))?.capabilities?.attachments !== false;
   const linkBlocked = !!link && (!linkReady || !!linkError);
   const busy = !!snapshot && (snapshot.running || snapshot.background || snapshot.queued > 0 || snapshot.tools.length > 0);
+  // One composer action: Stop while work is active and nothing is drafted, otherwise Send.
+  const showStop = busy && !(draft.trim() || files.length);
+  // Stop appears where Send was tapped; a repeated tap meant for Send must not stop the work.
+  const stopShownAt = useRef(0);
+  useEffect(() => { if (showStop) stopShownAt.current = performance.now(); }, [showStop]);
   // The sidebar and selected stream can observe a generated title in either order.
   const title = (listedChat?.nativeTitle ? listedChat : snapshot?.chat ?? listedChat)?.title ?? (link ? 'Linked conversation' : 'New conversation');
   // Before the first message, keyed item context is the conversation's content; afterwards the first message carries it.
@@ -343,8 +348,10 @@ export default function App() {
           {!!files.length && <InputGroupAddon align="block-start" className="attachment-list">{files.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt="" src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle>{file.name}</AttachmentTitle></AttachmentContent><Button type="button" variant="ghost" size="icon-xs" aria-label={`Remove ${file.name}`} disabled={sending || !!pending} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}><X/></Button></Attachment>)}</InputGroupAddon>}
           <InputGroupTextarea ref={composer} aria-label="Message" placeholder={busy ? 'Steer active work…' : `Message ${agentName(chatAgent) || 'agent'}…`} rows={2} value={draft} disabled={sending || !!pending || !deliveryReady || linkBlocked || !!selected && !snapshot} onChange={event => {const text=event.target.value;setDraft(text);void saveDelivery({text,attachments:files,pending}).catch(()=>setDeliveryReady(false));}} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229 && !softKeyboard()) { event.preventDefault(); void send(); } }}/>
           <InputGroupAddon align="block-end"><input hidden ref={fileInput} type="file" multiple aria-label="Select attachments" onChange={event=>void selectFiles(event.target.files)}/><InputGroupButton size="icon-sm" variant="ghost" className="rounded-full" aria-label="Attach files" disabled={sending || !!pending || !deliveryReady || !canAttach || linkBlocked} onClick={()=>fileInput.current?.click()}><Paperclip/></InputGroupButton>
-            <span className="composer-actions">{busy && <InputGroupButton type="button" size="icon-sm" variant="outline" aria-label={stopping ? 'Stopping' : 'Stop'} title="Stop" disabled={stopping} onClick={() => void stop()}><Square className="fill-current"/></InputGroupButton>}
-            <InputGroupButton type="submit" size="icon-sm" variant="default" className="send-button rounded-full" aria-label={sending ? 'Sending message' : 'Send message'} disabled={(!draft.trim() && !files.length) || sending || !ready || !!pending || !deliveryReady || readingFiles || linkBlocked || !!selected && !snapshot || !selected && !canCreate}>{sending ? <LoaderCircle className="animate-spin"/> : <ArrowUp/>}</InputGroupButton></span></InputGroupAddon>
+            {/* Separate keys keep keyboard focus from carrying Send onto Stop. */}
+            <span className="composer-actions">{showStop
+              ? <InputGroupButton key="stop" type="button" size="icon-sm" variant="default" className="rounded-full" aria-label={stopping ? 'Stopping' : 'Stop'} title="Stop" disabled={stopping} onClick={() => void stop()}><Square className="fill-current"/></InputGroupButton>
+              : <InputGroupButton key="send" type="submit" size="icon-sm" variant="default" className="send-button rounded-full" aria-label={sending ? 'Sending message' : 'Send message'} disabled={(!draft.trim() && !files.length) || sending || !ready || !!pending || !deliveryReady || readingFiles || linkBlocked || !!selected && !snapshot || !selected && !canCreate}>{sending ? <LoaderCircle className="animate-spin"/> : <ArrowUp/>}</InputGroupButton>}</span></InputGroupAddon>
         </InputGroup></form>
         <p className="composer-hint">Enter to send · Shift+Enter for a new line{busy ? ' · Messages steer at the next tool boundary' : ''}</p></>}
       </div>
