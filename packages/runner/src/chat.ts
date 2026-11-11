@@ -1,7 +1,9 @@
 import { prepareContent, ContentError, type AttachmentFile } from "./chat-content.js";
 import { projectChatTurns, type ChatTurn } from "./chat-turns.js";
 import { projectChatTools, type ChatToolCall } from "./chat-tools.js";
-export type ChatMessage = { provenance?: "user" | "agent" | "runtime"; id: string; role: string; text: string; at?: number; commentary?: string; author?: string; background?: boolean; error?: string; attachments?: AttachmentFile[]; artifacts?: Artifact[] };
+export type ChatMessage = { provenance?: "user" | "agent" | "runtime"; id: string; role: string; text: string; at?: number; commentary?: string; author?: string; background?: boolean;
+  /** A background reply's supporting material (publishReply details), shown collapsed. */
+  details?: { label: string; text: string }; error?: string; attachments?: AttachmentFile[]; artifacts?: Artifact[] };
 export type ChatSnapshot = {
   chat: Chat; messages: ChatMessage[]; turns?: ChatTurn[]; toolCalls?: ChatToolCall[]; running: boolean; queued: number;
   partial: string; tools: string[]; error: string | null; demo: boolean;
@@ -51,8 +53,10 @@ export function projectChatMessages(namespace: string, entries: readonly EntryRe
       return [{ provenance: "agent", id: `${entry.id}:artifact`, role: "assistant", text: "", artifacts: [artifact] }];
     }
     if (entry.kind === `${namespace}.background-reply`) {
-      const data = entry.data as { author: string; text: string };
-      return [{ provenance: "agent", id: `${entry.id}:background`, role: "assistant", text: data.text, author: data.author, background: true }];
+      const data = entry.data as { author: string; text: string; details?: { label: string; text: string } };
+      const at = entry.model?.[0]?.timestamp;
+      return [{ provenance: "agent", id: `${entry.id}:background`, role: "assistant", text: data.text, author: data.author, background: true,
+        ...(typeof at === "number" ? { at } : {}), ...(data.details ? { details: data.details } : {}) }];
     }
     return (entry.model ?? []).flatMap((message, index) => {
       if (message.role !== "user" && message.role !== "assistant") return [];

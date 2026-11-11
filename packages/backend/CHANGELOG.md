@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Chat messages carry an optional `details` field (a background reply's supporting material).
+
 - Adopt selected definitions for idle local chats after a release update while retaining unfinished work's stored configuration, matching ordinary CLI recovery.
 
 - Open ordinary session stores under the installation's single Pi Durable version record; a Web build carrying an older Pi Durable refuses to own a store instead of running beside a newer runtime.

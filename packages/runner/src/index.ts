@@ -32,7 +32,7 @@ export { withPrivateProviderErrors } from "./private-provider-errors.js";
 export type { AgentHost, OpenOptions, RunnerState, StatusFile, StartOptions, StorageFactory } from "./runtime.js";
 export type { AgentSetup } from "./configuration.js";
 export type { Chat, ChatInitializer, ChatMessage, ChatService, ChatSnapshot } from "./chat.js";
-export type { ReplyDestination, ReplySink, StatusSink } from "./replies.js";
+export type { ReplyDestination, ReplyDetails, ReplySink, StatusSink } from "./replies.js";
 export { context, projectChatMessages } from "./chat.js";
 export { run } from "./run.js";
 export type { Adapter, PreparedAdapter, RunOptions } from "./run.js";

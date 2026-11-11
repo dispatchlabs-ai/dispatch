@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- `publishReply` accepts optional `details` (label and text): kept on the background-reply entry and in the model message, so the replying agent reads them, and projected on the chat message with the reply's time (`at`) so clients can show them collapsed.
+
 - Run exactly one Pi Durable version per state root. `stateRoot/.runtime.json` records it under a lock: an older runtime refuses to open stores, and any other runtime first closes every live process of another version that owns stores there, waits for all of them, and only then selects itself; interrupted session work is resumed on the selected runtime afterwards. The CLI and `run`/`ChatService.open` (`runtimeRoot`) share the check.
 - Let ordinary sessions follow the selected release instead of stranding on the one that created them: owners exit after `ownerIdleMinutes` (default 60), an idle owner with another identity is replaced, a busy owner is joined only when it differs in definitions and not in host configuration, and changed definitions apply once saved work is idle (unfinished work continues with its stored conversation configuration). `--update-definitions` and `--replace-owner` are no longer required.
 

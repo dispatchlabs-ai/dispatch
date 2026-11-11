@@ -1042,6 +1042,15 @@
           "background": {
             "type": "boolean"
           },
+          "details": {
+            "type": "object",
+            "description": "A background reply's supporting material, shown collapsed.",
+            "required": ["label", "text"],
+            "properties": {
+              "label": { "type": "string" },
+              "text": { "type": "string" }
+            }
+          },
           "error": {
             "type": "string"
           },
