@@ -453,50 +453,55 @@ canonical database/conversation-based public IDs. A retained but unavailable
 endpoint never permits Backend to fall back to opening another writer.
 
 The selected Node/runtime module, canonical definition root, authored messaging
-closure fingerprints and host JSON determine the stable installation identity.
-A changed active selection is rejected, never silently repinned. Use immutable
-releases and preserve original host environment/provider/tool bindings. Existing
-native fingerprint, execution, extension and cwd checks still apply to cold starts.
-The startup lock only serializes concurrent launch attempts; it never substitutes
-for native ownership. POSIX process detachment and Unix sockets are required.
-There is no automatic restart daemon: a later ordinary run, or explicit recovery
-below, reconnects/starts the maintained owner. Existing external supervisors may
-keep using `dispatch-service`/`serveService`; this does not replace them.
+closure fingerprints and host JSON determine an owner's installation identity.
+Clients bind every command to that identity, so a command never reaches an owner
+other than the one it discovered. POSIX process detachment and Unix sockets are
+required. The startup lock only serializes concurrent launch attempts; it never
+substitutes for native ownership. There is no restart daemon: a later ordinary
+run, or `--resume-only`, starts the owner again. External supervisors may keep
+using `dispatch-service`/`serveService`.
 
-### Controlled recovery without another prompt
+### One Pi Durable per state root
 
-An old live CLI without an endpoint cannot be hot-attached. Read history without
-opening a writer; never delete its locks, clone its DB or resubmit its original
-prompt. With explicit operator authority, identify the current native owner and
-its task/tool state, then send SIGINT or SIGTERM to **that owner**, not Stop (native
-cancellation), SIGKILL or an arbitrary stale PID. Wait for graceful native close,
-process exit and native lock release. Preserve the original definitions, cwd,
-namespace, providers, extensions, environment and workspace release bindings.
-Native `Harness.close` joins invocations and writes them pending without a terminal
-outcome; it cannot undo external effects. Pi's tool recovery reruns only a safe
-replayable tool; an unsafe interrupted execution yields an interrupted result
-rather than blindly repeating an external side effect. Inspect tool/task outcomes
-before and after handoff. Suspension is not a guarantee that an in-flight shell
-command or external action finished successfully.
+`stateRoot/.runtime.json` records the Pi Durable version that owns the
+installation's stores. It only moves forward:
 
-Run the reviewed compatible launcher with original definitions and host bindings:
+- A launcher or service carrying an **older** Pi Durable refuses to start and
+  opens no store. Roll forward, or restore the state root with the older release.
+- A launcher carrying a **newer** version takes the root over. Before opening
+  anything it closes every live session owner on another version with the
+  owner's normal shutdown (SIGTERM: native work stays pending, nothing is
+  cancelled), and resumes the ones that had unfinished work on itself.
+- `ChatService.open`/`run` enforce the same record when given `runtimeRoot`
+  (`ServiceConfig.runtimeRoot` for a supervised service that shares the root).
 
-```sh
-dispatch-agent --root /srv/definitions run --config /srv/private/host.json \
-  --agent helper --session original-key --resume-only
-```
+Two versions therefore never own stores under one root at the same time.
+Closing an owner cannot undo external effects: Pi reruns only replay-safe tools
+and reports an interrupted unsafe call as interrupted. Workspace sessions pin
+their release's runtime; finish or suspend them before installing a release
+with a newer Pi Durable, because the pinned runtime will refuse to open.
 
-This prints the endpoint and resumes existing native work only: no create/find,
-new prompt, submission or conversation is admitted. It requires an existing native
-store and explicit original agent. If a previously shared, **stopped** owner has a
-different selection identity, add `--replace-owner` to acknowledge that deliberate
-transition. It never replaces a live incompatible owner and never bypasses native
-compatibility checks. `--update-definitions` also explicitly permits a stopped
-owner's selection change, but only when native idle migration checks pass. Do not
-use it on pending work; idle migration remains an explicit separate action. A compatible runtime with original
-definitions is required for active legacy work. Keep old releases available for
-recovery. Installed consumer and hosted browser qualification are separate from
-source compatibility.
+### A session follows the selected release
+
+An ordinary session is not tied to the release that created it:
+
+- Its owner exits after `ownerIdleMinutes` (host JSON, default 60, `0` keeps
+  it) without unfinished native work, a waiting client or an admitted command.
+  Reads such as a watching Web client do not keep it alive.
+- A run that finds a live owner with a different identity on the same Pi
+  Durable attaches to it while it has unfinished work, and otherwise closes it
+  and starts the selected release.
+- Changed definitions apply when the saved work is idle. While work is
+  unfinished the store opens with its stored conversation configuration, the
+  work finishes, and the owner exits as soon as it is idle so the next start
+  applies the update. Working directory, execution mode and host-extension
+  checks are unchanged and still refuse an incompatible host.
+
+`--resume-only` starts the owner and resumes existing native work without
+admitting a prompt; it needs the existing store and its agent.
+`--update-definitions` and `--replace-owner` are accepted for compatibility and
+no longer required. Installed consumer and hosted browser qualification are
+separate from source compatibility.
 
 `connectInTerminal` accepts optional `expected: {stateRoot,identity}` for an
 already-discovered owner and `drain: true` to wait for native idle after the

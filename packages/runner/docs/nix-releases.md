@@ -113,7 +113,8 @@ instruction, role or skill changes continue to require it.
 `bin/NAME catalog` loads definitions without credentials, stores or inference.
 `run --config HOST.json --agent helper --prompt "..."` creates a random session;
 `--session KEY` reopens an explicit one. `--history` replaces the prompt.
-`--update-definitions` explicitly opts into Runner's existing idle migration.
+A session follows the selected release: changed definitions apply once its saved
+work is idle, and one state root runs one Pi Durable version (see [service](service.md#one-pi-durable-per-state-root)).
 `watch --config HOST.json` discovers running sessions without opening a runtime;
 `watch --session KEY` also inspects stopped work. Viewer exit leaves owners running.
 

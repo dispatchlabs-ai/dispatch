@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Run exactly one Pi Durable version per state root. `stateRoot/.runtime.json` records it and only moves forward: an older launcher or service refuses to open stores, and a newer launcher closes live session owners on any other version and resumes their unfinished work itself. `run`/`ChatService.open` enforce it through `runtimeRoot`.
+- Let ordinary sessions follow the selected release instead of stranding on the one that created them: owners exit after `ownerIdleMinutes` (default 60), an idle owner with another identity is replaced, and changed definitions apply once saved work is idle (unfinished work continues with its stored conversation configuration). `--update-definitions` and `--replace-owner` are no longer required.
+
 - Abandon a gateway model request whose stream shows no progress for 3 minutes (minimal/low), 5 minutes (medium) or 10 minutes (high thinking) and let Pi's retry send a fresh one. Stalled Codex requests previously waited for the gateway's 900-second upstream limit; xhigh/max and unstated levels keep that limit. Empty or whitespace-only deltas are not progress (stalled requests streamed such tool-call argument deltas for 15 minutes).
 
 - Patch the packaged Claude Code provider so replayed requests keep signed thinking from earlier assistant turns. Claude Code's history replay dropped it at every tool-use boundary; the same upstream revision is retained with one source patch.

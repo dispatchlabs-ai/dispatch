@@ -72,3 +72,4 @@ export type { ChatToolCall } from "./chat-tools.js";
 
 export { projectChatTurns } from "./chat-turns.js";
 export type { ChatTurn } from "./chat-turns.js";
+export { piDurableVersion, readRuntimeSelection, selectRuntime, runtimeSelectionFile } from "./runtime-version.js";

@@ -20,7 +20,9 @@ export type ServiceConfig = ServicePolicy & HostModelsConfig & {
   socket: string;
   namespace?: string;
   names?: string[];
-  updateDefinitions?: boolean;
+  updateDefinitions?: boolean | "when-idle";
+  /** Installation state root shared with ordinary sessions; it runs exactly one Pi Durable version. */
+  runtimeRoot?: string;
   /** Disable factory schedules without disabling recovery of admitted work. */
   schedules?: boolean;
   definitionResources?: boolean;
@@ -89,7 +91,8 @@ async function dispatch(service: ServiceOperations, command: ServiceCommand, sig
 
 /** Bind a company-owned ChatService without creating another native owner.
  * Closing the listener disconnects clients only; the caller still owns service.close(). */
-export async function serveService(owner: ServiceOperations | (() => ServiceOperations | undefined), socket: string, adapters: Awaited<ReturnType<typeof run>>["adapters"] = [], metadata: ServiceMetadata = {}) {
+export async function serveService(owner: ServiceOperations | (() => ServiceOperations | undefined), socket: string, adapters: Awaited<ReturnType<typeof run>>["adapters"] = [], metadata: ServiceMetadata = {},
+  options: { /** Observes each dispatched command and its completion; reads included. */ onCommand?: (method: ServiceCommand["method"], phase: "start" | "end") => void } = {}) {
   if (resolve(socket) !== socket) throw new Error("socket must be an absolute path.");
   const socketDirectory = dirname(socket);
   await mkdir(socketDirectory, { recursive: true, mode: 0o700 });
@@ -130,8 +133,9 @@ export async function serveService(owner: ServiceOperations | (() => ServiceOper
         const observation = new AbortController();
         const disconnected = () => observation.abort();
         response.once("close", disconnected);
+        options.onCommand?.(command.method, "start");
         try { result = await dispatch(service, command, observation.signal); }
-        finally { response.off("close", disconnected); }
+        finally { response.off("close", disconnected); options.onCommand?.(command.method, "end"); }
       }
       response.end(JSON.stringify({ result }));
     } catch (error) {

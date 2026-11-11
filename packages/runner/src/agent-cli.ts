@@ -11,7 +11,10 @@ import { connectHostModels } from "./host-models.js";
 import { serviceSettings } from "./settings.js";
 import { connectInTerminal, serveService, type ServiceConfig } from "./service.js";
 import { run, type RunOptions } from "./run.js";
-import { ensureSessionService, sessionServiceIdentity, sessionServiceSocket, publishSessionService } from "./session-service.js";
+import { closeOtherRuntimeOwners, ensureSessionService, retireSessionService, sessionServiceIdentity, sessionServiceSocket, publishSessionService } from "./session-service.js";
+import { piDurableVersion, selectRuntime } from "./runtime-version.js";
+import { deferredDefinitionUpdates } from "./runtime.js";
+import { spawn } from "node:child_process";
 import { getOrThrow } from "@earendil-works/pi-durable/env";
 import { WorkspaceClient, type WorkspaceRecord, type WorkspaceRelease } from "./workspace.js";
 import { terminalError } from "./terminal-output.js";
@@ -21,13 +24,16 @@ import { sessionAgent } from "./session-agent.js";
 const usage = `dispatch-agent --root DEFINITIONS catalog
 dispatch-agent --root DEFINITIONS run --config HOST.json [--agent AGENT] [--session KEY] [--request-id ID] --prompt TEXT
 dispatch-agent --root DEFINITIONS run --config HOST.json [--agent AGENT] --session KEY --history
-dispatch-agent --root DEFINITIONS run --config HOST.json --agent AGENT --session KEY --resume-only [--replace-owner]
+dispatch-agent --root DEFINITIONS run --config HOST.json --agent AGENT --session KEY --resume-only
 dispatch-agent --root DEFINITIONS watch --config HOST.json [--session KEY] [--json]
 
 With config.socket, run connects to the supervised service; disconnect leaves work running.
 Without socket, run starts or joins a detached owner in the exact ordinary session directory. No factory schedules.
 New sessions use factory.yaml defaultAgent unless --agent is supplied; retained selections stay fixed.
-Use --update-definitions only for an explicit idle definition migration.
+One state root runs one Pi Durable: an older launcher refuses to start, and a newer one closes owners
+on any other version and resumes their unfinished work itself. A session follows the selected release;
+changed definitions apply once its saved work is idle. --update-definitions and --replace-owner are
+accepted and no longer needed. An owner exits after config.ownerIdleMinutes (default 60; 0 keeps it).
 dispatch-agent --root DEFINITIONS workspace --config HOST.json --agent AGENT --session KEY --action ensure|status|checkpoint|suspend|finish
 Client SIGINT/SIGTERM disconnect only. Owner SIGINT/SIGTERM suspend native work, not external effects.`;
 
@@ -69,10 +75,10 @@ try {
           values.history ? values.prompt !== undefined || !values.session : !values["session-owner"] && values.prompt !== undefined && !values.prompt.trim())) {
         throw new Error(usage);
       }
-      if (values["replace-owner"] && !values["resume-only"]) throw new Error("--replace-owner requires --resume-only, never a new prompt.");
       const session = values.session ?? randomUUID();
       if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(session)) throw new Error("Invalid session key.");
       const config: Pick<ServiceConfig, "socket" | "stateRoot" | "cwd" | "namespace" | "gateway" | "modelProviders" | "retry" | "compaction" | "afterFailedRun"> & {
+        ownerIdleMinutes?: number;
         workspace?: { agents: string[]; command: string[] };
         artifacts?: { module: string; export: string; args?: unknown[] };
       } =
@@ -90,6 +96,8 @@ try {
         }
 
         const stateRoot = join(config.stateRoot, session);
+        // Before anything is created or opened under an installation another Pi Durable owns.
+        if (!values.history) await selectRuntime(config.stateRoot);
         // History never opens/resumes an owner merely to observe saved work.
         if (values.history) {
           const { discoverWatchRuns, readWatchChatProjection, readWatchChat } = await import("./watch-reader.js");
@@ -160,9 +168,15 @@ try {
         if (!workspaceAction && !values["session-owner"]) {
           const agent = agentId;
           const args = ["--root", root, "run", "--config", resolve(values.config), "--agent", agent, "--session", session,
-            ...(values["release-manifest"] ? ["--release-manifest", resolve(values["release-manifest"])] : []),
-            ...(values["update-definitions"] ? ["--update-definitions"] : [])];
-          const endpoint = await ensureSessionService({ stateRoot, identity, args, replaceOwner: values["replace-owner"] || values["update-definitions"] });
+            ...(values["release-manifest"] ? ["--release-manifest", resolve(values["release-manifest"])] : [])];
+          await closeOtherRuntimeOwners(config.stateRoot, async other => {
+            if (other === session) return;
+            const saved = await readFile(join(config.stateRoot, other, "conversation-agent.json"), "utf8").then(text => JSON.parse(text).agent as string, () => undefined);
+            if (!saved) { console.error(`Session ${other} was closed with unfinished work; resume it with --session ${other} --resume-only and its agent.`); return; }
+            spawn(process.execPath, [process.argv[1], "--root", resolve(values.root!), "run", "--config", resolve(values.config!), "--agent", saved, "--session", other, "--resume-only"],
+              { detached: true, stdio: "ignore", env: process.env }).unref();
+          });
+          const endpoint = await ensureSessionService({ stateRoot, identity, args });
           if (values["resume-only"]) console.log(JSON.stringify(endpoint));
           else await connectInTerminal({ socket: endpoint.socket, agent, session, prompt: values.prompt, requestId: values["request-id"],
             expected: { stateRoot: endpoint.stateRoot, identity: endpoint.identity }, drain: true,
@@ -207,20 +221,49 @@ try {
               })() };
             } } : artifactSource ? { source: artifactSource } : undefined,
             runner: createRunner({ namespace: config.namespace }), models, names: [...names],
-            updateDefinitions: values["update-definitions"], settings,
+            // An ordinary session follows the selected release. Unfinished work keeps
+            // its stored configuration; the changed definition applies at the next idle start.
+            updateDefinitions: "when-idle", runtimeRoot: config.stateRoot, settings,
           };
           // Open exactly the ordinary session, never enable its factory jobs.
           const app = await run({ ...options, schedules: false, resume: false });
           let listener: Awaited<ReturnType<typeof serveService>> | undefined;
+          let retired: Parameters<typeof retireSessionService>[0] | undefined;
           try {
             const socket = await sessionServiceSocket(stateRoot);
             await app.service.start();
-            listener = await serveService(app.service, socket, app.adapters, { stateRoot: await realpath(stateRoot), identity, defaultAgent: agentId });
-            const endpoint = { version: 1 as const, socket, stateRoot: await realpath(stateRoot), identity, pid: process.pid };
+            // Reads (a watching Web sidebar) do not keep an owner alive; admitted
+            // commands, a waiting client and unfinished native work do.
+            const idleMinutes = config.ownerIdleMinutes ?? 60;
+            if (typeof idleMinutes !== "number" || !Number.isFinite(idleMinutes) || idleMinutes < 0) throw new Error("ownerIdleMinutes must be a nonnegative number.");
+            let lastUse = Date.now(), waiting = 0;
+            const used = new Set(["create", "send", "message", "stop", "compact", "drain"]);
+            listener = await serveService(app.service, socket, app.adapters, { stateRoot: await realpath(stateRoot), identity, defaultAgent: agentId },
+              { onCommand: (method, phase) => { if (used.has(method)) { waiting += phase === "start" ? 1 : -1; lastUse = Date.now(); } } });
+            const endpoint = { version: 1 as const, socket, stateRoot: await realpath(stateRoot), identity, pid: process.pid, piDurable: piDurableVersion };
             await publishSessionService(endpoint);
             if (process.connected) process.send?.({ ready: endpoint, info: { stateRoot: endpoint.stateRoot, identity, defaultAgent: agentId } }, () => {});
-            await new Promise<void>(done => { process.once("SIGTERM", done); process.once("SIGINT", done); });
+            let idle = false;
+            await new Promise<void>(done => {
+              process.once("SIGTERM", done); process.once("SIGINT", done);
+              // A deferred definition update applies at the next start, so leave as soon as the saved work is done.
+              const idleFor = deferredDefinitionUpdates.size ? 0 : idleMinutes * 60_000;
+              if (!idleMinutes && !deferredDefinitionUpdates.size) return;
+              const timer = setInterval(async () => {
+                try {
+                  if (waiting > 0 || Date.now() - lastUse < idleFor) return;
+                  const adapterBusy = (await Promise.all(app.adapters.map(adapter => adapter.busy?.() ?? false))).some(Boolean);
+                  if (adapterBusy || (await app.service.activity()).busy) { lastUse = Date.now(); return; }
+                  if (waiting > 0) return;
+                  idle = true; clearInterval(timer); done();
+                } catch (error) { console.error(terminalError(error).message); }
+              }, 15_000);
+              timer.unref();
+            });
+            if (idle) { console.error("Session owner is idle; exiting. The next run starts it on the selected release."); retired = endpoint; }
           } finally { try { await listener?.close(); } finally { await app.close(); } }
+          // Only after native state is closed, so a new owner never races this one.
+          if (retired) await retireSessionService(retired);
         } finally { await modelConnection.close(); }
       }
     }

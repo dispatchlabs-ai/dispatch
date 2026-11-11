@@ -17,13 +17,18 @@ export type OpenOptions = {
   /** Available to domain-created conversations without granting root-agent tools. */
   registryExtensions?: Extension[];
   replySink?: ReplySink;
-  updateDefinitions?: boolean;
+  /** "when-idle" defers a changed definition while saved work is unfinished: that work
+   * continues with its stored conversation configuration and the update applies at the next idle start. */
+  updateDefinitions?: boolean | "when-idle";
   /** Return true after preserving or migrating an application-owned configuration. */
   updateConversation?: (tx: import("@earendil-works/pi-durable").Tx, id: ConversationId, setup: AgentSetup) => Promise<boolean>;
   /** The factory transfers ownership to this host. Keep each logical store single-owner. */
   storage?: StorageFactory;
   artifacts?: ArtifactOptions;
 };
+
+/** Agents opened in this process whose changed definition waits for their saved work to finish. */
+export const deferredDefinitionUpdates = new Set<string>();
 
 export type StorageFactory = (agent: LoadedAgent) => Promise<Storage>;
 export type StatusFile = {
@@ -264,6 +269,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
         agent: configuration,
       });
       const existing = await harness.snapshot(RunnerDoc, context);
+      let deferred = false;
       if (existing?.fingerprint && (existing.cwd ?? null) !== (cwd ?? null)) {
         throw new Error("The saved agent belongs to a different working directory. Use the original --cwd or a separate --state-dir.");
       }
@@ -280,12 +286,14 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
           throw new Error(`${agent.id}'s definition changed. Use --update-definitions when its saved work is idle, or choose a new --state-dir.`);
         }
         const inspection = await harness.inspect(context);
-        if (inspection.tasks.some(task => task.record.kind !== scheduleTaskKind(namespace)
+        deferred = inspection.tasks.some(task => task.record.kind !== scheduleTaskKind(namespace)
           || (task.record.state.status !== "terminal"
-            && (task.record.state.checkpoint as { phase?: string }).phase !== "wait")) || inspection.submissions.length) {
+            && (task.record.state.checkpoint as { phase?: string }).phase !== "wait")) || inspection.submissions.length > 0;
+        if (deferred && options.updateDefinitions !== "when-idle") {
           throw new Error(`${agent.id} has pending work. Finish or stop that work with its previous definition before updating.`);
         }
-        await harness.commit(async tx => {
+        if (deferred) deferredDefinitionUpdates.add(agent.id);
+        else await harness.commit(async tx => {
           let cursor: Cursor | undefined;
           const conversations = [];
           do {
@@ -330,7 +338,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       }, context);
       await root.commit(async (tx) => {
         const state = await tx.doc(RunnerDoc);
-        state.fingerprint = agent.fingerprint;
+        if (!deferred) state.fingerprint = agent.fingerprint;
         state.execution = execution;
         state.cwd = cwd ?? null;
         state.hostExtensions = hostExtensions;

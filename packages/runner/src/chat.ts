@@ -26,6 +26,7 @@ import { createRuntime, type AgentHost, type StorageFactory, type OpenOptions } 
 import type { ReplySink } from "./replies.js";
 import { createHandoffs } from "./handoff.js";
 import { privateStateDirectory } from "./private-state.js";
+import { selectRuntime } from "./runtime-version.js";
 import { publicCommentary } from "./commentary.js";
 import { recordRequestCancellation } from "./request-completion.js";
 import { createInstanceMessaging, instanceMessagingExtension, type InstanceMessage } from "./messages.js";
@@ -114,7 +115,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
 
     static async open(options: {
       root: string; stateRoot: string; demo: boolean; names?: string[]; extensions?: Extension[];
-      replySink?: ReplySink; updateDefinitions?: boolean; models: Models; initialize?: ChatInitializer;
+      replySink?: ReplySink; updateDefinitions?: boolean | "when-idle"; models: Models; initialize?: ChatInitializer;
       resume?: boolean;
       /** The host starts recovery after its adapters and bindings are ready. */
       deferResume?: boolean;
@@ -125,6 +126,9 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       definitionResources?: OpenOptions["definitionResources"];
       storage?: StorageFactory;
       settings?: OpenOptions["settings"];
+      /** Directory shared by every session store of this installation. When set, it runs exactly one
+       * Pi Durable version: an older runtime refuses to open and a newer one takes the root over. */
+      runtimeRoot?: string;
       /** Trusted host binding, applied recursively to primaries and their private children before opening stores. */
       prepareAgent?: (agent: LoadedAgent) => LoadedAgent | Promise<LoadedAgent>;
       artifacts?: ArtifactOptions;
@@ -152,6 +156,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       modelCatalogs.set(service, models);
       if (!options.demo && agents.some(agent => !models.getProvider(agent.model.provider))) throw new Error("Register every agent's provider in the supplied Models catalog.");
       try {
+        if (options.runtimeRoot) await selectRuntime(resolve(options.runtimeRoot));
         await privateStateDirectory(stateRoot);
         const results = await Promise.allSettled(agents.map(async agent => {
           const calendar = createSchedules(namespace, agent, service, options.resume !== false);

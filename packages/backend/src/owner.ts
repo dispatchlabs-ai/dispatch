@@ -1,5 +1,6 @@
 // One native owner per worker: Dispatch's trusted session environment binding is
 // process-global; worker env isolation keeps inspection tools session-correct.
+import { dirname } from "node:path";
 import { parentPort, workerData } from "node:worker_threads";
 import * as runner from "@dispatch/runner";
 import { createModels } from "@earendil-works/pi-ai/models";
@@ -26,6 +27,8 @@ try {
   service = await native.ChatService.open({
     root: definitionsRoot,
     stateRoot: path,
+    // Web shares the installation's session root with the CLI: same single Pi Durable.
+    runtimeRoot: dirname(path),
     cwd: host.cwd,
     names,
     models,

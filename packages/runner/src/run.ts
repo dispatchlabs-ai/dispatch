@@ -33,7 +33,9 @@ export type RunOptions = {
   models?: Models;
   names?: string[];
   demo?: boolean;
-  updateDefinitions?: boolean;
+  updateDefinitions?: boolean | "when-idle";
+  /** See ChatService.open: one Pi Durable version per installation state root. */
+  runtimeRoot?: string;
   /** Skip automatic recovery/schedules when inspecting saved conversations. */
   resume?: boolean;
   initialize?: ChatInitializer;
@@ -82,7 +84,7 @@ export async function run(options: RunOptions = {}) {
       service = await runner.ChatService.open({
         root, stateRoot: resolve(options.stateRoot ?? resolve(root, ".state")),
         models: options.models, demo: options.demo ?? false, names: options.names,
-        updateDefinitions: options.updateDefinitions, initialize: options.initialize,
+        updateDefinitions: options.updateDefinitions, runtimeRoot: options.runtimeRoot, initialize: options.initialize,
         resume: options.resume, schedules: options.schedules,
         deferResume: true,
         cwd: options.cwd, env: options.env, storage: options.storage, settings: options.settings,
