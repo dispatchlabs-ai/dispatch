@@ -21,10 +21,12 @@ const authorAgent = (agent: string, author?: string) => {
   if (!author) return agent;
   // Native peer authors are instance IDs; artwork belongs to their role.
   const role = author.replace(/:([1-9][0-9]*)$/, '');
+  // A background reply signed with the conversation's own agent name ("Alfred") is that agent, with its artwork.
+  if (role.toLowerCase() === agentName(agent).toLowerCase()) return agent;
   return role.includes('~') || !agent.includes('~') ? role : `${installationName(agent)}~${role}`;
 };
 // Consecutive messages from one author share a header; task inputs do not break a group.
-const authorKey = (message: Snapshot['messages'][number]) => message.provenance === 'user' ? 'user' : `agent:${message.author ?? ''}`;
+const authorKey = (agent: string, message: Snapshot['messages'][number]) => message.provenance === 'user' ? 'user' : `agent:${authorAgent(agent, message.author)}`;
 // Task inputs render as collapsed rows; other entries need visible content (no empty turns).
 const visibleMessage = (message: Snapshot['messages'][number]) => message.provenance === 'runtime' ? !!message.text : !!(message.text || message.commentary || message.error || message.attachments?.length || message.artifacts?.length);
 // A background reply shows when it arrived (it may predate the conversation that follows), not a label.
@@ -301,7 +303,7 @@ export default function App() {
   const visible = (snapshot?.messages ?? []).filter(visibleMessage).map((message, index, all) => {
     let previous = index - 1;
     while (previous >= 0 && all[previous].provenance === 'runtime') previous--;
-    return { message, continued: message.provenance === 'runtime' ? index > 0 : previous >= 0 && authorKey(all[previous]) === authorKey(message) };
+    return { message, continued: message.provenance === 'runtime' ? index > 0 : previous >= 0 && authorKey(snapshot!.chat.agent, all[previous]) === authorKey(snapshot!.chat.agent, message) };
   });
   return <div className="app-shell">
     {navigation && <button className="nav-scrim" aria-label="Close conversation navigation" onClick={() => setNavigation(false)}/>}

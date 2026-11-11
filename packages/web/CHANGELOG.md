@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- A background reply signed with the conversation's own agent name (for example "Alfred") shows that agent's avatar and groups with its replies, as the conversation list does.
+
 - Show a background reply's time instead of a "Background" label, and its details as one collapsed row (for example "What I checked") that opens to Markdown.
 
 - Style every shadcn primitive from the pinned registry style with standard neutral tokens; fix Streamdown code block frames and controls; wrap JSON without line numbers.
