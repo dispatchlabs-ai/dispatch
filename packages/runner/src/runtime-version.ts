@@ -113,6 +113,8 @@ export async function selectRuntime(runtimeRoot: string, options: { hold?: boole
       const alive = () => [...close.keys()].filter(pid => { try { process.kill(pid, 0); return true; } catch { return false; } });
       for (let attempt = 0; alive().length && attempt < 600; attempt++) await new Promise(resolve => setTimeout(resolve, 100));
       if (alive().length) throw new Error(`Processes ${alive().join(", ")} on another Pi Durable version did not close within 60 seconds. This runtime was not selected and no store was opened.`);
+      // Their endpoint records now name no process; remove them so no client waits on a closed owner.
+      for (const name of named) await unlink(join(runtimeRoot, name, "service-endpoint.json")).catch(() => {});
       if (sessions.length) await replace(interruptedFile(runtimeRoot), [...new Set([...(await json<string[]>(interruptedFile(runtimeRoot)) ?? []), ...sessions])]);
     }
     if (selected?.piDurable !== piDurableVersion) await replace(runtimeSelectionFile(runtimeRoot), { piDurable: piDurableVersion });
