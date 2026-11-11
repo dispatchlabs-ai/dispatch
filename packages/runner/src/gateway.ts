@@ -12,7 +12,7 @@ const filtered = (options: any) => Object.fromEntries(Object.entries(options ?? 
 // Observed on the Codex route: stalled requests ended only at the gateway's 900 s upstream limit with
 // provider_connection_error, and their retries completed in seconds. The slowest healthy whole responses observed
 // were 55 s (low), 90 s (medium), 228 s (high) and 418 s (max) thinking, so each limit stays well above any
-// healthy silence. Empty deltas do not count as progress. xhigh/max and an unstated level keep the gateway's own limit.
+// healthy silence. Empty or whitespace-only deltas do not count as progress. xhigh/max and an unstated level keep the gateway's own limit.
 const STALL_SECONDS: Record<string, number> = { minimal: 180, low: 180, medium: 300, high: 600 };
 export const stallMs = (reasoning?: string) => (reasoning === undefined ? 0 : STALL_SECONDS[reasoning] ?? 0) * 1000;
 
@@ -108,9 +108,9 @@ export async function refreshGatewayModels(origin: string, models: any, key?: st
         });
         for await (const event of upstream) {
           if (stall.signal.aborted) break;
-          // An empty delta is not progress: a stalled upstream was observed sending empty tool-call argument deltas for
-          // 15 minutes (about 10 MB) without changing the response.
-          if (!(event.type.endsWith('_delta') && !(event as any).delta)) arm();
+          // A delta with no visible content is not progress: stalled requests were observed streaming empty or
+          // whitespace-only tool-call argument deltas for 15 minutes (10+ MB) without changing the response.
+          if (!(event.type.endsWith('_delta') && !String((event as any).delta ?? '').trim())) arm();
           const message = event.type === 'done' ? event.message : event.type === 'error' ? event.error : event.partial;
           if ((event.type === 'done' || event.type === 'error') && terminal) Object.assign(message, terminal);
           message.api = model.api; message.provider = provider;
