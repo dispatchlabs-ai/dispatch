@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-12
+
 - Chat messages carry an optional `details` field (a background reply's supporting material).
 
 - Adopt selected definitions for idle local chats after a release update while retaining unfinished work's stored configuration, matching ordinary CLI recovery.

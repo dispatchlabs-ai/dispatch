@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-12
+
 - `publishReply` accepts optional `details` (label and text): kept on the background-reply entry and in the model message, so the replying agent reads them, and projected on the chat message with the reply's time (`at`) so clients can show them collapsed.
 
 - Run exactly one Pi Durable version per state root. `stateRoot/.runtime.json` records it under a lock: an older runtime refuses to open stores, and any other runtime first closes every live process of another version that owns stores there, waits for all of them, and only then selects itself; interrupted session work is resumed on the selected runtime afterwards. The CLI and `run`/`ChatService.open` (`runtimeRoot`) share the check.
