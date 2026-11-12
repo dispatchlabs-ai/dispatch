@@ -34,7 +34,9 @@ See [definition workspaces](docs/definition-workspaces.md) for separating the
 installation from company definitions, domain workflows and integration code.
 
 For repo-owned immutable application releases, use the
-[shared Nix builder and deployment procedure](docs/nix-releases.md).
+[shared Nix builder and deployment procedure](docs/nix-releases.md). To move a
+machine's profiles, supervised services and sessions to a selected release, see
+[upgrading a machine](docs/upgrade.md).
 
 Hosts can use [durable workflow progress](docs/workflow-progress.md) to report
 separately hosted work in the originating conversation after the initial reply.

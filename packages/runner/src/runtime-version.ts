@@ -17,7 +17,8 @@ export const runtimeSelectionFile = (runtimeRoot: string) => join(runtimeRoot, "
 const holdersDirectory = (runtimeRoot: string) => join(runtimeRoot, ".runtime-holders");
 const interruptedFile = (runtimeRoot: string) => join(runtimeRoot, ".runtime-interrupted.json");
 
-const order = (a: string, b: string) => {
+/** Compare two Pi Durable versions by their release numbers. */
+export const order = (a: string, b: string) => {
   const parse = (value: string) => value.split("-")[0].split(".").map(Number);
   const [x, y] = [parse(a), parse(b)];
   for (let index = 0; index < 3; index++) if ((x[index] ?? 0) !== (y[index] ?? 0)) return (x[index] ?? 0) - (y[index] ?? 0);
@@ -74,8 +75,10 @@ async function locked<T>(runtimeRoot: string, work: () => Promise<T>) {
  * Otherwise every live process of another version that owns stores here (registered
  * holders, and session owners started before holders were recorded) is asked to close
  * normally, and only when all of them are gone does this version become the selection.
- * `hold` registers this process as an owner of stores under the root. */
-export async function selectRuntime(runtimeRoot: string, options: { hold?: boolean } = {}) {
+ * `hold` registers this process as an owner of stores under the root. `beforeSelect` runs
+ * under the same lock once the others have closed and before this version is recorded: it
+ * receives the processes of this version that still own stores here; a throw or `false` selects nothing. */
+export async function selectRuntime(runtimeRoot: string, options: { hold?: boolean; beforeSelect?: (open: number[]) => Promise<void | false> } = {}) {
   await locked(runtimeRoot, async () => {
     const selected = await readRuntimeSelection(runtimeRoot);
     if (selected && order(piDurableVersion, selected.piDurable) < 0)
@@ -83,7 +86,7 @@ export async function selectRuntime(runtimeRoot: string, options: { hold?: boole
     const running = await processes();
     const close = new Map<number, string | undefined>();
     const endpoints = new Map<string, { socket?: string; identity?: string }>();
-    const holders = new Set<number>();
+    const holders = new Set<number>(), owners = new Set<number>();
     for (const name of await readdir(holdersDirectory(runtimeRoot)).catch(() => [] as string[])) {
       const path = join(holdersDirectory(runtimeRoot), name);
       const holder = await json<Holder>(path).catch(() => undefined);
@@ -98,6 +101,7 @@ export async function selectRuntime(runtimeRoot: string, options: { hold?: boole
       const parts = owner?.args.split(/\s+/) ?? [];
       if (!owner || !parts.includes("--session-owner") || parts[parts.indexOf("--session") + 1] !== entry.name) continue;
       endpoints.set(entry.name, endpoint!);
+      owners.add(endpoint!.pid!);
       if (close.has(endpoint!.pid!)) { close.set(endpoint!.pid!, entry.name); continue; }
       if (holders.has(endpoint!.pid!)) continue;
       // An owner from before holders were recorded: read the version beside its module.
@@ -117,6 +121,7 @@ export async function selectRuntime(runtimeRoot: string, options: { hold?: boole
       for (const name of named) await unlink(join(runtimeRoot, name, "service-endpoint.json")).catch(() => {});
       if (sessions.length) await replace(interruptedFile(runtimeRoot), [...new Set([...(await json<string[]>(interruptedFile(runtimeRoot)) ?? []), ...sessions])]);
     }
+    if (await options.beforeSelect?.([...new Set([...holders, ...owners])].filter(pid => !close.has(pid) && pid !== process.pid)) === false) return;
     if (selected?.piDurable !== piDurableVersion) await replace(runtimeSelectionFile(runtimeRoot), { piDurable: piDurableVersion });
     if (options.hold && !held.has(runtimeRoot)) {
       const path = join(holdersDirectory(runtimeRoot), `${process.pid}.json`);

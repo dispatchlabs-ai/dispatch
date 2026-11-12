@@ -41,10 +41,15 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
       shift
       exec ${watcher}/bin/dispatch-watch "$@"
     fi
+    if [ "''${1:-}" = upgrade ]; then
+      shift
+      exec ${runtime}/bin/dispatch-upgrade "$@"
+    fi
     if [ "''${1:-}" = --help ]; then
       @EXECUTION@ "$@"
       echo
       echo '${name} watch --config HOST.json [--session KEY] [--json]'
+      echo '${name} upgrade status|preflight|backup|converge --declaration MACHINE.json'
       exit
     fi
     exec @EXECUTION@ "$@"

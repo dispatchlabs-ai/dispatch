@@ -40,7 +40,8 @@ target. `dispatch-native-tools` supplies the model-free worker endpoint describe
 in [isolated native tools](isolated-native-tools.md).
 
 The default launcher also routes `NAME watch --config HOST.json` to the separate
-[read-only terminal watcher](watch.md). Applications may add a newer watcher
+[read-only terminal watcher](watch.md), and `NAME upgrade` to the selected
+execution Runner's [machine upgrade command](upgrade.md). Applications may add a newer watcher
 without changing the runtime that owns their agent state:
 
 ```nix
@@ -168,7 +169,8 @@ nix-env --profile "$PROFILE" --rollback
 Nix profile generations retain previous closures and change the selection
 atomically. Do not remove generations needed for rollback. Activation does not
 restart an already-running process. Service deployments need their own idle/
-drain, closed-state backup and supervised restart. The optional Fleet package
+drain, closed-state backup and supervised restart; `NAME upgrade` does this for
+a whole machine from one declaration (see [upgrading a machine](upgrade.md)). The optional Fleet package
 supplies worker ownership and retirement; ordinary releases remain inactive.
 
 Binary rollback does not undo Pi schema changes or native definition migrations.

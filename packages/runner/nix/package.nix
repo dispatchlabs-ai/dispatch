@@ -37,7 +37,7 @@ buildNpmPackage {
       ++ lib.optionals withSlack [ ../../slack/src ../../slack/tsconfig.json ]
       ++ lib.optionals withFleet [ ../../fleet/src ../../fleet/scripts ../../fleet/tsconfig.json ]);
   };
-  npmDepsHash = "sha256-2bFltejezTfT3H5HE3sSh4mwXVVEGgDaiLRiWkNSptg=";
+  npmDepsHash = "sha256-D++//KS/wRP5WpERDLwKYCHJ0uXE+FTJPHulhZR+1nY=";
   npmInstallFlags = [ "--workspace=@dispatch/runner" "--include-workspace-root=false" ]
     ++ lib.optionals withBackend [ "--workspace=@dispatch/remote" "--workspace=@dispatch/postgres" "--workspace=@dispatch/backend" ]
     ++ lib.optional withGoogleChat "--workspace=@dispatch/google-chat"
@@ -117,6 +117,8 @@ buildNpmPackage {
       --add-flags "$app/packages/runner/dist/native-tools-cli.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-watch" \
       --add-flags "$app/packages/runner/dist/watch-cli.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-upgrade" \
+      --add-flags "$app/packages/runner/dist/upgrade-cli.js"
     runHook postInstall
   '';
   passthru = { nodejs = nodejs_24; inherit python3; };
