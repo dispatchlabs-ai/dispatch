@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-12
+
 - `mkAgentRelease` accepts `withKit = true`: the release builder composes the [kit](../kit/README.md) of starter agents and skills under the company tree, appends `agents/ROLE/company.md` to that kit role, fails on a company file at a kit path unless `kit.json` declares the replacement with a reason, and records the kit in `release.json` and `share/NAME/kit.json`. Releases built without it are unchanged.
 
 ## [0.8.0] - 2026-11-12
