@@ -30,7 +30,9 @@ export class FleetClient {
       outgoing.on("error", reject); outgoing.end(payload);
     });
   }
-  ensure(run: string, release: FleetRelease, input: unknown) { return this.call<FleetRunStatus>(run, "ensure", { release, input }); }
+  ensure(run: string, release: FleetRelease, input: unknown, updateRelease?: "when-idle") {
+    return this.call<FleetRunStatus>(run, "ensure", { release, input, updateRelease });
+  }
   command<T = unknown>(run: string, command: unknown, timeout?: number, observation = false) {
     return this.call<T>(run, "command", { command, timeout, observation });
   }

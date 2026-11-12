@@ -7,6 +7,7 @@
   interruptible `wait_for_child` controls; retain results through restart without
   automatic transport callbacks. Recover older foreground-owned calls without
   duplicating their children; those calls retain their original blocking wait.
+- Share read-only unfinished-store inspection with Fleet and allow trusted fenced workspace release rebinding without losing source or artifacts.
 
 ## [0.11.0] - 2026-11-12
 

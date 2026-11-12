@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { BACKGROUND_CONTEXT as context } from "@earendil-works/chord/context";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import type { Storage } from "@earendil-works/pi-durable";
+import { unfinishedStores } from "@dispatch/runner";
 
 const root = "/var/lib/dispatch-fleet";
 const arities = new Map([
@@ -95,6 +96,22 @@ async function dispatch(run: string, role: string, request: Request) {
   const operation = state.pending.then(() => execute(run, role, request, state!));
   state.pending = operation.catch(() => {}); return operation;
 }
+
+async function idle(run: string) {
+  if (closing) throw new Error("Storage is closing.");
+  let state = runs.get(run);
+  if (!state) { state = { stores: new Map(), pending: Promise.resolve() }; runs.set(run, state); }
+  const operation = state.pending.then(async () => {
+    const assignment = JSON.parse(await readFile(join(root, "assignments", run + ".json"), "utf8"));
+    if (assignment.fleet) throw new Error("Close the worker ownership before inspecting a release change.");
+    if (state.transitionError) throw state.transitionError;
+    for (const store of state.stores.values()) await store.close(context);
+    state.stores.clear();
+    return { idle: unfinishedStores(join(root, "native", run)).length === 0 };
+  });
+  state.pending = operation.catch(() => {});
+  return operation;
+}
 if (process.getuid?.() !== 0) throw new Error("Coordinator storage must run as root.");
 const socket = "/run/dispatch-fleet/storage.sock";
 await mkdir(dirname(socket), { recursive: true, mode: 0o700 });
@@ -109,10 +126,12 @@ if (await lstat(socket).catch(error => { if (error.code !== "ENOENT") throw erro
 const server = createServer(async (incoming, outgoing) => {
   try {
     const match = /^\/storage\/([a-f0-9]{64})\/([a-z][a-z0-9_-]*)$/.exec(incoming.url ?? "");
-    if (incoming.method !== "POST" || !match) throw new Error("Unknown storage endpoint.");
+    const inspection = /^\/idle\/([a-f0-9]{64})$/.exec(incoming.url ?? "");
+    if (incoming.method !== "POST" || (!match && !inspection)) throw new Error("Unknown storage endpoint.");
     const chunks: Buffer[] = [];
     for await (const chunk of incoming) chunks.push(Buffer.from(chunk));
-    const result = await dispatch(match[1], match[2], JSON.parse(Buffer.concat(chunks).toString()));
+    const result = inspection ? await idle(inspection[1])
+      : await dispatch(match![1], match![2], JSON.parse(Buffer.concat(chunks).toString()));
     outgoing.end(JSON.stringify({ ok: true, result }));
   } catch (error) { outgoing.writeHead(409).end(JSON.stringify({ ok: false, error: diagnostic(error) })); }
 });

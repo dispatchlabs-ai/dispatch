@@ -79,7 +79,14 @@ an active owner. Preserve `/var/lib/dispatch-fleet` and required release archive
 Only the application's trusted root adapter can use `FleetClient` over
 `/run/dispatch-fleet/control.sock`. `ensure(run, release, input)` durably pins a
 SHA-256 run identity, release reference and initial input. Later input uses
-`command`; existing runs cannot change their original release or initial input.
+`command`; the original input is retained. To follow a selected application, first
+`suspend` its worker and pass `"when-idle"` as the fourth `ensure` argument. The
+storage owner closes its handles and checks native tasks/submissions before
+changing the release. Unfinished work keeps its release only when Pi versions
+match; a Pi upgrade requires completing or qualifying that work separately.
+The selected release must preserve the namespace and all existing native roles.
+A new worker epoch rebinds the closed workspace while preserving its EFS source,
+artifacts and recovery receipts. Cancellation intent and run identity stay intact.
 `assignment` and `status` inspect root metadata without asking the native process.
 `suspend` retains work, `cancel` persists cancellation intent before stopping,
 and `finish` removes shared workspace/artifact bytes after the application has
@@ -135,15 +142,19 @@ import { startFleetRelay } from "@dispatch/fleet/relay";
 import { runSlackHost } from "@dispatch/slack";
 
 const client = new FleetClient();
-const bridge = new FleetSlackThreads({ client, release: resolveRetainedRelease });
+const bridge = new FleetSlackThreads({ client, release: resolveSelectedRelease, updateRelease: "when-idle" });
 const relay = await startFleetRelay({ ...trustedRelayOptions, client, bridge });
 await runSlackHost({ ...trustedHostOptions, executeThread: bridge.execute,
   async close() { await trustedHostOptions.close?.(); await relay.close(); },
 });
 ```
 
-The installation supplies the trusted options and maps each retained Slack
-launch to its original `FleetRelease`. Its native adapter uses
+The installation supplies the trusted options and maps the selected Slack
+launch to its `FleetRelease`. With `updateRelease: "when-idle"`, disable
+`retainRelease` on the Slack host and open native stores with
+`updateDefinitions: "when-idle"`. A busy run on the same Pi finishes on its old
+release and closes at its next idle boundary; later input follows the selection.
+Its native adapter uses
 `createFleetSlackRun` to open the complete message graph with `context.storage`
 and `context.env`. Only the root supervisor opens Slack Socket Mode; remote
 delivery uses the run-bound API relay and awaits durable stream receipts.

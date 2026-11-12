@@ -12,8 +12,8 @@ import socketserver
 import struct
 import threading
 
-from common import ROOT, RUNTIME, CONFIG, private_config, valid_run, save, release_reference
-from controller import Controller
+from common import ROOT, RUNTIME, CONFIG, private_config, valid_run, save, release_reference, immutable_path, load_release
+from controller import Controller, UnixConnection
 
 
 class Records:
@@ -70,9 +70,37 @@ class Broker:
             with self.intent_guard:
                 try:
                     value = self.assignment(run)
-                    if value['release'] != body['release'] or value['input'] != body['input']:
-                        raise ValueError('Retained runs keep their original release and input; use command for new input')
+                    if value['input'] != body['input']:
+                        raise ValueError('Retained runs keep their original input; use command for new input')
                     if value.get('finished'): raise ValueError('Finished run needs a new identity')
+                    if value['release'] != body['release']:
+                        if body.get('updateRelease') != 'when-idle':
+                            raise ValueError('Use updateRelease when-idle to select another release')
+                        if value.get('fleet'):
+                            raise ValueError('Suspend the worker before changing its release')
+                        manifest = release_reference(body['release'])
+                        if (manifest['fleet']['namespace'] != value['namespace']
+                                or not set(value['roles']).issubset(manifest['fleet']['roles'])):
+                            raise ValueError('The selected release must preserve the native namespace and roles')
+                        connection = UnixConnection('/run/dispatch-fleet/storage.sock', timeout=30)
+                        try:
+                            connection.request('POST', '/idle/' + run, body=b'{}')
+                            response = connection.getresponse()
+                            inspection = json.loads(response.read())
+                            if response.status != 200 or inspection.get('ok') is not True:
+                                raise ValueError('Could not establish whether the retained native work is idle')
+                        finally: connection.close()
+                        # Suspension alone preserves unfinished work. The storage
+                        # owner closes its handles and checks the fenced stores.
+                        if inspection['result']['idle']:
+                            value['release'] = body['release']
+                            value['roles'] = manifest['fleet']['roles']
+                        else:
+                            def pi_version(release):
+                                path = release['dispatch']['storePath'] + '/lib/dispatch-runner/node_modules/@earendil-works/pi-durable/package.json'
+                                return json.loads(immutable_path(path).read_text())['version']
+                            if pi_version(load_release(value['release']['manifest'])) != pi_version(manifest):
+                                raise ValueError('Unfinished work must finish or be qualified for the selected Pi runtime before upgrading')
                 except RunNotFound:
                     manifest = release_reference(body['release'])
                     value = {'run': run, 'release': body['release'], 'input': body['input'],

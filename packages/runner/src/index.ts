@@ -74,3 +74,5 @@ export { projectChatTurns } from "./chat-turns.js";
 export type { ChatTurn } from "./chat-turns.js";
 export { sessionAgent } from "./session-agent.js";
 export { piDurableVersion, readRuntimeSelection, selectRuntime, takeInterruptedSessions, runtimeSelectionFile } from "./runtime-version.js";
+
+export { unfinishedStores } from "./store-status.js";

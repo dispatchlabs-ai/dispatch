@@ -187,11 +187,15 @@ class Controller:
         if entry: release['runtimeEntryPoint'] = {key: str(Path(value).resolve(strict=True)) for key, value in entry.items()}
         return release
 
-    def bind(self, run, release):
+    def bind(self, run, release, update_release=False):
         record = self.load(run)
-        if record: return record
+        if record and not update_release: return record
         value = self.validate_release(release)
-        record = {'format': 1, 'namespace': self.owner, 'run': run, 'release': value, 'state': 'uncreated', 'artifacts': [], 'createdAt': time.time()}
+        changed = bool(record and record['release'] != value)
+        if changed:
+            if record.get('finished') or record['state'] not in ('deleted', 'uncreated') or self.owned(record):
+                raise ValueError('Close the old workspace projection before changing its release')
+        record = record or {'format': 1, 'namespace': self.owner, 'run': run, 'release': value, 'state': 'uncreated', 'artifacts': [], 'createdAt': time.time()}
         if self.config.get('persistentRoot'):
             retained = self.persistent(run, create=True).parent / 'workspace-state.json'
             if retained.exists():
@@ -199,10 +203,20 @@ class Controller:
                 if not stat.S_ISREG(info.st_mode) or info.st_uid or info.st_nlink != 1:
                     raise ValueError('Invalid persistent workspace lifecycle record')
                 saved = json.loads(retained.read_text())
-                if saved.get('run') != run or saved.get('namespace') != self.owner or saved.get('release') != value:
+                if saved.get('run') != run or saved.get('namespace') != self.owner or (saved.get('release') != value and not update_release):
                     raise ValueError('Persistent workspace belongs to another admitted release')
+                if saved.get('release') != value:
+                    if record['state'] not in ('deleted', 'uncreated') or self.owned(record):
+                        raise ValueError('Close the old workspace projection before changing its release')
+                    changed = True
                 record.update(saved)
                 if record.get('finished'): record['state'] = 'deleted'
+        if changed:
+            if record.get('finished'): raise ValueError('A finished workspace cannot select another release')
+            record['release'] = value
+            for key in ('imageId', 'container', 'name', 'controlPort', 'sandbox', 'writableLayer'):
+                record.pop(key, None)
+            record['state'] = 'uncreated'
         identity, _ = self.location(run)
         paths = [value['definitionsRoot'], *value.get('runtimeEntryPoint', {}).values()]
         roots = {str(Path('/nix/store') / Path(path).parts[3]) for path in paths if path.startswith('/nix/store/')}

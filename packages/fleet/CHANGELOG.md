@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Add opt-in idle release selection after worker closure, preserving native identity, cancellation and EFS state; unfinished work may retain only a compatible Pi runtime.
+
 ## [0.8.0] - 2026-11-12
 
 - Align shared Pi dependencies with Runner at 1.5.2 for native Fable 5.2 support; existing installations remain pinned.

@@ -3,10 +3,9 @@ import { constants, existsSync, lstatSync, readdirSync, readFileSync, realpathSy
 import { cp, mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, matchesGlob, relative } from "node:path";
-import { pathToFileURL } from "node:url";
-import { DatabaseSync } from "node:sqlite";
 import { order as compare, piDurableVersion, readRuntimeSelection, selectRuntime } from "./runtime-version.js";
 import { serviceRequest } from "./service.js";
+import { openStore, unfinishedStores } from "./store-status.js";
 import { hostSupervisor, run, supervisors, type Supervision, type Unit } from "./upgrade-supervisor.js";
 
 /** What one machine declares: the selected releases and everything that runs them. See docs/upgrade.md. */
@@ -245,37 +244,6 @@ async function inspect(declaration: Declaration, options: Options = {}): Promise
   for (const owner of owners) owner.superseded = superseded(`session ${owner.session}`);
   for (const item of running) item.superseded = superseded(item.who);
   return { selected, piDurable: carried.length === 1 ? carried[0] : undefined, problems, services, running, owners, roots, profiles, reach, uninspected, installed: [...units.values()] };
-}
-
-/** Open a store without writing beside it: SQLite treats a store with no pending log as immutable, so it creates no sidecar files. */
-function openStore(path: string) {
-  const location = pathToFileURL(path);
-  if (!statSync(`${path}-wal`, { throwIfNoEntry: false })?.size) location.searchParams.set("immutable", "1");
-  return new DatabaseSync(location, { readOnly: true });
-}
-
-/** Store files under a closed state root that hold unfinished work, by Runner's own definition of busy. Read-only. */
-function unfinishedStores(root: string, skip: string[]): string[] {
-  const found: string[] = [];
-  const walk = (directory: string, depth: number) => {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      const path = join(directory, entry.name);
-      if (entry.isDirectory() && depth < 4 && !entry.name.startsWith(".") && entry.name !== "artifacts" && !skip.includes(path)) walk(path, depth + 1);
-      if (!entry.isFile() || !entry.name.endsWith(".sqlite")) continue;
-      try {
-        const db = openStore(path);
-        try {
-          if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='tasks'").get()) continue;
-          // A calendar schedule asleep until its next occurrence is not work in progress.
-          const pending = db.prepare(`SELECT (SELECT count(*) FROM tasks WHERE status<>'terminal' AND NOT (status='sleeping' AND kind LIKE '%.calendar-schedule'))
-            + (SELECT count(*) FROM submissions WHERE status IN ('queued','placed')) AS n`).get() as { n: number };
-          if (pending.n) found.push(path);
-        } finally { db.close(); }
-      } catch { found.push(`${path} (unreadable)`); }
-    }
-  };
-  if (existsSync(root)) walk(root, 0);
-  return found;
 }
 
 /** Whether a live owner or service reports unfinished work. Unknown counts as unfinished. */

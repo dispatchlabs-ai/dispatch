@@ -10,7 +10,7 @@ import type { FleetRelease, FleetRun, FleetRunContext } from "./types.js";
 
 type ExecuteRequest = Parameters<SlackThreadExecutor>[0];
 type EventHandler = Parameters<SlackThreadExecutor>[1];
-type OwnedThread = { input: SlackThreadInput; admitted?: string; onEvent: EventHandler; closing: boolean; cancelling: boolean };
+type OwnedThread = { input: SlackThreadInput; admitted?: string; onEvent: EventHandler; closing: boolean; cancelling: boolean; retire?: () => void };
 
 function sameThread(left: SlackThreadInput, right: SlackThreadInput) {
   return left.team === right.team && left.channel === right.channel && left.thread === right.thread
@@ -22,8 +22,9 @@ export class FleetSlackThreads {
   private readonly owned = new Map<string, OwnedThread>();
   constructor(readonly options: {
     client: FleetClient;
-    /** Resolve the exact retained launch, never replace it with today's release. */
+    /** Resolve the selected launch. Idle retained runs can follow it after their owner closes. */
     release(request: ExecuteRequest): FleetRelease | Promise<FleetRelease>;
+    updateRelease?: "when-idle";
   }) {}
 
   /** Call only after the root relay has authenticated this run and worker epoch. */
@@ -39,6 +40,8 @@ export class FleetSlackThreads {
     const owned = this.owned.get(run);
     if (!owned) throw new Error("Slack thread has no active coordinator owner.");
     await owned.onEvent(event);
+    const value = event as { type?: string; key?: string };
+    if (value?.type === "idle" && value.key === owned.input.key) owned.retire?.();
   }
 
   readonly execute: SlackThreadExecutor = async (request, onEvent) => {
@@ -82,13 +85,24 @@ export class FleetSlackThreads {
     try {
       const release = await this.options.release(request);
       const retained = await this.options.client.statusOrUndefined(run);
-      if (retained && (!isDeepStrictEqual(retained.assignment.release, release)
-        || !sameThread(retained.assignment.input as SlackThreadInput, request.input))) {
-        throw new Error("Fleet assignment does not match the retained Slack thread and release.");
+      if (retained && !sameThread(retained.assignment.input as SlackThreadInput, request.input)) {
+        throw new Error("Fleet assignment does not match the retained Slack thread.");
       }
       // A supervisor may die after saving Stop but before reaching Fleet.
       if (retained && request.cancelPending) await this.options.client.cancel(run);
-      await this.options.client.ensure(run, release, retained?.assignment.input ?? request.input);
+      if (retained && !isDeepStrictEqual(retained.assignment.release, release)) {
+        if (this.options.updateRelease !== "when-idle") throw new Error("Fleet assignment uses another retained release.");
+        await this.options.client.suspend(run);
+      }
+      const ensured = await this.options.client.ensure(run, release, retained?.assignment.input ?? request.input, this.options.updateRelease);
+      if (!isDeepStrictEqual(ensured.assignment.release, release)) owned.retire = () => {
+        // Acknowledge the worker's durable idle event before asking it to close.
+        // The supervisor replays any input admitted across this exit boundary.
+        const idleKey = owned.input.key;
+        setImmediate(() => {
+          if (owned.input.key === idleKey) void execution.close().catch(console.error);
+        });
+      };
       return execution;
     } catch (error) {
       if (this.owned.get(run) === owned) this.owned.delete(run);

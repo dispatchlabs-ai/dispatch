@@ -50,7 +50,9 @@ def ensure(run, value):
     release = {'definitionsRoot': manifest['definitionsRoot'], 'runtimeRevision': manifest['dispatch']['revision'],
                'runtimeEntryPoint': manifest['runtimeEntryPoint'], 'workspace': manifest['workspace']}
     with controller.locked(run):
-        record = controller.bind(run, release)
+        # Fleet has already closed or fenced the previous epoch before this
+        # worker accepts the assignment. Keep its EFS bytes and lifecycle.
+        record = controller.bind(run, release, update_release=True)
         if record['release'] != controller.validate_release(release):
             raise ValueError('Workspace belongs to another immutable release')
         if not record.get('finished'): controller.ensure(record)
