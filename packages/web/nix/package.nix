@@ -1,4 +1,4 @@
-{ lib, buildNpmPackage, nodejs_24, makeWrapper }:
+{ lib, buildNpmPackage, nodejs_24, makeWrapper, lsof }:
 buildNpmPackage {
   pname = "dispatch-web";
   version = (builtins.fromJSON (builtins.readFile ../package.json)).version;
@@ -59,7 +59,8 @@ buildNpmPackage {
     cp packages/backend/AGENT-CHAT-LICENSE "$out/share/dispatch-web/AGENT-CHAT-LICENSE"
     cp -R packages/web/licenses "$out/share/dispatch-web/licenses"
     ln -s "$app/packages/web/dist/web" "$out/share/dispatch-web/client"
-    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-web" --add-flags "$app/packages/web/dist/server/server/main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-web" --add-flags "$app/packages/web/dist/server/server/main.js" \
+      --prefix PATH : ${lib.makeBinPath [ lsof ]}
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-worker" --add-flags "$app/packages/workers/dist/main.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-bootstrap" --add-flags "$app/packages/web/dist/server/server/bootstrap.js"
     runHook postInstall

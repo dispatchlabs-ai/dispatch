@@ -19,7 +19,7 @@ release operator; metadata does not grant access. Never republish a used version
 
 1. Follow [CONTRIBUTING](../CONTRIBUTING.md), prepare the authorized lockstep version
    with `npm run release -- VERSION`, commit it, then check/build from a clean tree.
-2. In `nix develop`, run `npm ci`, `npm run check`, measured dependency-hash builds
+2. In `nix develop`, run `npm ci`, `npm run build`, `npm run check`, measured dependency-hash builds
    and the affected release artifacts. Do not run automated tests.
 3. `npm run pack:packages -- --out /tmp/dispatch-packages-RELEASE` builds the public
    workspaces in dependency order, checks exact public internal dependencies and

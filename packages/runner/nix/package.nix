@@ -1,4 +1,4 @@
-{ lib, stdenv, buildNpmPackage, nodejs_24, python3, makeWrapper, autoPatchelfHook, libxcb, withBackend ? true, withSlack ? false, withFleet ? false, withGoogleChat ? false }:
+{ lib, stdenv, buildNpmPackage, nodejs_24, python3, makeWrapper, autoPatchelfHook, libxcb, lsof, withBackend ? true, withSlack ? false, withFleet ? false, withGoogleChat ? false }:
 
 assert lib.assertMsg (lib.versions.major nodejs_24.version == "24" && lib.versionAtLeast nodejs_24.version "24.22.1")
   "Runner releases require patched Node 24.22.1+ within 24.x";
@@ -110,13 +110,13 @@ buildNpmPackage {
     }
     JS
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-agent" \
-      --add-flags "$app/packages/runner/dist/agent-cli.js"
+      --add-flags "$app/packages/runner/dist/agent-cli.js" --prefix PATH : ${lib.makeBinPath [ lsof ]}
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-service" \
       --add-flags "$app/packages/runner/dist/service-cli.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-native-tools" \
       --add-flags "$app/packages/runner/dist/native-tools-cli.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-watch" \
-      --add-flags "$app/packages/runner/dist/watch-cli.js"
+      --add-flags "$app/packages/runner/dist/watch-cli.js" --prefix PATH : ${lib.makeBinPath [ lsof ]}
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-upgrade" \
       --add-flags "$app/packages/runner/dist/upgrade-cli.js"
     runHook postInstall

@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+exec nix --extra-experimental-features 'nix-command flakes' develop --command sh -eu -c '
+  npm ci
+  npm run build
+  npm run check
+'

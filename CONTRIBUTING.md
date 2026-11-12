@@ -16,6 +16,10 @@ for private vulnerability reports. Keep reproductions synthetic.
 Automatic checks run on maintainer-owned equipment; this repository does not use
 GitHub Actions. Public check commands below remain independently reproducible.
 Current observed checks and limits are in [the verification record](docs/qualification.md).
+The portable CI entry points are `scripts/check` (locked toolchain, dependency
+installation, build and type checks) and `scripts/check-package` (Nix checks and
+application build). They run no automated functional tests, publish nothing and
+do not deploy a service.
 
 ## Testing policy
 

@@ -72,7 +72,7 @@
           checks.eval-content = eval-content;
           checks.eval-release = eval-release;
           devShells.default = pkgs.mkShell {
-            packages = [ runtime.nodejs_24 ];
+            packages = [ runtime.nodejs_24 pkgs.lsof ];
           };
         };
     in {

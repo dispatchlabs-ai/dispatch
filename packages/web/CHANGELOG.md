@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Include `lsof` in the Nix Web command so Linux process status works without an undeclared host package.
+
 - Update the Web build tool to Vite 8.3.8 and refresh vulnerable locked HTTP/packaging dependencies; rebuild from the new lockfile before adopting these fixes.
 
 - Bring the OpenAPI version and authentication/cache descriptions current; release preparation now advances its version with the packages. Add public onboarding, interface and qualification guidance.

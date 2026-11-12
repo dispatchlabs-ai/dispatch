@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+nix --extra-experimental-features 'nix-command flakes' flake check
+exec nix --extra-experimental-features 'nix-command flakes' build --no-link
