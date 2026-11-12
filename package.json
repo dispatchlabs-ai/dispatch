@@ -13,6 +13,7 @@
     "packages/email",
     "packages/fleet",
     "packages/observer",
+    "packages/kit",
     "packages/web"
   ],
   "engines": {

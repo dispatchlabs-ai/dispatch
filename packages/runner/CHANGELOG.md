@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- `mkAgentRelease` accepts `withKit = true`: the release builder composes the [kit](../kit/README.md) of starter agents and skills under the company tree, appends `agents/ROLE/company.md` to that kit role, fails on a company file at a kit path unless `kit.json` declares the replacement with a reason, and records the kit in `release.json` and `share/NAME/kit.json`. Releases built without it are unchanged.
+
 ## [0.8.0] - 2026-11-12
 
 - `publishReply` accepts optional `details` (label and text): kept on the background-reply entry and in the model message, so the replying agent reads them, and projected on the chat message with the reply's time (`at`) so clients can show them collapsed.

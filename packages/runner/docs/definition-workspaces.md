@@ -102,10 +102,13 @@ connection alone does not prove that an earlier worker stopped.
 
 | Owner | Responsibility |
 | --- | --- |
-| Dispatch packages | Published libraries, service components, channel adapters, client APIs and reusable UI components that independent applications can compose. |
+| Dispatch packages | Published libraries, service components, channel adapters, client APIs and reusable UI components that independent applications can compose; the [kit](../../kit/README.md) of starter agents and skills that name no company, person or host. |
 | Shared infrastructure repositories | Centrally maintained, versioned Terraform/OpenTofu modules for deploying those components and their supporting infrastructure. |
 | Consumer agent/application repository | Agent definitions, skills, domain workflows, company integrations and application composition from selected packages. |
 | Consumer infrastructure repository | Module calls, installation configuration, version selections, secret references, deployment state and rollout. |
+
+Work belongs in the repository of the company whose data and outcome it serves;
+shared machinery belongs in the shared layer under a company-neutral name.
 
 Each consumer owns its installation's principals, credentials and data. Local
 validation uses the selected agent release and capability contracts against an

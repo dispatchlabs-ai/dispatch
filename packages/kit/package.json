@@ -1,0 +1,22 @@
+{
+  "name": "@dispatch/kit",
+  "version": "0.8.0",
+  "private": true,
+  "description": "Starter agents and skills composed into an agent release by the Dispatch Nix builder",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <26"
+  },
+  "scripts": {
+    "build": "node scripts/check.mjs",
+    "pretypecheck": "npm run build --workspace @dispatch/runner",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@dispatch/runner": "0.8.0",
+    "@earendil-works/pi-durable": "1.5.2",
+    "@types/node": "24.19.1",
+    "typescript": "6.0.3"
+  }
+}

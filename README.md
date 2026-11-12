@@ -17,6 +17,8 @@ owns execution, task recovery and authoritative conversation history.
 - [Slack](packages/slack/README.md), [Google Chat](packages/google-chat/README.md)
   and [Email](packages/email/README.md): native channel integrations.
 - [Observer](packages/observer/README.md): read-only desktop native inspection.
+- [Kit](packages/kit/README.md): starter agents and skills a company release can
+  compose instead of copying them.
 
 ## First result
 

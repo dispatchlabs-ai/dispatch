@@ -22,11 +22,12 @@ buildNpmPackage {
       ../../observer/package.json ../../observer/tsconfig.json ../../observer/src
       ../../fleet/scripts ../../observer/scripts ../../observer/licenses
       ../../observer/index.html ../../observer/vite.config.ts
+      ../../kit
       ../package.json ../tsconfig.json ../tsconfig.server.json ../vite.config.ts
       ../index.html ../src ../server ../openapi.yaml ../licenses ../LICENSE ../THIRD_PARTY.md
     ];
   };
-  npmDepsHash = "sha256-7hKbMJvvYx1VJxQF6iR3inW+v9pfG1jDecEEUKEVeBM=";
+  npmDepsHash = "sha256-VYaj0uSV80cq8C3yXUPlqvtljVlzjMyyeLTzfzV/P4c=";
   ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
   npmBuildScript = "build";
   doCheck = true;
@@ -38,6 +39,7 @@ buildNpmPackage {
     mkdir -p "$app/packages" "$out/bin" "$out/share/dispatch-web"
     cp package.json LICENSE "$app/"
     cp -R node_modules "$app/"
+    rm "$app/node_modules/@dispatch/kit" # composed by the agent release builder, not served by Web
     for package in runner remote postgres backend workers slack google-chat email fleet observer web; do
       mkdir -p "$app/packages/$package"
       cp packages/$package/package.json "$app/packages/$package/"

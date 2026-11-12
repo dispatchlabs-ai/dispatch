@@ -64,6 +64,46 @@ viewer separately under `watch`. All execution commands and `runtimeEntryPoint`
 continue to use the selected execution package. Custom application entrypoints
 own their own command routing.
 
+## Starter kit
+
+`withKit = true` composes the [kit](../../kit/README.md) of generic agents and
+skills under the company tree, so a company repository holds only its own
+definitions. The kit comes from the same Dispatch input as the builder:
+
+```nix
+dispatch.lib.mkAgentRelease {
+  inherit system;
+  name = "company-agents";
+  src = source;
+  revision = self.rev;
+  withKit = true;
+}
+```
+
+The builder writes the kit's `agents/`, `skills/` and `kit/` first and the
+company `src` on top, giving the one definitions root Runner reads.
+
+- A company path the kit does not use is added unchanged.
+- `agents/ROLE/company.md` is appended to the kit's `agents/ROLE/agent.md`. Use
+  it for company context a generic role lacks. It must name a kit role that the
+  company does not also replace.
+- A company file at a kit path is a replacement. Declare each one with a reason
+  in `kit.json` at the company root, or the build fails:
+
+  ```json
+  { "replacements": { "agents/developer/agent.md": "Uses the company's own delivery stages" } }
+  ```
+
+  A declaration naming no kit file, or no company file, fails too. Changing a
+  role's model, tools or recipients needs a replacement of its `agent.md` or
+  `agent.ts`.
+
+`release.json` gains `kit` with the kit's revision and version, and
+`share/NAME/kit.json` lists the applied replacements and addenda. Without
+`withKit` the release contains exactly `src` and neither record. Adopting the
+kit or moving its pin changes definitions; apply that through the ordinary idle
+definition update.
+
 ## Build, publish, activate
 
 Build on the target OS/architecture using a clean, published application revision:

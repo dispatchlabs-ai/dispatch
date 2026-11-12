@@ -17,6 +17,18 @@
           runner-google-chat = pkgs.callPackage ./packages/runner/nix/package.nix { inherit (runtime) nodejs_24; withGoogleChat = true; };
           runner-fleet = pkgs.callPackage ./packages/runner/nix/package.nix { inherit (runtime) nodejs_24; withSlack = true; withFleet = true; };
           claude-code-provider = pkgs.callPackage ./packages/runner/nix/claude-code-provider.nix { inherit (runtime) nodejs_24; inherit runner; };
+          # The kit names no owner, company or host, and composes with a company tree.
+          kit-content = pkgs.runCommand "dispatch-kit-content" { } ''
+            ${runtime.nodejs_24}/bin/node ${./packages/kit}/scripts/check.mjs ${./packages/kit}
+            touch $out
+          '';
+          kit-release = self.lib.mkAgentRelease {
+            inherit system;
+            name = "kit-example";
+            src = ./packages/kit/example;
+            revision = self.rev or self.dirtyRev or "uncommitted";
+            withKit = true;
+          };
         in {
           packages = { default = web; inherit runner runner-slack runner-fleet runner-google-chat claude-code-provider; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
             macos-release = pkgs.callPackage ./packages/web/nix/macos-release.nix { inherit web; inherit (runtime) nodejs_24; };
@@ -42,6 +54,8 @@
           checks.runner-fleet = runner-fleet;
           checks.runner-google-chat = runner-google-chat;
           checks.claude-code-provider = claude-code-provider;
+          checks.kit-content = kit-content;
+          checks.kit-release = kit-release;
           devShells.default = pkgs.mkShell {
             packages = [ runtime.nodejs_24 ];
           };
@@ -61,6 +75,14 @@
           watcher = (forSystem system).packages.runner;
           watcherRevision = self.rev or self.dirtyRev or "uncommitted";
           fleetTools = if withFleet then import ./packages/fleet/nix/tools.nix { inherit pkgs; } else null;
+          kit = {
+            src = pkgs.lib.fileset.toSource {
+              root = ./packages/kit;
+              fileset = pkgs.lib.fileset.unions [ ./packages/kit/agents ./packages/kit/skills ./packages/kit/kit ./packages/kit/scripts/compose.mjs ];
+            };
+            revision = self.rev or self.dirtyRev or "uncommitted";
+            version = (builtins.fromJSON (builtins.readFile ./packages/kit/package.json)).version;
+          };
         }) (builtins.removeAttrs args [ "system" "withSlack" "withFleet" "withGoogleChat" "execution" ]);
       packages = eachSystem (system: (forSystem system).packages);
       checks = eachSystem (system: (forSystem system).checks);
