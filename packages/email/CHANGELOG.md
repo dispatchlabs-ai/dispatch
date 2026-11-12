@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- List route labels and consult native per-route receipts before fetching Gmail
+  messages. Preserve later labels, multi-route admission, owned sent copies and
+  filing repairs while avoiding repeated body fetches for completed work.
+- Honor provider retry deadlines during Gmail preparation reads and polling.
+
 ## [0.8.0] - 2026-11-12
 
 - Align shared Pi dependencies with Runner at 1.5.2 for native Fable 5.2 support; existing installations remain pinned.

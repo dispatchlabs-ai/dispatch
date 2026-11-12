@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { Type } from "typebox";
 import {
   AssistantEntry, defineDoc, defineExtension, defineTask, defineTool, type ConversationId, type TaskId,
@@ -51,7 +52,9 @@ function address(value: string) {
 function cleanHeader(value: string) { return value.replace(/[\r\n\0]/g, " ").trim(); }
 function messageIds(value: string) { return value.match(/<[^<>\s]+@[^<>\s]+>/g)?.join(" ") ?? ""; }
 class GmailApiError extends Error {
-  constructor(readonly status: number, path: string) { super(`Gmail ${path.split("?")[0]} failed (${status}).`); }
+  constructor(readonly status: number, path: string, readonly retryAt?: number) {
+    super(`Gmail ${path.split("?")[0]} failed (${status}).${retryAt ? ` Retry after ${new Date(retryAt).toISOString()}.` : ""}`);
+  }
 }
 
 /** Gmail is a transport, not a second conversation store or model executor. */
@@ -102,16 +105,38 @@ export function createAdapter(options: GmailOptions): Adapter {
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     if (response.status === 401) token = undefined;
-    // Do not include response bodies: errors can contain credentials or private mail.
-    if (!response.ok) throw new GmailApiError(response.status, path);
+    if (!response.ok) {
+      const retry = response.headers.get("retry-after");
+      let retryAt = retry ? (/^\d+(?:\.\d+)?$/.test(retry) ? Date.now() + Number(retry) * 1000 : Date.parse(retry)) : 0;
+      if ([403, 429].includes(response.status)) {
+        // Extract only Gmail's retry timestamp; never expose private error bodies.
+        const body = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+        const message = body?.error?.message;
+        const timestamp = typeof message === "string" ? message.match(/\bRetry after (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)/i)?.[1] : undefined;
+        const parsed = timestamp ? Date.parse(timestamp) : NaN;
+        if (Number.isFinite(parsed)) retryAt = Math.max(Number.isFinite(retryAt) ? retryAt : 0, parsed);
+      }
+      throw new GmailApiError(response.status, path, Number.isFinite(retryAt) && retryAt > Date.now() ? retryAt : undefined);
+    }
     return await response.json() as T;
   }
-  async function list(query: string) {
+  async function prepareRead<T>(path: string): Promise<T> {
+    for (;;) {
+      try { return await api<T>(path); }
+      catch (error) {
+        if (!(error instanceof GmailApiError) || !error.retryAt) throw error;
+        console.error("Gmail preparation:", error.message);
+        await delay(Math.max(0, error.retryAt - Date.now()));
+      }
+    }
+  }
+  async function list(query: string, labelIds: string[] = []) {
     const messages: { id: string }[] = [];
     let page = "";
     do {
-      const result = await api<{ messages?: { id: string }[]; nextPageToken?: string }>(
-        `messages?${new URLSearchParams({ q: query, includeSpamTrash: "true", maxResults: "500", ...(page ? { pageToken: page } : {}) })}`);
+      const params = new URLSearchParams({ q: query, includeSpamTrash: "true", maxResults: "500", ...(page ? { pageToken: page } : {}) });
+      for (const label of labelIds) params.append("labelIds", label);
+      const result = await api<{ messages?: { id: string }[]; nextPageToken?: string }>(`messages?${params}`);
       messages.push(...result.messages ?? []);
       page = result.nextPageToken ?? "";
     } while (page);
@@ -122,12 +147,12 @@ export function createAdapter(options: GmailOptions): Adapter {
       const { namespace } = runner;
       await privateStateDirectory(attachmentRoot);
       // Validate the destination before opening stores, which can resume tasks.
-      const profile = await api<{ emailAddress: string }>("profile");
+      const profile = await prepareRead<{ emailAddress: string }>("profile");
       if (profile.emailAddress.toLowerCase() !== options.mailbox.toLowerCase()) throw new Error("Gmail credentials belong to another mailbox.");
       const senders = options.routes.some(route => route.sendEnabled)
-        ? await api<{ sendAs: { sendAsEmail: string; verificationStatus?: string }[] }>("settings/sendAs")
+        ? await prepareRead<{ sendAs: { sendAsEmail: string; verificationStatus?: string }[] }>("settings/sendAs")
         : { sendAs: [] };
-      const available = await api<{ labels: { id: string; name: string }[] }>("labels");
+      const available = await prepareRead<{ labels: { id: string; name: string }[] }>("labels");
       const labels = new Map<string, string>();
       async function ensureLabel(name: string) {
         const existing = available.labels.find(label => label.name === name);
@@ -145,7 +170,12 @@ export function createAdapter(options: GmailOptions): Adapter {
         }
         await ensureLabel(route.label);
       }
-      const Inbox = defineDoc<{ seen: Record<string, number>; threads: Record<string, number>; bindings?: Record<string, Input> }>({
+      type InboxState = {
+        seen: Record<string, number>; threads: Record<string, number>; bindings?: Record<string, Input>;
+        /** Verified immutable From header; only reused while Gmail still lists this sent copy. */
+        sentFrom?: Record<string, string | null>;
+      };
+      const Inbox = defineDoc<InboxState>({
         kind: `${namespace}.gmail-inbox`, version: 1, scope: "session",
         checkpointWhen: () => false, initial: () => ({ seen: {}, threads: {} }),
       });
@@ -449,28 +479,89 @@ export function createAdapter(options: GmailOptions): Adapter {
       let timer: ReturnType<typeof setTimeout> | undefined;
       async function poll() {
         const value = service!;
-        const candidates = await list(`after:${Math.floor(options.startAfter / 1000)} -in:drafts`);
-        const indexes = new Map<string, { seen: Record<string, number> }>();
+        const query = `after:${Math.floor(options.startAfter / 1000)} -in:drafts`;
+        const indexes = new Map<string, Pick<InboxState, "seen" | "sentFrom">>();
         for (const route of options.routes) {
           if (!indexes.has(route.agent)) indexes.set(route.agent,
             (await value.host(route.agent).harness.snapshot(Inbox, context)) ?? { seen: {} });
         }
-        const messages = [];
-        for (const candidate of candidates) {
-          if (closing) return;
-          messages.push(await api<Message>(`messages/${candidate.id}?format=full`));
+        async function admitted(route: GmailOptions["routes"][number], id: string) {
+          const index = indexes.get(route.agent)!;
+          if (index.seen[`${route.address}:${id}`]) return true;
+          // Old single-route receipts must not suppress a newly applied route.
+          const task = index.seen[id] && await value.host(route.agent).harness.getTask(index.seen[id] as TaskId, context);
+          return !!task && (task.input as Input)?.address === route.address;
         }
-        messages.sort((a, b) => Number(a.internalDate) - Number(b.internalDate) || a.id.localeCompare(b.id));
-        for (const message of messages) {
+        const candidates = new Map<string, { labeled: Set<string>; sent: Set<string> }>();
+        const candidate = (id: string) => {
+          if (!candidates.has(id)) candidates.set(id, { labeled: new Set(), sent: new Set() });
+          return candidates.get(id)!;
+        };
+        for (const route of options.routes) {
+          for (const { id } of await list(query, [labels.get(route.label)!])) candidate(id).labeled.add(route.address);
+          // This query discovers sent copies; exact parsed From still decides ownership.
+          for (const { id } of await list(`${query} from:${route.address}`, ["SENT"])) candidate(id).sent.add(route.address);
+        }
+        if (options.unrouted !== "ignore") for (const { id } of await list(query)) candidate(id);
+        const inbox = new Set((await list(query, ["INBOX"])).map(message => message.id));
+        const other = new Set((await list(query, [otherLabel])).map(message => message.id));
+        const messages: { message: Message; full: boolean; sent: Set<string> }[] = [];
+        for (const [id, found] of candidates) {
           if (closing) return;
+          const ownSent = [...found.sent].filter(address => {
+            const route = routeFor(address)!;
+            const from = indexes.get(route.agent)!.sentFrom?.[id];
+            return from === undefined || from === address;
+          });
+          let needsAdmission = false;
+          for (const address of found.labeled) {
+            const route = routeFor(address)!;
+            const own = found.sent.has(address) && indexes.get(route.agent)!.sentFrom?.[id] === address;
+            if (!own && !await admitted(route, id)) needsAdmission = true;
+          }
+          const routed = found.labeled.size > 0 || ownSent.length > 0;
+          const needsFiling = routed
+            ? inbox.has(id) || other.has(id) || ownSent.some(address => !found.labeled.has(address))
+            : options.unrouted !== "ignore" && (inbox.has(id) || !other.has(id));
+          const unknownSender = ownSent.some(address => indexes.get(routeFor(address)!.agent)!.sentFrom?.[id] === undefined);
+          if (!needsAdmission && !needsFiling && !unknownSender) continue;
+          // Filing and sent classification need only headers; fetch bodies only for new work.
+          const full = needsAdmission && !unknownSender;
+          const message = await api<Message>(`messages/${id}?format=${full ? "full" : "metadata&metadataHeaders=From"}`);
+          messages.push({ message, full, sent: found.sent });
+        }
+        messages.sort((a, b) => Number(a.message.internalDate) - Number(b.message.internalDate) || a.message.id.localeCompare(b.message.id));
+        for (const item of messages) {
+          if (closing) return;
+          let message = item.message;
           if (Number(message.internalDate) < options.startAfter || message.labelIds.includes("DRAFT")) continue;
-          const part = message.payload;
-          const labeled = options.routes.filter(route => message.labelIds.includes(labels.get(route.label)!));
-          const sentRoute = message.labelIds.includes("SENT") ? routeFor(address(header(part, "From")) ?? "") : undefined;
+          let part = message.payload;
+          let labeled = options.routes.filter(route => message.labelIds.includes(labels.get(route.label)!));
+          let sentRoute = message.labelIds.includes("SENT") ? routeFor(address(header(part, "From")) ?? "") : undefined;
           // Filing an agent's own sent copy must not start another turn for that identity.
           // Other route labels still admit work, including mail between agents.
-          const routes = labeled.filter(route => route.address !== sentRoute?.address);
+          let routes = [];
+          for (const route of labeled) if (route.address !== sentRoute?.address && !await admitted(route, message.id)) routes.push(route);
+          if (routes.length && !item.full) {
+            message = await apiMailMessage(message.id);
+            if (Number(message.internalDate) < options.startAfter || message.labelIds.includes("DRAFT")) continue;
+            part = message.payload;
+            labeled = options.routes.filter(route => message.labelIds.includes(labels.get(route.label)!));
+            sentRoute = message.labelIds.includes("SENT") ? routeFor(address(header(part, "From")) ?? "") : undefined;
+            routes = [];
+            for (const route of labeled) if (route.address !== sentRoute?.address && !await admitted(route, message.id)) routes.push(route);
+          }
           const filing = [...new Set([...labeled, ...(sentRoute ? [sentRoute] : [])].map(route => labels.get(route.label)!))];
+          if (message.labelIds.includes("SENT")) {
+            const from = address(header(part, "From"));
+            for (const agent of new Set([...item.sent].map(address => routeFor(address)!.agent))) {
+              if (indexes.get(agent)!.sentFrom?.[message.id] === from) continue;
+              await value.host(agent).harness.commit(async tx => {
+                const index = await tx.doc(Inbox);
+                (index.sentFrom ??= {})[message.id] = from;
+              }, context);
+            }
+          }
           if (!filing.length && options.unrouted === "ignore") continue;
           if (!filing.length) filing.push(otherLabel);
           if (message.labelIds.includes("INBOX") || filing.some(label => !message.labelIds.includes(label))
@@ -478,14 +569,7 @@ export function createAdapter(options: GmailOptions): Adapter {
             await api(`messages/${message.id}/modify`, { addLabelIds: filing, removeLabelIds: ["INBOX", ...(filing.includes(otherLabel) ? [] : [otherLabel])] });
           }
           for (const route of routes) {
-            const index = indexes.get(route.agent)!;
             const receiptKey = `${route.address}:${message.id}`;
-            // Existing single-route receipts remain valid without dropping newly labeled routes.
-            if (index.seen[receiptKey]) continue;
-            if (index.seen[message.id]) {
-              const old = await value.host(route.agent).harness.getTask(index.seen[message.id] as TaskId, context);
-              if ((old?.input as Input)?.address === route.address) continue;
-            }
             const sender = address(header(part, "From")) ?? header(part, "From");
             const load = (id: string) => api<{ data: string }>(`messages/${message.id}/attachments/${encodeURIComponent(id)}`);
             const text = await mailText(part, load);
@@ -562,8 +646,11 @@ export function createAdapter(options: GmailOptions): Adapter {
           service = value;
           const tick = () => {
             polling = true;
-            pending = poll().catch(error => { console.error("Gmail polling:", error instanceof Error ? error.message : "failed"); })
-              .finally(() => { polling = false; if (!closing) timer = setTimeout(tick, options.pollMs ?? 15_000); });
+            let nextPoll = options.pollMs ?? 15_000;
+            pending = poll().catch(error => {
+              if (error instanceof GmailApiError && error.retryAt) nextPoll = Math.max(nextPoll, error.retryAt - Date.now());
+              console.error("Gmail polling:", error instanceof Error ? error.message : "failed");
+            }).finally(() => { polling = false; if (!closing) timer = setTimeout(tick, nextPoll); });
           };
           tick();
         },

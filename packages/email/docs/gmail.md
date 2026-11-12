@@ -82,11 +82,17 @@ are left completely unchanged; Gmail filters or another designated consumer must
 file unmatched mail. The default `"file"` retains catch-all filing. Use disjoint
 agent/store ownership across processes, not multiple writers to one native store.
 Multiple labels still fan out through their respective workers. This does not
-provide mailbox-level access isolation or optimize the full polling scan.
+provide mailbox-level access isolation.
 
-Polling defaults to 15 seconds and rereads messages since `startAfter`; this is
-not push/history-based synchronization. The rescan detects labels applied to
-previously seen mail as well as new deliveries. No performance qualification for
+Polling defaults to 15 seconds and lists eligible message IDs since `startAfter`;
+this is not push/history-based synchronization. Route labels and native admission
+receipts identify new work before fetching bodies. Separate Inbox/catch-all
+membership checks retain filing repairs, including when a label is reapplied.
+Sent-header classifications persist in the native inbox document and are reused
+only while Gmail still lists the sent copy for that address. The rescan detects
+later-applied route labels without rereading already-admitted bodies. Provider
+quotas still apply; preparation reads and polling honor a provider-supplied
+`Retry-After` header or Gmail retry timestamp. No performance qualification for
 large mailboxes is implied.
 
 **Enablement is explicit:** `sendEnabled` defaults to false and blocks both tools
