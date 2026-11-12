@@ -91,6 +91,8 @@ company `src` on top, giving the one definitions root Runner reads.
   file, such as a role's `operations.md`.
 - `kit.json` can omit a kit agent or skill, by file or directory, with a reason:
   `{ "omit": { "skills/development": "Uses its own cleanup skill" } }`.
+- `kit.json` can set a kit role's model:
+  `{ "models": { "developer": { "provider": "openai", "id": "gpt-6-astra", "thinking": "high" } } }`.
 - A company file at a kit path is a replacement. Declare each one with a reason
   in `kit.json` at the company root, or the build fails:
 

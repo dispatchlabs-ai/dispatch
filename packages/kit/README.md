@@ -82,6 +82,12 @@ The builder lays the kit down first and the company tree on top.
   ```
 
   Nothing under `kit/` can be omitted; kit agents import and link it.
+- **Model.** `kit.json` can set a kit role's model without replacing its
+  `agent.md`; `thinking` is optional:
+
+  ```json
+  { "models": { "developer": { "provider": "openai", "id": "gpt-6-astra", "thinking": "high" } } }
+  ```
 
 `release.json` records the kit's revision and version under `kit`, and
 `share/NAME/kit.json` lists the replacements, omissions and addenda that were
@@ -94,8 +100,8 @@ through the ordinary idle definition update.
 Each agent's `agent.md` names a provider and model. The host binds those names
 to real model access through its `gateway` or `modelProviders`
 [configuration](../runner/docs/service.md#local-model-providers); the kit holds
-no route or credential. A company that wants another model for a role replaces
-that `agent.md`.
+no route or credential. A company that wants another model for a role sets it
+under `models` in `kit.json`.
 
 The kit agents use only Runner's coding, read and shell tools. A role that
 needs a company tool (a wiki, a tracker) or other message recipients gets them
@@ -106,8 +112,8 @@ missing capability.
 
 - Composition exists only in the Nix builder. A parent Node installation that
   points Runner at a checkout does not get the kit.
-- An addendum adds instructions. It cannot change a role's model, tools,
-  delegates or message recipients.
+- An addendum adds instructions. It cannot change a role's tools, delegates or
+  message recipients; those take a declared replacement of its `agent.ts`.
 - `jett` messages only `development`, and delegates to the five workers. Its
   guide points at the company's other workflows, but it can message them only
   after a declared replacement of `agents/jett/agent.ts` lists them.

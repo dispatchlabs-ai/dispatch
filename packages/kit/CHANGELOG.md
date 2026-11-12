@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- `kit.json` accepts `models`: set a kit role's provider, model and thinking level without replacing its `agent.md`.
+
 ## [0.10.1] - 2026-11-12
 
 - Development no longer names the kit's cleanup skill by its catalog identifier, so omitting that skill leaves no dangling reference.

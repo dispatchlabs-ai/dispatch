@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Kit composition accepts `models` in `kit.json`; see the [kit](../kit/README.md).
+
 ## [0.10.1] - 2026-11-12
 
 - Fix `withEval` releases whose definitions import `@dispatch/eval`: the package is in place before the catalog is built.
