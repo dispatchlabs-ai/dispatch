@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-11-12
+
 - Add opt-in idle release selection after worker closure, preserving native identity, cancellation and EFS state; unfinished work may retain only a compatible Pi runtime.
 
 ## [0.8.0] - 2026-11-12

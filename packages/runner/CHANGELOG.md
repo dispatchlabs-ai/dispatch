@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-11-12
+
 - Let new coordinator input release a `delegate` or `clone_agent` wait while its
   owned native worker continues. Add scoped `steer_child`, `cancel_child` and
   interruptible `wait_for_child` controls; retain results through restart without
