@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-12
+
 - Add `dispatch-upgrade` (and `NAME upgrade` in a release's default launcher): from one machine declaration of the selected releases and their consumers, report what is installed where (`status`), check readiness without changing anything (`preflight`), take a verified closed-state backup of each state root (`backup`, `restore`), and move profiles, supervised launchd or systemd services and session owners to the selection, remove what it supersedes and verify that nothing installed or running can load another Pi Durable (`converge`), with a JSON receipt per run. See [upgrading a machine](docs/upgrade.md). `selectRuntime` accepts `beforeSelect`, run under the state root's lock before the version is recorded.
 
 ## [0.10.2] - 2026-11-12

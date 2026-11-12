@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-12
+
 - Composition no longer copies `kit.json` or applied addendum files into the definitions root, so a skill folder holding only an addendum composes cleanly. The Fable worker's description no longer names a model version. Document composing without the Nix builder.
 
 ## [0.10.2] - 2026-11-12

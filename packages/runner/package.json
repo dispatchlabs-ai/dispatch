@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/runner",
-  "version": "0.10.2",
+  "version": "0.11.0",
   "description": "Standalone Pi Durable company agents",
   "license": "MIT",
   "type": "module",
