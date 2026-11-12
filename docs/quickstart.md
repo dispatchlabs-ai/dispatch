@@ -7,7 +7,7 @@ a model account. It does not measure model quality or run real tools.
 ## Prerequisites and effects
 
 - Git, access to public GitHub/Nix/npm downloads, and Nix with the
-  `nix-command` and `flakes` features enabled. The pinned development shell
+  `nix-command` and `flakes` features available. The pinned development shell
   supplies Node 24.22.1 and npm; no global Node installation is needed.
 - A supported Nix platform: macOS Apple Silicon or Linux. See the
   [verification record](qualification.md) for the exact architectures observed.
@@ -40,6 +40,10 @@ Keep the printed commit with your result: `main` can advance, and a successful
 walkthrough qualifies the commit you actually used. `npm ci` uses the committed
 lockfile. Initial builds may download dependencies and take longer than a warm build.
 `nix develop --command COMMAND ...` is the noninteractive equivalent for agents.
+If these experimental features are not enabled by default, use
+`nix --extra-experimental-features 'nix-command flakes' develop` (and add
+`--command COMMAND ...` for noninteractive use). This enables them for that
+invocation without changing machine configuration.
 
 Leave the last command running. Open **http://127.0.0.1:4319**, using
 `127.0.0.1` rather than `localhost`.
@@ -69,8 +73,9 @@ optional PostgreSQL/outbound-worker composition.
 
 ## Failure and recovery
 
-- **Nix missing or flakes disabled:** report the prerequisite. Do not silently
-  install system software or change the user's Nix configuration.
+- **Nix missing:** report the prerequisite. If Nix is already installed but not
+  on PATH, load its existing shell profile; do not install another copy. Do not
+  silently install system software or change the user's Nix configuration.
 - **Port 4319 occupied:** leave its owner alone. Use
   `DISPATCH_PORT=4329 DISPATCH_CONFIG="$PWD/.local/chat-example/native.json" npm start`
   and open `http://127.0.0.1:4329`. Reuse that port when reopening browser state.
