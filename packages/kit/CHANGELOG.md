@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-11-12
+
 - `kit.json` accepts `models`: set a kit role's provider, model and thinking level without replacing its `agent.md`.
 
 ## [0.10.1] - 2026-11-12

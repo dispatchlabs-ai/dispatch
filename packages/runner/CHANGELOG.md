@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-11-12
+
 - Kit composition accepts `models` in `kit.json`; see the [kit](../kit/README.md).
 
 ## [0.10.1] - 2026-11-12
