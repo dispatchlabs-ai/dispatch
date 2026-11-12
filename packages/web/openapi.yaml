@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Web API",
-    "version": "0.11.1",
+    "version": "0.11.2",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
@@ -60,14 +60,14 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
           "403": {
             "$ref": "#/components/responses/Error403"
           },
           "500": {
             "$ref": "#/components/responses/Error500"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error401"
           }
         }
       }
@@ -93,14 +93,14 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
           "403": {
             "$ref": "#/components/responses/Error403"
           },
           "500": {
             "$ref": "#/components/responses/Error500"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error401"
           }
         }
       },
@@ -121,23 +121,23 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Error403"
-          },
-          "500": {
-            "$ref": "#/components/responses/Error500"
-          },
           "400": {
             "$ref": "#/components/responses/Error400"
           },
-          "415": {
-            "$ref": "#/components/responses/Error415"
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           },
           "409": {
             "$ref": "#/components/responses/Error409"
           },
-          "401": {
-            "$ref": "#/components/responses/Error401"
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
           }
         },
         "requestBody": {
@@ -191,20 +191,20 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Error403"
-          },
-          "500": {
-            "$ref": "#/components/responses/Error500"
-          },
           "400": {
             "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           },
           "404": {
             "$ref": "#/components/responses/Error404"
           },
-          "401": {
-            "$ref": "#/components/responses/Error401"
+          "500": {
+            "$ref": "#/components/responses/Error500"
           }
         },
         "parameters": [
@@ -241,26 +241,26 @@
               }
             }
           },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
           "403": {
             "$ref": "#/components/responses/Error403"
-          },
-          "500": {
-            "$ref": "#/components/responses/Error500"
           },
           "404": {
             "$ref": "#/components/responses/Error404"
           },
-          "400": {
-            "$ref": "#/components/responses/Error400"
+          "409": {
+            "$ref": "#/components/responses/Error409"
           },
           "415": {
             "$ref": "#/components/responses/Error415"
           },
-          "409": {
-            "$ref": "#/components/responses/Error409"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error401"
+          "500": {
+            "$ref": "#/components/responses/Error500"
           }
         },
         "parameters": [
@@ -322,26 +322,26 @@
               }
             }
           },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
           "403": {
             "$ref": "#/components/responses/Error403"
-          },
-          "500": {
-            "$ref": "#/components/responses/Error500"
           },
           "404": {
             "$ref": "#/components/responses/Error404"
           },
-          "400": {
-            "$ref": "#/components/responses/Error400"
+          "409": {
+            "$ref": "#/components/responses/Error409"
           },
           "415": {
             "$ref": "#/components/responses/Error415"
           },
-          "409": {
-            "$ref": "#/components/responses/Error409"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error401"
+          "500": {
+            "$ref": "#/components/responses/Error500"
           }
         },
         "parameters": [
@@ -382,20 +382,20 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Error403"
-          },
-          "500": {
-            "$ref": "#/components/responses/Error500"
-          },
           "400": {
             "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           },
           "404": {
             "$ref": "#/components/responses/Error404"
           },
-          "401": {
-            "$ref": "#/components/responses/Error401"
+          "500": {
+            "$ref": "#/components/responses/Error500"
           }
         },
         "parameters": [
@@ -432,20 +432,20 @@
               }
             }
           },
-          "403": {
-            "$ref": "#/components/responses/Error403"
-          },
-          "500": {
-            "$ref": "#/components/responses/Error500"
-          },
           "400": {
             "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           },
           "404": {
             "$ref": "#/components/responses/Error404"
           },
-          "401": {
-            "$ref": "#/components/responses/Error401"
+          "500": {
+            "$ref": "#/components/responses/Error500"
           }
         },
         "parameters": [
@@ -476,17 +476,17 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
           "403": {
             "$ref": "#/components/responses/Error403"
-          },
-          "500": {
-            "$ref": "#/components/responses/Error500"
           },
           "404": {
             "$ref": "#/components/responses/Error404"
           },
-          "401": {
-            "$ref": "#/components/responses/Error401"
+          "500": {
+            "$ref": "#/components/responses/Error500"
           }
         }
       }
@@ -519,17 +519,17 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
           "403": {
             "$ref": "#/components/responses/Error403"
-          },
-          "500": {
-            "$ref": "#/components/responses/Error500"
           },
           "404": {
             "$ref": "#/components/responses/Error404"
           },
-          "401": {
-            "$ref": "#/components/responses/Error401"
+          "500": {
+            "$ref": "#/components/responses/Error500"
           }
         },
         "parameters": [
@@ -558,14 +558,14 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
           "403": {
             "$ref": "#/components/responses/Error403"
           },
           "500": {
             "$ref": "#/components/responses/Error500"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error401"
           }
         }
       }
@@ -591,14 +591,14 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
           "403": {
             "$ref": "#/components/responses/Error403"
           },
           "500": {
             "$ref": "#/components/responses/Error500"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error401"
           }
         }
       }
@@ -1019,14 +1019,14 @@
           "200": {
             "description": "Authenticated PNG/JPEG/WebP bytes loaded from trusted startup bindings."
           },
-          "404": {
-            "description": "No approved artwork; clients use the placeholder."
-          },
           "401": {
             "$ref": "#/components/responses/Error401"
           },
           "403": {
             "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "description": "No approved artwork; clients use the placeholder."
           }
         }
       }

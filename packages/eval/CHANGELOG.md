@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-11-12
+
 - Retain the evaluation package MIT license in Nix-built agent releases.
 
 ## [0.10.0] - 2026-11-12

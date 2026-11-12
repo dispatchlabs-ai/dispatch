@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-11-12
+
 - Preserve the shared MIT notice at `kit/LICENSE` in direct and Nix compositions; it cannot be omitted or replaced.
 
 ## [0.11.0] - 2026-11-12

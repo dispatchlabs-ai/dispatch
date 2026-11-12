@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-11-12
+
 - Include process discovery's `lsof` dependency in Nix agent/watch commands and the development shell.
 
 - Correct public setup commands, current runtime/distribution guidance and the replacement of Agent Scaffold by the Dispatch Kit.

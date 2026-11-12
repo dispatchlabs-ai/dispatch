@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-11-12
+
 - List route labels and consult native per-route receipts before fetching Gmail
   messages. Preserve later labels, multi-route admission, owned sent copies and
   filing repairs while avoiding repeated body fetches for completed work.

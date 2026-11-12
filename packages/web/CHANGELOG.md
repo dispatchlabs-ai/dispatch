@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-11-12
+
 - Include `lsof` in the Nix Web command so Linux process status works without an undeclared host package.
 
 - Update the Web build tool to Vite 8.3.8 and refresh vulnerable locked HTTP/packaging dependencies; rebuild from the new lockfile before adopting these fixes.
