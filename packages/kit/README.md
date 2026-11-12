@@ -81,6 +81,7 @@ The builder lays the kit down first and the company tree on top.
   { "omit": { "skills/development": "Uses its own cleanup skill" } }
   ```
 
+  The shared MIT notice is retained as `kit/LICENSE` and cannot be replaced.
   Nothing under `kit/` can be omitted; kit agents import and link it.
 - **Model.** `kit.json` can set a kit role's model without replacing its
   `agent.md`; `thinking` is optional:

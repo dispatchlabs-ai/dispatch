@@ -16,6 +16,7 @@ if (!kit || !company || !destination) throw new Error('Usage: compose.mjs KIT CO
 const declaration = 'kit.json';
 const addendum = 'company.md';
 const kitDirectories = ['agents', 'skills', 'kit'];
+const kitLicense = 'kit/LICENSE';
 
 function list(root, directories) {
   const files = [];
@@ -41,7 +42,7 @@ function place(source, target) {
 }
 
 const problems = [];
-const kitFiles = list(kit, kitDirectories);
+const kitFiles = [...list(kit, kitDirectories), kitLicense];
 const kitPaths = new Set(kitFiles);
 const kitFolders = new Set(kitFiles.flatMap(path => path.split('/').slice(0, -1).map((_, index, parts) => parts.slice(0, index + 1).join('/'))));
 const companyFiles = list(company);
@@ -63,6 +64,7 @@ if (companyPaths.has(declaration)) {
   }
 }
 for (const [path, reason] of Object.entries(replacements)) {
+  if (path === kitLicense) problems.push(`${declaration} cannot replace ${kitLicense}; retain the shared kit's license notice.`);
   if (typeof reason !== 'string' || !reason.trim()) problems.push(`${declaration}: the replacement of ${path} needs a reason.`);
   if (!kitPaths.has(path)) problems.push(`${declaration} declares a replacement of ${path}, but the kit has no such file. Remove the entry.`);
   else if (!companyPaths.has(path)) problems.push(`${declaration} declares a replacement of ${path}, but the company tree has no such file. Remove the entry or add the file.`);
@@ -120,7 +122,7 @@ if (problems.length) {
   process.exit(1);
 }
 
-for (const path of kitFiles) if (!companyPaths.has(path) && !omitted(path)) place(join(kit, path), join(destination, path));
+for (const path of kitFiles) if (!companyPaths.has(path) && !omitted(path)) place(join(kit, path === kitLicense ? 'LICENSE' : path), join(destination, path));
 // Addendum sources and the declaration are build inputs: applied below, recorded in the summary, not shipped.
 const applied = new Set(addenda.map(([path]) => path));
 for (const path of companyFiles) if (!applied.has(path) && path !== declaration) place(join(company, path), join(destination, path));

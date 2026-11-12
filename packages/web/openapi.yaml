@@ -2,12 +2,12 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Web API",
-    "version": "0.6.0",
+    "version": "0.11.1",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
     },
-    "description": "Single-user loopback adapter to the consumer-configured native Dispatch runtime. Local mode has no login or bearer credential. Hosted mode requires HTTPS DISPATCH_ORIGIN and a trusted DISPATCH_AUTH_MODULE exporting authorize(request, response) that validates actual credentials/session and authorizes all configured runs; exact configured Host/Origin apply, and API/SSE requests require that authorization. Request-only authorization modules remain compatible. Denied modules may end a 401 browser challenge response and return false; otherwise denial is 403. Health is unauthenticated and secret-free. No per-user grants UI is implemented. Local requests require Host 127.0.0.1:PORT; supplied Origin must equal the server origin; API Fetch Metadata must be same-origin or none; the shell navigation exception is described below. Every write requires the exact Origin header and application/json. No CORS. Cross-site API requests and DNS rebinding hosts receive 403. GET / permits external top-level navigation (Sec-Fetch-Mode navigate, Sec-Fetch-Dest document, no Origin) to the nonsensitive app shell only. Local native processes with the same user remain trusted. DISPATCH_PORT defaults to 4319. Unsupported routes/methods return 404 JSON Error. All responses disable caching, sniffing, framing and cross-origin resource embedding. The optional session-auth module redirects anonymous shell visits to /login and successful form submissions to the original same-origin conversation link (otherwise /). Request text and identities must contain non-whitespace characters. The app sets no character or body-byte cap; native/provider context constraints still apply. GET needs no Origin for browser navigation or native inspection. Named local installations use installation~localId identities; creation sources must belong to the selected installation. Legacy single-installation IDs remain unchanged; one explicitly configured primary named installation may preserve unqualified conversation IDs. Catalogs are lightweight native read-only observations; selected routes use direct identity lookup. Browser IndexedDB stores only per-tab drafts/uncertain outbox, never authoritative conversation state. Optional session-auth.js provides GET/POST /login and POST /logout with a Secure HttpOnly SameSite=Strict host-only session cookie (30-day expiry renewed daily on authenticated requests; DISPATCH_SESSION_STATE_FILE durably retains only digests/expiry bound to credentials and origin); native form writes require the exact Origin. Referrer-Policy is same-origin. External top-level GET /login is allowed by the same document-navigation exception as GET /."
+    "description": "Single-user loopback adapter to the consumer-configured native Dispatch runtime. Local mode has no login or bearer credential. Hosted mode requires HTTPS DISPATCH_ORIGIN and a trusted DISPATCH_AUTH_MODULE exporting authorize(request, response) that validates actual credentials/session and authorizes all configured runs; exact configured Host/Origin apply, and API/SSE requests require that authorization. Request-only authorization modules remain compatible. Denied modules may end a 401 browser challenge response and return false; otherwise denial is 403. Health is unauthenticated and secret-free. No per-user grants UI is implemented. Local requests require Host 127.0.0.1:PORT; supplied Origin must equal the server origin; API Fetch Metadata must be same-origin or none; the shell navigation exception is described below. Every write requires the exact Origin header. API writes require application/json; POST /login requires application/x-www-form-urlencoded, and POST /logout needs no body. No CORS. Cross-site API requests and DNS rebinding hosts receive 403. GET / permits external top-level navigation (Sec-Fetch-Mode navigate, Sec-Fetch-Dest document, no Origin) to the nonsensitive app shell only. Local native processes with the same user remain trusted. DISPATCH_PORT defaults to 4319. Unsupported routes/methods return 404 JSON Error. Native API and HTML responses disable caching; approved avatar artwork uses private caching. Responses disable sniffing, framing and cross-origin resource embedding. The optional session-auth module redirects anonymous shell visits to /login and successful form submissions to the original same-origin conversation link (otherwise /). Request text and identities must contain non-whitespace characters. The app sets no character or body-byte cap; native/provider context constraints still apply. GET needs no Origin for browser navigation or native inspection. Named local installations use installation~localId identities; creation sources must belong to the selected installation. Legacy single-installation IDs remain unchanged; one explicitly configured primary named installation may preserve unqualified conversation IDs. Catalogs are lightweight native read-only observations; selected routes use direct identity lookup. Browser IndexedDB stores only per-tab drafts/uncertain outbox, never authoritative conversation state. Optional session-auth.js provides GET/POST /login and POST /logout with a Secure HttpOnly SameSite=Strict host-only session cookie (30-day expiry renewed daily on authenticated requests; DISPATCH_SESSION_STATE_FILE durably retains only digests/expiry bound to credentials and origin); native form writes require the exact Origin. Referrer-Policy is same-origin. External top-level GET /login is allowed by the same document-navigation exception as GET /."
   },
   "servers": [
     {
@@ -15,7 +15,15 @@
       "description": "Local mode; hosted deployments use their configured HTTPS origin"
     }
   ],
-  "security": [],
+  "security": [
+    {},
+    {
+      "sessionCookie": []
+    },
+    {
+      "basicAuth": []
+    }
+  ],
   "tags": [
     {
       "name": "Agents",
@@ -606,7 +614,8 @@
           "200": {
             "description": "Ready"
           }
-        }
+        },
+        "security": []
       }
     },
     "/login": {
@@ -614,51 +623,176 @@
         "summary": "Sign in or manage the current session (optional session authorization module)",
         "responses": {
           "200": {
-            "description": "HTML sign-in or session page (GET login)"
-          },
-          "303": {
-            "description": "Fixed same-origin redirect after sign-in/sign-out"
-          },
-          "401": {
-            "description": "Incorrect or missing credential"
+            "description": "HTML sign-in or signed-in session page.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "403": {
             "$ref": "#/components/responses/Error403"
           },
-          "413": {
-            "description": "Credential form exceeds 8192 bytes"
-          },
-          "415": {
-            "description": "Use application/x-www-form-urlencoded"
-          },
-          "429": {
-            "description": "Sign-in attempt limit; Retry-After provided"
+          "500": {
+            "$ref": "#/components/responses/Error500"
           }
-        }
+        },
+        "security": [],
+        "operationId": "loginPage",
+        "parameters": [
+          {
+            "name": "returnTo",
+            "in": "query",
+            "required": false,
+            "description": "Return to / or /? with installation, chat, key, title and context query fields. Other destinations normalize to /; no external redirect. This is a query parameter, not a form field.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       },
       "post": {
-        "summary": "Sign in or manage the current session (optional session authorization module)",
+        "summary": "Verify credentials and create a durable session (session-auth module)",
         "responses": {
-          "200": {
-            "description": "HTML sign-in or session page (GET login)"
-          },
           "303": {
-            "description": "Fixed same-origin redirect after sign-in/sign-out"
+            "description": "Same-origin redirect; session cookie set or cleared.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Sanitized returnTo on sign-in, /login on sign-out."
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Secure, HttpOnly, SameSite=Strict __Host-dispatch_session cookie."
+              }
+            }
+          },
+          "400": {
+            "description": "Credential upload disconnected or could not be read.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
-            "description": "Incorrect or missing credential"
+            "description": "Incorrect or missing username/password.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "403": {
             "$ref": "#/components/responses/Error403"
           },
+          "408": {
+            "description": "Credential upload exceeded the 15-second deadline.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "413": {
-            "description": "Credential form exceeds 8192 bytes"
+            "description": "Credential form exceeds 8192 bytes.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "415": {
-            "description": "Use application/x-www-form-urlencoded"
+            "description": "Use application/x-www-form-urlencoded.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "429": {
-            "description": "Sign-in attempt limit; Retry-After provided"
+            "description": "Six sign-in attempts admitted in the preceding minute; retry later.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "security": [],
+        "operationId": "login",
+        "parameters": [
+          {
+            "name": "returnTo",
+            "in": "query",
+            "required": false,
+            "description": "Return to / or /? with installation, chat, key, title and context query fields. Other destinations normalize to /; no external redirect. This is a query parameter, not a form field.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "description": "The exact configured HTTPS origin, without a trailing slash.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "format": "password"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -667,28 +801,50 @@
       "post": {
         "summary": "Revoke the current session (optional session authorization module)",
         "responses": {
-          "200": {
-            "description": "HTML sign-in or session page (GET login)"
-          },
           "303": {
-            "description": "Fixed same-origin redirect after sign-in/sign-out"
-          },
-          "401": {
-            "description": "Incorrect or missing credential"
+            "description": "Same-origin redirect; session cookie set or cleared.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Sanitized returnTo on sign-in, /login on sign-out."
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Secure, HttpOnly, SameSite=Strict __Host-dispatch_session cookie."
+              }
+            }
           },
           "403": {
             "$ref": "#/components/responses/Error403"
           },
-          "413": {
-            "description": "Credential form exceeds 8192 bytes"
-          },
-          "415": {
-            "description": "Use application/x-www-form-urlencoded"
-          },
-          "429": {
-            "description": "Sign-in attempt limit; Retry-After provided"
+          "500": {
+            "$ref": "#/components/responses/Error500"
           }
-        }
+        },
+        "operationId": "logout",
+        "description": "Only supplied by session-auth. Revoke the presented session, close its streams and clear its cookie. With no valid session the same redirect is returned. No request body is required.",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "description": "The exact configured HTTPS origin, without a trailing slash.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "sessionCookie": []
+          }
+        ]
       }
     },
     "/api/chat-link": {
@@ -950,7 +1106,16 @@
           },
           "transport": {
             "type": "string",
-            "enum": ["cli", "web", "slack", "google-chat", "phone", "email", "agent", "schedule"],
+            "enum": [
+              "cli",
+              "web",
+              "slack",
+              "google-chat",
+              "phone",
+              "email",
+              "agent",
+              "schedule"
+            ],
             "description": "Native transport that started an indexed chat. Absent for conversations outside the chat index."
           },
           "addressable": {
@@ -1045,10 +1210,17 @@
           "details": {
             "type": "object",
             "description": "A background reply's supporting material, shown collapsed.",
-            "required": ["label", "text"],
+            "required": [
+              "label",
+              "text"
+            ],
             "properties": {
-              "label": { "type": "string" },
-              "text": { "type": "string" }
+              "label": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
             }
           },
           "error": {
@@ -1158,7 +1330,12 @@
           },
           "readOnly": {
             "type": "string",
-            "enum": ["worker", "internal", "owner", "unavailable"],
+            "enum": [
+              "worker",
+              "internal",
+              "owner",
+              "unavailable"
+            ],
             "description": "Why sending is unavailable: task-run worker, internal service conversation, another process owns it, or the service is unreachable."
           },
           "readOnlyReason": {
@@ -1516,6 +1693,24 @@
           "pattern": "^[a-zA-Z0-9_.-]+$"
         }
       }
+    },
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-dispatch_session",
+        "description": "Hosted session-auth module. Obtain via POST /login over HTTPS; POST /logout revokes this session and closes its streams."
+      },
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Hosted basic-auth module over HTTPS. Credential rotation plus service restart revokes access; no session logout is supplied."
+      }
     }
+  },
+  "x-dispatch-authentication": {
+    "loopback": "Only the empty security alternative applies to unauthenticated local mode; exact Host/Origin and Fetch Metadata checks still apply.",
+    "hosted": "Authorization is mandatory. Select the sessionCookie or basicAuth scheme matching the installation, or supply the custom adapter contract. The empty alternative does not authorize hosted access.",
+    "scope": "A supplied hosted credential authorizes all configured runs, not per-user grants."
   }
 }

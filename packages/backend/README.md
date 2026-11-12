@@ -59,7 +59,7 @@ for replaceable EC2 placements; the fixed worker composition does not replicate 
 
 ## Packaging and limits
 
-Node 24.22.1+, Pi 1.5.0; build dependencies first, then `npm run build --workspace
+Node 24.22.1+, Pi 1.5.2; build dependencies first, then `npm run build --workspace
 @dispatch/backend`. Public exports reference emitted declarations and shipped JS.
 Local synthetic-provider interaction qualifies native/transport/storage behavior,
 not production models, real host tools, hosted identity or cloud installation.

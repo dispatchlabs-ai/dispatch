@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Update the Web build tool to Vite 8.3.8 and refresh vulnerable locked HTTP/packaging dependencies; rebuild from the new lockfile before adopting these fixes.
+
+- Bring the OpenAPI version and authentication/cache descriptions current; release preparation now advances its version with the packages. Add public onboarding, interface and qualification guidance.
+
 ## [0.8.0] - 2026-11-12
 
 - A background reply signed with the conversation's own agent name (for example "Alfred") shows that agent's avatar and groups with its replies, as the conversation list does.

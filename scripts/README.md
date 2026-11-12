@@ -2,7 +2,8 @@
 
 This prepares reusable packages, not an application deployment. Publication needs
 separate explicit authority. The root, Web, Observer, Fleet and channel adapters
-remain private; Web retains the `@dispatch/web` application identity. The public
+are excluded from npm publication with `private: true`; their source remains public
+under MIT. Web retains the `@dispatch/web` application identity. The public
 closure is Runner and Remote, Remote → Postgres, Runner/Remote/Postgres → Backend,
 and Runner/Remote/Backend → Workers. Runner's `./gmail`
 compatibility factory needs the separately installed Email adapter; it is not
@@ -39,7 +40,7 @@ release operator; metadata does not grant access. Never republish a used version
 
    Type-build real imports with NodeNext/strict, `lib: ["ES2024", "DOM",
    "DOM.Iterable"]` and `skipLibCheck: false`. Pi Chord declarations need ES2024
-   Promise types. Pi AI 1.5.0 exposes Google GenAI 2.21.0 declarations, which
+   Promise types. Pi AI 1.5.2 exposes Google GenAI 2.21.0 declarations, which
    reference an optional MCP peer even without MCP use: for full upstream library
    checking install a compatible `@modelcontextprotocol/sdk` (1.32.2 qualified) as
    a consumer dev dependency. This is not a Dispatch runtime requirement. Record
@@ -86,9 +87,10 @@ This does not deploy or change an installed application.
 
 ## Pi reference and deliberate differences
 
-Based on Pi `bd0d815c3197e75323f6db60ee3ad1f73d5280d7` package-artifact,
-public-workspace selection, publishing and external-consumer practices; runtime
-pins stay released Pi 1.5.0 (`f9a26365568127461c47a07a37dcb42c140a3ac5`).
+Rechecked November 12, 2026 against released Pi 1.5.2
+(`b4afdddf44e059c67ccf5097e5317d913521b470`): Durable exports/types/files and exact
+dependencies, `scripts/publish.mjs`, `scripts/check-package-install.mjs` and
+release guidance. Runtime pins use that released version.
 Dispatch uses a small artifact preparer and the manual npm commands above instead
 of Pi's larger release framework, tests or provenance automation. Exact internal
 versions, emitted types, dependency order, reviewed tarball bytes and independent

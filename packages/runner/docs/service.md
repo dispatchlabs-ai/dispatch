@@ -176,7 +176,7 @@ After building and packing Runner, prepare an installation artifact with the
 selected adapter archives:
 
 ```sh
-node packages/runner/scripts/pack-service.mjs installation.tar.gz dispatch-runner-0.6.0.tgz adapter.tgz
+node packages/runner/scripts/pack-service.mjs installation.tar.gz dispatch-runner-0.11.1.tgz adapter.tgz
 ```
 
 Build on the target platform with its pinned Node toolchain. The archive retains

@@ -93,7 +93,7 @@
           kit = {
             src = pkgs.lib.fileset.toSource {
               root = ./packages/kit;
-              fileset = pkgs.lib.fileset.unions [ ./packages/kit/agents ./packages/kit/skills ./packages/kit/kit ./packages/kit/scripts/compose.mjs ];
+              fileset = pkgs.lib.fileset.unions [ ./packages/kit/agents ./packages/kit/skills ./packages/kit/kit ./packages/kit/LICENSE ./packages/kit/scripts/compose.mjs ];
             };
             revision = self.rev or self.dirtyRev or "uncommitted";
             version = (builtins.fromJSON (builtins.readFile ./packages/kit/package.json)).version;
@@ -101,7 +101,7 @@
           eval = {
             src = pkgs.lib.fileset.toSource {
               root = ./packages/eval;
-              fileset = pkgs.lib.fileset.unions [ ./packages/eval/src ./packages/eval/engine ./packages/eval/definitions ./packages/eval/example ./packages/eval/package.json ];
+              fileset = pkgs.lib.fileset.unions [ ./packages/eval/src ./packages/eval/engine ./packages/eval/definitions ./packages/eval/example ./packages/eval/package.json ./packages/eval/LICENSE ];
             };
             revision = self.rev or self.dirtyRev or "uncommitted";
             version = (builtins.fromJSON (builtins.readFile ./packages/eval/package.json)).version;

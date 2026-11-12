@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Correct public setup commands, current runtime/distribution guidance and the replacement of Agent Scaffold by the Dispatch Kit.
+
 ## [0.11.1] - 2026-11-12
 
 - Handle large inventory arrays, inspect declared systemd template instances, keep disabled services stopped during upgrades and backups, and record and restore state ownership and permissions before replacing the original root.

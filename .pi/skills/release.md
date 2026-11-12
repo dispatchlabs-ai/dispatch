@@ -21,7 +21,7 @@ feature assignment does not authorize tags, registries or live deployment.
 4. Use `npm run pack:packages -- --out NEW_DIRECTORY` and the
    [package release path](../../scripts/README.md); install/type-build outside
    the monorepo; inspect
-   exports, declaration paths, files and exact Pi 1.5.0 dependencies. Inspect actual
+   exports, declaration paths, files and exact pinned Pi dependencies. Confirm the OpenAPI version matches the lockstep release. Inspect actual
    archives and images for private information and upstream notices. Scan with
    `scripts/scan-release-artifact.py` as supplementary evidence, never privacy proof.
 5. Retain exact commit, digests, runtime versions, commands/results and limits.
@@ -29,7 +29,7 @@ feature assignment does not authorize tags, registries or live deployment.
 6. Only within release authority, fetch/reconcile, inspect outgoing commits,
    publish normal source, create a new immutable tag and upload checksum-verified
    artifacts. Publish only the prepared public closure under the package release
-   path; private applications are not npm targets. Verify remote bytes,
+   path; application packages marked `private` are not npm targets. Verify remote bytes,
    tag and publication receipts; report unavailable channels specifically.
 
 Never move released tags, blindly overwrite assets or treat a release as permission

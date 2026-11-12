@@ -25,7 +25,7 @@ matching request. Cancelled, completed or replaced requests are discarded.
 Admission and recovery use native tasks and submission identities.
 
 This is a source-alpha package, installed as a packed archive from reviewed
-source. It shares the repository's 0.6.0 development version and has not been
+source. It shares the repository's lockstep version (0.11.1) and has not been
 published to npm.
 See [use cases](USE_CASES.md) and [changes](CHANGELOG.md).
 

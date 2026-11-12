@@ -5,6 +5,18 @@ inspect the full diff and staged/outgoing content for private information before
 committing. Use synthetic data; keep captures and receipts outside public source.
 Publish only within explicit task authority; source publication is not deployment.
 
+## Ownership and contributions
+
+Chris Reynolds, cofounder of Dispatch Labs AI, created Dispatch and maintains the
+project. Contributions are accepted under the existing MIT license; no CLA or
+copyright assignment is required. Preserve contributors' and upstream notices.
+Use GitHub Issues for reproducible bugs and proposals, and [SECURITY.md](SECURITY.md)
+for private vulnerability reports. Keep reproductions synthetic.
+
+Automatic checks run on maintainer-owned equipment; this repository does not use
+GitHub Actions. Public check commands below remain independently reproducible.
+Current observed checks and limits are in [the verification record](docs/qualification.md).
+
 ## Testing policy
 
 Do not add or run automated tests. AI-agent interaction using `agent-browser` is
@@ -58,14 +70,17 @@ for an authorized release. No cleanup or separate acceptance stage is implied.
 
 ## Pi as the packaging reference
 
-Packaging study: Pi `bd0d815c3197e75323f6db60ee3ad1f73d5280d7` (origin/main),
-released 1.5.0 `f9a26365568127461c47a07a37dcb42c140a3ac5` governs runtime.
+Packaging reference, rechecked November 12, 2026: released Pi 1.5.2
+[`b4afddd`](https://github.com/earendil-works/pi/tree/b4afdddf44e059c67ccf5097e5317d913521b470)
+governs the current runtime.
 Read its Durable manifest (exports/types/files/exact dependencies),
 `scripts/publish.mjs`, `scripts/check-package-install.mjs` and release procedure.
-Current main refactors SQLite internals after the release; do not depend on them.
+Use the pinned release's public contracts, not unreleased storage internals.
 Dispatch follows packed, external consumer checks and emitted types/files, not
 Pi tests or CI. The reusable Runner/Remote/Postgres/Backend/Workers closure is
-prepared for public npm distribution; root and applications remain private. Follow
+available as GitHub release archives; npm publication is separate. Root and
+application manifests set `private: true` to exclude npm publication; their
+source is public under MIT. Follow
 [scripts/README.md](scripts/README.md) for reviewed tarball preparation, external
 consumers and separately authorized publication. The PostgreSQL implementation
 uses the **released public Storage** contract, including grouped commit receipts, not copied unreleased SQLite internals.

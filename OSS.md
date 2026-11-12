@@ -5,6 +5,23 @@ Dispatch package. These public standards apply proportionately to the package's
 scope and maturity. [CONTRIBUTING.md](CONTRIBUTING.md) owns the development
 commands, testing policy and publication workflow.
 
+## Public use and maintenance
+
+- Lead with a useful first result and a short "Use it with your AI agent" prompt
+  linking to a public operational guide. State required capabilities, effects and
+  prerequisites, and retain a manual path. Verify the exact prompt in a fresh
+  agent session before describing it as verified.
+- Keep GitHub's description, topics and homepage aligned with supported public
+  capabilities. Record discovery observations separately from successful use.
+- Preserve maintainer-led MIT contribution terms and the public creator credit;
+  no CLA or copyright assignment is required. See [CONTRIBUTING](CONTRIBUTING.md).
+- Run automatic checks on maintainer-owned infrastructure, not GitHub Actions.
+  Public source/type/build commands and synthetic examples must work independently.
+  Follow this repository's explicit prohibition on automated functional tests.
+- Obtain independent open-source and security review before declaring an initial
+  release ready. Record the scope of later reviews and fresh-user verification in
+  the [verification record](docs/qualification.md).
+
 ## Public information boundary
 
 Keep secrets and private company, customer, infrastructure and personal
@@ -55,6 +72,10 @@ Before committing or publishing:
 - Build supported clients on shared application operations and authorization.
   Preserve permissions, validation, data visibility and usage attribution across
   interfaces for the same identity and scope.
+- Keep a versioned HTTP contract and [operation-to-interface inventory](docs/interfaces.md).
+  Document intentional differences, local filesystem authority, authenticated
+  service access and separate administration. Verify relevant denials, revocation,
+  uncertain retries and recovery; do not claim parity from schema coverage alone.
 - Document inputs, outputs, errors, side effects, continuation and retry behavior.
   Keep machine-readable contracts current where the package exposes them;
   schema coverage alone does not establish working integration.

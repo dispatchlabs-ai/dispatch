@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Retain the evaluation package MIT license in Nix-built agent releases.
+
 ## [0.10.0] - 2026-11-12
 
 - Add the evaluation package. `dispatch.lib.mkAgentRelease { withEval = true; }` installs `bin/dispatch-eval`: a read-only native record reader (`records`), one step of one use-case package in a native session (`run`: collect or rerun, grade, publish), the engine's commands (`engine`: `plan-run`, `compare`, `status`, `agreement`, `publish`, `report`, `runs`) and a store converter (`convert`). The session's owner is a built-in agent, so a company repository supplies only use-case packages and bindings. Definitions can import `@dispatch/eval/grading`, `@dispatch/eval/records` and `@dispatch/eval/task`.

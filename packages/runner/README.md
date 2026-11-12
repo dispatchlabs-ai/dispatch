@@ -12,23 +12,21 @@ Storage interface and an explicit isolated execution environment. The optional
 1.5.2. It loads trusted definitions, owns each SQLite session, schedules native
 tasks and exposes persistent shared conversations without a web server.
 
-This is a source-alpha package. Its current 0.6.0 manifest follows the repository
-version; registry publication is prepared, not claimed. See the
-[package release path](https://github.com/dispatchlabs-ai/dispatch/blob/main/scripts/README.md). The
-[agent scaffold](https://github.com/dispatchlabs-ai/agent-scaffold) provides a
-complete terminal example with an integrity-pinned public runner archive.
-For source builds, pack a reviewed revision as below. See the
-[use cases](USE_CASES.md) and [changes](CHANGELOG.md).
-
-The `runner-v0.6.0-alpha.5` GitHub prerelease is a Runner/Slack source snapshot
-using Pi 1.4.0. Its notes identify the exact source commit and archive checksums.
-The archives retain the repository's 0.6.0 package version; their immutable tag,
-URL and npm lockfile integrity identify the snapshot. Install in the parent
-runtime workspace:
+This source-alpha package follows Dispatch's lockstep version, currently 0.11.1.
+The [v0.11.1 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.11.1)
+provides a Runner archive, source manifest and checksums. It is not published to
+npm. Install the archive in your own runtime workspace:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/runner-v0.6.0-alpha.5/dispatch-runner-0.6.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.11.1/dispatch-runner-0.11.1.tgz
 ```
+
+The [Dispatch Kit](https://github.com/dispatchlabs-ai/dispatch/blob/main/packages/kit/README.md) supplies reusable starter agents through the
+shared release builder. It replaces the archived Agent Scaffold. For a complete
+browser walkthrough with no credentials, use the [quickstart](https://github.com/dispatchlabs-ai/dispatch/blob/main/docs/quickstart.md).
+For source packing and external-consumer checks, follow the
+[package guide](https://github.com/dispatchlabs-ai/dispatch/blob/main/scripts/README.md). See [use cases](USE_CASES.md) and
+[changes](CHANGELOG.md).
 
 See [definition workspaces](docs/definition-workspaces.md) for separating the
 installation from company definitions, domain workflows and integration code.
@@ -49,12 +47,13 @@ conversation-scoped downloads and transport receipts.
 
 Keep the resulting lockfile. Snapshot updates use a new immutable tag and URL;
 published assets are never replaced. This distribution does not change the
-repository's lockstep version policy. Applications and channel adapters remain
-private; the reusable runtime closure is prepared for separate npm publication.
+repository's lockstep version policy. Application and channel packages are public MIT source but excluded from npm
+publication. The reusable runtime closure has GitHub archives and a separate
+npm publication path.
 
 ## Try it without credentials
 
-Node 22.19 or later is required. From the Dispatch repository's Nix shell:
+Node 24.22.1 is supplied by the pinned development shell. From the Dispatch repository's Nix shell:
 
 ```sh
 npm ci
@@ -67,7 +66,7 @@ In a new directory, create a private ESM package and install the archive:
 ```sh
 npm init -y
 npm pkg set type=module
-npm install /tmp/dispatch-runner-0.6.0.tgz
+npm install /tmp/dispatch-runner-0.11.1.tgz
 mkdir -p agents/helper
 ```
 
@@ -321,8 +320,7 @@ handoff children; applications with pinned domain configurations use the
 code is not transitively hashed.
 
 Runner source builds now pin Pi 1.5.2, including the terminal UI dependency.
-Remote, Observer and the transport adapters also pin 1.5.2. Web remains on its
-separate Pi 1.4.0 dependencies; its upgrade is deferred. Custom storage providers
+Remote, Observer, Web and the transport adapters also pin 1.5.2. Custom storage providers
 must implement Pi 1.5 grouped commits before use
 with this runner. Pi 1.5 writes newer native live-document and task versions that
 Pi 1.4 cannot resume. Before upgrading, stop the owner and back up

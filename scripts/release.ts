@@ -83,6 +83,12 @@ function main() {
   lock.version = next;
   updates.set("package-lock.json", `${JSON.stringify(lock, null, 2)}\n`);
 
+  const contractPath = "packages/web/openapi.yaml";
+  const contract = readJson(contractPath);
+  if (contract.info.version !== current) throw new Error("Web API contract version is not in lockstep.");
+  contract.info.version = next;
+  updates.set(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
+
   const date = new Date().toISOString().slice(0, 10);
   let changed = false;
   for (const path of packages) {
