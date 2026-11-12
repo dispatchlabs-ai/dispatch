@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Add an optional SDK-injected Socket Mode broker with durable capture before
+  acknowledgement, ordered local replay, stable journal identity and explicit
+  upstream coverage gaps for independent channel hosts.
+
 - Align shared Pi dependencies with Runner at 1.5.2 for native Fable 5.2 support; existing installations remain pinned.
 
 ## [0.7.0] - 2026-11-09

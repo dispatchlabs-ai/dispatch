@@ -51,6 +51,11 @@ Accepted November 9, 2026; integration with other clients remains to be qualifie
   opens the same thread's durable conversation in another client while preserving
   human authorship, the agent principal, audience permissions and reply routing.
 
+- **SLK-009 — Recover channel transport:** Independent channel hosts share one
+  Socket Mode receiver that persists messages before acknowledgement, replays
+  local receipts after IPC reconnect and exposes durable upstream outage ranges
+  for authorized history reconciliation without repeating routine history reads.
+
 See [Runner's cross-interface goal](../runner/USE_CASES.md#2-portable-agents-and-published-packages)
 and the [ownership direction](../runner/docs/definition-workspaces.md#accepted-portable-agent-direction).
 

@@ -9,6 +9,11 @@
     "node": ">=22.19.0"
   },
   "exports": {
+    "./broker": {
+      "types": "./dist/broker.d.ts",
+      "import": "./dist/broker.js",
+      "default": "./dist/broker.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"

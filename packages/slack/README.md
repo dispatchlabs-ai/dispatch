@@ -25,9 +25,68 @@ matching request. Cancelled, completed or replaced requests are discarded.
 Admission and recovery use native tasks and submission identities.
 
 This is a source-alpha package, installed as a packed archive from reviewed
-source. It shares the repository's 0.6.0 development version and has not been
+source. Its manifest follows the repository's lockstep version; immutable source
+snapshot tags and archive integrity identify each installation. It has not been
 published to npm.
 See [use cases](USE_CASES.md) and [changes](CHANGELOG.md).
+
+## Durable broker for channel hosts
+
+`@dispatch/slack/broker` exports `SlackSocketBroker`, `SlackEventJournal` and the
+journal/event protocol types. It uses Node's SQLite and Unix sockets without
+importing Runner, Pi or an SDK. A trusted host supplies its SDK transport,
+normalizer, authenticated download callback, account/team/channel identifiers,
+private state/socket paths and exclusive ownership socket. Credential lookup and
+SDK selection remain with that host. This optional broker does not replace the
+existing `slack()` adapter or change native conversation storage.
+Give each broker a dedicated socket directory; its `broker.json` status file
+lives beside the socket.
+
+Create `new SlackSocketBroker(options)`, call `await broker.start()`, and close it
+on process termination with `await broker.close()`. `onFatal(message)` runs after
+shutdown; the host must restart or exit unsuccessfully. New journals require an
+explicit `handoverAfter` Slack timestamp identifying the beginning of upstream
+coverage. Existing journals retain that bound and their UUID; never replace them
+with empty state during an upgrade. State grows with retained receipts; there is
+no automatic pruning or history limit.
+
+The broker commits each normalized message and upstream delivery identifiers
+before acknowledging Slack. The account-wide sequence is monotonic and
+`channelId:ts` deduplicates messages. A channel host uses newline-delimited JSON
+over the private Unix socket:
+
+```json
+{"id":"resume-1","type":"subscribe","channelId":"C0123456789","journalId":"saved-journal-uuid","afterSequence":42}
+```
+
+Omit `journalId` and use `afterSequence: 0` only for a new subscriber. The broker
+rejects a changed identity or an invalid/out-of-range cursor. It writes ordered
+`{type:"event", sequence, journalId, event}` replay envelopes before returning
+`{id, ok:true, result:{subscriptionId, state, journal}}`; live events cannot pass
+that replay. Persist each cursor with its received event before admitting work.
+Stream backpressure can end a subscription before its response. Commit each
+received event/cursor immediately, then retry from that cursor; partial replay
+is retained progress. A large control frame can drain without forcing reconnect.
+`status` returns current process/transport identity plus the same journal;
+`unsubscribe` takes `subscriptionId`, and `download` delegates a file reference
+to the host. Unsupported RPCs return `{id, ok:false, error}`.
+
+The journal is `{id, coverageStart, sequence, gaps:[{id, oldest, latest}]}`.
+Channel IPC reconnects replay local receipts without creating upstream gaps.
+Upstream `close` and broker restart open a durable gap from the prior connection's
+start, since loss detection does not prove earlier delivery. Repeated failures
+preserve that bound. Only SDK `connected` (Slack hello), never `authenticated`,
+closes it. The broker synchronously commits and publishes
+`{type:"transport", state, journal}` before subsequent live events. Consumers
+must suspend admission while disconnected and reconcile newly closed gaps using
+their authorized Slack reader before admitting overlapping arrivals. Closed gaps
+are immutable. Journal receipts prove capture, not native admission or delivery.
+
+Socket Mode acknowledgement failures trigger shutdown and restart with the
+receipt intact. A failed subscriber cannot invalidate committed capture; it
+resumes using its own durable cursor. The host must ensure only one Socket Mode
+consumer owns the app; the exclusive ownership socket is acquired before the
+broker changes its stable filesystem endpoint.
 
 Runner's [artifact tools](../runner/docs/artifacts.md) upload documents/images
 to the authenticated originating thread using Slack's external-upload flow.
