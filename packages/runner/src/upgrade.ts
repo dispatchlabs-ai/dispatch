@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { constants, existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { cp, mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { chmod, cp, lchown, mkdir, readdir, readFile, rename, rm, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, matchesGlob, relative } from "node:path";
 import { order as compare, piDurableVersion, readRuntimeSelection, selectRuntime } from "./runtime-version.js";
@@ -117,7 +117,7 @@ class Reach {
       for (const stack = [data]; stack.length;) {
         const item = stack.pop();
         if (typeof item === "string") for (const inner of this.versions(item, who, namespace, seen)) found.add(inner);
-        else if (item && typeof item === "object") stack.push(...Object.values(item));
+        else if (item && typeof item === "object") for (const value of Object.values(item)) stack.push(value);
       }
     }
     return found;
@@ -293,7 +293,7 @@ async function plan(declaration: Declaration, options: Options): Promise<Plan> {
     if (service.superseded.length) problems.push(`${label}: the definition or configuration of ${service.unit} names ${service.superseded.join(", ")}; point it at the selection (or a declared profile) first`);
     if (!reason) continue;
     restart.push({ label, supervision: consumer.supervision!, expected: service.expected });
-    moves.push(`${label}: ${service.unit} ${service.running ? "restarts" : "starts"} (${reason})`);
+    moves.push(`${label}: ${service.unit} ${service.running ? "restarts" : service.expected ? "starts" : "stays stopped"} (${reason})`);
     const socket = configOf(consumer).socket;
     if (service.running && socket ? await busy(socket) : root !== undefined && unfinishedStores(root, live).length > 0) problems.push(`${label}: ${service.unit} has unfinished work; let it finish or stop it`);
     if (root) live.push(root);
@@ -312,7 +312,12 @@ async function plan(declaration: Declaration, options: Options): Promise<Plan> {
 const files = async (directory: string) => (await readdir(directory, { recursive: true, withFileTypes: true }))
   .filter(entry => entry.isFile()).map(entry => relative(directory, join(entry.parentPath, entry.name))).sort();
 const digest = async (path: string) => createHash("sha256").update(await readFile(path)).digest("hex");
-type BackupManifest = { schemaVersion: 1; source: string; piDurable?: string; takenFor?: string; created: string; files: Record<string, { size: number; sha256: string }> };
+type Metadata = { uid: number; gid: number; mode: number };
+type BackupManifest = { schemaVersion: 1 | 2; source: string; piDurable?: string; takenFor?: string; created: string;
+  files: Record<string, { size: number; sha256: string }>; metadata?: Record<string, Metadata> };
+const metadataOf = async (directory: string, names?: string[]): Promise<Record<string, Metadata>> => Object.fromEntries(
+  (names ?? [".", ...(await readdir(directory, { recursive: true, withFileTypes: true })).map(entry => relative(directory, join(entry.parentPath, entry.name)))])
+    .map(name => { const { uid, gid, mode } = lstatSync(join(directory, name)); return [name, { uid, gid, mode }]; }));
 
 /** Copy a closed state root, then prove the copy: every file's digest against the source, and SQLite's own check of every store. */
 async function backupRoot(root: Root, directory: string, takenFor?: string) {
@@ -320,7 +325,8 @@ async function backupRoot(root: Root, directory: string, takenFor?: string) {
   await mkdir(target, { recursive: true, mode: 0o700 });
   const transient = (path: string) => /\.lock$|\.sock$/.test(path) || basename(path) === ".runtime-holders" || lstatSync(path).isSocket();
   await cp(root.root, state, { recursive: true, preserveTimestamps: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE, filter: source => !transient(source) });
-  const manifest: BackupManifest = { schemaVersion: 1, source: root.root, piDurable: root.recorded, takenFor, created: new Date().toISOString(), files: {} };
+  const manifest: BackupManifest = { schemaVersion: 2, source: root.root, piDurable: root.recorded, takenFor, created: new Date().toISOString(), files: {},
+    metadata: await metadataOf(root.root, Object.keys(await metadataOf(state))) };
   for (const file of await files(state)) {
     const sha256 = await digest(join(state, file));
     if (sha256 !== await digest(join(root.root, file))) throw new Error(`Backup of ${root.root} differs from its source at ${file}; the state root was not closed.`);
@@ -344,6 +350,12 @@ async function verifyBackup(path: string) {
   const present = await files(state);
   if (present.length !== Object.keys(manifest.files).length) throw new Error(`${path} holds ${present.length} files; its manifest lists ${Object.keys(manifest.files).length}.`);
   for (const file of present) if (manifest.files[file]?.sha256 !== await digest(join(state, file))) throw new Error(`${path}: ${file} does not match the manifest.`);
+  if (manifest.schemaVersion === 2) {
+    const metadata = await metadataOf(state);
+    if (!manifest.metadata || Object.keys(metadata).length !== Object.keys(manifest.metadata).length
+      || Object.entries(metadata).some(([name, item]) => (item.mode & constants.S_IFMT) !== (manifest.metadata![name]?.mode & constants.S_IFMT)))
+      throw new Error(`${path}: backup entries do not match the manifest.`);
+  }
   await checkStores(state, present);
   return manifest;
 }
@@ -355,9 +367,23 @@ export async function restore(path: string, to?: string) {
     ...(existsSync(join(root, ".runtime-holders")) ? readdirSync(join(root, ".runtime-holders")).map(name => Number(name.split(".")[0])) : [])].filter(alive) : [];
   if (open.length) throw new Error(`${root} is open by process ${open.join(", ")}. Stop its consumers first; nothing was changed.`);
   const replaced = existsSync(root) ? `${root}.replaced-${stamp()}` : undefined;
-  if (replaced) await rename(root, replaced);
-  await cp(join(path, "state"), root, { recursive: true, preserveTimestamps: true, verbatimSymlinks: true });
-  for (const [file, { sha256 }] of Object.entries(manifest.files)) if (sha256 !== await digest(join(root, file))) throw new Error(`${root}: restored ${file} does not match the backup.`);
+  const staged = `${root}.restore-${stamp()}-${process.pid}`;
+  // Older backups did not record source ownership; their copy's metadata is all that remains available.
+  const metadata = manifest.metadata ?? await metadataOf(join(path, "state"));
+  if (!manifest.metadata) console.error(`${path}: legacy backup; ownership comes from the backup copy, not a source ownership record.`);
+  try {
+    await cp(join(path, "state"), staged, { recursive: true, preserveTimestamps: true, verbatimSymlinks: true });
+    for (const [file, { sha256 }] of Object.entries(manifest.files)) if (sha256 !== await digest(join(staged, file))) throw new Error(`${root}: restored ${file} does not match the backup.`);
+    // Apply parents last, so private directory modes do not prevent restoring their children.
+    for (const name of Object.keys(metadata).sort((a, b) => b.split("/").length - a.split("/").length || (a === "." ? 1 : b === "." ? -1 : 0))) {
+      const entry = join(staged, name), saved = metadata[name], current = lstatSync(entry);
+      if (current.uid !== saved.uid || current.gid !== saved.gid) await lchown(entry, saved.uid, saved.gid);
+      if (!current.isSymbolicLink()) await chmod(entry, saved.mode & 0o7777);
+    }
+    if (replaced) await rename(root, replaced);
+    try { await rename(staged, root); }
+    catch (error) { if (replaced) await rename(replaced, root); throw error; }
+  } catch (error) { await rm(staged, { recursive: true, force: true }); throw error; }
   return { root, from: path, piDurable: manifest.piDurable, files: Object.keys(manifest.files).length, replaced };
 }
 
@@ -469,14 +495,15 @@ export async function converge(declaration: Declaration, options: Options & { on
       did(`${profile.of}: profile ${profile.path} selects ${profile.package}`);
     }
   } catch (error) { receipt.failures.push((error as Error).message); }
-  // Whatever happened above, a service this run stopped is started again.
+  // Restore services that were running; converge also starts services expected to be up.
   const started = new Map<Supervision, number | undefined>();
   for (const item of planned.restart) {
     if (receipt.failures.length && !stopped.includes(item)) continue;
+    if (!ran.has(item.supervision) && (options.only || !item.expected)) continue;
     try {
       await supervisors[item.supervision.kind].start(item.supervision);
       did(`${item.label}: ${item.supervision.unit} ${ran.has(item.supervision) ? "restarted" : "started"}`);
-      if (item.expected) started.set(item.supervision, undefined);
+      started.set(item.supervision, undefined);
     } catch (error) { receipt.failures.push((error as Error).message); }
   }
   // Started is not up: a service that exits is started again by its supervisor, so require one process to last.

@@ -105,7 +105,8 @@ owner anything.
   a closed store is read without being opened for writing.
 - **backup** closes each declared state root (services through their
   supervisor, idle session owners with their ordinary shutdown), copies it,
-  verifies the copy and starts the services again.
+  verifies the copy and restarts the services that were running. Disabled,
+  stopped services stay stopped.
 - **converge** runs the preflight and stops there, changing nothing, if it
   refuses. Otherwise it stops the services that must restart, closes idle
   session owners that are on another runtime or an earlier release, takes the
@@ -136,7 +137,11 @@ does not verify, and 2 for a usage or declaration error.
 
 A backup is `stateDirectory/backups/NAME-ID-TIME/` holding `state/`, a complete
 copy of the state root without sockets and lock files, and `backup.json` with
-the source, the Pi Durable that owned it and each file's size and SHA-256. It is
+the source, the Pi Durable that owned it, each file's size and SHA-256, and the
+owner, group and mode of every file, directory and symlink. Restore prepares and
+verifies a replacement before moving the existing root, and requires permission
+to reproduce the recorded ownership. Older backups without that record retain
+the ownership of their backup copy. It is
 taken under the lock every Runner takes before opening a store in that root,
 after everything that owns stores there has closed and before the new version
 is recorded. It is verified before the upgrade continues: every file's digest

@@ -4,6 +4,7 @@
 
 ## [0.11.1] - 2026-11-12
 
+- Handle large inventory arrays, inspect declared systemd template instances, keep disabled services stopped during upgrades and backups, and record and restore state ownership and permissions before replacing the original root.
 - Let new coordinator input release a `delegate` or `clone_agent` wait while its
   owned native worker continues. Add scoped `steer_child`, `cancel_child` and
   interruptible `wait_for_child` controls; retain results through restart without

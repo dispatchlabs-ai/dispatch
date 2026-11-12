@@ -90,11 +90,13 @@ const systemd: Supervisor = (() => {
     if (result.code !== 0) throw new Error(`systemctl ${args.join(" ")} ${service.unit}: ${result.stderr.trim()}`);
   };
   return {
-    async units() {
+    async units(declared) {
       const units: Unit[] = [];
       for (const scope of ["system", "user"] as const) {
         const listed = (await ctl(scope, "list-unit-files", "--type=service", "--no-legend", "--no-pager")).stdout;
-        for (const unit of [...new Set(listed.split("\n").map(line => line.trim().split(/\s+/)[0]).filter(name => name && !name.includes("@.")))].sort()) {
+        const names = new Set(listed.split("\n").map(line => line.trim().split(/\s+/)[0]).filter(name => name && !name.includes("@.")));
+        for (const service of declared) if ((service.scope ?? "user") === scope) names.add(service.unit);
+        for (const unit of [...names].sort()) {
           // The effective unit: its file together with every drop-in that overrides it.
           const shown = await ctl(scope, "cat", "--no-pager", unit);
           if (shown.code !== 0) continue;
