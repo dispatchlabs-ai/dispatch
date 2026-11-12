@@ -6,21 +6,53 @@ installation, model-quality or security qualification.
 
 ## Released baseline
 
-[v0.11.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.11.1)
-resolves to `bbe716a0e5bd0e4dee9a50a52bb8e58041ce7a42` and pins Pi Durable 1.5.2.
+[v0.11.2](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.11.2)
+resolves to `9707e09bc4a192425249f37a725bbc40f3e1ca18` and pins Pi Durable 1.5.2.
 
-Recorded November 12, 2026: full package build/type checks; macOS arm64 Nix flake,
-frontend and portable builds; Linux x86_64 Runner and OCI builds; external packed
-consumer strict type checking; and a production dependency audit with zero findings.
-The five public reusable archives have a clean source manifest and SHA-256
-checksums. They are GitHub release assets, not an npm registry publication.
-No automated test suite was run.
+Recorded November 12, 2026 at that commit: full package build/type checks; macOS
+arm64 Nix flake, default, frontend and portable builds; Linux x86_64 default, Web
+OCI and worker OCI builds and Nix flake checks; external packed consumer strict
+type checking with real imports; and production and full dependency audits with
+zero findings. The five public reusable archives have a clean source manifest and
+SHA-256 checksums, verified again after download. They are GitHub release assets,
+not an npm registry publication. No automated test suite was run, and no rendered
+browser review was repeated for the release commit.
 
-Artifact scans were accompanied by source/content review. Known-pattern matches
-in bundled dependencies were classified as upstream examples, parser strings
-or SDK source paths. This is bounded privacy evidence, not a security certification.
+Artifact scans were accompanied by source/content review and reported no
+known-pattern matches in the five archives. This is bounded privacy evidence,
+not a security certification.
 
-## Current-source qualification — November 12, 2026
+## Kit customization and first conversation — November 12, 2026
+
+Observed on macOS 27.2 arm64 at `403eefe`, with a Nix-built release unless noted:
+
+- A repository created with `nix flake init` from the kit template built, and
+  its catalog listed the seven agents its `kit.json` keeps. `nix flake check`
+  builds the same template with the checkout standing in for the pinned release.
+- With one OpenAI API key bound through `environmentProvider`, the template's
+  Jett answered, continued the same session, and delegated a file-writing task to
+  `assistant-terra`, which wrote the file in the configured working directory.
+  Without the key, the turn ended with the withheld-details authentication
+  message. This is one short conversation; it does not measure model quality.
+- A synthetic company tree changed four kit roles through `roles`: added and
+  whole-list recipients and delegates, an added company extension, a removed
+  kit extension and a whole extension list. The composed definitions loaded with
+  the expected lists and passed strict type checking. A change naming an
+  extension the kit role lacks failed the release build with that message.
+  Malformed entries, a changed role that is also replaced or omitted, and
+  unknown recipients or modules were each reported by the composer.
+- `status` and `accept` ran directly and through `nix run ...#kit`. With a
+  record altered to stand for an earlier kit, `status` listed the changed
+  replaced file, the unrecorded one, received changes, and new and removed
+  files; the build printed the two warnings, `catalog` repeated them, and both
+  stopped after `accept`.
+
+Not observed: Linux for these four items before the 0.12.0 release checks; a
+kit move between two real releases (the earlier kit was simulated by editing the
+record); `environmentProvider` with any provider other than OpenAI; a company
+repository built with `roles`.
+
+## Web walkthrough qualification — November 12, 2026
 
 The [published prompt and manual walkthrough](quickstart.md) were exercised by two
 fresh agent sessions using clean public clones and isolated synthetic state:
@@ -102,12 +134,12 @@ The public quickstart was also fetched anonymously with HTTP 200.
 - Multi-human grants and a general authenticated network agent-client API are
   outside the current alpha contract. See the [interface inventory](interfaces.md).
 - The kit requires composition before loading an adopting repository. Model
-  overrides, addenda and declared file replacements are supported; structured
-  tool/recipient overrides and upstream-change warnings for replaced files are
-  not implemented. A flake template, a real single-provider kit conversation and
-  a repository-specific upgrade-change summary remain unqualified or unshipped.
-  The kit/composer have no npm distribution. The synthetic Web quickstart does
-  not establish those workflows.
+  and role changes, addenda and declared file replacements are supported.
+  `status` names the kit files that changed for a repository by digest; it does
+  not show what changed in them. Repositories that do not use Nix are not a
+  supported audience: the kit and composer have no npm distribution. The
+  synthetic Web quickstart does not establish the kit workflows; the section
+  above records what was observed for them.
 - Source review and dependency scans are not a penetration test.
 
 ## Reproduce the permitted checks
