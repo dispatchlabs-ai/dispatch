@@ -19,10 +19,12 @@ export async function connectHostModels(config: HostModelsConfig, models: Mutabl
   } else if (!config.modelProviders?.length) throw new Error("Supply a gateway or trusted modelProviders.");
   const cleanups: (() => Promise<void>)[] = [];
   for (const binding of config.modelProviders ?? []) {
-    if (!isAbsolute(binding.module) || !binding.export || (binding.id !== undefined && !binding.id.trim()) || !Array.isArray(binding.args ?? [])) {
-      throw new Error("Supply an absolute modelProviders.module, its factory export, and optional id and args.");
+    // A host module by absolute path, or one of Runner's own exports such as @dispatch/runner/environment-provider.
+    const own = typeof binding.module === "string" && /^@dispatch\/runner\/[a-z][a-z0-9-]*$/.test(binding.module);
+    if ((!own && !isAbsolute(binding.module)) || !binding.export || (binding.id !== undefined && !binding.id.trim()) || !Array.isArray(binding.args ?? [])) {
+      throw new Error("Supply an absolute modelProviders.module or a @dispatch/runner export, its factory export, and optional id and args.");
     }
-    const module = await import(pathToFileURL(binding.module).href);
+    const module = await import(own ? binding.module : pathToFileURL(binding.module).href);
     const factory = module[binding.export];
     if (typeof factory !== "function") throw new Error("The configured model provider factory is unavailable.");
     const provider: Provider = await factory(...(binding.args ?? []));

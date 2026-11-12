@@ -70,6 +70,29 @@ authored provider name. These bindings replace the matching gateway provider;
 an error does not fall back to API billing. Modules run with the host's privileges.
 Keep secrets in the provider's credential store, not factory arguments.
 
+An installation that holds one provider API key binds Runner's own
+`environmentProvider`. Its argument names one of Pi's built-in providers, and
+that provider authenticates from the environment variable it defines, such as
+`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`:
+
+```json
+{
+  "modelProviders": [{
+    "module": "@dispatch/runner/environment-provider",
+    "export": "environmentProvider",
+    "args": ["openai"]
+  }]
+}
+```
+
+`module` is an absolute path, or one of Runner's own exports named this way.
+Only the named provider reads the environment; no other provider gains ambient
+credentials. A detached session owner keeps the environment it was started
+with until it exits. Raw provider errors are withheld as described in
+[credentials](credentials.md#provider-error-privacy). This suits a first
+conversation or one person's machine; a shared installation uses the gateway or
+a provider module with its own credential store.
+
 For the experimental [Earendil Claude Code provider](https://github.com/earendil-works/pi-claude-code),
 build the pinned module with `nix build .#claude-code-provider` and retain its
 store path in a Nix profile. The package applies one source patch that restores
