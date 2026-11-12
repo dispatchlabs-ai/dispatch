@@ -87,6 +87,10 @@ company `src` on top, giving the one definitions root Runner reads.
 - `agents/ROLE/company.md` is appended to the kit's `agents/ROLE/agent.md`. Use
   it for company context a generic role lacks. It must name a kit role that the
   company does not also replace.
+  `DIR/NAME.company.md` is appended the same way to any other kit Markdown
+  file, such as a role's `operations.md`.
+- `kit.json` can omit a kit agent or skill, by file or directory, with a reason:
+  `{ "omit": { "skills/development": "Uses its own cleanup skill" } }`.
 - A company file at a kit path is a replacement. Declare each one with a reason
   in `kit.json` at the company root, or the build fails:
 
@@ -99,7 +103,7 @@ company `src` on top, giving the one definitions root Runner reads.
   `agent.ts`.
 
 `release.json` gains `kit` with the kit's revision and version, and
-`share/NAME/kit.json` lists the applied replacements and addenda. Without
+`share/NAME/kit.json` lists the applied replacements, omissions and addenda. Without
 `withKit` the release contains exactly `src` and neither record. Adopting the
 kit or moving its pin changes definitions; apply that through the ordinary idle
 definition update.

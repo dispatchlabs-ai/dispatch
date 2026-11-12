@@ -63,7 +63,9 @@ The builder lays the kit down first and the company tree on top.
 
 - **Add.** Any company path the kit does not use is copied as is.
 - **Addendum.** `agents/ROLE/company.md` is appended to that kit role's
-  `agent.md` under a heading naming its source. Plain Markdown, no frontmatter.
+  `agent.md` under a heading naming its source. `DIR/NAME.company.md` does the
+  same for any other kit Markdown file, such as
+  `agents/development/operations.company.md`. Plain Markdown, no frontmatter.
 - **Replace.** A company file at a kit path fails the build unless `kit.json`
   at the company root declares it with a reason:
 
@@ -72,9 +74,18 @@ The builder lays the kit down first and the company tree on top.
   ```
 
   A declaration that matches no kit file, or no company file, also fails.
+- **Omit.** `kit.json` can leave out a kit agent or skill, by file or
+  directory, with a reason:
+
+  ```json
+  { "omit": { "skills/development": "Uses its own cleanup skill" } }
+  ```
+
+  Nothing under `kit/` can be omitted; kit agents import and link it.
 
 `release.json` records the kit's revision and version under `kit`, and
-`share/NAME/kit.json` lists the replacements and addenda that were applied.
+`share/NAME/kit.json` lists the replacements, omissions and addenda that were
+applied.
 A kit role's instructions change with the pinned Dispatch release; apply them
 through the ordinary idle definition update.
 
@@ -97,7 +108,13 @@ missing capability.
   points Runner at a checkout does not get the kit.
 - An addendum adds instructions. It cannot change a role's model, tools,
   delegates or message recipients.
-- `jett` messages only `development`, and delegates to the five workers.
+- `jett` messages only `development`, and delegates to the five workers. Its
+  guide points at the company's other workflows, but it can message them only
+  after a declared replacement of `agents/jett/agent.ts` lists them.
+- Adopting the kit in a repository that already had these roles renames the
+  read/shell inspection extension to `kit.repo-inspection`. A stored
+  conversation keeps the old name until its idle definition update, and runs
+  without those tools until then. Select the release while those roles are idle.
 - The security-remediation mode in
   [Development's protocol](agents/development/operations.md) expects a security
   role and finalized report that a company supplies.
