@@ -260,10 +260,15 @@ each model request; company/role guidance follows definition update rules.
 The working directory is saved and must match when reopening the store.
 
 An agent can declare `delegates: ["worker"]` to expose `list_agents` and `delegate`. Each
-call creates a native task-owned foreground conversation using the named agent's
-own instructions, model and tools. Parallel calls can run concurrently. A stable
-submission ID and task ownership preserve the child across interrupted tool
-replay; results return to the parent. Assign bounded work and disjoint files when
+call creates a child conversation owned by a native background worker, using the
+named agent's own instructions, model and tools. Parallel calls can run concurrently.
+The call waits for a result or new coordinator input. New input releases the wait
+without stopping the child; `steer_child`, `cancel_child` and `wait_for_child`
+control that coordinator's children. Resume waiting after handling a follow-up
+until every assignment is collected or cancelled; there is no automatic result
+notification. Stable native identities preserve the worker, child and retained
+result across restart. Older persisted calls retain their original foreground
+ownership and blocking wait. Assign bounded work and disjoint files when
 several children edit one checkout. There is no separate orchestrator or automatic
 acceptance gate.
 

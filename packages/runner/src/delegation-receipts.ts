@@ -1,6 +1,7 @@
 import {
-  ToolResultEntry, UsageDoc,
-  type ConversationId, type Cursor, type ModelRef, type ToolExecutionApi,
+  AssistantEntry, ToolResultEntry, UsageDoc,
+  type ConversationId, type Cursor, type EntryRecord, type ModelRef, type SettledSubmissionRecord,
+  type ToolExecutionApi, type ToolExecutionResult, type Tx,
 } from "@earendil-works/pi-durable";
 import type { Context } from "@earendil-works/chord/context";
 
@@ -27,10 +28,14 @@ export type DelegationReceipt = {
   estimatedCostUsd: number;
 };
 
+type ReceiptApi = Pick<ToolExecutionApi, "snapshot" | "now"> & {
+  commit(change: (tx: Tx) => Promise<undefined>, context: Context): Promise<unknown>;
+};
+
 /** Read native ledgers; returning these as tool usage would count the same spend twice. */
-export async function childUsage(api: ToolExecutionApi, child: ConversationId, context: Context) {
-  const ids = await api.commit(async tx => {
-    const ids = [child];
+async function childUsage(api: ReceiptApi, child: ConversationId, context: Context) {
+  const ids = [child];
+  await api.commit(async tx => {
     for (const id of ids) {
       let cursor: Cursor | undefined;
       do {
@@ -39,7 +44,7 @@ export async function childUsage(api: ToolExecutionApi, child: ConversationId, c
         cursor = page.next;
       } while (cursor);
     }
-    return ids;
+    return undefined;
   }, context);
   const states = await Promise.all(ids.map(id => api.snapshot(UsageDoc, id, context)));
   const models: Record<string, ModelUsage> = Object.create(null);
@@ -62,6 +67,41 @@ export async function childUsage(api: ToolExecutionApi, child: ConversationId, c
   };
 }
 
+export async function delegationResult(api: ReceiptApi, child: ConversationId,
+  submission: SettledSubmissionRecord, selection: {
+    agent: string; fingerprint?: string; model?: ModelRef; thinking: string; startedAt: number;
+  }, context: Context, cancelled = false): Promise<ToolExecutionResult> {
+  let entry: EntryRecord | undefined;
+  await api.commit(async tx => {
+    entry = submission.status === "done" && submission.type === "input"
+      ? await tx.entry(AssistantEntry, submission.answer) : undefined;
+    return undefined;
+  }, context);
+  const answer = entry?.model?.[0];
+  const answered = !cancelled && answer?.role === "assistant" && answer.stopReason !== "error" && answer.stopReason !== "aborted";
+  const { startedAt, ...identity } = selection;
+  const receipt: DelegationReceipt = {
+    kind: "dispatch.delegation", version: 1, ...identity,
+    conversationId: child, submissionId: submission.id,
+    outcome: answered ? "answered" : "unanswered", elapsedMs: api.now() - startedAt,
+    recordedAt: new Date(api.now()).toISOString(), scope: "child_subtree",
+    ...await childUsage(api, child, context),
+  };
+  const text = answered ? answer.content.flatMap(part => part.type === "text" ? [part.text] : []).join("\n")
+    : cancelled ? "Delegate was cancelled. Remaining work was not completed."
+    : `Delegate did not return a successful answer: ${submission.status}${submission.status === "unanswered" ? ` (${submission.reason})` : ""}.`;
+  const { kind: _kind, version: _version, fingerprint: _fingerprint, ...feedback } = receipt;
+  return {
+    ...(answered ? {} : { isError: true }),
+    output: [
+      { type: "text", text: `Recorded delegation receipt (estimated cost; answer quality is unscored):\n${JSON.stringify(feedback)}` },
+      { type: "text", text: text || "Delegate completed without a text response." },
+    ],
+    details: { agent: selection.agent, conversationId: child,
+      ...(submission.status === "done" ? { answer: submission.answer } : {}), receipt },
+  };
+}
+
 /** Reuse retained tool receipts, including those preceding compaction; no second ledger. */
 export async function delegationReceipts(api: ToolExecutionApi, context: Context): Promise<DelegationReceipt[]> {
   return api.commit(async tx => {
@@ -72,13 +112,13 @@ export async function delegationReceipts(api: ToolExecutionApi, context: Context
       for (const entry of page.items) {
         if (!ToolResultEntry.is(entry)) continue;
         const message = entry.model?.[0];
-        if (message?.role !== "toolResult" || !["delegate", "clone_agent"].includes(message.toolName)) continue;
+        if (message?.role !== "toolResult" || !["delegate", "clone_agent", "wait_for_child"].includes(message.toolName)) continue;
         const receipt = (message.details as { receipt?: DelegationReceipt } | undefined)?.receipt;
         if (receipt?.kind === "dispatch.delegation" && receipt.version === 1) receipts.push(receipt);
       }
       cursor = page.next;
     } while (cursor);
-    return receipts;
+    return [...new Map(receipts.map(receipt => [`${receipt.conversationId}:${receipt.submissionId}`, receipt])).values()];
   }, context);
 }
 
