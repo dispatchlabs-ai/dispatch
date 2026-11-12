@@ -69,7 +69,9 @@ own their own command routing.
 
 `withKit = true` composes the [kit](../../kit/README.md) of generic agents and
 skills under the company tree, so a company repository holds only its own
-definitions. The kit comes from the same Dispatch input as the builder:
+definitions. A new repository can start from the kit's flake template,
+`nix flake init -t github:dispatchlabs-ai/dispatch/TAG#kit`. The kit comes
+from the same Dispatch input as the builder:
 
 ```nix
 dispatch.lib.mkAgentRelease {
@@ -101,15 +103,24 @@ company `src` on top, giving the one definitions root Runner reads.
   { "replacements": { "agents/developer/agent.md": "Uses the company's own delivery stages" } }
   ```
 
-  A declaration naming no kit file, or no company file, fails too. Changing a
-  role's model, tools or recipients needs a replacement of its `agent.md` or
-  `agent.ts`.
+  A declaration naming no kit file, or no company file, fails too.
+- `kit.json` can change a kit role's message recipients, delegates and
+  extensions without replacing its `agent.ts`:
+  `{ "roles": { "jett": { "messages": { "add": ["researcher"] } } } }`.
+  The [kit guide](../../kit/README.md#company-changes) describes the forms.
 
 `release.json` gains `kit` with the kit's revision and version, and
-`share/NAME/kit.json` lists the applied replacements, omissions and addenda. Without
-`withKit` the release contains exactly `src` and neither record. Adopting the
-kit or moving its pin changes definitions; apply that through the ordinary idle
-definition update.
+`share/NAME/kit.json` lists the applied replacements, omissions, model and role
+changes and addenda. Without `withKit` the release contains exactly `src` and
+neither record. Adopting the kit or moving its pin changes definitions; apply
+that through the ordinary idle definition update.
+
+A replaced file stops receiving the kit's changes. `kit.lock.json`, written by
+the kit's `accept` command, records the kit a repository was last checked
+against. When a replaced file's kit original has changed since, or has no
+record, the build prints a warning, keeps it in `share/NAME/kit-warnings.txt`,
+and the default launcher repeats it before `NAME catalog`. See
+[moving to a new kit](../../kit/README.md#moving-to-a-new-kit).
 
 ## Evaluation
 

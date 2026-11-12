@@ -6,6 +6,11 @@
   outputs = { self, nixpkgs }:
     let
       systems = [ "aarch64-darwin" "aarch64-linux" "x86_64-linux" ];
+      # What a release composes from: the kit's files, its composer and its version.
+      kitSource = pkgs: pkgs.lib.fileset.toSource {
+        root = ./packages/kit;
+        fileset = pkgs.lib.fileset.unions [ ./packages/kit/agents ./packages/kit/skills ./packages/kit/kit ./packages/kit/LICENSE ./packages/kit/package.json ./packages/kit/scripts/compose.mjs ];
+      };
       eachSystem = nixpkgs.lib.genAttrs systems;
       forSystem = system:
         let
@@ -22,13 +27,15 @@
             ${runtime.nodejs_24}/bin/node ${./packages/kit}/scripts/check.mjs ${./packages/kit}
             touch $out
           '';
-          kit-release = self.lib.mkAgentRelease {
-            inherit system;
-            name = "kit-example";
-            src = ./packages/kit/example;
-            revision = self.rev or self.dirtyRev or "uncommitted";
-            withKit = true;
-          };
+          # The starter template as a newcomer builds it, with this checkout standing in for its pinned Dispatch.
+          kit-release = ((import ./packages/kit/template/flake.nix).outputs { inherit self nixpkgs; dispatch = self; }).packages.${system}.default;
+          # `nix run --inputs-from . dispatch#kit -- status` in a company repository: the composer's status and accept commands for the pinned kit.
+          kit = pkgs.writeShellScriptBin "dispatch-kit" ''
+            case "''${1:-}" in
+              status|accept) exec ${runtime.nodejs_24}/bin/node ${kitSource pkgs}/scripts/compose.mjs "$1" ${kitSource pkgs} "''${2:-$PWD}" ;;
+              *) echo "Usage: dispatch-kit status|accept [COMPANY_DIRECTORY]" >&2; exit 2 ;;
+            esac
+          '';
           # The evaluation package ships to every consumer that opts in, so its text names none of them either.
           eval-content = pkgs.runCommand "dispatch-eval-content" { } ''
             ${runtime.nodejs_24}/bin/node ${./packages/kit}/scripts/check.mjs ${./packages/eval}
@@ -37,13 +44,16 @@
           eval-release = self.lib.mkAgentRelease {
             inherit system;
             name = "eval-example";
-            src = ./packages/kit/example;
+            src = pkgs.lib.fileset.toSource {
+              root = ./packages/kit/template;
+              fileset = pkgs.lib.fileset.unions [ ./packages/kit/template/AGENTS.md ./packages/kit/template/factory.yaml ./packages/kit/template/kit.json ./packages/kit/template/agents ];
+            };
             revision = self.rev or self.dirtyRev or "uncommitted";
             withKit = true;
             withEval = true;
           };
         in {
-          packages = { default = web; inherit runner runner-slack runner-fleet runner-google-chat claude-code-provider; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
+          packages = { default = web; inherit kit runner runner-slack runner-fleet runner-google-chat claude-code-provider; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
             macos-release = pkgs.callPackage ./packages/web/nix/macos-release.nix { inherit web; inherit (runtime) nodejs_24; };
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             oci = pkgs.callPackage ./packages/web/nix/oci.nix {
@@ -91,10 +101,7 @@
           watcherRevision = self.rev or self.dirtyRev or "uncommitted";
           fleetTools = if withFleet then import ./packages/fleet/nix/tools.nix { inherit pkgs; } else null;
           kit = {
-            src = pkgs.lib.fileset.toSource {
-              root = ./packages/kit;
-              fileset = pkgs.lib.fileset.unions [ ./packages/kit/agents ./packages/kit/skills ./packages/kit/kit ./packages/kit/LICENSE ./packages/kit/scripts/compose.mjs ];
-            };
+            src = kitSource pkgs;
             revision = self.rev or self.dirtyRev or "uncommitted";
             version = (builtins.fromJSON (builtins.readFile ./packages/kit/package.json)).version;
           };
@@ -111,6 +118,11 @@
             };
           };
         }) (builtins.removeAttrs args [ "system" "withSlack" "withFleet" "withGoogleChat" "execution" ]);
+      templates.kit = {
+        path = ./packages/kit/template;
+        description = "An agent repository on the Dispatch kit: starter agents, one model provider";
+      };
+      templates.default = self.templates.kit;
       packages = eachSystem (system: (forSystem system).packages);
       checks = eachSystem (system: (forSystem system).checks);
       devShells = eachSystem (system: (forSystem system).devShells);

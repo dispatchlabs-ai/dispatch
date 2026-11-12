@@ -33,7 +33,7 @@ and limits; browser access and Nix are prerequisites supplied by the user or age
 | Goal | Package |
 | --- | --- |
 | Define and run durable agents from a CLI or local service | [Runner](packages/runner/README.md) |
-| Start with Jett, Development, Developer and review roles | [Kit](packages/kit/README.md) |
+| Start an agent repository with Jett, Development, Developer and review roles, then hold a first real conversation | [Kit](packages/kit/README.md#first-result) |
 | Grade retained work or compare controlled reruns with your own rubric | [Eval](packages/eval/README.md) |
 | Browse, steer and stop native conversations | [Web](packages/web/README.md) |
 | Embed shared conversation operations in a client | [Backend](packages/backend/README.md) |
@@ -49,7 +49,7 @@ company definitions extend it when a release is built.
 
 ## Versions and distribution
 
-The latest tagged source release is [v0.11.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.11.1),
+The latest tagged source release is [v0.11.2](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.11.2),
 using Pi Durable 1.5.2. Its five reusable package archives, source manifest and
 checksums are attached to that release; they are **not published to npm**.
 Current `main` also carries the unreleased changes listed in package changelogs.

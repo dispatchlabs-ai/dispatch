@@ -18,3 +18,14 @@ implementation or deployment.
   or host identifier into the kit fails the build and `nix flake check`.
 - **KIT-007 — Leave others alone:** a release built without `withKit` contains
   exactly the company tree, as before.
+- **KIT-008 — Change a role's reach:** a company sets whom a kit role messages
+  or delegates to, and which extensions it carries, in `kit.json`, and the role
+  keeps receiving the kit's own changes to everything else.
+- **KIT-009 — Notice upstream changes:** after moving the kit pin, a company
+  sees which kit files changed for it and is warned about each replaced file
+  whose kit original changed since it was last checked.
+- **KIT-010 — Start a repository:** a newcomer creates a repository from the
+  flake template, builds it and lists its agents without credentials.
+- **KIT-011 — First real conversation:** with one provider API key in the
+  environment, a newcomer talks to the template's Jett and a worker it
+  delegates to.

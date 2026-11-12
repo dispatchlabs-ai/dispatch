@@ -18,7 +18,10 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
   app="$out/lib/${name}"
   mkdir -p "$app/definitions" "$out/bin" "$out/share/${name}"
   ${if withKit then ''
-    ${runtime.nodejs}/bin/node ${kit.src}/scripts/compose.mjs ${kit.src} ${src} "$app/definitions" "$out/share/${name}/kit.json"
+    # The composer's warnings stay with the release: the catalog command repeats them.
+    ${runtime.nodejs}/bin/node ${kit.src}/scripts/compose.mjs ${kit.src} ${src} "$app/definitions" "$out/share/${name}/kit.json" \
+      2> "$out/share/${name}/kit-warnings.txt" || { cat "$out/share/${name}/kit-warnings.txt" >&2; exit 1; }
+    cat "$out/share/${name}/kit-warnings.txt" >&2
   '' else ''cp -R ${src}/. "$app/definitions/"''}
   ${lib.optionalString (nodeModules != null) ''ln -s ${nodeModules} "$app/definitions/node_modules"''}
   ${if withEval then ''
@@ -45,6 +48,9 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
       shift
       exec ${runtime}/bin/dispatch-upgrade "$@"
     fi
+    if [ "''${1:-}" = catalog ] && [ -s @KIT_WARNINGS@ ]; then
+      cat @KIT_WARNINGS@ >&2
+    fi
     if [ "''${1:-}" = --help ]; then
       @EXECUTION@ "$@"
       echo
@@ -54,7 +60,8 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
     fi
     exec @EXECUTION@ "$@"
     SH
-    substituteInPlace "$out/bin/${name}" --replace-fail '@EXECUTION@' "$out/bin/.${name}-run"
+    substituteInPlace "$out/bin/${name}" --replace-fail '@EXECUTION@' "$out/bin/.${name}-run" \
+      --replace-fail '@KIT_WARNINGS@' "$out/share/${name}/kit-warnings.txt"
     chmod +x "$out/bin/${name}"
   '' else ''
     test -f "$app/definitions/"${lib.escapeShellArg entrypoint}

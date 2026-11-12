@@ -89,6 +89,13 @@ function main() {
   contract.info.version = next;
   updates.set(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
 
+  // The root guide names the latest release; the kit's starter template and guide name the tag a newcomer builds with.
+  for (const path of ["README.md", "packages/kit/template/flake.nix", "packages/kit/README.md"]) {
+    const source = readFileSync(resolve(root, path), "utf8");
+    if (!source.includes(`v${current}`)) throw new Error(`${path} does not name v${current}.`);
+    updates.set(path, source.replaceAll(`v${current}`, `v${next}`));
+  }
+
   const date = new Date().toISOString().slice(0, 10);
   let changed = false;
   for (const path of packages) {

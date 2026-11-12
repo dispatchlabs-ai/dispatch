@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- `kit.json` accepts `roles`: change a kit role's message recipients, delegates and extensions without replacing its `agent.ts`. A changed role is composed as `agents/ROLE/agent.ts` beside the kit's definition in `agents/ROLE/agent.kit.ts`.
+- The composer gains `status` and `accept`, run as `nix run --inputs-from . dispatch#kit -- status`. `accept` records the kit's files in `kit.lock.json`; `status` lists what the kit changed for the repository since. A build warns when a replaced file's kit original changed since the record or has none, and `NAME catalog` repeats the warning.
+- Add a flake template, `nix flake init -t github:dispatchlabs-ai/dispatch/TAG#kit`, bound to one model provider, and a first-conversation guide. `example/` is now `template/`.
+- The composer's summary (`share/NAME/kit.json`) adds `roles` and `review`.
+
 ## [0.11.2] - 2026-11-12
 
 - Preserve the shared MIT notice at `kit/LICENSE` in direct and Nix compositions; it cannot be omitted or replaced.
