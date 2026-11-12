@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-12
+
 - `kit.json` accepts `omit`: leave out a kit agent or skill, by file or directory, with a reason. `DIR/NAME.company.md` is appended to any kit `DIR/NAME.md`, not only a role's `agent.md`.
 
 ## [0.9.0] - 2026-11-12
