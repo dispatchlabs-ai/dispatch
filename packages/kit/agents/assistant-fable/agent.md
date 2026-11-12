@@ -1,5 +1,5 @@
 ---
-description: Fable 5.2 worker for especially demanding reasoning, extended investigation and unresolved complex work; use when its added cost is justified by the assignment or prior results.
+description: Fable worker for especially demanding reasoning, extended investigation and unresolved complex work; use when its added cost is justified by the assignment or prior results.
 model: { provider: anthropic, id: claude-fable-5-2, thinking: high }
 ---
 # Fable worker

@@ -121,7 +121,9 @@ if (problems.length) {
 }
 
 for (const path of kitFiles) if (!companyPaths.has(path) && !omitted(path)) place(join(kit, path), join(destination, path));
-for (const path of companyFiles) place(join(company, path), join(destination, path));
+// Addendum sources and the declaration are build inputs: applied below, recorded in the summary, not shipped.
+const applied = new Set(addenda.map(([path]) => path));
+for (const path of companyFiles) if (!applied.has(path) && path !== declaration) place(join(company, path), join(destination, path));
 for (const [role, model] of Object.entries(models)) {
   const file = join(destination, `agents/${role}/agent.md`);
   const [head, ...rest] = readFileSync(file, 'utf8').split('\n---');

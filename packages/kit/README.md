@@ -95,6 +95,20 @@ applied.
 A kit role's instructions change with the pinned Dispatch release; apply them
 through the ordinary idle definition update.
 
+## Composing without the Nix builder
+
+An installation that packages a checkout or an archive itself runs the same
+composition as one step and points Runner at the result:
+
+```sh
+node packages/kit/scripts/compose.mjs packages/kit COMPANY_CHECKOUT DESTINATION [SUMMARY.json]
+```
+
+`DESTINATION` is the definitions root. A company checkout that has adopted the
+kit is not a loadable root by itself: its kit roles and skills exist only after
+composition. `kit.json` and applied addendum files are build inputs and are not
+copied into the result.
+
 ## Models and tools
 
 Each agent's `agent.md` names a provider and model. The host binds those names
@@ -110,8 +124,14 @@ missing capability.
 
 ## Limits
 
-- Composition exists only in the Nix builder. A parent Node installation that
-  points Runner at a checkout does not get the kit.
+- A raw checkout or archive of a company repository that adopted the kit does
+  not load. Compose it first, with the Nix builder or the script above.
+- A kit skill's text is part of the definition fingerprint of every agent that
+  loads skills, so moving the kit pin can require an idle definition update
+  for company agents too.
+- Development hands off with `reply: false` and waits with `wait_for_agent` in
+  the same turn. A host built around `reply: true` handoffs keeps its own
+  `agents/development/operations.md` as a declared replacement.
 - An addendum adds instructions. It cannot change a role's tools, delegates or
   message recipients; those take a declared replacement of its `agent.ts`.
 - `jett` messages only `development`, and delegates to the five workers. Its
