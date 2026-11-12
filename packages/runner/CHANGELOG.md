@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Let new coordinator input release a `delegate` or `clone_agent` wait while its
+  owned native worker continues. Add scoped `steer_child`, `cancel_child` and
+  interruptible `wait_for_child` controls; retain results through restart without
+  automatic transport callbacks. Recover older foreground-owned calls without
+  duplicating their children; those calls retain their original blocking wait.
+
 - Select `factory.yaml` defaultAgent for new CLI sessions and retain the initial selection when resuming.
 - Apply trusted host bindings recursively to private workers; accept broker-backed workspace transports.
 

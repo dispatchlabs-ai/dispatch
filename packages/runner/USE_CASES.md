@@ -46,7 +46,8 @@
 - **RUN-014 — Coordinate parallel clones:** opt into fresh, task-owned children
   with the parent's stored agent configuration and tool filters, run independent
   assignments concurrently, and reconcile their reports through native tool
-  results, ownership and recovery.
+  results, ownership and recovery. Release a wait for new coordinator input, then
+  steer, cancel or resume waiting for only that coordinator's delegated children.
 
 - **RUN-015 — Wait through provider outages:** configure sustained native model retries
   with capped exponential backoff and jitter, inspect the next attempt, recover

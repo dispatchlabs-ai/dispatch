@@ -16,12 +16,26 @@ export default defineAgent({
 `clones: true` exposes `clone_agent({ task: "complete bounded assignment" })`.
 Several calls in one model response can run concurrently under Pi's native
 tool-execution setting. Runner adds no concurrency limit, queue or recovery
-engine. A single call waits for its child; do not await one child before assigning
-the next if the assignments should overlap.
+engine. A call waits for its child or new input to the coordinator; do not await
+one child before assigning the next if the assignments should overlap.
+
+New input releases the wait without stopping the child. The coordinator handles
+the message and uses `steer_child({ conversationId, message })` for a correction,
+`cancel_child({ conversationId })` to stop that assignment and its descendants,
+or `wait_for_child({ conversationId })` to resume waiting. These controls accept
+only children created by this coordinator's delegation extension. Steering is
+native admission, not proof that the child has applied the correction; steering
+a completed or cancelled worker is rejected. Delegate a new assignment instead.
+
+Keep the original request active through status questions. Give brief status in
+commentary, then resume waiting for every outstanding assignment. There is no
+automatic result notification or transport callback. The extension supplies this
+instruction on every model request; applications requiring continued work through
+answers can also select [request completion](request-completion.md).
 
 ## What a clone inherits
 
-Pi Durable creates a conversation owned by the invoking tool task and copies
+Pi Durable creates a conversation owned by a background worker task and copies
 the parent's **stored native agent configuration** in the same transaction:
 model, thinking level, instructions, selected extensions, working directory,
 enabled-tool filters and model-visible-tool filters. This includes host adapters
@@ -46,18 +60,35 @@ unnecessary recursive delegation, rather than adding an arbitrary depth limit.
 
 ## Results, failure and recovery
 
-The native tool-task identity owns exactly one child. Replaying an interrupted
-call reuses that conversation and its stable input request ID. Closing the host
-suspends work; compatible reopening resumes it. An explicit abort follows native
-ownership to the child. A clone is not an independently scheduled sibling.
+The invoking tool's native state identifies one conversation-owned background
+worker task, which owns exactly one child. Both are created in one transaction.
+Replaying an interrupted call reuses that worker, conversation and stable input
+request ID. Closing the host suspends work; compatible reopening resumes it.
+The terminal worker retains its result after task-scoped working documents retire.
 
-Successful completion returns the child's final text, recorded usage/cost receipt
+Cancelling a foreground wait alone does not stop the worker. `cancel_child` marks
+cancellation durably and aborts the child's native ownership scope, including
+background descendants, before returning. Siblings are unaffected. Host-level
+Stop must include background work (`conversation.abort(context, { background: true })`);
+Runner's conversation Stop does so. A default conversation abort excludes these
+background tasks.
+
+Calls saved by older Runner versions may own their child directly. Those calls
+recover the same child with their original blocking wait; Pi ownership cannot be
+changed in place. Drain these older calls before relying on interruptible waits
+for every active assignment. No persisted child is recreated during upgrade.
+
+Successful completion returns the child's latest final text, recorded usage/cost receipt
 and native conversation/answer identifiers in tool details. A terminal unsuccessful
 child produces a tool error with the recorded receipt when the parent can still
-return it. Parent cancellation can prevent that return; native ledgers retain
+return it. An early return for new input is pending, not a completion receipt.
+Repeatedly collecting one result does not add another sample to catalog statistics.
+Parent cancellation can prevent a receipt; native ledgers retain
 recorded usage. The coordinator must account for that child rather
 than silently omit it or count it as passed. A successful tool call means the
-child returned an answer, not that the assigned checks passed.
+child returned an answer, not that the assigned checks passed. Ordinary child
+idle excludes its background descendants; coordinators must collect or cancel
+their own outstanding delegated assignments before reporting completion.
 
 Native tasks, submissions, tool arguments/results and conversation history stay
 in the existing Pi store. Retain domain traces separately when evaluating another

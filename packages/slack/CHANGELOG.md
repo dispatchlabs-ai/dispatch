@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Complete successful silent turns without an invented failure message. Retain
+  ordered commentary and retry temporary progress cleanup durably; preserve
+  failure reporting for unsuccessful native turns.
+
 - Remove temporary progress messages after the ordered final reply is delivered,
   instead of leaving a canned completion message. Resume cleanup retries without
   reposting the answer; preserve commentary and failure details.

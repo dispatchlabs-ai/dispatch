@@ -6,7 +6,7 @@ The default remains local SQLite. See [remote SQLite](https://github.com/dispatc
 for the optional relay service and its single-owner recovery boundary.
 
 `@dispatch/runner` runs directory-defined company agents with stock Pi Durable
-1.5.0. It loads trusted definitions, owns each SQLite session, schedules native
+1.5.2. It loads trusted definitions, owns each SQLite session, schedules native
 tasks and exposes persistent shared conversations without a web server.
 
 This is a source-alpha package. Its current 0.6.0 manifest follows the repository
@@ -16,14 +16,17 @@ complete terminal example with an integrity-pinned public runner archive.
 For source builds, pack a reviewed revision as below. See the
 [use cases](USE_CASES.md) and [changes](CHANGELOG.md).
 
-The `runner-v0.6.0-alpha.5` GitHub prerelease is a Runner/Slack source snapshot
-using Pi 1.4.0. Its notes identify the exact source commit and archive checksums.
+The `runner-v0.6.0-alpha.6` GitHub prerelease is a Runner/Slack compatibility
+snapshot using Pi 1.5.2. It backports interruptible worker waits and successful
+silent Slack responses to the 0.6 line; it does not release the other workspaces
+or migrate retained Slack turn tasks to the newer delivery protocol. Its notes
+identify the exact source commit and archive checksums.
 The archives retain the repository's 0.6.0 package version; their immutable tag,
 URL and npm lockfile integrity identify the snapshot. Install in the parent
 runtime workspace:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/runner-v0.6.0-alpha.5/dispatch-runner-0.6.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/runner-v0.6.0-alpha.6/dispatch-runner-0.6.0.tgz
 ```
 
 See [definition workspaces](docs/definition-workspaces.md) for separating the
@@ -247,10 +250,15 @@ each model request; company/role guidance follows definition update rules.
 The working directory is saved and must match when reopening the store.
 
 An agent can declare `delegates: ["worker"]` to expose `list_agents` and `delegate`. Each
-call creates a native task-owned foreground conversation using the named agent's
-own instructions, model and tools. Parallel calls can run concurrently. A stable
-submission ID and task ownership preserve the child across interrupted tool
-replay; results return to the parent. Assign bounded work and disjoint files when
+call creates a child conversation owned by a native background worker, using the
+named agent's own instructions, model and tools. Parallel calls can run concurrently.
+The call waits for a result or new coordinator input. New input releases the wait
+without stopping the child; `steer_child`, `cancel_child` and `wait_for_child`
+control that coordinator's children. Resume waiting after handling a follow-up
+until every assignment is collected or cancelled; there is no automatic result
+notification. Stable native identities preserve the worker, child and retained
+result across restart. Older persisted calls retain their original foreground
+ownership and blocking wait. Assign bounded work and disjoint files when
 several children edit one checkout. There is no separate orchestrator or automatic
 acceptance gate.
 

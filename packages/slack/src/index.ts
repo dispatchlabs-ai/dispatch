@@ -441,14 +441,20 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         if (receipt.status === "done" && receipt.type === "input") {
           const entry = await runtime.entry(AssistantEntry, receipt.answer, ctx);
           const message = entry?.model?.[0];
-          if (message?.role === "assistant" && !["error", "aborted"].includes(message.stopReason)) text = publicAnswer(message);
+          if (message?.role === "assistant" && !["error", "aborted", "pending", "deferred"].includes(message.stopReason)) text = publicAnswer(message);
         }
+        const commentary = (await runtime.snapshot(Commentary, runtime.conversationId, ctx))?.turns[task.input.key];
         if (!text.trim()) {
-          text = "The assistant ended without a final answer; completion has not been verified.";
+          // A successful native turn may intentionally finish without public text.
+          // Keep its commentary and durably remove only the temporary progress.
+          if (commentary?.lastTask) await runtime.waitForTask(commentary.lastTask as TaskId, ctx);
+          await runtime.commit(() => stream
+            ? { status: "running", checkpoint: { phase: "cleanup", stream, retryAt: 0 } }
+            : { status: "terminal", outcome: { status: "completed", result: null } }, ctx);
+          return;
         }
         // Keep commentary in order. Remove its temporary progress message only
         // after the complete final reply has been delivered.
-        const commentary = (await runtime.snapshot(Commentary, runtime.conversationId, ctx))?.turns[task.input.key];
         const cleanup = commentary?.lastTask ? stream : undefined;
         await runtime.commit(() => ({
           status: "running", checkpoint: { phase: "deliver", text, offset: 0, retryAt: 0,

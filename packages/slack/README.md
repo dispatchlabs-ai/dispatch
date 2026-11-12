@@ -13,6 +13,9 @@ Native entry cursors and delivery dependencies survive restart. The editable
 working message supplies current activity during quiet periods.
 Follow-ups joining active work share its reply; native message identities prevent
 duplicate commentary and final answers across observers and recovery.
+Successful native turns with no final public text finish silently and remove
+their temporary progress message. Completed commentary stays visible; failed or
+unanswered turns still report a failure.
 
 Hosts observing external workflows can pass `transport.queueStatus` as Runner's
 `createWorkflowProgress.statusSink`. Its stable key selects one editable message;
@@ -40,7 +43,7 @@ file/thread receipt. Text replies and image observations are not file delivery.
 ## Configure
 
 Install both packed packages in a private company repository. Use the same exact
-Pi Durable version as the runner (1.5.0 for current source). Upgrade both packages
+Pi Durable version as the runner (1.5.2 for this compatibility snapshot). Upgrade both packages
 together and follow the runner's [state upgrade precautions](../runner/README.md#persistence-and-boundaries)
 before opening an existing store. Add a connection to `factory.yaml`:
 

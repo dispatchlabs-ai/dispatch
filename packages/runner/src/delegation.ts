@@ -1,57 +1,35 @@
 import { Type } from "typebox";
 import type { Context } from "@earendil-works/chord/context";
 import {
-  AssistantEntry, configure, defineExtension, defineTool,
+  defineExtension, defineTool,
   type AgentChange, type ToolExecutionApi, type ToolExecutionResult, type ToolRegistration,
 } from "@earendil-works/pi-durable";
-import { childUsage, delegationReceipts, observations, type DelegationReceipt } from "./delegation-receipts.js";
+import { delegationResult, delegationReceipts, observations } from "./delegation-receipts.js";
+import { createDelegationWorkers } from "./delegation-workers.js";
 
 type Delegate = { name: string; description: string; fingerprint: string; configuration: AgentChange };
 
-/** Native foreground children: parallel tool calls delegate in parallel; abort follows ownership. */
+/** Owned native workers; new input releases the foreground wait without abandoning the child. */
 export function delegationExtension(owner: string, agents: Delegate[], clones = false) {
+  const workers = createDelegationWorkers(owner);
   async function runChild(agent: string, task: string, configuration: AgentChange | undefined, api: ToolExecutionApi, context: Context, fingerprint?: string): Promise<ToolExecutionResult> {
+    // Old persisted calls own their child directly. Ownership is immutable: recover
+    // that exact child with the old wait rather than duplicate or reparent its work.
+    const childId = await api.commit(async tx =>
+      (await tx.scanConversations({ ownerTaskId: api.taskId }, 1)).items[0]?.id, context);
+    if (childId === undefined) return workers.run(agent, task, configuration, api, context, fingerprint);
     const startedAt = await api.memo("startedAt", api.now(), context);
-    const cwd = configuration ? api.env?.cwd ?? (await api.agent(context)).cwd : undefined;
-    const childId = await api.commit(async tx => {
-      const existing = (await tx.scanConversations({ ownerTaskId: api.taskId }, 1)).items[0];
-      if (existing) return existing.id;
-      // Pi copies the owner's stored agent, including tool/model-tool filters.
-      // A clone deliberately makes no configuration change and copies no history.
-      const child = await tx.createConversation({ ownership: { kind: "task", taskId: api.taskId } });
-      if (configuration) await configure(tx, child.id, { ...configuration, cwd });
-      return child.id;
-    }, context);
     await api.details({ agent, conversationId: childId }, context);
     const child = await api.conversation(childId, context);
     if (!child) throw new Error("Delegate conversation disappeared.");
     // Preserve the existing request identity for interrupted delegate calls.
     const submission = await (await child.submit({ type: "input", content: task, requestId: `delegate:${api.taskId}` }, context)).wait(context);
-    const entry = submission.status === "done" && submission.type === "input"
-      ? await api.commit(tx => tx.entry(AssistantEntry, submission.answer), context) : undefined;
-    const answer = entry?.model?.[0];
-    const answered = answer?.role === "assistant" && answer.stopReason !== "error" && answer.stopReason !== "aborted";
     const parent = await api.agent(context);
-    const receipt: DelegationReceipt = {
-      kind: "dispatch.delegation", version: 1, agent, ...(fingerprint ? { fingerprint } : {}),
+    return delegationResult(api, childId, submission, {
+      agent, ...(fingerprint ? { fingerprint } : {}), startedAt,
       model: configuration?.model ?? parent.model,
       thinking: configuration?.thinkingLevel ?? parent.thinkingLevel,
-      conversationId: childId, submissionId: submission.id,
-      outcome: answered ? "answered" : "unanswered", elapsedMs: api.now() - startedAt,
-      recordedAt: new Date(api.now()).toISOString(), scope: "child_subtree",
-      ...await childUsage(api, childId, context),
-    };
-    const text = answered ? answer.content.flatMap(part => part.type === "text" ? [part.text] : []).join("\n")
-      : `Delegate did not return a successful answer: ${submission.status}${submission.status === "unanswered" ? ` (${submission.reason})` : ""}.`;
-    const { kind: _kind, version: _version, fingerprint: _fingerprint, ...feedback } = receipt;
-    return {
-      ...(answered ? {} : { isError: true }),
-      output: [
-        { type: "text", text: `Recorded delegation receipt (estimated cost; answer quality is unscored):\n${JSON.stringify(feedback)}` },
-        { type: "text", text: text || "Delegate completed without a text response." },
-      ],
-      details: { agent, conversationId: childId, ...(submission.status === "done" ? { answer: submission.answer } : {}), receipt },
-    };
+    }, context);
   }
   const tools: ToolRegistration[] = [];
   if (agents.length) tools.push(
@@ -88,7 +66,7 @@ export function delegationExtension(owner: string, agents: Delegate[], clones = 
     }),
     defineTool({
       name: "delegate",
-      description: `Delegate a complete assignment; return its result and recorded usage/cost receipt. list_agents provides model prices and capabilities. Parallel calls create independent children, including multiple instances of the same definition. Assign disjoint files to concurrent editors. Available agents: ${agents.map(agent => agent.name).join(", ")}`,
+      description: `Delegate a complete assignment; wait for its result and recorded usage/cost receipt. New user input releases the wait while the child continues; use steer_child, cancel_child or wait_for_child with its conversationId. list_agents provides model prices and capabilities. Parallel calls create independent children, including multiple instances of the same definition. Assign disjoint files to concurrent editors. Available agents: ${agents.map(agent => agent.name).join(", ")}`,
       parameters: Type.Object({ agent: Type.String(), task: Type.String({ minLength: 1 }), reason: Type.Optional(Type.String({ description: "Brief reason this worker fits the task and expected total cost." })) }),
       replay: "safe",
       async execute({ agent, task }, api, context) {
@@ -99,12 +77,16 @@ export function delegationExtension(owner: string, agents: Delegate[], clones = 
     }));
   if (clones) tools.push(defineTool({
       name: "clone_agent",
-      description: "Create a fresh, private child with your current instructions, model, thinking level, extensions and tool filters, but no conversation history. Send a complete bounded assignment and necessary context. Parallel tool calls run concurrently under the host's native tool-execution settings. The child returns its final report here; completion is not acceptance. Replaying this call recovers the same child. Host permissions still apply; use isolated resources for concurrent work.",
+      description: "Create a fresh, private child with your current instructions, model, thinking level, extensions and tool filters, but no conversation history. Send a complete bounded assignment and necessary context. Waits for its report, but new user input releases the wait while the child continues. Use steer_child, cancel_child or wait_for_child with its conversationId. Completion is not acceptance. Replaying this call recovers the same child. Host permissions still apply; use isolated resources for concurrent work.",
       parameters: Type.Object({ task: Type.String({ minLength: 1 }) }),
       replay: "safe",
       execute({ task }, api, context) {
         return runChild(owner, task, undefined, api, context);
       },
     }));
-  return defineExtension({ name: `dispatch.delegation.${owner}`, tools });
+  return defineExtension({ name: `dispatch.delegation.${owner}`,
+    tasks: [workers.task], tools: [...tools, ...workers.tools],
+    sections: [{ key: "delegated-work", render: () =>
+      "A new user message releases a delegation wait; it does not stop the child. Handle the latest instruction, use steer_child or cancel_child as needed, then use wait_for_child for each outstanding assignment before claiming completion. Keep the original request active through status questions; give a brief commentary update and resume waiting. Results are retained durably but are not sent automatically. A worker report is evidence to assess, not proof that the user's goal is complete." }],
+  });
 }

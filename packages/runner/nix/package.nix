@@ -26,7 +26,7 @@ buildNpmPackage {
       ../scripts
     ] ++ lib.optionals withSlack [ ../../slack/src ../../slack/tsconfig.json ]);
   };
-  npmDepsHash = "sha256-BNoj5FQ1C9N1CSIRN6MYHKs9U9f45C0dUH7/dWD5qew=";
+  npmDepsHash = "sha256-VysIcU5MHYpd1cNmXNyDNX9OfKoEcyaEg44UB9Ncc+I=";
   npmInstallFlags = [ "--workspace=@dispatch/runner" "--include-workspace-root=false" ]
     ++ lib.optional withSlack "--workspace=@dispatch/slack";
   npmWorkspace = "packages/runner";
