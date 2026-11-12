@@ -1,5 +1,5 @@
-{ lib, runCommand, makeWrapper, runtimeShell, runtime, runtimeRevision, watcher, watcherRevision, fleetTools ? null, kit ? null }:
-{ name, src, revision, entrypoint ? null, nodeModules ? null, workspace ? null, fleet ? null, withKit ? false }:
+{ lib, runCommand, makeWrapper, runtimeShell, runtime, runtimeRevision, watcher, watcherRevision, fleetTools ? null, kit ? null, eval ? null }:
+{ name, src, revision, entrypoint ? null, nodeModules ? null, workspace ? null, fleet ? null, withKit ? false, withEval ? false }:
 
 assert builtins.match "[a-z][a-z0-9-]*" name != null;
 assert fleet == null || (fleetTools != null && workspace != null && fleet.roles != []
@@ -8,6 +8,9 @@ assert fleet == null || (fleetTools != null && workspace != null && fleet.roles 
   && !(lib.hasPrefix "/" fleet.module) && !(builtins.elem ".." (lib.splitString "/" fleet.module))
   && builtins.all (role: builtins.match "[a-z][a-z0-9_-]*" role != null) fleet.roles);
 assert lib.assertMsg (!withKit || kit != null) "withKit needs the kit that dispatch.lib.mkAgentRelease supplies.";
+assert lib.assertMsg (!withEval || eval != null) "withEval needs the evaluation package that dispatch.lib.mkAgentRelease supplies.";
+assert lib.assertMsg (!withEval || eval.version == runtime.version) "withEval needs a Runner of the evaluation package's own version (${if eval == null then "" else eval.version}); the selected execution is ${runtime.version}.";
+assert lib.assertMsg (!withEval || name != "dispatch-eval") "withEval installs bin/dispatch-eval; choose another release name.";
 runCommand "${name}-${lib.substring 0 12 revision}" {
   nativeBuildInputs = [ makeWrapper ];
   passthru = { inherit runtime watcher; };
@@ -18,7 +21,15 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
     ${runtime.nodejs}/bin/node ${kit.src}/scripts/compose.mjs ${kit.src} ${src} "$app/definitions" "$out/share/${name}/kit.json"
   '' else ''cp -R ${src}/. "$app/definitions/"''}
   ${lib.optionalString (nodeModules != null) ''ln -s ${nodeModules} "$app/definitions/node_modules"''}
-  ln -s ${runtime}/lib/agent-node_modules "$app/node_modules"
+  ${if withEval then ''
+    # The same runtime packages, plus the evaluation package beside Runner so definitions can import @dispatch/eval.
+    mkdir -p "$app/node_modules/@dispatch"
+    for entry in ${runtime}/lib/agent-node_modules/*; do
+      test "$(basename "$entry")" = "@dispatch" || ln -s "$entry" "$app/node_modules/"
+    done
+    ln -s ${runtime}/lib/agent-node_modules/@dispatch/* "$app/node_modules/@dispatch/"
+    ln -s ../../eval "$app/node_modules/@dispatch/eval"
+  '' else ''ln -s ${runtime}/lib/agent-node_modules "$app/node_modules"''}
   echo '{"type":"module","private":true}' > "$app/package.json"
   ${if entrypoint == null then ''
     makeWrapper ${runtime}/bin/dispatch-agent "$out/bin/.${name}-run" \
@@ -46,6 +57,15 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
   ''}
   ${runtime}/bin/dispatch-agent --root "$app/definitions" catalog \
     > "$out/share/${name}/catalog.json"
+  ${lib.optionalString withEval ''
+    cp -R ${eval.src} "$app/eval"
+    makeWrapper ${runtime.nodejs}/bin/node "$out/bin/dispatch-eval" \
+      --add-flags "$app/eval/src/cli.ts --release-manifest $out/share/${name}/release.json" \
+      --set DISPATCH_EVAL_PYTHON ${eval.python}/bin/python3 \
+      --set PYTHONDONTWRITEBYTECODE 1
+    "$out/bin/dispatch-eval" --help > /dev/null
+    ${eval.python}/bin/python3 "$app/eval/engine/dispatch_eval/engine.py" convert --help > /dev/null
+  ''}
   cat > "$out/share/${name}/release.json" <<'JSON'
   ${builtins.toJSON ({
     schemaVersion = 1;
@@ -67,7 +87,13 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
         scripts = "${runtime}/lib/dispatch-runner/packages/fleet/scripts";
       };
     };
-  } // lib.optionalAttrs withKit { kit = { inherit (kit) revision version; }; })}
+  } // lib.optionalAttrs withKit { kit = { inherit (kit) revision version; }; }
+    // lib.optionalAttrs withEval { eval = {
+      inherit (eval) revision version;
+      command = "${placeholder "out"}/bin/dispatch-eval";
+      engine = "${placeholder "out"}/lib/${name}/eval/engine";
+      python = "${eval.python}/bin/python3";
+    }; })}
   JSON
   ${runtime.nodejs}/bin/node --input-type=module - "$out/share/${name}/release.json" "$app/definitions" <<'JS'
   import { readFileSync, writeFileSync } from "node:fs";

@@ -1,0 +1,11 @@
+{
+  "name": "atlas-example",
+  "unit": "one answer to one question about a fictional atlas",
+  "module": "usecase.py",
+  "rubric": { "extract": "extract.md", "judge": "judge.md", "prompt_version": 1, "schema_version": 1, "metric_version": "a1" },
+  "grader": { "provider": "synthetic", "id": "atlas-rules", "thinking": "off" },
+  "judgments": 3,
+  "clock": { "kind": "synthetic-fixed", "measures": "a fixed number per variant and repeat, written by the synthetic target; not a measurement" },
+  "evidence": "synthetic recorded answers in retained.json; reruns come from the synthetic target in usecase.py",
+  "effects": "none: nothing outside the data directory is read or written"
+}

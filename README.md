@@ -19,6 +19,8 @@ owns execution, task recovery and authoritative conversation history.
 - [Observer](packages/observer/README.md): read-only desktop native inspection.
 - [Kit](packages/kit/README.md): starter agents and skills a company release can
   compose instead of copying them.
+- [Eval](packages/eval/README.md): grade retained runs and compare controlled reruns
+  of a company's agents from its own use-case packages.
 
 ## First result
 

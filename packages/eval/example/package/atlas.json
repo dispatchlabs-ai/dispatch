@@ -1,0 +1,8 @@
+{
+  "about": "A fictional atlas. Every place and fact is invented for this example.",
+  "places": {
+    "Larkhaven": { "river": "Sel", "founded": 1612, "population": 4200 },
+    "Dunmere": { "river": "Ostrel", "founded": 1489, "population": 910 },
+    "Quillford": { "river": "Brae", "founded": 1730 }
+  }
+}

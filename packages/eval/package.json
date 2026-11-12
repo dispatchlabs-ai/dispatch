@@ -1,0 +1,29 @@
+{
+  "name": "@dispatch/eval",
+  "version": "0.9.0",
+  "private": true,
+  "description": "Evaluation of Pi Durable agents: a read-only native record reader, a grading loop and task, an engine with versioned append-only history, and one launcher",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <26"
+  },
+  "exports": {
+    "./records": "./src/records.ts",
+    "./grading": "./src/grading.ts",
+    "./task": "./src/task.ts"
+  },
+  "scripts": {
+    "build": "node ../kit/scripts/check.mjs .",
+    "pretypecheck": "npm run build --workspace @dispatch/runner",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@dispatch/runner": "0.9.0",
+    "@earendil-works/chord": "1.5.2",
+    "@earendil-works/pi-ai": "1.5.2",
+    "@earendil-works/pi-durable": "1.5.2",
+    "@types/node": "24.19.1",
+    "typescript": "6.0.3"
+  }
+}

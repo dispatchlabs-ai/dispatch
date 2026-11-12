@@ -1,0 +1,8 @@
+{
+  "about": "Synthetic rerun cases for the fictional atlas.",
+  "cases": [
+    { "id": "C1", "place": "Larkhaven", "question": "Which river runs through Larkhaven, when was it founded, and what is its population?" },
+    { "id": "C2", "place": "Dunmere", "question": "When was Dunmere founded, and which river is it on?" },
+    { "id": "C3", "place": "Quillford", "question": "What is the population of Quillford?" }
+  ]
+}

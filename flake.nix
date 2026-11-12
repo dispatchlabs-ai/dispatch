@@ -29,6 +29,19 @@
             revision = self.rev or self.dirtyRev or "uncommitted";
             withKit = true;
           };
+          # The evaluation package ships to every consumer that opts in, so its text names none of them either.
+          eval-content = pkgs.runCommand "dispatch-eval-content" { } ''
+            ${runtime.nodejs_24}/bin/node ${./packages/kit}/scripts/check.mjs ${./packages/eval}
+            touch $out
+          '';
+          eval-release = self.lib.mkAgentRelease {
+            inherit system;
+            name = "eval-example";
+            src = ./packages/kit/example;
+            revision = self.rev or self.dirtyRev or "uncommitted";
+            withKit = true;
+            withEval = true;
+          };
         in {
           packages = { default = web; inherit runner runner-slack runner-fleet runner-google-chat claude-code-provider; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
             macos-release = pkgs.callPackage ./packages/web/nix/macos-release.nix { inherit web; inherit (runtime) nodejs_24; };
@@ -56,6 +69,8 @@
           checks.claude-code-provider = claude-code-provider;
           checks.kit-content = kit-content;
           checks.kit-release = kit-release;
+          checks.eval-content = eval-content;
+          checks.eval-release = eval-release;
           devShells.default = pkgs.mkShell {
             packages = [ runtime.nodejs_24 ];
           };
@@ -82,6 +97,18 @@
             };
             revision = self.rev or self.dirtyRev or "uncommitted";
             version = (builtins.fromJSON (builtins.readFile ./packages/kit/package.json)).version;
+          };
+          eval = {
+            src = pkgs.lib.fileset.toSource {
+              root = ./packages/eval;
+              fileset = pkgs.lib.fileset.unions [ ./packages/eval/src ./packages/eval/engine ./packages/eval/definitions ./packages/eval/example ./packages/eval/package.json ];
+            };
+            revision = self.rev or self.dirtyRev or "uncommitted";
+            version = (builtins.fromJSON (builtins.readFile ./packages/eval/package.json)).version;
+            # The engine's locked dependencies on the same patched Python the release already carries.
+            python = pkgs.callPackage ./packages/eval/nix/python.nix {
+              inherit ((import ./packages/runner/nix/runtime.nix { inherit pkgs; })) python3;
+            };
           };
         }) (builtins.removeAttrs args [ "system" "withSlack" "withFleet" "withGoogleChat" "execution" ]);
       packages = eachSystem (system: (forSystem system).packages);

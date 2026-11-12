@@ -23,11 +23,12 @@ buildNpmPackage {
       ../../fleet/scripts ../../observer/scripts ../../observer/licenses
       ../../observer/index.html ../../observer/vite.config.ts
       ../../kit
+      ../../eval
       ../package.json ../tsconfig.json ../tsconfig.server.json ../vite.config.ts
       ../index.html ../src ../server ../openapi.yaml ../licenses ../LICENSE ../THIRD_PARTY.md
     ];
   };
-  npmDepsHash = "sha256-t0K/QPfEXNt3gdMRwla6VLG8hZnVeyI6UTqEUDBfSXk=";
+  npmDepsHash = "sha256-03mwQ9jjfL95+6q4ptG6R74BDzkibkOcY1yh9mfUQFc=";
   ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
   npmBuildScript = "build";
   doCheck = true;
@@ -40,6 +41,7 @@ buildNpmPackage {
     cp package.json LICENSE "$app/"
     cp -R node_modules "$app/"
     rm "$app/node_modules/@dispatch/kit" # composed by the agent release builder, not served by Web
+    rm "$app/node_modules/@dispatch/eval" # installed by the agent release builder, not served by Web
     for package in runner remote postgres backend workers slack google-chat email fleet observer web; do
       mkdir -p "$app/packages/$package"
       cp packages/$package/package.json "$app/packages/$package/"

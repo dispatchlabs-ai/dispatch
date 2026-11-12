@@ -108,6 +108,31 @@ company `src` on top, giving the one definitions root Runner reads.
 kit or moving its pin changes definitions; apply that through the ordinary idle
 definition update.
 
+## Evaluation
+
+`withEval = true` installs the [evaluation package](../../eval/README.md), from the same Dispatch input as the
+builder, so a company repository holds only its use-case packages:
+
+```nix
+dispatch.lib.mkAgentRelease {
+  inherit system;
+  name = "company-agents";
+  src = source;
+  revision = self.rev;
+  withEval = true;
+}
+```
+
+The release gains `bin/dispatch-eval`, the package's source, engine and synthetic example under
+`lib/NAME/eval`, and a Python interpreter with the engine's dependency. Definitions can import
+`@dispatch/eval/grading`, `@dispatch/eval/records` and `@dispatch/eval/task` beside Runner. `release.json`
+gains `eval` with the package's revision and version, the launcher (`command`), the engine directory
+(`engine`) and its interpreter (`python`). The launcher passes the release manifest to every evaluation, which
+is how a run records its definitions commit, its Dispatch revision and whether either was dirty; evidence from
+a dirty build is labelled as development evidence. The evaluation package is versioned with Runner, so
+`withEval` with an `execution` of another version fails the build. It adds no agent to the company's
+definitions or catalog and composes with `withKit`. Without `withEval` the release is built exactly as before.
+
 ## Build, publish, activate
 
 Build on the target OS/architecture using a clean, published application revision:

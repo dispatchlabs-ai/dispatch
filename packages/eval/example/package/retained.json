@@ -1,0 +1,11 @@
+{
+  "about": "Synthetic retained runs: what a recorded agent was asked and what it answered. Nothing here was produced by a model.",
+  "runs": [
+    { "id": "R1", "at": "2026-01-05T09:00:00Z", "place": "Larkhaven", "question": "Which river runs through Larkhaven, and when was it founded?",
+      "answer": "The Sel runs through Larkhaven. It was founded in 1612.", "seconds": 2.4, "tokens": 310 },
+    { "id": "R2", "at": "2026-01-05T09:10:00Z", "place": "Dunmere", "question": "What is the population of Dunmere and which river is it on?",
+      "answer": "Dunmere has a population of 1200. It stands on the Ostrel.", "seconds": 3.1, "tokens": 345 },
+    { "id": "R3", "at": "2026-01-05T09:20:00Z", "place": "Quillford", "question": "Who is the mayor of Quillford, and when was it founded?",
+      "answer": "Quillford was founded in 1730. Its mayor is Avery Stone.", "seconds": 2.9, "tokens": 330 }
+  ]
+}

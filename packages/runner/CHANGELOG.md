@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 - Kit composition accepts `omit` in `kit.json` and `DIR/NAME.company.md` addenda for any kit Markdown file; see the [kit](../kit/README.md).
+- `mkAgentRelease` accepts `withEval = true`: the release builder installs the [evaluation package](../eval/README.md) under `lib/NAME/eval` with `bin/dispatch-eval` and a Python interpreter carrying the engine's dependency, and records it in `release.json` under `eval`. It requires the builder's own Runner version. Releases built without it are unchanged.
+- Export `sessionAgent`, which retains a session's initial agent selection, for hosts that open an ordinary session directory themselves.
 
 ## [0.9.0] - 2026-11-12
 

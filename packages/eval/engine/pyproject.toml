@@ -1,0 +1,9 @@
+[project]
+name = "dispatch-eval"
+version = "0.0.0"
+description = "Dispatch evaluation engine: store, versions, grading protocol, comparison and workbook. Versioned with packages/eval/package.json."
+requires-python = ">=3.12"
+dependencies = ["openpyxl>=3.1.5"]
+
+[tool.uv]
+package = false
