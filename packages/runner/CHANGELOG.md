@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-12
+
 - Fix `withEval` releases whose definitions import `@dispatch/eval`: the package is in place before the catalog is built.
 
 ## [0.10.0] - 2026-11-12

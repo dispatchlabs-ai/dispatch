@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-12
+
 - Development no longer names the kit's cleanup skill by its catalog identifier, so omitting that skill leaves no dangling reference.
 
 ## [0.10.0] - 2026-11-12
