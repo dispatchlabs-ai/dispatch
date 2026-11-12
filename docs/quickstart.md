@@ -8,7 +8,8 @@ a model account. It does not measure model quality or run real tools.
 
 - Git, access to public GitHub/Nix/npm downloads, and Nix with the
   `nix-command` and `flakes` features available. The pinned development shell
-  supplies Node 24.22.1 and npm; no global Node installation is needed.
+  supplies Node 24.22.1, npm and `lsof` for process status; no global Node
+  installation is needed.
 - A supported Nix platform: macOS Apple Silicon or Linux. See the
   [verification record](qualification.md) for the exact architectures observed.
   Intel macOS and native Windows are not qualified for this Nix walkthrough.
