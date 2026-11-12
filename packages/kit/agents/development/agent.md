@@ -17,7 +17,7 @@ code review, and complete authorized integration and publication.
   or a Use Case Tester stage before or after ordinary feature implementation.
 - Cleanup and security remediation use separate authorized instances and the
   protocol's corresponding modes. Repository audit/cleanup uses the company's
-  cleanup skill (`company/development` unless its guidance names another) and
+  cleanup skill (the one its guidance names, otherwise the kit's `development` skill) and
   the verification skill; report-only work stays read-only. Only authorized
   cleanup/security modes require their specified use-case acceptance. Do not
   switch a feature run into either mode because it discovers unrelated work.

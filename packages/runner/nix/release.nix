@@ -28,6 +28,7 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
       test "$(basename "$entry")" = "@dispatch" || ln -s "$entry" "$app/node_modules/"
     done
     ln -s ${runtime}/lib/agent-node_modules/@dispatch/* "$app/node_modules/@dispatch/"
+    cp -R ${eval.src} "$app/eval"
     ln -s ../../eval "$app/node_modules/@dispatch/eval"
   '' else ''ln -s ${runtime}/lib/agent-node_modules "$app/node_modules"''}
   echo '{"type":"module","private":true}' > "$app/package.json"
@@ -58,7 +59,6 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
   ${runtime}/bin/dispatch-agent --root "$app/definitions" catalog \
     > "$out/share/${name}/catalog.json"
   ${lib.optionalString withEval ''
-    cp -R ${eval.src} "$app/eval"
     makeWrapper ${runtime.nodejs}/bin/node "$out/bin/dispatch-eval" \
       --add-flags "$app/eval/src/cli.ts --release-manifest $out/share/${name}/release.json" \
       --set DISPATCH_EVAL_PYTHON ${eval.python}/bin/python3 \

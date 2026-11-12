@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Development no longer names the kit's cleanup skill by its catalog identifier, so omitting that skill leaves no dangling reference.
+
 ## [0.10.0] - 2026-11-12
 
 - `kit.json` accepts `omit`: leave out a kit agent or skill, by file or directory, with a reason. `DIR/NAME.company.md` is appended to any kit `DIR/NAME.md`, not only a role's `agent.md`.

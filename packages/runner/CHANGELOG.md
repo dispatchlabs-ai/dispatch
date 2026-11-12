@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Fix `withEval` releases whose definitions import `@dispatch/eval`: the package is in place before the catalog is built.
+
 ## [0.10.0] - 2026-11-12
 
 - Kit composition accepts `omit` in `kit.json` and `DIR/NAME.company.md` addenda for any kit Markdown file; see the [kit](../kit/README.md).

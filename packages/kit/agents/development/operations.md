@@ -51,7 +51,7 @@ native cycle ledger and every handoff. Explicit cleanup uses `cleanup` in a
 separate instance; a finalized security handoff uses `security-remediation` in
 its own instance. Direct report-only or Use Case Tester assignments retain their
 narrow scope. For a repository audit, read the company's cleanup skill
-(`company/development` unless its guidance names another) and the verification
+(the one its guidance names, otherwise the kit's `development` skill) and the verification
 skill; report findings without repairing them.
 A legacy workflow ID, old handoff checklist or available tester does not select
 cleanup or acceptance for a new feature run.
