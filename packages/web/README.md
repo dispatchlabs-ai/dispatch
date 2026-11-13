@@ -10,7 +10,7 @@ operations. Public name: **Web**. See [design](DESIGN_GUIDE.md),
 From an existing Dispatch application's directory with Node 24.22.1 or newer, install the matching Web archive and add its npm command:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.17.1/dispatch-web-0.17.1.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.17.2/dispatch-web-0.17.2.tgz
 npm pkg set 'scripts.web=dispatch-web --config host.json'
 ```
 

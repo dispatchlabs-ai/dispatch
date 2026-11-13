@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.17.2] - 2026-11-13
+
 - Remove the inherited 30-second deadline from MCP tool calls unless the host explicitly configures a timeout. Long agent-to-agent waits remain cancellable without resubmitting work.
 
 ## [0.16.1] - 2026-11-13
