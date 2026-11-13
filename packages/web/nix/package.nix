@@ -27,7 +27,7 @@ buildNpmPackage {
       ../index.html ../src ../server ../openapi.yaml ../licenses ../LICENSE ../THIRD_PARTY.md
     ];
   };
-  npmDepsHash = "sha256-baHz6InBZFjr1yuI87HD0uuCqugb64GPQ8YfRGElwkw=";
+  npmDepsHash = "sha256-vAUhhAvUeu8bkzAEIIDGZ+4UEvMX8nIFfZY7xL9YroQ=";
   ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
   npmBuildScript = "build";
   doCheck = true;

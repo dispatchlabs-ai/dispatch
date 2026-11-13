@@ -21,11 +21,11 @@ in-process operations; the [service guide](../packages/runner/docs/service.md)
 documents commands and receipts. [Remote](../packages/remote/README.md) owns the
 separate storage transport contract.
 
-The Unreleased [Pi terminal client](../packages/runner/docs/service.md#interactive-terminal-ui-unreleased)
+The [Pi terminal client](../packages/runner/docs/service.md#interactive-terminal-ui)
 uses the same catalog, conversation and watch operations for interactive chat.
 Its pickers, draft retention, scrolling and tool expansion are client behavior;
 no protocol or storage migration is introduced. One-shot and redirected commands
-keep plain output. Published v0.15.1 archives retain the earlier terminal UI.
+keep plain output. Available in Runner 0.16.0 and newer.
 
 ## Authority
 

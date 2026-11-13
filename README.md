@@ -12,8 +12,8 @@ Use Node 24.22.1 or newer and npm. The demo echoes your messages locally so you 
 mkdir dispatch-demo && cd dispatch-demo
 npm init -y --init-type=module
 npm install \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.15.1/dispatch-runner-0.15.1.tgz \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.15.1/dispatch-web-0.15.1.tgz
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.16.0/dispatch-runner-0.16.0.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.16.0/dispatch-web-0.16.0.tgz
 ```
 
 **2. Write your agent and start its host.**
@@ -57,8 +57,8 @@ A shared `host.json` can supply a model gateway and named MCP connections. For e
 
 Run `npm start`, then `npm run chat` or `npm run web` in another terminal. To upgrade Dispatch, install matching release archives, commit the updated npm manifest and lockfile, and restart your processes. Your Markdown definitions belong to your application. [Releases](https://github.com/dispatchlabs-ai/dispatch/releases) · [Upgrade guide](packages/runner/docs/upgrade.md)
 
-Current source includes an Unreleased [Pi terminal UI](packages/runner/README.md#interactive-terminal-ui-unreleased)
-for `npm run chat`. The v0.15.1 archives above retain the earlier plain terminal UI.
+Dispatch 0.16.0 includes a [Pi terminal UI](packages/runner/README.md#interactive-terminal-ui)
+for `npm run chat`, with streaming Markdown, multiline input and saved conversations.
 
 ## Packages and integrations
 

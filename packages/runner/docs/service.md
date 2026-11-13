@@ -92,12 +92,11 @@ owners or import agent definitions. A channel adapter may map its external threa
 key to the same chat. Sources are open strings; adding a client requires no Runner
 source-code change.
 
-### Interactive terminal UI (Unreleased)
+### Interactive terminal UI
 
-Current source connects Pi's editor, Markdown, scrolling and pickers to
+Runner 0.16.0 connects Pi's editor, Markdown, scrolling and pickers to
 `AgentClient`. It runs as one foreground client; it does not start an execution
-owner or use the separate storage observer. The released v0.15.1 client retains
-its plain interface.
+owner or use the separate storage observer.
 
 | Command | Behavior |
 | --- | --- |

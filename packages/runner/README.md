@@ -10,7 +10,7 @@ source checkout are optional. In a new application directory:
 
 ```sh
 npm init -y --init-type=module
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.15.1/dispatch-runner-0.15.1.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.16.0/dispatch-runner-0.16.0.tgz
 ```
 
 An existing npm application only needs the install command. Creating a local
@@ -53,11 +53,10 @@ turn and `/quit` to disconnect. `--session NAME` selects another conversation.
 Stopping the host with Ctrl-C preserves its history and unfinished work; start it
 with the same command to recover. Clients never start replacement owners.
 
-### Interactive terminal UI (Unreleased)
+### Interactive terminal UI
 
-Current source uses Pi's terminal UI for interactive `dispatch chat` and
+Dispatch 0.16.0 uses Pi's terminal UI for interactive `dispatch chat` and
 `dispatch-agent run`, including applications that expose either as `npm run chat`.
-The v0.15.1 archive above still has the earlier plain terminal interface.
 
 Retained history appears immediately above a multiline composer. Replies render
 as streaming Markdown; tool activity shows native status, inputs, progress and
@@ -76,7 +75,7 @@ observes the same host without resending input. `/retry` explicitly retries an
 uncertain send with its original payload and request ID. Unresolved identities
 and payloads print on exit so they remain available for deliberate recovery.
 `--prompt`, `--history`, file submissions, redirected streams and `TERM=dumb`
-keep the plain interface. See the [client guide](docs/service.md#interactive-terminal-ui-unreleased).
+keep the plain interface. See the [client guide](docs/service.md#interactive-terminal-ui).
 
 ## Try it without credentials
 

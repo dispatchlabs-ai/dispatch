@@ -13,7 +13,7 @@ optional. Choose a new directory:
 mkdir dispatch-demo
 cd dispatch-demo
 npm init -y --init-type=module
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.15.1/dispatch-runner-0.15.1.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.16.0/dispatch-runner-0.16.0.tgz
 ```
 
 Initialize `package.json` in this directory before installing. Otherwise npm can
@@ -56,9 +56,9 @@ Send `Hello from the quickstart`. The streamed response begins **Demo reply:**
 and repeats your message. `/history` shows the retained messages; `/quit`
 disconnects the client. A client disconnect leaves admitted work running.
 
-Current source also has an Unreleased [Pi terminal UI](../packages/runner/README.md#interactive-terminal-ui-unreleased)
-with visible retained history, multiline editing, tool details and conversation
-pickers. It is not included in the v0.15.1 archive installed by this walkthrough.
+The Pi terminal UI shows retained history immediately. Use Alt+Enter for a
+newline, Ctrl+O for tool details, and `/chats` to find saved conversations.
+[Commands and shortcuts](../packages/runner/README.md#interactive-terminal-ui).
 
 Stop the **host** with Ctrl-C, then start it with the same command. Reconnect with
 `npx dispatch chat --state .demo --history`: the same conversation must remain,

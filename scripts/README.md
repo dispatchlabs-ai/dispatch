@@ -7,7 +7,7 @@ Postgres, Backend, Workers, Slack, Google Chat, Email and Fleet. Web ships as an
 packages your application uses. Backend's central storage peers and Fleet's Slack
 peer are optional; explicit subpath imports activate those integrations.
 
-The [v0.15.1 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.15.1)
+The [v0.16.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.16.0)
 provides the nine library archives and the Web client archive with their source manifest and SHA-256 checksums.
 Web’s GitHub archive references its exact Runner and Backend release archives so npm can resolve the client from its URL. Graph edges in the source workspace stay at the lockstep version. Install matching library archives
 together; npm publication remains separate. Future breaking 0.x changes require

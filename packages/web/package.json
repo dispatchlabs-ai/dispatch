@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/web",
-  "version": "0.15.1",
+  "version": "0.16.0",
   "type": "module",
   "engines": {
     "node": ">=24.22.1"
@@ -11,9 +11,9 @@
     "start": "node dist/server/server/main.js"
   },
   "dependencies": {
-    "@dispatch/backend": "0.15.1",
+    "@dispatch/backend": "0.16.0",
     "zod": "4.6.6",
-    "@dispatch/runner": "0.15.1"
+    "@dispatch/runner": "0.16.0"
   },
   "devDependencies": {
     "@radix-ui/react-slot": "^1.2.4",

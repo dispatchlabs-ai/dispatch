@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-13
+
 - Use the existing Pi TUI dependency for interactive chat: retained Markdown
   history, multiline editing/paste, searchable agent and conversation pickers,
   expandable native tool activity, and scrolling above a fixed composer.
