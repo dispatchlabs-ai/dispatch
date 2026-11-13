@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-13
+
 - Ship the compiled browser client as the Web release archive. Add `dispatch-web --config host.json [--port PORT]` to use the same host connection as the CLI.
 
 ## [0.13.0] - 2026-11-13

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-13
+
 - Export `readClientConnection` from `@dispatch/runner/client` for CLI and Web clients sharing a host file, including authenticated loopback HTTP listeners.
 
 ## [0.14.1] - 2026-11-13
