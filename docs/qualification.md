@@ -4,6 +4,35 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.17.3 portable Slack Markdown — November 13, 2026
+
+[Release v0.17.3](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.17.3)
+contains eleven archives from `63f29f226916f51c2460f95c0a1cf35c3db529bf`.
+All thirteen public assets matched the reviewed bytes and GitHub digests.
+Empty-cache public installs passed strict NodeNext declaration checks, actual
+imports and dependency resolution. Web-only and MCP-only installs resolved
+their transitive archives; minimal Backend and Fleet consumers retained optional
+integrations. Selected production audits reported zero findings. Source/type/build,
+Mac arm64 and Linux x86_64 artifact/flake checks, frontend, portable Mac and both
+Linux images passed. Artifact scans retained the same reviewed upstream matches.
+
+An actual Web message and its agent reply showed headings, emphasis, lists,
+links, a pipe table, quotation and literal code in Web, the Pi terminal and Slack.
+Slack displayed a table inside a user blockquote as raw pipes; the corrected
+adapter keeps complete tables outside its added quote under the same bold source
+attribution. Both human and assistant tables then rendered in the live Slack
+thread. Saved native Markdown remained unchanged. The shared client does not
+provide a verified human display name, so the label identifies the user role and
+source without inferring a name from the Slack recipient.
+
+Web was inspected at all four required viewport sizes, with mobile navigation
+and fullscreen table interaction. Native instructions, inputs, answers, submissions,
+tasks and delivery state were inspected; prior entries remained byte-identical.
+No automated functional tests were run. Existing channel, multi-user, attachment,
+edit/delete and uncertain-delivery qualification limits remain. Oversized individual
+Markdown blocks retain the documented literal chunk fallback. This is scoped
+implementation and artifact review, not a comprehensive security assessment.
+
 ## v0.17.2 MCP tool deadlines — November 13, 2026
 
 [Release v0.17.2](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.17.2)
@@ -64,7 +93,6 @@ concurrent steering and an in-flight uncertain-delivery restart remain unverifie
 This is scoped implementation and artifact review, not a comprehensive security
 assessment or qualification of every deployment.
 
-||||||| parent of 98f4277 (Record MCP release qualification and compatibility)
 ## v0.17.0 MCP conversation connector — November 13, 2026
 
 [Release v0.17.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.17.0)
