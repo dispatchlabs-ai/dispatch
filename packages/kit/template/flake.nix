@@ -2,7 +2,7 @@
   description = "Agents built on the Dispatch kit";
 
   # One tag selects the runtime, its Pi Durable and the kit. Move the tag to upgrade.
-  inputs.dispatch.url = "github:dispatchlabs-ai/dispatch/v0.12.2";
+  inputs.dispatch.url = "github:dispatchlabs-ai/dispatch/v0.12.3";
   inputs.nixpkgs.follows = "dispatch/nixpkgs";
 
   outputs = { self, dispatch, nixpkgs }:

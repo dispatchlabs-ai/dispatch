@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.12.3] - 2026-11-13
+
 - Remove reasoning-level silence deadlines from gateway streams. Quiet provider work remains attached until the caller cancels or the gateway reports a failure, avoiding premature retries and uncertain usage.
 
 ## [0.12.1] - 2026-11-13

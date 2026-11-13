@@ -42,7 +42,7 @@ involved yet.
 
 ```sh
 mkdir my-agents && cd my-agents
-nix flake init -t github:dispatchlabs-ai/dispatch/v0.12.2#kit
+nix flake init -t github:dispatchlabs-ai/dispatch/v0.12.3#kit
 git init -q && git add -A
 nix build
 ./result/bin/my-agents catalog

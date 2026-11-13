@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/kit",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "private": true,
   "description": "Starter agents and skills composed into an agent release by the Dispatch Nix builder",
   "license": "MIT",
@@ -14,7 +14,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
-    "@dispatch/runner": "0.12.2",
+    "@dispatch/runner": "0.12.3",
     "@earendil-works/pi-durable": "1.5.2",
     "@types/node": "24.19.1",
     "typescript": "6.0.3"
