@@ -4,6 +4,29 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.16.1 Slack DMs — November 13, 2026
+
+The released Runner, Web and Slack archives were installed together in an
+ordinary npm application on macOS. One explicit host loaded the Slack adapter
+through `host.json` and a private options file; no factory configuration or
+separate channel host was needed. The dependency tree retained one Pi Durable
+1.5.2 installation. The npm audit reported zero findings.
+
+Manual browser interactions with a real Slack app verified DM admission, a Bash
+calculation, a contextual thread reply, the native working indicator, and Stop
+during a running shell command. Slack acknowledged Stop; native tasks and the
+submission recorded cancellation. Restarting the host preserved the thread and
+allowed another reply. The actual npm terminal client's `/chats` picker and Web
+opened the same history, including tool outcomes. A terminal follow-up retained
+context and was visible to the next Slack turn. Native entries, submissions,
+tasks and delivery documents were inspected alongside the visible replies.
+
+This qualifies a single authorized DM participant with a local shared host.
+Other-client turns on an idle thread were not mirrored into Slack. It does not
+qualify multi-user authorization, channel mentions, attachments, concurrent
+steering, in-flight restart or uncertain-delivery retries. No automated
+functional tests were added or run.
+
 ## v0.16.1 thinking summaries and discovery — November 13, 2026
 
 [Release v0.16.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.16.1)

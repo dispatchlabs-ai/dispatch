@@ -24,9 +24,8 @@ It waits for active work and queued human input, then resumes only an unfinished
 matching request. Cancelled, completed or replaced requests are discarded.
 Admission and recovery use native tasks and submission identities.
 
-This is a source-alpha package, installed as a packed archive from reviewed
-source. It shares the repository's lockstep version (0.12.3, unreleased) and has not been
-published to npm.
+Install matching Runner and Slack archives from [Dispatch releases](https://github.com/dispatchlabs-ai/dispatch/releases).
+The packages share the repository's lockstep version; they are not published to npm.
 See [use cases](USE_CASES.md) and [changes](CHANGELOG.md).
 
 Runner's [artifact tools](../runner/docs/artifacts.md) upload documents/images
@@ -44,10 +43,53 @@ inbox/outbox tasks remain inside the owner; other clients use Runner's common AP
 
 ## Configure
 
-Install both packed packages in a private company repository. Use the same exact
-Pi Durable version as the runner (1.5.2 for current source). Upgrade both packages
-together and follow the runner's [state upgrade precautions](../runner/README.md#persistence-and-boundaries)
-before opening an existing store. Add a connection to `factory.yaml`:
+Install both packages in the agent application's repository. Use the same exact
+Pi Durable version as Runner (1.5.2 for current source). Upgrade the packages
+together and follow Runner's [state upgrade precautions](../runner/README.md#persistence-and-boundaries)
+before opening an existing store.
+
+For the ordinary host launcher, add the adapter to `host.json`:
+
+```json
+{
+  "adapters": [
+    { "module": "@dispatch/slack", "optionsFile": "slack.local.json" }
+  ]
+}
+```
+
+Put the connection settings in `slack.local.json`, relative to the host's working
+directory. For an agent defined in `agents/helper/agent.md`, a DM-only connection is:
+
+```json
+{
+  "config": {
+    "teamId": "T0123456789",
+    "channels": {},
+    "directMessagesAgent": "helper"
+  }
+}
+```
+
+Supply `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN` through the host's environment.
+Alternatively, the private options file can include
+`credentials: { botToken, appToken }` beside `config`; exclude that file from Git
+and restrict it to the host account. Start `dispatch serve --config host.json`.
+Slack, terminal and Web then use the same host and native conversations. No
+additional agent implementation, Slack-only host or `factory.yaml` is required.
+
+For DMs, enable the app's Messages tab and allow users to send messages. Subscribe
+to `message.im` and install `im:history` and `chat:write`. Reauthorize the app after
+adding scopes. Each top-level DM starts a conversation; reply in its thread to
+continue it. Send `stop` or `cancel` in that thread to stop its active work.
+
+Open the conversation in the terminal with `/chats` or select its Slack-labelled
+row in Web. Other clients share its saved history. An idle thread's messages and
+answers from those clients are not automatically mirrored into Slack; the next
+Slack reply continues from the shared history.
+
+Applications using `run({adapters})` may instead keep named connections in an
+optional `factory.yaml`:
 
 ```yaml
 agents: []

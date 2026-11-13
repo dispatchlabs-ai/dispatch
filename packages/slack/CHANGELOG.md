@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Document ordinary `host.json` setup, DM permissions and shared-client history
+  using the published package archives. Record live DM and cancellation checks.
+
 ## [0.13.0] - 2026-11-13
 
 - Prepare a public reusable package. Admit channel input through shared host validation and preserve native transactional continuation and delivery receipts.
