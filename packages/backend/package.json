@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/backend",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -37,7 +37,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@dispatch/runner": "0.13.0",
+    "@dispatch/runner": "0.13.1",
     "@earendil-works/pi-ai": "1.5.2",
     "ws": "8.22.0",
     "@earendil-works/chord": "1.5.2",
@@ -66,8 +66,8 @@
   "types": "./dist/index.d.ts",
   "description": "Shared native chat operations and central service for Dispatch clients",
   "peerDependencies": {
-    "@dispatch/remote": "0.13.0",
-    "@dispatch/postgres": "0.13.0"
+    "@dispatch/remote": "0.13.1",
+    "@dispatch/postgres": "0.13.1"
   },
   "peerDependenciesMeta": {
     "@dispatch/remote": {

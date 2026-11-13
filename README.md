@@ -26,7 +26,7 @@ and the [service/client contract](packages/runner/docs/service.md#shared-clients
 **Source alpha.** Install the runtime in your own application with Node 24.22.1 or newer and npm:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.13.0/dispatch-runner-0.13.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.13.1/dispatch-runner-0.13.1.tgz
 ```
 
 Write one `agent.md` with its description, model and instructions, then start
@@ -72,7 +72,7 @@ definition files you inspect and edit in source.
 
 ## Versions and distribution
 
-The latest release is [v0.13.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.13.0),
+The latest release is [v0.13.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.13.1),
 using Pi Durable 1.5.2. Its nine reusable package archives, source manifest and
 SHA-256 checksums are attached to the release. These packages are not published
 to npm. The [package guide](scripts/README.md) describes archive preparation and

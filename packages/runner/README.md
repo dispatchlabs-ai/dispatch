@@ -9,7 +9,7 @@ Use **Node 24.22.1 or newer**, with npm. Nix and a Dispatch
 source checkout are optional. In your application directory:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.13.0/dispatch-runner-0.13.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.13.1/dispatch-runner-0.13.1.tgz
 ```
 
 npm records Runner as `@dispatch/runner` in `package.json` and `package-lock.json`.

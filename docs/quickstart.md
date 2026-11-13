@@ -12,7 +12,7 @@ optional. Choose a new directory:
 ```sh
 mkdir dispatch-demo
 cd dispatch-demo
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.13.0/dispatch-runner-0.13.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.13.1/dispatch-runner-0.13.1.tgz
 ```
 
 The archive is the installed library, not a source checkout. npm creates or updates

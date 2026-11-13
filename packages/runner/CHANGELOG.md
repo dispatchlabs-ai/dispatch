@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-11-13
+
 - Start a local host with `dispatch serve` from one root `agent.md`; provider bindings
   and private local paths are inferred. `dispatch chat` reconnects to the same
   host and retained main conversation. No scaffold, host JSON or Nix is required.

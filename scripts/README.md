@@ -7,7 +7,7 @@ Postgres, Backend, Workers, Slack, Google Chat, Email and Fleet. Install only th
 packages your application uses. Backend's central storage peers and Fleet's Slack
 peer are optional; explicit subpath imports activate those integrations.
 
-The [v0.13.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.13.0)
+The [v0.13.1 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.13.1)
 provides all nine library archives with their source manifest and SHA-256 checksums.
 It adds the one-file host command on top of the shared host/client contract. Install matching archives
 together; npm publication remains separate. Future breaking 0.x changes require
