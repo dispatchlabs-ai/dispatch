@@ -1,23 +1,36 @@
 {
   "name": "@dispatch/mcp",
-  "version": "0.16.1",
+  "version": "0.17.0",
   "description": "MCP conversation connector for an existing Dispatch host",
   "license": "MIT",
   "type": "module",
-  "engines": { "node": ">=24.22.1" },
+  "engines": {
+    "node": ">=24.22.1"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
-  "bin": { "dispatch-mcp": "./dist/cli.js" },
-  "files": ["dist", "README.md", "USE_CASES.md", "CHANGELOG.md", "LICENSE"],
+  "bin": {
+    "dispatch-mcp": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "USE_CASES.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@dispatch/runner": "0.16.1",
+    "@dispatch/runner": "0.17.0",
     "@modelcontextprotocol/server": "2.4.0",
     "@modelcontextprotocol/node": "2.1.2",
     "zod": "4.6.6"
@@ -32,6 +45,11 @@
     "directory": "packages/mcp"
   },
   "homepage": "https://github.com/dispatchlabs-ai/dispatch/tree/main/packages/mcp#readme",
-  "bugs": { "url": "https://github.com/dispatchlabs-ai/dispatch/issues" },
-  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" }
+  "bugs": {
+    "url": "https://github.com/dispatchlabs-ai/dispatch/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
 }
