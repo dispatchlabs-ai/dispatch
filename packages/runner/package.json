@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=24.22.1 <25"
+    "node": ">=24.22.1"
   },
   "exports": {
     "./service": {
@@ -46,6 +46,7 @@
     }
   },
   "bin": {
+    "dispatch": "./dist/agent-cli.js",
     "dispatch-agent": "./dist/agent-cli.js",
     "dispatch-service": "./dist/service-cli.js",
     "dispatch-watch": "./dist/watch-cli.js"

@@ -133,7 +133,7 @@ not a security certification. [v0.11.2](https://github.com/dispatchlabs-ai/dispa
 
 ## Web walkthrough qualification — November 12, 2026
 
-The [published prompt and manual walkthrough](quickstart.md) were exercised by two
+The [published prompt and manual walkthrough](web-quickstart.md) were exercised by two
 fresh agent sessions using clean public clones and isolated synthetic state:
 
 | Platform | Source | Observed result |

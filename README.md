@@ -23,28 +23,33 @@ Dispatch dependency changes the runtime; your definition files stay yours.
 See the [minimal agent example](packages/runner/README.md#try-it-without-credentials)
 and the [service/client contract](packages/runner/docs/service.md#shared-clients-and-company-compositions).
 
-**Source alpha.** Start with a local synthetic conversation: send a message,
-watch the reply stream, restart the demo and reopen its saved history. No model
-key, account, database server or private infrastructure is needed.
+**Source alpha.** Install the runtime in your own application with Node 24.22.1 or newer and npm:
+
+```sh
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.13.0/dispatch-runner-0.13.0.tgz
+```
+
+Write one `agent.md` with its description, model and instructions, then start
+`npx dispatch serve`. In another terminal, `npx dispatch chat` connects to the
+same host. The [quickstart](docs/quickstart.md) includes the complete Markdown
+and a credential-free demo. No scaffold, application build or Nix is required.
 
 ## Use it with your AI agent
 
-Your agent needs public-documentation, shell, file and browser access. The machine
-needs Git and Node 24.22.1. The pinned Nix shell is an optional way to obtain the toolchain.
 Give your agent this prompt:
 
 > Read https://github.com/dispatchlabs-ai/dispatch/blob/main/docs/quickstart.md and
-> complete the local chat walkthrough in a fresh directory. Verify a synthetic
-> reply and that the same conversation survives a service restart. Report the
-> source commit, platform, observed result and any user intervention. Use only
-> the demo's isolated state; leave existing installations and real accounts alone.
-> Stop the demo you started when finished and tell me how to reopen its history.
+> complete the local conversation walkthrough in a fresh directory. Install the
+> released library, create one agent.md, and use the documented host and chat
+> commands with synthetic inference. Verify that the same conversation survives
+> a host restart. Report the installed version, platform and observed results.
+> Use only the new directory's isolated state; leave existing installations and
+> real accounts alone. Stop the host you started when finished.
 
-The walkthrough downloads build dependencies, starts a loopback-only server and
-writes synthetic conversation history in the new checkout. It does not install
-a system service. The [manual walkthrough](docs/quickstart.md) follows the same
-steps. See the [verification record](docs/qualification.md) for observed platforms
-and limits; browser access and Node are prerequisites supplied by the user or agent.
+The walkthrough needs shell and file access, Node and npm. The optional
+[browser walkthrough](docs/web-quickstart.md) also needs a browser and builds Web
+from source. See the [verification record](docs/qualification.md) for observed
+platforms and limits.
 
 ## Choose the pieces you need
 

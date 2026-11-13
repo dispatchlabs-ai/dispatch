@@ -1,68 +1,100 @@
 # Dispatch Runner
 
-Define agents in your application, start one host, and connect clients to its
-conversations. Pi Durable owns execution, recovery and storage. Dispatch supplies
-agent loading, shared conversation operations and optional channel integrations.
+Define an agent in one Markdown file, start one host, and connect clients to its
+saved conversations. Pi Durable owns execution, recovery and storage.
 
-Use Node 24.22.1. Nix is optional. Install the Runner archive from
-[v0.13.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.13.0)
-in your application and retain `package-lock.json`. Matching optional package
-archives are attached to the same release. The [package guide](../../scripts/README.md)
-also explains how to build archives from source. The packages are not published to npm.
+## Install and start
 
-## Try it without credentials
-
-In a new application directory, install the released Runner archive:
+Use **Node 24.22.1 or newer**, with npm. Nix and a Dispatch
+source checkout are optional. In your application directory:
 
 ```sh
-npm init -y
-npm pkg set type=module
 npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.13.0/dispatch-runner-0.13.0.tgz
-mkdir -p agents/helper
 ```
 
-Create `agents/helper/agent.md`:
+npm records Runner as `@dispatch/runner` in `package.json` and `package-lock.json`.
+Keep both files. This installs a versioned GitHub package archive; no npm account
+is needed. The packages are not published to the npm registry.
+
+Create **`agent.md`**:
 
 ```markdown
 ---
-description: A minimal helper
-model: { provider: faux, id: faux-1 }
+description: A helpful assistant
+model: { provider: anthropic, id: claude-sonnet-4-6 }
 ---
-Answer clearly.
+Answer clearly. Ask when you need more information.
 ```
 
-That is the complete agent definition. No TypeScript, trigger, scheduled input or
-factory file is needed. Create `main.mjs`:
+With `ANTHROPIC_API_KEY` set in your shell, start the host:
+
+```sh
+npx dispatch serve
+```
+
+The host reads your definition and selects its built-in Pi provider. It saves
+conversations in `.state/`; add that directory to `.gitignore`. Provider keys
+stay in the host's environment. No host JSON, application code or generated
+agent files are required. The root definition has the stable agent ID `agent`.
+
+In a second terminal in the same directory:
+
+```sh
+npx dispatch chat
+```
+
+The terminal connects to the running host and returns to the `main` conversation.
+Use `/new` for a new conversation, `/history` to read messages, `/stop` to cancel a
+turn and `/quit` to disconnect. `--session NAME` selects another conversation.
+Stopping the host with Ctrl-C preserves its history and unfinished work; start it
+with the same command to recover. Clients never start replacement owners.
+
+## Try it without credentials
+
+Use the same `agent.md` with an explicitly synthetic host:
+
+```sh
+npx dispatch serve --demo --state .demo
+```
+
+In another terminal:
+
+```sh
+npx dispatch chat --state .demo --prompt "Hello"
+npx dispatch chat --state .demo --history
+```
+
+The response begins **Demo reply:** and repeats your message. It uses native
+durable storage and no model account. Keep `.demo/` out of Git. Stop the host with
+Ctrl-C; restart it to reopen the same history. Demo and live stores stay separate.
+See the [first-conversation walkthrough](../../docs/quickstart.md).
+
+## Application code and configuration
+
+`--root DIRECTORY`, `--state DIRECTORY` and `--socket PATH` select explicit local
+paths. The default socket is a stable, account-private temporary path derived
+from the application state path, so deeply nested checkouts work too. The host
+prints its socket for other clients. `dispatch catalog` reads definitions without
+opening stores. For custom model providers, HTTPS, channel extensions or host
+policy, use `dispatch serve --config HOST.json` and the
+[host configuration guide](docs/service.md).
+
+The library remains directly usable from application code:
 
 ```js
 import { run } from "@dispatch/runner";
-import { createModels } from "@earendil-works/pi-ai/models";
-import { fauxProvider, fauxAssistantMessage } from "@earendil-works/pi-ai/providers/faux";
-
-const faux = fauxProvider();
-faux.setResponses([fauxAssistantMessage("Hello from a durable conversation.")]);
-const models = createModels();
-models.setProvider(faux.provider);
-const host = await run({ models, demo: true });
-try {
-  const chat = await host.client.create("helper", "example", "hello", "Example");
-  const turn = await host.client.submit(chat.id, "Hello", "hello-1");
-  await host.client.wait(chat.id, turn.submissionId);
-  console.log((await host.client.snapshot(chat.id)).messages);
-} finally {
-  await host.close();
-}
+const host = await run({ models }); // Your configured Pi Models catalog.
+// Use host.client, or expose it to your chosen clients.
+// Close the host when your application shuts down.
+await host.close();
 ```
-
-Run `node main.mjs`. This uses synthetic inference and real durable storage.
-Rerunning the same request identity observes the retained result. For live models,
-supply a Pi Models catalog with your provider and credentials. No particular
-provider or gateway is required.
 
 ## Definitions and optional capabilities
 
 Your repository owns instructions, model selection, tools, skills and application
-code. Add `agents/helper/agent.ts` only when the agent needs capabilities:
+code. Add `agent.ts` beside the root Markdown only when the agent needs capabilities.
+For several agents, use `agents/NAME/agent.md` and optional `agent.ts` beside each.
+A root `agent.md` can coexist with named agents, but not with `agents/agent/agent.md`.
 
 ```ts
 import { defineAgent } from "@dispatch/runner";
@@ -109,7 +141,7 @@ dispatch-agent --socket /srv/example/run/agent.sock run --agent helper --session
 dispatch-agent --socket /srv/example/run/agent.sock run --session main --history
 ```
 
-The CLI never starts or replaces a host. Web uses the same client through Backend.
+The client commands never start or replace a host. Web uses the same client through Backend.
 Watch streams are driven by native changes; clients do not poll full histories.
 See [host and client setup](docs/service.md) for configuration, HTTPS, receipts,
 errors, streaming and explicit ownership.

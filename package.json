@@ -17,7 +17,7 @@
     "packages/web"
   ],
   "engines": {
-    "node": ">=24 <26"
+    "node": ">=24.22.1"
   },
   "scripts": {
     "dev": "npm run build && npm start",

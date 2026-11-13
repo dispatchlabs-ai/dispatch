@@ -25,3 +25,18 @@ export async function environmentProvider(name: string): Promise<Provider> {
     ...(apiKey.check ? { check: input => apiKey.check!({ ...input, ctx: environment }) } : {}),
   } } };
 }
+
+/** Explicit synthetic inference for trying the host without provider credentials. */
+export async function demoProvider(): Promise<Provider> {
+  const { fauxProvider, fauxAssistantMessage } = await import("@earendil-works/pi-ai/providers/faux");
+  const faux = fauxProvider({ tokensPerSecond: 12 });
+  const reply: import("@earendil-works/pi-ai/providers/faux").FauxResponseFactory = context => {
+    faux.appendResponses([reply]);
+    const message = context.messages.filter(message => message.role === "user").at(-1);
+    const text = typeof message?.content === "string" ? message.content
+      : message?.content?.filter(part => part.type === "text").map(part => part.text).join("\n");
+    return fauxAssistantMessage(`Demo reply: ${text ?? "Hello"}`);
+  };
+  faux.setResponses([reply]);
+  return faux.provider;
+}

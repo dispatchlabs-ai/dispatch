@@ -110,6 +110,7 @@ buildNpmPackage {
     JS
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-agent" \
       --add-flags "$app/packages/runner/dist/agent-cli.js" --prefix PATH : ${lib.makeBinPath [ lsof ]}
+    ln -s dispatch-agent "$out/bin/dispatch"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-service" \
       --add-flags "$app/packages/runner/dist/service-cli.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-native-tools" \

@@ -7,7 +7,8 @@ not certify implementation, package publication or installation qualification.
 
 - **RUN-001 — Start application definitions:** a Markdown file defines a
   conversational agent; optional TypeScript adds capabilities and schedules.
-  No trigger, dummy input or factory file is required for conversation.
+  A root `agent.md` and `dispatch serve` suffice; no trigger, dummy input, factory
+  file, host JSON, generated application code or Nix is required for conversation.
 - **RUN-002 — Recover work:** preserve native tasks, conversations and submissions
   across restarts, with one owner per SQLite session and stable native identities.
   Secure new and existing stores with owner-only POSIX permissions or native

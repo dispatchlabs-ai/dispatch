@@ -9,7 +9,7 @@ peer are optional; explicit subpath imports activate those integrations.
 
 The [v0.13.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.13.0)
 provides all nine library archives with their source manifest and SHA-256 checksums.
-It contains the breaking host/client simplification. Install matching archives
+It adds the one-file host command on top of the shared host/client contract. Install matching archives
 together; npm publication remains separate. Future breaking 0.x changes require
 a new minor release.
 

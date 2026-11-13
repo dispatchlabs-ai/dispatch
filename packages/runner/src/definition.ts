@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile, readdir } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Extension } from "@earendil-works/pi-durable";
@@ -81,19 +81,41 @@ export function defineAgent(definition: AgentDefinition = {}): AgentDefinition &
   return { ...definition, trigger, input: definition.input ?? "" };
 }
 
+async function hasRootAgent(root: string): Promise<boolean> {
+  return access(join(root, "agent.md")).then(() => true, error => {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  });
+}
+
 export async function catalog(root: string): Promise<{ id: string; runnable: boolean }[]> {
-  const entries = await readdir(join(root, "agents"), { withFileTypes: true });
-  return Promise.all(entries.filter((entry) => entry.isDirectory() && agentName.test(entry.name))
+  const entries = await readdir(join(root, "agents"), { withFileTypes: true }).catch(error => {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  });
+  const agents = await Promise.all(entries.filter((entry) => entry.isDirectory() && agentName.test(entry.name))
     .sort((a, b) => a.name.localeCompare(b.name)).map(async (entry) => {
       const files = await readdir(join(root, "agents", entry.name));
       return { id: entry.name, runnable: files.includes("agent.md") };
     }));
+  if (await hasRootAgent(root)) {
+    if (agents.some(agent => agent.id === "agent" && agent.runnable)) throw new Error("Choose either agent.md or agents/agent/agent.md; both define the agent named agent.");
+    return [{ id: "agent", runnable: true }, ...agents.filter(agent => agent.id !== "agent")];
+  }
+  return agents;
 }
 
 export async function loadAgent(root: string, id: string, ancestors: string[] = []): Promise<LoadedAgent> {
   if (!agentName.test(id)) throw new Error(`Invalid agent name: ${id}`);
   if (ancestors.includes(id)) throw new Error(`Circular agent dependency: ${[...ancestors, id].join(" → ")}`);
-  const folder = join(root, "agents", id);
+  let folder = join(root, "agents", id);
+  if (id === "agent" && await hasRootAgent(root)) {
+    await access(join(folder, "agent.md")).then(() => {
+      throw new Error("Choose either agent.md or agents/agent/agent.md; both define the agent named agent.");
+    }, error => { if (error.code !== "ENOENT") throw error; });
+    folder = root;
+  }
+  const source = relative(root, join(folder, "agent.md")).replaceAll("\\", "/");
   const [markdown, code] = await Promise.all([
     readFile(join(folder, "agent.md"), "utf8"),
     readFile(join(folder, "agent.ts"), "utf8").catch((error) => {
@@ -102,18 +124,18 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
     }),
   ]);
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/.exec(markdown);
-  if (!match) throw new Error(`${id}/agent.md must contain YAML frontmatter followed by instructions.`);
+  if (!match) throw new Error(`${source} must contain YAML frontmatter followed by instructions.`);
   const meta = parse(match[1]);
   if (!meta || typeof meta.description !== "string" || !meta.description.trim()
     || typeof meta.model?.provider !== "string" || !meta.model.provider.trim()
     || typeof meta.model?.id !== "string" || !meta.model.id.trim()
     || (meta.model?.thinking !== undefined && !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(meta.model.thinking))
     || !match[2].trim()) {
-    throw new Error(`${id}/agent.md requires description, model.provider, model.id, and instructions.`);
+    throw new Error(`${source} requires description, model.provider, model.id, and instructions.`);
   }
   // An agent module is trusted application code, loaded once per process.
   const module = code !== undefined ? await import(pathToFileURL(join(folder, "agent.ts")).href) : undefined;
-  if (module && !Object.hasOwn(module, "default")) throw new Error(`${id}/agent.ts must export its definition as default.`);
+  if (module && !Object.hasOwn(module, "default")) throw new Error(`${source.replace(/\.md$/, ".ts")} must export its definition as default.`);
   const definition = defineAgent(module?.default);
   const skillCatalog = definition.skills ? await loadSkills(root, id) : [];
   const repositoryInstructions = await loadRepositoryInstructions(folder, root);
@@ -122,7 +144,7 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
   const delegateAgents = definition.delegates?.length
     ? await Promise.all(definition.delegates.map(name => loadAgent(root, name, [...ancestors, id]))) : undefined;
   const instructions = [formatRepositoryInstructions(repositoryInstructions, root),
-    `# Role instructions from agents/${id}/agent.md\n${match[2].trim()}`].filter(Boolean).join("\n\n");
+    `# Role instructions from ${source}\n${match[2].trim()}`].filter(Boolean).join("\n\n");
   return {
     ...definition, root, id, instructions,
     repositoryInstructions, description: meta.description, model: { ...meta.model, thinking: meta.model.thinking ?? "off" },

@@ -6,7 +6,15 @@ stops work. Clients never start, replace, upgrade or reopen an execution owner.
 
 ## Start a host
 
-Use `run({root,stateRoot,models,...})` from application code, or create `HOST.json`
+For a local application with a root `agent.md` (or `agents/NAME/agent.md`), install
+Runner and run `npx dispatch serve`. The launcher selects the definitions' built-in
+Pi providers, reads their API keys from the host environment and saves native work
+in `.state/`. `npx dispatch chat` connects from the same application directory.
+Use `--state DIRECTORY` on both commands to select another store. No JSON file,
+application entry point or Nix environment is required. See the
+[quickstart](../../../docs/quickstart.md).
+
+For explicit custom provider, channel or network bindings, use `run({root,stateRoot,models,...})` from application code, or create `HOST.json`
 with absolute paths and start `dispatch-service HOST.json serve`:
 
 ```json
@@ -27,7 +35,7 @@ Supply the selected provider's credentials in the host's environment or use your
 own trusted provider binding. The host requires a provider, not a gateway.
 The socket's directory must belong only to its account (0700); the socket is 0600.
 Runner creates an absent directory with those permissions. Keep it outside shared
-`/tmp` itself. `root` contains application-owned `agents/`; `cwd` is explicit tool
+`/tmp` itself. `root` contains application-owned `agent.md` or `agents/`; `cwd` is explicit tool
 authority, not a sandbox. Defaults discover all agents. `names` selects a subset.
 One definition is the default; with several, clients choose an agent or the
 optional `factory.yaml` selects `defaultAgent`.

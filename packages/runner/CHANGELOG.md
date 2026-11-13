@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Start a local host with `dispatch serve` from one root `agent.md`; provider bindings
+  and private local paths are inferred. `dispatch chat` reconnects to the same
+  host and retained main conversation. No scaffold, host JSON or Nix is required.
+- Remove the Node major-version ceiling; the local host also runs on Node 26.
+- Add explicit credential-free demo mode, actionable startup errors and a short
+  socket path for deeply nested applications. Preserve existing named definitions,
+  library APIs, host configurations and client ownership rules.
+
 ## [0.13.0] - 2026-11-13
 
 - One Markdown file can define a conversational agent; TypeScript, triggers and

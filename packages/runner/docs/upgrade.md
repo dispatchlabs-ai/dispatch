@@ -2,7 +2,17 @@
 
 Dispatch is a normal application dependency. Select a new published package
 version or immutable release archive, update the application's lockfile, and run
-its build and relevant checks. For Nix applications update the pinned Dispatch
+its build and relevant checks. For an application using only Runner:
+
+```sh
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.13.0/dispatch-runner-0.13.0.tgz
+```
+
+Commit the updated `package.json` and `package-lock.json`. For a later release,
+substitute its version in the URL; installed library names and application imports
+stay the same. Install matching optional channel packages together.
+
+For Nix applications update the pinned Dispatch
 input and build the resulting closure.
 
 Stop the application's host through its existing supervisor. Preserve its state

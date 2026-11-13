@@ -23,6 +23,8 @@ export type ServiceConfig = ServicePolicy & HostModelsConfig & {
   http?: { host?: string; port: number; tokenFile: string };
   namespace?: string;
   names?: string[];
+  /** Explicit synthetic inference; retained stores cannot switch between demo and live. */
+  demo?: boolean;
   updateDefinitions?: boolean | "when-idle";
   /** Disable factory schedules without disabling recovery of admitted work. */
   schedules?: boolean;
