@@ -5,8 +5,8 @@ installed definition repository. Model access, state, adapter modules and the
 process supervisor belong to the installation. Agent instructions, model
 defaults, skills and domain tools belong to the definition repository.
 
-The installation contains one locked dependency tree and an independent
-definition checkout below it. Follow [definition workspaces](definition-workspaces.md).
+The host uses one locked dependency tree, either in the application itself or
+above separate definition checkouts. See [definition workspaces](definition-workspaces.md).
 The service discovers runnable definitions unless `names` selects a subset.
 `factory.yaml` controls autonomous schedules by default. Set `schedules: false`
 in the service configuration for a conversation-only installation: admitted native

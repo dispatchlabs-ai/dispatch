@@ -145,7 +145,3 @@ The coordinator reconciles returned reports against the original assignment
 list, preserves failures and gaps, and gives one final result. This workflow
 belongs in the company's role instructions and tools, not in a generic scheduler
 or a second persistence layer.
-
-The [scaffold parallel example](https://github.com/dispatchlabs-ai/agent-scaffold/blob/main/examples/dispatch/docs/parallel-qa.md)
-demonstrates this pattern with synthetic recorded traces and real native clones.
-It does not claim live application acceptance or supply a sandbox.

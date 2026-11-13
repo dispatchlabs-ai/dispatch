@@ -1,9 +1,27 @@
 # Dispatch
 
-Build durable AI agents, start with reusable agent roles, and evaluate their work.
-Dispatch combines [Pi Durable](https://github.com/earendil-works/pi) with a runtime,
-an optional starter kit, evaluation tools and clients for your own agent application.
-Your repository owns its instructions, tools, model access and data.
+Build durable AI agents in your own application. Your repository owns the agent
+instructions, models, tools and skills. Dispatch provides the runtime and client
+libraries; [Pi Durable](https://github.com/earendil-works/pi) owns execution,
+recovery and conversation history.
+
+An agent is two small files: `agent.md` describes it, and `agent.ts` selects its
+capabilities. A host process loads those definitions and owns the conversation
+store. CLI, Web and channel connectors interact with that owner. Add another
+client by using the same conversation operations.
+
+```mermaid
+flowchart LR
+  C[CLI · Web · Slack · Google Chat · Email] --> H[Agent host]
+  D[Your definitions and tools] --> H
+  H --> S[Pi Durable conversation store]
+```
+
+Install the library, write the definitions, and start the host. There is no
+scaffold, generated agent layer or build-time instruction merge. Updating the
+Dispatch dependency changes the runtime; your definition files stay yours.
+See the [minimal agent example](packages/runner/README.md#try-it-without-credentials)
+and the [service/client contract](packages/runner/docs/service.md#shared-clients-and-company-compositions).
 
 **Source alpha.** Start with a local synthetic conversation: send a message,
 watch the reply stream, restart the demo and reopen its saved history. No model
@@ -33,7 +51,6 @@ and limits; browser access and Nix are prerequisites supplied by the user or age
 | Goal | Package |
 | --- | --- |
 | Define and run durable agents from a CLI or local service | [Runner](packages/runner/README.md) |
-| Start an agent repository with Jett, Development, Developer and review roles, then hold a first real conversation | [Kit](packages/kit/README.md#first-result) |
 | Grade retained work or compare controlled reruns with your own rubric | [Eval](packages/eval/README.md) |
 | Browse, steer and stop native conversations | [Web](packages/web/README.md) |
 | Embed shared conversation operations in a client | [Backend](packages/backend/README.md) |
@@ -43,9 +60,10 @@ and limits; browser access and Nix are prerequisites supplied by the user or age
 | Place complete runs on replaceable EC2 workers | [Fleet](packages/fleet/README.md) |
 
 Packages can be adopted separately at their documented boundaries. Fleet,
-PostgreSQL, Web and channel accounts are optional. Pi Durable owns execution,
-recovery and authoritative history. The kit stays a versioned dependency;
-company definitions extend it when a release is built.
+PostgreSQL, Web and channel accounts are optional. Use a single application
+dependency tree, or a separately managed runtime for
+several definition repositories. Nix packaging is optional; it copies the same
+definition files you inspect and edit in source.
 
 ## Versions and distribution
 
@@ -55,7 +73,8 @@ checksums are attached to that release; they are **not published to npm**.
 Current `main` also carries the unreleased changes listed in package changelogs.
 The quickstart uses current source and records its exact commit.
 
-Kit and Eval are included through the [Nix release builder](packages/runner/docs/nix-releases.md).
+The optional [Nix release builder](packages/runner/docs/nix-releases.md) packages
+complete application definitions with the runtime and, when selected, Eval.
 Web, Observer, Fleet and channel packages are public MIT source with separate
 build instructions; `private: true` in an npm manifest means the package is not
 an npm publication target. It does not make the source proprietary.
@@ -68,8 +87,12 @@ Building or publishing source never upgrades a running installation.
 
 Local chat trusts the local account and binds exact loopback Host/Origin. Hosted
 Web requires HTTPS and an installation-owned authorization binding covering its
-configured runs. Multi-user grants and a general network agent-client API remain
-outside the current scope. Agent tools have their host's actual authority; a
+configured runs. The shared local service uses a private Unix socket. Web supplies
+its HTTP
+adapter; Slack, Google Chat and email supply channel adapters. These share native
+operations but are not all clients of one public HTTP endpoint. Multi-user grants
+and a general authenticated network agent-client API remain outside the current
+scope. Agent tools have their host's actual authority; a
 working directory is not a sandbox.
 
 Read the [interface inventory](docs/interfaces.md), [HTTP contract](packages/web/openapi.yaml),

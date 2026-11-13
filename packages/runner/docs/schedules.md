@@ -112,9 +112,6 @@ missed occurrences, disable/re-enable, bounded expiry and timezone transitions.
 Follow the repository's manual verification policy; no automated functional test
 suite is shipped. Source publication does not upgrade installed services.
 
-The [scaffold walkthrough](https://github.com/dispatchlabs-ai/agent-scaffold/blob/main/examples/dispatch/docs/schedules.md)
-shows a complete author/reviewer definition and service command.
-
 ## Prior decision
 
 The October 26, 2026 document accepted agent-local ownership and proposed the API,

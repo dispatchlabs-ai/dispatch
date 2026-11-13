@@ -91,7 +91,7 @@ start on the new release and converge reports it as not staying up.
 owner anything.
 
 - **status** prints, for each declared release, its revision, Dispatch version,
-  Pi Durable, kit and evaluation package, and each consumer's profile, service
+  Pi Durable and evaluation package, and each consumer's profile, service
   and state root with their running state; then any other installed service or
   running process that loads Pi Durable, and the last receipts. `--json` gives
   the same as data.

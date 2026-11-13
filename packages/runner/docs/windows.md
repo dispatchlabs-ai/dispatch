@@ -1,9 +1,8 @@
 # Native Windows operation
 
 The runner works directly in Windows with Node.js and the built-in Windows
-PowerShell 5.1. Applications use the same runner and credential APIs. The
-[scaffold walkthrough](https://github.com/dispatchlabs-ai/agent-scaffold/blob/main/examples/dispatch/docs/setup.md)
-uses `npm.cmd` in PowerShell so the normal script policy need not change.
+PowerShell 5.1. Applications use the same Runner and credential APIs. Use
+`npm.cmd` in PowerShell so the normal script policy need not change.
 Users do not configure ACLs, elevate a terminal, install a compiler or use WSL.
 
 ## Private files
@@ -55,6 +54,5 @@ local-filesystem requirement.
 
 ## Qualification
 
-Platform observations are recorded with the published runner snapshot and the
-scaffold changelog. A successful build alone does not qualify installation,
+Platform observations are recorded in the [verification record](../../../docs/qualification.md). A successful build alone does not qualify installation,
 Credential Manager, private storage or interactive terminal behavior.

@@ -1,9 +1,29 @@
 # Runtime installations and company definitions
 
-The installation owns Dispatch Runner and its Pi dependencies. A company
-definition repository owns prompts, models, tools, skills, domain workflows and
-the entrypoints that compose them. Do not vendor Runner or install a separate Pi
-runtime inside that repository or an individual agent folder.
+Your application owns its agent instructions, models, tools, skills and domain
+workflows. Dispatch is a library dependency. The simplest layout is one project:
+
+```text
+my-agents/
+  package.json               # Dispatch and application dependencies
+  package-lock.json
+  node_modules/
+  agents/helper/agent.md
+  agents/helper/agent.ts
+  factory.yaml
+  main.mjs                   # starts the owner process
+```
+
+Install the selected immutable Runner archive and any adapters in this project,
+retain the lockfile, and import their public APIs from your code. Definitions are
+complete source files; building a release does not generate missing roles or merge
+instructions. Upgrade the dependency, check your application and rebuild. Agent
+content stays unchanged unless you edit it. See the [minimal example](../README.md#try-it-without-credentials).
+
+Use one Pi dependency tree per application; do not install runtimes per agent.
+Several separately versioned definition repositories may instead share a
+supervised installation. In that layout, the installation owns Dispatch and Pi,
+and each definition repository owns only its business dependencies:
 
 Use an ordinary parent Node installation:
 
@@ -102,7 +122,7 @@ connection alone does not prove that an earlier worker stopped.
 
 | Owner | Responsibility |
 | --- | --- |
-| Dispatch packages | Published libraries, service components, channel adapters, client APIs and reusable UI components that independent applications can compose; the [kit](../../kit/README.md) of starter agents and skills that name no company, person or host. |
+| Dispatch packages | Published libraries, service components, channel adapters, client APIs and reusable UI components that independent applications can compose. Agent definitions remain ordinary application source files. |
 | Shared infrastructure repositories | Centrally maintained, versioned Terraform/OpenTofu modules for deploying those components and their supporting infrastructure. |
 | Consumer agent/application repository | Agent definitions, skills, domain workflows, company integrations and application composition from selected packages. |
 | Consumer infrastructure repository | Module calls, installation configuration, version selections, secret references, deployment state and rollout. |

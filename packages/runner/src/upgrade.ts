@@ -143,7 +143,7 @@ class Reach {
 }
 
 export type Selected = { name: string; package: string; revision?: string; dispatch?: { revision: string; version: string; storePath: string };
-  piDurable?: string; kit?: string; eval?: string; companions: { name: string; package: string; piDurable: string[] }[] };
+  piDurable?: string; eval?: string; companions: { name: string; package: string; piDurable: string[] }[] };
 type Service = { unit: string; kind: Supervision["kind"]; scope: "user" | "system"; definition: string; piDurable: string[]; enabled: boolean; expected: boolean;
   running: boolean; pid?: number; consumer?: string; superseded: string[]; profiles: string[] };
 type Running = { pid: number; who: string; unit?: string; session?: string; piDurable: string[]; superseded: string[]; program: string };
@@ -169,7 +169,7 @@ async function inspect(declaration: Declaration, options: Options = {}): Promise
     const item: Selected = { name: release.name, package: release.package, companions: [] };
     try {
       const manifest = json(join(release.package, "share", release.name, "release.json"));
-      Object.assign(item, { revision: manifest.revision, dispatch: manifest.dispatch, kit: manifest.kit?.version, eval: manifest.eval?.version,
+      Object.assign(item, { revision: manifest.revision, dispatch: manifest.dispatch, eval: manifest.eval?.version,
         piDurable: version(join(manifest.dispatch.storePath, "lib/dispatch-runner/node_modules", PI)) });
     } catch { problems.push(`${release.name}: ${release.package} is not a built release of that name on this machine`); return item; }
     const carried = reach.versions(release.package, "selected");

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Fails when kit files carry an identifier that belongs to one owner, company
-// or host. The kit ships to every consumer, so its text names none of them.
-//   node scripts/check.mjs [DIRECTORY]      (default: this package)
+// Fails when evaluation files carry an identifier that belongs to one owner, company
+// or host. The evaluation package ships to every consumer, so its text names none of them.
+//   node scripts/check-content.mjs [DIRECTORY]      (default: this package)
 // Only generic shapes are matched. This file lists no private name, and a
 // clean result does not replace reading the text.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -12,7 +12,7 @@ const root = process.argv[2] ?? fileURLToPath(new URL('../', import.meta.url));
 const skipped = new Set(['.git', 'node_modules', 'dist']);
 const textFile = /\.(md|ts|mts|mjs|js|json|ya?ml|txt|nix|sh|py)$|(^|\/)LICENSE$/;
 
-// Names reserved for documentation, and the public sources the kit cites.
+// Names reserved for documentation, and the public sources the package cites.
 const reservedHost = /(^|\.)(example\.(com|org|net)|example|invalid|test|localhost)$/;
 const publicHosts = new Set(['docs.slack.dev', 'github.com']);
 const publicSourceOwners = new Set(['dispatchlabs-ai', 'earendil-works']);
@@ -68,7 +68,7 @@ for (const path of files) {
 
 if (problems.length) {
   console.error(problems.join('\n'));
-  console.error(`\n${problems.length} identifier(s) found. Kit text reads company context from the company's own AGENTS.md and factory.yaml; examples use example.com.`);
+  console.error(`\n${problems.length} identifier(s) found. Shared text reads company context from the company's own AGENTS.md and factory.yaml; examples use example.com.`);
   process.exit(1);
 }
-console.log(`kit ok: ${files.length} files carry no owner, company or host identifier`);
+console.log(`evaluation content ok: ${files.length} files carry no owner, company or host identifier`);

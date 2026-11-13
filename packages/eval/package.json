@@ -14,7 +14,7 @@
     "./task": "./src/task.ts"
   },
   "scripts": {
-    "build": "node ../kit/scripts/check.mjs .",
+    "build": "node scripts/check-content.mjs",
     "pretypecheck": "npm run build --workspace @dispatch/runner",
     "typecheck": "tsc -p tsconfig.json"
   },

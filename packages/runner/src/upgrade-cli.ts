@@ -38,7 +38,7 @@ function overview(found: Awaited<ReturnType<typeof status>>) {
     out.push(`${release.name}  revision ${release.revision ?? "unknown"}`,
       `  package     ${release.package}`,
       `  Dispatch    ${release.dispatch?.version ?? "unknown"} (${release.dispatch?.revision ?? "unknown"})`,
-      `  Pi Durable  ${release.piDurable ?? "unknown"}    kit ${release.kit ?? "absent"}    eval ${release.eval ?? "absent"}`);
+      `  Pi Durable  ${release.piDurable ?? "unknown"}    eval ${release.eval ?? "absent"}`);
     for (const companion of release.companions) out.push(`  companion   ${companion.name}: ${companion.package} (Pi Durable ${companion.piDurable.join(", ") || "none"})`);
     for (const consumer of found.declaration.filter(item => item.release === release.name)) {
       out.push(`  consumer    ${consumer.label}`);

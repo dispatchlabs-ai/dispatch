@@ -5,7 +5,7 @@ The agent repository owns its application source, deployment declarations and
 machines, Nix, identities, secrets, network and supervision. Never put secrets,
 state or operational captures in a flake source.
 
-Compose an allowlisted source tree with the shared builder:
+Package an allowlisted source tree with the shared builder:
 
 ```nix
 dispatch.lib.mkAgentRelease {
@@ -65,62 +65,21 @@ viewer separately under `watch`. All execution commands and `runtimeEntryPoint`
 continue to use the selected execution package. Custom application entrypoints
 own their own command routing.
 
-## Starter kit
+## Complete definitions
 
-`withKit = true` composes the [kit](../../kit/README.md) of generic agents and
-skills under the company tree, so a company repository holds only its own
-definitions. A new repository can start from the kit's flake template,
-`nix flake init -t github:dispatchlabs-ai/dispatch/TAG#kit`. The kit comes
-from the same Dispatch input as the builder:
+`src` is the complete definition tree: agent instructions and TypeScript, skills,
+local helpers and company integrations. The builder copies it unchanged, supplies
+the runtime dependencies and loads every runnable definition to produce the
+catalog. Relative links and imports refer to the same files in the checkout and
+in the release. Nothing is inherited from a separate starter package.
 
-```nix
-dispatch.lib.mkAgentRelease {
-  inherit system;
-  name = "company-agents";
-  src = source;
-  revision = self.rev;
-  withKit = true;
-}
-```
+Edit an agent's own files to customize it. Inspect changes with ordinary Git diffs.
+Upgrade Dispatch by changing the pinned input and updating `flake.lock`, then build
+and check the application. Runtime updates do not replace or append instructions.
 
-The builder writes the kit's `agents/`, `skills/` and `kit/` first and the
-company `src` on top, giving the one definitions root Runner reads.
-
-- A company path the kit does not use is added unchanged.
-- `agents/ROLE/company.md` is appended to the kit's `agents/ROLE/agent.md`. Use
-  it for company context a generic role lacks. It must name a kit role that the
-  company does not also replace.
-  `DIR/NAME.company.md` is appended the same way to any other kit Markdown
-  file, such as a role's `operations.md`.
-- `kit.json` can omit a kit agent or skill, by file or directory, with a reason:
-  `{ "omit": { "skills/development": "Uses its own cleanup skill" } }`.
-- `kit.json` can set a kit role's model:
-  `{ "models": { "developer": { "provider": "openai", "id": "gpt-6-astra", "thinking": "high" } } }`.
-- A company file at a kit path is a replacement. Declare each one with a reason
-  in `kit.json` at the company root, or the build fails:
-
-  ```json
-  { "replacements": { "agents/developer/agent.md": "Uses the company's own delivery stages" } }
-  ```
-
-  A declaration naming no kit file, or no company file, fails too.
-- `kit.json` can change a kit role's message recipients, delegates and
-  extensions without replacing its `agent.ts`:
-  `{ "roles": { "jett": { "messages": { "add": ["researcher"] } } } }`.
-  The [kit guide](../../kit/README.md#company-changes) describes the forms.
-
-`release.json` gains `kit` with the kit's revision and version, and
-`share/NAME/kit.json` lists the applied replacements, omissions, model and role
-changes and addenda. Without `withKit` the release contains exactly `src` and
-neither record. Adopting the kit or moving its pin changes definitions; apply
-that through the ordinary idle definition update.
-
-A replaced file stops receiving the kit's changes. `kit.lock.json`, written by
-the kit's `accept` command, records the kit a repository was last checked
-against. When a replaced file's kit original has changed since, or has no
-record, the build prints a warning, keeps it in `share/NAME/kit-warnings.txt`,
-and the default launcher repeats it before `NAME catalog`. See
-[moving to a new kit](../../kit/README.md#moving-to-a-new-kit).
+A small complete example is in `examples/chat/definitions` in Dispatch. Build it
+with `nix build .#agent-example`; `result/bin/example-agents catalog` lists its
+helper without opening a store or connecting to a model.
 
 ## Evaluation
 
@@ -145,7 +104,7 @@ gains `eval` with the package's revision and version, the launcher (`command`), 
 is how a run records its definitions commit, its Dispatch revision and whether either was dirty; evidence from
 a dirty build is labelled as development evidence. The evaluation package is versioned with Runner, so
 `withEval` with an `execution` of another version fails the build. It adds no agent to the company's
-definitions or catalog and composes with `withKit`. Without `withEval` the release is built exactly as before.
+definitions or catalog. Without `withEval` the release contains no evaluation package.
 
 ## Build, publish, activate
 

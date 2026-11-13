@@ -98,9 +98,8 @@ is no Nix profile or system service to remove.
 
 ## Next steps
 
-- [Start an agent repository from the kit's template](../packages/kit/README.md#first-result),
-  then hold a [first conversation](../packages/kit/README.md#first-conversation)
-  with one provider API key.
+- [Define a minimal agent](../packages/runner/README.md#try-it-without-credentials)
+  in your own application and customize its ordinary Markdown and TypeScript files.
 - [Run a synthetic evaluation](../packages/eval/README.md) before supplying a real
   rubric, target and OpenAI or other supported judge binding.
 - [Run a terminal-only example](../packages/runner/README.md#try-it-without-credentials)

@@ -1,5 +1,0 @@
-# A company's directory. The kit supplies the agents this file names.
-name: example-company
-defaultAgent: jett
-# Agents whose schedules a persistent service may load.
-agents: []

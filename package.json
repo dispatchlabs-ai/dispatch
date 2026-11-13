@@ -13,7 +13,6 @@
     "packages/email",
     "packages/fleet",
     "packages/observer",
-    "packages/kit",
     "packages/eval",
     "packages/web"
   ],

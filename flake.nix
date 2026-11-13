@@ -6,11 +6,6 @@
   outputs = { self, nixpkgs }:
     let
       systems = [ "aarch64-darwin" "aarch64-linux" "x86_64-linux" ];
-      # What a release composes from: the kit's files, its composer and its version.
-      kitSource = pkgs: pkgs.lib.fileset.toSource {
-        root = ./packages/kit;
-        fileset = pkgs.lib.fileset.unions [ ./packages/kit/agents ./packages/kit/skills ./packages/kit/kit ./packages/kit/LICENSE ./packages/kit/package.json ./packages/kit/scripts/compose.mjs ];
-      };
       eachSystem = nixpkgs.lib.genAttrs systems;
       forSystem = system:
         let
@@ -22,38 +17,27 @@
           runner-google-chat = pkgs.callPackage ./packages/runner/nix/package.nix { inherit (runtime) nodejs_24; withGoogleChat = true; };
           runner-fleet = pkgs.callPackage ./packages/runner/nix/package.nix { inherit (runtime) nodejs_24; withSlack = true; withFleet = true; };
           claude-code-provider = pkgs.callPackage ./packages/runner/nix/claude-code-provider.nix { inherit (runtime) nodejs_24; inherit runner; };
-          # The kit names no owner, company or host, and composes with a company tree.
-          kit-content = pkgs.runCommand "dispatch-kit-content" { } ''
-            ${runtime.nodejs_24}/bin/node ${./packages/kit}/scripts/check.mjs ${./packages/kit}
-            touch $out
-          '';
-          # The starter template as a newcomer builds it, with this checkout standing in for its pinned Dispatch.
-          kit-release = ((import ./packages/kit/template/flake.nix).outputs { inherit self nixpkgs; dispatch = self; }).packages.${system}.default;
-          # `nix run --inputs-from . dispatch#kit -- status` in a company repository: the composer's status and accept commands for the pinned kit.
-          kit = pkgs.writeShellScriptBin "dispatch-kit" ''
-            case "''${1:-}" in
-              status|accept) exec ${runtime.nodejs_24}/bin/node ${kitSource pkgs}/scripts/compose.mjs "$1" ${kitSource pkgs} "''${2:-$PWD}" ;;
-              *) echo "Usage: dispatch-kit status|accept [COMPANY_DIRECTORY]" >&2; exit 2 ;;
-            esac
-          '';
-          # The evaluation package ships to every consumer that opts in, so its text names none of them either.
+          # Build the same complete definition files a reader sees in the example.
+          agent-example = self.lib.mkAgentRelease {
+            inherit system;
+            name = "example-agents";
+            src = ./examples/chat/definitions;
+            revision = self.rev or self.dirtyRev or "uncommitted";
+          };
+          # Evaluation content is reusable and carries no installation identifiers.
           eval-content = pkgs.runCommand "dispatch-eval-content" { } ''
-            ${runtime.nodejs_24}/bin/node ${./packages/kit}/scripts/check.mjs ${./packages/eval}
+            ${runtime.nodejs_24}/bin/node ${./packages/eval}/scripts/check-content.mjs ${./packages/eval}
             touch $out
           '';
           eval-release = self.lib.mkAgentRelease {
             inherit system;
             name = "eval-example";
-            src = pkgs.lib.fileset.toSource {
-              root = ./packages/kit/template;
-              fileset = pkgs.lib.fileset.unions [ ./packages/kit/template/AGENTS.md ./packages/kit/template/factory.yaml ./packages/kit/template/kit.json ./packages/kit/template/agents ];
-            };
+            src = ./examples/chat/definitions;
             revision = self.rev or self.dirtyRev or "uncommitted";
-            withKit = true;
             withEval = true;
           };
         in {
-          packages = { default = web; inherit kit runner runner-slack runner-fleet runner-google-chat claude-code-provider; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
+          packages = { default = web; inherit agent-example runner runner-slack runner-fleet runner-google-chat claude-code-provider; frontend = pkgs.callPackage ./packages/web/nix/frontend.nix { inherit web; }; } // pkgs.lib.optionalAttrs (system == "aarch64-darwin") {
             macos-release = pkgs.callPackage ./packages/web/nix/macos-release.nix { inherit web; inherit (runtime) nodejs_24; };
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             oci = pkgs.callPackage ./packages/web/nix/oci.nix {
@@ -77,8 +61,7 @@
           checks.runner-fleet = runner-fleet;
           checks.runner-google-chat = runner-google-chat;
           checks.claude-code-provider = claude-code-provider;
-          checks.kit-content = kit-content;
-          checks.kit-release = kit-release;
+          checks.agent-example = agent-example;
           checks.eval-content = eval-content;
           checks.eval-release = eval-release;
           devShells.default = pkgs.mkShell {
@@ -100,11 +83,6 @@
           watcher = (forSystem system).packages.runner;
           watcherRevision = self.rev or self.dirtyRev or "uncommitted";
           fleetTools = if withFleet then import ./packages/fleet/nix/tools.nix { inherit pkgs; } else null;
-          kit = {
-            src = kitSource pkgs;
-            revision = self.rev or self.dirtyRev or "uncommitted";
-            version = (builtins.fromJSON (builtins.readFile ./packages/kit/package.json)).version;
-          };
           eval = {
             src = pkgs.lib.fileset.toSource {
               root = ./packages/eval;
@@ -118,11 +96,6 @@
             };
           };
         }) (builtins.removeAttrs args [ "system" "withSlack" "withFleet" "withGoogleChat" "execution" ]);
-      templates.kit = {
-        path = ./packages/kit/template;
-        description = "An agent repository on the Dispatch kit: starter agents, one model provider";
-      };
-      templates.default = self.templates.kit;
       packages = eachSystem (system: (forSystem system).packages);
       checks = eachSystem (system: (forSystem system).checks);
       devShells = eachSystem (system: (forSystem system).devShells);

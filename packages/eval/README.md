@@ -268,7 +268,7 @@ records a runtime identity for reference only. A declaration is recorded as made
 
 ## Checks
 
-`npm run build --workspace @dispatch/eval` runs the kit's [content check](../kit/scripts/check.mjs) over this
+`npm run build --workspace @dispatch/eval` runs its [content check](scripts/check-content.mjs) over this
 package, `npm run typecheck --workspace @dispatch/eval` checks the TypeScript against Runner, and `nix flake check`
 runs the content check and builds the example release. Package text is public: follow the
 [public information boundary](../../OSS.md#public-information-boundary).

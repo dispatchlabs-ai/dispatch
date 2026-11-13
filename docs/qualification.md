@@ -4,6 +4,29 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## Complete application definitions — November 13, 2026
+
+The unreleased removal of the starter kit was verified on macOS arm64 with Node
+24.22.1 and Pi Durable 1.5.2. Package build/type checks, `nix flake check`, the
+default application and the small agent-example build passed. The example's
+packaged definition tree matches its source exactly; its catalog loads without
+opening a conversation store. The release-preparation dry run includes the twelve
+remaining workspaces and no kit inputs.
+
+All five reusable archives installed together into a fresh external ESM project.
+Strict NodeNext consumer type checking passed. The Runner README's synthetic
+example produced a reply; the packaged CLI loaded its complete two-file definition.
+A separate service owner accepted input from the CLI, a Backend client observed
+the same native conversation, and stopping/restarting the owner preserved its
+history. The clients disconnected without stopping the owner. Temporary owners
+and synthetic stores were removed after verification.
+
+Dependency audits reported no findings. Archive scans reported no known-pattern
+or sensitive-path matches, accompanied by source/content review. This is a scoped
+packaging check, not a new security certification, Linux execution qualification,
+rendered Web review, real inference check or live channel deployment. No automated
+functional tests were added or run.
+
 ## Released baseline
 
 [v0.12.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.12.0)
@@ -24,49 +47,6 @@ Artifact scans were accompanied by source/content review and reported no
 known-pattern matches in the five archives. This is bounded privacy evidence,
 not a security certification. [v0.11.2](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.11.2)
 (`9707e09bc4a192425249f37a725bbc40f3e1ca18`) passed the same checks earlier the same day.
-
-## Kit customization and first conversation — November 12, 2026
-
-Observed on macOS 27.2 arm64 at `403eefe`, with a Nix-built release unless noted:
-
-- A repository created with `nix flake init` from the kit template built, and
-  its catalog listed the seven agents its `kit.json` keeps. `nix flake check`
-  builds the same template with the checkout standing in for the pinned release.
-- With one OpenAI API key bound through `environmentProvider`, the template's
-  Jett answered, continued the same session, and delegated a file-writing task to
-  `assistant-terra`, which wrote the file in the configured working directory.
-  Without the key, the turn ended with the withheld-details authentication
-  message. This is one short conversation; it does not measure model quality.
-- A synthetic company tree changed four kit roles through `roles`: added and
-  whole-list recipients and delegates, an added company extension, a removed
-  kit extension and a whole extension list. The composed definitions loaded with
-  the expected lists and passed strict type checking. A change naming an
-  extension the kit role lacks failed the release build with that message.
-  Malformed entries, a changed role that is also replaced or omitted, and
-  unknown recipients or modules were each reported by the composer.
-- `status` and `accept` ran directly and through `nix run ...#kit`. With a
-  record altered to stand for an earlier kit, `status` listed the changed
-  replaced file, the unrecorded one, received changes, and new and removed
-  files; the build printed the two warnings, `catalog` repeated them, and both
-  stopped after `accept`.
-
-After the release, from the published tag: a repository created with
-`nix flake init -t github:dispatchlabs-ai/dispatch/v0.12.0#kit` built on macOS,
-`nix run --inputs-from . dispatch#kit -- status` ran against it, and the guide's
-first-conversation commands produced a real OpenAI reply. Four private company
-repositories moved to v0.12.0 and turned 11 of their 20 declared file replacements into
-`roles` entries, leaving 9. Each built its releases on Linux x86_64 with the
-composed roles carrying the configured recipients and extensions, and three
-passed their own Nix checks. The fourth passes its type check and 85 of 86
-tests: its own tool authorization follows task owners from a delegated child to
-the coordinator's current model turn and stops at the background worker task
-that Runner 0.11.1 introduced (see [parallel children](../packages/runner/docs/parallel-children.md#who-owns-a-delegated-child)).
-None of those four builds has been deployed.
-
-Not observed: a kit move between two real releases (the earlier kit was
-simulated by editing the record); `environmentProvider` with any provider other
-than OpenAI; a first conversation on Linux; any installed service running a
-role changed through `roles`.
 
 ## Web walkthrough qualification — November 12, 2026
 
@@ -149,13 +129,6 @@ The public quickstart was also fetched anonymously with HTTP 200.
   installation and each production recovery path remain installation-owned.
 - Multi-human grants and a general authenticated network agent-client API are
   outside the current alpha contract. See the [interface inventory](interfaces.md).
-- The kit requires composition before loading an adopting repository. Model
-  and role changes, addenda and declared file replacements are supported.
-  `status` names the kit files that changed for a repository by digest; it does
-  not show what changed in them. Repositories that do not use Nix are not a
-  supported audience: the kit and composer have no npm distribution. The
-  synthetic Web quickstart does not establish the kit workflows; the section
-  above records what was observed for them.
 - Source review and dependency scans are not a penetration test.
 
 ## Reproduce the permitted checks

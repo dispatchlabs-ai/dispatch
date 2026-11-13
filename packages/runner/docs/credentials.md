@@ -68,7 +68,7 @@ categories, preserving retry/compaction behavior without retaining raw details.
 Authentication failures remain actionable; detailed provider diagnostics are
 withheld. This wrapper does not cover image/classifier operations, cancellation
 RPCs or host telemetry callbacks. Do not log raw SDK errors or request headers in
-those integrations. The scaffold applies it to both chat providers.
+those integrations. Apply the wrapper when binding a provider to the host.
 
 ## Native storage and host configuration
 
@@ -106,9 +106,7 @@ skills or repository files. Native credential accounts use generated IDs.
 
 `credentialCommand` implements `login PROVIDER [--stdin]`,
 `helper PROVIDER /absolute/program ARGS`, `status [PROVIDER] [--json]`,
-`check PROVIDER` and `logout PROVIDER`. The first-class
-[scaffold guide](https://github.com/dispatchlabs-ai/agent-scaffold/blob/main/examples/dispatch/docs/credentials.md)
-shows the user workflow. `promptForSecret` reads hidden terminal input and restores
+`check PROVIDER` and `logout PROVIDER`. `promptForSecret` reads hidden terminal input and restores
 terminal state on completion/cancellation. The explicit `--stdin` setup option
 accepts a trusted secret-manager pipe; keys must not be command arguments.
 

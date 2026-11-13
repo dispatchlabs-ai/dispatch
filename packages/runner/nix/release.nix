@@ -1,5 +1,5 @@
-{ lib, runCommand, makeWrapper, runtimeShell, runtime, runtimeRevision, watcher, watcherRevision, fleetTools ? null, kit ? null, eval ? null }:
-{ name, src, revision, entrypoint ? null, nodeModules ? null, workspace ? null, fleet ? null, withKit ? false, withEval ? false }:
+{ lib, runCommand, makeWrapper, runtimeShell, runtime, runtimeRevision, watcher, watcherRevision, fleetTools ? null, eval ? null }:
+{ name, src, revision, entrypoint ? null, nodeModules ? null, workspace ? null, fleet ? null, withEval ? false }:
 
 assert builtins.match "[a-z][a-z0-9-]*" name != null;
 assert fleet == null || (fleetTools != null && workspace != null && fleet.roles != []
@@ -7,7 +7,6 @@ assert fleet == null || (fleetTools != null && workspace != null && fleet.roles 
   && builtins.match "[a-zA-Z0-9_./-]+" fleet.module != null
   && !(lib.hasPrefix "/" fleet.module) && !(builtins.elem ".." (lib.splitString "/" fleet.module))
   && builtins.all (role: builtins.match "[a-z][a-z0-9_-]*" role != null) fleet.roles);
-assert lib.assertMsg (!withKit || kit != null) "withKit needs the kit that dispatch.lib.mkAgentRelease supplies.";
 assert lib.assertMsg (!withEval || eval != null) "withEval needs the evaluation package that dispatch.lib.mkAgentRelease supplies.";
 assert lib.assertMsg (!withEval || eval.version == runtime.version) "withEval needs a Runner of the evaluation package's own version (${if eval == null then "" else eval.version}); the selected execution is ${runtime.version}.";
 assert lib.assertMsg (!withEval || name != "dispatch-eval") "withEval installs bin/dispatch-eval; choose another release name.";
@@ -17,12 +16,7 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
 } ''
   app="$out/lib/${name}"
   mkdir -p "$app/definitions" "$out/bin" "$out/share/${name}"
-  ${if withKit then ''
-    # The composer's warnings stay with the release: the catalog command repeats them.
-    ${runtime.nodejs}/bin/node ${kit.src}/scripts/compose.mjs ${kit.src} ${src} "$app/definitions" "$out/share/${name}/kit.json" \
-      2> "$out/share/${name}/kit-warnings.txt" || { cat "$out/share/${name}/kit-warnings.txt" >&2; exit 1; }
-    cat "$out/share/${name}/kit-warnings.txt" >&2
-  '' else ''cp -R ${src}/. "$app/definitions/"''}
+  cp -R ${src}/. "$app/definitions/"
   ${lib.optionalString (nodeModules != null) ''ln -s ${nodeModules} "$app/definitions/node_modules"''}
   ${if withEval then ''
     # The same runtime packages, plus the evaluation package beside Runner so definitions can import @dispatch/eval.
@@ -48,9 +42,6 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
       shift
       exec ${runtime}/bin/dispatch-upgrade "$@"
     fi
-    if [ "''${1:-}" = catalog ] && [ -s @KIT_WARNINGS@ ]; then
-      cat @KIT_WARNINGS@ >&2
-    fi
     if [ "''${1:-}" = --help ]; then
       @EXECUTION@ "$@"
       echo
@@ -60,8 +51,7 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
     fi
     exec @EXECUTION@ "$@"
     SH
-    substituteInPlace "$out/bin/${name}" --replace-fail '@EXECUTION@' "$out/bin/.${name}-run" \
-      --replace-fail '@KIT_WARNINGS@' "$out/share/${name}/kit-warnings.txt"
+    substituteInPlace "$out/bin/${name}" --replace-fail '@EXECUTION@' "$out/bin/.${name}-run"
     chmod +x "$out/bin/${name}"
   '' else ''
     test -f "$app/definitions/"${lib.escapeShellArg entrypoint}
@@ -99,8 +89,7 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
         scripts = "${runtime}/lib/dispatch-runner/packages/fleet/scripts";
       };
     };
-  } // lib.optionalAttrs withKit { kit = { inherit (kit) revision version; }; }
-    // lib.optionalAttrs withEval { eval = {
+  } // lib.optionalAttrs withEval { eval = {
       inherit (eval) revision version;
       command = "${placeholder "out"}/bin/dispatch-eval";
       engine = "${placeholder "out"}/lib/${name}/eval/engine";

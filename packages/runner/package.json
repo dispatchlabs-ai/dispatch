@@ -42,6 +42,7 @@
     }
   },
   "bin": {
+    "dispatch-agent": "./dist/agent-cli.js",
     "dispatch-service": "./dist/service-cli.js",
     "dispatch-upgrade": "./dist/upgrade-cli.js",
     "dispatch-watch": "./dist/watch-cli.js"

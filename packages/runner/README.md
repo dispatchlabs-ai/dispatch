@@ -12,24 +12,26 @@ Storage interface and an explicit isolated execution environment. The optional
 1.5.2. It loads trusted definitions, owns each SQLite session, schedules native
 tasks and exposes persistent shared conversations without a web server.
 
-This source-alpha package follows Dispatch's lockstep version, currently 0.11.1.
-The [v0.11.1 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.11.1)
+This source-alpha package follows Dispatch's lockstep version, currently 0.12.3.
+The [v0.12.3 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.12.3)
 provides a Runner archive, source manifest and checksums. It is not published to
 npm. Install the archive in your own runtime workspace:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.11.1/dispatch-runner-0.11.1.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.12.3/dispatch-runner-0.12.3.tgz
 ```
 
-The [Dispatch Kit](https://github.com/dispatchlabs-ai/dispatch/blob/main/packages/kit/README.md) supplies reusable starter agents through the
-shared release builder. It replaces the archived Agent Scaffold. For a complete
-browser walkthrough with no credentials, use the [quickstart](https://github.com/dispatchlabs-ai/dispatch/blob/main/docs/quickstart.md).
+Agent definitions are ordinary files owned by your application. Start with the
+small example below and customize it directly. For a complete browser walkthrough
+with no credentials, use the [quickstart](https://github.com/dispatchlabs-ai/dispatch/blob/main/docs/quickstart.md).
 For source packing and external-consumer checks, follow the
 [package guide](https://github.com/dispatchlabs-ai/dispatch/blob/main/scripts/README.md). See [use cases](USE_CASES.md) and
 [changes](CHANGELOG.md).
 
-See [definition workspaces](docs/definition-workspaces.md) for separating the
-installation from company definitions, domain workflows and integration code.
+Use one application package and lockfile for ordinary library use. A separately
+managed parent runtime is also supported; see [definition workspaces](docs/definition-workspaces.md).
+Bump the runtime dependency and rebuild to upgrade Dispatch. Instructions and tool
+choices change only when you edit your definitions.
 
 For repo-owned immutable application releases, use the
 [shared Nix builder and deployment procedure](docs/nix-releases.md). To move a
@@ -66,7 +68,7 @@ In a new directory, create a private ESM package and install the archive:
 ```sh
 npm init -y
 npm pkg set type=module
-npm install /tmp/dispatch-runner-0.11.1.tgz
+npm install /tmp/dispatch-runner-0.12.3.tgz
 mkdir -p agents/helper
 ```
 
@@ -87,7 +89,8 @@ import { defineAgent } from "@dispatch/runner";
 export default defineAgent({ trigger: { mode: "manual" }, input: "Say hello." });
 ```
 
-Create `factory.yaml` containing `agents: []`, then `main.mjs`:
+Create `factory.yaml` containing `agents: []`. The empty list disables schedules;
+the manual helper is still available. Then create `main.mjs`:
 
 ```js
 import { run, context } from "@dispatch/runner";
@@ -203,9 +206,8 @@ escapes, except for tabs and newlines. This also covers controls split across
 streaming chunks, saved history, tool diagnostics and returned error messages.
 The stored text is unchanged; other clients must apply their own display policy.
 
-Use separate state roots for demo and live execution. The scaffold supplies
-argument parsing, two direct providers and a clearly labeled scripted example;
-the runner does not embed a provider credential or require an inference gateway.
+Use separate state roots for demo and live execution. The host binds its model
+providers; Runner embeds no provider credentials and requires no inference gateway.
 
 ## Local provider credentials
 

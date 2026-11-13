@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Remove the starter kit, overlay composition, kit configuration/lock records and
+  flake templates. Application releases contain their complete supplied definitions;
+  runtime upgrades do not change agent instructions. No migration layer is included.
+- Export the existing `dispatch-agent` CLI in the Runner package, alongside the
+  service, watch and upgrade commands; Node and Nix installations use the same CLI.
+
 ## [0.12.3] - 2026-11-13
 
 - Remove reasoning-level silence deadlines from gateway streams. Quiet provider work remains attached until the caller cancels or the gateway reports a failure, avoiding premature retries and uncertain usage.
@@ -39,7 +45,7 @@
 
 ## [0.10.2] - 2026-11-12
 
-- Kit composition accepts `models` in `kit.json`; see the [kit](../kit/README.md).
+- Kit composition accepts `models` in `kit.json`; see the [kit](https://github.com/dispatchlabs-ai/dispatch/blob/v0.12.2/packages/kit/README.md).
 
 ## [0.10.1] - 2026-11-12
 
@@ -47,13 +53,13 @@
 
 ## [0.10.0] - 2026-11-12
 
-- Kit composition accepts `omit` in `kit.json` and `DIR/NAME.company.md` addenda for any kit Markdown file; see the [kit](../kit/README.md).
+- Kit composition accepts `omit` in `kit.json` and `DIR/NAME.company.md` addenda for any kit Markdown file; see the [kit](https://github.com/dispatchlabs-ai/dispatch/blob/v0.12.2/packages/kit/README.md).
 - `mkAgentRelease` accepts `withEval = true`: the release builder installs the [evaluation package](../eval/README.md) under `lib/NAME/eval` with `bin/dispatch-eval` and a Python interpreter carrying the engine's dependency, and records it in `release.json` under `eval`. It requires the builder's own Runner version. Releases built without it are unchanged.
 - Export `sessionAgent`, which retains a session's initial agent selection, for hosts that open an ordinary session directory themselves.
 
 ## [0.9.0] - 2026-11-12
 
-- `mkAgentRelease` accepts `withKit = true`: the release builder composes the [kit](../kit/README.md) of starter agents and skills under the company tree, appends `agents/ROLE/company.md` to that kit role, fails on a company file at a kit path unless `kit.json` declares the replacement with a reason, and records the kit in `release.json` and `share/NAME/kit.json`. Releases built without it are unchanged.
+- `mkAgentRelease` accepts `withKit = true`: the release builder composes the [kit](https://github.com/dispatchlabs-ai/dispatch/blob/v0.12.2/packages/kit/README.md) of starter agents and skills under the company tree, appends `agents/ROLE/company.md` to that kit role, fails on a company file at a kit path unless `kit.json` declares the replacement with a reason, and records the kit in `release.json` and `share/NAME/kit.json`. Releases built without it are unchanged.
 
 ## [0.8.0] - 2026-11-12
 
