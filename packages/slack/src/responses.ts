@@ -6,7 +6,7 @@ import type { SlackWebApi } from "./api.js";
 import { fallbackText, replyBlocks, replyChunk, streamText } from "./text.js";
 
 type Destination = { channel: string; thread: string; user: string };
-type ResponseInput = Destination & { key: string; generation?: number; entry?: number; first: number; after?: number };
+type ResponseInput = Destination & { key: string; generation?: number; entry?: number; first: number; after?: number; text?: string; origin?: number };
 type ResponseFields = { stream: string | null; opening?: boolean; ordinary?: boolean;
   latest: string; text?: string; entry?: number; offset: number; retryAt: number };
 type ResponseState = ({phase: "watch"} | {phase: "deliver"}) & ResponseFields;
@@ -45,9 +45,14 @@ export function createResponseDelivery(namespace: string, client: SlackWebApi, o
     kind: `${namespace}.slack-public-responses`, version: 1, scope: "conversation", history: "latest", fork: "initial",
     initial: () => ({ last: null, owners: {} }), checkpointWhen: () => false,
   });
+  const History = defineDoc<{ cursor: number; destination?: Destination }>({
+    kind: `${namespace}.slack-history`, version: 1, scope: "conversation", history: "latest", fork: "initial",
+    initial: () => ({ cursor: 0 }), checkpointWhen: () => false,
+  });
   const response = defineTask<ResponseInput, ResponseState, null>({
     name: `${namespace}.slack-public-response`, version: 1,
-    initial: () => ({ phase: "watch", stream: null, latest: "", offset: 0, retryAt: 0 }),
+    initial: input => ({ phase: input.text === undefined ? "watch" : "deliver", stream: null, latest: "",
+      ...(input.text === undefined ? {} : { text: input.text }), offset: 0, retryAt: 0 }),
     phases: {
       async watch(task, runtime, ctx) {
         if (task.input.after) await runtime.waitForTask(task.input.after as TaskId, ctx);
@@ -155,6 +160,7 @@ export function createResponseDelivery(namespace: string, client: SlackWebApi, o
         }
       },
       async deliver(task, runtime, ctx) {
+        if (task.input.after) await runtime.waitForTask(task.input.after as TaskId, ctx);
         let state: ResponseState = task.state.checkpoint;
         if (state.retryAt > runtime.now()) return runtime.sleepUntil(state.retryAt, state, ctx);
         const source = state.text ?? "";
@@ -168,11 +174,11 @@ export function createResponseDelivery(namespace: string, client: SlackWebApi, o
           return;
         }
         const text = replyChunk(source, state.offset);
-        const hash = deliveryHash(`${runtime.conversationId}:${task.input.key}:${state.offset}`);
+        const hash = deliveryHash(`${task.input.origin ?? runtime.conversationId}:${task.input.key}:${state.offset}`);
         try {
           const payload = { channel: task.input.channel, text: fallbackText(text), blocks: replyBlocks(text, source, state.offset),
             metadata: { event_type: `${namespace}_agent_reply`, event_payload: { delivery: hash } }, parse: "none" as const, link_names: false };
-          if (!state.stream && state.offset === 0) {
+          if (task.input.text === undefined && !state.stream && state.offset === 0) {
             if (state.opening) {
               const ts = await findDelivery(client, namespace, task.input, hash);
               if (!ts) {
@@ -232,15 +238,53 @@ export function createResponseDelivery(namespace: string, client: SlackWebApi, o
       await runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx);
     },
   });
-  async function queue(tx: Tx, conversation: ConversationId, input: Omit<ResponseInput, "key">) {
+  async function queue(tx: Tx, conversation: ConversationId, input: Omit<ResponseInput, "key">, owner = conversation) {
     const state = await tx.doc(Queue, conversation);
-    const key = input.generation ? `response:${input.generation}` : `entry:${input.entry}`;
+    const key = input.text !== undefined ? `input:${input.entry}` : input.generation ? `response:${input.generation}` : `entry:${input.entry}`;
     if (state.owners[key]) return state.owners[key];
-    const task = await tx.createTask(response, { ...input, key, ...(state.last ? { after: state.last } : {}) },
-      { conversationId: conversation, ownership: { kind: "conversation" }, background: true });
+    const task = await tx.createTask(response, { ...input, key, ...(input.text === undefined ? {} : { origin: conversation }),
+      ...(state.last ? { after: state.last } : {}) },
+      { conversationId: owner, ownership: { kind: "conversation" }, background: true });
     state.owners[key] = task;
     state.last = task;
     return task;
   }
-  return { task: response, queue };
+  /** One ordered census for every client. The cursor and outbox admission commit
+   * together; a restart catches up without changing already delivered responses. */
+  async function queueHistory(tx: Tx, conversation: ConversationId, target: Pick<Destination, "channel" | "thread">,
+    allowedUser: (user: string) => boolean, owner: ConversationId, stream?: { generation: number; first: number }) {
+    const state = await tx.doc(History, conversation);
+    // Read the page before creating tasks: native transactions reject table reads
+    // after table writes. Each following page gets its own commit.
+    const page = await tx.scanEntries({ conversationId: conversation, minEntryId: (state.cursor + 1) as EntryId, order: "ascending" }, 100);
+    const queued = await tx.doc(Queue, conversation);
+    for (const entry of page.items) {
+      state.cursor = entry.id;
+      const data = entry.data as { source?: string; actor?: string; text?: string;
+        attachments?: { name: string }[]; slack?: Destination } | undefined;
+      // Only Slack admission supplies this metadata. A common client's source
+      // label is not enough to bind or impersonate a Slack participant.
+      if (entry.kind === `${namespace}.message` && data?.source === "slack" && data.slack?.channel === target.channel
+        && data.slack.thread === target.thread && allowedUser(data.slack.user)) state.destination = data.slack;
+      const destination = state.destination;
+      if (!destination || !allowedUser(destination.user)) continue;
+      const message = entry.model?.[0];
+      if (AssistantEntry.is(entry) && message?.role === "assistant" && completedResponse(message) && responseText(message).trim()) {
+        await queue(tx, conversation, { ...destination, first: entry.id, entry: entry.id,
+          ...(entry.byTaskId ? { generation: entry.byTaskId } : {}) });
+      } else if (entry.kind === `${namespace}.message` && message?.role === "user" && data?.actor === "user" && data.source !== "slack") {
+        const text = data.attachments?.length ? data.text ?? "" : typeof message.content === "string" ? message.content
+          : message.content.flatMap(part => part.type === "text" ? [part.text] : []).join("\n");
+        const label = data.source === "web" ? "Web" : data.source === "terminal" || data.source === "cli" ? "CLI" : "another client";
+        const files = data.attachments?.length ? `\n\nAttachments: ${data.attachments.map(file => file.name).join(", ")}` : "";
+        if (text || files) await queue(tx, conversation, { ...destination, first: entry.id, entry: entry.id,
+          // Stop cancels inference, not delivery of a human message already saved.
+          text: `User · ${label}\n\n${text}${files}` }, owner);
+      }
+    }
+    if (!page.next && stream && state.destination && allowedUser(state.destination.user))
+      await queue(tx, conversation, { ...state.destination, ...stream });
+    return { more: !!page.next, last: queued.last };
+  }
+  return { task: response, queueHistory };
 }

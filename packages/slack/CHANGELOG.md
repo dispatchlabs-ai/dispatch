@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Mirror Web and CLI messages and public agent replies into their existing Slack
+  thread. Use one native history cursor and durable ordered delivery queue, label
+  human source clients, recover missed history after restart, and retain existing
+  response identities without echoing Slack input or exposing tool/thinking data.
+
 ## [0.17.0] - 2026-11-13
 
 - Document ordinary `host.json` setup, DM permissions and shared-client history

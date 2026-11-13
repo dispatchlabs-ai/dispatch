@@ -84,9 +84,22 @@ adding scopes. Each top-level DM starts a conversation; reply in its thread to
 continue it. Send `stop` or `cancel` in that thread to stop its active work.
 
 Open the conversation in the terminal with `/chats` or select its Slack-labelled
-row in Web. Other clients share its saved history. An idle thread's messages and
-answers from those clients are not automatically mirrored into Slack; the next
-Slack reply continues from the shared history.
+row in Web. Messages sent there appear in the same Slack thread, labelled
+`User · Web` or `User · CLI`, followed by the agent's public replies. Slack's own
+messages are already in the thread and are not echoed. All three clients use
+the same saved conversation; starting a separate conversation does not link it.
+
+The adapter observes native conversation changes and admits delivery into its
+existing durable queue. Startup catches up missing turns, including history
+written before this feature was installed, using retained entry/generation IDs
+to avoid reposting delivered responses. Catch-up posts appear at the end of the
+Slack thread; Slack cannot insert them at their original historical positions.
+Human messages use the bot's identity with an explicit source label, never a
+claimed Slack identity. Stop does not discard an already-saved human message.
+The existing host authorization and Slack route/user restrictions still apply.
+Only public message text is mirrored. Attachment names are listed, but this does
+not upload their bytes; raw tools, system instructions and thinking stay out of
+Slack's transcript. Slack message edits/deletions are not history synchronization.
 
 Applications using `run({adapters})` may instead keep named connections in an
 optional `factory.yaml`:

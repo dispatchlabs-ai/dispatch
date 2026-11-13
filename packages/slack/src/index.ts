@@ -6,12 +6,13 @@ import { parse } from "yaml";
 import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
 import { awaitWithContext, withAbortSignal, type Context } from "@earendil-works/chord/context";
-import { AssistantEntry, ConversationBusy, InboxDoc, LiveDoc, defineDoc, defineExtension, defineTask, type ConversationId, type Cursor, type EntryId, type JsonObject, type LiveState, type TaskId, type TaskRuntime, type Tx } from "@earendil-works/pi-durable";
+import { ConversationBusy, InboxDoc, LiveDoc, defineDoc, defineExtension, defineTask, type ConversationId, type JsonObject, type LiveState, type TaskId, type TaskRuntime, type Tx } from "@earendil-works/pi-durable";
 import { context, prepareContent, type AttachmentFile, type ChatService, type Runner, type ReplySink } from "@dispatch/runner";
 import { fallbackText, replyBlocks, replyChunk } from "./text.js";
 import { slackArtifacts } from "./files.js";
 import { createStatusDelivery } from "./status.js";
-import { createResponseDelivery, completedResponse, responseText, findDelivery } from "./responses.js";
+import { createResponseDelivery, findDelivery } from "./responses.js";
+import { createHistorySync } from "./history.js";
 import { activityLabel, currentToolActivity, type SlackActivity, type SlackToolDescription } from "./progress.js";
 import type { SlackWebApi } from "./api.js";
 export type { SlackActivity, SlackToolCall, SlackToolDescription } from "./progress.js";
@@ -257,6 +258,10 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
   const artifacts = slackArtifacts(runner, client, config.teamId, ready);
   const responses = createResponseDelivery(namespace, client, { team: config.teamId, onStream: options.onStream,
     allowProgressText: options.allowProgressText });
+  const allowedUser = (user: string) => !config.allowedUsers || config.allowedUsers.includes(user);
+  const history = createHistorySync(runner, responses, { team: config.teamId, allowedUser,
+    accepts: (channel, agent) => (channel.startsWith("D") ? config.directMessagesAgent : channelAgent(channel)) === agent,
+    allowProgressText: options.allowProgressText });
   const turn = defineTask<SlackInput, Delivery, null>({
     name: `${namespace}.slack-turn`, version: 2,
     // Existing active v1 deliveries retain their old release; never reinterpret a
@@ -344,33 +349,16 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
           const live = await runtime.snapshot(LiveDoc, runtime.conversationId, ctx);
           const active = live?.run?.inputs.includes(submission.id);
           const allowed = !options.allowProgressText || await options.allowProgressText(runtime.conversationId, [submission.id]);
-          let cursor: Cursor | undefined;
+          let more: boolean;
           do {
-            const page = await runtime.entries({ minEntryId: ((checkpoint.cursor ?? checkpoint.first!) + 1) as EntryId,
-              ...(receipt.status === "done" && receipt.type === "input" ? { maxEntryId: receipt.answer } : {}), order: "ascending" }, 100, cursor, ctx);
             await runtime.commit(async tx => {
-              for (const entry of page.items) {
-                checkpoint = { ...checkpoint, cursor: entry.id };
-                if (!AssistantEntry.is(entry)) continue;
-                const message = entry.model?.[0];
-                if (message?.role !== "assistant" || !completedResponse(message) || !responseText(message).trim()) continue;
-                // The evidence gate suppresses speculative live prose, not completed public output.
-                const lastResponse = await responses.queue(tx, runtime.conversationId, { channel: task.input.channel, thread: task.input.thread, user: task.input.user,
-                  first: checkpoint.first!, entry: entry.id, ...(entry.byTaskId ? { generation: entry.byTaskId } : {}) });
-                checkpoint = { ...checkpoint, lastResponse: Math.max(checkpoint.lastResponse ?? 0, lastResponse) };
-              }
+              const queued = await responses.queueHistory(tx, runtime.conversationId, task.input, allowedUser, service.host(chat.agent).conversation.id,
+                active && allowed && live?.generation?.message ? { first: checkpoint.first!, generation: live.run!.taskId } : undefined);
+              more = queued.more;
+              if (queued.last) checkpoint = { ...checkpoint, lastResponse: Math.max(checkpoint.lastResponse ?? 0, queued.last) };
               return { status: "running", checkpoint };
             }, ctx);
-            cursor = page.next;
-          } while (cursor);
-          if (active && allowed && live?.generation?.message) {
-            await runtime.commit(async tx => {
-              const lastResponse = await responses.queue(tx, runtime.conversationId, { channel: task.input.channel, thread: task.input.thread, user: task.input.user,
-                first: checkpoint.first!, generation: live.run!.taskId });
-              checkpoint = { ...checkpoint, lastResponse: Math.max(checkpoint.lastResponse ?? 0, lastResponse) };
-              return { status: "running", checkpoint };
-            }, ctx);
-          }
+          } while (more!);
           if (receipt.status === "done" || receipt.status === "unanswered") {
             if (checkpoint.lastResponse) await runtime.waitForTask(checkpoint.lastResponse as TaskId, ctx);
             // A tool-only successful termination is valid, not an empty-answer error.
@@ -673,6 +661,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
       for (const route of [...Object.values(config.channels), ...(config.directMessagesAgent ? [config.directMessagesAgent] : [])])
         service.host(typeof route === "string" ? route : route.agent);
       startService(service);
+      await history.start(service);
       if (!listen || !socket) return;
       socket.on("slack_event", async ({ body, ack }) => {
         try {
@@ -720,7 +709,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
       await socket.start();
       console.log(`Slack connected: ${identity.team} / ${identity.user}; ${Object.keys(config.channels).length} channel route(s).`);
     },
-    async close() { await socket?.disconnect(); },
+    async close() { await socket?.disconnect(); await history.close(); },
   };
 }
 
