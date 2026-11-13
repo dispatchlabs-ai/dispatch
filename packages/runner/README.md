@@ -53,6 +53,31 @@ turn and `/quit` to disconnect. `--session NAME` selects another conversation.
 Stopping the host with Ctrl-C preserves its history and unfinished work; start it
 with the same command to recover. Clients never start replacement owners.
 
+### Interactive terminal UI (Unreleased)
+
+Current source uses Pi's terminal UI for interactive `dispatch chat` and
+`dispatch-agent run`, including applications that expose either as `npm run chat`.
+The v0.15.1 archive above still has the earlier plain terminal interface.
+
+Retained history appears immediately above a multiline composer. Replies render
+as streaming Markdown; tool activity shows native status, inputs, progress and
+results. Use `/chats` or Ctrl+P for saved conversations and `/agents` or Ctrl+G for
+agents. Pickers search titles, IDs and descriptions; switching preserves each
+conversation's draft, scroll position and expanded tools.
+
+Enter sends. Alt+Enter or Ctrl+J inserts a newline; Up/Down recalls input history.
+PgUp/PgDn scroll, Ctrl+Home/End jump to the beginning/latest, and Ctrl+O toggles
+tool details. `/help` or F1 lists commands and shortcuts. Ctrl+C clears the draft, then
+exits when empty; Ctrl+D exits from an empty composer. Escape closes a menu.
+Only `/stop` cancels host work.
+
+`/history` refreshes and scrolls to the beginning. After a disconnect, `/reconnect`
+observes the same host without resending input. `/retry` explicitly retries an
+uncertain send with its original payload and request ID. Unresolved identities
+and payloads print on exit so they remain available for deliberate recovery.
+`--prompt`, `--history`, file submissions, redirected streams and `TERM=dumb`
+keep the plain interface. See the [client guide](docs/service.md#interactive-terminal-ui-unreleased).
+
 ## Try it without credentials
 
 Use the same `agent.md` with an explicitly synthetic host:

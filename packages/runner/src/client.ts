@@ -161,8 +161,8 @@ async function watchService(connection: ClientConnection, expected: ServiceExpec
 }
 
 /** Bind a connection to an owner's stable identity. Reconnect deliberately after transport loss. */
-export async function connectClient(connection: ClientConnection & { expected?: ServiceExpectation }): Promise<AgentClient> {
-  const info = await serviceRequest(connection, { method: "info" }, { expected: connection.expected });
+export async function connectClient(connection: ClientConnection & { expected?: ServiceExpectation }, signal?: AbortSignal): Promise<AgentClient> {
+  const info = await serviceRequest(connection, { method: "info" }, { expected: connection.expected, signal });
   const expected = connection.expected ?? (info.identity !== undefined ? { identity: info.identity }
     : info.stateRoot !== undefined ? { stateRoot: info.stateRoot } : undefined);
   if (!expected) throw new Error("The host must expose a stable stateRoot or identity.");

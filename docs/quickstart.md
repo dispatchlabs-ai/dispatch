@@ -56,6 +56,10 @@ Send `Hello from the quickstart`. The streamed response begins **Demo reply:**
 and repeats your message. `/history` shows the retained messages; `/quit`
 disconnects the client. A client disconnect leaves admitted work running.
 
+Current source also has an Unreleased [Pi terminal UI](../packages/runner/README.md#interactive-terminal-ui-unreleased)
+with visible retained history, multiline editing, tool details and conversation
+pickers. It is not included in the v0.15.1 archive installed by this walkthrough.
+
 Stop the **host** with Ctrl-C, then start it with the same command. Reconnect with
 `npx dispatch chat --state .demo --history`: the same conversation must remain,
 without another submission. Reconnect interactively and send a follow-up.

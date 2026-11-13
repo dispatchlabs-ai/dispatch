@@ -57,6 +57,9 @@ A shared `host.json` can supply a model gateway and named MCP connections. For e
 
 Run `npm start`, then `npm run chat` or `npm run web` in another terminal. To upgrade Dispatch, install matching release archives, commit the updated npm manifest and lockfile, and restart your processes. Your Markdown definitions belong to your application. [Releases](https://github.com/dispatchlabs-ai/dispatch/releases) · [Upgrade guide](packages/runner/docs/upgrade.md)
 
+Current source includes an Unreleased [Pi terminal UI](packages/runner/README.md#interactive-terminal-ui-unreleased)
+for `npm run chat`. The v0.15.1 archives above retain the earlier plain terminal UI.
+
 ## Packages and integrations
 
 | Build or connect | Packages |

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Use the existing Pi TUI dependency for interactive chat: retained Markdown
+  history, multiline editing/paste, searchable agent and conversation pickers,
+  expandable native tool activity, and scrolling above a fixed composer.
+- Preserve drafts and view state while switching conversations; reconnect to the
+  original host and explicitly retry uncertain sends with their original request
+  identities. Cancel client I/O on exit without stopping host work. Keep the
+  existing plain path for one-shot, history, file and redirected commands.
+
 ## [0.15.0] - 2026-11-13
 
 - Export `readClientConnection` from `@dispatch/runner/client` for CLI and Web clients sharing a host file, including authenticated loopback HTTP listeners.

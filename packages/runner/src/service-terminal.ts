@@ -5,6 +5,7 @@ import { connectClient, type ClientConnection, type AgentClient, type ChatWatch 
 import type { ChatSnapshot } from "./chat.js";
 import type { AttachmentFile } from "./chat-content.js";
 import { terminalText } from "./terminal-output.js";
+import { chatInTerminal } from "./chat-terminal.js";
 
 export type ServiceTerminalOptions = {
   client?: AgentClient;
@@ -27,6 +28,10 @@ export type ServiceTerminalOptions = {
 
 /** A terminal connection is not an execution owner. Disconnect never sends Stop. */
 export async function connectInTerminal(options: ServiceTerminalOptions) {
+  if (options.prompt === undefined && !options.history && !options.files?.length
+    && process.stdin.isTTY && process.stdout.isTTY && process.env.TERM !== "dumb") {
+    return chatInTerminal(options);
+  }
   const controller = new AbortController();
   let input: ReturnType<typeof createInterface> | undefined;
   let client: AgentClient | undefined;

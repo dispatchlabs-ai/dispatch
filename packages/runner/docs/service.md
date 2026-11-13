@@ -79,10 +79,10 @@ dispatch-agent --socket /srv/example/run/agent.sock run --session main --prompt 
 dispatch-agent --socket /srv/example/run/agent.sock run --session main --history
 ```
 
-Interactive commands are `/new`, `/history`, `/stop` and `/quit`. Ctrl-C disconnects;
-only `/stop` cancels. A session key finds the same conversation, including after
-a host restart. `--history` never creates one. The CLI prints request and submission
-identities and returns a nonzero exit status on failure. Untrusted terminal
+A session key finds the same conversation, including after a host restart or
+a change to the default agent. `--agent` scopes that lookup. `--history` never
+creates a conversation. One-shot CLI commands print request and submission
+identities and return a nonzero exit status on failure. Untrusted terminal
 control characters are rendered as visible escapes; stored text is unchanged.
 
 Use `dispatch-web --config host.json` to connect Web to the same host as `dispatch chat --config host.json`. Both clients use the same socket or service URL. An HTTP host bound to loopback can use its own listener port and token file in this configuration.
@@ -91,6 +91,51 @@ Web's Backend connects with `openServiceRuntime({socket})`. Web does not launch
 owners or import agent definitions. A channel adapter may map its external thread
 key to the same chat. Sources are open strings; adding a client requires no Runner
 source-code change.
+
+### Interactive terminal UI (Unreleased)
+
+Current source connects Pi's editor, Markdown, scrolling and pickers to
+`AgentClient`. It runs as one foreground client; it does not start an execution
+owner or use the separate storage observer. The released v0.15.1 client retains
+its plain interface.
+
+| Command | Behavior |
+| --- | --- |
+| `/new` | Create a conversation with the selected agent |
+| `/chats` | Search and open retained conversations |
+| `/agents` | Choose an agent and open its terminal session |
+| `/history` | Refresh the watch and scroll to the beginning |
+| `/stop` | Cancel the selected conversation's owned work |
+| `/reconnect` | Reconnect observation to the original host identity |
+| `/retry` | Select an uncertain send and reuse its exact payload/request ID |
+| `/help`, `/quit` | Show commands/shortcuts or disconnect |
+
+Enter sends; Alt+Enter or Ctrl+J adds a newline. Up/Down browses input history.
+F1 opens commands, Ctrl+P opens conversations and Ctrl+G opens agents without clearing the draft.
+PgUp/PgDn and the mouse wheel scroll; Ctrl+Home/End jump to the beginning/latest.
+Ctrl+O expands tool results and supporting details; individual tool headings are
+clickable. Ctrl+Shift+F searches the transcript. Escape closes menus/search.
+Ctrl+C copies a selection, closes autocomplete, or clears a draft, then exits
+when empty. Ctrl+D exits from an empty editor. None of these keys sends Stop.
+
+Full watch snapshots include retained history and messages from other clients.
+Updates preserve the editor, scroll anchor and tool expansion; switching keeps
+drafts and view positions per conversation. Tool completion/failure comes from
+native results, not assistant narration. Retry/compaction errors and queued or
+unanswered input remain visible. Catalog model metadata is not presented as the
+effective configuration of an older conversation.
+
+Reconnect never resubmits a mutation. A definite rejection restores the draft;
+a lost acknowledgement retains the original request and payload for `/retry`.
+A later rejection does not erase an earlier uncertain admission. On exit,
+unresolved sends print their identities and text; inspect history before using
+the same payload with `--request-id`. Quitting aborts client requests and watches,
+while admitted host work continues. `connectClient(connection, signal?)` also
+accepts cancellation during the initial connection.
+
+One-shot prompts, `--history`, files, redirected input/output and `TERM=dumb`
+use the existing plain path. Its interactive commands remain `/new`, `/history`,
+`/stop` and `/quit`, and Ctrl+C disconnects.
 
 ## Authenticated network connections
 
