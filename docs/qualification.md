@@ -4,6 +4,26 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.15.1 Web startup guidance — November 13, 2026
+
+[Release v0.15.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.15.1)
+contains ten package archives from `789969012010a5e6c000318e1fca2f9cc617e887`. Twelve GitHub asset downloads
+matched the reviewed package bytes, source manifest and checksums.
+
+Running `npm run web` before its local host was available printed a single line telling
+the user to run `npm start` in another terminal and then retry `npm run web`. The command exited with status
+1. After startup, CLI and Web connected to the same stored conversation. The
+missing socket and stale socket cases were exercised with isolated local state.
+The installed browser client reopened a CLI conversation, accepted a follow-up,
+and left the same history accessible from the CLI after Web exited.
+
+The workspace build and type checks, macOS arm64 and Linux x86_64 flake checks,
+frontend, macOS portable and Linux image builds passed. External npm applications
+installed the release URLs, checked strict library types, executed imports and
+verified package integrity. Production audits of the checked installs reported
+zero findings. Browser interaction used a synthetic agent at 1440×900, 1280×720,
+768×1024 and 390×844. Hosted systems and channels were outside this check.
+
 ## v0.15.0 installable Web client — November 13, 2026
 
 The [v0.15.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.15.0)
