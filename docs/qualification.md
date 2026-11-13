@@ -4,6 +4,33 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.17.2 MCP tool deadlines — November 13, 2026
+
+[Release v0.17.2](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.17.2)
+contains eleven archives from `a3e73546f42e35934a81ad5e248e61996dbcbcb2`,
+including the preceding Slack history change. All thirteen public assets matched
+the reviewed files and GitHub digests. Empty-cache public imports, strict NodeNext
+declaration checks, MCP-only and Web-only installs passed; selected audits found
+zero vulnerabilities. Mac arm64 and Linux x86_64 build/flake checks, frontend,
+portable Mac and both Linux images passed. Archive/image review retained the same
+previously reviewed upstream examples, constants and directory matches.
+
+Manual Runner/Pi MCP interaction kept a tool call pending beyond 37 seconds and
+then returned its result. Explicit cancellation returned immediately, and a
+configured one-second deadline still timed out. Unconfigured tool calls now have
+no deadline; connection initialization and discovery retain Pi's existing
+defaults. Cancellation ends observation; stopping recipient work remains explicit.
+The implementation uses the released Pi 1.5.2 per-request options.
+
+An installed two-agent application then completed one MCP result wait lasting
+44.8 seconds while the recipient ran a 40-second shell task. There was one input
+submission and one wait, without a retry or timeout. Both agents' native tasks,
+tool results and completed submission receipts were inspected.
+
+This patch changes no browser UI. The preceding four-size browser qualification
+remains applicable; no automated functional tests were added or run. Hosted TLS,
+OAuth, Windows interaction and fresh-agent setup limits remain unchanged.
+
 ## v0.17.1 shared Slack history — November 13, 2026
 
 [Release v0.17.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.17.1)
