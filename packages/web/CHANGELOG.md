@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Show provider thinking summaries while streaming and in saved history, with an accessible expandable Thinking section.
+
 ## [0.15.1] - 2026-11-13
 
 - When `npm run web` cannot connect to a local host socket, print how to start the host and retry.

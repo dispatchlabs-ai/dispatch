@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Show agent/chat selection on the terminal intro and render native provider thinking summaries in live and retained chats; exclude redacted content and replay signatures.
+
 ## [0.16.0] - 2026-11-13
 
 - Use the existing Pi TUI dependency for interactive chat: retained Markdown

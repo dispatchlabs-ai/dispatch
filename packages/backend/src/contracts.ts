@@ -33,6 +33,7 @@ export interface ChatMessage {
   text: string;
   at?: number;
   commentary?: string;
+  thinking?: string;
   author?: string;
   background?: boolean;
   /** A background reply's supporting material, shown collapsed under its text. */
@@ -68,6 +69,7 @@ export interface Snapshot {
   running: boolean;
   queued: number;
   partial: string;
+  partialThinking?: string;
   tools: string[];
   error: string | null;
   demo: boolean;

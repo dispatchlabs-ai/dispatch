@@ -36,7 +36,12 @@ Hosted authorization is a required installation binding, not a bundled identity 
 MIT Agent Chat copyright and upstream component licenses are retained.
 No private installation paths/configuration or operational data are included.
 
-## Tools and input files
+## Thinking, tools and input files
+
+Provider-supplied thinking summaries appear in an expandable **Thinking** section
+while streaming and in saved history. It starts open. No section is invented for
+responses without summary text; redacted content and opaque replay signatures
+are not displayed. CLI and Web read the same native summaries.
 
 Actual tool inputs/results and native status are expandable in the corresponding
 turn; parallel calls retain distinct identities. Missing result is never success.

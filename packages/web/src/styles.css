@@ -166,6 +166,9 @@ h1 { font-weight: 600; font-size: 14px; margin: 0; white-space: nowrap; overflow
 /* Streamdown's image download only appears on hover; without hover it would be an invisible tap target. */
 @media (hover: none) { [data-streamdown=image-wrapper] button { display: none; } }
 .message-list img { max-width: 100%; }
+.thinking-summary { color: var(--muted-foreground); font-size: 13px; margin-bottom: 12px; }
+.thinking-summary > summary { cursor: pointer; font-size: 12px; }
+.thinking-summary > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .message-list .commentary { color: var(--muted-foreground); font-size: 12px; }
 .message-list [data-streamdown=code-block-body] pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .message-note { font-size: 12px; color: var(--muted-foreground); margin: 6px 0 0; }

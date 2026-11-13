@@ -1,12 +1,12 @@
 import { prepareContent, ContentError, type AttachmentFile } from "./chat-content.js";
 import { projectChatTurns, type ChatTurn } from "./chat-turns.js";
 import { projectChatTools, type ChatToolCall } from "./chat-tools.js";
-export type ChatMessage = { provenance?: "user" | "agent" | "runtime"; id: string; role: string; text: string; at?: number; commentary?: string; author?: string; background?: boolean;
+export type ChatMessage = { provenance?: "user" | "agent" | "runtime"; id: string; role: string; text: string; at?: number; commentary?: string; thinking?: string; author?: string; background?: boolean;
   /** A background reply's supporting material (publishReply details), shown collapsed. */
   details?: { label: string; text: string }; error?: string; attachments?: AttachmentFile[]; artifacts?: Artifact[] };
 export type ChatSnapshot = {
   chat: Chat; messages: ChatMessage[]; turns?: ChatTurn[]; toolCalls?: ChatToolCall[]; running: boolean; queued: number;
-  partial: string; tools: string[]; error: string | null; demo: boolean;
+  partial: string; partialThinking?: string; tools: string[]; error: string | null; demo: boolean;
   background: boolean;
   /** Native pending retry; at is an epoch-millisecond deadline. */
   retry?: { attempt: number; at: number; error: string };
@@ -45,6 +45,12 @@ function messageText(content: unknown): string {
   return content.flatMap(part => part.type === "text" ? [part.text] : []).join("\n");
 }
 
+/** Provider-visible thinking text only; opaque replay signatures and redacted blocks stay native. */
+function messageThinking(content: unknown): string {
+  if (!Array.isArray(content)) return "";
+  return content.flatMap(part => part.type === "thinking" && !part.redacted ? [part.thinking] : []).join("\n\n");
+}
+
 export function projectChatMessages(namespace: string, entries: readonly EntryRecord[]): ChatMessage[] {
   return entries.flatMap<ChatMessage>(entry => {
     if (entry.kind === `${namespace}.artifact`) {
@@ -60,6 +66,7 @@ export function projectChatMessages(namespace: string, entries: readonly EntryRe
     return (entry.model ?? []).flatMap((message, index) => {
       if (message.role !== "user" && message.role !== "assistant") return [];
       const text = messageText(message.content);
+      const thinking = message.role === "assistant" ? messageThinking(message.content) : "";
       const error = message.role === "assistant" ? message.errorMessage : undefined;
       const at = message.timestamp + (message.role === "assistant" ? message.durationMs ?? 0 : 0);
       const data = entry.data as { source?: string; actor?: "user" | "agent" | "runtime"; text?: string; attachments?: AttachmentFile[] } | undefined;
@@ -69,8 +76,9 @@ export function projectChatMessages(namespace: string, entries: readonly EntryRe
         : entry.kind === `${namespace}.message` && data?.actor ? data.actor
         : entry.kind === `${namespace}.message` && data?.source && !["agent", "schedule"].includes(data.source) ? "user" as const
           : entry.kind === `${namespace}.instance-message` ? "agent" as const : "runtime" as const;
-      return text || error || attached || hasTools ? [{ provenance, ...(entry.kind === `${namespace}.instance-message` ? {author: (entry.data as {from?: string})?.from} : {}), id: `${entry.id}:${index}`, role: message.role, text: attached ? data?.text ?? "" : text, at,
+      return text || thinking || error || attached || hasTools ? [{ provenance, ...(entry.kind === `${namespace}.instance-message` ? {author: (entry.data as {from?: string})?.from} : {}), id: `${entry.id}:${index}`, role: message.role, text: attached ? data?.text ?? "" : text, at,
         ...(attached ? { attachments: attached } : {}),
+        ...(thinking ? { thinking } : {}),
         ...(message.role === "assistant" ? { commentary: publicCommentary(message) } : {}), ...(error ? { error } : {}) }] : [];
     });
   });
@@ -458,6 +466,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
           turns: projectChatTurns(submissions),
           running: !!live?.run, queued: inbox?.items?.length ?? 0,
           partial: messageText(live?.generation?.message?.content),
+          partialThinking: messageThinking(live?.generation?.message?.content),
           tools: live?.tools?.filter(tool => tool.status !== "done").map(tool => tool.name) ?? [],
           error: live?.generation?.retry?.error ?? live?.compactionFailure?.error ?? null, demo: this.demo,
           ...(live?.compactions?.length ? { compactions: live.compactions } : {}),

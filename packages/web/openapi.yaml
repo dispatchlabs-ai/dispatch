@@ -1198,6 +1198,10 @@
           "at": {
             "type": "number"
           },
+          "thinking": {
+            "type": "string",
+            "description": "Provider-visible thinking summary, excluding redacted content and opaque replay signatures."
+          },
           "commentary": {
             "type": "string"
           },
@@ -1294,6 +1298,10 @@
           },
           "queued": {
             "type": "integer"
+          },
+          "partialThinking": {
+            "type": "string",
+            "description": "Provider-visible thinking summary from the current native generation."
           },
           "partial": {
             "type": "string"

@@ -197,6 +197,10 @@ export class ChatUI {
     return block.render(Math.max(1, width));
   }
 
+  private thinking(id: string, text: string, width: number): string[] {
+    return [muted("Thinking"), ...this.markdown(`${id}:thinking`, text, width).map(muted), ""];
+  }
+
   private renderHeader(width: number): string[] {
     const chat = this.state.snapshot?.chat;
     return [fit(bold(`Dispatch${chat ? ` · ${oneLine(chat.agent)}` : ""}`), width),
@@ -246,6 +250,7 @@ export class ChatUI {
         + (message.background ? muted(" · background") : "")
         + (turn && turn.status !== "done" ? muted(` · ${turn.status}`) : "");
       const content = [fit(heading, width)];
+      if (message.thinking) content.push(...this.thinking(message.id, message.thinking, width));
       if (message.commentary && message.commentary !== message.text) content.push(...this.markdown(`${message.id}:commentary`, message.commentary, width));
       if (message.text) content.push(...this.markdown(message.id, message.text, width));
       if (message.details) content.push(...this.expandNew
@@ -260,7 +265,9 @@ export class ChatUI {
       grouped.delete(message.id);
     }
     for (const tools of grouped.values()) addTools(tools);
-    if (snapshot.partial) add("partial", [accent(bold(oneLine(snapshot.chat.agent))), ...this.markdown("partial", snapshot.partial, width)]);
+    if (snapshot.partial || snapshot.partialThinking) add("partial", [accent(bold(oneLine(snapshot.chat.agent))),
+      ...snapshot.partialThinking ? this.thinking("partial", snapshot.partialThinking, width) : [],
+      ...snapshot.partial ? this.markdown("partial", snapshot.partial, width) : []]);
     for (const turn of snapshot.turns ?? []) if (turn.entryId === undefined && turn.status !== "done")
       add(`turn:${turn.submissionId}`, [fit(warning(`Input ${turn.submissionId} · ${turn.status}${turn.reason ? ` · ${oneLine(turn.reason)}` : ""}`), width)]);
     if (snapshot.retry) add("retry", wrapTextWithAnsi(warning(terminalText(
@@ -271,7 +278,11 @@ export class ChatUI {
     if (snapshot.error && snapshot.error !== snapshot.retry?.error && snapshot.error !== snapshot.compactionFailure?.error)
       add("error", wrapTextWithAnsi(failure(terminalText(snapshot.error)), Math.max(1, width)));
     if (this.state.notice) add("notice", wrapTextWithAnsi(warning(terminalText(this.state.notice)), Math.max(1, width)));
-    if (!lines.length) lines.push(muted("Start a conversation. /help shows commands."));
+    if (!lines.length) lines.push(
+      "Start a conversation.", "",
+      muted("/agents · Ctrl+G   Switch agent"),
+      muted("/chats  · Ctrl+P   Open a saved chat"),
+      muted("/help             Commands and shortcuts"), "");
     if (this.anchor) {
       const row = this.rows.find(row => row.id === this.anchor!.id);
       if (row && !this.scroll.isFollowingEnd && this.scroll.scrollTop === this.anchor.top)

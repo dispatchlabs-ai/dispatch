@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Carry optional thinking and partialThinking summary text in the shared chat contract.
+
 ## [0.13.0] - 2026-11-13
 
 - Connect only to explicit hosts through the shared Runner client, using native watch streams. Remove local writer discovery/startup, duplicate metadata/provenance readers and unqualified installation aliases. Central storage is an optional subpath with optional peers.

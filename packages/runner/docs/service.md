@@ -94,6 +94,13 @@ source-code change.
 
 ### Interactive terminal UI
 
+The intro advertises agent and conversation selection. Chat messages expose
+optional `thinking`, and snapshots expose `partialThinking` for the native live
+generation. These are provider-visible summary text, separate from commentary
+and answers; redacted blocks and opaque replay signatures are excluded. They
+remain in the saved native transcript and require no client-side history store.
+A model may return no summary even when thinking is enabled.
+
 Runner 0.16.0 connects Pi's editor, Markdown, scrolling and pickers to
 `AgentClient`. It runs as one foreground client; it does not start an execution
 owner or use the separate storage observer.

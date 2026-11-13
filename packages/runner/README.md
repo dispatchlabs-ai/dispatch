@@ -55,6 +55,11 @@ with the same command to recover. Clients never start replacement owners.
 
 ### Interactive terminal UI
 
+The intro shows `/agents` (Ctrl+G), `/chats` (Ctrl+P) and `/help`.
+Provider-supplied thinking summaries appear live and in saved history under
+**Thinking**. A response without a provider summary has no thinking section.
+Tool headings show actual calls; Ctrl+O expands their inputs and results.
+
 Dispatch 0.16.0 uses Pi's terminal UI for interactive `dispatch chat` and
 `dispatch-agent run`, including applications that expose either as `npm run chat`.
 
@@ -127,8 +132,17 @@ A root `agent.md` can coexist with named agents, but not with `agents/agent/agen
 
 ```ts
 import { defineAgent } from "@dispatch/runner";
-export default defineAgent({ skills: true, coding: true });
+import { CodingTools } from "@earendil-works/pi-durable/tools";
+export default defineAgent({ extensions: [CodingTools] });
 ```
+
+`CodingTools` supplies Pi Durable's stock `read`, `write`, `edit` and `bash` tools.
+Declare `@earendil-works/pi-durable` at the same version as Runner (currently
+1.5.2) in the application that imports it. The host supplies their execution
+environment; the CLI defaults its working directory to the application root.
+`skills: true` enables repository skills. The separate `coding: true` adapter
+adds repository selection and a restricted private checkout; it is not required
+for the stock tools.
 
 `defineAgent({})` is conversational by default. Tools are explicit grants;
 trusted extensions can supply native Pi tools, documents and tasks. Markdown
