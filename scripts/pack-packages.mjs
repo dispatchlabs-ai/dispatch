@@ -2,7 +2,8 @@
 // Prepare public npm artifacts only. This command never publishes or changes versions.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, readFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -25,7 +26,8 @@ const ordered = [], visiting = new Set(), selected = new Set();
 function visit(pkg) {
   if (selected.has(pkg.name)) return;
   if (visiting.has(pkg.name)) throw new Error(`Public dependency cycle: ${pkg.name}`);
-  if (pkg.private === true || pkg.version !== manifest.version || !pkg.exports || !pkg.types || pkg.publishConfig?.access !== 'public') throw new Error(`Incomplete public package: ${pkg.name}`);
+  const executableOnly = !pkg.exports && !pkg.main && !pkg.types && Object.keys(pkg.bin ?? {}).length > 0;
+  if (pkg.private === true || pkg.version !== manifest.version || !(executableOnly || (pkg.exports && pkg.main && pkg.types)) || pkg.publishConfig?.access !== 'public') throw new Error(`Incomplete public package: ${pkg.name}`);
   visiting.add(pkg.name);
   for (const field of ['dependencies', 'peerDependencies', 'optionalDependencies']) for (const [name, version] of Object.entries(pkg[field] ?? {})) {
     if (!workspaces.has(name)) continue;
@@ -40,11 +42,36 @@ if (!ordered.length) throw new Error('No public packages selected.');
 // Exclusive creation prevents mixing an old artifact set with current bytes.
 mkdirSync(destination, { recursive: false, mode: 0o700 });
 const artifacts = [];
+const pack = directory => JSON.parse(run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', destination], directory, true))[0];
+// The Web executable installs from a single release URL. Keep workspaces on exact
+// semver during development and resolve its published runtime against sibling assets.
+function packWeb(pkg, directory) {
+  const staging = mkdtempSync(resolve(tmpdir(), 'dispatch-web-pack-'));
+  try {
+    const web = JSON.parse(readFileSync(resolve(directory, 'package.json'), 'utf8'));
+    for (const name of Object.keys(web.dependencies)) {
+      if (!workspaces.has(name)) continue;
+      const archive = artifacts.find(artifact => artifact.name === name);
+      if (!archive) throw new Error(`Missing release archive for ${name}.`);
+      web.dependencies[name] = `https://github.com/dispatchlabs-ai/dispatch/releases/download/v${pkg.version}/${archive.tarball}`;
+    }
+    writeFileSync(resolve(staging, 'package.json'), JSON.stringify(web, null, 2) + '\n');
+    for (const path of web.files) cpSync(resolve(directory, path), resolve(staging, path), {recursive: true});
+    return pack(staging);
+  } finally { rmSync(staging, {recursive: true, force: true}); }
+}
 for (const pkg of ordered) {
   run('npm', ['run', 'build', '--workspace', pkg.name]);
-  const packed = JSON.parse(run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', destination], resolve(root, pkg.directory), true))[0];
+  const directory = resolve(root, pkg.directory);
+  const packed = pkg.name === '@dispatch/web' ? packWeb(pkg, directory) : pack(directory);
   const files = new Set(packed.files.map(file => file.path));
-  for (const path of ['LICENSE', 'README.md', 'CHANGELOG.md', ...pkg.files.filter(path => /LICENSE|NOTICE/.test(path)), pkg.main, pkg.types, ...Object.values(pkg.exports).flatMap(entry => typeof entry === 'string' ? [entry] : [entry.import, entry.types]), ...Object.values(pkg.bin ?? {})]) {
+  const required = ['LICENSE', 'README.md', 'CHANGELOG.md', ...pkg.files.filter(path => /LICENSE|NOTICE/.test(path)), ...Object.values(pkg.bin ?? {})];
+  if (pkg.exports) {
+    required.push(pkg.main, pkg.types);
+    for (const entry of Object.values(pkg.exports)) required.push(...(typeof entry === 'string' ? [entry] : [entry.import, entry.types]));
+  }
+  if (pkg.name === '@dispatch/web') required.push('dist/web/index.html', 'dist/web/THIRD-PARTY-NOTICES.md', 'openapi.yaml', 'THIRD_PARTY.md');
+  for (const path of required) {
     if (!path || !files.has(path.replace(/^\.\//, ''))) throw new Error(`${pkg.name}: missing shipped public file ${path}`);
   }
   const bytes = readFileSync(resolve(destination, packed.filename));

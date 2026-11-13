@@ -90,11 +90,11 @@ function main() {
   updates.set(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
 
   // Public installation instructions name the immutable runtime archive.
-  for (const path of ["README.md", "packages/runner/README.md", "docs/quickstart.md", "packages/runner/docs/upgrade.md", "scripts/README.md"]) {
+  for (const path of ["README.md", "packages/runner/README.md", "packages/web/README.md", "docs/quickstart.md", "packages/runner/docs/upgrade.md", "scripts/README.md"]) {
     const source = readFileSync(resolve(root, path), "utf8");
     if (!source.includes(`v${current}`)) throw new Error(`${path} does not name v${current}.`);
     updates.set(path, source.replaceAll(`v${current}`, `v${next}`)
-      .replaceAll(`dispatch-runner-${current}.tgz`, `dispatch-runner-${next}.tgz`)
+      .replaceAll(`-${current}.tgz`, `-${next}.tgz`)
       .replaceAll(`currently ${current}`, `currently ${next}`));
   }
 

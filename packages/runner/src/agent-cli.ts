@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { catalog, loadAgent } from "./definition.js";
 import { connectInTerminal } from "./service-terminal.js";
 import { terminalError, terminalText } from "./terminal-output.js";
 import type { ClientConnection } from "./client.js";
-import { localHostConfig, localHostPaths, readHostConfig } from "./local-host.js";
+import { localHostConfig } from "./local-host.js";
+import { localHostPaths, readHostConfig, readClientConnection } from "./host-config.js";
 import { startService } from "./service.js";
 
 const usage = `dispatch serve [--root DIRECTORY] [--state DIRECTORY] [--socket SOCKET] [--demo]
@@ -70,14 +70,10 @@ try {
       ...(values.session ? ["--session", values.session] : []), ...(values.json ? ["--json"] : []),
     ]);
   } else if (positionals[0] === "run" || positionals[0] === "chat") {
-    const config = values.config ? await readHostConfig(values.config) : undefined;
     let connection: ClientConnection;
-    const socket = values.socket ?? config?.socket;
-    if (socket) connection = { socket: resolve(socket) };
-    else if (config?.url) connection = { url: config.url, ...(config.tokenFile ? {
-      headers: { authorization: `Bearer ${(await readFile(config.tokenFile, "utf8")).trim()}` },
-    } : {}) };
-    else if (!values.config && positionals[0] === "chat") connection = { socket: (await localHostPaths(values)).socket };
+    if (values.socket) connection = { socket: resolve(values.socket) };
+    else if (values.config) connection = await readClientConnection(values.config);
+    else if (positionals[0] === "chat") connection = { socket: (await localHostPaths(values)).socket };
     else throw new Error("Configure a socket or URL for the running owner. Start it with dispatch serve.");
     try {
       await connectInTerminal({ connection, agent: values.agent, session: values.session ?? (positionals[0] === "chat" ? "main" : undefined),

@@ -172,3 +172,5 @@ export async function connectClient(connection: ClientConnection & { expected?: 
 
 export { ServiceError } from "./protocol.js";
 export type { ServiceCommand, ServiceResults, ServiceExpectation, ServiceMetadata } from "./protocol.js";
+
+export { readClientConnection } from "./host-config.js";

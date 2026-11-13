@@ -2,7 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { startService, connectClient, type ServiceCommand, connectInTerminal } from "./service.js";
-import { readHostConfig } from "./local-host.js";
+import { readHostConfig } from "./host-config.js";
 
 const [configPath, action, ...args] = process.argv.slice(2);
 try {

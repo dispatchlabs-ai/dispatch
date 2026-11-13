@@ -1,4 +1,4 @@
-import { readHostConfig } from "./local-host.js";
+import { readHostConfig } from "./host-config.js";
 import { parseArgs } from "node:util";
 import { discoverWatchRuns, isWatchSessionKey, readWatchRun } from "./watch-reader.js";
 import { terminalText } from "./terminal-output.js";

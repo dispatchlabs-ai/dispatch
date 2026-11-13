@@ -5,7 +5,24 @@ operations. Public name: **Web**. See [design](DESIGN_GUIDE.md),
 [use cases](USE_CASES.md), [usage](docs/usage-guide.md),
 [HTTP contract](openapi.yaml) and [component notices](THIRD_PARTY.md).
 
-First useful result: [synthetic local composition](../../examples/chat/README.md).
+## Quickstart
+
+From an existing Dispatch application's directory with Node 24.22.1 or newer, install the matching Web archive and add its npm command:
+
+```sh
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.14.1/dispatch-web-0.14.1.tgz
+npm pkg set 'scripts.web=dispatch-web --config host.json'
+```
+
+Keep the agent host running with `npx dispatch serve --config host.json`. In another terminal run `npm run web` and open the printed address (normally http://127.0.0.1:4319). Open an existing CLI conversation in the sidebar or choose an agent and start a chat. For another port, use `npm run web -- --port 4329`. The explicit port takes precedence over `DISPATCH_PORT`. Ctrl-C closes the browser client process. CLI and Web share the host's saved conversations.
+
+For an agent started with plain `dispatch serve` or `dispatch serve --demo`, run `npx dispatch-web` in the same directory.
+
+`--config` selects the same socket or authenticated service URL as `dispatch chat`. Keep gateway and MCP credentials on the host. Existing Web installations can still supply `DISPATCH_CONFIG` for named installations and historical sources, or `DISPATCH_CENTRAL_CONFIG` for the central backend.
+
+## Build from source
+
+The [synthetic local composition](../../examples/chat/README.md) includes a runnable demo.
 `npm run build --workspace @dispatch/web` produces `dist/web` and
 `dist/server`; `npm start` starts the built service. Dependency packages must
 be built first. Current shadcn Chat/Prompt Input/Trace/Sidebar and Streamdown own presentation;

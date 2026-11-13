@@ -9,6 +9,8 @@ import {
 import { readFile } from "node:fs/promises";
 import { resolve, extname, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
+import { readClientConnection } from "@dispatch/runner/client";
 import {
   openRuntime,
   withConversationTitles,
@@ -18,9 +20,16 @@ import {
 import { prepareContent, ContentError, type AttachmentFile } from "@dispatch/runner";
 
 process.umask(0o077);
-const port = Number(process.env.DISPATCH_PORT ?? 4319);
+const { values } = parseArgs({ options: {
+  config: { type: "string" }, port: { type: "string" }, help: { type: "boolean", short: "h" },
+} });
+if (values.help) {
+  console.log("Usage: dispatch-web [--config HOST.json] [--port PORT]\nConnect to the running Dispatch host and open the printed URL in your browser.");
+  process.exit(0);
+}
+const port = Number(values.port ?? process.env.DISPATCH_PORT ?? 4319);
 if (!Number.isInteger(port) || port < 1 || port > 65535)
-  throw new Error("DISPATCH_PORT must be an integer from 1 to 65535.");
+  throw new Error("The Web port must be an integer from 1 to 65535.");
 const hosted = process.env.DISPATCH_ORIGIN !== undefined;
 const origin = process.env.DISPATCH_ORIGIN ?? `http://127.0.0.1:${port}`;
 if (hosted && !/^https:\/\/[^/]+$/.test(origin))
@@ -99,9 +108,12 @@ async function protect(request: IncomingMessage, response: ServerResponse, path:
   return true;
 }
 const central = process.env.DISPATCH_CENTRAL_CONFIG;
+if (values.config && central) throw new Error("Choose --config for an agent host or DISPATCH_CENTRAL_CONFIG for a central backend.");
+const useHost = values.config !== undefined || (!hosted && !central && !process.env.DISPATCH_CONFIG);
+const serviceConfig = useHost ? { service: await readClientConnection(values.config) } : undefined;
 let runtime: Runtime = central
   ? await (await import("@dispatch/backend/central")).openCentralRuntime(JSON.parse(await readFile(central, "utf8")))
-  : await openRuntime();
+  : await openRuntime(serviceConfig);
 if (process.env.DISPATCH_TITLES) {
   if (!isAbsolute(process.env.DISPATCH_TITLES)) throw new Error("DISPATCH_TITLES must be an absolute trusted JSON configuration path.");
   runtime = await withConversationTitles(runtime, JSON.parse(await readFile(process.env.DISPATCH_TITLES, "utf8")));

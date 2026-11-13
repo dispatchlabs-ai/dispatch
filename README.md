@@ -1,114 +1,75 @@
 # Dispatch
 
-Build durable AI agents in your own application. Your repository owns the agent
-instructions, models, tools and skills. Dispatch provides the runtime and client
-libraries; [Pi Durable](https://github.com/earendil-works/pi) owns execution,
-recovery and conversation history.
+Define an AI agent in Markdown. Run one host for its tools and conversation history. Start a conversation in the terminal and pick it up in the browser.
 
-An agent can be one `agent.md` file. Add `agent.ts` only for optional capabilities.
-A host process loads those definitions and owns the conversation store.
-CLI, Web and channel connectors interact with that owner. Add another
-client by using the same conversation operations.
+## Quickstart
 
-```mermaid
-flowchart LR
-  C[CLI · Web · Slack · Google Chat · Email] --> H[Agent host]
-  D[Your definitions and tools] --> H
-  H --> S[Pi Durable conversation store]
-```
+Use Node 24.22.1 or newer and npm. The demo echoes your messages locally so you can try both clients without a model account.
 
-Install the library, write the definitions, and start the host. There is no
-scaffold, generated agent layer or build-time instruction merge. Updating the
-Dispatch dependency changes the runtime; your definition files stay yours.
-See the [minimal agent example](packages/runner/README.md#try-it-without-credentials)
-and the [service/client contract](packages/runner/docs/service.md#shared-clients-and-company-compositions).
-
-**Source alpha.** Use Node 24.22.1 or newer and npm. In a new application directory:
+**1. Install Dispatch in a new directory.**
 
 ```sh
+mkdir dispatch-demo && cd dispatch-demo
 npm init -y --init-type=module
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.14.1/dispatch-runner-0.14.1.tgz
+npm install \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.14.1/dispatch-runner-0.14.1.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.14.1/dispatch-web-0.14.1.tgz
 ```
 
-An existing npm application only needs the install command. Initialize new projects
-first so npm installs locally instead of selecting a parent project's dependencies.
+**2. Write your agent and start its host.**
 
-Write one `agent.md` with its description, model and instructions, then start
-`npx dispatch serve`. In another terminal, `npx dispatch chat` connects to the
-same host. The [quickstart](docs/quickstart.md) includes the complete Markdown
-and a credential-free demo. No scaffold, application build or Nix is required.
+```sh
+cat > agent.md <<'EOF_AGENT'
+---
+description: A helpful assistant
+model: { provider: anthropic, id: claude-sonnet-4-6 }
+---
+Answer clearly. Ask for details when you need them.
+EOF_AGENT
 
-## Use it with your AI agent
+npx dispatch serve --demo
+```
 
-Give your agent this prompt:
+**3. Talk to the same agent from two clients.** Leave the host running. Open each client in its own terminal from `dispatch-demo`.
 
-> Read https://github.com/dispatchlabs-ai/dispatch/blob/main/docs/quickstart.md and
-> complete the local conversation walkthrough in a fresh directory. Install the
-> released library, create one agent.md, and use the documented host and chat
-> commands with synthetic inference. Verify that the same conversation survives
-> a host restart. Report the installed version, platform and observed results.
-> Use only the new directory's isolated state; leave existing installations and
-> real accounts alone. Stop the host you started when finished.
+| Client | Command | Try it |
+| --- | --- | --- |
+| Terminal | `npx dispatch chat` | Send `Hello from the CLI`. The reply begins with `Demo reply:`. |
+| Browser | `npx dispatch-web` | Open the printed URL and select the CLI conversation in the sidebar. Send a follow-up. |
 
-The walkthrough needs shell and file access, Node and npm. The optional
-[browser walkthrough](docs/web-quickstart.md) also needs a browser and builds Web
-from source. See the [verification record](docs/qualification.md) for observed
-platforms and limits.
+Run `npx dispatch chat --history` to see the conversation from both clients. Stop and restart the host with the same command to reopen that conversation. The host stores it in `.state/`. If the default web port is busy, run `npx dispatch-web --port 4329`.
 
-## Choose the pieces you need
+## Run your own agents
 
-| Goal | Package |
+In your own project, select a model in `agent.md`, set its provider credential, and run `npx dispatch serve`. For several agents, give each one a directory such as `agents/researcher/agent.md`. Its directory name is its ID. [Model setup and examples](docs/quickstart.md)
+
+A shared `host.json` can supply a model gateway and named MCP connections. For example, add `mcp: [wiki]` to an agent's frontmatter to give it the wiki tools configured on the host. CLI and Web both connect to that host. You can give the commands short names in your application's `package.json`. [MCP configuration](packages/runner/docs/mcp.md) · [Host and client settings](packages/runner/docs/service.md)
+
+```json
+{
+  "scripts": {
+    "start": "dispatch serve --config host.json",
+    "chat": "dispatch chat --config host.json --agent researcher",
+    "web": "dispatch-web --config host.json"
+  }
+}
+```
+
+Run `npm start`, then `npm run chat` or `npm run web` in another terminal. To upgrade Dispatch, install matching release archives, commit the updated npm manifest and lockfile, and restart your processes. Your Markdown definitions belong to your application. [Releases](https://github.com/dispatchlabs-ai/dispatch/releases) · [Upgrade guide](packages/runner/docs/upgrade.md)
+
+## Packages and integrations
+
+| Build or connect | Packages |
 | --- | --- |
-| Define and run durable agents from a CLI or local service | [Runner](packages/runner/README.md) |
-| Grade retained work or compare controlled reruns with your own rubric | [Eval](packages/eval/README.md) |
-| Browse, steer and stop native conversations | [Web](packages/web/README.md) |
-| Embed shared conversation operations in a client | [Backend](packages/backend/README.md) |
-| Connect a supported channel | [Slack](packages/slack/README.md), [Google Chat](packages/google-chat/README.md), [Email](packages/email/README.md) |
-| Inspect native records without running agents | [Observer](packages/observer/README.md) |
-| Use remote storage or outbound workers | [Remote](packages/remote/README.md), [Postgres](packages/postgres/README.md), [Workers](packages/workers/README.md) |
-| Place complete runs on replaceable EC2 workers | [Fleet](packages/fleet/README.md) |
+| Run agents and build clients | [Runner](packages/runner/README.md) · [Web](packages/web/README.md) · [Backend](packages/backend/README.md) |
+| Add a channel | [Slack](packages/slack/README.md) · [Google Chat](packages/google-chat/README.md) · [Email](packages/email/README.md) |
+| Distribute execution or storage | [Remote](packages/remote/README.md) · [Workers](packages/workers/README.md) · [Fleet](packages/fleet/README.md) · [Postgres](packages/postgres/README.md) |
+| Inspect history or evaluate agents | [Observer](packages/observer/README.md) · [Eval](packages/eval/README.md) |
 
-Packages can be adopted separately at their documented boundaries. Fleet,
-PostgreSQL, Web and channel accounts are optional. Use a single application
-dependency tree, or a separately managed runtime for
-several definition repositories. Nix packaging is optional; it copies the same
-definition files you inspect and edit in source.
+Dispatch uses [Pi Durable](https://github.com/earendil-works/pi) for execution, recovery and stored conversations. Web and other clients share the host's conversation operations. Local Web binds to loopback. Hosted Web requires HTTPS and application-owned authorization. [Client contract](docs/interfaces.md) · [HTTP API](packages/web/openapi.yaml) · [Security](SECURITY.md) · [Verification](docs/qualification.md)
 
-## Versions and distribution
+**Use it with your AI agent.** Ask an agent with shell access to run the walkthrough.
 
-The latest release is [v0.14.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.14.1),
-using Pi Durable and Pi MCP 1.5.2. Markdown agents can select [MCP tools](packages/runner/docs/mcp.md) in their host settings. Its nine reusable package archives, source manifest and
-SHA-256 checksums are attached to the release. These packages are not published
-to npm. The [package guide](scripts/README.md) describes archive preparation and
-installation in an ordinary external application.
+> Follow the [Dispatch quickstart](https://github.com/dispatchlabs-ai/dispatch/blob/main/docs/quickstart.md) in a fresh directory. Start the demo, send a message and verify the same conversation survives a host restart. Stop the host when finished.
 
-Runner, Backend, Remote, Postgres, Workers, Slack, Google Chat, Email and Fleet
-have public package definitions. Install matching packages only as needed.
-Web, Observer and Eval remain applications with their own build instructions.
-The optional [Nix builder](packages/runner/docs/nix-releases.md) packages complete
-application source. It does not generate or merge definitions.
-
-Use [the release guide](.pi/skills/release.md) for publication. Upgrading an
-application means changing its dependency/lockfile, checking it and explicitly
-restarting its host. Building or publishing source never deploys an installation.
-
-## Boundaries and contributing
-
-Local chat trusts the local account and binds exact loopback Host/Origin. Hosted
-Web requires HTTPS and an installation-owned authorization binding covering its
-configured runs. The shared service exposes one versioned command and watch protocol. Web supplies
-its browser adapter over the common client API. Other clients can connect over a
-private Unix socket or authenticated HTTPS. Durable channel delivery uses optional
-host extensions with shared input validation. Multi-user grants and machine-principal
-enrollment remain future work. Agent tools have their host's actual authority; a
-working directory is not a sandbox.
-
-Read the [interface inventory](docs/interfaces.md), [HTTP contract](packages/web/openapi.yaml),
-[security policy](SECURITY.md), [contribution guide](CONTRIBUTING.md),
-[open-source standards](OSS.md) and [verification record](docs/qualification.md).
-Report ordinary bugs in [GitHub Issues](https://github.com/dispatchlabs-ai/dispatch/issues)
-and vulnerabilities through [private reporting](SECURITY.md).
-
-Created by Chris Reynolds, cofounder of Dispatch Labs AI. Published by
-[Dispatch Labs AI](https://github.com/dispatchlabs-ai) under the [MIT license](LICENSE).
-Upstream licenses and attribution remain with their components.
+Dispatch is pre-1.0 software created by Chris Reynolds, cofounder of Dispatch Labs AI, and distributed under the MIT license. [License](LICENSE) · [Contributing](CONTRIBUTING.md) · [Open-source standards](OSS.md) · [Package distribution](scripts/README.md)

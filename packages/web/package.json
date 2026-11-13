@@ -1,7 +1,6 @@
 {
   "name": "@dispatch/web",
   "version": "0.14.1",
-  "private": true,
   "type": "module",
   "engines": {
     "node": ">=24.22.1"
@@ -12,37 +11,37 @@
     "start": "node dist/server/server/main.js"
   },
   "dependencies": {
-    "@radix-ui/react-slot": "^1.2.4",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.468.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "streamdown": "^2.4.0",
-    "tailwind-merge": "^3.4.0",
     "@dispatch/backend": "0.14.1",
     "zod": "4.6.6",
-    "@shadcn/react": "0.3.1",
-    "radix-ui": "1.4.3",
     "@dispatch/runner": "0.14.1"
   },
   "devDependencies": {
+    "@radix-ui/react-slot": "^1.2.4",
+    "@shadcn/react": "0.3.1",
     "@tailwindcss/vite": "^4.1.0",
     "@types/node": "24.19.1",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "6.0.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.468.0",
+    "radix-ui": "1.4.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "streamdown": "^2.4.0",
+    "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.0",
     "typescript": "6.0.3",
     "vite": "8.3.8"
   },
   "license": "MIT",
   "bin": {
-    "dispatch-web": "./dist/server/server/main.js",
-    "dispatch-bootstrap": "./dist/server/server/bootstrap.js"
+    "dispatch-web": "./dist/server/server/main.js"
   },
   "files": [
-    "dist",
+    "dist/web",
+    "dist/server/server",
     "openapi.yaml",
     "licenses",
     "LICENSE",
@@ -50,6 +49,21 @@
     "README.md",
     "USE_CASES.md",
     "CHANGELOG.md",
-    "docs"
-  ]
+    "docs",
+    "DESIGN_GUIDE.md"
+  ],
+  "description": "Browser conversation client for a running Dispatch host",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dispatchlabs-ai/dispatch.git",
+    "directory": "packages/web"
+  },
+  "homepage": "https://github.com/dispatchlabs-ai/dispatch/tree/main/packages/web#readme",
+  "bugs": {
+    "url": "https://github.com/dispatchlabs-ai/dispatch/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
 }

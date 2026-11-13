@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Ship the compiled browser client as the Web release archive. Add `dispatch-web --config host.json [--port PORT]` to use the same host connection as the CLI.
+
 ## [0.13.0] - 2026-11-13
 
 - Connect to an explicitly started owner through Backend; load central storage only when configured. The local example starts its host separately. Keep event observation reconnectable while its owner is temporarily unavailable.

@@ -85,6 +85,8 @@ a host restart. `--history` never creates one. The CLI prints request and submis
 identities and returns a nonzero exit status on failure. Untrusted terminal
 control characters are rendered as visible escapes; stored text is unchanged.
 
+Use `dispatch-web --config host.json` to connect Web to the same host as `dispatch chat --config host.json`. Both clients use the same socket or service URL. An HTTP host bound to loopback can use its own listener port and token file in this configuration.
+
 Web's Backend connects with `openServiceRuntime({socket})`. Web does not launch
 owners or import agent definitions. A channel adapter may map its external thread
 key to the same chat. Sources are open strings; adding a client requires no Runner

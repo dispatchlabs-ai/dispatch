@@ -5,7 +5,7 @@ agents. Implementation/qualification limits are in the [usage guide](docs/usage-
 
 ## Current replacement scope
 
-- **DSP-004 — Work with agents:** A person selects an authored agent and sends messages and follow-ups in independent native conversations.
+- **DSP-004 — Work with agents:** A person runs the installed browser client against the same host settings as the CLI, selects an authored agent and sends messages and follow-ups in native conversations.
 - **DSP-010 — Stop owned work:** A person stops the selected native conversation's owned work without cancelling independent recipients, and distinguishes accepted Stop from native stopped/completed turns.
 - **DSP-011 — Resume observation:** A person reopens saved native history after disconnect without resending or resuming execution.
 - **DSP-013 — Inspect execution evidence:** A person sees attributed replies, streaming and native tool identities, arguments/results, waits/cancellation and failures in expandable turn-scoped traces.
