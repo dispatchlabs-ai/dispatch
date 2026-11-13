@@ -8,14 +8,6 @@ export type GatewayAuthorization = (options?: { forceRefresh?: boolean; signal?:
 const filtered = (options: any) => Object.fromEntries(Object.entries(options ?? {}).filter(([key, value]) =>
   value !== undefined && !['model','toolExecution','apiKey','headers','env','signal','fetch','onPayload','onResponse','onProviderStreamEvent','identity','telemetry','telemetryContext','transformHeaders'].includes(key)));
 
-// A gateway request whose stream shows no progress for this long is abandoned so Pi's retry policy sends a fresh one.
-// Observed on the Codex route: stalled requests ended only at the gateway's 900 s upstream limit with
-// provider_connection_error, and their retries completed in seconds. The slowest healthy whole responses observed
-// were 55 s (low), 90 s (medium), 228 s (high) and 418 s (max) thinking, so each limit stays well above any
-// healthy silence. Empty or whitespace-only deltas do not count as progress. xhigh/max and an unstated level keep the gateway's own limit.
-const STALL_SECONDS: Record<string, number> = { minimal: 180, low: 180, medium: 300, high: 600 };
-export const stallMs = (reasoning?: string) => (reasoning === undefined ? 0 : STALL_SECONDS[reasoning] ?? 0) * 1000;
-
 export async function refreshGatewayModels(origin: string, models: any, key?: string | GatewayAuthorization, aliases: GatewayAliases = {}, options: { signal?: AbortSignal } = {}): Promise<ModelChoice[]> {
   const gatewayOrigin = new URL(origin).origin;
   const authorizedFetch: typeof fetch = async (input, init) => {
@@ -70,10 +62,9 @@ export async function refreshGatewayModels(origin: string, models: any, key?: st
       id: m.id, name: m.name ?? m.id, levels: getSupportedThinkingLevels(m), images: m.input?.includes('image') === true, ...(hidden ? { hidden } : {}) })));
     const stream = (operation: string) => (model: any, transcript: any, options: any) => {
       const output = new AssistantMessageEventStream();
-      const limit = stallMs(options?.reasoning);
-      const stall = new AbortController();
-      const signal = options?.signal ? AbortSignal.any([options.signal, stall.signal]) : stall.signal;
-      let timer: ReturnType<typeof setTimeout> | undefined;
+      // Reasoning effort is not a response deadline. Let the caller and gateway
+      // own cancellation so a quiet provider stream is not replayed after a guessed timeout.
+      const signal = options?.signal;
       let ended = false;
       const fail = (errorMessage: string) => {
         if (ended) return;
@@ -85,16 +76,8 @@ export async function refreshGatewayModels(origin: string, models: any, key?: st
           stopReason: 'error', errorMessage,
         } });
       };
-      // "timed out" is retryable in Pi; the caller's own abort is never relabelled as a stall.
-      const stalled = () => `Model stream stalled: no progress for ${limit / 1000} s at ${options?.reasoning} thinking; the request timed out and is retried.`;
-      const arm = () => {
-        if (!limit) return;
-        clearTimeout(timer);
-        timer = setTimeout(() => { if (!options?.signal?.aborted) stall.abort(new Error(stalled())); }, limit);
-      };
       void (async () => {
         let terminal: any;
-        arm();
         const responses = group ? await import('@earendil-works/pi-ai/api/openai-responses') : undefined;
         const upstream = responses ? (operation === 'streamSimple' ? responses.streamSimple : responses.stream)(
           { ...model, api: 'openai-responses', baseUrl: `${origin}/v1` }, transcript, {
@@ -107,19 +90,13 @@ export async function refreshGatewayModels(origin: string, models: any, key?: st
           onProviderStreamEvent: (event: any) => { if (event.message) terminal = event.message; },
         });
         for await (const event of upstream) {
-          if (stall.signal.aborted) break;
-          // A delta with no visible content is not progress: stalled requests were observed streaming empty or
-          // whitespace-only tool-call argument deltas for 15 minutes (10+ MB) without changing the response.
-          if (!(event.type.endsWith('_delta') && !String((event as any).delta ?? '').trim())) arm();
           const message = event.type === 'done' ? event.message : event.type === 'error' ? event.error : event.partial;
           if ((event.type === 'done' || event.type === 'error') && terminal) Object.assign(message, terminal);
           message.api = model.api; message.provider = provider;
           if (event.type === 'done' || event.type === 'error') ended = true;
           output.push(event);
         }
-        if (stall.signal.aborted) fail(stalled());
-      })().catch(error => fail(stall.signal.aborted ? stalled() : String(error)))
-        .finally(() => clearTimeout(timer));
+      })().catch(error => fail(String(error)));
       return output;
     };
     models.setProvider({ id: provider, name,

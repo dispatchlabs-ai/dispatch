@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Remove reasoning-level silence deadlines from gateway streams. Quiet provider work remains attached until the caller cancels or the gateway reports a failure, avoiding premature retries and uncertain usage.
+
 ## [0.12.1] - 2026-11-13
 
 - Inspect each directory in JSON `PATH` values during machine upgrades instead of reporting the search path list as one missing file.

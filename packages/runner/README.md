@@ -111,9 +111,10 @@ try {
 Run `node main.mjs`. The supplied Pi Models catalog owns inference and credentials.
 Use native provider setup or the separately installed inference gateway for live
 models. The runner never requires a particular customer, provider, gateway or
-web installation. A gateway request whose stream makes no progress for 3/5/10
-minutes at minimal-low/medium/high thinking is abandoned as timed out, so Pi's
-retry policy sends a fresh request instead of waiting for the gateway's own limit.
+web installation. The caller and gateway own request cancellation and timeouts.
+The runner does not impose a deadline based on reasoning effort: a quiet stream
+can still be doing provider work. Pi retries reported transient failures according
+to the installation's retry policy.
 
 ## Company application
 
