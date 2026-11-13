@@ -4,6 +4,39 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.16.1 thinking summaries and discovery — November 13, 2026
+
+[Release v0.16.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.16.1)
+contains ten npm archives from `a53b2cdd951246692ee3f1d52fa1103555c90f9e`.
+All twelve public downloads and GitHub SHA-256 digests matched the reviewed
+archives, manifest and checksums. Fresh public installs passed strict NodeNext
+library checks and actual imports. Web installed by itself; minimal Backend and
+Fleet consumers loaded without central peers or Slack. Selected npm audits
+reported zero findings.
+
+Manual Mac terminal checks at 100×28, 80×24 and 48×24 verified the intro shortcuts,
+agent switching, live/retained thinking summaries and stock Pi Durable file/shell
+tools. Native `write`, `read`, `edit` and `bash` results matched the resulting
+local file. A second client saw the same summaries; reopening retained them.
+A streaming response preserved the draft and scroll position, and explicit Stop
+retained its emitted summary with an unanswered/aborted native turn. Redacted
+thinking and opaque replay signatures were absent from the public chat snapshot.
+
+Web checks at 1440×900, 1280×720, 768×1024 and 390×844 covered thinking disclosure
+with the keyboard, native tool details, shared streaming, Stop, reload and mobile
+navigation. The checks used an isolated synthetic provider with native tools.
+No browser console errors were observed.
+
+Node 24.22.1 source build/type checks, Mac arm64 and Linux x86_64 Nix builds and
+flake checks, frontend, portable Mac and both Linux images passed. The Linux
+builder reused the verified platform-independent fixed-output npm cache after
+a network fetch stalled; its content address matched, and native builds and
+checks then completed. No machine trust settings changed. Archive/image matches
+were inspected as upstream examples, parser constants, SDK directories and empty
+npm configuration. Notices were retained. Review was scoped, not an independent
+security assessment; no automated functional tests were added or run. Linux and
+Windows terminal interaction and hosted/channel deployments remain unverified.
+
 ## v0.16.0 Pi terminal client — November 13, 2026
 
 [Release v0.16.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.16.0)
