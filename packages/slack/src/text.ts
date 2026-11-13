@@ -39,7 +39,7 @@ export function progressText(text: string) {
 export function streamText(text: string) {
   const opening = text.lastIndexOf("<");
   if (opening >= 0 && /^<(?:@(?:[UW][A-Z0-9]*)?)?$/.test(text.slice(opening))) text = text.slice(0, opening);
-  return fallbackText(text);
+  return markdownText(text);
 }
 
 // Escaping can expand one character to five; stay within Markdown's 12,000.
@@ -77,4 +77,18 @@ export function replyBlocks(text: string, source = text, offset = 0) {
     type: "rich_text_section" as const, elements: [{ type: "text" as const, text }],
   }] }];
   return [{ type: "markdown" as const, text: markdownText(text) }];
+}
+
+export function userBlocks(text: string, source: string, offset: number, attribution: string) {
+  const heading = { type: "rich_text" as const, elements: [{
+    type: "rich_text_section" as const, elements: [{ type: "text" as const, text: attribution, style: { bold: true } }],
+  }] };
+  const [body] = replyBlocks(text, source, offset);
+  // Wrap each delivered part so even a split paragraph/code block remains
+  // visibly authored by the user. Complete blocks retain their Markdown.
+  return body.type === "markdown"
+    ? [heading, { type: "markdown" as const, text: body.text.split("\n").map(line => `> ${line}`).join("\n") }]
+    : [heading, { type: "rich_text" as const, elements: [{
+      type: "rich_text_quote" as const, elements: [{ type: "text" as const, text }],
+    }] }];
 }

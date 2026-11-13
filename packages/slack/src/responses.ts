@@ -3,10 +3,11 @@ import { setTimeout as delay } from "node:timers/promises";
 import { AssistantEntry, LiveDoc, defineDoc, defineTask, type ConversationId, type EntryRecord, type EntryId, type TaskId, type Tx } from "@earendil-works/pi-durable";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { SlackWebApi } from "./api.js";
-import { fallbackText, replyBlocks, replyChunk, streamText } from "./text.js";
+import { fallbackText, markdownText, replyBlocks, replyChunk, streamText, userBlocks } from "./text.js";
 
 type Destination = { channel: string; thread: string; user: string };
-type ResponseInput = Destination & { key: string; generation?: number; entry?: number; first: number; after?: number; text?: string; origin?: number };
+type ResponseInput = Destination & { key: string; generation?: number; entry?: number; first: number; after?: number;
+  text?: string; origin?: number; attribution?: string };
 type ResponseFields = { stream: string | null; opening?: boolean; ordinary?: boolean;
   latest: string; text?: string; entry?: number; offset: number; retryAt: number };
 type ResponseState = ({phase: "watch"} | {phase: "deliver"}) & ResponseFields;
@@ -173,10 +174,13 @@ export function createResponseDelivery(namespace: string, client: SlackWebApi, o
           await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), ctx);
           return;
         }
-        const text = replyChunk(source, state.offset);
+        // Reserve the quote prefix within Slack's 12,000-character Markdown budget.
+        const text = replyChunk(source, state.offset, task.input.attribution ? Math.floor((12_000 - 2) / 5) : undefined);
         const hash = deliveryHash(`${task.input.origin ?? runtime.conversationId}:${task.input.key}:${state.offset}`);
         try {
-          const payload = { channel: task.input.channel, text: fallbackText(text), blocks: replyBlocks(text, source, state.offset),
+          const payload = { channel: task.input.channel,
+            text: fallbackText(task.input.attribution ? `${task.input.attribution}\n\n${text}` : text),
+            blocks: task.input.attribution ? userBlocks(text, source, state.offset, task.input.attribution) : replyBlocks(text, source, state.offset),
             metadata: { event_type: `${namespace}_agent_reply`, event_payload: { delivery: hash } }, parse: "none" as const, link_names: false };
           if (task.input.text === undefined && !state.stream && state.offset === 0) {
             if (state.opening) {
@@ -193,7 +197,7 @@ export function createResponseDelivery(namespace: string, client: SlackWebApi, o
                 recipient_team_id: options.team, recipient_user_id: task.input.user,
                 chunks: [{ type: "blocks", blocks: [{ type: "context", block_id: `response-${hash}`,
                   elements: [{ type: "plain_text", text: "Agent response" }] }] },
-                  { type: "markdown_text", text: fallbackText(text) }] });
+                  { type: "markdown_text", text: markdownText(text) }] });
               if (!opened.ts) throw new Error("Slack did not return a response timestamp.");
               state = { ...state, stream: opened.ts, opening: false };
             }
@@ -279,7 +283,7 @@ export function createResponseDelivery(namespace: string, client: SlackWebApi, o
         const files = data.attachments?.length ? `\n\nAttachments: ${data.attachments.map(file => file.name).join(", ")}` : "";
         if (text || files) await queue(tx, conversation, { ...destination, first: entry.id, entry: entry.id,
           // Stop cancels inference, not delivery of a human message already saved.
-          text: `User · ${label}\n\n${text}${files}` }, owner);
+          text: `${text}${files}`, attribution: `User · ${label}` }, owner);
       }
     }
     if (!page.next && stream && state.destination && allowedUser(state.destination.user))
