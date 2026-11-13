@@ -12,7 +12,6 @@ import { fileURLToPath } from "node:url";
 import {
   openRuntime,
   withConversationTitles,
-  openCentralRuntime,
   AdmissionError,
   type Runtime,
 } from "@dispatch/backend";
@@ -101,7 +100,7 @@ async function protect(request: IncomingMessage, response: ServerResponse, path:
 }
 const central = process.env.DISPATCH_CENTRAL_CONFIG;
 let runtime: Runtime = central
-  ? await openCentralRuntime(JSON.parse(await readFile(central, "utf8")))
+  ? await (await import("@dispatch/backend/central")).openCentralRuntime(JSON.parse(await readFile(central, "utf8")))
   : await openRuntime();
 if (process.env.DISPATCH_TITLES) {
   if (!isAbsolute(process.env.DISPATCH_TITLES)) throw new Error("DISPATCH_TITLES must be an absolute trusted JSON configuration path.");
@@ -216,7 +215,9 @@ const server = createServer(async (request, response) => {
       const id = decodeURIComponent(match[1]);
       const action = match[2];
       const artifactId = match[3];
-      if (!(await service.has(id)))
+      // An unavailable owner must still produce a valid SSE response so the
+      // browser retries observation. A failed HTTP preflight permanently closes EventSource.
+      if (!(action === "events" && method === "GET" && !artifactId) && !(await service.has(id)))
         throw new HttpError(404, "Conversation not found.");
       if (!action && method === "GET") {
         json(response, 200, await runtime.presentation.snapshot(id));

@@ -23,8 +23,8 @@ export { loadRepositoryInstructions } from "./instructions.js";
 export { loadSkills } from "./skills.js";
 export { definitionResourcesExtension } from "./definition-resources.js";
 export type { Skill } from "./skills.js";
-export { chatInTerminal } from "./terminal.js";
-export type { TerminalOptions } from "./terminal.js";
+export { connectInTerminal } from "./service-terminal.js";
+export type { ServiceTerminalOptions } from "./service-terminal.js";
 export { UserCredentials, CredentialError } from "./credentials.js";
 export type { CredentialProvider, CredentialStatus } from "./credentials.js";
 export { credentialCommand, promptForSecret } from "./credential-cli.js";
@@ -35,6 +35,8 @@ export type { Chat, ChatInitializer, ChatMessage, ChatService, ChatSnapshot } fr
 export type { ReplyDestination, ReplyDetails, ReplySink, StatusSink } from "./replies.js";
 export { context, projectChatMessages } from "./chat.js";
 export { run } from "./run.js";
+export { AgentClient, connectClient } from "./client.js";
+export type { ClientConnection, ChatWatch } from "./client.js";
 export type { Adapter, PreparedAdapter, RunOptions } from "./run.js";
 export { ProcessScope, serveProcess, cancelService } from "./process-scope.js";
 export { nativeToolProxies, openNativeTools } from "./native-tools.js";
@@ -73,6 +75,6 @@ export type { ChatToolCall } from "./chat-tools.js";
 export { projectChatTurns } from "./chat-turns.js";
 export type { ChatTurn } from "./chat-turns.js";
 export { sessionAgent } from "./session-agent.js";
-export { piDurableVersion, readRuntimeSelection, selectRuntime, takeInterruptedSessions, runtimeSelectionFile } from "./runtime-version.js";
+export { piDurableVersion } from "./runtime-version.js";
 
 export { unfinishedStores } from "./store-status.js";

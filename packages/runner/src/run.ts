@@ -1,3 +1,4 @@
+import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { Models } from "@earendil-works/pi-ai/models";
 import type { StorageFactory, OpenOptions } from "./runtime.js";
@@ -7,6 +8,8 @@ import type { ChatService, ChatInitializer } from "./chat.js";
 import type { ReplySink } from "./replies.js";
 import { reportError } from "./terminal-output.js";
 import type { ArtifactOptions, ArtifactSink } from "./artifacts.js";
+import { localClient } from "./client.js";
+import { defaultAgent } from "./definition.js";
 
 export type PreparedAdapter = {
   extension: Extension;
@@ -34,8 +37,6 @@ export type RunOptions = {
   names?: string[];
   demo?: boolean;
   updateDefinitions?: boolean | "when-idle";
-  /** See ChatService.open: one Pi Durable version per installation state root. */
-  runtimeRoot?: string;
   /** Skip automatic recovery/schedules when inspecting saved conversations. */
   resume?: boolean;
   initialize?: ChatInitializer;
@@ -84,7 +85,7 @@ export async function run(options: RunOptions = {}) {
       service = await runner.ChatService.open({
         root, stateRoot: resolve(options.stateRoot ?? resolve(root, ".state")),
         models: options.models, demo: options.demo ?? false, names: options.names,
-        updateDefinitions: options.updateDefinitions, runtimeRoot: options.runtimeRoot, initialize: options.initialize,
+        updateDefinitions: options.updateDefinitions, initialize: options.initialize,
         resume: options.resume, schedules: options.schedules,
         deferResume: true,
         cwd: options.cwd, env: options.env, storage: options.storage, settings: options.settings,
@@ -95,7 +96,14 @@ export async function run(options: RunOptions = {}) {
     await options.beforeStart?.(service);
     for (const adapter of adapters) await adapter.start(service);
     if (options.resume !== false) await service.start();
-    return { runner, service, adapters, close };
+    const stateRoot = options.stateRoot ?? (!options.open ? resolve(root, ".state") : undefined);
+    const preferredAgent = await defaultAgent(root).catch(() => undefined);
+    const client = localClient(service, {
+      ...(stateRoot ? { stateRoot: await realpath(stateRoot) } : {}),
+      defaultAgent: preferredAgent ?? (service.agents.length === 1 ? service.agents[0].id : undefined),
+    },
+      async () => (await Promise.all(adapters.map(adapter => adapter.busy?.() ?? false))).some(Boolean));
+    return { runner, service, client, adapters, close: async () => { try { await client.close(); } finally { await close(); } } };
   } catch (error) {
     await close().catch(closeError => reportError("Runner cleanup failed:", closeError));
     throw error;

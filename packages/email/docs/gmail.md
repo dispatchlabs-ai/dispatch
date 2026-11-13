@@ -183,14 +183,11 @@ instead of risking a blind resend. Definitive provider 4xx rejections (except
 sending blocks queued, not-yet-attempted mail; already-attempted mail is reconciled
 and filed, never resent merely because enablement changed.
 
-## Migration and qualification
+## Installation and qualification
 
-Include both email and Runner archives in the service installation bundle. The
-old `@dispatch/runner/gmail` entry point forwards to the installed email package;
-new integrations should import `GmailOptions` and `createAdapter` from
-`@dispatch/email`. Remove obsolete `allowedSenders` and `maxAttachmentBytes`
-options: neither is enforced. Existing routes without `sendEnabled` become
-receive-only. Routing now uses the existing `label` field rather than recipient
+Install matching Email and Runner archives in the application. Import
+`GmailOptions` and `createAdapter` directly from `@dispatch/email`. Routes are
+receive-only until `sendEnabled: true` is explicitly configured. Routing now uses the existing `label` field rather than recipient
 headers. Before rollout, verify Gmail filters apply the intended route labels to
 each incoming message (including follow-ups); aliases alone no longer trigger
 work. Existing route/message receipts prevent replay, while previously unrouted

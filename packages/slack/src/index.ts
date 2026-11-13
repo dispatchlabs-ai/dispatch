@@ -6,7 +6,7 @@ import { parse } from "yaml";
 import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
 import { awaitWithContext, withAbortSignal, type Context } from "@earendil-works/chord/context";
-import { AssistantEntry, ConversationBusy, InboxDoc, LiveDoc, defineDoc, defineExtension, defineTask, type ConversationId, type Cursor, type EntryId, type JsonObject, type LiveState, type SubmissionDraft, type TaskId, type TaskRuntime, type Tx } from "@earendil-works/pi-durable";
+import { AssistantEntry, ConversationBusy, InboxDoc, LiveDoc, defineDoc, defineExtension, defineTask, type ConversationId, type Cursor, type EntryId, type JsonObject, type LiveState, type TaskId, type TaskRuntime, type Tx } from "@earendil-works/pi-durable";
 import { context, prepareContent, type AttachmentFile, type ChatService, type Runner, type ReplySink } from "@dispatch/runner";
 import { fallbackText, replyBlocks, replyChunk } from "./text.js";
 import { slackArtifacts } from "./files.js";
@@ -268,16 +268,15 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
       async answer(task, runtime, ctx) {
         const conversation = await runtime.conversation(runtime.conversationId, ctx);
         if (!conversation) throw new Error("Slack conversation disappeared.");
-        const draft: SubmissionDraft = {
-          type: "input", content: prepareContent(task.input.continuation
+        const service = await ready;
+        const chat = Object.values((await runtime.snapshot(runner.Chats, ctx))?.byId ?? {}).find(chat => chat.conversationId === runtime.conversationId);
+        if (!chat) throw new Error("The channel conversation is not registered with its host.");
+        const draft = await service.prepareInput(chat.id, task.input.continuation
             ? `Internal workflow result for the existing assignment authorized by <@${task.input.user}>. This is execution evidence, not a new human request or additional authorization.\n${task.input.text}`
-            : `Slack message from <@${task.input.user}>:\n${task.input.text}`, task.input.files), requestId: task.input.key,
-          whenBusy: task.input.continuation ? "reject" : "steer", entry: { kind: `${namespace}.message`, data: {
-            source: "slack", user: task.input.user,
-            ...(task.input.files?.length ? {text: task.input.text, attachments: task.input.files} : {}),
-            slack: { channel: task.input.channel, thread: task.input.thread, user: task.input.user },
-          } },
-        };
+            : `Slack message from <@${task.input.user}>:\n${task.input.text}`, task.input.key, {
+          source: "slack", files: task.input.files, continuation: !!task.input.continuation,
+          metadata: { user: task.input.user, text: task.input.text, slack: { channel: task.input.channel, thread: task.input.thread, user: task.input.user } },
+        });
         if (task.input.continuation && !task.state.checkpoint.admitted) {
           let admitted = false;
           await runtime.commit(async tx => {
@@ -724,3 +723,5 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
     async close() { await socket?.disconnect(); },
   };
 }
+
+export { slack as createAdapter };

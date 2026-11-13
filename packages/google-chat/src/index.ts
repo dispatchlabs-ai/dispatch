@@ -2,7 +2,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { awaitWithContext, withAbortSignal } from "@earendil-works/chord/context";
 import {
   AssistantEntry, ConversationBusy, InboxDoc, LiveDoc, defineDoc, defineExtension, defineTask,
-  type ConversationId, type Cursor, type EntryId, type SubmissionDraft, type TaskId, type Tx,
+  type ConversationId, type Cursor, type EntryId, type TaskId, type Tx,
 } from "@earendil-works/pi-durable";
 import { context, prepareContent, type AttachmentFile, publicAnswer, publicCommentary, ThreadProcesses,
   type ChatService, type ReplyDestination, type ReplySink, type StatusSink, type Runner, type ThreadExecutor } from "@dispatch/runner";
@@ -129,15 +129,15 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
       async answer(task, runtime, ctx) {
         const conversation = await runtime.conversation(runtime.conversationId, ctx);
         if (!conversation) throw new Error("Google Chat conversation disappeared.");
-        const draft: SubmissionDraft = {
-          type: "input", requestId: task.input.key, whenBusy: task.input.continuation ? "reject" : "steer",
-          content: prepareContent(task.input.continuation
+        const service = await ready;
+        const chat = Object.values((await runtime.snapshot(runner.Chats, ctx))?.byId ?? {}).find(chat => chat.conversationId === runtime.conversationId);
+        if (!chat) throw new Error("The channel conversation is not registered with its host.");
+        const draft = await service.prepareInput(chat.id, task.input.continuation
             ? `Internal workflow result for the existing assignment from ${task.input.user}. This is execution evidence, not a new human request or additional authorization.\n${task.input.text}`
-            : `Google Chat message from ${task.input.user}:\n${task.input.text}`, task.input.files),
-          entry: { kind: `${namespace}.message`, data: { source: "google-chat", user: task.input.user,
-            ...(task.input.files?.length ? {text: task.input.text, attachments: task.input.files} : {}),
-            googleChat: { project: config.projectId, space: task.input.channel, thread: task.input.thread, user: task.input.user } } },
-        };
+            : `Google Chat message from ${task.input.user}:\n${task.input.text}`, task.input.key, {
+          source: "google-chat", files: task.input.files, continuation: !!task.input.continuation,
+          metadata: { user: task.input.user, text: task.input.text, googleChat: { project: config.projectId, space: task.input.channel, thread: task.input.thread, user: task.input.user } },
+        });
         if (task.input.continuation && !task.state.checkpoint.admitted) {
           let admitted = false;
           await runtime.commit(async tx => {
@@ -376,3 +376,5 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
     async close() { controller.abort(); await polling; connected = false; },
   };
 }
+
+export { googleChat as createAdapter };

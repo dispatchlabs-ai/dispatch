@@ -27,7 +27,7 @@ The release records both the application commit and the Dispatch commit; they
 belong to different repositories. The store path identifies the complete build.
 Dirty/local revisions are for qualification, not published release provenance.
 
-The default `bin/NAME` runs the shared on-demand CLI. An application with its own
+The default `bin/NAME` runs the shared connecting CLI. An application with its own
 host can supply `entrypoint = "src/main.ts"`; it is run with the packaged Node.
 That host still owns native initialization, adapters, signals and recovery.
 Applications hosting replaceable workers can select `withFleet = true` and a
@@ -39,9 +39,8 @@ without a second Runner/Pi tree. The builder never installs dependencies on the
 target. `dispatch-native-tools` supplies the model-free worker endpoint described
 in [isolated native tools](isolated-native-tools.md).
 
-The default launcher also routes `NAME watch --config HOST.json` to the separate
-[read-only terminal watcher](watch.md), and `NAME upgrade` to the selected
-execution Runner's [machine upgrade command](upgrade.md). Applications may add a newer watcher
+The launcher provides the same explicit host/client commands as npm installations.
+Applications may add a newer watcher
 without changing the runtime that owns their agent state:
 
 ```nix
@@ -138,55 +137,29 @@ nix-env --profile "$PROFILE" --rollback
 
 Nix profile generations retain previous closures and change the selection
 atomically. Do not remove generations needed for rollback. Activation does not
-restart an already-running process. Service deployments need their own idle/
-drain, closed-state backup and supervised restart; `NAME upgrade` does this for
-a whole machine from one declaration (see [upgrading a machine](upgrade.md)). The optional Fleet package
+restart an already-running process. The application operator handles idle/drain,
+closed-state backup and supervised restart (see [application upgrades](upgrade.md)). The optional Fleet package
 supplies worker ownership and retirement; ordinary releases remain inactive.
 
-Binary rollback does not undo Pi schema changes or native definition migrations.
+Binary rollback does not undo Pi schema changes.
 Keep compatible closed-state backups. A rollout must preserve namespace,
 adapters, tool/data bindings and store ownership; never open a second writer.
 Company instruction paths are definition-root-relative, so a different release
-store path alone does not change a definition fingerprint. Stores created before
-this correction still require an explicit idle definition migration once; actual
-instruction, role or skill changes continue to require it.
+store path alone does not change a definition fingerprint. Changes to instructions, roles or skills require an explicit idle definition update.
 
-## On-demand CLI
+## Host and client commands
 
-`bin/NAME catalog` loads definitions without credentials, stores or inference.
-`run --config HOST.json --agent helper --prompt "..."` creates a random session;
-`--session KEY` reopens an explicit one. `--history` replaces the prompt.
-A session follows the selected release: changed definitions apply once its saved
-work is idle, and one state root runs one Pi Durable version (see [service](service.md#one-pi-durable-per-state-root)).
-`watch --config HOST.json` discovers running sessions without opening a runtime;
-`watch --session KEY` also inspects stopped work. Viewer exit leaves owners running.
+`bin/NAME catalog` loads complete definitions without credentials, stores or
+inference. `bin/NAME-service HOST.json serve` explicitly starts a host using
+absolute root, stateRoot, cwd and socket paths. The packaged definitions path is
+recorded in `share/NAME/release.json`; use it as the host's root.
 
-HOST.json contains `stateRoot`, `cwd`, `namespace`, `gateway`, optional
-[`modelProviders`](service.md#local-model-providers), and optional `retry`,
-`compaction` and `afterFailedRun` [host policies](service.md#compaction-and-queued-input-recovery)
-from the [service configuration](service.md). State and working-directory paths
-are absolute. The definition root is supplied by the immutable release.
-The launcher changes its process directory to `cwd` (or the session state
-directory for a container workspace) before opening agents, so host-side
-provider subprocesses do not depend on the caller's directory. A task may remove
-the worktree it was launched from without breaking later turns.
-Each session stores agents under `stateRoot/KEY/`. The selected agent and its
-transitive `message_agent` recipients share one detached native owner in that
-exact directory. Reopening the same session joins its owner; separate sessions
-remain independent. Do not aim this launcher at another service's stores.
-Native same-store locking remains authoritative.
-Every participant can read its packaged instructions and linked workflow
-references through `read_definition_resource`, including host-bound sessions.
+`bin/NAME --socket SOCKET run --agent helper --session main` connects a terminal.
+The same session key returns to the same host conversation. `--history` reads
+without creating one. Disconnect leaves work running; explicit Stop cancels.
+No command creates a detached owner or chooses a machine-wide runtime version.
+Use [the service guide](service.md) for configuration and the common client API.
 
-Normal `run` starts or discovers an owner-only local socket automatically. No
-factory schedules, calendar reconciliation or transport adapters are started.
-The CLI is a client: exit or SIGINT/SIGTERM disconnects without stopping execution.
-Prompt mode waits for the native receipt and drains admitted peer work and replies,
-including on host-bound desktops. The detached owner remains available afterward.
-Use explicit `/stop` (or Web Stop) to cancel native work. `--history` reads the
-retained terminal key without starting an owner, including for legacy sessions.
-See [ordinary session ownership and controlled recovery](service.md#ordinary-session-owners).
-The trusted process binding `DISPATCH_SESSION_STATE_ROOT` gives definition-owned
-inspection tools the selected session directory; it grants no new permissions.
-This is not a scheduler,
-whole-tree cancellation API or automatic integration of external services.
+`bin/NAME watch --config HOST.json --session .` inspects retained native state
+without becoming its owner. Application entrypoints can provide their own commands
+while retaining the same host/client boundary.

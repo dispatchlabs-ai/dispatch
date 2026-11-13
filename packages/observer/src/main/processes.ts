@@ -1,3 +1,4 @@
+import { openSqliteSnapshot } from "@dispatch/runner/records";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
@@ -66,17 +67,8 @@ function withStore<T>(
     throw new Error(
       "This source is no longer available. Return to Processes and refresh.",
     );
-  const db = new DatabaseSync(store.connection.path, {
-    readOnly: true,
-    allowExtension: false,
-  });
+  const db = openSqliteSnapshot(store.connection.path);
   try {
-    db.exec("PRAGMA query_only=ON; PRAGMA busy_timeout=3000; BEGIN");
-    const version = db
-      .prepare("SELECT version FROM durable_schema WHERE singleton=1")
-      .get()?.version;
-    if (version !== 1 && version !== 2)
-      throw new Error("Unsupported Pi storage version. No data was changed.");
     if (
       !db
         .prepare("SELECT id FROM conversations WHERE id=?")

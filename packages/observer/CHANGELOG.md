@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Reuse Runner read-only SQLite snapshots and released document-revision decoding instead of a separate implementation.
+
 ## [0.11.2] - 2026-11-12
 
 - Refresh the locked Electron archive/glob dependencies to their security-patched releases.

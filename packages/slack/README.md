@@ -25,7 +25,7 @@ matching request. Cancelled, completed or replaced requests are discarded.
 Admission and recovery use native tasks and submission identities.
 
 This is a source-alpha package, installed as a packed archive from reviewed
-source. It shares the repository's lockstep version (0.11.1) and has not been
+source. It shares the repository's lockstep version (0.12.3, unreleased) and has not been
 published to npm.
 See [use cases](USE_CASES.md) and [changes](CHANGELOG.md).
 
@@ -34,6 +34,13 @@ to the authenticated originating thread using Slack's external-upload flow.
 Install both `files:write` and `files:read` scopes and reauthorize existing apps.
 Native upload identities survive retries; success requires a matching Slack
 file/thread receipt. Text replies and image observations are not file delivery.
+
+## Package and host contract
+
+Install the matching prepared package archive beside Runner. `createAdapter(options)`
+returns the adapter accepted by `run({adapters})`, and is also the factory used by
+`dispatch-service` JSON configuration. A wrapper module is unnecessary. Native
+inbox/outbox tasks remain inside the owner; other clients use Runner's common API.
 
 ## Configure
 

@@ -26,10 +26,10 @@ export function projectChatTools(
   const calls: ChatToolCall[] = [];
   let turnId = "initial";
   for (const entry of [...entries].sort((a, b) => a.id - b.id)) {
-    const data = entry.data as { source?: string; diagnostics?: { code?: string }[] } | undefined;
+    const data = entry.data as { source?: string; actor?: string; diagnostics?: { code?: string }[] } | undefined;
     for (const [index, message] of (entry.model ?? []).entries()) {
       if (message.role === "user" && /\.message$/.test(entry.kind) &&
-        ["web", "cli", "slack", "google-chat", "phone", "email"].includes(data?.source ?? "")) turnId = String(entry.id);
+        (data?.actor === "user" || !data?.actor && typeof data?.source === "string" && !["agent", "schedule"].includes(data.source))) turnId = String(entry.id);
       if (message.role === "assistant" && Array.isArray(message.content)) {
         for (const block of message.content) if (block.type === "toolCall") calls.push({
           id: `${entry.id}:${block.id}`, callId: block.id, entryId: entry.id, turnId,

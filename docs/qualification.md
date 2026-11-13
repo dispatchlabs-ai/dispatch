@@ -4,6 +4,46 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## Simple definitions and shared clients — November 13, 2026
+
+The unreleased host/client simplification was checked on macOS arm64, Node
+24.22.1 and Pi Durable 1.5.2. Full source/type/build checks and the current
+macOS Nix flake checks passed. Linux outputs were not executed for this change.
+
+All nine reusable archives installed together outside the checkout and passed
+real imports and strict NodeNext consumer type checking. Separate consumers
+loaded and type-checked Runner + Backend without Remote/Postgres, and Runner +
+Fleet without Slack. Full upstream declaration checking needed the documented
+optional MCP SDK dev dependency. Dependency audits before and after it reported
+zero findings. The archives included their licenses and declared exports, omitted
+the removed owner/upgrade modules, and produced no known-pattern or sensitive-path
+scan matches. Source and outgoing-change review accompanied those scans.
+
+The Runner README example ran from an installed archive with just one `agent.md`
+and application code. Repeating its request returned the same retained entries.
+The CLI and Web used one explicit host and continued the same native conversation.
+Observed behavior included streaming, keyboard send, explicit Stop with retained
+cancellation, saved history after restart, and automatic Web reconnection after
+the owner restarted. The browser recovery check exposed and fixed an HTTP error
+that prevented EventSource from reconnecting. A CLI disconnect left its admitted
+turn running, and its native receipt subsequently reached `done`.
+
+Authenticated loopback HTTP accepted the client token and rejected missing
+authentication. A changed owner expectation returned 409 before dispatch. A new
+state directory exposed the same canonical owner identity before and after its
+first restart; replaying the request kept the same conversation and submission.
+The shared read-only CLI inspected the synthetic store without becoming its owner.
+Rendered Web pages were reviewed at 1440×900, 1280×720, 768×1024 and 390×844;
+mobile navigation and keyboard dismissal worked. Temporary services, stores and
+browser sessions were removed after these observations.
+
+No automated functional tests were added or run. This is source qualification,
+not a package release, npm publication, deployment, new Linux qualification,
+live Slack/Google Chat/email delivery check, hosted TLS or multi-user authorization
+review, real-model quality evaluation, or comprehensive security assessment.
+The revised walkthrough was exercised here; a fresh independent agent session
+was not repeated. Existing deployed consumers remain on their selected releases.
+
 ## Complete application definitions — November 13, 2026
 
 The unreleased removal of the starter kit was verified on macOS arm64 with Node
@@ -127,8 +167,9 @@ The public quickstart was also fetched anonymously with HTTP 200.
   or production provider credentials.
 - Hosted HTTPS, consumer-specific authorization, real channel delivery, fleet
   installation and each production recovery path remain installation-owned.
-- Multi-human grants and a general authenticated network agent-client API are
-  outside the current alpha contract. See the [interface inventory](interfaces.md).
+- The shared client protocol supports installation-wide authentication. Multi-human
+  grants and machine-principal enrollment remain outside the current alpha contract.
+  See the [interface inventory](interfaces.md).
 - Source review and dependency scans are not a penetration test.
 
 ## Reproduce the permitted checks

@@ -41,16 +41,13 @@ Named installation bindings are documented in [Backend](../backend/README.md).
 
 ## Shared service replacement
 
-Use Backend's [shared-owner configuration](../backend/README.md#shared-local-owners-and-retained-history)
+Use Backend's [shared-owner configuration](../backend/README.md#several-installations-and-saved-histories)
 to attach Web and CLI to one maintained owner while browsing native history.
 Stop explicitly targets this conversation. Accepted Stop feedback is distinct from
 native `unanswered/aborted` turn markers, which remain visible after reopening;
 `Turn completed` means a native answered turn, not a claim that project work is done.
 Tool completion is labeled separately.
 
-At the same browser origin Web adopts Agent Chat's selected conversation and
-per-tab IndexedDB draft/uncertain outbox once, preserving original IDs and bytes.
-The legacy record is retained, not deleted. Keep the primary installation's
-conversation IDs unchanged with `unqualifiedChats:true` when needed. Do not clear
-site storage or change origin before resolving pending delivery. Do not run both
-frontends concurrently against the same tab's legacy draft during cutover.
+Start the owner explicitly and point Web at its socket or HTTPS connection.
+Web shutdown closes its client; it does not stop the host. Named installations use
+qualified IDs; installation configuration never supplies definitions or starts owners.

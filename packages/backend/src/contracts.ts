@@ -22,7 +22,7 @@ export interface Chat {
   /** Owning conversation of a task-run worker. Workers are observable, not steerable. */
   parentId?: string;
   /** Native transport that started an indexed chat; absent for unindexed conversations. */
-  transport?: "cli" | "web" | "slack" | "google-chat" | "phone" | "email" | "agent" | "schedule";
+  transport?: string;
   /** Whether this Web installation can currently send to the conversation. */
   addressable?: boolean;
 }

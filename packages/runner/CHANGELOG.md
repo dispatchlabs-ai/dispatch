@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- One Markdown file can define a conversational agent; TypeScript, triggers and factory configuration are optional. Share AgentClient operations and native watch streams over embedded calls, Unix sockets and authenticated HTTPS. Remove detached CLI owners, embedded terminal owners, machine version takeover and the upgrade command. Centralize retained document reading and channel input validation; allow new transport names without runtime edits.
+
 - Remove the starter kit, overlay composition, kit configuration/lock records and
   flake templates. Application releases contain their complete supplied definitions;
   runtime upgrades do not change agent instructions. No migration layer is included.

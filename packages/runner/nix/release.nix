@@ -1,4 +1,4 @@
-{ lib, runCommand, makeWrapper, runtimeShell, runtime, runtimeRevision, watcher, watcherRevision, fleetTools ? null, eval ? null }:
+{ lib, runCommand, makeWrapper, runtime, runtimeRevision, watcher, watcherRevision, fleetTools ? null, eval ? null }:
 { name, src, revision, entrypoint ? null, nodeModules ? null, workspace ? null, fleet ? null, withEval ? false }:
 
 assert builtins.match "[a-z][a-z0-9-]*" name != null;
@@ -30,29 +30,9 @@ runCommand "${name}-${lib.substring 0 12 revision}" {
   '' else ''ln -s ${runtime}/lib/agent-node_modules "$app/node_modules"''}
   echo '{"type":"module","private":true}' > "$app/package.json"
   ${if entrypoint == null then ''
-    makeWrapper ${runtime}/bin/dispatch-agent "$out/bin/.${name}-run" \
-      --add-flags "--root $app/definitions --release-manifest $out/share/${name}/release.json"
-    cat > "$out/bin/${name}" <<'SH'
-    #!${runtimeShell}
-    if [ "''${1:-}" = watch ]; then
-      shift
-      exec ${watcher}/bin/dispatch-watch "$@"
-    fi
-    if [ "''${1:-}" = upgrade ]; then
-      shift
-      exec ${runtime}/bin/dispatch-upgrade "$@"
-    fi
-    if [ "''${1:-}" = --help ]; then
-      @EXECUTION@ "$@"
-      echo
-      echo '${name} watch --config HOST.json [--session KEY] [--json]'
-      echo '${name} upgrade status|preflight|backup|converge --declaration MACHINE.json'
-      exit
-    fi
-    exec @EXECUTION@ "$@"
-    SH
-    substituteInPlace "$out/bin/${name}" --replace-fail '@EXECUTION@' "$out/bin/.${name}-run"
-    chmod +x "$out/bin/${name}"
+    makeWrapper ${runtime}/bin/dispatch-agent "$out/bin/${name}" \
+      --add-flags "--root $app/definitions"
+    makeWrapper ${runtime}/bin/dispatch-service "$out/bin/${name}-service"
   '' else ''
     test -f "$app/definitions/"${lib.escapeShellArg entrypoint}
     makeWrapper ${runtime.nodejs}/bin/node "$out/bin/${name}" \

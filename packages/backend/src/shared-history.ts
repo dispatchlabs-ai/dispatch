@@ -1,3 +1,4 @@
+import { watch as watchDirectory } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import { openServiceRuntime, type ServiceConnection } from "./service-runtime.js";
@@ -7,7 +8,7 @@ import type { Chat, Snapshot } from "./contracts.js";
 import type { Runtime } from "./runtime.js";
 import { AdmissionError, type Source } from "./config.js";
 
-export interface SharedHistoryConnection extends ServiceConnection {
+export type SharedHistoryConnection = ServiceConnection & {
   sourceId: string;
   /** Native session directory, for canonical deduplication with saved SQLite history. */
   stateRoot: string;
@@ -75,10 +76,7 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
       if (saved.readOnly === "owner" && (await stores.get(id)).run.path !== root) return { ...saved, chat };
       return { ...saved, chat, readOnly: "internal", readOnlyReason: "Not exposed by this installation's service." };
     }
-    // Older owners may omit optional turn projections. Read the same native
-    // records without resuming them; never derive cancellation from idle state.
-    const turns = value.turns ?? (await stores.snapshot(id)).turns;
-    return { ...value, turns, chat: project(value.chat) };
+    return { ...value, chat: project(value.chat) };
   };
   const catalog = async () => await read(runtime => runtime.catalog?.() ?? Promise.resolve(runtime.service.agents)) ?? [];
   const agents = await catalog();
@@ -139,27 +137,34 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
     },
     catalog,
     presentation: { snapshot, watch: async (id, listener) => {
-      const watch = await pollSnapshot(() => snapshot(id), listener);
+      const live = await read(async runtime => {
+        const native = nativeId(id, await runtime.service.list());
+        return native ? runtime.presentation.watch(native, async value => listener({ ...value, chat: project(value.chat) })) : undefined;
+      });
+      const watch = live ?? await watchSaved(dirname((await stores.get(id)).store.path), () => snapshot(id), listener);
       const stop = async () => { watches.delete(stop); await watch.stop(); };
-      watches.add(stop); void watch.closed.then(() => watches.delete(stop));
+      watches.add(stop); void watch.closed.then(() => watches.delete(stop), () => watches.delete(stop));
       return { ...watch, stop };
     } },
     close: async () => { stores.close(); closed = true; await Promise.all([...watches].map(stop => stop())); await connecting?.catch(() => {}); await connected?.close(); },
   };
 }
 
-export async function pollSnapshot(snapshot: () => Promise<Snapshot>, listener: (value: Snapshot) => Promise<void>) {
+async function watchSaved(directory: string, snapshot: () => Promise<Snapshot>, listener: (value: Snapshot) => Promise<void>) {
   let stopped = false;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let finish!: () => void;
-  const closed = new Promise<void>(resolve => { finish = resolve; });
   let pending = Promise.resolve();
-  const tick = async () => {
-    try { const value = await snapshot(); if (!stopped) await listener(value); }
-    catch { stopped = true; finish(); }
-    if (!stopped) timer = setTimeout(() => { pending = tick(); }, 1000);
+  let finish!: () => void, fail!: (error: unknown) => void;
+  const closed = new Promise<void>((resolve, reject) => { finish = resolve; fail = reject; });
+  void closed.catch(() => {});
+  const refresh = () => {
+    pending = pending.then(async () => { if (!stopped) await listener(await snapshot()); });
+    void pending.catch(error => { stopped = true; observer.close(); fail(error); });
   };
-  await listener(await snapshot());
-  timer = setTimeout(() => { pending = tick(); }, 1000);
-  return { closed, stop: async () => { stopped = true; clearTimeout(timer); await pending; finish(); } };
+  const observer = watchDirectory(directory, (_event, name) => {
+    if (!name || /^session\.sqlite(?:-wal)?$/.test(String(name))) refresh();
+  });
+  observer.on("error", error => { stopped = true; observer.close(); fail(error); });
+  try { refresh(); await pending; }
+  catch (error) { observer.close(); throw error; }
+  return { closed, stop: async () => { stopped = true; observer.close(); await pending.catch(() => {}); finish(); } };
 }

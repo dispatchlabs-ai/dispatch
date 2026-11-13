@@ -5,8 +5,9 @@ not certify implementation, package publication or installation qualification.
 
 ## 1. Existing execution and application goals
 
-- **RUN-001 — Start company definitions:** discover agent folders and run manual,
-  continuous or interval work without a browser or customer-specific service.
+- **RUN-001 — Start application definitions:** a Markdown file defines a
+  conversational agent; optional TypeScript adds capabilities and schedules.
+  No trigger, dummy input or factory file is required for conversation.
 - **RUN-002 — Recover work:** preserve native tasks, conversations and submissions
   across restarts, with one owner per SQLite session and stable native identities.
   Secure new and existing stores with owner-only POSIX permissions or native
@@ -20,15 +21,10 @@ not certify implementation, package publication or installation qualification.
   separate, preserving the existing native ownership and recovery model.
 - **RUN-006 — Use scoped skills:** opt into company and agent-specific skill
   discovery, load instructions/resources on demand and retain revision evidence.
-- **RUN-007 — Chat in a terminal:** stream turns through the local service,
-  resume named conversations and suspend embedded caller-owned work safely on
-  owner exit. Ordinary installed runs discover/start the exact named session's
-  detached owner; terminal disconnect leaves work running for other clients.
-  Keep a continuous agent working in that conversation across completed passes,
-  suspend and recover its native loop, and resume an explicit blocker pause with
-  the needed user input.
-  Display untrusted terminal controls as visible escapes, including streaming
-  chunks and saved history, without changing stored conversation content.
+- **RUN-007 — Chat in a terminal:** connect to an explicitly started host, stream
+  turns, return to named conversations and disconnect while work continues.
+  Explicit Stop cancels the selected owned work. Display untrusted terminal
+  controls as visible escapes without changing stored conversation content.
 - **RUN-008 — Use host-owned credentials:** configure a native store or trusted
   vault helper, resolve API keys directly into Pi, inspect only source metadata,
   and explicitly select session/environment compatibility without plaintext
@@ -74,9 +70,9 @@ not certify implementation, package publication or installation qualification.
 - **RUN-017 — Own process trees:** supervise trusted POSIX workers and inherited
   descendants; distinguish recoverable suspension from durable cancellation.
 
-- **RUN-018 — Release an agent application:** compose a pinned shared runtime and
-  company source into a Nix closure; publish and select it separately from host
-  provisioning, secrets, native state and process activation.
+- **RUN-018 — Release an agent application:** install a published runtime in an
+  ordinary application and lockfile; optionally package it with Nix. Upgrade the
+  library and restart the host independently of source definitions and native state.
 
 - **RUN-019 — Isolate native tools:** retain native execution/retry identities
   while a host runs tools outside its credential-bearing primary process.
@@ -147,3 +143,10 @@ Hosted Dispatch Web adoption, broad disposable-host qualification, npm
 registry publication and broad installation qualification remain separate work.
 Runner source snapshots can be installed from public GitHub release archives;
 their exact tag, source revision and lockfile integrity identify the bytes.
+
+## Explicitly retired
+
+Automatic detached CLI owners, Backend-created writers, machine-wide runtime
+selection/takeover, and the machine upgrade command are removed. Their conversation,
+recovery and deployment goals use explicit hosts, clients and normal application
+upgrades instead. No migration machinery is introduced.

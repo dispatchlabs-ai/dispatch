@@ -5,9 +5,9 @@ instructions, models, tools and skills. Dispatch provides the runtime and client
 libraries; [Pi Durable](https://github.com/earendil-works/pi) owns execution,
 recovery and conversation history.
 
-An agent is two small files: `agent.md` describes it, and `agent.ts` selects its
-capabilities. A host process loads those definitions and owns the conversation
-store. CLI, Web and channel connectors interact with that owner. Add another
+An agent can be one `agent.md` file. Add `agent.ts` only for optional capabilities.
+A host process loads those definitions and owns the conversation store.
+CLI, Web and channel connectors interact with that owner. Add another
 client by using the same conversation operations.
 
 ```mermaid
@@ -30,7 +30,7 @@ key, account, database server or private infrastructure is needed.
 ## Use it with your AI agent
 
 Your agent needs public-documentation, shell, file and browser access. The machine
-needs Git and [Nix with flakes enabled](https://nix.dev/manual/nix/stable/command-ref/new-cli/nix3-flake).
+needs Git and Node 24.22.1. The pinned Nix shell is an optional way to obtain the toolchain.
 Give your agent this prompt:
 
 > Read https://github.com/dispatchlabs-ai/dispatch/blob/main/docs/quickstart.md and
@@ -44,7 +44,7 @@ The walkthrough downloads build dependencies, starts a loopback-only server and
 writes synthetic conversation history in the new checkout. It does not install
 a system service. The [manual walkthrough](docs/quickstart.md) follows the same
 steps. See the [verification record](docs/qualification.md) for observed platforms
-and limits; browser access and Nix are prerequisites supplied by the user or agent.
+and limits; browser access and Node are prerequisites supplied by the user or agent.
 
 ## Choose the pieces you need
 
@@ -67,32 +67,31 @@ definition files you inspect and edit in source.
 
 ## Versions and distribution
 
-The latest tagged source release is [v0.12.3](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.12.3),
-using Pi Durable 1.5.2. Its five reusable package archives, source manifest and
-checksums are attached to that release; they are **not published to npm**.
-Current `main` also carries the unreleased changes listed in package changelogs.
-The quickstart uses current source and records its exact commit.
+Current `main` carries the unreleased host/client simplification. The last
+available reusable package archives are [v0.12.2](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.12.2).
+The v0.12.3 source tag has no downloadable archives. These packages are not
+published to npm. The [package guide](scripts/README.md) builds the current
+archives and describes installation in an ordinary external application.
 
-The optional [Nix release builder](packages/runner/docs/nix-releases.md) packages
-complete application definitions with the runtime and, when selected, Eval.
-Web, Observer, Fleet and channel packages are public MIT source with separate
-build instructions; `private: true` in an npm manifest means the package is not
-an npm publication target. It does not make the source proprietary.
+Runner, Backend, Remote, Postgres, Workers, Slack, Google Chat, Email and Fleet
+have public package definitions. Install matching packages only as needed.
+Web, Observer and Eval remain applications with their own build instructions.
+The optional [Nix builder](packages/runner/docs/nix-releases.md) packages complete
+application source. It does not generate or merge definitions.
 
-Use [the release guide](.pi/skills/release.md) to prepare artifacts and
-[the upgrade guide](packages/runner/docs/upgrade.md) for an existing installation.
-Building or publishing source never upgrades a running installation.
+Use [the release guide](.pi/skills/release.md) for publication. Upgrading an
+application means changing its dependency/lockfile, checking it and explicitly
+restarting its host. Building or publishing source never deploys an installation.
 
 ## Boundaries and contributing
 
 Local chat trusts the local account and binds exact loopback Host/Origin. Hosted
 Web requires HTTPS and an installation-owned authorization binding covering its
-configured runs. The shared local service uses a private Unix socket. Web supplies
-its HTTP
-adapter; Slack, Google Chat and email supply channel adapters. These share native
-operations but are not all clients of one public HTTP endpoint. Multi-user grants
-and a general authenticated network agent-client API remain outside the current
-scope. Agent tools have their host's actual authority; a
+configured runs. The shared service exposes one versioned command and watch protocol. Web supplies
+its browser adapter over the common client API. Other clients can connect over a
+private Unix socket or authenticated HTTPS. Durable channel delivery uses optional
+host extensions with shared input validation. Multi-user grants and machine-principal
+enrollment remain future work. Agent tools have their host's actual authority; a
 working directory is not a sandbox.
 
 Read the [interface inventory](docs/interfaces.md), [HTTP contract](packages/web/openapi.yaml),

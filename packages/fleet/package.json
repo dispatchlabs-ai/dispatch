@@ -1,7 +1,6 @@
 {
   "name": "@dispatch/fleet",
   "version": "0.12.3",
-  "private": true,
   "description": "Host-owned durable agent execution on replaceable workers",
   "license": "MIT",
   "type": "module",
@@ -16,6 +15,10 @@
     "./relay": {
       "types": "./dist/relay-server.d.ts",
       "import": "./dist/relay-server.js"
+    },
+    "./slack": {
+      "types": "./dist/slack.d.ts",
+      "import": "./dist/slack.js"
     }
   },
   "files": [
@@ -32,7 +35,6 @@
   },
   "dependencies": {
     "@dispatch/runner": "0.12.3",
-    "@dispatch/slack": "0.12.3",
     "@earendil-works/chord": "1.5.2",
     "@earendil-works/pi-ai": "1.5.2",
     "@earendil-works/pi-durable": "1.5.2"
@@ -40,5 +42,28 @@
   "devDependencies": {
     "@types/node": "24.19.1",
     "typescript": "6.0.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dispatchlabs-ai/dispatch.git",
+    "directory": "packages/fleet"
+  },
+  "homepage": "https://github.com/dispatchlabs-ai/dispatch/tree/main/packages/fleet#readme",
+  "bugs": {
+    "url": "https://github.com/dispatchlabs-ai/dispatch/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "peerDependencies": {
+    "@dispatch/slack": "0.12.3"
+  },
+  "peerDependenciesMeta": {
+    "@dispatch/slack": {
+      "optional": true
+    }
   }
 }

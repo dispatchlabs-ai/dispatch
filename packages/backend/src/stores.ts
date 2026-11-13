@@ -2,11 +2,8 @@ import { watch, type FSWatcher } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { dirname, isAbsolute, relative } from "node:path";
 import { createHash } from "node:crypto";
-import { DatabaseSync } from "node:sqlite";
-import { lstatSync, realpathSync } from "node:fs";
-import type { Chat, ChatMessage, Snapshot, SourceStatus } from "./contracts.js";
-import { AdmissionError } from "./config.js";
-import type { LocalConfig, Source } from "./config.js";
+import type { Chat, Snapshot, SourceStatus } from "./contracts.js";
+import type { Source } from "./config.js";
 
 export interface Store {
   agent: string;
@@ -76,113 +73,6 @@ export interface Reader {
 }
 export const identity = (path: string, id: number) =>
   createHash("sha256").update(`${path}\0${id}`).digest("base64url");
-export function readStore<T>(path: string, read: (db: DatabaseSync) => T): T {
-  // No immutable=1: a live owner's committed WAL is part of the history.
-  if (realpathSync(path) !== path)
-    throw new Error(
-      "Native store path was redirected; refresh configured sources.",
-    );
-  for (const [target, directory] of [
-    [dirname(dirname(path)), true],
-    [dirname(path), true],
-    [path, false],
-  ] as const) {
-    const info = lstatSync(target);
-    if (
-      info.isSymbolicLink() ||
-      (directory ? !info.isDirectory() : !info.isFile() || info.nlink !== 1) ||
-      (process.getuid && info.uid !== process.getuid())
-    )
-      throw new Error(
-        "Read only owned regular native store paths, without symlinks.",
-      );
-  }
-  const db = new DatabaseSync(path, { readOnly: true, allowExtension: false });
-  try {
-    db.exec("PRAGMA query_only=ON; PRAGMA busy_timeout=1000; BEGIN");
-    return read(db);
-  } finally {
-    db.close();
-  }
-}
-// Read the native session document format for admission only. No writes, invented
-// chat-index admission, migrations or copied history. Unknown formats fail closed.
-export function sessionDocument(path: string, kind: string): any {
-  return readStore(path, (db) => {
-    const doc = db
-      .prepare("SELECT id FROM documents WHERE kind=? AND scope_kind='session'")
-      .get(JSON.stringify(kind));
-    if (!doc)
-      throw new AdmissionError(
-        `Missing ${kind} metadata. Recover with the original native runtime.`,
-      );
-    const rows = db
-      .prepare(
-        "SELECT kind,version,content FROM document_revisions WHERE document_id=? AND seq>=COALESCE((SELECT MAX(seq) FROM document_revisions WHERE document_id=? AND kind='base'),0) ORDER BY seq",
-      )
-      .all(doc.id!, doc.id!);
-    let value: any = {};
-    for (const row of rows) {
-      if (row.version !== 1)
-        throw new AdmissionError(
-          "Unsupported native metadata version. Use the original runtime.",
-        );
-      const content = JSON.parse(String(row.content));
-      if (row.kind === "base") {
-        value = content;
-        continue;
-      }
-      if (row.kind !== "delta" || !Array.isArray(content))
-        throw new AdmissionError("Unsupported native metadata delta.");
-      for (const op of content) {
-        if (!Array.isArray(op)) throw new AdmissionError("Unsupported native metadata operation.");
-        if (op[0] === "r") {
-          value = op[1];
-          continue;
-        }
-        const path = op[1];
-        if (
-          !Array.isArray(path) ||
-          !path.length ||
-          path.some((key) =>
-            ["__proto__", "constructor", "prototype"].includes(String(key)),
-          )
-        )
-          throw new AdmissionError("Unsupported native metadata path.");
-        let target = value;
-        for (const key of path.slice(0, -1)) {
-          if (!target || !Object.hasOwn(target, key)) throw new AdmissionError("Unsupported native metadata parent.");
-          target = target[key];
-        }
-        if (!target || typeof target !== "object") throw new AdmissionError("Unsupported native metadata target.");
-        const key = path.at(-1);
-        if (op[0] === "s") target[key] = op[2];
-        else if (op[0] === "d") delete target[key];
-        else if (op[0] === "a" && typeof target[key] === "string" && typeof op[2] === "string") target[key] += op[2];
-        else if (op[0] === "t" && typeof target[key] === "string" && Number.isSafeInteger(op[2]) && op[2] >= 0) target[key] = target[key].slice(0, op[2]);
-        else throw new AdmissionError("Unsupported native metadata operation.");
-      }
-    }
-    return value;
-  });
-}
-export function provenance(
-  kind: string | undefined,
-  data: any,
-  namespace: string,
-): Pick<ChatMessage, "provenance" | "author"> {
-  if (
-    kind === `${namespace}.message` &&
-    ["web", "cli", "slack", "google-chat", "phone", "email"].includes(
-      data?.source,
-    )
-  )
-    return { provenance: "user" };
-  if (kind === `${namespace}.instance-message`)
-    return { provenance: "agent", author: data?.from ?? "Agent message" };
-  return { provenance: "runtime" };
-}
-const transports = new Set<string>(["cli", "web", "slack", "google-chat", "phone", "email", "agent", "schedule"]);
 function catalogChat(conversation: CatalogConversation, store: Store, run: Run, source: Source): Chat {
   const id = identity(store.path, conversation.conversationId);
   return {
@@ -195,14 +85,14 @@ function catalogChat(conversation: CatalogConversation, store: Store, run: Run, 
     session: run.session,
     createdAt: new Date(conversation.startedAt ?? 0).toISOString(),
     addressable: conversation.registered === true,
-    ...(conversation.transport && transports.has(conversation.transport)
+    ...(conversation.transport
       ? { transport: conversation.transport as Chat["transport"] } : {}),
     ...(conversation.parentKey
       ? { parentId: identity(store.path, Number(conversation.parentKey.split(":").at(-1))) }
       : {}),
   };
 }
-export function createStores(config: Pick<LocalConfig, "sources">, reader: Reader) {
+export function createStores(config: { sources: Source[] }, reader: Reader) {
   let selections = new Map<string, Selection>();
   let statuses: SourceStatus[] = [];
   let inventory = new Map<Run, Source>();

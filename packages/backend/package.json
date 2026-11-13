@@ -22,10 +22,6 @@
     "./central": {
       "types": "./dist/central.d.ts",
       "import": "./dist/central.js"
-    },
-    "./provenance": {
-      "types": "./dist/provenance.d.ts",
-      "import": "./dist/provenance.js"
     }
   },
   "files": [
@@ -37,15 +33,12 @@
     "AGENT-CHAT-LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@dispatch/runner": "0.12.3",
-    "@dispatch/remote": "0.12.3",
-    "@dispatch/postgres": "0.12.3",
     "@earendil-works/pi-ai": "1.5.2",
-    "proper-lockfile": "4.1.2",
     "ws": "8.22.0",
     "@earendil-works/chord": "1.5.2",
     "@earendil-works/pi-durable": "1.5.2"
@@ -54,7 +47,6 @@
     "@types/node": "24.19.1",
     "@types/ws": "8.18.1",
     "@types/pg": "8.15.5",
-    "@types/proper-lockfile": "4.1.4",
     "typescript": "6.0.3"
   },
   "repository": {
@@ -72,5 +64,17 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "description": "Shared native chat operations and central service for Dispatch clients"
+  "description": "Shared native chat operations and central service for Dispatch clients",
+  "peerDependencies": {
+    "@dispatch/remote": "0.12.3",
+    "@dispatch/postgres": "0.12.3"
+  },
+  "peerDependenciesMeta": {
+    "@dispatch/remote": {
+      "optional": true
+    },
+    "@dispatch/postgres": {
+      "optional": true
+    }
+  }
 }

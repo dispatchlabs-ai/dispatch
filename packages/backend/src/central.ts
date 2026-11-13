@@ -320,30 +320,7 @@ export async function openCentralRuntime(config: CentralConfig) {
           context,
         ),
       );
-      const byId = new Map(entries.map((entry) => [Number(entry.id), entry]));
-      const messages: Snapshot["messages"] = projectChatMessages(
-        namespace,
-        entries,
-      ).map((message) => {
-        if (message.role !== "user") return { ...message, provenance: "agent" };
-        const entry = byId.get(Number(message.id.split(":")[0]));
-        const data = entry?.data as
-          { source?: string; from?: string } | undefined;
-        const human =
-          entry?.kind === `${namespace}.message` &&
-          ["web", "cli", "slack", "google-chat", "phone", "email"].includes(
-            data?.source ?? "",
-          );
-        return {
-          ...message,
-          provenance: human
-            ? "user"
-            : entry?.kind === `${namespace}.instance-message`
-              ? "agent"
-              : "runtime",
-          author: data?.from,
-        };
-      });
+      const messages = projectChatMessages(namespace, entries);
       return {
         chat,
         messages,

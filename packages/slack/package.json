@@ -1,12 +1,11 @@
 {
   "name": "@dispatch/slack",
   "version": "0.12.3",
-  "private": true,
   "description": "Slack transport for Dispatch Runner",
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22.19.0"
+    "node": ">=24.22.1 <25"
   },
   "exports": {
     ".": {
@@ -40,5 +39,20 @@
     "@dispatch/runner": "0.12.3",
     "@earendil-works/pi-durable": "1.5.2",
     "@earendil-works/chord": "1.5.2"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dispatchlabs-ai/dispatch.git",
+    "directory": "packages/slack"
+  },
+  "homepage": "https://github.com/dispatchlabs-ai/dispatch/tree/main/packages/slack#readme",
+  "bugs": {
+    "url": "https://github.com/dispatchlabs-ai/dispatch/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts"
 }

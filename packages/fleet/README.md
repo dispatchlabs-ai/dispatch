@@ -139,7 +139,8 @@ unless `--activate` is supplied and refuses to replace an active owner.
 The root host connects the supervisor to Fleet and authenticates its relay:
 
 ```ts
-import { FleetClient, FleetSlackThreads } from "@dispatch/fleet";
+import { FleetClient } from "@dispatch/fleet";
+import { FleetSlackThreads } from "@dispatch/fleet/slack";
 import { startFleetRelay } from "@dispatch/fleet/relay";
 import { runSlackHost } from "@dispatch/slack";
 

@@ -6,7 +6,8 @@ import { projectChatTools } from "./chat-tools.js";
 import { execFile } from "node:child_process";
 import { lstat, readFile, readdir, realpath } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
+import { openSqliteSnapshot, readSqliteDocument } from "./records.js";
 import { promisify } from "node:util";
 import type {
   WatchActivity, WatchCatalog, WatchCatalogConversation, WatchConversation, WatchCursor, WatchOptions, WatchPage,
@@ -71,12 +72,8 @@ async function withStore<T>(path: string, read: (db: DatabaseSync) => T): Promis
   await ownedPath(path, false);
   // Retained selections must not follow an ancestor redirected after discovery.
   if (await realpath(path) !== path) throw new Error("Session path was redirected; rediscover the configured installation.");
-  const db = new DatabaseSync(path, { readOnly: true, allowExtension: false });
+  const db = openSqliteSnapshot(path);
   try {
-    db.exec("PRAGMA query_only=ON; PRAGMA busy_timeout=1000; BEGIN");
-    const schema = db.prepare("SELECT version FROM durable_schema WHERE singleton=1").get();
-    if (schema?.version !== 1 && schema?.version !== 2)
-      throw new Error("Unsupported native SQLite schema; watch never migrates a store.");
     return read(db);
   } finally { db.close(); }
 }
@@ -86,35 +83,12 @@ function chats(db: DatabaseSync, namespace: string, key?: string): Map<number, D
   const doc = db.prepare("SELECT id FROM documents WHERE kind=? AND scope_kind='session'")
     .get(JSON.stringify(`${namespace}.chats`));
   if (!doc) return new Map();
-  const revisions = db.prepare(`SELECT kind,version,content FROM document_revisions WHERE document_id=?
-    AND seq>=COALESCE((SELECT MAX(seq) FROM document_revisions WHERE document_id=? AND kind='base'),0) ORDER BY seq`)
-    .all(number(doc.id), number(doc.id));
-  let value: Data = {};
-  for (const revision of revisions) {
-    if (revision.version !== 1) return new Map();
-    const content = JSON.parse(String(revision.content));
-    if (revision.kind === "base") { value = content; continue; }
-    if (revision.kind !== "delta" || !Array.isArray(content)) return new Map();
-    for (const op of content) {
-      if (!Array.isArray(op)) return new Map();
-      if (op[0] === "r") { value = op[1]; continue; }
-      const path = op[1];
-      if (!Array.isArray(path) || !path.length || path.some(key => ["__proto__", "prototype", "constructor"].includes(String(key))))
-        return new Map();
-      let target = value;
-      for (const key of path.slice(0, -1)) {
-        if (!target || !Object.hasOwn(target, key)) return new Map();
-        target = target[key];
-      }
-      if (!target || typeof target !== "object") return new Map();
-      const key = path.at(-1);
-      if (op[0] === "s") target[key] = op[2];
-      else if (op[0] === "d") delete target[key];
-      else if (op[0] === "a" && typeof target[key] === "string" && typeof op[2] === "string") target[key] += op[2];
-      else if (op[0] === "t" && typeof target[key] === "string" && Number.isSafeInteger(op[2]) && op[2] >= 0) target[key] = target[key].slice(0, op[2]);
-      else return new Map();
-    }
-  }
+  let value: Data;
+  try {
+    const document = readSqliteDocument(db, number(doc.id));
+    if (document.version !== 1) return new Map();
+    value = document.value as Data;
+  } catch { return new Map(); }
   return new Map(Object.values(value?.byId ?? {}).filter((chat: any) =>
     chat && (key === undefined || value.keys?.[key] === chat.id) && Number.isSafeInteger(chat.conversationId) && chat.id === `${chat.agent}:${chat.conversationId}`)
     .map((chat: any) => [chat.conversationId, chat]));
@@ -477,16 +451,7 @@ export async function readWatchChatProjection(run: WatchRun, key: string) {
   return withStore(store.path, db => {
     const entries = db.prepare("SELECT record FROM entries WHERE conversation_id=? ORDER BY commit_seq,id").all(id).map(row => parse(row.record) as EntryRecord);
     const tasks = db.prepare("SELECT record FROM tasks WHERE conversation_id=? AND kind=?").all(id, JSON.stringify("pi.tool")).map(row => parse(row.record));
-    const byId = new Map(entries.map(entry => [Number(entry.id), entry]));
-    const messages = projectChatMessages(store.namespace, entries).map(message => {
-      const entry = byId.get(Number(message.id.split(":")[0]));
-      const data = entry?.data as {source?: string; from?: string} | undefined;
-      const source = data?.source;
-      const provenance = message.role !== "user" ? "agent" as const
-        : entry?.kind === `${store.namespace}.message` && ["web","cli","slack","google-chat","phone","email"].includes(source ?? "") ? "user" as const
-          : entry?.kind === `${store.namespace}.instance-message` ? "agent" as const : "runtime" as const;
-      return {...message, provenance, ...(entry?.kind === `${store.namespace}.instance-message` ? {author:data?.from} : {})};
-    });
+    const messages = projectChatMessages(store.namespace, entries);
     // Selected upload bytes are native input, not credential metadata. Preserve
     // them byte-for-byte for downloads/replay rather than redacting base64 text.
     return { messages: messages.map(message => ({...redact({...message, attachments: undefined}),

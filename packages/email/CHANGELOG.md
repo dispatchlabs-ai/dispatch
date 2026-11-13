@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Prepare a public reusable package. Use shared host input admission policy while retaining per-thread delivery and attachment identities.
+
 ## [0.11.2] - 2026-11-12
 
 - List route labels and consult native per-route receipts before fetching Gmail

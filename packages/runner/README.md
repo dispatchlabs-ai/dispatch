@@ -1,74 +1,25 @@
 # Dispatch Runner
 
-Applications can supply a `storage(agent)` factory to `run`, `ChatService.open`
-or `openAgent`. The host owns and closes the returned Pi Durable Storage.
-The default remains local SQLite. See [remote SQLite](https://github.com/dispatchlabs-ai/dispatch/blob/main/packages/remote/README.md)
-for the optional relay service and its single-owner recovery boundary.
-`openNativeTools(directory, workspace, { storage, env })` accepts the same native
-Storage interface and an explicit isolated execution environment. The optional
-[Fleet package](../fleet/README.md) binds complete runs to replaceable workers.
+Define agents in your application, start one host, and connect clients to its
+conversations. Pi Durable owns execution, recovery and storage. Dispatch supplies
+agent loading, shared conversation operations and optional channel integrations.
 
-`@dispatch/runner` runs directory-defined company agents with stock Pi Durable
-1.5.2. It loads trusted definitions, owns each SQLite session, schedules native
-tasks and exposes persistent shared conversations without a web server.
-
-This source-alpha package follows Dispatch's lockstep version, currently 0.12.3.
-The [v0.12.3 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.12.3)
-provides a Runner archive, source manifest and checksums. It is not published to
-npm. Install the archive in your own runtime workspace:
-
-```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.12.3/dispatch-runner-0.12.3.tgz
-```
-
-Agent definitions are ordinary files owned by your application. Start with the
-small example below and customize it directly. For a complete browser walkthrough
-with no credentials, use the [quickstart](https://github.com/dispatchlabs-ai/dispatch/blob/main/docs/quickstart.md).
-For source packing and external-consumer checks, follow the
-[package guide](https://github.com/dispatchlabs-ai/dispatch/blob/main/scripts/README.md). See [use cases](USE_CASES.md) and
-[changes](CHANGELOG.md).
-
-Use one application package and lockfile for ordinary library use. A separately
-managed parent runtime is also supported; see [definition workspaces](docs/definition-workspaces.md).
-Bump the runtime dependency and rebuild to upgrade Dispatch. Instructions and tool
-choices change only when you edit your definitions.
-
-For repo-owned immutable application releases, use the
-[shared Nix builder and deployment procedure](docs/nix-releases.md). To move a
-machine's profiles, supervised services and sessions to a selected release, see
-[upgrading a machine](docs/upgrade.md).
-
-Hosts can use [durable workflow progress](docs/workflow-progress.md) to report
-separately hosted work in the originating conversation after the initial reply.
-
-Definitions can select [request completion](docs/request-completion.md) to retain
-the original goal and continue unfinished work when the model reaches an answer.
-
-Use [documents and images](docs/artifacts.md) for retained artifact tools,
-conversation-scoped downloads and transport receipts.
-
-Keep the resulting lockfile. Snapshot updates use a new immutable tag and URL;
-published assets are never replaced. This distribution does not change the
-repository's lockstep version policy. Application and channel packages are public MIT source but excluded from npm
-publication. The reusable runtime closure has GitHub archives and a separate
-npm publication path.
+Use Node 24.22.1. Nix is optional. This checkout contains unreleased API changes;
+the last downloadable package release is
+[v0.12.2](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.12.2).
+The v0.12.3 source tag has no package archives.
+To use this source now, build and pack it with the [package guide](../../scripts/README.md),
+then install the resulting Runner archive in your application. Published release
+archives can be installed by their immutable URL; retain `package-lock.json`.
 
 ## Try it without credentials
 
-Node 24.22.1 is supplied by the pinned development shell. From the Dispatch repository's Nix shell:
-
-```sh
-npm ci
-npm run build --workspace @dispatch/runner
-npm pack --workspace @dispatch/runner --pack-destination /tmp
-```
-
-In a new directory, create a private ESM package and install the archive:
+In a new application directory, install the prepared Runner archive:
 
 ```sh
 npm init -y
 npm pkg set type=module
-npm install /tmp/dispatch-runner-0.12.3.tgz
+npm install /path/to/dispatch-runner-0.12.3.tgz
 mkdir -p agents/helper
 ```
 
@@ -76,138 +27,135 @@ Create `agents/helper/agent.md`:
 
 ```markdown
 ---
-description: A minimal helper.
-model: { provider: faux, id: faux-1, thinking: off }
+description: A minimal helper
+model: { provider: faux, id: faux-1 }
 ---
-Answer the user's question clearly.
+Answer clearly.
 ```
 
-Create `agents/helper/agent.ts`:
-
-```ts
-import { defineAgent } from "@dispatch/runner";
-export default defineAgent({ trigger: { mode: "manual" }, input: "Say hello." });
-```
-
-Create `factory.yaml` containing `agents: []`. The empty list disables schedules;
-the manual helper is still available. Then create `main.mjs`:
+That is the complete agent definition. No TypeScript, trigger, scheduled input or
+factory file is needed. Create `main.mjs`:
 
 ```js
-import { run, context } from "@dispatch/runner";
+import { run } from "@dispatch/runner";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { fauxProvider, fauxAssistantMessage } from "@earendil-works/pi-ai/providers/faux";
+
 const faux = fauxProvider();
 faux.setResponses([fauxAssistantMessage("Hello from a durable conversation.")]);
 const models = createModels();
 models.setProvider(faux.provider);
-const app = await run({ models, demo: true });
+const host = await run({ models, demo: true });
 try {
-  const chat = await app.service.create("helper", "cli", "example", "Example");
-  const { submissionId } = await app.service.submit(chat.id, "Hello", "hello-1");
-  await (await app.service.host("helper").harness.submission(submissionId, context)).wait(context);
-  console.log((await app.service.snapshot(chat.id)).messages);
+  const chat = await host.client.create("helper", "example", "hello", "Example");
+  const turn = await host.client.submit(chat.id, "Hello", "hello-1");
+  await host.client.wait(chat.id, turn.submissionId);
+  console.log((await host.client.snapshot(chat.id)).messages);
 } finally {
-  await app.close();
+  await host.close();
 }
 ```
 
-Run `node main.mjs`. The supplied Pi Models catalog owns inference and credentials.
-Use native provider setup or the separately installed inference gateway for live
-models. The runner never requires a particular customer, provider, gateway or
-web installation. The caller and gateway own request cancellation and timeouts.
-The runner does not impose a deadline based on reasoning effort: a quiet stream
-can still be doing provider work. Pi retries reported transient failures according
-to the installation's retry policy.
+Run `node main.mjs`. This uses synthetic inference and real durable storage.
+Rerunning the same request identity observes the retained result. For live models,
+supply a Pi Models catalog with your provider and credentials. No particular
+provider or gateway is required.
 
-## Company application
+## Definitions and optional capabilities
 
-An agent folder contains `agent.md` (instructions and model frontmatter) and
-`agent.ts` (a `defineAgent` export). Definitions are trusted application code.
-They can install native Pi extensions. Continuous definitions also receive
-`pause_loop` to report a blocking need for user input; file and shell tools remain
-explicit grants.
-The `model.thinking` value accepts Pi's `off`, `minimal`, `low`, `medium`, `high`,
-`xhigh`, and `max` levels. The chosen provider/model must support the selected level.
-`factory.yaml` lists scheduled `agents`. Manual definitions remain available
-for conversations. Interval schedules skip missed slots after an overdue turn;
-continuous schedules wait their configured delay after each result.
+Your repository owns instructions, model selection, tools, skills and application
+code. Add `agents/helper/agent.ts` only when the agent needs capabilities:
 
-For calendar scheduling, use the [agent-local schedules](docs/schedules.md) field.
-Named cron/timezone assignments live in the owning definition; factory.yaml only
-enables agents. Native Pi timer tasks preserve deadlines and admission identities.
-Inspect next runs and admitted conversations with the service `schedules` command.
+```ts
+import { defineAgent } from "@dispatch/runner";
+export default defineAgent({ skills: true, coding: true });
+```
 
-`run({ root, stateRoot, models, adapters: [...] })` starts a service and returns
-`service` and `close()`. Call `close()` on SIGTERM/SIGINT. The host application
-owns process supervision. Optional adapters, including
-[`@dispatch/slack`](../slack/README.md), start after hosts and any `beforeStart`
-bindings are ready. No HTTP listener is started.
+`defineAgent({})` is conversational by default. Tools are explicit grants;
+trusted extensions can supply native Pi tools, documents and tasks. Markdown
+requires a description, model provider/id and instructions. `model.thinking`
+defaults to `off`; supported values are `off`, `minimal`, `low`, `medium`, `high`,
+`xhigh` and `max`, subject to the model's capabilities.
 
-For existing domain workflows, use `open` to construct one host and return
-`runner.ChatService.attach({ agents, hosts, initialize })`. The service takes
-ownership of those hosts and closes them. `initialize(tx, chat, host)` configures
-new discussions and mounts their domain documents in the creation transaction.
-`chat.origin` is an application-supplied JSON reference. `service.create` uses a
-stable external key and returns the same conversation on retry.
+Scheduling is optional. A non-manual `trigger` requires `input`. An optional
+`factory.yaml` enables scheduled agents and may select `defaultAgent`; without it
+all definitions are available for chat and no schedules start. A single agent is
+automatically the default. See [schedules](docs/schedules.md).
 
-`openAgent` registers `extensions` in the root agent and `registryExtensions`
-without granting their tools to the root. Domain initializers can select the
-latter for conversations with a different activity. Workflows, conversations and
-adapters share one native harness; never open a second writer to the same store.
+## One host, one client contract
 
-## Terminal conversations
+`run({root, stateRoot, models})` explicitly starts the owner and returns
+`{service, client, close}`. `client` is an embedded `AgentClient`; it has the same
+operations as clients connected over a Unix socket or authenticated HTTPS.
+`service` exposes host-only extension and native-storage hooks. Ordinary clients
+need only `@dispatch/runner/client` and never open a database or configure tools.
 
-For persistent work shared with other clients, use the
-[supervised service and connecting terminal](docs/service.md#shared-clients-and-company-compositions).
-The direct-owned terminal API below remains available for isolated legacy runs.
+```js
+import { connectClient } from "@dispatch/runner/client";
+const client = await connectClient({ socket: "/srv/example/run/agent.sock" });
+const agents = await client.agents();
+const chat = await client.create(agents[0].id, "my-client", "stable-thread-key");
+const watch = await client.watch(chat.id, snapshot => console.log(snapshot));
+// Send with a stable request ID; keep it if a response is lost.
+await client.submit(chat.id, "Hello", "request-1");
+await watch.stop();
+await client.close();
+```
 
-Use the separate [terminal watcher](docs/watch.md) to discover existing local
-sessions and inspect their agent conversations and tool results without starting
-or controlling work. An application release exposes `NAME watch --config HOST.json`;
-the standalone command is `dispatch-watch --config HOST.json`.
+Closing a client disconnects observation. Only `client.stop(id)` cancels work.
+Closing the host suspends unfinished native work for recovery on restart.
+Start a supervised host with `dispatch-service HOST.json serve`, then connect:
 
-`chatInTerminal({ root, models, agent: "helper", stateRoot, session: "main" })`
-starts the same headless service with a streaming terminal client. It selects one
-agent, creates or resumes a named conversation and owns process signal cleanup.
-Supply `names` to include that agent's instance-message recipients in the same
-process; their hosts resume admitted work without enabling schedules.
-`prompt` sends one turn and exits; `history` prints the selected history without
-inference. `newChat` creates a fresh session and prints its key. Interactive
-commands are `/new`, `/history` and `/quit`; Ctrl-C suspends unfinished work and
-exits with status 130. A turn failure rejects the function for the caller to
-report with a nonzero exit status. Recovered generation errors remain diagnostics;
-the native submission or loop outcome determines success. Model credentials
-remain the host's choice.
-Terminal clients do not start the schedules listed in `factory.yaml`; use `run`
-for the scheduled service.
+```sh
+dispatch-agent --socket /srv/example/run/agent.sock run --agent helper --session main
+dispatch-agent --socket /srv/example/run/agent.sock run --session main --history
+```
 
-For a definition with a `continuous` trigger, pass `continuous: true` and an
-initial `prompt` to keep working in the named terminal conversation. The initial
-prompt is saved in the native loop task; later iterations use the definition's
-`input` in that same conversation. A final response completes one pass and starts
-the next after the configured delay. There is no fixed pass count. Native task
-checkpoints and request IDs preserve admitted work across restarts.
+The CLI never starts or replaces a host. Web uses the same client through Backend.
+Watch streams are driven by native changes; clients do not poll full histories.
+See [host and client setup](docs/service.md) for configuration, HTTPS, receipts,
+errors, streaming and explicit ownership.
 
-Ctrl-C suspends the loop. Reopen with the same session and working directory,
-`continuous: true`, and no new prompt to resume it. A different prompt is rejected
-while the saved loop is active, and single-turn mode cannot silently resume that
-loop. If the agent calls `pause_loop({ reason })`, it finishes its current response
-and saves a `paused` status with that reason. Supply the needed input as a new
-`prompt` to resume. Pausing is explicit; ordinary prose is never parsed as a stop
-signal. The agent's instructions determine what constitutes a genuine blocker.
+Slack, Google Chat and email are optional packages. Their durable delivery tasks
+run as host extensions so input admission and delivery receipts can share native
+transactions. They use the host's shared input validation and conversation
+operations. A new ordinary client does not need tasks or a native harness.
+Transport names are open strings. Account routing remains each connector's job.
 
-Applications can use the same mechanism directly through
-`host.start(false, { conversationId, input })`; `host.wait(id)` resolves when the
-loop pauses and rejects on a failed or aborted task. The existing one-loop-per-host
-schedule state and native SQLite ownership are unchanged.
+## Build, upgrade and deploy
 
-Terminal output renders C0/C1 control characters and DEL as visible `\xNN`
-escapes, except for tabs and newlines. This also covers controls split across
-streaming chunks, saved history, tool diagnostics and returned error messages.
-The stored text is unchanged; other clients must apply their own display policy.
+Install only the packages your application uses. Channel adapters are prepared
+alongside Runner by `npm run pack:packages`; install matching archives together.
+Remote storage, PostgreSQL, Fleet and the browser application are optional.
+Bump the Dispatch dependency, update the application lockfile, build/check your
+application, stop its host, and restart with the new package. Existing clients
+reconnect to the same owner identity and conversations. There is no machine-wide
+version selector, detached-owner takeover, scaffold merge or migration command.
 
-Use separate state roots for demo and live execution. The host binds its model
-providers; Runner embeds no provider credentials and requires no inference gateway.
+Keep one Pi dependency tree per application. Runtime upgrades do not rewrite
+agent files. Changes to authored definitions remain explicit host configuration
+(`updateDefinitions` while idle, or `"when-idle"` to defer while work recovers).
+See [ordinary upgrades](docs/upgrade.md) and the optional
+[Nix application builder](docs/nix-releases.md).
+
+## Host extensions and inspection
+
+`run({adapters})` prepares native channel extensions before recovering work.
+For domain workflows, `open` may return `runner.ChatService.attach(...)` with
+existing hosts; this transfers their lifetime to `run`. `initialize(tx,chat,host)`
+binds application documents in the chat-creation transaction. Never open another
+writer to a store already owned by a host.
+
+A `storage(agent)` factory supplies optional Pi Storage implementations; local
+SQLite is the default. [Remote](../remote/README.md), [Postgres](../postgres/README.md)
+and [Fleet](../fleet/README.md) are explicit deployments of that ownership model.
+
+`dispatch-watch --config HOST.json --session .` inspects saved native work without
+starting it. The shared `@dispatch/runner/records` reader handles read-only SQLite
+snapshots and document revisions for Runner, Observer and Eval. See
+[watch](docs/watch.md), [artifacts](docs/artifacts.md),
+[workflow progress](docs/workflow-progress.md), [request completion](docs/request-completion.md),
+[use cases](USE_CASES.md) and [changes](CHANGELOG.md).
 
 ## Local provider credentials
 
@@ -408,9 +356,8 @@ so its acknowledgement keeps the same identity.
 
 Set `defaultAgent: jett` in the definition tree's `factory.yaml` to select the
 agent for new `dispatch-agent run` sessions. `--agent` overrides that selection.
-The CLI saves the initial choice per session; changing the factory default does
-not relabel saved conversations. For an older session without a saved choice,
-supply its original `--agent` once. This setting does not enable calendars.
+The owner retains the conversation and its agent under the terminal session key;
+changing the default does not relabel it. This setting does not enable calendars.
 
 `ChatService.open({ prepareAgent })` applies the trusted binding recursively to
 primary definitions, named delegates and legacy handoff children. Hosts can

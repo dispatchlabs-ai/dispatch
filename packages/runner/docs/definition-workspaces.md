@@ -9,8 +9,8 @@ my-agents/
   package-lock.json
   node_modules/
   agents/helper/agent.md
-  agents/helper/agent.ts
-  factory.yaml
+  agents/helper/agent.ts      # optional capabilities
+  factory.yaml               # optional schedule enablement/default
   main.mjs                   # starts the owner process
 ```
 
@@ -141,6 +141,5 @@ The consumer outcome is an independent repository that installs released package
 defines and runs an agent, and deploys through shared modules without checking out
 Dispatch source or copying runtime implementation. Reusable UI and service APIs
 must be consumable without requiring the complete Dispatch Web application.
-Exact package extraction boundaries, public API shapes, credential enrollment and
-existing-store migration procedures remain implementation decisions. This
-direction does not replace Dispatch Web's database-owned product specification.
+Principal credential enrollment remains future work. Current hosts and clients
+use the [shared service contract](service.md); this task adds no migrations.

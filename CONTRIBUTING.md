@@ -81,8 +81,8 @@ Read its Durable manifest (exports/types/files/exact dependencies),
 `scripts/publish.mjs`, `scripts/check-package-install.mjs` and release procedure.
 Use the pinned release's public contracts, not unreleased storage internals.
 Dispatch follows packed, external consumer checks and emitted types/files, not
-Pi tests or CI. The reusable Runner/Remote/Postgres/Backend/Workers closure is
-available as GitHub release archives; npm publication is separate. Root and
+Pi tests or CI. Reusable runtime and channel packages are prepared together as versioned archives;
+actual release availability is recorded in the root README. npm publication is separate. Root and
 application manifests set `private: true` to exclude npm publication; their
 source is public under MIT. Follow
 [scripts/README.md](scripts/README.md) for reviewed tarball preparation, external

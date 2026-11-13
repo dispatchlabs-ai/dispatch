@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Reuse Runner read-only SQLite snapshots and document-revision decoding; remove machine runtime-selection wiring.
+
 - Own the shared-content check inside Eval, independently of the removed starter kit.
 
 ## [0.12.3] - 2026-11-13

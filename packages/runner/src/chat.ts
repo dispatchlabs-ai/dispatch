@@ -17,10 +17,10 @@ export type ChatSnapshot = {
 export type ChatInitializer = (tx: Tx, chat: Chat, host: Pick<AgentHost, "configuration">) => Promise<void>;
 import { isDeepStrictEqual } from "node:util";
 import { join, resolve } from "node:path";
-import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import {
   configure, defineDoc, LiveDoc, type ConversationId, type ConversationView, type Cursor,
-  type EntryRecord, type TaskRecord, type Extension, type LiveState, type SubmissionId, type Tx, type JsonObject,
+  type SubmissionDraft, type EntryRecord, type TaskRecord, type Extension, type LiveState, type SubmissionId, type Tx, type JsonObject,
 } from "@earendil-works/pi-durable";
 import { catalog, enabledAgents, loadAgent, type LoadedAgent } from "./definition.js";
 import type { Models } from "@earendil-works/pi-ai/models";
@@ -28,7 +28,6 @@ import { createRuntime, type AgentHost, type StorageFactory, type OpenOptions } 
 import type { ReplySink } from "./replies.js";
 import { createHandoffs } from "./handoff.js";
 import { privateStateDirectory } from "./private-state.js";
-import { selectRuntime } from "./runtime-version.js";
 import { publicCommentary } from "./commentary.js";
 import { recordRequestCancellation } from "./request-completion.js";
 import { createInstanceMessaging, instanceMessagingExtension, type InstanceMessage } from "./messages.js";
@@ -38,7 +37,7 @@ import type { Artifact, ArtifactRecord, ArtifactOptions, createArtifacts } from 
 export const context = BACKGROUND_CONTEXT;
 export type Chat = {
   id: string; agent: string; conversationId: number; title: string;
-  source: "cli" | "web" | "slack" | "google-chat" | "phone" | "email" | "agent" | "schedule"; createdAt: string; origin?: JsonObject;
+  source: string; createdAt: string; origin?: JsonObject;
 };
 function messageText(content: unknown): string {
   if (typeof content === "string") return content;
@@ -63,11 +62,12 @@ export function projectChatMessages(namespace: string, entries: readonly EntryRe
       const text = messageText(message.content);
       const error = message.role === "assistant" ? message.errorMessage : undefined;
       const at = message.timestamp + (message.role === "assistant" ? message.durationMs ?? 0 : 0);
-      const data = entry.data as { source?: string; text?: string; attachments?: AttachmentFile[] } | undefined;
+      const data = entry.data as { source?: string; actor?: "user" | "agent" | "runtime"; text?: string; attachments?: AttachmentFile[] } | undefined;
       const attached = message.role === "user" && entry.kind === `${namespace}.message` && data?.attachments?.length ? data.attachments : undefined;
       const hasTools = message.role === "assistant" && Array.isArray(message.content) && message.content.some(part => part.type === "toolCall");
       const provenance = message.role !== "user" ? "agent" as const
-        : entry.kind === `${namespace}.message` && ["web", "cli", "slack", "google-chat", "phone", "email"].includes(data?.source ?? "") ? "user" as const
+        : entry.kind === `${namespace}.message` && data?.actor ? data.actor
+        : entry.kind === `${namespace}.message` && data?.source && !["agent", "schedule"].includes(data.source) ? "user" as const
           : entry.kind === `${namespace}.instance-message` ? "agent" as const : "runtime" as const;
       return text || error || attached || hasTools ? [{ provenance, ...(entry.kind === `${namespace}.instance-message` ? {author: (entry.data as {from?: string})?.from} : {}), id: `${entry.id}:${index}`, role: message.role, text: attached ? data?.text ?? "" : text, at,
         ...(attached ? { attachments: attached } : {}),
@@ -130,9 +130,6 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       definitionResources?: OpenOptions["definitionResources"];
       storage?: StorageFactory;
       settings?: OpenOptions["settings"];
-      /** Directory shared by every session store of this installation. When set, it runs exactly one
-       * Pi Durable version: an older runtime refuses to open and a newer one takes the root over. */
-      runtimeRoot?: string;
       /** Trusted host binding, applied recursively to primaries and their private children before opening stores. */
       prepareAgent?: (agent: LoadedAgent) => LoadedAgent | Promise<LoadedAgent>;
       artifacts?: ArtifactOptions;
@@ -160,7 +157,6 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       modelCatalogs.set(service, models);
       if (!options.demo && agents.some(agent => !models.getProvider(agent.model.provider))) throw new Error("Register every agent's provider in the supplied Models catalog.");
       try {
-        if (options.runtimeRoot) await selectRuntime(resolve(options.runtimeRoot), { hold: true });
         await privateStateDirectory(stateRoot);
         const results = await Promise.allSettled(agents.map(async agent => {
           const calendar = createSchedules(namespace, agent, service, options.resume !== false);
@@ -336,22 +332,36 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       }, context);
     }
 
-    async submit(id: string, text: string, requestId: string, mode: "followUp" | "steer" = "followUp", source: Chat["source"] = "web", files: AttachmentFile[] = []) {
+    /** Shared validation for client commands and host-side durable channel tasks.
+     * Tasks can commit the resulting draft with their delivery receipt in one native transaction. */
+    async prepareInput(id: string, text: string, requestId: string, options: {
+      source?: string; mode?: "followUp" | "steer"; files?: AttachmentFile[];
+      metadata?: JsonObject; continuation?: boolean;
+    } = {}): Promise<SubmissionDraft> {
+      const { source = "web", mode = "followUp", files = [], metadata = {}, continuation = false } = options;
       const content = prepareContent(text, files);
-      if (!requestId.trim()) throw new Error("A request ID is required.");
+      if (typeof requestId !== "string" || !requestId.trim()) throw new Error("A request ID is required.");
+      if (typeof source !== "string" || !source.trim()) throw new Error("A source is required.");
+      const { chat } = await this.resolve(id);
+      if (files.some(file => file.mimeType.startsWith("image/"))) {
+        const agent = this.agents.find(agent => agent.id === chat.agent)!;
+        if (!modelCatalogs.get(this)?.getModel(agent.model.provider, agent.model.id)?.input.includes("image"))
+          throw new ContentError("This authored model does not accept images. Remove the image or choose an image-capable agent.");
+      }
+      const internal = source === "agent" || source === "schedule";
+      return {
+        type: "input", content, requestId, whenBusy: continuation ? "reject" : internal ? mode : "steer",
+        entry: { kind: `${namespace}.message`, data: { ...metadata, source,
+          actor: continuation || source === "schedule" ? "runtime" : source === "agent" ? "agent" : "user",
+          ...(files.length ? { text: metadata.text ?? text, attachments: files } : {}) } },
+      };
+    }
+
+    async submit(id: string, text: string, requestId: string, mode: "followUp" | "steer" = "followUp", source: Chat["source"] = "web", files: AttachmentFile[] = []) {
       return admit(this, id, async () => {
+        const draft = await this.prepareInput(id, text, requestId, { mode, source, files });
         const { chat, conversation } = await this.resolve(id);
-        if (files.some(file => file.mimeType.startsWith("image/"))) {
-          const agent = this.agents.find(agent => agent.id === chat.agent)!;
-          if (!modelCatalogs.get(this)?.getModel(agent.model.provider, agent.model.id)?.input.includes("image"))
-            throw new ContentError("This authored model does not accept images. Remove the image or choose an image-capable agent.");
-        }
-        const submission = await conversation.submit({
-          // Human chat always steers; only internal agent/schedule work may
-          // deliberately wait for a final boundary.
-          type: "input", content, requestId, whenBusy: source === "agent" || source === "schedule" ? mode : "steer",
-          entry: { kind: `${namespace}.message`, data: { source, ...(files.length ? {text, attachments: files} : {}) } },
-        }, context);
+        const submission = await conversation.submit(draft, context);
         if (chat.title === "New chat") await this.rename(id, text || files[0]?.name || "Attachment");
         return { submissionId: submission.id };
       });
@@ -363,6 +373,15 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       const record = await submission?.status(context);
       if (!record || record.conversationId !== conversation.id) throw new Error("Unknown submission.");
       return record;
+    }
+
+    async wait(id: string, submissionId: number, signal?: AbortSignal) {
+      const { host, conversation } = await this.resolve(id);
+      const ctx = signal ? withAbortSignal(signal, context) : context;
+      const submission = await host.harness.submission(submissionId as SubmissionId, ctx);
+      const record = await submission?.status(ctx);
+      if (!record || record.conversationId !== conversation.id) throw new Error("Unknown submission.");
+      return submission!.wait(ctx);
     }
 
     async message(from: string, message: InstanceMessage, requestId: string) {
@@ -390,11 +409,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     }
 
     async watch(id: string, listener: (snapshot: ChatSnapshot) => Promise<void>) {
-      const { host, chat: selectedChat, conversation } = await this.resolve(id);
-      // Older chats predate delegation. Mount its document once before observing.
-      if (this.agents.find(agent => agent.id === selectedChat.agent)?.handoff) {
-        await conversation.commit(async tx => { await tx.doc(Handoffs, conversation.id); }, context);
-      }
+      const { host, conversation } = await this.resolve(id);
       // Attach before loading history so commits during history reads are not lost.
       const watch = await conversation.watch(context);
       const handoffWatch = await host.harness.watchDoc(Handoffs, conversation.id, context);

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Connect to an explicitly started owner through Backend; load central storage only when configured. The local example starts its host separately. Keep event observation reconnectable while its owner is temporarily unavailable.
+
 ## [0.11.2] - 2026-11-12
 
 - Include `lsof` in the Nix Web command so Linux process status works without an undeclared host package.

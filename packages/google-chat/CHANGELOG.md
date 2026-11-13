@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Prepare a public reusable package. Share host input validation and preserve native transactional continuation and delivery receipts.
+
 ## [0.8.0] - 2026-11-12
 
 - Align shared Pi dependencies with Runner at 1.5.2 for native Fable 5.2 support; existing installations remain pinned.

@@ -14,7 +14,6 @@ import {
 } from "@dispatch/runner/host-models";
 import { serviceSettings, type ServicePolicy } from "@dispatch/runner/settings";
 import { readDocument } from "@dispatch/backend/central";
-import { createProvenance } from "@dispatch/backend/provenance";
 import { BACKGROUND_CONTEXT as context } from "@earendil-works/chord/context";
 import type { Storage, Cursor } from "@earendil-works/pi-durable";
 export interface WorkerConfig {
@@ -226,12 +225,7 @@ export async function startWorker(config: WorkerConfig) {
       if (value.method === "observe") {
         if (service) {
           try {
-            const { conversation } = await service.resolve(value.args[0]);
-            result = await createProvenance(
-              conversation,
-              context,
-              "dispatch",
-            )(await service.snapshot(value.args[0]));
+            result = await service.snapshot(value.args[0]);
           } catch {
             result = null;
           }

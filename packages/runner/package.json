@@ -5,13 +5,9 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22.19.0"
+    "node": ">=24.22.1 <25"
   },
   "exports": {
-    "./gmail": {
-      "types": "./dist/gmail.d.ts",
-      "import": "./dist/gmail.js"
-    },
     "./service": {
       "types": "./dist/service.d.ts",
       "import": "./dist/service.js"
@@ -39,12 +35,19 @@
     "./settings": {
       "types": "./dist/settings.d.ts",
       "import": "./dist/settings.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./records": {
+      "types": "./dist/records.d.ts",
+      "import": "./dist/records.js"
     }
   },
   "bin": {
     "dispatch-agent": "./dist/agent-cli.js",
     "dispatch-service": "./dist/service-cli.js",
-    "dispatch-upgrade": "./dist/upgrade-cli.js",
     "dispatch-watch": "./dist/watch-cli.js"
   },
   "files": [
@@ -59,7 +62,7 @@
     "AGENT-CHAT-LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

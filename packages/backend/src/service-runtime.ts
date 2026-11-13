@@ -1,17 +1,17 @@
 import { isAbsolute } from "node:path";
-import { serviceRequest, ServiceError } from "@dispatch/runner/service";
-import type { ServiceCommand, ServiceResults, ServiceExpectation } from "@dispatch/runner/service";
+import { connectClient, type ClientConnection } from "@dispatch/runner/client";
+import { ServiceError } from "@dispatch/runner/client";
+import type { ServiceCommand, ServiceResults, ServiceExpectation } from "@dispatch/runner/client";
 import type { Chat as NativeChat } from "@dispatch/runner";
 import { AdmissionError } from "./config.js";
 import type { Runtime } from "./runtime.js";
 import type { Capabilities, Chat, Snapshot } from "./contracts.js";
 
-export interface ServiceConnection { socket: string; sourceId?: string; label?: string; expectedStateRoot?: string; expectedIdentity?: string; capabilities?: Capabilities; keyedCreation?: { agent: string; keyPrefix: string } }
+export type ServiceConnection = ClientConnection & { sourceId?: string; label?: string; expectedStateRoot?: string; expectedIdentity?: string; capabilities?: Capabilities; keyedCreation?: { agent: string; keyPrefix: string } }
 
 /** Connect to the authorized local native owner; closing this client never stops it. */
 export async function openServiceRuntime(config: ServiceConnection): Promise<Runtime> {
-  if (!config || typeof config.socket !== "string" || !isAbsolute(config.socket))
-    throw new Error("Provide an absolute service.socket in trusted installation configuration.");
+  if (!config || config.socket && !isAbsolute(config.socket)) throw new Error("Provide an absolute service socket or a service URL.");
   const keyed = config.keyedCreation;
   if (keyed && (!/^[a-zA-Z0-9_-]+$/.test(keyed.agent) || !/^[a-z][a-z0-9-]*:$/.test(keyed.keyPrefix)))
     throw new Error("Provide keyedCreation agent and keyPrefix in trusted service configuration.");
@@ -25,12 +25,13 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
   const source = config.sourceId ?? "service", label = config.label ?? "Native service";
   let closed = false;
   const watches = new Set<() => Promise<void>>();
-  let expected: ServiceExpectation | undefined = (config.expectedStateRoot !== undefined || config.expectedIdentity !== undefined)
+  const expected: ServiceExpectation | undefined = (config.expectedStateRoot !== undefined || config.expectedIdentity !== undefined)
     ? { ...(config.expectedStateRoot !== undefined ? {stateRoot: config.expectedStateRoot} : {}),
       ...(config.expectedIdentity !== undefined ? {identity: config.expectedIdentity} : {}) } : undefined;
+  const client = await connectClient({ ...config, expected });
   const call = async <C extends ServiceCommand>(command: C): Promise<ServiceResults[C["method"]]> => {
     if (closed) throw new Error("Service connection is closed.");
-    try { return await serviceRequest(config.socket, command, { expected }); }
+    try { return await client.command(command); }
     catch (error) {
       if (error instanceof ServiceError && error.status === 409) throw new AdmissionError(error.message);
       // Transport failures remain uncertain: do not resend or change request IDs.
@@ -38,11 +39,6 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
     }
   };
   const metadata = await call({ method: "info" });
-  // Bind all later operations, including reads, to this owner selection. Same
-  // root/identity survives compatible restarts; socket reuse by another root does not.
-  if (!expected) expected = metadata.identity !== undefined ? { identity: metadata.identity }
-    : metadata.stateRoot !== undefined ? { stateRoot: metadata.stateRoot } : undefined;
-  if (!expected) throw new Error("The service must expose a stable stateRoot or installation identity for safe client binding.");
   const catalog = async () => (await call({ method: "agents" })).map(agent => ({ ...agent, capabilities }));
   const agents = await catalog();
   let lastChats: Chat[] = [];
@@ -54,7 +50,7 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
       provenance: message.provenance ?? "runtime" })) };
   };
   return {
-    stateRoot: metadata.stateRoot ?? config.socket,
+    stateRoot: metadata.stateRoot ?? config.socket ?? config.url!,
     catalog,
     summary: async () => {
       let currentAgents, chats;
@@ -63,7 +59,7 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
       // A healthy service is not evidence of active work. Native task states are.
       let activity: Awaited<ReturnType<typeof call<{method: "status"}>>> | undefined;
       try { activity = await call({ method: "status" }); } catch { /* Older trusted facades may not expose status. */ }
-      return { agents: currentAgents, sources: [{ id: source, label, path: config.socket, issues: [] }], chats: await Promise.all(chats.map(async chat => {
+      return { agents: currentAgents, sources: [{ id: source, label, path: config.socket ?? config.url, issues: [] }], chats: await Promise.all(chats.map(async chat => {
         const work = activity?.hosts.flatMap(host => host.conversations).find(item => item.id === chat.id);
         const host = activity?.hosts.find(host => host.conversations.some(item => item.id === chat.id));
         let state = !activity || host?.scheduling === "paused" || work?.tasks.some(task => task.state === "blocked") ? "unavailable" : work?.held ? "unavailable" : work?.tasks.some(task => ["running", "pending"].includes(task.state)) ? "working" : work?.tasks.length || work?.queued ? "waiting" : "idle";
@@ -93,7 +89,7 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
     },
     service: {
       agents,
-      sources: async () => [{ id: source, label, path: config.socket, issues: [] }],
+      sources: async () => [{ id: source, label, path: config.socket ?? config.url, issues: [] }],
       list: async () => (await call({ method: "chats" })).map(project),
       has: async id => (await call({ method: "chats" })).some(chat => chat.id === id),
       create: async (agent, transport, key, sourceId = source) => {
@@ -115,34 +111,19 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
     presentation: {
       snapshot,
       watch: async (id, listener) => {
-        let stopped = false, timer: ReturnType<typeof setTimeout> | undefined;
-        let finish!: () => void;
-        const done = new Promise<void>(resolve => { finish = resolve; });
-        let pending: Promise<void> = Promise.resolve();
-        const stop = async () => {
-          stopped = true;
-          clearTimeout(timer);
-          watches.delete(stop);
-          await pending;
-          finish();
-        };
-        const tick = async () => {
-          try {
-            const value = await snapshot(id);
-            if (!stopped) await listener(value);
-          } catch { stopped = true; watches.delete(stop); finish(); }
-          if (!stopped) timer = setTimeout(() => { pending = tick(); }, 200);
-        };
-        // Fail initial observation explicitly; later transport loss ends the watch.
-        await listener(await snapshot(id));
+        const watch = await client.watch(id, async value => listener({ ...value,
+          chat: project(value.chat), messages: value.messages.map(message => ({ ...message, provenance: message.provenance ?? "runtime" })),
+        }));
+        const stop = async () => { watches.delete(stop); await watch.stop(); };
         watches.add(stop);
-        timer = setTimeout(() => { pending = tick(); }, 200);
-        return { closed: done, stop };
+        void watch.closed.then(() => watches.delete(stop), () => watches.delete(stop));
+        return { closed: watch.closed, stop };
       },
     },
     close: async () => {
       closed = true;
       await Promise.all([...watches].map(stop => stop()));
+      await client.close();
     },
   };
 }

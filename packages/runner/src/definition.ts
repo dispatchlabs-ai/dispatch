@@ -14,9 +14,9 @@ export type Trigger =
   | { mode: "interval"; everyMs: number; runImmediately?: boolean };
 
 export type AgentDefinition = {
-  trigger: Trigger;
+  trigger?: Trigger;
   /** The input sent for each scheduled iteration. */
-  input: string;
+  input?: string;
   schedules?: AgentSchedule[];
   /** Native Pi Durable extensions. No tools are installed by default. */
   extensions?: Extension[];
@@ -34,6 +34,8 @@ export type AgentDefinition = {
 };
 
 export type LoadedAgent = AgentDefinition & {
+  trigger: Trigger;
+  input: string;
   root: string;
   id: string;
   instructions: string;
@@ -48,16 +50,15 @@ export type LoadedAgent = AgentDefinition & {
 
 export const agentName = /^[a-z][a-z0-9-]*$/;
 
-export function defineAgent(definition: AgentDefinition): AgentDefinition {
-  if (!definition || typeof definition.input !== "string" || !definition.input.trim()) {
-    throw new Error("An agent needs a nonempty input.");
-  }
+export function defineAgent(definition: AgentDefinition = {}): AgentDefinition & { trigger: Trigger; input: string } {
+  const trigger = definition.trigger ?? { mode: "manual" };
+  if (definition.input !== undefined && typeof definition.input !== "string") throw new Error("Agent input must be text.");
+  if (trigger.mode !== "manual" && !definition.input?.trim()) throw new Error("A scheduled agent needs a nonempty input.");
   validateSchedules(definition.schedules);
   if (definition.delegates && (!Array.isArray(definition.delegates) || definition.delegates.some(id => !agentName.test(id))
     || new Set(definition.delegates).size !== definition.delegates.length)) throw new Error("Delegates must be unique agent names.");
   if (definition.messages && (!Array.isArray(definition.messages) || definition.messages.some(id => !agentName.test(id))
     || new Set(definition.messages).size !== definition.messages.length)) throw new Error("Message recipients must be unique agent names.");
-  const trigger = definition.trigger;
   if (!trigger || !["manual", "continuous", "interval"].includes(trigger.mode)) {
     throw new Error("Trigger mode must be manual, continuous, or interval.");
   }
@@ -77,7 +78,7 @@ export function defineAgent(definition: AgentDefinition): AgentDefinition {
     || !Number.isSafeInteger(definition.handoff.progressEveryMs) || definition.handoff.progressEveryMs <= 0)) {
     throw new Error("A handoff needs a target agent and a positive progressEveryMs.");
   }
-  return definition;
+  return { ...definition, trigger, input: definition.input ?? "" };
 }
 
 export async function catalog(root: string): Promise<{ id: string; runnable: boolean }[]> {
@@ -85,7 +86,7 @@ export async function catalog(root: string): Promise<{ id: string; runnable: boo
   return Promise.all(entries.filter((entry) => entry.isDirectory() && agentName.test(entry.name))
     .sort((a, b) => a.name.localeCompare(b.name)).map(async (entry) => {
       const files = await readdir(join(root, "agents", entry.name));
-      return { id: entry.name, runnable: files.includes("agent.ts") };
+      return { id: entry.name, runnable: files.includes("agent.md") };
     }));
 }
 
@@ -96,7 +97,7 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
   const [markdown, code] = await Promise.all([
     readFile(join(folder, "agent.md"), "utf8"),
     readFile(join(folder, "agent.ts"), "utf8").catch((error) => {
-      if (error.code === "ENOENT") throw new Error(`${id} is a draft: implement agents/${id}/agent.ts first.`);
+      if (error.code === "ENOENT") return undefined;
       throw error;
     }),
   ]);
@@ -106,13 +107,14 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
   if (!meta || typeof meta.description !== "string" || !meta.description.trim()
     || typeof meta.model?.provider !== "string" || !meta.model.provider.trim()
     || typeof meta.model?.id !== "string" || !meta.model.id.trim()
-    || !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(meta.model?.thinking)
+    || (meta.model?.thinking !== undefined && !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(meta.model.thinking))
     || !match[2].trim()) {
-    throw new Error(`${id}/agent.md requires description, model.provider, model.id, model.thinking, and instructions.`);
+    throw new Error(`${id}/agent.md requires description, model.provider, model.id, and instructions.`);
   }
   // An agent module is trusted application code, loaded once per process.
-  const module = await import(pathToFileURL(join(folder, "agent.ts")).href);
-  const definition = defineAgent(module.default);
+  const module = code !== undefined ? await import(pathToFileURL(join(folder, "agent.ts")).href) : undefined;
+  if (module && !Object.hasOwn(module, "default")) throw new Error(`${id}/agent.ts must export its definition as default.`);
+  const definition = defineAgent(module?.default);
   const skillCatalog = definition.skills ? await loadSkills(root, id) : [];
   const repositoryInstructions = await loadRepositoryInstructions(folder, root);
   const handoffAgent = definition.handoff
@@ -123,11 +125,11 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
     `# Role instructions from agents/${id}/agent.md\n${match[2].trim()}`].filter(Boolean).join("\n\n");
   return {
     ...definition, root, id, instructions,
-    repositoryInstructions, description: meta.description, model: meta.model,
+    repositoryInstructions, description: meta.description, model: { ...meta.model, thinking: meta.model.thinking ?? "off" },
     ...(handoffAgent ? { handoffAgent } : {}),
     ...(delegateAgents ? { delegateAgents } : {}),
     ...(definition.skills ? { skillCatalog } : {}),
-    fingerprint: createHash("sha256").update(markdown).update(code).update(instructions).update(handoffAgent?.fingerprint ?? "")
+    fingerprint: createHash("sha256").update(markdown).update(code ?? "").update(instructions).update(handoffAgent?.fingerprint ?? "")
       .update(definition.schedules?.length ? JSON.stringify(definition.schedules) : "")
       .update(JSON.stringify(repositoryInstructions.map(({ path, revision }) => ({ path: relative(root, path), revision }))))
       .update(JSON.stringify(delegateAgents?.map(agent => agent.fingerprint) ?? []))
@@ -136,7 +138,13 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
 }
 
 export async function enabledAgents(root: string): Promise<string[]> {
-  const factory = parse(await readFile(join(root, "factory.yaml"), "utf8"));
+  const text = await readFile(join(root, "factory.yaml"), "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (text === undefined) return [];
+  const factory = parse(text);
+  if (factory && factory.agents === undefined) return [];
   if (!Array.isArray(factory?.agents) || factory.agents.some((id: unknown) => typeof id !== "string" || !agentName.test(id))) {
     throw new Error("factory.yaml agents must be a list of agent names.");
   }
@@ -146,9 +154,17 @@ export async function enabledAgents(root: string): Promise<string[]> {
 
 /** Default for a new conversation; independent of enabled calendars and loops. */
 export async function defaultAgent(root: string): Promise<string> {
-  const factory = parse(await readFile(join(root, "factory.yaml"), "utf8"));
-  if (typeof factory?.defaultAgent !== "string" || !agentName.test(factory.defaultAgent))
-    throw new Error("Select --agent or set factory.yaml defaultAgent for new conversations.");
+  const text = await readFile(join(root, "factory.yaml"), "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+  const factory = text === undefined ? undefined : parse(text);
+  if (factory?.defaultAgent === undefined) {
+    const agents = (await catalog(root)).filter(agent => agent.runnable);
+    if (agents.length === 1) return agents[0].id;
+    throw new Error("Select an agent for this conversation.");
+  }
+  if (typeof factory.defaultAgent !== "string" || !agentName.test(factory.defaultAgent)) throw new Error("Invalid factory.yaml defaultAgent.");
   await loadAgent(root, factory.defaultAgent);
   return factory.defaultAgent;
 }

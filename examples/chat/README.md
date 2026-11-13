@@ -3,20 +3,26 @@
 Node 24.22.1+, PostgreSQL 15+ for central mode; no provider credentials needed.
 The synthetic provider exercises the **real Runner/Pi/transport/storage and UI**, not
 external inference or tools. Configuration creation is exclusive: choose a fresh directory.
-Inside `nix develop`, from the repository root:
+From the repository root with Node 24.22.1 (or inside the optional `nix develop` shell):
 
 ```sh
 npm ci
 npm run build
 node examples/chat/configure.mjs
+node packages/runner/dist/service-cli.js "$PWD/.local/chat-example/owner.json" serve
+```
+
+Keep the host running, then start Web in a second terminal:
+
+```sh
 DISPATCH_CONFIG="$PWD/.local/chat-example/native.json" npm start
 ```
 
 Open http://127.0.0.1:4319. Choose helper, type Hello, press Enter. A slowly
 streaming synthetic reply appears; send a follow-up or Stop all work, then reload
-and reopen its native history. No service/provider/owner starts merely by browsing.
+and reopen its native history. Web connects to the running host; browsing never starts an owner.
 
-For central PostgreSQL + outbound worker, stop Web, provision a **new disposable**
+For central PostgreSQL + outbound worker, stop Web and the example host, then provision a **new disposable**
 local database using your PostgreSQL tools, and write its URL into the private
 `.local/chat-example/database-url` file (mode 0600). Never use an existing database
 for a demonstration. Start the service and worker in separate terminals:

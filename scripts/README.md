@@ -1,13 +1,16 @@
 # Reusable npm package release
 
 This prepares reusable packages, not an application deployment. Publication needs
-separate explicit authority. The root, Web, Observer, Fleet and channel adapters
-are excluded from npm publication with `private: true`; their source remains public
-under MIT. Web retains the `@dispatch/web` application identity. The public
-closure is Runner and Remote, Remote → Postgres, Runner/Remote/Postgres → Backend,
-and Runner/Remote/Backend → Workers. Runner's `./gmail`
-compatibility factory needs the separately installed Email adapter; it is not
-required by the shared Backend/Worker runtime.
+separate explicit authority. Root, Web, Observer and Eval remain application
+packages excluded from npm publication. The public library set is Runner, Remote,
+Postgres, Backend, Workers, Slack, Google Chat, Email and Fleet. Install only the
+packages your application uses. Backend's central storage peers and Fleet's Slack
+peer are optional; explicit subpath imports activate those integrations.
+
+The last published archives are v0.12.2. Current main includes unreleased breaking
+API changes, and the v0.12.3 tag has no downloadable assets. Build current source
+archives for development; the next authorized breaking release must use a new
+minor version.
 
 Node 24.22.1 and the repository Nix shell are the supported preparation environment.
 All packages remain lockstep at the source version until a release is authorized.
@@ -28,7 +31,7 @@ release operator; metadata does not grant access. Never republish a used version
    Use a **clean** source for a release; `source.dirty: true` is development evidence
    only. Failures leave incomplete output for inspection, not publication.
 4. Inspect the actual tar contents, notices, metadata, declarations and files for
-   privacy and licensing. Compare `sha256sum *.tgz` with the manifest. Install all
+   privacy and licensing. Compare `sha256sum *.tgz` with the manifest. Install selected
    tarballs together into a fresh ESM directory **outside** this checkout:
 
    ```sh
@@ -45,6 +48,8 @@ release operator; metadata does not grant access. Never republish a used version
    checking install a compatible `@modelcontextprotocol/sdk` (1.32.2 qualified) as
    a consumer dev dependency. This is not a Dispatch runtime requirement. Record
    the audit both before and after installing this optional upstream peer.
+   Also install Runner + Backend without central peers, and Fleet without Slack,
+   in separate external directories to verify optional features stay optional.
    Resolve the documented public subpaths and use the non-mutating bin usage commands.
    Check `npm ls` and `npm audit --omit=dev`, recording unresolved advisories
    honestly. Do not patch package manifests or rely on workspace symlinks.

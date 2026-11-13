@@ -8,9 +8,8 @@ import { createHash } from "node:crypto";
 import { chmod, copyFile, mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { DatabaseSync, type SQLInputValue } from "node:sqlite";
-import { apply } from "@earendil-works/chord/delta";
-import type { Op } from "@earendil-works/chord/delta";
+import type { DatabaseSync, SQLInputValue } from "node:sqlite";
+import { openSqliteSnapshot, readSqliteDocument } from "@dispatch/runner/records";
 import type { JsonValue } from "@earendil-works/chord/json";
 import type { ConversationRecord, DocumentRecord, EntryRecord } from "@earendil-works/pi-durable";
 
@@ -86,12 +85,8 @@ export class NativeRecords {
   readonly source: Source;
   constructor(source: Source) {
     this.source = source;
-    this.db = new DatabaseSync(source.database, { readOnly: true });
+    this.db = openSqliteSnapshot(source.database);
     try {
-      this.db.exec("PRAGMA query_only = ON; BEGIN");
-      if (![1, 2].includes(Number(this.one("SELECT version FROM durable_schema WHERE singleton = 1")?.version))) {
-        throw new Error("Unsupported Pi Durable SQLite schema; this read-only reader supports schema versions 1 and 2.");
-      }
       this.sequence = Number(this.one("SELECT next_seq FROM durable_metadata WHERE singleton = 1")!.next_seq) - 1;
     } catch (error) { this.db.close(); throw error; }
   }
@@ -108,15 +103,8 @@ export class NativeRecords {
   document(id: number, at = this.sequence): Document {
     const record = this.record<DocumentRecord>("documents", id);
     if (record.kind === "pi.provider") throw new Error("Opaque provider state is not exposed by this reader.");
-    const base = this.one("SELECT seq, version, content FROM document_revisions WHERE document_id = ? AND kind = 'base' AND seq <= ? ORDER BY seq DESC LIMIT 1", id, at);
-    if (!base) throw new Error("This document revision is not retained.");
-    let value = JSON.parse(String(base.content)) as JsonValue, seq = Number(base.seq);
-    for (const row of this.rows("SELECT seq, kind, version, content FROM document_revisions WHERE document_id = ? AND seq > ? AND seq <= ? ORDER BY seq", id, seq, at)) {
-      if (row.kind !== "delta" || row.version !== base.version) throw new Error("Unsupported document revision boundary.");
-      value = apply(value, JSON.parse(String(row.content)) as Op[]);
-      seq = Number(row.seq);
-    }
-    return { record, seq, value };
+    const { value, sequence } = readSqliteDocument(this.db, id, at);
+    return { record, seq: sequence, value };
   }
   documents(conversationId?: number) {
     const rows = conversationId === undefined

@@ -4,16 +4,19 @@
 
 Use [the local composition](../../../examples/chat/README.md), which includes a
 synthetic provider and instructions for both native local and PostgreSQL/worker
-modes. `npm ci`, `npm run build`, `npm start` run inside `nix develop`.
+modes. Use Node 24.22.1, optionally supplied by `nix develop`. Build the packages,
+start the explicit host, then start Web with its client configuration.
 Open http://127.0.0.1:4319, not localhost. Override `DISPATCH_PORT` if occupied.
 Do not stop another installation to free a port.
 
 ## Configuration
 
-`DISPATCH_CONFIG` selects an absolute consumer-owned native JSON file with
-`definitionsRoot`, `host.cwd`, trusted gateway/model-provider bindings, `sources`
-(`id`, `label`, absolute existing `path`) and `defaultSource`.
-No personal paths, host wrappers, release manifests or platform defaults.
+`DISPATCH_CONFIG` selects an absolute consumer-owned JSON file containing a
+`service` connection or named `installations`, each with its own service connection.
+Use a private Unix socket or authenticated HTTPS. Optional read-only `sources`
+include an installation ID, label and absolute existing path. See
+[Backend configuration](../../backend/README.md). Definitions, working directories
+and model-provider bindings belong to the host, not Web.
 `DISPATCH_CENTRAL_CONFIG` instead selects the [central contract](../../backend/README.md).
 Only the service reads PostgreSQL secrets; workers initiate authenticated connections.
 
@@ -97,12 +100,10 @@ parent) are read-only: their owning task parses their output, so a human message
 would break its contract. Open the parent and steer it instead. The read-only bar
 states the actual reason: worker, internal service conversation, another process
 owns it, or the service is unreachable.
-Definitions, namespace, execution mode, cwd, host adapters and schema must match.
-Workspace/custom artifact host bindings require their original configured CLI.
-
-Admission checks paused native work under acquired locks before submit **or abort**
-can enable scheduling. Unrelated suspended conversations, recipient work and
-loop/calendar tasks are rejected, not silently resumed. Stop affects the selected
+Send and Stop route to the configured host through the common client contract.
+The host owns definitions, adapters, native recovery and input validation. Web
+never acquires execution locks or opens replacement owners. Unavailable owners
+leave retained histories read-only until they reconnect. Stop affects the selected
 ownership tree, not independent recipient work. No principal-wide concurrency cap.
 
 The browser stores selection in localStorage and uncertain request identity/text
@@ -131,11 +132,11 @@ packing and local archive creation do not deploy anything.
 
 ### Current source qualification gaps
 
-Native local and central PostgreSQL/outbound-worker paths were exercised with a
-synthetic provider on Apple Silicon. Matching Linux OCI build/install, real hosted
-authorization adapters and external provider/tool execution require separate
-consumer qualification. Existing dependency audit findings remain in the private
-task report; a passing build is not a security review.
+The [verification record](../../../docs/qualification.md) gives dated platform,
+browser, package and dependency-audit results. The current host/client change was
+exercised with a local synthetic provider on Apple Silicon. Linux execution,
+central PostgreSQL, live channel delivery, hosted TLS and external provider/tool
+execution were not requalified for this change.
 
 ## Open a conversation link
 

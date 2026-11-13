@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Prepare a public reusable package. Move Slack integration to the explicit /slack subpath and make the Slack peer optional.
+
 ## [0.12.2] - 2026-11-13
 
 - Keep workers available after restart when all retained runs have completed release, preserving their fencing receipts without repeating workspace shutdown.

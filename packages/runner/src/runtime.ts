@@ -276,14 +276,14 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       const hostExtensions = [...(options.extensions ?? []), ...(options.registryExtensions ?? []), ...resources].map(extension => extension.name);
       const missing = existing?.hostExtensions?.filter(name => !hostExtensions.includes(name)) ?? [];
       if (missing.length) {
-        throw new Error(`${agent.id}'s saved state requires ${missing.join(", ")}. Restart its chat server with the same adapters (serve --slack for Slack), then attach the CLI. Pending work has been preserved.`);
+        throw new Error(`${agent.id}'s saved state requires ${missing.join(", ")}. Restart its host with the same adapters, then connect the client. Pending work has been preserved.`);
       }
       if (existing?.fingerprint && existing.execution !== execution) {
         throw new Error(`${agent.id}'s demo/live mode changed. Preserve this state and choose a new --state-dir.`);
       }
       if (existing?.fingerprint && (existing.fingerprint !== agent.fingerprint || existing.artifactVersion !== 1)) {
         if (!options.updateDefinitions) {
-          throw new Error(`${agent.id}'s definition changed. Use --update-definitions when its saved work is idle, or choose a new --state-dir.`);
+          throw new Error(`${agent.id}'s definition changed. Set updateDefinitions in the host configuration when its saved work is idle, or use a new stateRoot.`);
         }
         const inspection = await harness.inspect(context);
         deferred = inspection.tasks.some(task => task.record.kind !== scheduleTaskKind(namespace)

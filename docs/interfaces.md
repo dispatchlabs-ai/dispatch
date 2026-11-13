@@ -1,19 +1,19 @@
 # Supported operations and interfaces
 
-Clients share native conversation operations when connected to the same Runner
-owner. This inventory records supported paths and intentional differences; every
-channel is not yet wired to Web's HTTP adapter.
+Clients use one Runner command/watch contract over embedded calls, Unix sockets
+or authenticated HTTPS. Web adapts that contract to browser routes and SSE.
+Durable channel delivery tasks are optional extensions in the same owner.
 
 | Operation | Web / HTTP | Runner local service / CLI | Other packages |
 | --- | --- | --- | --- |
 | List agents and histories | Agent, chat and source routes | `agents`, `chats`; same owner catalog | Observer reads configured stores; channel routing is installation configuration |
 | Create | Stable conversation creation key | `create`, native Chats identity | Channels map external threads into native conversations |
 | Send and steer | Retained `requestId` | `send`, native admission receipt | Each channel preserves its admission and delivery identities |
-| Observe | Snapshot and SSE | `snapshot`, `receipt`, status/watch | Observer is read-only; channels publish their documented public response projection |
+| Observe | Snapshot and SSE | `snapshot`, `receipt`, native event stream | Observer is read-only; channels publish their documented public response projection |
 | Stop | Selected conversation's stop route | `stop CHAT` | Channel controls are adapter-specific; independent recipients keep their own lifecycle |
 | Files | Validated native input blocks and artifact routes | Native attachments and retained artifacts | MIME types and delivery receipts depend on the channel |
 | Evaluate | No Web grading endpoint | Separate `dispatch-eval` command | Retained evidence or an explicitly configured rerun target |
-| Upgrade / restore | No ordinary user operation | Separate `dispatch-upgrade` administration | Host declarations and closed-state backups determine authority |
+| Upgrade | Application deployment | Bump the package and restart the explicit host | No runtime version takeover or machine migration command |
 
 The versioned [Web OpenAPI contract](../packages/web/openapi.yaml) defines exact
 paths, schemas and errors. [Backend](../packages/backend/README.md) documents
@@ -39,9 +39,8 @@ separate storage transport contract.
 - **Administration:** upgrade, backup and offline repair are explicit host
   operations, not alternatives to ordinary service authorization.
 
-A general authenticated network CLI with machine principals and multi-human
-grants is deferred. This alpha supplies a local service CLI and a hosted Web
-adapter. No MCP or WebMCP server is advertised by this repository.
+The network client uses installation-level bearer authorization and HTTPS.
+Machine-principal enrollment and multi-human grants remain future work. No MCP or WebMCP server is advertised by this repository.
 
 ## Errors and recovery
 

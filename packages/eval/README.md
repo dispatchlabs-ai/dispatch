@@ -149,7 +149,7 @@ dispatch-eval engine --package DIR --bindings FILE compare --runs A,B           
 
 `HOST.json` is the [on-demand host configuration](../runner/docs/nix-releases.md#on-demand-cli). It must bind the
 provider named as the package's grader, through `gateway` or
-[`modelProviders`](../runner/docs/service.md#local-model-providers). `run` exits 0 only when the step completed.
+[`modelProviders`](../runner/docs/service.md#start-a-host). `run` exits 0 only when the step completed.
 Diagnostics go to standard error; `run` prints two JSON events and each `engine` command prints one JSON value.
 
 `run` opens the native session `eval-NAME` under the host's state root (`--session KEY` or `DISPATCH_EVAL_SESSION`

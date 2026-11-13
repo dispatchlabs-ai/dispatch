@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Connect only to explicit hosts through the shared Runner client, using native watch streams. Remove local writer discovery/startup, duplicate metadata/provenance readers and unqualified installation aliases. Central storage is an optional subpath with optional peers.
+
 ## [0.8.0] - 2026-11-12
 
 - Chat messages carry an optional `details` field (a background reply's supporting material).

@@ -1,5 +1,4 @@
-import { apply, type Op } from "@earendil-works/chord/delta";
-import type { JsonValue } from "@earendil-works/chord/json";
+import { replayDocument } from "@dispatch/runner/records";
 import type {
   Activity,
   Connection,
@@ -195,15 +194,7 @@ export function project(raw: RawSnapshot, source: Connection): Snapshot {
           : "No retained base revision.",
       };
     try {
-      let value = base.content as JsonValue,
-        sequence = base.seq;
-      for (const revision of doc.revisions)
-        if (revision.seq > base.seq) {
-          if (revision.kind !== "delta" || revision.version !== base.version)
-            throw new Error("Unsupported revision boundary");
-          value = apply(value, revision.content as Op[]);
-          sequence = revision.seq;
-        }
+      const { value, sequence } = replayDocument(doc.revisions);
       return { ...summary, sequence, value: redact(value) };
     } catch {
       return {

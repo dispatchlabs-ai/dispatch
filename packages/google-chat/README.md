@@ -4,6 +4,13 @@ Expose an existing Dispatch agent through a Google Chat app. The adapter owns
 Google authentication, Pub/Sub intake, thread routing, presentation and delivery.
 Agent definitions and their command-line operation remain independent.
 
+## Package and host contract
+
+Install the matching prepared package archive beside Runner. `createAdapter(options)`
+returns the adapter accepted by `run({adapters})`, and is also the factory used by
+`dispatch-service` JSON configuration. A wrapper module is unnecessary. Native
+inbox/outbox tasks remain inside the owner; other clients use Runner's common API.
+
 ## Host integration
 
 Install this package with `@dispatch/runner`, Pi Durable and Chord 1.5.2. Build
