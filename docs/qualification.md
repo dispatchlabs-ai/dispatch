@@ -4,6 +4,45 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.16.0 Pi terminal client — November 13, 2026
+
+[Release v0.16.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.16.0)
+contains ten package archives from `3def3765d3a5dcbaf133dc83db4d8c1011105f7b`.
+All twelve downloaded assets matched the reviewed archives, manifest and checksums,
+including GitHub's SHA-256 digests. Fresh, empty-cache public URL installs passed
+strict NodeNext declaration checks, real library imports and npm dependency checks.
+Web also installed alone with its transitive Runner and Backend archives. Minimal
+Backend and Fleet consumers loaded without central peers and Slack respectively.
+Selected production audits reported zero findings; the full consumer audit also
+reported zero before and after installing the documented MCP development peer.
+
+Actual `npm run chat` interaction on macOS arm64, Node 26.5.0, covered streaming
+Markdown, native tool progress/results/failure/cancellation, multiline input and
+paste, retained history, command and conversation pickers, per-chat drafts and
+scroll restoration. Layouts were inspected at 120×36, 80×24 and 48×24. A second
+client's message appeared in the same conversation. Exiting during admitted work
+left that work running; missing hosts, stalled initial connection, disconnect,
+explicit reconnect and a different host identity were exercised. A dropped send
+acknowledgement retained the original request. A subsequent rejection did not
+erase that uncertainty; another explicit retry reattached to one submission.
+Definite first-attempt rejection restored the draft. Plain prompt/history paths
+retained their output behavior.
+
+The released Web client continued a terminal conversation through the same host.
+Keyboard send, incremental replies, native tool Stop, retained state after reload,
+tool details and mobile navigation were exercised at 1440×900, 1280×720, 768×1024
+and 390×844. These checks used isolated synthetic agents and the native runtime.
+
+Workspace build/check, macOS arm64 and Linux x86_64 Nix builds and flake checks,
+frontend, macOS portable and both Linux OCI builds passed with Node 24.22.1 and
+Pi 1.5.2. Source, outgoing commits, package contents and notices were reviewed.
+Supplementary package scans had no matches; application archive/image matches
+were inspected as upstream examples, parser strings, SDK directories and empty
+npm configuration. This was a scoped implementation and privacy review, not an
+independent security assessment. No automated functional tests were added or run.
+Linux and Windows terminal interaction, hosted deployments and live channels
+were not qualified by this release. npm registry publication remains separate.
+
 ## v0.15.1 Web startup guidance — November 13, 2026
 
 [Release v0.15.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.15.1)
