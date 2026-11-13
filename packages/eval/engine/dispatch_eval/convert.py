@@ -16,8 +16,8 @@ nothing has to be graded again. What moves:
 - Any other table is carried over unchanged under its own name.
 
 Schema 1 recorded neither a clock kind nor a runtime identity for a run. Converted runs therefore refuse speed
-comparison and are marked not comparable by runtime, unless `--clock-kind` and `--runtime` declare what they were;
-a declaration is recorded in the run manifest as made at conversion.
+comparison unless `--clock-kind` declares what the clock was. `--runtime` records a runtime identity in the run
+manifest for reference; it does not affect comparisons. A declaration is recorded as made at conversion.
 """
 from __future__ import annotations
 

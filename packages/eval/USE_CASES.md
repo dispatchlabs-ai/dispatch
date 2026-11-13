@@ -15,7 +15,7 @@ implementation or deployment.
   session or taking a lock, and learns from `coverage` what the store did not hold.
 - **EVAL-006 — Resume:** an interrupted step is run again and repeats no finished rerun, grader call or judgment.
 - **EVAL-007 — Trust a comparison's limits:** a reader is told when speed was not compared because the clocks
-  differ, when runs are not comparable because the runtime differs, and when evidence came from a dirty build.
+  differ and when evidence came from a dirty build, and can see the runtime each run recorded.
 - **EVAL-008 — Keep earlier results:** an operator converts a store written by the earlier schema and reads the
   same figures from it.
 - **EVAL-009 — Leave others alone:** a release built without `withEval` is built exactly as before.

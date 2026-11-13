@@ -367,11 +367,6 @@ def search(p: Package, run: str) -> dict:
         drift = sorted(k for k in set(planned) | set(now_identity) if k not in ("release",) and planned.get(k) != now_identity.get(k))
         if drift:
             raise SystemExit(f"run {run}: target drifted since planning ({', '.join(drift)}); finished cases are kept; plan a new run for the rest")
-    if pending and "runtime" in manifest and not (manifest.get("target_identity") or {}).get("runtime"):
-        # One run has one runtime identity: its remaining cases are not run on another Dispatch or Pi Durable.
-        changed = E.runtime_comparability("the plan", manifest.get("runtime"), "this build", p.runtime())
-        if changed:
-            raise SystemExit(f"run {run}: {changed}; finished cases are kept; plan a new run for the rest")
     if pending:
         known = manifest.get("development") or []
         added = [x for x in (f"continued by a development build: {r}" for r in E.development_reasons(p.build))
@@ -418,9 +413,9 @@ def run_status(p: Package, run: str) -> dict:
 
 def compare(p: Package, a: str, b: str) -> list[list]:
     """Run against run over the planned case population: clear only when ranges (search repeats x judgments) separate.
-    Each run is read under its own recorded rubric versions. Runs with different rubric, grader or metric versions,
-    or on different runtime identities, are not comparable. Seconds are compared only when both runs recorded the
-    same clock kind. Coverage (completed, failed, pending, unassessed) is shown for both."""
+    Each run is read under its own recorded rubric versions. Runs with different rubric, grader or metric versions
+    are not comparable. Seconds are compared only when both runs recorded the same clock kind. The runtime a run
+    recorded is shown, and never decides whether two runs are compared. Coverage (completed, failed, pending, unassessed) is shown for both."""
     ra, rb = (p.con.execute("select * from runs where run=?", (x,)).fetchone() for x in (a, b))
     for name, row in ((a, ra), (b, rb)):
         if not row:
@@ -446,9 +441,6 @@ def compare(p: Package, a: str, b: str) -> list[list]:
         reasons.append(f"different metric versions ({ma.get('metric_version')} vs {mb.get('metric_version')})")
     if ma.get("metric_version") == mb.get("metric_version") and metric_now != ma.get("metric_version"):
         reasons.append(f"the package now computes metric version {metric_now}; the runs recorded {ma.get('metric_version')} / {mb.get('metric_version')}")
-    runtime = E.runtime_comparability(a, ma.get("runtime"), b, mb.get("runtime"))
-    if runtime:
-        reasons.append(runtime)
     comparable = not reasons
     measures = p.m.measures
     rows = []

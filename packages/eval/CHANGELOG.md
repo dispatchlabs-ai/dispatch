@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Runtime no longer decides whether runs are compared or continued. `compare` gives its verdicts for runs that recorded different Dispatch revisions or Pi Durable versions, or none, and a run with pending cases continues on the build at hand. The runtime identity is still recorded in the run manifest and shown in reports. `runtime_comparability` is removed from the engine.
+
 ## [0.11.2] - 2026-11-12
 
 - Retain the evaluation package MIT license in Nix-built agent releases.

@@ -229,8 +229,6 @@ Enforced, not left to convention:
 
 - **Speed is compared only on one clock.** `compare` refuses to compare seconds between runs whose clock kinds
   differ, or that recorded none, and says which.
-- **Different runtimes are not comparable.** Runs on different Dispatch revisions or Pi Durable versions are marked
-  `NOT COMPARABLE`, and a run is not continued on another runtime than the one it was planned on.
 - **A dirty build is development evidence.** A build whose definitions or Dispatch revision is not a clean commit,
   a package with uncommitted changes, or an engine started without the launcher, labels its runs, its assessments
   and every report that includes them `DEVELOPMENT EVIDENCE`, with the reason.
@@ -250,8 +248,8 @@ dispatch-eval convert --data-dir DIR [--bundle-root DIR] [--clock-kind KIND] [--
 Every row keeps its ID, so history, frozen requirements and comparisons keep their links and nothing is graded
 again. Each column of a schema-1 unit that named a domain attribute becomes a label under the column's name. The
 original file is kept beside the new one as `assessments.schema1.sqlite`. Schema 1 recorded no clock kind or
-runtime identity: converted runs refuse speed comparison and are marked not comparable until `--clock-kind` and
-`--runtime` declare them, and a declaration is recorded as made at conversion. See
+runtime identity: converted runs refuse speed comparison until `--clock-kind` declares the clock, and `--runtime`
+records a runtime identity for reference only. A declaration is recorded as made at conversion. See
 [convert.py](engine/dispatch_eval/convert.py) for the full mapping.
 
 ## Limits

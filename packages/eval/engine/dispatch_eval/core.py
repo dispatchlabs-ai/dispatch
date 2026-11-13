@@ -216,23 +216,6 @@ def speed_comparability(a: str, clock_a: str | None, b: str, clock_b: str | None
     return None
 
 
-def runtime_comparability(a: str, runtime_a: dict | None, b: str, runtime_b: dict | None) -> str | None:
-    """Why two runs are not comparable by runtime identity (Dispatch revision and Pi Durable version), or None."""
-    def known(r):
-        return bool(r and r.get("dispatch") and r.get("pi_durable"))
-
-    def text(r):
-        return f"Dispatch {r.get('dispatch')}, Pi Durable {r.get('pi_durable')}"
-    missing = [run for run, r in ((a, runtime_a), (b, runtime_b)) if not known(r)]
-    if missing:
-        return f"runtime identity not recorded for {' and '.join(missing)}"
-    if (runtime_a["dispatch"], runtime_a["pi_durable"]) != (runtime_b["dispatch"], runtime_b["pi_durable"]):
-        return f"different runtime identities ({a}: {text(runtime_a)}; {b}: {text(runtime_b)})"
-    return None
-
-
-# ---------------------------------------------------------------- agreement
-
 def agreement(units: list[list[dict]], label=lambda key: key, noun: str = "units") -> dict:
     """Repeat agreement over closed items. `units` holds each unit's judgments, already flattened to {item: value}.
     The union of items is compared: an item missing from one judgment counts as a disagreement."""
