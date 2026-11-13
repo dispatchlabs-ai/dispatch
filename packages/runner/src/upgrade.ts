@@ -118,8 +118,8 @@ class Reach {
         const item = stack.pop();
         if (typeof item === "string") for (const inner of this.versions(item, who, namespace, seen)) found.add(inner);
         else if (item && typeof item === "object") for (const [key, value] of Object.entries(item)) {
-          // PATH remains a search path list inside JSON configuration.
-          if (key === "PATH" && typeof value === "string") stack.push(...value.split(":"));
+          // Environment PATH and release tools.path both contain search path lists.
+          if ((key === "PATH" || key === "path") && typeof value === "string") stack.push(...value.split(":"));
           else stack.push(value);
         }
       }
