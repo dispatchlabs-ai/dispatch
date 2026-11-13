@@ -4,6 +4,50 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.13.1 one-file host — November 13, 2026
+
+[v0.13.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.13.1)
+resolves to `29340ac0ff8bb5fb0daf9096572d720315a9cd2a`. All nine library archives,
+their clean-source manifest and checksums were published and downloaded again;
+all eleven assets match the reviewed originals, including every package's npm
+SHA-512 integrity. This is a GitHub archive release, not npm registry publication.
+
+A fresh directory installed Runner directly from its public GitHub URL with
+ordinary npm. One root `agent.md`, `npx dispatch serve --demo` and `dispatch chat`
+produced a saved conversation without application code, host JSON, a scaffold or
+Nix. The final archive ran on macOS arm64 with ordinary Node 26.5.0 and an official
+Node 24.22.1 download; history survived restarting the same host between them.
+The same archive and one-file commands also ran on Linux x86_64 with Node 24.22.1.
+Runtime and packages remain pinned to Pi Durable 1.5.2.
+
+Actual CLI/Web use shared one conversation: keyboard send and incremental replies,
+terminal disconnect without cancellation, explicit Stop with retained partial
+text, host restart with automatic browser reconnection, follow-up, reload and
+mobile navigation. Whole pages were reviewed at 1440×900, 1280×720, 768×1024 and
+390×844, with no browser console errors. Root and named definitions coexist;
+duplicate root/named IDs, missing credentials and absent or duplicate hosts
+produce actionable errors. No live provider credentials were used.
+
+Full source/type/build checks, measured dependency hashes and macOS/Linux Nix
+flake checks passed, including frontend, portable macOS and both Linux OCI
+artifacts. External consumers installed all nine archives, imported 22 library
+subpaths and checked the worker executable's declarations/resolution. Strict
+NodeNext declaration checking used the documented ES2024 types and optional
+upstream MCP SDK dev dependency. Minimal Backend and Fleet consumers did not
+require central-storage or Slack peers. Downloaded archives passed the same
+import/type checks; imports ran on Node 24 and 26. Production audits reported zero findings.
+
+Source, outgoing history, package contents, notices and image metadata were
+reviewed. Nine package archives had no known-pattern scan matches. Application
+artifact matches were reviewed upstream examples, parser strings, empty npm
+configuration and SDK source directories; the images were qualified, not uploaded.
+Scans are supplementary evidence, not comprehensive security clearance.
+
+No automated functional tests were added or run. Live inference, channel delivery,
+hosted TLS, multi-user authorization and other platforms were not requalified.
+No fresh independent agent walkthrough or deployment was performed. Consumer
+repositories and installed services were unchanged.
+
 ## v0.13.0 package release — November 13, 2026
 
 [v0.13.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.13.0)
