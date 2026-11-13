@@ -112,7 +112,9 @@ Workers report CPU/memory pressure. Sustained pressure can move a run to healthy
 spare capacity through the same stop/release boundary; independent runs have no
 configured concurrency cap. Lost coordinator contact suspends native work and
 guest processes, then exits with failure so systemd reconnects. A restarted host
-with previous assignments drains for fenced replacement. Long shell commands
+with unresolved assignments drains for fenced replacement. Completed release
+receipts remain available for epoch fencing without draining an idle worker or
+repeating workspace shutdown. Long shell commands
 do not hold the lifecycle fence. Failed effects and uncertain commits are not
 blindly retried by transport; applications reconcile native receipts.
 

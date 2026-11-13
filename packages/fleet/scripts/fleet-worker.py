@@ -39,6 +39,10 @@ def valid_run(run):
     return run
 
 
+def release_complete(row):
+    return row['state'] == 'released' and row.get('releaseComplete') is True
+
+
 def systemctl(*args):
     return subprocess.run(['systemctl', *args], capture_output=True, text=True, check=True).stdout.strip()
 
@@ -225,8 +229,9 @@ class Worker:
             row = json.loads(path.read_text()); valid_run(row['run'])
             self.runs[row['run']] = row
         # A restarted daemon cannot prove which pre-restart requests escaped.
-        # Let the coordinator fence/reassign its retained runs as a group.
-        self.draining = bool(self.runs)
+        # Let the coordinator fence/reassign unresolved runs as a group.
+        # Completed release receipts remain available for epoch fencing.
+        self.draining = any(not release_complete(row) for row in self.runs.values())
         for path in (ROOT / 'commands').glob('*.json'):
             row = json.loads(path.read_text())
             if row['state'] == 'running':
@@ -606,7 +611,8 @@ class Worker:
             if time.monotonic() - self.last_contact < 60 or self.quarantined: continue
             self.quarantined = True
             self.stop.set()
-            for run in list(self.runs):
+            for run, row in list(self.runs.items()):
+                if release_complete(row): continue
                 try: self.suspend(run, stop_space=True)
                 except Exception:
                     print(json.dumps({'run': run, 'fleetWatchdog': 'stop-failed'}), flush=True)
@@ -614,7 +620,8 @@ class Worker:
     def serve(self):
         # A daemon restart does not authorize replaying a previously running
         # effect. Stop its old local processes before asking for new commands.
-        for run in list(self.runs): self.suspend(run, stop_space=True)
+        for run, row in list(self.runs.items()):
+            if not release_complete(row): self.suspend(run, stop_space=True)
         for target in (self.heartbeat, self.deliver_results, self.watchdog):
             threading.Thread(target=target, daemon=True).start()
         while not self.stop.is_set():
@@ -642,11 +649,12 @@ def main():
     signal.signal(signal.SIGINT, shutdown)
     try: worker.serve()
     finally:
-        for run in list(worker.runs):
+        for run, row in list(worker.runs.items()):
+            if release_complete(row): continue
             try: worker.suspend(run, stop_space=True)
             except Exception: pass
     # The watchdog is a lost-contact failure, not an operator-requested stop.
-    # Restart=on-failure reconnects idle hosts; retained runs restart draining.
+    # Restart=on-failure reconnects idle hosts; unresolved runs restart draining.
     if worker.quarantined: raise SystemExit(1)
 
 
