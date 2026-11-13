@@ -9,7 +9,8 @@ import type { ReplySink } from "./replies.js";
 import { reportError } from "./terminal-output.js";
 import type { ArtifactOptions, ArtifactSink } from "./artifacts.js";
 import { localClient } from "./client.js";
-import { defaultAgent } from "./definition.js";
+import { catalog, defaultAgent, loadAgent, type LoadedAgent } from "./definition.js";
+import { connectMcpServers, type McpServers } from "./mcp.js";
 
 export type PreparedAdapter = {
   extension: Extension;
@@ -41,11 +42,14 @@ export type RunOptions = {
   resume?: boolean;
   initialize?: ChatInitializer;
   adapters?: Adapter[];
+  /** MCP connections are owned by this host; agents select them by name. */
+  mcpServers?: McpServers;
   replySink?: ReplySink;
   schedules?: boolean;
   artifacts?: ArtifactOptions;
   /** Attach domain workflows to the same host before adapters begin receiving. */
-  open?: (options: { extensions: Extension[]; replySink?: ReplySink; settings?: OpenOptions["settings"]; artifacts?: ArtifactOptions }) => Promise<ChatService>;
+  open?: (options: { extensions: Extension[]; replySink?: ReplySink; settings?: OpenOptions["settings"]; artifacts?: ArtifactOptions;
+    prepareAgent: (agent: LoadedAgent) => LoadedAgent }) => Promise<ChatService>;
   beforeStart?: (service: ChatService) => Promise<void>;
 };
 
@@ -55,16 +59,35 @@ export async function run(options: RunOptions = {}) {
   const runner = options.runner ?? createRunner();
   const adapters: PreparedAdapter[] = [];
   let service: ChatService | undefined;
+  let mcp: Awaited<ReturnType<typeof connectMcpServers>> | undefined;
   let closing: Promise<void> | undefined;
   const close = () => closing ??= (async () => {
     const results = await Promise.allSettled(adapters.map(adapter => adapter.close()));
-    try { await service?.close(); }
+    try { try { await service?.close(); } finally { await mcp?.close(); } }
     finally {
       const failed = results.find(result => result.status === "rejected");
       if (failed?.status === "rejected") throw failed.reason;
     }
   })();
   try {
+    if (options.mcpServers !== undefined) {
+      const names = options.names?.length ? options.names : (await catalog(root)).filter(agent => agent.runnable).map(agent => agent.id);
+      const requested = new Set<string>();
+      const collect = (agent: LoadedAgent) => {
+        for (const name of agent.mcp ?? []) requested.add(name);
+        for (const child of agent.delegateAgents ?? []) collect(child);
+        if (agent.handoffAgent) collect(agent.handoffAgent);
+      };
+      for (const name of names) collect(await loadAgent(root, name));
+      mcp = await connectMcpServers(options.mcpServers, { cwd: options.cwd ?? root, names: [...requested] });
+    }
+    const prepareAgent = (agent: LoadedAgent): LoadedAgent => !agent.mcp?.length ? agent : ({ ...agent,
+      extensions: [...(agent.extensions ?? []), ...(agent.mcp ?? []).map(name => {
+        const extension = mcp?.extensions[name];
+        if (!extension) throw new Error(`Agent ${agent.id} requires MCP server ${name}; configure it in mcpServers.`);
+        return extension;
+      })],
+    });
     for (const adapter of options.adapters ?? []) adapters.push(await adapter.prepare({ root, runner }));
     const extensions = adapters.map(adapter => adapter.extension);
     // Never broadcast a reply or guess between transports. Legacy destinations
@@ -79,12 +102,13 @@ export async function run(options: RunOptions = {}) {
     });
     const artifacts: ArtifactOptions = { ...options.artifacts, sink: options.artifacts?.sink ?? (async (tx, id, artifact) =>
       (await Promise.all(adapters.map(adapter => adapter.queueArtifact?.(tx, id, artifact) ?? []))).flat()) };
-    if (options.open) service = await options.open({ extensions, replySink, settings: options.settings, artifacts });
+    if (options.open) service = await options.open({ extensions, replySink, settings: options.settings, artifacts, prepareAgent });
     else {
       if (!options.models) throw new Error("Supply a Pi Models catalog or an open callback.");
       service = await runner.ChatService.open({
         root, stateRoot: resolve(options.stateRoot ?? resolve(root, ".state")),
         models: options.models, demo: options.demo ?? false, names: options.names,
+        prepareAgent,
         updateDefinitions: options.updateDefinitions, initialize: options.initialize,
         resume: options.resume, schedules: options.schedules,
         deferResume: true,

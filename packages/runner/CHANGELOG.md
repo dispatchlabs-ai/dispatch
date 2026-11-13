@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+- Preserve Pi's strict tool-schema default for Codex models routed through a gateway Responses pool, so optional arguments can be omitted when calling tools.
+
+- Connect configured MCP servers through Pi MCP 1.5.2 and register discovered tools
+  with Pi Durable. Select named connections with `mcp` in Markdown and configure
+  stdio or Streamable HTTP under host `mcpServers`; no agent-specific adapter is
+  required. Preserve native cancellation, recovery and complete returned results.
+- Add optional tool selection, startup validation and host-owned connection
+  cleanup. Interactive OAuth sign-in and non-tool MCP features remain outside
+  this initial integration.
+
 ## [0.13.1] - 2026-11-13
 
 - Start a local host with `dispatch serve` from one root `agent.md`; provider bindings

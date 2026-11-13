@@ -9,6 +9,8 @@ import { createArtifacts } from "./artifacts.js";
 import type { LoadedAgent } from "./definition.js";
 
 export * from "./definition.js";
+export { connectMcpServers } from "./mcp.js";
+export type { McpServers } from "./mcp.js";
 export { publicCommentary, publicAnswer } from "./commentary.js";
 export { WorkspaceClient, WorkspaceEnvironment } from "./workspace.js";
 export type { WorkspaceImage, WorkspaceRelease, WorkspaceRecord, WorkspaceTransport } from "./workspace.js";

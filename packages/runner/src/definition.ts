@@ -20,6 +20,8 @@ export type AgentDefinition = {
   schedules?: AgentSchedule[];
   /** Native Pi Durable extensions. No tools are installed by default. */
   extensions?: Extension[];
+  /** Named MCP connections supplied by the host. Also accepted in Markdown frontmatter. */
+  mcp?: string[];
   /** Native coding tools, with a private checkout selected by the agent. */
   coding?: boolean;
   /** Discover company skills and this agent's own skills. Opt-in for existing stores. */
@@ -55,6 +57,9 @@ export function defineAgent(definition: AgentDefinition = {}): AgentDefinition &
   if (definition.input !== undefined && typeof definition.input !== "string") throw new Error("Agent input must be text.");
   if (trigger.mode !== "manual" && !definition.input?.trim()) throw new Error("A scheduled agent needs a nonempty input.");
   validateSchedules(definition.schedules);
+  if (definition.mcp !== undefined && (!Array.isArray(definition.mcp)
+    || definition.mcp.some(name => typeof name !== "string" || !/^[A-Za-z0-9_-]+$/.test(name))
+    || new Set(definition.mcp).size !== definition.mcp.length)) throw new Error("mcp must be a list of unique MCP server names.");
   if (definition.delegates && (!Array.isArray(definition.delegates) || definition.delegates.some(id => !agentName.test(id))
     || new Set(definition.delegates).size !== definition.delegates.length)) throw new Error("Delegates must be unique agent names.");
   if (definition.messages && (!Array.isArray(definition.messages) || definition.messages.some(id => !agentName.test(id))
@@ -136,7 +141,7 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
   // An agent module is trusted application code, loaded once per process.
   const module = code !== undefined ? await import(pathToFileURL(join(folder, "agent.ts")).href) : undefined;
   if (module && !Object.hasOwn(module, "default")) throw new Error(`${source.replace(/\.md$/, ".ts")} must export its definition as default.`);
-  const definition = defineAgent(module?.default);
+  const definition = defineAgent({ ...module?.default, ...(meta.mcp !== undefined ? { mcp: meta.mcp } : {}) });
   const skillCatalog = definition.skills ? await loadSkills(root, id) : [];
   const repositoryInstructions = await loadRepositoryInstructions(folder, root);
   const handoffAgent = definition.handoff

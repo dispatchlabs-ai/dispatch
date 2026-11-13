@@ -13,6 +13,7 @@ import type { ModelChoice } from "./gateway.js";
 import { connectHostModels, type HostModelsConfig } from "./host-models.js";
 import { serviceSettings, type ServicePolicy } from "./settings.js";
 import { privateStateDirectory } from "./private-state.js";
+import type { McpServers } from "./mcp.js";
 
 export type ServiceConfig = ServicePolicy & HostModelsConfig & {
   root: string;
@@ -30,6 +31,7 @@ export type ServiceConfig = ServicePolicy & HostModelsConfig & {
   schedules?: boolean;
   definitionResources?: boolean;
   adapters?: { module: string; optionsFile: string }[];
+  mcpServers?: McpServers;
 };
 export type ServiceListener = string | { host?: string; port: number; authorize(request: IncomingMessage): boolean | Promise<boolean> };
 

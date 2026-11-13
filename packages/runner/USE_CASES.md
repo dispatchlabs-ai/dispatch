@@ -131,6 +131,11 @@ records the agreed boundaries and existing foundations.
   application from published, versioned Dispatch packages using its own agent
   definitions and interfaces without a Dispatch source checkout or the full
   browser application.
+- **RUN-034 — Connect MCP tools from settings:** An operator configures authorized
+  MCP servers once in the host; each agent selects named connections in Markdown.
+  Discover server-defined tools and execute them through Pi Durable with retained
+  results, cancellation and recovery, without an agent-specific protocol adapter.
+  See [MCP connections](docs/mcp.md) for the supported transports and boundaries.
 
 Remote persistence and connectivity belong to
 [Remote's goals](../remote/USE_CASES.md#2-portable-service-additions);

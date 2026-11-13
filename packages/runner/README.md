@@ -79,8 +79,8 @@ See the [first-conversation walkthrough](../../docs/quickstart.md).
 paths. The default socket is a stable, account-private temporary path derived
 from the application state path, so deeply nested checkouts work too. The host
 prints its socket for other clients. `dispatch catalog` reads definitions without
-opening stores. For custom model providers, HTTPS, channel extensions or host
-policy, use `dispatch serve --config HOST.json` and the
+opening stores. For custom model providers, MCP servers, HTTPS, channel extensions
+or host policy, use `dispatch serve --config HOST.json` and the
 [host configuration guide](docs/service.md).
 
 The library remains directly usable from application code:
@@ -96,7 +96,8 @@ await host.close();
 ## Definitions and optional capabilities
 
 Your repository owns instructions, model selection, tools, skills and application
-code. Add `agent.ts` beside the root Markdown only when the agent needs capabilities.
+code. Select MCP connections in Markdown; add `agent.ts` beside it for custom
+application code or other optional capabilities.
 For several agents, use `agents/NAME/agent.md` and optional `agent.ts` beside each.
 A root `agent.md` can coexist with named agents, but not with `agents/agent/agent.md`.
 
@@ -115,6 +116,20 @@ Scheduling is optional. A non-manual `trigger` requires `input`. An optional
 `factory.yaml` enables scheduled agents and may select `defaultAgent`; without it
 all definitions are available for chat and no schedules start. A single agent is
 automatically the default. See [schedules](docs/schedules.md).
+
+## MCP connections
+
+Add `mcp: [wiki]` to an agent's Markdown frontmatter and configure `wiki` under
+the host's `mcpServers`. Dispatch discovers the server's tool descriptions and
+schemas using Pi MCP and registers them with Pi Durable. No agent TypeScript or
+server-specific tool adapter is needed.
+
+Connections support stdio commands and Streamable HTTP URLs with configured
+headers. The host owns credentials and connection lifetime; CLI, web and channel
+clients use the same tools. An optional `tools` list selects exact server tool
+names. See [MCP setup, lifecycle and current boundaries](docs/mcp.md), including
+authentication prerequisites and the distinction between tools and other MCP
+features.
 
 ## One host, one client contract
 

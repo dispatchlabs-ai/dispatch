@@ -14,7 +14,7 @@ Use `--state DIRECTORY` on both commands to select another store. No JSON file,
 application entry point or Nix environment is required. See the
 [quickstart](../../../docs/quickstart.md).
 
-For explicit custom provider, channel or network bindings, use `run({root,stateRoot,models,...})` from application code, or create `HOST.json`
+For explicit custom provider, MCP, channel or network bindings, use `run({root,stateRoot,models,...})` from application code, or create `HOST.json`
 with absolute paths and start `dispatch-service HOST.json serve`:
 
 ```json
@@ -39,6 +39,11 @@ Runner creates an absent directory with those permissions. Keep it outside share
 authority, not a sandbox. Defaults discover all agents. `names` selects a subset.
 One definition is the default; with several, clients choose an agent or the
 optional `factory.yaml` selects `defaultAgent`.
+
+For MCP tools, configure `mcpServers` here and select named connections with
+`mcp: [name]` in each agent's Markdown frontmatter. The host connects them before
+recovery; callers use the existing client contract. See [MCP connections](mcp.md)
+for stdio/HTTP settings, authentication and lifecycle boundaries.
 
 Start and stop this process with your application supervisor. SIGTERM/SIGINT
 close it gracefully and preserve unfinished native work. Restart with the same

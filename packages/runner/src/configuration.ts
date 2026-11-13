@@ -16,6 +16,10 @@ export function createConfiguration(codingExtension: ReturnType<typeof createCod
   ): Promise<AgentSetup> {
     const repositoryInstructions = repositoryInstructionsExtension();
     const extensions: Extension[] = [repositoryInstructions, ...(agent.extensions ?? [])];
+    for (const name of agent.mcp ?? []) {
+      if (!extensions.some(extension => extension.name === `mcp:${name}`))
+        throw new Error(`${agent.id} requires MCP server ${name}. Use run/startService with mcpServers, or bind its native extension before opening the agent.`);
+    }
     const installed: Extension[] = [];
     if (agent.skillCatalog?.length) extensions.push(skillExtension(agent.id, agent.skillCatalog));
     let delegate: AgentSetup | undefined;

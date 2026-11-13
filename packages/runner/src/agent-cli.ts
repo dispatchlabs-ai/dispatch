@@ -59,7 +59,7 @@ try {
   } else if (positionals[0] === "catalog") {
     const root = resolve(values.root ?? ".");
     const agents = await Promise.all((await catalog(root)).filter(agent => agent.runnable).map(agent => loadAgent(root, agent.id)));
-    console.log(JSON.stringify(agents.map(({ id, description, model, fingerprint }) => ({ id, description, model, fingerprint })), null, 2));
+    console.log(JSON.stringify(agents.map(({ id, description, model, fingerprint, mcp }) => ({ id, description, model, fingerprint, ...(mcp ? { mcp } : {}) })), null, 2));
   } else if (positionals[0] === "watch") {
     const { watchCommand } = await import("./watch.js");
     await watchCommand([

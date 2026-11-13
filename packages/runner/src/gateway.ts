@@ -80,7 +80,10 @@ export async function refreshGatewayModels(origin: string, models: any, key?: st
         let terminal: any;
         const responses = group ? await import('@earendil-works/pi-ai/api/openai-responses') : undefined;
         const upstream = responses ? (operation === 'streamSimple' ? responses.streamSimple : responses.stream)(
-          { ...model, api: 'openai-responses', baseUrl: `${origin}/v1` }, transcript, {
+          { ...model, api: 'openai-responses', baseUrl: `${origin}/v1`,
+            // Preserve Pi's Codex strict-schema default across the gateway's Responses transport.
+            ...(model.api === 'openai-codex-responses' ? { compat: { supportsStrictMode: true, ...model.compat } } : {}),
+          }, transcript, {
             ...options, signal, apiKey: typeof key === 'string' ? key : 'native-keychain',
             fetch: authorizedFetch,
             onPayload: (payload: any) => ({ ...payload, model: `${group}/${model.id}` }),
