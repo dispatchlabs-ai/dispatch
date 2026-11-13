@@ -4,6 +4,33 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.14.0 native MCP tools — November 13, 2026
+
+[v0.14.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.14.0)
+ships nine library archives from `d7a8233f4287564a9c17739b3ee71c0f899ec93a`.
+The downloaded archives, manifest and checksums matched the retained bytes. The
+Runner archive installed by its versioned GitHub URL into a standalone application.
+Pi MCP and Pi Durable are pinned to 1.5.2; the coding-agent runtime is not required.
+
+One Markdown agent, a configured authenticated stdio MCP client, and a real
+model routed through a shared inference gateway completed research with four
+discovered tools. The resulting article and original conversation supported the
+answer's citation anchors. The native store retained a 58,838-byte tool result;
+the installed host reopened the same answer after restart without new work. A
+separate live Streamable HTTP server returned a document through the released
+connector. These checks qualify the transports and tools exercised, not arbitrary
+servers, interactive OAuth or non-tool MCP features.
+
+All nine archives passed external installation, public-file, integrity, strict
+NodeNext type and runtime import checks; the selected production npm audits had
+zero findings. Workspace build and type checks, arm64 macOS and x86_64 Linux
+flake checks, frontend and portable macOS builds, and both Linux OCI builds
+passed. Package and image contents were reviewed, including known-pattern scan
+matches in upstream examples and library strings. Synthetic Web/CLI qualification
+covered keyboard send, streaming, Stop, retained history, reload and reconnect;
+Web was inspected at 1440×900, 1280×720, 768×1024 and 390×844. No hosted deployment
+or live messaging channel was changed or qualified by this release.
+
 ## v0.13.1 one-file host — November 13, 2026
 
 **Setup correction after release:** the initial instructions omitted `npm init`.
