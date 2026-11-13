@@ -6,6 +6,13 @@ installation, model-quality or security qualification.
 
 ## v0.13.1 one-file host — November 13, 2026
 
+**Setup correction after release:** the initial instructions omitted `npm init`.
+In a new directory nested beneath an existing npm project, installation selected
+that parent project. The current instructions initialize a local package first.
+The corrected commands were exercised in that nested layout: Runner was the
+child application's only direct dependency, its audit reported zero findings,
+and the parent manifest remained unchanged. Release archives and tags are unchanged.
+
 [v0.13.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.13.1)
 resolves to `29340ac0ff8bb5fb0daf9096572d720315a9cd2a`. All nine library archives,
 their clean-source manifest and checksums were published and downloaded again;

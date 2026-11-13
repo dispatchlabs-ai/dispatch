@@ -23,11 +23,15 @@ Dispatch dependency changes the runtime; your definition files stay yours.
 See the [minimal agent example](packages/runner/README.md#try-it-without-credentials)
 and the [service/client contract](packages/runner/docs/service.md#shared-clients-and-company-compositions).
 
-**Source alpha.** Install the runtime in your own application with Node 24.22.1 or newer and npm:
+**Source alpha.** Use Node 24.22.1 or newer and npm. In a new application directory:
 
 ```sh
+npm init -y --init-type=module
 npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.13.1/dispatch-runner-0.13.1.tgz
 ```
+
+An existing npm application only needs the install command. Initialize new projects
+first so npm installs locally instead of selecting a parent project's dependencies.
 
 Write one `agent.md` with its description, model and instructions, then start
 `npx dispatch serve`. In another terminal, `npx dispatch chat` connects to the

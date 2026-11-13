@@ -12,11 +12,15 @@ optional. Choose a new directory:
 ```sh
 mkdir dispatch-demo
 cd dispatch-demo
+npm init -y --init-type=module
 npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.13.1/dispatch-runner-0.13.1.tgz
 ```
 
-The archive is the installed library, not a source checkout. npm creates or updates
-`package.json` and the lockfile. No scaffold, build step or runtime service is installed.
+Initialize `package.json` in this directory before installing. Otherwise npm can
+[select a parent project](https://docs.npmjs.com/cli/v11/configuring-npm/folders/#more-information)
+and change its dependencies. The archive is the installed library, not a source
+checkout. npm records it in your package and lockfile; no scaffold, build step or
+runtime service is installed.
 
 ## Define your agent
 

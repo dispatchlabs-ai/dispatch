@@ -6,11 +6,15 @@ saved conversations. Pi Durable owns execution, recovery and storage.
 ## Install and start
 
 Use **Node 24.22.1 or newer**, with npm. Nix and a Dispatch
-source checkout are optional. In your application directory:
+source checkout are optional. In a new application directory:
 
 ```sh
+npm init -y --init-type=module
 npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.13.1/dispatch-runner-0.13.1.tgz
 ```
+
+An existing npm application only needs the install command. Creating a local
+`package.json` first prevents npm from installing into a parent project.
 
 npm records Runner as `@dispatch/runner` in `package.json` and `package-lock.json`.
 Keep both files. This installs a versioned GitHub package archive; no npm account
