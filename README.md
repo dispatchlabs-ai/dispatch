@@ -49,7 +49,7 @@ company definitions extend it when a release is built.
 
 ## Versions and distribution
 
-The latest tagged source release is [v0.12.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.12.0),
+The latest tagged source release is [v0.12.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.12.1),
 using Pi Durable 1.5.2. Its five reusable package archives, source manifest and
 checksums are attached to that release; they are **not published to npm**.
 Current `main` also carries the unreleased changes listed in package changelogs.

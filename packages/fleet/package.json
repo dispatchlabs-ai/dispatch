@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/fleet",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "private": true,
   "description": "Host-owned durable agent execution on replaceable workers",
   "license": "MIT",
@@ -31,8 +31,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@dispatch/runner": "0.12.0",
-    "@dispatch/slack": "0.12.0",
+    "@dispatch/runner": "0.12.1",
+    "@dispatch/slack": "0.12.1",
     "@earendil-works/chord": "1.5.2",
     "@earendil-works/pi-ai": "1.5.2",
     "@earendil-works/pi-durable": "1.5.2"
