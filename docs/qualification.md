@@ -4,6 +4,39 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.17.1 shared Slack history — November 13, 2026
+
+[Release v0.17.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.17.1)
+contains eleven package archives from `1794a5c7c2b7b104088c04bdce16de21448a746a`.
+All thirteen public downloads matched the reviewed archives, manifest, checksums
+and GitHub digests. Empty-cache public installs passed strict NodeNext declaration
+checks, actual imports, dependency resolution and selected production audits with
+zero findings. Web-only and MCP-only installs resolved their transitive archives;
+minimal Backend and Fleet consumers loaded without central peers or Slack.
+
+An existing authorized Slack DM conversation was continued through the actual
+npm terminal client and Web. Missing earlier human/assistant turns caught up in
+Slack with source attribution. A live terminal Bash calculation and its reply
+appeared in Slack; a live Web prompt and reply appeared in Slack and CLI. A Slack
+follow-up recalled both clients' context and appeared in Web and CLI without an
+input echo. A host restart retained the same Slack reply count and delivery
+identities. Existing native entries remained byte-identical. Complete relevant
+instructions, entries, tool results, submissions, tasks and delivery documents
+were reviewed against the visible results. Web was reviewed at all four required
+viewport sizes. The local runtime used Node 26.5.0 and one Pi Durable 1.5.2 install.
+
+Source build/type checks, Mac arm64 and Linux x86_64 Nix builds and flake checks,
+frontend, portable Mac and both Linux images passed with Node 24.22.1. Actual
+archive/image matches were reviewed as upstream examples, parser strings, SDK
+directories and empty npm configuration. No automated functional tests were run.
+
+This qualifies additive message sync for one authorized DM participant. Older
+missing turns append to the Slack thread. Edits/deletions and automatic attachment
+byte replication are outside the change. Multi-user/channel authorization,
+concurrent steering and an in-flight uncertain-delivery restart remain unverified.
+This is scoped implementation and artifact review, not a comprehensive security
+assessment or qualification of every deployment.
+
 ## v0.16.1 Slack DMs — November 13, 2026
 
 The released Runner, Web and Slack archives were installed together in an
