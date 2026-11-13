@@ -5,7 +5,7 @@ version or immutable release archive, update the application's lockfile, and run
 its build and relevant checks. For an application using only Runner:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.17.2/dispatch-runner-0.17.2.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.17.3/dispatch-runner-0.17.3.tgz
 ```
 
 Commit the updated `package.json` and `package-lock.json`. For a later release,

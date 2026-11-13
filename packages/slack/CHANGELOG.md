@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.17.3] - 2026-11-13
+
 - Make mirrored user messages distinct with bold source attribution and a quoted
   body on every delivered part. Retain Markdown for complete blocks and keep
   oversized partial blocks visibly quoted. Preserve blockquotes and literal code

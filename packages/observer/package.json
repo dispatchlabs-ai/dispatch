@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/observer",
-  "version": "0.17.2",
+  "version": "0.17.3",
   "private": true,
   "description": "Read-only desktop inspection and playback for Pi Durable agents",
   "license": "MIT",
@@ -28,7 +28,7 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "tailwind-merge": "3.7.0",
-    "@dispatch/runner": "0.17.2"
+    "@dispatch/runner": "0.17.3"
   },
   "devDependencies": {
     "@electron/packager": "20.3.0",
