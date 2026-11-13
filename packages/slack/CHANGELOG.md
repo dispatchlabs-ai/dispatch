@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-13
+
 - Document ordinary `host.json` setup, DM permissions and shared-client history
   using the published package archives. Record live DM and cancellation checks.
 
