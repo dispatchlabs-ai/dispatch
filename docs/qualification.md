@@ -37,6 +37,41 @@ concurrent steering and an in-flight uncertain-delivery restart remain unverifie
 This is scoped implementation and artifact review, not a comprehensive security
 assessment or qualification of every deployment.
 
+||||||| parent of 98f4277 (Record MCP release qualification and compatibility)
+## v0.17.0 MCP conversation connector — November 13, 2026
+
+[Release v0.17.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.17.0)
+contains eleven npm archives from `f1c5369775aa6f835fadda431dd5aff2c2cacb1c`.
+All thirteen public assets and GitHub SHA-256 digests matched the reviewed bytes.
+Empty-cache public installs passed strict NodeNext declaration checks and actual
+imports. MCP installed alone with its Runner archive; Web also resolved its
+transitive archives. Minimal Backend and Fleet consumers loaded without central
+peers and Slack. Selected audits reported zero findings, including before and
+after the optional upstream declaration-checking peer.
+
+Manual MCP checks used Pi MCP 1.5.2 (2025-11-25 protocol) over stdio and HTTP,
+and the current SDK client 2.4.0 pinned to 2026-07-28 over HTTP. Discovery worked
+before the host started and within a same-host agent connection. Native creation
+and request identities reattached retained conversations/submissions. Snapshots
+carried provider summaries, tool results, attachments and artifact metadata;
+downloaded artifact bytes matched the prepared file. Cancellation/disconnection
+left admitted work running and a second client retrieved completion. Explicit
+Stop retained an unanswered/aborted receipt. Missing credentials, an untrusted
+Origin and an untrusted Host were rejected; token rotation rejected the old token.
+
+Web continued an MCP-created conversation, and MCP read the resulting Web reply.
+Rendered review at 1440×900, 1280×720, 768×1024 and 390×844 covered that shared
+history, retained summaries, keyboard send, reload and mobile navigation. No
+browser warning/error logs were observed. These Web checks used synthetic data.
+
+Node 24.22.1 source/build/type checks, Mac arm64 and Linux x86_64 Nix builds and
+flake checks, frontend, portable Mac and both Linux images passed. Archives and
+images retained upstream notices. Known-pattern matches were reviewed as upstream
+examples, parser constants, SDK directories and empty npm configuration; scans
+are supplementary evidence, not a comprehensive security assessment. No automated
+functional tests were added or run. Hosted TLS/reverse-proxy deployment, OAuth,
+Windows interaction and the exact fresh-agent setup prompt remain unqualified.
+
 ## v0.16.1 Slack DMs — November 13, 2026
 
 The released Runner, Web and Slack archives were installed together in an
