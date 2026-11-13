@@ -4,6 +4,34 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.15.0 installable Web client — November 13, 2026
+
+The [v0.15.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.15.0)
+contains nine library archives and the Web client from commit
+`27b2c6d2b8f1afec333dfb4a51e1a38c1f507af2`. All twelve published asset downloads
+matched the reviewed archives, source manifest and checksums.
+
+Fresh npm consumers installed Web from its versioned GitHub URL, both alone and
+with Runner. The immutable dependency URLs and integrity hashes for Runner, Web
+and Backend matched the release. An application started the owner and both clients
+from outside its working directory with one `host.json`. Web returned the CLI's
+saved conversation from that owner. The README quickstart also ran from a fresh
+application with its default private socket, one Markdown agent and a synthetic
+model. Web's browser assets and dependency licenses ship in its archive.
+
+The workspace build and type checks, arm64 macOS and x86_64 Linux flake checks,
+frontend and portable macOS builds and both Linux OCI builds passed. External
+consumers installed the ten artifacts by URL, checked strict TypeScript imports
+and executed libraries with Node 24.22.1 and 26.5.0. The selected production npm
+audits reported zero findings. Scope covered local clients and local saved state.
+
+The browser check followed a conversation from CLI to Web and back. Keyboard
+send, streaming, explicit Stop, the retained partial answer after reload,
+reconnection to the restarted owner and a follow-up completed. The four
+required viewport sizes and mobile drawer were inspected. Browser diagnostics
+were empty. The interactive check used the exact candidate packages and a
+synthetic local model. The same bytes were verified after publication.
+
 ## v0.14.1 portable host settings — November 13, 2026
 
 The [v0.14.1 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.14.1)

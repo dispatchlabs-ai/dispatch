@@ -33,12 +33,18 @@ release operator; metadata does not grant access. Never republish a used version
    only. Failures leave incomplete output for inspection, not publication.
 4. Inspect the actual tar contents, notices, metadata, declarations and files for
    privacy and licensing. Compare `sha256sum *.tgz` with the manifest. Install selected
-   tarballs together into a fresh ESM directory **outside** this checkout:
+   packages together in a fresh ESM directory **outside** this checkout. For
+   library-only checks, local archive paths work. For Web checks, npm tracks the
+   source URL as well as package name and version. Install Web, Runner and Backend
+   from their matching GitHub URLs. Supplying local archive paths for those same
+   packages can make `npm ls` report invalid dependency sources even with identical
+   bytes. Before publication, use an isolated npm cache containing the reviewed
+   assets at their intended release URLs. After publication, repeat the URL
+   install with an empty cache and verify the lockfile integrity against the
+   release manifest. A Web-only install must resolve its transitive archives.
 
    ```sh
-   npm init -y
-   npm pkg set type=module
-   npm install /tmp/dispatch-packages-RELEASE/*.tgz
+   npm init -y --init-type=module
    npm install --save-dev typescript@6.0.3 @types/node@24.19.1
    ```
 
