@@ -27,7 +27,7 @@ and the [service/client contract](packages/runner/docs/service.md#shared-clients
 
 ```sh
 npm init -y --init-type=module
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.13.1/dispatch-runner-0.13.1.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.14.0/dispatch-runner-0.14.0.tgz
 ```
 
 An existing npm application only needs the install command. Initialize new projects
@@ -76,8 +76,8 @@ definition files you inspect and edit in source.
 
 ## Versions and distribution
 
-The latest release is [v0.13.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.13.1),
-using Pi Durable 1.5.2. Its nine reusable package archives, source manifest and
+The latest release is [v0.14.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.14.0),
+using Pi Durable and Pi MCP 1.5.2. Markdown agents can select [MCP tools](packages/runner/docs/mcp.md) in their host settings. Its nine reusable package archives, source manifest and
 SHA-256 checksums are attached to the release. These packages are not published
 to npm. The [package guide](scripts/README.md) describes archive preparation and
 installation in an ordinary external application.

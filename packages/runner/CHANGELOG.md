@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-13
+
 - Preserve Pi's strict tool-schema default for Codex models routed through a gateway Responses pool, so optional arguments can be omitted when calling tools.
 
 - Connect configured MCP servers through Pi MCP 1.5.2 and register discovered tools

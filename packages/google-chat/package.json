@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/google-chat",
-  "version": "0.13.1",
+  "version": "0.14.0",
   "description": "Google Chat transport for Dispatch Runner",
   "license": "MIT",
   "type": "module",
@@ -31,7 +31,7 @@
     "typescript": "6.0.3"
   },
   "peerDependencies": {
-    "@dispatch/runner": "0.13.1",
+    "@dispatch/runner": "0.14.0",
     "@earendil-works/pi-durable": "1.5.2",
     "@earendil-works/chord": "1.5.2"
   },
