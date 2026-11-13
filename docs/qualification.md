@@ -4,6 +4,30 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.14.1 portable host settings — November 13, 2026
+
+The [v0.14.1 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.14.1)
+contains nine library archives from `a3699240f9212ecc871886dddb6d0d79ebb0d9d5`.
+All published downloads matched the reviewed archives, manifest and checksums.
+
+An external application installed Runner from its versioned GitHub URL. A local
+host and CLI client launched from another directory used the same small
+checked-in configuration. The host located the agent beside the settings file,
+created private state and a socket, completed a synthetic model turn, and
+returned the saved answer after a restart. Two named Markdown agents also reopened their distinct
+saved conversations through a shared socket. Explicit HTTP-only settings and
+existing service and watch commands were exercised with synthetic credentials.
+
+The workspace build and type checks passed. macOS arm64 and Linux x86_64 flake
+checks and builds passed, including frontend, portable macOS and both Linux
+container images. External consumers checked public imports and strict types,
+including the optional Backend and Fleet integrations. Production dependency
+audits of the selected installations reported zero findings. The Web client used a
+synthetic provider with the same portable host configuration and retained its conversation across a host
+restart. Keyboard send, streaming, Stop, reload and mobile navigation were
+exercised at the four required viewport sizes. Package and image contents were
+reviewed.
+
 ## v0.14.0 native MCP tools — November 13, 2026
 
 [v0.14.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.14.0)
