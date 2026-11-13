@@ -33,6 +33,22 @@ automatic result notification or transport callback. The extension supplies this
 instruction on every model request; applications requiring continued work through
 answers can also select [request completion](request-completion.md).
 
+## Who owns a delegated child
+
+Since 0.11.1 a delegated or cloned child conversation is owned by a background
+worker task, `dispatch.delegation.OWNER.worker`, not by the tool call that
+asked for it. That task is owned by the coordinator's conversation and has no
+owning task, so the coordinator's wait can be released by new input while the
+child continues. Its input names the calling tool's task as `sourceTool`, and
+that tool task's `dispatch.delegation-call` document names the worker task.
+
+A host that authorizes a child's tool calls by following task owners from the
+child to the coordinator's active run finds no owner at the worker task and
+must decide what to do there. Following `sourceTool` reaches the tool call that
+created the child. It does not show that the coordinator is still in that run:
+a child can outlive the wait, and the run, that started it. Decide whose input
+authorizes such a child before crossing that edge.
+
 ## What a clone inherits
 
 Pi Durable creates a conversation owned by a background worker task and copies

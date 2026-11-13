@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Document who owns a delegated child since 0.11.1, for hosts that authorize a child's tools by following task owners.
+
 ## [0.12.0] - 2026-11-12
 
 - Add `environmentProvider`, a host model provider that binds one of Pi's built-in providers and authenticates it from that provider's own environment variable. `modelProviders.module` accepts a Runner export such as `@dispatch/runner/environment-provider` as well as an absolute path.

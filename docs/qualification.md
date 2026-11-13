@@ -6,8 +6,8 @@ installation, model-quality or security qualification.
 
 ## Released baseline
 
-[v0.11.2](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.11.2)
-resolves to `9707e09bc4a192425249f37a725bbc40f3e1ca18` and pins Pi Durable 1.5.2.
+[v0.12.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.12.0)
+resolves to `5aba1696f9944175fd4ce6da87b44560a1eec970` and pins Pi Durable 1.5.2.
 
 Recorded November 12, 2026 at that commit: full package build/type checks; macOS
 arm64 Nix flake, default, frontend and portable builds; Linux x86_64 default, Web
@@ -15,12 +15,15 @@ OCI and worker OCI builds and Nix flake checks; external packed consumer strict
 type checking with real imports; and production and full dependency audits with
 zero findings. The five public reusable archives have a clean source manifest and
 SHA-256 checksums, verified again after download. They are GitHub release assets,
-not an npm registry publication. No automated test suite was run, and no rendered
-browser review was repeated for the release commit.
+not an npm registry publication. On Linux the kit command and the starter
+template also built, and the template's catalog listed its seven agents. No
+automated test suite was run, and no rendered browser review was repeated for
+the release commit; the release changes no browser interface.
 
 Artifact scans were accompanied by source/content review and reported no
 known-pattern matches in the five archives. This is bounded privacy evidence,
-not a security certification.
+not a security certification. [v0.11.2](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.11.2)
+(`9707e09bc4a192425249f37a725bbc40f3e1ca18`) passed the same checks earlier the same day.
 
 ## Kit customization and first conversation — November 12, 2026
 
@@ -47,10 +50,23 @@ Observed on macOS 27.2 arm64 at `403eefe`, with a Nix-built release unless noted
   files; the build printed the two warnings, `catalog` repeated them, and both
   stopped after `accept`.
 
-Not observed: Linux for these four items before the 0.12.0 release checks; a
-kit move between two real releases (the earlier kit was simulated by editing the
-record); `environmentProvider` with any provider other than OpenAI; a company
-repository built with `roles`.
+After the release, from the published tag: a repository created with
+`nix flake init -t github:dispatchlabs-ai/dispatch/v0.12.0#kit` built on macOS,
+`nix run --inputs-from . dispatch#kit -- status` ran against it, and the guide's
+first-conversation commands produced a real OpenAI reply. Four private company
+repositories moved to v0.12.0 and turned 11 of their 20 declared file replacements into
+`roles` entries, leaving 9. Each built its releases on Linux x86_64 with the
+composed roles carrying the configured recipients and extensions, and three
+passed their own Nix checks. The fourth passes its type check and 85 of 86
+tests: its own tool authorization follows task owners from a delegated child to
+the coordinator's run and stops at the background worker task that Runner 0.11.1
+introduced (see [parallel children](../packages/runner/docs/parallel-children.md#who-owns-a-delegated-child)).
+None of those four builds has been deployed.
+
+Not observed: a kit move between two real releases (the earlier kit was
+simulated by editing the record); `environmentProvider` with any provider other
+than OpenAI; a first conversation on Linux; any installed service running a
+role changed through `roles`.
 
 ## Web walkthrough qualification — November 12, 2026
 
