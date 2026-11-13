@@ -59,8 +59,8 @@ repositories moved to v0.12.0 and turned 11 of their 20 declared file replacemen
 composed roles carrying the configured recipients and extensions, and three
 passed their own Nix checks. The fourth passes its type check and 85 of 86
 tests: its own tool authorization follows task owners from a delegated child to
-the coordinator's run and stops at the background worker task that Runner 0.11.1
-introduced (see [parallel children](../packages/runner/docs/parallel-children.md#who-owns-a-delegated-child)).
+the coordinator's current model turn and stops at the background worker task
+that Runner 0.11.1 introduced (see [parallel children](../packages/runner/docs/parallel-children.md#who-owns-a-delegated-child)).
 None of those four builds has been deployed.
 
 Not observed: a kit move between two real releases (the earlier kit was

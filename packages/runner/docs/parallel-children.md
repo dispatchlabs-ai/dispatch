@@ -43,11 +43,25 @@ child continues. Its input names the calling tool's task as `sourceTool`, and
 that tool task's `dispatch.delegation-call` document names the worker task.
 
 A host that authorizes a child's tool calls by following task owners from the
-child to the coordinator's active run finds no owner at the worker task and
-must decide what to do there. Following `sourceTool` reaches the tool call that
-created the child. It does not show that the coordinator is still in that run:
-a child can outlive the wait, and the run, that started it. Decide whose input
-authorizes such a child before crossing that edge.
+child to the coordinator finds no owner at the worker task. Two things observed
+on Pi Durable 1.5.2 decide what such a host can rely on:
+
+- The live run's `taskId` is the current generation, and each model turn has
+  its own. When new input releases the wait, the turn that called `delegate`
+  ends and a later one takes over. The run itself continues: its first placed
+  input and first entry stay the same, and steered input is appended to
+  `inputs`.
+- The calling tool task is then terminal, and a task-scoped document on a
+  terminal task can no longer be opened. A check that reads
+  `dispatch.delegation-call` there, or expects the calling tool to belong to
+  the current generation, works only until the first interruption.
+
+So identify the request, not the turn: record which run admitted the
+delegation (for example the first input of the coordinator's live run) where it
+stays readable, and authorize the child only while that run is still live.
+Recompute authority from the run's current inputs on every call. A child can
+outlive the run that started it; under this rule it loses authority when that
+run ends.
 
 ## What a clone inherits
 

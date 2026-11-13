@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- Document who owns a delegated child since 0.11.1, for hosts that authorize a child's tools by following task owners.
+- Document who owns a delegated child since 0.11.1 and what persists across an interrupted wait, for hosts that authorize a child's tools by following task owners.
 
 ## [0.12.0] - 2026-11-12
 
