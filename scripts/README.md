@@ -7,9 +7,9 @@ Postgres, Backend, Workers, Slack, Google Chat, Email and Fleet. Install only th
 packages your application uses. Backend's central storage peers and Fleet's Slack
 peer are optional; explicit subpath imports activate those integrations.
 
-The [v0.14.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.14.0)
+The [v0.14.1 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.14.1)
 provides all nine library archives with their source manifest and SHA-256 checksums.
-It adds native MCP tools to Markdown agents on the shared host/client contract. Install matching archives
+It supports a portable host configuration beside application-owned agents. Install matching archives
 together; npm publication remains separate. Future breaking 0.x changes require
 a new minor release.
 

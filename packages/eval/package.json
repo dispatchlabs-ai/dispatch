@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/eval",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "private": true,
   "description": "Evaluation of Pi Durable agents: a read-only native record reader, a grading loop and task, an engine with versioned append-only history, and one launcher",
   "license": "MIT",
@@ -19,7 +19,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
-    "@dispatch/runner": "0.14.0",
+    "@dispatch/runner": "0.14.1",
     "@earendil-works/chord": "1.5.2",
     "@earendil-works/pi-ai": "1.5.2",
     "@earendil-works/pi-durable": "1.5.2",

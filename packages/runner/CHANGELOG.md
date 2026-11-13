@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-11-13
+
 - Use one checked-in host settings file across checkouts. The Runner CLI derives
   local state, working directory and socket defaults from the file location,
   and accepts relative or home-relative paths for the gateway credential file.
