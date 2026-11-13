@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/workers",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -28,9 +28,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@dispatch/runner": "0.15.0",
-    "@dispatch/remote": "0.15.0",
-    "@dispatch/backend": "0.15.0",
+    "@dispatch/runner": "0.15.1",
+    "@dispatch/remote": "0.15.1",
+    "@dispatch/backend": "0.15.1",
     "@earendil-works/pi-ai": "1.5.2",
     "ws": "8.22.0",
     "@earendil-works/chord": "1.5.2",

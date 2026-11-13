@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-11-13
+
 - When `npm run web` cannot connect to a local host socket, print how to start the host and retry.
 
 ## [0.15.0] - 2026-11-13
