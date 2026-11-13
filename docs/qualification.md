@@ -4,9 +4,52 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.13.0 package release — November 13, 2026
+
+[v0.13.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.13.0)
+resolves to `6cb31cad047bdad54964c9602e9936d305accb7b`, with Node 24.22.1 and
+Pi Durable 1.5.2. All nine reusable archives, their clean-source manifest and
+`SHA256SUMS` are public release assets. Their uploaded digests and downloaded
+bytes were verified against the original archives, including npm SHA-512
+integrity. This is an archive release; the packages are not published to npm.
+
+Full source builds and type checks passed. macOS arm64 qualification includes
+Nix flake checks, the default application, frontend and portable build. Linux
+x86_64 qualification includes Nix flake checks, the default application, Web OCI
+and worker OCI builds. Linux arm64, Intel macOS and native Windows were not
+requalified. The application images were inspected but are not release assets.
+
+Fresh external consumers installed all nine archives together. Strict NodeNext
+declaration checking used the documented ES2024 library types and optional MCP
+SDK dev dependency. All 22 library subpaths imported; the worker CLI subpath
+resolved and its declarations checked. That executable requires worker
+configuration when run. Separate consumers verified Runner + Backend without
+Remote/Postgres and Runner + Fleet without Slack. Full and production dependency
+audits reported zero findings. The downloaded archives were installed and checked
+again after publication.
+
+The one-Markdown README example ran from installed archives on both platforms.
+A fresh application also installed Runner alone from its public release URL;
+the example ran and replayed the same retained entries. Actual Web interaction
+on macOS covered streaming, keyboard send, explicit Stop with a retained partial
+reply, automatic reconnection after the host restarted, continued conversation,
+reload and mobile navigation. The whole page was reviewed at 1440×900,
+1280×720, 768×1024 and 390×844. Temporary owners and browser sessions were closed.
+
+Source and artifact content, metadata and license notices were reviewed.
+Supplementary known-pattern scans found no matches in the nine package archives.
+Application artifact matches were inspected as upstream SDK examples, parser
+strings, documentation fixtures, empty npm configuration and SDK source
+directories. These scans do not establish the absence of arbitrary secrets.
+
+No automated functional tests were added or run. Live channel delivery,
+real-model quality, hosted TLS and multi-user authorization were not requalified;
+this was not a comprehensive security review or a fresh independent agent
+walkthrough. No consumer repository or installed deployment was changed.
+
 ## Simple definitions and shared clients — November 13, 2026
 
-The unreleased host/client simplification was checked on macOS arm64, Node
+Before v0.13.0, the host/client simplification was checked on macOS arm64, Node
 24.22.1 and Pi Durable 1.5.2. Full source/type/build checks and the current
 macOS Nix flake checks passed. Linux outputs were not executed for this change.
 
@@ -46,7 +89,7 @@ was not repeated. Existing deployed consumers remain on their selected releases.
 
 ## Complete application definitions — November 13, 2026
 
-The unreleased removal of the starter kit was verified on macOS arm64 with Node
+Before v0.13.0, removal of the starter kit was verified on macOS arm64 with Node
 24.22.1 and Pi Durable 1.5.2. Package build/type checks, `nix flake check`, the
 default application and the small agent-example build passed. The example's
 packaged definition tree matches its source exactly; its catalog loads without
@@ -67,7 +110,7 @@ packaging check, not a new security certification, Linux execution qualification
 rendered Web review, real inference check or live channel deployment. No automated
 functional tests were added or run.
 
-## Released baseline
+## Earlier release baseline
 
 [v0.12.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.12.0)
 resolves to `5aba1696f9944175fd4ce6da87b44560a1eec970` and pins Pi Durable 1.5.2.
