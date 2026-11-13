@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-11-13
+
 - Mirror Web and CLI messages and public agent replies into their existing Slack
   thread. Use one native history cursor and durable ordered delivery queue, label
   human source clients, recover missed history after restart, and retain existing

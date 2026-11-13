@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/mcp",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "description": "MCP conversation connector for an existing Dispatch host",
   "license": "MIT",
   "type": "module",
@@ -30,7 +30,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@dispatch/runner": "0.17.0",
+    "@dispatch/runner": "0.17.1",
     "@modelcontextprotocol/server": "2.4.0",
     "@modelcontextprotocol/node": "2.1.2",
     "zod": "4.6.6"
