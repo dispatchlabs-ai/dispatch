@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Inspect each directory in JSON `PATH` values during machine upgrades instead of reporting the search path list as one missing file.
+
 - Document who owns a delegated child since 0.11.1 and what persists across an interrupted wait, for hosts that authorize a child's tools by following task owners.
 
 ## [0.12.0] - 2026-11-12
