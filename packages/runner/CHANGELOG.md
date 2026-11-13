@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Remove the inherited 30-second deadline from MCP tool calls unless the host explicitly configures a timeout. Long agent-to-agent waits remain cancellable without resubmitting work.
+
 ## [0.16.1] - 2026-11-13
 
 - Show agent/chat selection on the terminal intro and render native provider thinking summaries in live and retained chats; exclude redacted content and replay signatures.

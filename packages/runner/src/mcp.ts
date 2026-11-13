@@ -127,7 +127,10 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
           const connection = await awaitWithContext(client(), context);
           try {
             // Durable validated the arguments against the server's object schema.
-            const result = await connection.callTool(tool.name, args as Record<string, unknown>, { signal: context.abortSignal });
+            // Agent work has no predictable duration. Pi's zero disables its default request deadline.
+            const result = await connection.callTool(tool.name, args as Record<string, unknown>, {
+              signal: context.abortSignal, timeoutMs: (servers[server].timeout ?? 0) * 1000,
+            });
             const output = toLlmContent(result);
             if (result.isError && !output.some(block => block.type === "text" && block.text.trim())) {
               output.push({ type: "text", text: `MCP tool ${server}/${tool.name} returned an error.` });

@@ -92,6 +92,9 @@ in its definition. It can ask another agent by creating a conversation and
 following the same send/result sequence. Discovery is independent of host startup,
 so the MCP client and recipient can share one host. The recipient uses its own
 configured tools; the caller does not receive those tools directly.
+Runner leaves tool calls without a deadline unless that MCP connection explicitly
+sets `timeout`. Long-running `get_result` calls therefore keep waiting, while
+cancellation and `stop_conversation` remain available.
 
 ## Streamable HTTP and authority
 

@@ -91,7 +91,7 @@ Both transports accept these settings:
 | --- | --- |
 | `tools` | Optional list of exact server tool names. Omit it to expose all discovered tools from that connection; an empty list exposes none. |
 | `enabled` | `false` prevents use. An agent requesting a disabled server fails startup. |
-| `timeout` | Pi MCP request timeout in seconds. Omit it to use Pi's default. |
+| `timeout` | Optional positive request timeout in seconds. Omit it for tool calls without a deadline; connection initialization and discovery retain Pi's 30-second default. |
 
 Tool names exposed to the model use Pi's `mcp__<server>__<tool>` naming helper.
 Configuration `tools` entries use the original names advertised by the server.
@@ -108,6 +108,12 @@ by this initial tools integration.
 ## Execution and lifecycle
 
 The host connects selected servers and discovers tools before starting recovery.
+Tool calls wait until completion, cancellation or a connection error unless the
+server configuration explicitly sets `timeout`. This allows research and
+agent-to-agent work to outlast 30 seconds without repeated polling or resubmission.
+The caller's cancellation signal still interrupts its wait; it does not imply
+that a remote agent's admitted work has stopped.
+
 The discovered tool list is a startup snapshot: restart the host after changing
 server settings or its available tools. Closing the host closes its MCP clients
 and subprocesses after suspending Durable work. CLI, web and messaging clients
