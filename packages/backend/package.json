@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/backend",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -41,9 +41,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@dispatch/runner": "0.12.1",
-    "@dispatch/remote": "0.12.1",
-    "@dispatch/postgres": "0.12.1",
+    "@dispatch/runner": "0.12.2",
+    "@dispatch/remote": "0.12.2",
+    "@dispatch/postgres": "0.12.2",
     "@earendil-works/pi-ai": "1.5.2",
     "proper-lockfile": "4.1.2",
     "ws": "8.22.0",

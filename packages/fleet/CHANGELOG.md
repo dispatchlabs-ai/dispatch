@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.12.2] - 2026-11-13
+
 - Keep workers available after restart when all retained runs have completed release, preserving their fencing receipts without repeating workspace shutdown.
 
 ## [0.11.1] - 2026-11-12
