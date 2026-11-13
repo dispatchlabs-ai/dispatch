@@ -44,8 +44,9 @@ Manual tool sequence (replace `researcher` with an ID from `list_agents`):
 3. `send_message {"conversationId":"<returned ID>","requestId":"intro-1","message":"Hello from MCP"}` returns a submission ID.
 4. `get_result {"conversationId":"<returned ID>","submissionId":1,"wait":true}` returns that submission's receipt and current conversation snapshot. Use the actual returned submission ID.
 
-Select the same conversation in Web or the terminal's `/chats` picker to continue
-it. The host's configured model and tools determine the answer and effects.
+Select the same conversation in Web's **Runs** tab or the terminal's `/chats`
+picker to continue it. Web search covers both Chats and Runs. The host's
+configured model and tools determine the answer and effects.
 
 ## Tools and continuation
 
