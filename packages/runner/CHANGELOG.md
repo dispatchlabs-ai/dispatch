@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Use one checked-in host settings file across checkouts. The Runner CLI derives
+  local state, working directory and socket defaults from the file location,
+  and accepts relative or home-relative paths for the gateway credential file.
+
 ## [0.14.0] - 2026-11-13
 
 - Preserve Pi's strict tool-schema default for Codex models routed through a gateway Responses pool, so optional arguments can be omitted when calling tools.

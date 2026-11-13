@@ -6,8 +6,8 @@ import { catalog, loadAgent } from "./definition.js";
 import { connectInTerminal } from "./service-terminal.js";
 import { terminalError, terminalText } from "./terminal-output.js";
 import type { ClientConnection } from "./client.js";
-import { localHostConfig, localHostPaths } from "./local-host.js";
-import { startService, type ServiceConfig } from "./service.js";
+import { localHostConfig, localHostPaths, readHostConfig } from "./local-host.js";
+import { startService } from "./service.js";
 
 const usage = `dispatch serve [--root DIRECTORY] [--state DIRECTORY] [--socket SOCKET] [--demo]
 dispatch serve --config HOST.json
@@ -46,15 +46,18 @@ try {
   else if (positionals.length !== 1) throw new Error(usage);
   else if (positionals[0] === "serve") {
     if (values.config && (values.root || values.state || values.socket || values.demo)) throw new Error("Use --config HOST.json on its own, or select local host options.");
-    const config: ServiceConfig = values.config ? JSON.parse(await readFile(values.config, "utf8")) : await localHostConfig(values);
+    const config = values.config ? await readHostConfig(values.config) : await localHostConfig(values);
     process.chdir(config.cwd);
     const host = await startService(config);
     for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => {
       void host.close().then(() => process.exit(0), error => { console.error(terminalError(error).message); process.exit(1); });
     });
-    const connectionHint = config.socket
-      ? `In ${config.root}, connect with npx dispatch chat${values.state ? ` --state ${JSON.stringify(config.stateRoot)}` : ""}${values.config || values.socket ? ` --socket ${JSON.stringify(config.socket)}` : ""}.`
-      : "Connect using your HTTPS client configuration.";
+    let connectionHint = "Connect using your HTTPS client configuration.";
+    if (config.socket) {
+      connectionHint = values.config
+        ? "In another terminal, run npx dispatch chat with the same --config file."
+        : `In ${config.root}, connect with npx dispatch chat${values.state ? ` --state ${JSON.stringify(config.stateRoot)}` : ""}${values.socket ? ` --socket ${JSON.stringify(config.socket)}` : ""}.`;
+    }
     console.log(terminalText(`${config.demo ? "Demo host" : "Host"} ready: ${host.service.agents.map(agent => agent.id).join(", ")}\nState: ${config.stateRoot}\n${config.socket ? `Socket: ${config.socket}\n` : ""}${connectionHint}\nPress Ctrl-C to stop the host; saved conversations remain.`));
   } else if (positionals[0] === "catalog") {
     const root = resolve(values.root ?? ".");
@@ -67,10 +70,11 @@ try {
       ...(values.session ? ["--session", values.session] : []), ...(values.json ? ["--json"] : []),
     ]);
   } else if (positionals[0] === "run" || positionals[0] === "chat") {
-    const config = values.config ? JSON.parse(await readFile(values.config, "utf8")) : {};
+    const config = values.config ? await readHostConfig(values.config) : undefined;
     let connection: ClientConnection;
-    if (values.socket ?? config.socket) connection = { socket: resolve(values.socket ?? config.socket) };
-    else if (config.url) connection = { url: config.url, ...(config.tokenFile ? {
+    const socket = values.socket ?? config?.socket;
+    if (socket) connection = { socket: resolve(socket) };
+    else if (config?.url) connection = { url: config.url, ...(config.tokenFile ? {
       headers: { authorization: `Bearer ${(await readFile(config.tokenFile, "utf8")).trim()}` },
     } : {}) };
     else if (!values.config && positionals[0] === "chat") connection = { socket: (await localHostPaths(values)).socket };

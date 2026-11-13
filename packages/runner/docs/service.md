@@ -14,15 +14,10 @@ Use `--state DIRECTORY` on both commands to select another store. No JSON file,
 application entry point or Nix environment is required. See the
 [quickstart](../../../docs/quickstart.md).
 
-For explicit custom provider, MCP, channel or network bindings, use `run({root,stateRoot,models,...})` from application code, or create `HOST.json`
-with absolute paths and start `dispatch-service HOST.json serve`:
+For explicit custom provider, MCP, channel or network bindings, use `run({root,stateRoot,models,...})` from application code, or keep a `host.json` beside the definition and start `dispatch serve --config host.json` or `dispatch-service host.json serve`.
 
 ```json
 {
-  "root": "/srv/example/app",
-  "stateRoot": "/srv/example/state",
-  "cwd": "/srv/example/workspace",
-  "socket": "/srv/example/run/agent.sock",
   "modelProviders": [{
     "module": "@dispatch/runner/environment-provider",
     "export": "environmentProvider",
@@ -30,6 +25,14 @@ with absolute paths and start `dispatch-service HOST.json serve`:
   }]
 }
 ```
+
+The CLI defaults `root` to the configuration file's directory, `cwd` to `root`,
+`stateRoot` to `.state` beneath `root`, and the local socket to a private path
+for that store. Use the same file with `dispatch chat --config host.json`.
+An HTTP-only host opens only its configured network listener. Override `root`,
+`cwd`, `stateRoot`, `socket` or `gateway.credentialFile` with a path relative to
+the configuration file, an absolute path, or `~/` for the host account's home.
+Programmatic callers of `startService` continue to supply explicit absolute paths.
 
 Supply the selected provider's credentials in the host's environment or use your
 own trusted provider binding. The host requires a provider, not a gateway.
@@ -94,6 +97,10 @@ A host may expose the same protocol behind HTTPS:
 ```json
 "http": {"host":"127.0.0.1", "port":4320, "tokenFile":"/srv/example/secrets/client-token"}
 ```
+
+Both HTTP token paths accept `~/`. Relative `http.tokenFile` paths use the host
+working directory. A relative `tokenFile` in a URL client file uses the invoking
+terminal's working directory.
 
 Place TLS termination in front of this loopback listener. The token file contains
 one private bearer token; it authorizes the installation's entire exposed catalog.

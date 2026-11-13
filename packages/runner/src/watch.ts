@@ -1,5 +1,4 @@
-import { readFile } from "node:fs/promises";
-import { isAbsolute } from "node:path";
+import { readHostConfig } from "./local-host.js";
 import { parseArgs } from "node:util";
 import { discoverWatchRuns, isWatchSessionKey, readWatchRun } from "./watch-reader.js";
 import { terminalText } from "./terminal-output.js";
@@ -24,14 +23,9 @@ export async function watchCommand(args: string[]): Promise<void> {
   if (values.session !== undefined && !isWatchSessionKey(values.session)) {
     throw new Error("Invalid session key.");
   }
-  const config: unknown = JSON.parse(await readFile(values.config, "utf8"));
-  if (!config || typeof config !== "object" || !("stateRoot" in config)
-    || typeof config.stateRoot !== "string" || !isAbsolute(config.stateRoot)) {
-    throw new Error("Host configuration requires an absolute stateRoot.");
-  }
-  const namespace = "namespace" in config ? config.namespace : undefined;
+  const { stateRoot, namespace } = await readHostConfig(values.config);
   if (namespace !== undefined && typeof namespace !== "string") throw new Error("namespace must be a string.");
-  const options: WatchOptions = { stateRoot: config.stateRoot, namespace, session: values.session };
+  const options: WatchOptions = { stateRoot, namespace, session: values.session };
   if (values.json || !process.stdin.isTTY || !process.stdout.isTTY) {
     const discovery = await discoverWatchRuns(options);
     const snapshots = await Promise.all(discovery.runs.map(run => readWatchRun(run)));

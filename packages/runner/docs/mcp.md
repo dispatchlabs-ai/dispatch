@@ -19,15 +19,11 @@ mcp: [wiki]
 Research questions using the wiki. Read supporting sources and cite their links.
 ```
 
-Put the matching connection in `host.local.json`. This example uses an
+Put the matching connection in a `host.json` alongside the definition. This example uses an
 HTTP server and a token supplied through the host's environment:
 
 ```json
 {
-  "root": "/srv/example/app",
-  "cwd": "/srv/example/app",
-  "stateRoot": "/srv/example/state",
-  "socket": "/srv/example/run/agent.sock",
   "modelProviders": [{
     "module": "@dispatch/runner/environment-provider",
     "export": "environmentProvider",
@@ -42,14 +38,14 @@ HTTP server and a token supplied through the host's environment:
 }
 ```
 
-Replace the example paths and server URL. Set `ANTHROPIC_API_KEY` and `WIKI_TOKEN`
+Set the server URL. Set `ANTHROPIC_API_KEY` and `WIKI_TOKEN`
 in the host environment, then run:
 
 ```sh
-npx dispatch serve --config host.local.json
+npx dispatch serve --config host.json
 ```
 
-In another terminal, run `npx dispatch chat --config host.local.json` and ask a
+In another terminal, run `npx dispatch chat --config host.json` and ask a
 question covered by that wiki. The agent receives the server's discovered tool
 descriptions and schemas; inspect its returned sources and tool results. No
 `agent.ts` or server-specific adapter is required.

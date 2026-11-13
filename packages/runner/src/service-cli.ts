@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { startService, connectClient, type ServiceCommand, type ServiceConfig, connectInTerminal } from "./service.js";
+import { startService, connectClient, type ServiceCommand, connectInTerminal } from "./service.js";
+import { readHostConfig } from "./local-host.js";
 
 const [configPath, action, ...args] = process.argv.slice(2);
 try {
   if (!configPath || !action) throw new Error("Usage: dispatch-service CONFIG serve|connect [CHAT]|command COMMAND.json|agents|chats|schedules|status|idle|create AGENT [TITLE]|send CHAT TEXT|message FROM TO TEXT|ask FROM TO TEXT|message-status FROM TASK|snapshot CHAT|compact CHAT [INSTRUCTIONS]|download CHAT ARTIFACT DESTINATION|stop CHAT|receipt CHAT SUBMISSION");
-  const config: ServiceConfig = JSON.parse(await readFile(configPath, "utf8"));
+  const config = await readHostConfig(configPath);
   if (action === "serve") {
     // Provider subprocesses inherit the service directory; keep it the configured workspace.
     process.chdir(config.cwd);
