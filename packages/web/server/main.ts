@@ -113,7 +113,15 @@ const useHost = values.config !== undefined || (!hosted && !central && !process.
 const serviceConfig = useHost ? { service: await readClientConnection(values.config) } : undefined;
 let runtime: Runtime = central
   ? await (await import("@dispatch/backend/central")).openCentralRuntime(JSON.parse(await readFile(central, "utf8")))
-  : await openRuntime(serviceConfig);
+  : await openRuntime(serviceConfig).catch((error: NodeJS.ErrnoException) => {
+      if (!serviceConfig?.service.socket || error?.syscall !== "connect" ||
+          (error.code !== "ENOENT" && error.code !== "ECONNREFUSED")) throw error;
+      const nextStep = process.env.npm_lifecycle_event === "web"
+        ? "Run `npm start` in another terminal, then run `npm run web` again."
+        : "Start the host in another terminal using your project's host command, then try again.";
+      console.error(`Cannot connect to the Dispatch host. ${nextStep}`);
+      process.exit(1);
+    });
 if (process.env.DISPATCH_TITLES) {
   if (!isAbsolute(process.env.DISPATCH_TITLES)) throw new Error("DISPATCH_TITLES must be an absolute trusted JSON configuration path.");
   runtime = await withConversationTitles(runtime, JSON.parse(await readFile(process.env.DISPATCH_TITLES, "utf8")));
