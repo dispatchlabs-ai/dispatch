@@ -67,11 +67,11 @@ definition files you inspect and edit in source.
 
 ## Versions and distribution
 
-Current `main` carries the unreleased host/client simplification. The last
-available reusable package archives are [v0.12.2](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.12.2).
-The v0.12.3 source tag has no downloadable archives. These packages are not
-published to npm. The [package guide](scripts/README.md) builds the current
-archives and describes installation in an ordinary external application.
+The latest release is [v0.13.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.13.0),
+using Pi Durable 1.5.2. Its nine reusable package archives, source manifest and
+SHA-256 checksums are attached to the release. These packages are not published
+to npm. The [package guide](scripts/README.md) describes archive preparation and
+installation in an ordinary external application.
 
 Runner, Backend, Remote, Postgres, Workers, Slack, Google Chat, Email and Fleet
 have public package definitions. Install matching packages only as needed.

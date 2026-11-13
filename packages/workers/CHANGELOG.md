@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-13
+
 - Use Runner's shared message provenance directly instead of scanning native history a second time.
 
 ## [0.8.0] - 2026-11-12

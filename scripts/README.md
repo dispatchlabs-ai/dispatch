@@ -7,10 +7,11 @@ Postgres, Backend, Workers, Slack, Google Chat, Email and Fleet. Install only th
 packages your application uses. Backend's central storage peers and Fleet's Slack
 peer are optional; explicit subpath imports activate those integrations.
 
-The last published archives are v0.12.2. Current main includes unreleased breaking
-API changes, and the v0.12.3 tag has no downloadable assets. Build current source
-archives for development; the next authorized breaking release must use a new
-minor version.
+The [v0.13.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.13.0)
+provides all nine library archives with their source manifest and SHA-256 checksums.
+It contains the breaking host/client simplification. Install matching archives
+together; npm publication remains separate. Future breaking 0.x changes require
+a new minor release.
 
 Node 24.22.1 and the repository Nix shell are the supported preparation environment.
 All packages remain lockstep at the source version until a release is authorized.
@@ -92,7 +93,7 @@ This does not deploy or change an installed application.
 
 ## Pi reference and deliberate differences
 
-Rechecked November 12, 2026 against released Pi 1.5.2
+Rechecked November 13, 2026 against released Pi 1.5.2
 (`b4afdddf44e059c67ccf5097e5317d913521b470`): Durable exports/types/files and exact
 dependencies, `scripts/publish.mjs`, `scripts/check-package-install.mjs` and
 release guidance. Runtime pins use that released version.

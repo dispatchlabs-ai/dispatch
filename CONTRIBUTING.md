@@ -74,7 +74,7 @@ for an authorized release. No cleanup or separate acceptance stage is implied.
 
 ## Pi as the packaging reference
 
-Packaging reference, rechecked November 12, 2026: released Pi 1.5.2
+Packaging reference, rechecked November 13, 2026: released Pi 1.5.2
 [`b4afddd`](https://github.com/earendil-works/pi/tree/b4afdddf44e059c67ccf5097e5317d913521b470)
 governs the current runtime.
 Read its Durable manifest (exports/types/files/exact dependencies),

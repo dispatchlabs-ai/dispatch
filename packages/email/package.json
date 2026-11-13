@@ -1,5 +1,5 @@
 {
-  "version": "0.12.3",
+  "version": "0.13.0",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -40,7 +40,7 @@
     "typescript": "6.0.3"
   },
   "peerDependencies": {
-    "@dispatch/runner": "0.12.3",
+    "@dispatch/runner": "0.13.0",
     "@earendil-works/pi-durable": "1.5.2",
     "@earendil-works/pi-ai": "1.5.2",
     "@earendil-works/chord": "1.5.2"

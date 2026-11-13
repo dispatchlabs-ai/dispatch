@@ -45,8 +45,8 @@
   labels do not erase identity; source/session/native ID remain searchable or in
   metadata. All native histories remain reachable, without truncation caps.
 - Observe configured native history without owners/providers/resume. Only explicit
-  compatible mutations acquire ownership; retain old definitions/host/state on
-  mismatch. Host/Origin/Fetch Metadata and real hosted authorization protect every
+  compatible mutations reach the configured host; Web never opens a replacement
+  owner. Retain definitions, host and state on mismatch. Host/Origin/Fetch Metadata and real hosted authorization protect every
   read/write/SSE operation, including new content. CSP allows same-origin/data
   image previews, blocks remote images/connections and arbitrary HTML execution.
 

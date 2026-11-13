@@ -4,22 +4,20 @@ Define agents in your application, start one host, and connect clients to its
 conversations. Pi Durable owns execution, recovery and storage. Dispatch supplies
 agent loading, shared conversation operations and optional channel integrations.
 
-Use Node 24.22.1. Nix is optional. This checkout contains unreleased API changes;
-the last downloadable package release is
-[v0.12.2](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.12.2).
-The v0.12.3 source tag has no package archives.
-To use this source now, build and pack it with the [package guide](../../scripts/README.md),
-then install the resulting Runner archive in your application. Published release
-archives can be installed by their immutable URL; retain `package-lock.json`.
+Use Node 24.22.1. Nix is optional. Install the Runner archive from
+[v0.13.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.13.0)
+in your application and retain `package-lock.json`. Matching optional package
+archives are attached to the same release. The [package guide](../../scripts/README.md)
+also explains how to build archives from source. The packages are not published to npm.
 
 ## Try it without credentials
 
-In a new application directory, install the prepared Runner archive:
+In a new application directory, install the released Runner archive:
 
 ```sh
 npm init -y
 npm pkg set type=module
-npm install /path/to/dispatch-runner-0.12.3.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.13.0/dispatch-runner-0.13.0.tgz
 mkdir -p agents/helper
 ```
 

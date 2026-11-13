@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-13
+
 - Prepare a public reusable package. Move Slack integration to the explicit /slack subpath and make the Slack peer optional.
 
 ## [0.12.2] - 2026-11-13

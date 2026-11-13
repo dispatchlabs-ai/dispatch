@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-13
+
 - Prepare a public reusable package. Admit channel input through shared host validation and preserve native transactional continuation and delivery receipts.
 
 ## [0.8.0] - 2026-11-12

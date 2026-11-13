@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-13
+
 - Reuse Runner read-only SQLite snapshots and released document-revision decoding instead of a separate implementation.
 
 ## [0.11.2] - 2026-11-12
