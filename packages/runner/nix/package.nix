@@ -24,6 +24,7 @@ buildNpmPackage {
       ../../google-chat/package.json
       ../../observer/package.json
       ../../email/package.json
+      ../../mcp/package.json
       ../../fleet/package.json
       ../../eval/package.json
       ../package.json

@@ -21,6 +21,13 @@ in-process operations; the [service guide](../packages/runner/docs/service.md)
 documents commands and receipts. [Remote](../packages/remote/README.md) owns the
 separate storage transport contract.
 
+[MCP](../packages/mcp/README.md) adapts the same conversation operations through
+stdio and authenticated Streamable HTTP: `list_agents`, `list_conversations`,
+`find_conversation`, `create_conversation`, `send_message`, `get_conversation`,
+`get_result`, `get_artifact` and `stop_conversation`. Native request identities,
+receipts, snapshots and artifact validation remain owned by the host. A model can
+use this connector to ask another agent; it does not acquire that agent's tools.
+
 The [Pi terminal client](../packages/runner/docs/service.md#interactive-terminal-ui)
 uses the same catalog, conversation and watch operations for interactive chat.
 Its pickers, draft retention, scrolling and tool expansion are client behavior;
@@ -40,13 +47,19 @@ keep plain output. Available in Runner 0.16.0 and newer.
 - **Channels:** account permissions and recipient routing belong to the adapter.
   A Slack token grants no Web or Unix-socket access. Operators bind shared agent
   identity deliberately; identical display names do not establish shared authority.
+- **MCP:** stdio inherits its launching account's host access. HTTP requires a
+  separate bearer token on every request and validates Host and Origin. That token
+  authorizes the connected host's entire catalog, not a per-agent or per-user
+  subset. Rotation revokes future requests; admitted work and existing waits
+  continue. Network exposure requires installation-owned HTTPS termination.
 - **Observation:** browsing, reconnecting and retained-record inspection do not
   submit, resume or cancel work. Reading records does not grant execution authority.
 - **Administration:** upgrade, backup and offline repair are explicit host
   operations, not alternatives to ordinary service authorization.
 
 The network client uses installation-level bearer authorization and HTTPS.
-Machine-principal enrollment and multi-human grants remain future work. No MCP or WebMCP server is advertised by this repository.
+Machine-principal enrollment and multi-human grants remain future work. MCP is an
+optional connector package; WebMCP is not implemented.
 
 ## Errors and recovery
 

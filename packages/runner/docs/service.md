@@ -59,6 +59,12 @@ the application still closes its host. The JSON launcher uses these same APIs.
 
 ## Shared clients and company compositions
 
+The optional [MCP connector](../../mcp/README.md) exposes these conversation
+operations to MCP clients over stdio or authenticated Streamable HTTP. It uses
+`AgentClient`, keeps native conversation/request identities and never starts a
+second owner. An agent can select that connection to ask another agent in the
+same host. See the connector guide for tool names, authorization and continuation.
+
 ```js
 import { connectClient } from "@dispatch/runner/client";
 const client = await connectClient({ socket: "/srv/example/run/agent.sock" });

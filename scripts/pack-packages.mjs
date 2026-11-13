@@ -43,27 +43,27 @@ if (!ordered.length) throw new Error('No public packages selected.');
 mkdirSync(destination, { recursive: false, mode: 0o700 });
 const artifacts = [];
 const pack = directory => JSON.parse(run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', destination], directory, true))[0];
-// The Web executable installs from a single release URL. Keep workspaces on exact
-// semver during development and resolve its published runtime against sibling assets.
-function packWeb(pkg, directory) {
-  const staging = mkdtempSync(resolve(tmpdir(), 'dispatch-web-pack-'));
+// Standalone clients install from one release URL. Keep source workspace edges
+// on exact semver and resolve their published runtimes against sibling assets.
+function packClient(pkg, directory) {
+  const staging = mkdtempSync(resolve(tmpdir(), 'dispatch-client-pack-'));
   try {
-    const web = JSON.parse(readFileSync(resolve(directory, 'package.json'), 'utf8'));
-    for (const name of Object.keys(web.dependencies)) {
+    const client = JSON.parse(readFileSync(resolve(directory, 'package.json'), 'utf8'));
+    for (const name of Object.keys(client.dependencies)) {
       if (!workspaces.has(name)) continue;
       const archive = artifacts.find(artifact => artifact.name === name);
       if (!archive) throw new Error(`Missing release archive for ${name}.`);
-      web.dependencies[name] = `https://github.com/dispatchlabs-ai/dispatch/releases/download/v${pkg.version}/${archive.tarball}`;
+      client.dependencies[name] = `https://github.com/dispatchlabs-ai/dispatch/releases/download/v${pkg.version}/${archive.tarball}`;
     }
-    writeFileSync(resolve(staging, 'package.json'), JSON.stringify(web, null, 2) + '\n');
-    for (const path of web.files) cpSync(resolve(directory, path), resolve(staging, path), {recursive: true});
+    writeFileSync(resolve(staging, 'package.json'), JSON.stringify(client, null, 2) + '\n');
+    for (const path of client.files) cpSync(resolve(directory, path), resolve(staging, path), {recursive: true});
     return pack(staging);
   } finally { rmSync(staging, {recursive: true, force: true}); }
 }
 for (const pkg of ordered) {
   run('npm', ['run', 'build', '--workspace', pkg.name]);
   const directory = resolve(root, pkg.directory);
-  const packed = pkg.name === '@dispatch/web' ? packWeb(pkg, directory) : pack(directory);
+  const packed = ['@dispatch/web', '@dispatch/mcp'].includes(pkg.name) ? packClient(pkg, directory) : pack(directory);
   const files = new Set(packed.files.map(file => file.path));
   const required = ['LICENSE', 'README.md', 'CHANGELOG.md', ...pkg.files.filter(path => /LICENSE|NOTICE/.test(path)), ...Object.values(pkg.bin ?? {})];
   if (pkg.exports) {

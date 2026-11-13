@@ -65,7 +65,7 @@ for `npm run chat`, with streaming Markdown, multiline input and saved conversat
 | Build or connect | Packages |
 | --- | --- |
 | Run agents and build clients | [Runner](packages/runner/README.md) · [Web](packages/web/README.md) · [Backend](packages/backend/README.md) |
-| Add a channel | [Slack](packages/slack/README.md) · [Google Chat](packages/google-chat/README.md) · [Email](packages/email/README.md) |
+| Add a channel | [MCP](packages/mcp/README.md) · [Slack](packages/slack/README.md) · [Google Chat](packages/google-chat/README.md) · [Email](packages/email/README.md) |
 | Distribute execution or storage | [Remote](packages/remote/README.md) · [Workers](packages/workers/README.md) · [Fleet](packages/fleet/README.md) · [Postgres](packages/postgres/README.md) |
 | Inspect history or evaluate agents | [Observer](packages/observer/README.md) · [Eval](packages/eval/README.md) |
 

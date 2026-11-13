@@ -1,5 +1,8 @@
 # MCP tools
 
+This guide connects **tools into an agent**. To expose Dispatch agents as MCP
+tools for another client or agent, use the optional [MCP connector](../../mcp/README.md).
+
 Connect an agent to an existing MCP server with its Markdown definition and host
 settings. Dispatch uses `@earendil-works/pi-mcp` for the connection and Pi Durable
 for tool execution, stored results, cancellation and recovery. Pi coding agent is

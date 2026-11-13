@@ -18,6 +18,7 @@ buildNpmPackage {
       ../../slack/package.json ../../slack/tsconfig.json ../../slack/src
       ../../google-chat/package.json ../../google-chat/tsconfig.json ../../google-chat/src
       ../../email/package.json ../../email/tsconfig.json ../../email/src
+      ../../mcp/package.json ../../mcp/tsconfig.json ../../mcp/src
       ../../fleet/package.json ../../fleet/tsconfig.json ../../fleet/src
       ../../observer/package.json ../../observer/tsconfig.json ../../observer/src
       ../../fleet/scripts ../../observer/scripts ../../observer/licenses
@@ -40,7 +41,7 @@ buildNpmPackage {
     cp package.json LICENSE "$app/"
     cp -R node_modules "$app/"
     rm "$app/node_modules/@dispatch/eval" # installed by the agent release builder, not served by Web
-    for package in runner remote postgres backend workers slack google-chat email fleet observer web; do
+    for package in runner remote postgres backend workers slack google-chat email mcp fleet observer web; do
       mkdir -p "$app/packages/$package"
       cp packages/$package/package.json "$app/packages/$package/"
       cp -R packages/$package/dist "$app/packages/$package/"
@@ -60,6 +61,7 @@ buildNpmPackage {
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-web" --add-flags "$app/packages/web/dist/server/server/main.js" \
       --prefix PATH : ${lib.makeBinPath [ lsof ]}
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-worker" --add-flags "$app/packages/workers/dist/main.js"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-mcp" --add-flags "$app/packages/mcp/dist/cli.js"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/dispatch-bootstrap" --add-flags "$app/packages/web/dist/server/server/bootstrap.js"
     runHook postInstall
   '';
