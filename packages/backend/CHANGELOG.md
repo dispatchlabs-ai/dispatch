@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-11-13
+
 - Carry optional thinking and partialThinking summary text in the shared chat contract.
 
 ## [0.13.0] - 2026-11-13

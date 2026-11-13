@@ -10,7 +10,7 @@ operations. Public name: **Web**. See [design](DESIGN_GUIDE.md),
 From an existing Dispatch application's directory with Node 24.22.1 or newer, install the matching Web archive and add its npm command:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.16.0/dispatch-web-0.16.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.16.1/dispatch-web-0.16.1.tgz
 npm pkg set 'scripts.web=dispatch-web --config host.json'
 ```
 
@@ -36,7 +36,7 @@ Hosted authorization is a required installation binding, not a bundled identity 
 MIT Agent Chat copyright and upstream component licenses are retained.
 No private installation paths/configuration or operational data are included.
 
-## Thinking, tools and input files
+## Tools and input files
 
 Provider-supplied thinking summaries appear in an expandable **Thinking** section
 while streaming and in saved history. It starts open. No section is invented for

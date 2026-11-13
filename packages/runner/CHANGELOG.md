@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-11-13
+
 - Show agent/chat selection on the terminal intro and render native provider thinking summaries in live and retained chats; exclude redacted content and replay signatures.
 
 ## [0.16.0] - 2026-11-13

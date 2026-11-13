@@ -12,8 +12,8 @@ Use Node 24.22.1 or newer and npm. The demo echoes your messages locally so you 
 mkdir dispatch-demo && cd dispatch-demo
 npm init -y --init-type=module
 npm install \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.16.0/dispatch-runner-0.16.0.tgz \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.16.0/dispatch-web-0.16.0.tgz
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.16.1/dispatch-runner-0.16.1.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.16.1/dispatch-web-0.16.1.tgz
 ```
 
 **2. Write your agent and start its host.**

@@ -48,7 +48,7 @@ function messageText(content: unknown): string {
 /** Provider-visible thinking text only; opaque replay signatures and redacted blocks stay native. */
 function messageThinking(content: unknown): string {
   if (!Array.isArray(content)) return "";
-  return content.flatMap(part => part.type === "thinking" && !part.redacted ? [part.thinking] : []).join("\n\n");
+  return content.flatMap(part => part.type === "thinking" && !part.redacted && part.thinking.trim() ? [part.thinking] : []).join("\n\n");
 }
 
 export function projectChatMessages(namespace: string, entries: readonly EntryRecord[]): ChatMessage[] {

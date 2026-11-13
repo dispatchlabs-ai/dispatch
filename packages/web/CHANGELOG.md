@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-11-13
+
 - Show provider thinking summaries while streaming and in saved history, with an accessible expandable Thinking section.
 
 ## [0.15.1] - 2026-11-13
