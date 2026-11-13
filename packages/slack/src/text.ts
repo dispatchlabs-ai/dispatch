@@ -1,5 +1,9 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
+import { gfmTableFromMarkdown } from "mdast-util-gfm-table";
+import { gfmTable } from "micromark-extension-gfm-table";
 import type { Nodes } from "mdast";
+
+const parseMarkdown = (text: string) => fromMarkdown(text, { extensions: [gfmTable()], mdastExtensions: [gfmTableFromMarkdown()] });
 
 export function fallbackText(text: string) {
   return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
@@ -21,7 +25,7 @@ export function markdownText(text: string) {
       offset = end;
     } else if ("children" in node) node.children.forEach(visit);
   };
-  visit(fromMarkdown(text));
+  visit(parseMarkdown(text));
   return result + escape(text.slice(offset));
 }
 
@@ -48,7 +52,7 @@ export function replyChunk(text: string, offset: number, limit = 2400, markdown 
   // Each final message is parsed separately. Prefer complete blocks; oversized
   // individual blocks use literal chunks in replyBlocks instead.
   if (markdown && end < text.length) {
-    const blocks = fromMarkdown(text).children;
+    const blocks = parseMarkdown(text).children;
     const complete = blocks.filter(node => node.position!.end.offset! > offset && node.position!.end.offset! <= end);
     if (complete.length && end < text.length) end = complete.at(-1)!.position!.end.offset!;
     else {
@@ -68,7 +72,7 @@ export function replyChunk(text: string, offset: number, limit = 2400, markdown 
 // A plain rich_text text element would display formatting markers literally.
 export function replyBlocks(text: string, source = text, offset = 0) {
   const end = offset + text.length;
-  const partial = fromMarkdown(source).children.some(node => {
+  const partial = parseMarkdown(source).children.some(node => {
     const start = node.position!.start.offset!;
     const stop = node.position!.end.offset!;
     return start < end && stop > offset && (start < offset || stop > end);
@@ -86,9 +90,20 @@ export function userBlocks(text: string, source: string, offset: number, attribu
   const [body] = replyBlocks(text, source, offset);
   // Wrap each delivered part so even a split paragraph/code block remains
   // visibly authored by the user. Complete blocks retain their Markdown.
-  return body.type === "markdown"
-    ? [heading, { type: "markdown" as const, text: body.text.split("\n").map(line => `> ${line}`).join("\n") }]
-    : [heading, { type: "rich_text" as const, elements: [{
+  if (body.type !== "markdown") return [heading, { type: "rich_text" as const, elements: [{
       type: "rich_text_quote" as const, elements: [{ type: "text" as const, text }],
-    }] }];
+  }] }];
+  // Slack renders tables inside blockquotes as raw pipes. Leave complete tables
+  // at the top level under the same attribution, quoting the surrounding prose.
+  const parts: string[] = [];
+  const quote = (value: string) => { if (value.trim()) parts.push(value.split("\n").map(line => `> ${line}`).join("\n")); };
+  let start = 0;
+  for (const node of parseMarkdown(body.text).children) {
+    if (node.type !== "table") continue;
+    quote(body.text.slice(start, node.position!.start.offset!));
+    start = node.position!.end.offset!;
+    parts.push(body.text.slice(node.position!.start.offset!, start));
+  }
+  quote(body.text.slice(start));
+  return [heading, { type: "markdown" as const, text: parts.join("\n\n") }];
 }

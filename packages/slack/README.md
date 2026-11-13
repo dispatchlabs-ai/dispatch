@@ -97,7 +97,9 @@ Slack thread; Slack cannot insert them at their original historical positions.
 Human messages use the bot's identity with an explicit source label. The shared
 client contract does not carry a verified human name; the Slack recipient is not
 assumed to be the author. Long user messages retain attribution and quotation on
-every part. Stop does not discard an already-saved human message.
+every part. Tables render outside the quote under that same heading, because
+Slack does not render pipe tables inside blockquotes. The saved Markdown is
+unchanged across clients. Stop does not discard an already-saved human message.
 The existing host authorization and Slack route/user restrictions still apply.
 Only public message text is mirrored. Attachment names are listed, but this does
 not upload their bytes; raw tools, system instructions and thinking stay out of
