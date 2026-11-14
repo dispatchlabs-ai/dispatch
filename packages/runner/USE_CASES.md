@@ -140,6 +140,10 @@ records the agreed boundaries and existing foundations.
   Discover server-defined tools and execute them through Pi Durable with retained
   results, cancellation and recovery, without an agent-specific protocol adapter.
   See [MCP connections](docs/mcp.md) for the supported transports and boundaries.
+- **RUN-035 — Customize execution environments:** An application author shares
+  reproducible environment components, adds agent-specific software and settings,
+  and explicitly builds and operates the selected environment for each agent.
+  See [repo-owned environments](docs/environments.md).
 
 Remote persistence and connectivity belong to
 [Remote's goals](../remote/USE_CASES.md#2-portable-service-additions);
