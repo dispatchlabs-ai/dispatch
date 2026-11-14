@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Web API",
-    "version": "0.17.3",
+    "version": "0.18.0",
     "license": {
       "name": "MIT",
       "identifier": "MIT"

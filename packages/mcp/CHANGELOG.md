@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-13
+
 - Expose native agent discovery, messaging, status and work waits through the shared host contract. Automatic replies return as new inputs to the sending conversation.
 - Bind Runner callers to their executing conversation and stable native tool identity, preserving recipient selection, recovery and independent cancellation.
 

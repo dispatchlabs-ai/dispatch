@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/remote",
-  "version": "0.17.3",
+  "version": "0.18.0",
   "description": "Relay transport and optional remote SQLite storage for Pi Durable runners",
   "license": "MIT",
   "type": "module",

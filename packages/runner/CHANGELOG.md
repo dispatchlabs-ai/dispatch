@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-13
+
 - Share native agent-instance discovery and message-work waits with clients and MCP, reusing the existing delivery tasks and automatic replies.
 - Bind MCP messaging calls to the executing top-level conversation; reject cross-host bindings and private-child impersonation.
 
