@@ -262,11 +262,19 @@ at native idle with no unfinished version1 deliveries; retain its original
 runtime for existing tasks rather than reinterpret old run-wide stream memos.
 Back up the complete closed state before changing release selection.
 See [Slack's response guidance](https://docs.slack.dev/ai/developing-agents/#responding-to-the-user).
+
+## Message formatting
+
+The adapter owns Slack presentation and delivery. Keep application `AGENTS.md`
+and `agent.md` channel-neutral: their ordinary replies and the native conversation
+history remain Markdown. Slack escaping, blocks, attribution, message sizing and
+retry receipts belong here, not in each agent's instructions.
+
 Replies use standard Markdown in Slack's Markdown blocks and streams: headings,
-bold text, lists, blockquotes, inline/fenced code, links and pipe tables. Use
-`[label](https://example.com)` and tables with header/separator rows; do not wrap
-tables in code fences or pre-convert replies into Slack `mrkdwn` or Block Kit JSON.
-Direct posting tools still follow their own declared payload format. Code stays
+bold text, lists, blockquotes, inline/fenced code, Markdown links and pipe tables.
+The adapter accepts this Markdown directly; it does not require agents to
+pre-convert replies into Slack `mrkdwn` or Block Kit JSON. Explicit posting tools
+follow their own declared payload format. Code stays
 literal, including angle brackets and ampersands, while ordinary Slack control
 syntax is escaped.
 Final messages split at complete Markdown blocks where possible. A block too
@@ -276,6 +284,14 @@ User mentions retain Slack's mention syntax in streamed and final replies.
 Other control syntax, including broadcast tags, stays literal. Partly generated
 mentions wait for completion before streaming, and delivery chunks keep complete
 mentions together. No directory lookup or `users:read` permission is required.
+
+For a Slack-bound conversation, Web and CLI user messages are delivered with a
+bold **User · Web** or **User · CLI** heading and quoted prose. Complete tables
+stay outside the added quote under the same heading because Slack otherwise
+renders their pipes literally. The common client does not supply a verified human
+name; the adapter does not infer one. These decorations do not alter native history.
+Restart catches up missing turns without reposting delivered messages; backfilled
+turns appear at the end of the Slack thread. Separate conversations stay separate.
 
 Slack posts are reconciled with deterministic native response/chunk metadata;
 initial streams carry a deterministic public block marker because Slack's

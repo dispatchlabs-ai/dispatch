@@ -1,18 +1,29 @@
 # Repository guidance
 
-- Read [OSS.md](OSS.md) when developing, documenting or preparing a release of any package.
-- For repository/package structure and publishing work, use [Pi as the packaging reference](CONTRIBUTING.md#pi-as-the-packaging-reference), inspecting current source and recording the revision and material differences.
-- Before committing or publishing, review staged changes, outgoing commits/messages and artifacts for secrets and private operational or personal information, including image content and metadata. Use synthetic examples and private evidence storage; follow the [public information boundary](OSS.md#public-information-boundary). A clean secret scan does not establish privacy.
-- Use the startup and check commands in [CONTRIBUTING.md](CONTRIBUTING.md).
-- Follow the [testing policy](CONTRIBUTING.md#testing-policy): do not add or run automated tests. AI-agent interactive verification using `agent-browser` is permitted; use source review, TypeScript and build checks too. Future coverage prioritizes stable end-to-end and API behavior.
-- Before changing behavior, read current authoritative project intent and relevant affected-package documentation. Historical handoffs are supporting evidence, not a second product specification.
-- Web replacement contracts are package-local; the retired database-only workspace spec and ui.tsx styling pointer no longer govern. Use packages/web/DESIGN_GUIDE.md.
-- Before changing browser UI, read relevant repo-local UI guidance and review records. Report requirements you did not meet or check as deviations or unverified; never describe them as done.
-- Review UI rendered, as a whole page, at 1440×900, 1280×720, 768×1024 and 390×844, compared with neighbouring sections. Sign in per project instructions or ask for captures; an unperformed review leaves the task incomplete. Keep captures in the gitignored `.local/`, and never commit ones that show account data. Still images do not verify keyboard, touch, or recovery flows.
-- Follow [CONTRIBUTING.md](CONTRIBUTING.md) for checks and publication. Fetch the remote target and safely synchronize the canonical checkout before work and after publication; preserve local commits/edits and coordinate with active owners. Develop in an isolated task worktree from that fetched target and deliver to the authorized target; local browser delivery applies only to local development tasks. Complete and verify the current task before starting further work.
-- Use the [agent workflow index](CONTRIBUTING.md#agent-workflows) to find reusable prompts and procedures. Read only those relevant to the current task; agents outside Pi can follow the same Markdown files directly.
-- Before completing an implementation package, apply the behavior-preserving review in [.pi/prompts/deslop.md](.pi/prompts/deslop.md). AI agents may use `agent-browser` for interactive verification of authorized work without a testing-policy exception.
-- For a release request, start with [.pi/skills/release.md](.pi/skills/release.md), the canonical build/verify/publish runbook. The initial request authorizes the ordinary release workflow through publication and documentation; do not ask again at each step. No previous release chat or private `.local/` script is required. Report action-specific access blockers and continue unblocked channels; do not deploy to live installations as a side effect.
-- Keep specifications, handoffs, usage guides, changelogs, and code with their owning package. Root files contain repository-wide guidance and tooling.
-- Record checks and outstanding acceptance evidence in the task report or relevant linked supporting document; do not create a separate validation plan.
-- Keep draft decisions and unresolved contracts explicitly labeled. Use stock Pi Durable's public interfaces and preserve its ownership of durable execution and recovery.
+- Use [CONTRIBUTING.md](CONTRIBUTING.md) for startup, checks and publication,
+  and [OSS.md](OSS.md) for public package standards. Keep private data out of
+  source, history and artifacts; review staged and outgoing content before publishing.
+- Work in a task worktree from the freshly fetched target. Safely synchronize the
+  canonical checkout before work and after publication; preserve unrelated edits
+  and commits and coordinate with active owners.
+- Read affected package contracts when changing behavior. Historical handoffs are
+  evidence, not current scope; label draft decisions and unresolved requirements.
+  Keep code, specifications, guides and changelogs with their owning package.
+- Use stock Pi Durable's public interfaces for durable execution and recovery.
+  For package structure or publishing changes, inspect the pinned Pi source using
+  [the packaging reference](CONTRIBUTING.md#pi-as-the-packaging-reference).
+- Follow the [testing policy](CONTRIBUTING.md#testing-policy): no automated tests.
+  Use the source/type/build checks and real interactions appropriate to the change.
+  Record observed results and gaps in the task report, not a separate validation plan.
+- For browser UI changes, use the affected package's design guide and
+  [browser verification procedure](.pi/skills/interactive-testing.md).
+  Web's current guide is [packages/web/DESIGN_GUIDE.md](packages/web/DESIGN_GUIDE.md).
+- Before completing an implementation, apply [deslop.md](.pi/prompts/deslop.md).
+  Read other [workflow prompts](CONTRIBUTING.md#agent-workflows) only when relevant;
+  the Markdown procedures also work outside Pi.
+- For an authorized release, follow [release.md](.pi/skills/release.md) through
+  publication and documentation without asking again at every step. Report specific
+  access blockers and continue unblocked channels. Release authority does not
+  itself authorize live deployment.
+- When writing agent instructions, including `agent.md`, skills and runtime prompts,
+  follow the [instruction authoring guide](packages/runner/docs/instructions.md).

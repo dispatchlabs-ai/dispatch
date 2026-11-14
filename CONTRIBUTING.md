@@ -47,9 +47,16 @@ No machine-specific launchers or installed-runtime dist-file discovery.
 TypeScript checks run inside `nix develop`. Packaging/dependency/Nix changes also
 require measured `npmDepsHash`, `nix build`, `nix flake check`, affected artifacts
 and isolated packed consumers. Record source revision, commands/results and limits
-in the private task report. Do not run functional suites. Review the whole page
+in the private task report. Do not run functional suites.
+
+For browser UI changes, read the affected package's design guidance and relevant
+review records. Review the whole page
 at 1440×900, 1280×720, 768×1024 and 390×844; observe keyboard, recovery and mobile
-navigation, not just screenshots. Run `git diff --check`, staged whitespace checks
+navigation, not just screenshots. Keep captures in gitignored `.local/`, excluding
+private content from publication. Record unmet or unverified requirements explicitly;
+an unperformed required review leaves that UI work incomplete.
+
+For all changes, run `git diff --check`, staged whitespace checks
 and affected documentation-link review.
 
 ## Specification and implementation
@@ -66,6 +73,9 @@ state belong outside Web. CLI and channels use the same native identities and
 operations. This feature does not implement every accepted portable-agent goal.
 
 ## Agent workflows
+
+When changing agent definitions, shared guidance, skills or runtime prompts, use
+the [instruction authoring guide](packages/runner/docs/instructions.md).
 
 Read [.pi/skills/interactive-testing.md](.pi/skills/interactive-testing.md) for
 rendered checks, [.pi/prompts/deslop.md](.pi/prompts/deslop.md) for the required

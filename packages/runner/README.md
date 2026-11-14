@@ -125,7 +125,10 @@ await host.close();
 ## Definitions and optional capabilities
 
 Your repository owns instructions, model selection, tools, skills and application
-code. Select MCP connections in Markdown; add `agent.ts` beside it for custom
+code. Keep shared rules and role instructions concise; use the
+[instruction authoring guide](docs/instructions.md) for `AGENTS.md`, agent
+definitions, skills and prompts. Select MCP connections in Markdown; add `agent.ts`
+beside it for custom
 application code or other optional capabilities.
 For several agents, use `agents/NAME/agent.md` and optional `agent.ts` beside each.
 A root `agent.md` can coexist with named agents, but not with `agents/agent/agent.md`.
