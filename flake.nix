@@ -69,6 +69,12 @@
           };
         };
     in {
+      lib.mkEnvironment = { system, ... }@args:
+        import ./packages/runner/nix/environment.nix { pkgs = import nixpkgs { inherit system; }; }
+          (builtins.removeAttrs args [ "system" ]);
+      lib.mkContainerEnvironment = { system, ... }@args:
+        import ./packages/runner/nix/container-environment.nix { pkgs = import nixpkgs { inherit system; }; }
+          (builtins.removeAttrs args [ "system" ]);
       lib.agentRuntime = { system }:
         import ./packages/runner/nix/runtime.nix { pkgs = import nixpkgs { inherit system; }; };
       lib.mkAgentRelease = { system, withSlack ? false, withFleet ? false, withGoogleChat ? false, execution ? null, ... }@args:

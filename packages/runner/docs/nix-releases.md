@@ -5,6 +5,10 @@ The agent repository owns its application source, deployment declarations and
 machines, Nix, identities, secrets, network and supervision. Never put secrets,
 state or operational captures in a flake source.
 
+Agents can also select [repo-owned environments](environments.md): shared Nix
+components with agent-specific packages and configuration, built independently
+from the agent host. Environment lifecycle and tool routing remain explicit.
+
 Package an allowlisted source tree with the shared builder:
 
 ```nix

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Add optional repository Nix environment selection per agent, catalog/instruction visibility, and explicit describe/build/run commands. Shared Nix builders compose software/configuration and package container environments with standard Compose lifecycle.
+
 - Add generic `providers add/list` and `models list/use` commands using Pi's native provider registry, authentication, credentials and discovery. Verify a response before saving connections; share `host.json` automatically across the local host and clients.
 - Add Apple local as a native Pi provider and manage `fm serve` through a generic host-owned process supervisor, with readiness, cancellation, restart and descendant cleanup. Custom provider bindings can use the same process settings.
 - Fit native compaction defaults to small model contexts while preserving explicit host budgets and native conversation model overrides.

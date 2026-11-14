@@ -12,6 +12,7 @@ const usage = `dispatch serve [--root DIRECTORY] [--state DIRECTORY] [--socket S
 dispatch serve --config HOST.json
 dispatch chat [--root DIRECTORY] [--state DIRECTORY] [--agent NAME] [--session KEY] [--prompt TEXT] [--history]
 dispatch catalog [--root DIRECTORY]
+dispatch environment describe|build|run --agent NAME [--root DIRECTORY] [-- ARGUMENTS]
 dispatch login PROVIDER [--api-key] [--no-browser]
 dispatch logout PROVIDER
 dispatch auth
@@ -45,16 +46,26 @@ Start the owner explicitly with dispatch serve, dispatch-service HOST.json serve
 Clients never start, replace or upgrade an owner. Disconnect leaves its work running.`;
 
 try {
-  const { values, positionals } = parseArgs({ allowPositionals: true, options: {
+  const argv = process.argv.slice(2);
+  const separator = argv.indexOf("--");
+  const forwarded = separator < 0 ? [] : argv.slice(separator + 1);
+  const { values, positionals } = parseArgs({ args: separator < 0 ? argv : argv.slice(0, separator), allowPositionals: true, options: {
     root: { type: "string" }, state: { type: "string" }, config: { type: "string" }, socket: { type: "string" }, demo: { type: "boolean" },
     agent: { type: "string" }, session: { type: "string" }, prompt: { type: "string" },
     "request-id": { type: "string" }, history: { type: "boolean" }, json: { type: "boolean" }, help: { type: "boolean" },
     "api-key": { type: "boolean" }, "no-browser": { type: "boolean" },
     provider: { type: "string" }, model: { type: "string" }, module: { type: "string" }, export: { type: "string" }, "base-url": { type: "string" },
   } });
+  if (separator >= 0 && positionals[0] !== "environment") throw new Error("Arguments after -- are supported by environment run.");
   if (values.demo && positionals[0] !== "serve") throw new Error("--demo is a host option: use dispatch serve --demo, then dispatch chat.");
   if ((values["api-key"] || values["no-browser"]) && !["login", "providers"].includes(positionals[0])) throw new Error("--api-key and --no-browser are sign-in options.");
   if (values.help) console.log(usage);
+  else if (positionals[0] === "environment" && positionals.length === 2 && ["describe", "build", "run"].includes(positionals[1])) {
+    if (values.config && values.root) throw new Error("Select --root or --config for environment commands.");
+    const { environmentCommand } = await import("./environments.js");
+    const root = values.config ? (await readHostConfig(values.config)).root : values.root;
+    await environmentCommand(positionals[1] as "describe" | "build" | "run", { root, agent: values.agent }, forwarded);
+  }
   else if ((positionals[0] === "login" || positionals[0] === "logout") && positionals.length === 2) {
     const { loginCommand, logoutCommand } = await import("./login-cli.js");
     if (positionals[0] === "login") await loginCommand(positionals[1], { apiKey: values["api-key"], noBrowser: values["no-browser"] });
@@ -89,7 +100,8 @@ try {
   } else if (positionals[0] === "catalog") {
     const root = resolve(values.root ?? ".");
     const agents = await Promise.all((await catalog(root)).filter(agent => agent.runnable).map(agent => loadAgent(root, agent.id)));
-    console.log(JSON.stringify(agents.map(({ id, description, model, fingerprint, mcp }) => ({ id, description, model, fingerprint, ...(mcp ? { mcp } : {}) })), null, 2));
+    console.log(JSON.stringify(agents.map(({ id, description, model, fingerprint, mcp, environment }) => ({ id, description, model, fingerprint,
+      ...(mcp ? { mcp } : {}), ...(environment ? { environment } : {}) })), null, 2));
   } else if (positionals[0] === "watch") {
     const { watchCommand } = await import("./watch.js");
     await watchCommand([
