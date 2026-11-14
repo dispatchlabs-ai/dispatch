@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Add generic `providers add/list` and `models list/use` commands using Pi's native provider registry, authentication, credentials and discovery. Verify a response before saving connections; share `host.json` automatically across the local host and clients.
+- Add Apple local as a native Pi provider and manage `fm serve` through a generic host-owned process supervisor, with readiness, cancellation, restart and descendant cleanup. Custom provider bindings can use the same process settings.
+- Fit native compaction defaults to small model contexts while preserving explicit host budgets and native conversation model overrides.
+
 ## [0.19.0] - 2026-11-14
 
 - Add `dispatch login`, `auth` and `logout` using Pi's native provider authentication. Local hosts can use saved subscription sign-ins with Pi-owned token refresh and private, locked credential storage; environment-only and gateway bindings remain available.

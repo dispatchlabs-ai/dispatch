@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { startService, connectClient, type ServiceCommand, connectInTerminal } from "./service.js";
+import { connectClient, type ServiceCommand, connectInTerminal } from "./service.js";
 import { readHostConfig } from "./host-config.js";
 
 const [configPath, action, ...args] = process.argv.slice(2);
@@ -11,10 +11,8 @@ try {
   if (action === "serve") {
     // Provider subprocesses inherit the service directory; keep it the configured workspace.
     process.chdir(config.cwd);
-    const service = await startService(config);
-    for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => {
-      void service.close().then(() => process.exit(0), error => { console.error(String(error)); process.exit(1); });
-    });
+    const { startServiceInTerminal } = await import("./service-lifecycle.js");
+    const service = await startServiceInTerminal(config);
     console.log(JSON.stringify({ event: "service-started", agents: service.service.agents.map(agent => agent.id) }));
   } else {
     if (!config.socket) throw new Error("These commands require a socket. For HTTPS use dispatch-agent --config CLIENT.json run or connectClient().");

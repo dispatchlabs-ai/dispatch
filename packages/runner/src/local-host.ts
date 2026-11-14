@@ -1,10 +1,14 @@
 import { createModels } from "@earendil-works/pi-ai/models";
 import { catalog, loadAgent } from "./definition.js";
 import { localProvider } from "./local-provider.js";
-import { localHostPaths } from "./host-config.js";
+import { localHostPaths, readProjectHostConfig } from "./host-config.js";
 import type { ServiceConfig } from "./service.js";
 
 export async function localHostConfig(options: { root?: string; state?: string; socket?: string; demo?: boolean }): Promise<ServiceConfig> {
+  if (!options.demo) {
+    const configured = await readProjectHostConfig(options);
+    if (configured) return configured;
+  }
   const paths = await localHostPaths(options);
   const agents = await Promise.all((await catalog(paths.root)).filter(agent => agent.runnable).map(agent => loadAgent(paths.root, agent.id)));
   if (!agents.length) throw new Error("No agent definition found. Create agent.md here, or agents/NAME/agent.md. Run dispatch --help for an example.");

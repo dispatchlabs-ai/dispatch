@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { createInterface } from "node:readline/promises";
-import type { AuthEvent, AuthPrompt } from "@earendil-works/pi-ai";
+import type { AuthEvent, AuthPrompt, AuthInteraction } from "@earendil-works/pi-ai";
+import { createModels } from "@earendil-works/pi-ai/models";
 import { promptForSecret } from "./credential-cli.js";
 import { LocalCredentials } from "./local-credentials.js";
 import { localModels } from "./local-provider.js";
@@ -14,12 +15,9 @@ function openBrowser(url: string): void {
   execFile(command, args, error => { if (error) console.error("Open the sign-in URL above in your browser."); });
 }
 
-export async function loginCommand(providerId: string, options: { apiKey?: boolean; noBrowser?: boolean } = {}): Promise<void> {
-  if (!process.stdin.isTTY) throw new Error("Sign-in needs an interactive terminal. Run dispatch login there; never pass credentials as arguments.");
-  const { models, provider, credentials } = await localModels(providerId);
-  const type = options.apiKey || !provider.auth.oauth ? "api_key" : "oauth";
-  if (type === "api_key" && !provider.auth.apiKey?.login) throw new Error(`${providerId} uses credentials supplied in the host environment.`);
-  const hostId = await credentials.hostId();
+/** Render Pi's native prompts for both sign-in and provider setup. */
+export function terminalInteraction(options: { noBrowser?: boolean } = {}): AuthInteraction & { signal: AbortSignal; close(): void } {
+  if (!process.stdin.isTTY) throw new Error("Setup needs an interactive terminal; never pass credentials as arguments.");
   const controller = new AbortController();
   const cancel = () => controller.abort();
   process.once("SIGINT", cancel);
@@ -65,26 +63,35 @@ export async function loginCommand(providerId: string, options: { apiKey?: boole
       throw error;
     }
   };
-  try {
-    await models.login(providerId, type, { signal: controller.signal, prompt, notify }, { getDeviceId: () => hostId, agentName: "Dispatch" });
-    console.log(`Signed in to ${providerId}. Start or restart your Dispatch host to use this account.`);
-  } catch {
-    throw new Error(controller.signal.aborted ? "Sign-in cancelled; existing credentials were kept."
-      : `Could not complete ${providerId} sign-in. Retry dispatch login ${providerId}; check provider eligibility and the browser result. Raw credential errors were withheld.`);
-  } finally {
+  return { signal: controller.signal, prompt, notify, close: () => {
     process.removeListener("SIGINT", cancel);
     process.removeListener("SIGTERM", cancel);
-  }
+  } };
+}
+
+export async function loginCommand(providerId: string, options: { apiKey?: boolean; noBrowser?: boolean } = {}): Promise<void> {
+  const { models, provider, credentials } = await localModels(providerId);
+  const type = options.apiKey || !provider.auth.oauth ? "api_key" : "oauth";
+  if (type === "api_key" && !provider.auth.apiKey?.login) throw new Error(`${providerId} uses credentials supplied in the host environment.`);
+  const hostId = await credentials.hostId();
+  const interaction = terminalInteraction(options);
+  try {
+    await models.login(providerId, type, interaction, { getDeviceId: () => hostId, agentName: "Dispatch" });
+    console.log(`Signed in to ${providerId}. Start or restart your Dispatch host to use this account.`);
+  } catch {
+    throw new Error(interaction.signal.aborted ? "Sign-in cancelled; existing credentials were kept."
+      : `Could not complete ${providerId} sign-in. Retry dispatch login ${providerId}; check provider eligibility and the browser result. Raw credential errors were withheld.`);
+  } finally { interaction.close(); }
 }
 
 export async function authStatus(): Promise<void> {
   const saved = await new LocalCredentials().list();
   if (!saved.length) console.log("No saved sign-ins. Run dispatch login openai for ChatGPT, or configure a provider API key in the host environment.");
-  else for (const item of saved) console.log(`${item.providerId}\t${item.type}`);
+  else for (const item of saved) console.log(terminalText(`${item.providerId}\t${item.type}`));
 }
 
 export async function logoutCommand(providerId: string): Promise<void> {
-  const { models } = await localModels(providerId);
+  const models = createModels({ credentials: new LocalCredentials() });
   await models.logout(providerId);
-  console.log(`Removed the saved ${providerId} sign-in. Provider-side access was not revoked; environment API keys are unchanged.`);
+  console.log(terminalText(`Removed the saved ${providerId} sign-in. Provider-side access was not revoked; environment API keys are unchanged.`));
 }

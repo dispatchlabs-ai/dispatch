@@ -4,6 +4,38 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## Generic provider setup — November 14, 2026 (unreleased)
+
+Provider setup uses Pi 1.5.2's native registry, authentication prompts, credential
+store, model discovery and inference interfaces. On macOS arm64 / Node 24.22.1,
+real browser sign-ins completed for ChatGPT and Claude. An isolated consumer of
+the development Runner archive configured `openai/gpt-6.1-sol`,
+`anthropic/claude-sonnet-5-5` and `apple-local/system` through `providers add`.
+Each passed the live response check, then completed a real `read` tool call
+through `npm run chat`. Both cloud providers used saved OAuth access with their
+API-key environment variables unset. Native instructions, entries, tool results,
+tasks and completed submissions were inspected. All three histories survived a
+host restart. This qualifies the observed accounts and flows, not every plan.
+
+Apple setup and the host started and stopped their own `fm serve` processes.
+Manual checks covered restart on the next request after a server crash, cleanup
+after host termination, startup cancellation, a missing executable, refusal to
+claim an occupied endpoint, and leaving an externally managed server running.
+A custom native provider with synthetic inference exercised its own secret
+prompt, provider identity, model discovery and agent model switching without a
+provider-specific CLI branch.
+
+Source build/type checks, macOS Nix build/flake checks and the packed consumer's
+strict NodeNext declaration check passed. The consumer dependency audit reported
+zero findings. Source, documentation links and the Runner archive received scoped
+privacy/secret review. No automated functional tests were added or run.
+
+The commands and Apple integration are source features, not part of the existing
+v0.19.0 release archives. No application or deployed service was upgraded. Live
+Windows/Linux sign-in, token-expiry/concurrent refresh and long-context Apple
+compaction quality were not newly qualified. The native compaction budgets fit
+small contexts; that does not establish suitability for complex agent tasks.
+
 ## v0.19.0 subscription setup release — November 14, 2026
 
 [Release v0.19.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.19.0)

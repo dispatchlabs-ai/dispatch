@@ -44,6 +44,14 @@ Its pickers, draft retention, scrolling and tool expansion are client behavior;
 no protocol or storage migration is introduced. One-shot and redirected commands
 keep plain output. Available in Runner 0.16.0 and newer.
 
+Provider setup (`providers add/list`, `models list/use`, sign-in and logout) is
+local host administration, separate from conversation operations. It uses native
+Pi providers and local file/credential authority; HTTP/MCP callers cannot install
+provider modules or launch commands through this feature. Managed inference
+servers belong to the explicit host, and client disconnect does not stop them.
+See [provider setup](../packages/runner/docs/providers.md) for availability and
+lifecycle details.
+
 ## Authority
 
 - **Local-first use:** CLI and local Web act with the local account's filesystem

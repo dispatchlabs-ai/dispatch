@@ -1,6 +1,7 @@
 import type { AuthContext } from "@earendil-works/pi-ai";
 import type { Provider } from "@earendil-works/pi-ai/models";
 import { withPrivateProviderErrors } from "./private-provider-errors.js";
+import { registeredProvider } from "./provider-catalog.js";
 
 // The launcher gives providers no ambient environment. This context is handed only to the one
 // provider the host names, so no other provider can authenticate from the environment.
@@ -8,11 +9,7 @@ const environment: AuthContext = { env: async name => process.env[name], fileExi
 
 /** Load only the named provider from the pinned Pi package. */
 export async function builtInProvider(name: string): Promise<Provider> {
-  if (typeof name !== "string" || !/^[a-z][a-z0-9-]*$/.test(name)) throw new Error("Name one of Pi's built-in providers, such as openai.");
-  const module: Record<string, unknown> = await import(`@earendil-works/pi-ai/providers/${name}`).catch(() => ({}));
-  const factory = Object.entries(module).find(([key]) => key.toLowerCase() === `${name.replaceAll("-", "")}provider`)?.[1];
-  if (typeof factory !== "function") throw new Error(`Pi has no built-in provider named ${name}.`);
-  return factory() as Provider;
+  return registeredProvider(name);
 }
 
 /** API-key-only host binding using the named Pi provider's environment variables. */

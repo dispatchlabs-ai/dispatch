@@ -7,6 +7,21 @@ stops work. Clients never start, replace, upgrade or reopen an execution owner.
 For a complete copyable application, begin with [Build your own agents](create-agents.md).
 This page is the reference for host settings, client operations and network access.
 
+## Provider setup in the current source
+
+The unreleased [provider setup commands](providers.md) save native provider IDs or
+trusted factory bindings in `host.json`. `serve` and clients discover that file
+from the project directory; `--config` selects a different file. Without a file,
+the local launcher still derives built-in providers from the agent definitions.
+For local socket hosts, `--state` derives another store/socket pair and `--socket`
+selects an explicit socket. `--demo` retains its separate synthetic setup.
+
+`startService` owns one shared set of provider resources across all its model
+consumers and channel adapters. A binding's optional `process` launches a local
+server, checks readiness and cleans up on shutdown or owner loss. Direct callers
+of `connectHostModels` must close the returned connection. Setup remains local
+administration and does not change the conversation command/watch contract.
+
 ## Start a host
 
 For a local application with a root `agent.md` (or `agents/NAME/agent.md`), install

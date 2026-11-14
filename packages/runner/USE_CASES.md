@@ -26,8 +26,11 @@ not certify implementation, package publication or installation qualification.
   turns, return to named conversations and disconnect while work continues.
   Explicit Stop cancels the selected owned work. Display untrusted terminal
   controls as visible escapes without changing stored conversation content.
-- **RUN-008 — Use host-owned credentials:** sign in through Pi's native provider
-  flows, inspect saved account metadata and log out. Persist local OAuth tokens
+- **RUN-008 — Connect models with host-owned credentials:** discover native Pi
+  providers, render their authentication prompts, verify a response and select
+  agent models. Support trusted native provider modules and host-managed local
+  inference processes with readiness, recovery and cleanup. Inspect saved account
+  metadata and log out. Persist local OAuth tokens
   privately with serialized refresh; use environment API keys when no sign-in is
   saved. Custom hosts can instead use a native store or trusted vault helper for
   API keys without plaintext fallback, or bind an existing model gateway or

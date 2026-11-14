@@ -19,6 +19,28 @@ export async function localHostPaths(options: { root?: string; state?: string; s
   return paths;
 }
 
+/** A project can share one non-secret connection file across its host and clients. */
+export async function projectHostConfig(root = "."): Promise<string | undefined> {
+  const path = resolve(root, "host.json");
+  return readFile(path).then(() => path, (error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+}
+
+export async function readProjectHostConfig(options: { root?: string; state?: string; socket?: string }): Promise<FileConfig | undefined> {
+  const path = await projectHostConfig(options.root);
+  if (!path) return undefined;
+  const config = await readHostConfig(path);
+  if (options.state) {
+    const paths = await localHostPaths({ root: config.root, state: options.state });
+    config.stateRoot = paths.stateRoot;
+    if (config.socket) config.socket = paths.socket;
+  }
+  if (options.socket) config.socket = resolve(options.socket);
+  return config;
+}
+
 function settingPath(directory: string, value: string) {
   if (typeof value !== "string" || !value.trim()) throw new Error("Configured paths must be nonempty strings.");
   if (value === "~") return homedir();
@@ -40,6 +62,13 @@ export async function readHostConfig(filename: string): Promise<FileConfig> {
   if (input.socket !== undefined) config.socket = settingPath(directory, input.socket);
   else if (input.http || input.url) delete config.socket;
   if (input.gateway) config.gateway = { ...input.gateway, credentialFile: settingPath(directory, input.gateway.credentialFile) };
+  if (input.modelProviders) {
+    if (!Array.isArray(input.modelProviders)) throw new Error("modelProviders must be a list.");
+    config.modelProviders = input.modelProviders.map(binding => {
+      if (!binding || typeof binding !== "object") throw new Error("Each model provider binding must be an object.");
+      return { ...binding, ...(typeof binding.module === "string" && binding.module.startsWith(".") ? { module: settingPath(directory, binding.module) } : {}) };
+    });
+  }
   // Relative HTTP tokens keep the working directory of their original reader.
   if (input.http) config.http = { ...input.http, tokenFile: settingPath(config.cwd, input.http.tokenFile) };
   if (input.tokenFile !== undefined) config.tokenFile = settingPath(process.cwd(), input.tokenFile);
@@ -48,6 +77,7 @@ export async function readHostConfig(filename: string): Promise<FileConfig> {
 
 /** Read the client endpoint from the same settings as the host. No model or tool connections are opened. */
 export async function readClientConnection(filename?: string): Promise<ClientConnection> {
+  filename ??= await projectHostConfig();
   if (filename === undefined) return { socket: (await localHostPaths({})).socket };
   const { socket, url, tokenFile, http } = await readHostConfig(filename);
   if (socket) return { socket };

@@ -7,6 +7,10 @@ Clients do not need model credentials.
 Available in **v0.19.0 and later**. Install the matching release archives using the
 [quickstart](../../../README.md#quickstart) or [two-agent setup](create-agents.md).
 
+For the current source's interactive provider/model setup and managed Apple local
+server, see [Connect providers and choose models](providers.md). That feature is
+unreleased; the commands below work with v0.19.0.
+
 ## ChatGPT subscription
 
 From your agents application directory:
@@ -64,6 +68,8 @@ for included API credits; a subscription is not itself an API key. See
 [Anthropic's subscriber API-credit instructions](https://platform.claude.com/docs/en/about-claude/api-credits-for-subscribers).
 
 Pi 1.5.2 also implements Claude OAuth, exposed by `npx dispatch login anthropic`.
+A live subscription sign-in and tool call were verified during the new provider
+setup work; see the dated [verification record](../../../docs/qualification.md).
 That implementation does not establish permission to use a subscription in a
 third-party app: Anthropic's current
 [credential-use policy](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
@@ -74,7 +80,7 @@ rules and your account eligibility.
 Advanced hosts can also bind the separately packaged experimental
 [Pi Claude Code provider](https://github.com/earendil-works/pi-claude-code), using
 the official CLI's own login and billing rules. Dispatch retains that optional
-Nix integration; it is not installed by the npm starter or newly qualified here.
+Nix integration; it is not installed by the npm starter and was not used in the native subscription check.
 
 ## API keys
 

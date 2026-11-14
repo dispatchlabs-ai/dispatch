@@ -41,7 +41,7 @@ export class LocalCredentials implements CredentialStore {
       if (value?.version !== 1 || !/^[a-f\d]{8}(-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(value.hostId)
         || !value.providers || typeof value.providers !== "object" || Array.isArray(value.providers)) throw new Error();
       for (const [id, credential] of Object.entries(value.providers)) {
-        if (!/^[a-z][a-z0-9-]*$/.test(id) || !credential || typeof credential !== "object") throw new Error();
+        if (!id || !credential || typeof credential !== "object") throw new Error();
         if (credential.type === "oauth") {
           if (typeof credential.access !== "string" || !credential.access || typeof credential.refresh !== "string"
             || !credential.refresh || !Number.isFinite(credential.expires)) throw new Error();
@@ -100,11 +100,11 @@ export class LocalCredentials implements CredentialStore {
     return Object.entries((await this.load())?.providers ?? {}).map(([providerId, credential]) => ({ providerId, type: credential.type }));
   }
   async modify(id: string, fn: (current: Credential | undefined) => Promise<Credential | undefined>, options?: AuthOperationOptions): Promise<Credential | undefined> {
-    if (!/^[a-z][a-z0-9-]*$/.test(id)) throw new Error("Invalid sign-in provider.");
+    if (!id) throw new Error("Invalid sign-in provider.");
     return this.change(async value => {
       const current = Object.hasOwn(value.providers, id) ? value.providers[id] : undefined;
       const next = await fn(current);
-      if (next !== undefined) value.providers[id] = next;
+      if (next !== undefined) Object.defineProperty(value.providers, id, { value: next, enumerable: true, writable: true, configurable: true });
       return next ?? current;
     }, options);
   }

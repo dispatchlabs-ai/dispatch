@@ -63,6 +63,18 @@ turn and `/quit` to disconnect. `--session NAME` selects another conversation.
 Stopping the host with Ctrl-C preserves its history and unfinished work; start it
 with the same command to recover. Clients never start replacement owners.
 
+### Provider setup (unreleased)
+
+`dispatch providers add` uses Pi's native provider registry, authentication prompts
+and model discovery, verifies a response and saves `host.json`. `dispatch models
+use` selects an agent's default model. The host can manage a local inference
+server; Apple local supplies an `fm serve` launch definition and a native Pi
+provider. Project hosts and clients discover `host.json` automatically.
+
+See [Connect providers and choose models](docs/providers.md). These commands are
+in the current source, not the v0.19.0 archives. The sign-in quickstart above
+remains valid for that release.
+
 ### Interactive terminal UI
 
 The intro shows `/agents` (Ctrl+G), `/chats` (Ctrl+P) and `/help`.

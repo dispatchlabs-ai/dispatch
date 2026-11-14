@@ -55,6 +55,7 @@ export function withPrivateProviderErrors(provider: Provider): Provider {
   return {
     id: provider.id, name: provider.name, auth: provider.auth,
     baseUrl: provider.baseUrl, headers: provider.headers,
+    refreshModelsAuth: provider.refreshModelsAuth,
     getModels: provider.getModels.bind(provider),
     ...(provider.getAllModels ? { getAllModels: provider.getAllModels.bind(provider) } : {}),
     ...(provider.refreshModels ? { refreshModels: provider.refreshModels.bind(provider) } : {}),

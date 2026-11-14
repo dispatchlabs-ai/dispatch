@@ -14,7 +14,14 @@ export async function localModels(name: string, credentials = new LocalCredentia
 
 /** Bind one provider's saved sign-in (or its API-key environment) to the shared host. */
 export async function localProvider(name: string): Promise<Provider> {
-  const { models, provider, credentials } = await localModels(name);
+  return withLocalCredentials(await builtInProvider(name));
+}
+
+/** Apply the native credential store to a provider, including application-supplied providers. */
+export async function withLocalCredentials(provider: Provider, credentials = new LocalCredentials()): Promise<Provider> {
+  const name = provider.id;
+  const models = createModels({ credentials });
+  models.setProvider(provider);
   if (!await models.checkAuth(name)) throw new Error(`Not signed in to ${name}. Run npx dispatch login ${name}, or set this provider's API key in the host environment.`);
   const saved = await credentials.read(name);
   return withPrivateProviderErrors({

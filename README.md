@@ -48,6 +48,17 @@ Run `npx dispatch chat --history` to read the conversation from both clients. St
 
 **Try it without an account:** follow the [credential-free demo](docs/quickstart.md). It echoes messages locally, uses separate `.demo/` state and makes no model or tool calls.
 
+## Provider setup in the current source
+
+The next release adds `npx dispatch providers add`: choose a native Pi provider,
+sign in, discover its models and verify a response before saving the connection.
+`npx dispatch models use` assigns a model to an agent. Apple local can have the
+host manage `fm serve`, including readiness, restart and cleanup.
+
+This is **not yet in the v0.19.0 archives** used above. See the
+[provider setup guide](packages/runner/docs/providers.md) for the source commands,
+custom native providers and local-server ownership.
+
 ## Run your own agents
 
 **[Build your own agents](packages/runner/docs/create-agents.md)** is the complete manual setup for a researcher and developer. It includes every file, model credentials, a shared `host.json`, coding tools, MCP messaging, verification and later edits:

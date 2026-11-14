@@ -10,7 +10,7 @@ import { defaultAgent } from "./definition.js";
 import { createRunner } from "./index.js";
 import { run, type Adapter } from "./run.js";
 import type { ModelChoice } from "./gateway.js";
-import { connectHostModels, type HostModelsConfig } from "./host-models.js";
+import { hostModels, type HostModelsConfig } from "./host-models.js";
 import { serviceSettings, type ServicePolicy } from "./settings.js";
 import { privateStateDirectory } from "./private-state.js";
 import type { McpServers } from "./mcp.js";
@@ -158,29 +158,22 @@ export async function serveService(owner: ServiceOperations | (() => ServiceOper
 }
 
 /** One supervised service owns native sessions; local clients never own its lifetime. */
-export async function startService(config: ServiceConfig) {
-  const settings = serviceSettings(config);
+export async function startService(config: ServiceConfig, options: { signal?: AbortSignal } = {}) {
+  let settings = serviceSettings(config);
   for (const field of ["root", "stateRoot", "cwd"] as const) {
     if (!config[field] || resolve(config[field]) !== config[field]) throw new Error(`${field} must be an absolute path.`);
   }
   if (!config.socket && !config.http) throw new Error("Configure a socket or HTTP listener.");
-  const modelConnections: Awaited<ReturnType<typeof connectHostModels>>[] = [];
-  const connectModels: ServiceAdapterContext["connectModels"] = async models => {
-    const connection = await connectHostModels(config, models);
-    modelConnections.push(connection);
-    return connection.choices;
-  };
-  const closeModels = async () => {
-    const results = await Promise.allSettled(modelConnections.map(connection => connection.close()));
-    const errors = results.filter(result => result.status === "rejected").map(result => result.reason);
-    if (errors.length) throw new AggregateError(errors, "Could not close service model providers.");
-  };
+  const connections = hostModels(config, config.cwd);
+  const connectModels: ServiceAdapterContext["connectModels"] = models => connections.connect(models, options.signal);
+  const closeModels = () => connections.close();
   const preparedAdapters: Awaited<ReturnType<typeof run>>["adapters"] = [];
   let runtime: Awaited<ReturnType<typeof run>> | undefined;
   const listeners: Awaited<ReturnType<typeof serveService>>[] = [];
   try {
     const models = createModels({ authContext: { env: async () => undefined, fileExists: async () => false } });
     await connectModels(models);
+    settings = serviceSettings(config, models);
     const adapters: Adapter[] = [];
     for (const adapter of config.adapters ?? []) {
       const modulePath = adapter.module.startsWith(".") || adapter.module.startsWith("/")
@@ -204,6 +197,7 @@ export async function startService(config: ServiceConfig) {
     const runner = createRunner({ namespace: config.namespace });
     runtime = await run({ ...config, runner, models, adapters, settings });
     preparedAdapters.push(...runtime.adapters);
+    options.signal?.throwIfAborted();
   } catch (error) {
     try { await Promise.all(listeners.map(listener => listener.close())); } finally {
       try { await runtime?.close(); } finally { await closeModels(); }

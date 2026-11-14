@@ -1,4 +1,5 @@
-import type { CompactionSettings, HarnessSettings } from "@earendil-works/pi-durable";
+import { DEFAULT_COMPACTION_POLICY, type CompactionSettings, type HarnessSettings } from "@earendil-works/pi-durable";
+import type { Models } from "@earendil-works/pi-ai/models";
 import { modelRetrySettings, type ModelRetry } from "./retry.js";
 
 export type ServicePolicy = {
@@ -8,9 +9,10 @@ export type ServicePolicy = {
 };
 
 /** Installation policy only; Pi retains task, summary and inbox ownership. */
-export function serviceSettings(policy: ServicePolicy): (() => HarnessSettings) | undefined {
+export function serviceSettings(policy: ServicePolicy, models?: Models): (() => HarnessSettings) | undefined {
   const retry = modelRetrySettings(policy.retry);
-  const { compaction, afterFailedRun } = policy;
+  let { compaction } = policy;
+  const { afterFailedRun } = policy;
   if (afterFailedRun !== undefined && !["keep", "continue", "withdraw"].includes(afterFailedRun)) {
     throw new Error("afterFailedRun must be keep, continue or withdraw.");
   }
@@ -33,6 +35,22 @@ export function serviceSettings(policy: ServicePolicy): (() => HarnessSettings) 
     }
   };
   if (compaction !== undefined) validate(compaction, "compaction", true);
+  // Pi's defaults target large contexts. Fit its native budgets to smaller models;
+  // explicit host budgets and conversation model overrides still take precedence.
+  for (const model of models?.getModels() ?? []) {
+    const window = model.contextWindow;
+    if (window <= 0 || window > DEFAULT_COMPACTION_POLICY.reserveTokens + DEFAULT_COMPACTION_POLICY.keepRecentTokens) continue;
+    const key = `${model.provider}/${model.id}`;
+    const configured = compaction?.modelOverrides?.[key];
+    const defaults: Partial<typeof DEFAULT_COMPACTION_POLICY> = {};
+    for (const [field, divisor] of [["reserveTokens", 8], ["keepRecentTokens", 2], ["backgroundTokens", 4]] as const) {
+      if (configured?.[field] === undefined && compaction?.[field] === undefined)
+        defaults[field] = Math.min(DEFAULT_COMPACTION_POLICY[field], Math.max(1, Math.floor(window / divisor)));
+    }
+    if (Object.keys(defaults).length) compaction = { ...compaction, modelOverrides: {
+      ...compaction?.modelOverrides, [key]: { ...defaults, ...configured },
+    } };
+  }
   if (!retry && compaction === undefined && afterFailedRun === undefined) return undefined;
   return () => ({ ...retry?.(), ...(compaction === undefined ? {} : { compaction }),
     ...(afterFailedRun === undefined ? {} : { afterFailedRun }) });
