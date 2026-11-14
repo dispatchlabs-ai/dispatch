@@ -47,7 +47,8 @@ export async function environmentCommand(
     ? ["build", "--no-update-lock-file", "--no-link", "--json", installable]
     : ["run", "--no-update-lock-file", installable, "--", ...args];
   await new Promise<void>((done, reject) => {
-    const child = spawn("nix", command, { cwd: root, stdio: "inherit", env: { ...process.env, DISPATCH_AGENT_ID: agent.id } });
+    // Keep launcher-relative paths and avoid Nix's store-working-directory resolution.
+    const child = spawn("nix", command, { stdio: "inherit", env: { ...process.env, DISPATCH_AGENT_ID: agent.id } });
     const interrupt = () => child.kill("SIGINT");
     const terminate = () => child.kill("SIGTERM");
     process.on("SIGINT", interrupt); process.on("SIGTERM", terminate);

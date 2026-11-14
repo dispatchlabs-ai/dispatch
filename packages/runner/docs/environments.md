@@ -34,7 +34,8 @@ and forwards arguments after `--` unchanged. Both require a committed lockfile,
 use the Git-aware checkout reference (or an explicit flake path for immutable
 definitions bundled in the Nix store), and leave lock updates explicit. Run these
 commands only on trusted repositories: flake builds and launchers execute code.
-The CLI passes `DISPATCH_AGENT_ID` to the launcher and preserves cancellation.
+The CLI keeps the caller's working directory, passes `DISPATCH_AGENT_ID` to the
+launcher and preserves cancellation.
 It does not open a conversation store or start an agent host.
 
 ## Share components and specialize agents
