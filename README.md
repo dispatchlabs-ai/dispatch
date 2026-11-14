@@ -6,19 +6,19 @@ Dispatch is an npm dependency of **your agents application**. You do not need to
 
 ## Quickstart
 
-Use Node **24.22.1 or newer** and npm on macOS or Linux. This demo echoes your messages locally so you can try both clients without a model account. For real models, tools and multiple agents, continue with [Build your own agents](packages/runner/docs/create-agents.md).
+Use Node **24.22.1 or newer** and npm on macOS or Linux. With a ChatGPT subscription, sign in once on the computer that will run your agents. No OpenAI API key, Dispatch source checkout or build is required.
 
-**1. Install Dispatch in a new directory.**
+**1. Install Dispatch in your own application.**
 
 ```sh
-mkdir dispatch-demo && cd dispatch-demo
+mkdir my-agents && cd my-agents
 npm init -y --init-type=module
 npm install \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.18.0/dispatch-runner-0.18.0.tgz \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.18.0/dispatch-web-0.18.0.tgz
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.19.0/dispatch-runner-0.19.0.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.19.0/dispatch-web-0.19.0.tgz
 ```
 
-**2. Write your agent and start its host.**
+**2. Write your agent, sign in and start its host.**
 
 ```sh
 cat > agent.md <<'EOF_AGENT'
@@ -29,29 +29,26 @@ model: { provider: openai, id: gpt-6.1-sol }
 Answer clearly. Ask for details when you need them.
 EOF_AGENT
 
-cat > demo.json <<'EOF_CONFIG'
-{ "stateRoot": ".demo" }
-EOF_CONFIG
-
-npx dispatch serve --demo --state .demo
+npx dispatch login openai
+npx dispatch serve
 ```
 
-**3. Talk to the same agent from two clients.** Leave the host running. Open each client in its own terminal from `dispatch-demo`.
+Choose the ChatGPT account whose plan you want to use and approve access in the browser. Login reports `Signed in to openai`; the host then reports `Host ready`. Keep the host running. Model access and usage limits depend on your account and plan. [Sign-in, account selection and logout](packages/runner/docs/sign-in.md)
+
+**3. Talk to the same agent from two clients.** Open each client in its own terminal from `my-agents`.
 
 | Client | Command | Try it |
 | --- | --- | --- |
-| Terminal | `npx dispatch chat --state .demo` | Send `Hello from the CLI`. The reply begins with `Demo reply:`. |
-| Browser | `npx dispatch-web --config demo.json` | Open the printed URL and select the CLI conversation in the sidebar. Send a follow-up. |
+| Terminal | `npx dispatch chat` | Send `Hello`. Use `/new` for a new conversation. |
+| Browser | `npx dispatch-web` | Open the printed URL, select the CLI conversation and send a follow-up. |
 
-`demo.json` tells the browser client to connect to the same `.demo/` store. Run `npx dispatch chat --state .demo --history` to read the conversation from both clients. Stop and restart the host with the same command, then reconnect: the messages remain. If the web port is busy, add `--port 4329` to the Web command.
+Run `npx dispatch chat --history` to read the conversation from both clients. Stop and restart the host with the same command, then reconnect: the messages remain in `.state/`. Keep `.state/`, `.demo/` and `node_modules/` out of Git. If the web port is busy, add `--port 4329` to the Web command. [Browser walkthrough](docs/web-quickstart.md)
 
-The demo makes no model calls and runs no real tools. Keep `.demo/`, `.state/` and `node_modules/` out of Git. Demo and live execution need separate stores. [Detailed walkthrough and troubleshooting](docs/quickstart.md)
+**Other authentication options:** supply `OPENAI_API_KEY` in the host environment, or save a key with `npx dispatch login openai --api-key`. For Claude, use `claude-sonnet-5-5` and follow the [Claude subscription and API setup](packages/runner/docs/sign-in.md#claude-subscription-or-api-account); account eligibility differs from ChatGPT.
+
+**Try it without an account:** follow the [credential-free demo](docs/quickstart.md). It echoes messages locally, uses separate `.demo/` state and makes no model or tool calls.
 
 ## Run your own agents
-
-The starter uses **OpenAI `gpt-6.1-sol`**. With a ChatGPT subscription, the new setup is `npx dispatch login openai`, then start the host and chat. Sign-in is implemented on `main` and awaiting release; the 0.18.0 archives above still use API keys. [Subscription sign-in and source preview](packages/runner/docs/sign-in.md)
-
-For the published 0.18.0 setup, stop the demo host and Web process, supply `OPENAI_API_KEY` in the host environment, then run `npx dispatch serve`. In other terminals, run `npx dispatch chat` and `npx dispatch-web`. These use `.state/`; the demo history stays in `.demo/`. For Claude, the guide uses `claude-sonnet-5-5` and explains subscription eligibility and API credits.
 
 **[Build your own agents](packages/runner/docs/create-agents.md)** is the complete manual setup for a researcher and developer. It includes every file, model credentials, a shared `host.json`, coding tools, MCP messaging, verification and later edits:
 

@@ -5,7 +5,7 @@ version or immutable release archive, update the application's lockfile, and run
 its build and relevant checks. For an application using only Runner:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.18.0/dispatch-runner-0.18.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.19.0/dispatch-runner-0.19.0.tgz
 ```
 
 Commit the updated `package.json` and `package-lock.json`. For a later release,
@@ -25,6 +25,23 @@ version and storage compatibility before opening retained stores; do not point
 an older runtime at state it cannot read. Deployment, backups and rollback belong
 to the application operator. Dispatch supplies no machine upgrade or migration
 machinery. Publishing source does not upgrade any running installation.
+
+## Upgrading from 0.18 to 0.19
+
+Version 0.19 adds `dispatch login`, `dispatch auth`, `dispatch logout` and
+`@dispatch/runner/local-provider`. Plain `dispatch serve` automatically uses saved
+sign-ins before environment API keys. Sign in once with `npx dispatch login openai`
+on the host's computer to use a ChatGPT subscription.
+
+An explicit `environmentProvider` binding remains API-key-only. To use saved
+sign-ins, change its module to `@dispatch/runner/local-provider` and export to
+`localProvider`, keeping its provider `args` and other host settings. Application
+code can import `localProvider` from that subpath. Restart the host after changing
+its bindings or account. See [sign-in setup](sign-in.md).
+
+Pi remains pinned to 1.5.2. This release does not change the native store version
+or migrate application definitions. Review the usual backup and restart steps
+above before upgrading an existing installation.
 
 ## Agent definition changes
 

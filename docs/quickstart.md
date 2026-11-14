@@ -14,7 +14,7 @@ optional. Choose a new directory:
 mkdir dispatch-demo
 cd dispatch-demo
 npm init -y --init-type=module
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.18.0/dispatch-runner-0.18.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.19.0/dispatch-runner-0.19.0.tgz
 ```
 
 Initialize `package.json` in this directory before installing. Otherwise npm can
@@ -72,20 +72,21 @@ A successful install alone does not verify conversation behavior.
 
 ## Use a real model
 
-Stop the demo host and any demo Web process. Set the API key for the provider
-selected in `agent.md` in the host's environment. For this example:
+Stop the demo host and any demo Web process. Sign in with your ChatGPT subscription
+on the host's computer:
 
 ```sh
-export OPENAI_API_KEY='replace-with-your-api-key'
+npx dispatch login openai
 ```
 
-Supply a real key with access to the selected model. The host uses your provider
-account for model requests. Keep credentials out of source files and Git; a
-`.env` file is not automatically loaded.
+Choose the account whose plan you want to use in the browser and approve access.
+Wait for `Signed in to openai`. No OpenAI API key is needed. See
+[Sign in and choose a model](../packages/runner/docs/sign-in.md) for account
+selection, Claude eligibility and saved credentials.
 
-For ChatGPT subscription access, use the new `dispatch login openai` path in
-[Sign in and choose a model](../packages/runner/docs/sign-in.md). It is available
-in the source preview, awaiting release; the 0.18.0 archive above uses API keys.
+Alternatively, supply `OPENAI_API_KEY` in the host environment, or save it through
+hidden input with `npx dispatch login openai --api-key`. Keep credentials out of
+source files and Git; a `.env` file is not automatically loaded.
 
 Start with ordinary state:
 
@@ -105,7 +106,8 @@ the same [host/client contract](../packages/runner/docs/service.md).
 - **Missing or invalid definition:** the launcher identifies the Markdown problem
   before opening an execution owner.
 - **Missing credentials:** the live launcher reports the unconfigured provider.
-  Supply that provider's API key, or use `--demo` with separate state.
+  Sign in with `npx dispatch login openai`, supply the selected provider's API key,
+  or use `--demo` with separate state.
 - **No host listening:** start the host explicitly; clients never start one.
 - **Host already running:** reconnect to it or stop the process you started before
   restarting. The launcher never takes over another writer.

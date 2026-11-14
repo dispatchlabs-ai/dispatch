@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-14
+
 - Link complete application setup and a manual automatic-reply exercise that identifies the MCP-prefixed tools explicitly.
 
 ## [0.18.0] - 2026-11-13

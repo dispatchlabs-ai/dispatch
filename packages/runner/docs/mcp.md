@@ -28,8 +28,8 @@ HTTP server and a token supplied through the host's environment:
 ```json
 {
   "modelProviders": [{
-    "module": "@dispatch/runner/environment-provider",
-    "export": "environmentProvider",
+    "module": "@dispatch/runner/local-provider",
+    "export": "localProvider",
     "args": ["openai"]
   }],
   "mcpServers": {
@@ -41,16 +41,16 @@ HTTP server and a token supplied through the host's environment:
 }
 ```
 
-Set the server URL. Set `OPENAI_API_KEY` and `WIKI_TOKEN`
-in the host environment, then run:
+Set the server URL and supply `WIKI_TOKEN` in the host environment. Sign in for
+model access, then start the host:
 
 ```sh
+npx dispatch login openai
 npx dispatch serve --config host.json
 ```
 
-For ChatGPT subscription access with the source preview, replace the
-environment-only model binding with `localProvider` and sign in as described in
-[Sign in and choose a model](sign-in.md). The wiki token is still separate.
+Alternatively, supply `OPENAI_API_KEY` in the host environment. Model credentials
+and the wiki token are separate. See [Sign in and choose a model](sign-in.md).
 
 In another terminal, run `npx dispatch chat --config host.json` and ask a
 question covered by that wiki. The agent receives the server's discovered tool

@@ -7,9 +7,9 @@ browser, with the same saved conversations.
 
 Use Node **24.22.1 or newer** and npm. The default example uses OpenAI's
 `gpt-6.1-sol`; the provider table below also gives a current Claude configuration.
-The published 0.18.0 setup uses a model API key. ChatGPT subscription sign-in is
-implemented on `main`, awaiting release: follow [Sign in and choose a model](sign-in.md)
-to install the source preview and use `dispatch login openai` instead.
+Sign in with your ChatGPT subscription using `dispatch login openai`. API keys
+are also supported. See [Sign in and choose a model](sign-in.md) for account
+selection and Claude subscription eligibility.
 Model requests use your provider account. The
 [credential-free demo](../../../docs/quickstart.md) lets you try conversation
 storage and both clients first. These instructions use a POSIX shell on macOS or
@@ -24,9 +24,9 @@ mkdir my-agents
 cd my-agents
 npm init -y --init-type=module
 npm install \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.18.0/dispatch-runner-0.18.0.tgz \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.18.0/dispatch-web-0.18.0.tgz \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.18.0/dispatch-mcp-0.18.0.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.19.0/dispatch-runner-0.19.0.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.19.0/dispatch-web-0.19.0.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.19.0/dispatch-mcp-0.19.0.tgz \
   @earendil-works/pi-durable@1.5.2
 mkdir -p agents/researcher agents/developer
 cat > .gitignore <<'EOF_IGNORE'
@@ -114,8 +114,8 @@ Create `host.json` in `my-agents`:
 {
   "updateDefinitions": "when-idle",
   "modelProviders": [{
-    "module": "@dispatch/runner/environment-provider",
-    "export": "environmentProvider",
+    "module": "@dispatch/runner/local-provider",
+    "export": "localProvider",
     "args": ["openai"]
   }],
   "mcpServers": {
@@ -132,28 +132,26 @@ connections and `.state/`; all clients connect to it. `when-idle` lets a restart
 host apply edited definitions after existing work becomes idle. It does not
 reload files while the host is running.
 
-In the terminal that will run the host, set your actual API key:
+Sign in once on the computer that runs the host, using the same OS user:
 
 ```sh
-export OPENAI_API_KEY='replace-with-your-api-key'
+npx dispatch login openai
 ```
 
-Keep the key out of agent files, `host.json` and Git. You can supply it using your
-secret manager instead. Creating a `.env` file alone does not load it into this
-command's environment. Other client terminals do not need the model key.
-
-For ChatGPT subscription access in the source preview, use
-`@dispatch/runner/local-provider` / `localProvider` in `host.json` and run
-`npx dispatch login openai` once. Keep `args: ["openai"]`. The
-[sign-in guide](sign-in.md) includes the complete binding and account controls.
+Choose your ChatGPT account in the browser. Wait for `Signed in to openai` before
+starting the host. Other client terminals do not need model credentials.
+Alternatively, supply `OPENAI_API_KEY` in the host environment or save a key with
+`npx dispatch login openai --api-key`. Keep credentials out of agent files,
+`host.json` and Git. Creating a `.env` file alone does not load it.
+The [sign-in guide](sign-in.md) covers saved accounts, precedence and logout.
 
 For another provider, change `model.provider` and `model.id` in both Markdown
-files, the corresponding `modelProviders` binding, and that provider's API-key
-environment variable. For example:
+files and the corresponding `modelProviders` binding, then sign in or supply
+credentials for that provider. For example:
 
-| Provider | `model` in both Markdown files | Host binding `args` | Host environment |
+| Provider | `model` in both Markdown files | Host binding `args` | Authentication |
 | --- | --- | --- | --- |
-| OpenAI (shown above) | `{ provider: openai, id: gpt-6.1-sol, thinking: low }` | `["openai"]` | `OPENAI_API_KEY`, or ChatGPT sign-in with `localProvider` in the source preview |
+| OpenAI (shown above) | `{ provider: openai, id: gpt-6.1-sol, thinking: low }` | `["openai"]` | `npx dispatch login openai`, or `OPENAI_API_KEY` |
 | Anthropic | `{ provider: anthropic, id: claude-sonnet-5-5, thinking: low }` | `["anthropic"]` | `ANTHROPIC_API_KEY`; see [Claude subscription eligibility](sign-in.md#claude-subscription-or-api-account) |
 
 For the Anthropic option, use `export ANTHROPIC_API_KEY='replace-with-your-api-key'`
@@ -191,7 +189,7 @@ Run `npx dispatch catalog` to check the definitions. Expect IDs `developer` and
 
 ## Start the host and clients
 
-In the terminal with your API key, run:
+After signing in (or supplying an API key), start the host:
 
 ```sh
 npm start

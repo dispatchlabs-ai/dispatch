@@ -17,16 +17,16 @@ Use `--state DIRECTORY` on both commands to select another store. No JSON file,
 application entry point or Nix environment is required. See the
 [quickstart](../../../docs/quickstart.md).
 
-Saved sign-ins and `localProvider` are source-preview features awaiting release;
-published 0.18.0 uses environment API keys. See [sign-in setup](sign-in.md).
+Sign in with `npx dispatch login openai` before starting an OpenAI host, or supply
+a provider API key. See [sign-in setup](sign-in.md).
 
 For explicit custom provider, MCP, channel or network bindings, use `run({root,stateRoot,models,...})` from application code, or keep a `host.json` beside the definition and start `dispatch serve --config host.json` or `dispatch-service host.json serve`.
 
 ```json
 {
   "modelProviders": [{
-    "module": "@dispatch/runner/environment-provider",
-    "export": "environmentProvider",
+    "module": "@dispatch/runner/local-provider",
+    "export": "localProvider",
     "args": ["openai"]
   }]
 }
@@ -40,11 +40,10 @@ An HTTP-only host opens only its configured network listener. Override `root`,
 the configuration file, an absolute path, or `~/` for the host account's home.
 Programmatic callers of `startService` continue to supply explicit absolute paths.
 
-Supply the selected provider's credentials in the host's environment or use your
-own trusted provider binding. The host requires a provider, not a gateway.
-For saved sign-ins, replace the binding above with
-`@dispatch/runner/local-provider` / `localProvider`, keeping the provider's
-`args`, and run `dispatch login openai` as the host's OS user.
+The binding above uses a saved sign-in or the selected provider's environment
+API key. Existing `@dispatch/runner/environment-provider` / `environmentProvider`
+bindings stay API-key-only. Application-owned provider bindings remain supported;
+a gateway is optional. Run login as the host's OS user.
 The socket's directory must belong only to its account (0700); the socket is 0600.
 Runner creates an absent directory with those permissions. Keep it outside shared
 `/tmp` itself. `root` contains application-owned `agent.md` or `agents/`; `cwd` is explicit tool

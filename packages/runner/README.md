@@ -14,7 +14,7 @@ source checkout are optional. In a new application directory:
 
 ```sh
 npm init -y --init-type=module
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.18.0/dispatch-runner-0.18.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.19.0/dispatch-runner-0.19.0.tgz
 ```
 
 An existing npm application only needs the install command. Creating a local
@@ -34,22 +34,22 @@ model: { provider: openai, id: gpt-6.1-sol }
 Answer clearly. Ask when you need more information.
 ```
 
-With `OPENAI_API_KEY` set in your shell, start the host:
+Sign in with your ChatGPT subscription, then start the host:
 
 ```sh
+npx dispatch login openai
 npx dispatch serve
 ```
 
-The host reads your definition and selects its built-in Pi provider. It saves
-conversations in `.state/`; add that directory to `.gitignore`. Provider keys
-stay in the host's environment. No host JSON, application code or generated
-agent files are required. The root definition has the stable agent ID `agent`.
+Choose your account and approve access in the browser. The host reads your
+definition, selects its built-in Pi provider and uses the saved sign-in. It saves
+conversations in `.state/`; add that directory to `.gitignore`. No host JSON,
+application code or generated agent files are required. The root definition has
+the stable agent ID `agent`.
 
-**ChatGPT subscribers:** the source preview adds `npx dispatch login openai`
-and automatically uses the saved sign-in in `dispatch serve`. This is awaiting
-release; 0.18.0 archives do not contain the command. See
-[Sign in and choose a model](docs/sign-in.md) for preview installation, current
-Claude examples, account eligibility, storage and logout.
+You can instead supply `OPENAI_API_KEY` in the host environment or save a key with
+`npx dispatch login openai --api-key`. See [Sign in and choose a model](docs/sign-in.md)
+for Claude examples, account eligibility, credential storage and logout.
 
 In a second terminal in the same directory:
 

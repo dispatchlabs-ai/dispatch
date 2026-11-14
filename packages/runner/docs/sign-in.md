@@ -4,14 +4,12 @@ The starter uses `openai/gpt-6.1-sol`. Sign in once on the computer that runs th
 host, then use the same agents from the terminal, browser or other clients.
 Clients do not need model credentials.
 
-**Availability:** `dispatch login`, `dispatch auth`, `dispatch logout` and
-`localProvider` are implemented on `main`, awaiting a package release. The
-published **0.18.0** archives support API keys and custom host providers; they do
-not contain these new commands. Use the source preview below to try sign-in now.
+Available in **v0.19.0 and later**. Install the matching release archives using the
+[quickstart](../../../README.md#quickstart) or [two-agent setup](create-agents.md).
 
 ## ChatGPT subscription
 
-With the source preview installed in your agents application:
+From your agents application directory:
 
 ```sh
 npx dispatch login openai
@@ -80,13 +78,12 @@ Nix integration; it is not installed by the npm starter or newly qualified here.
 
 ## API keys
 
-API-key access works in both the released archives and the source preview.
 For the default OpenAI model, set `OPENAI_API_KEY` in the host terminal using
 your secret manager, then start the host. Use `ANTHROPIC_API_KEY` for Anthropic.
 Creating `.env` alone does not load it. Keep keys out of agent definitions,
 `host.json`, shell command arguments and Git.
 
-In the source preview, `npx dispatch login openai --api-key` (or `anthropic`)
+`npx dispatch login openai --api-key` (or `anthropic`)
 offers hidden terminal input for a saved key. For OS keychain or vault-helper
 integration in a custom host, see [host-owned API credentials](credentials.md).
 
@@ -118,30 +115,3 @@ and host processes. Keep it outside your agents repository and backups shared
 with others. One OS-user store is shared by local Dispatch applications unless
 you explicitly select separate directories. Never copy another app's rotating
 OAuth credentials into a second independently refreshing store.
-
-## Try the source preview
-
-Use Node 24.22.1 or newer. This is an optional development install until the next
-versioned archive includes sign-in; the normal released install needs no clone.
-
-```sh
-git clone https://github.com/dispatchlabs-ai/dispatch.git dispatch-source
-cd dispatch-source
-npm ci
-npm run build --workspace @dispatch/runner
-npm pack --workspace @dispatch/runner --pack-destination ..
-```
-
-In your agents application, install the resulting archive, using its absolute
-path:
-
-```sh
-npm install /absolute/path/to/dispatch-runner-0.18.0.tgz
-```
-
-The source version remains 0.18.0 until release preparation. This locally built
-archive contains unreleased changes; it is not the published 0.18.0 archive.
-Keep your own agent files and host settings. Follow the
-[two-agent setup](create-agents.md), changing its provider binding to
-`localProvider` as shown above, then sign in. Web and MCP clients continue using
-the same host/client contract.

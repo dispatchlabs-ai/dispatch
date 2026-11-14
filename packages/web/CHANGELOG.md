@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-14
+
 - Replace the source-build browser walkthrough with prebuilt package setup and explicit connections to demo or live hosts.
 
 ## [0.16.1] - 2026-11-13
