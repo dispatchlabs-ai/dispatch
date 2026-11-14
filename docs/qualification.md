@@ -4,7 +4,46 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
-## Subscription sign-in source preview — November 14, 2026
+## v0.19.0 subscription setup release — November 14, 2026
+
+[Release v0.19.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.19.0)
+contains eleven package archives from `5fd1fbce00309687e824615748bfa704465f475b`,
+plus the source manifest and checksums. All thirteen public downloads matched the
+reviewed bytes and GitHub asset digests. Empty-cache GitHub URL installs passed
+for all packages together, Web alone, MCP alone, Runner with Backend without
+central peers, and Runner with Fleet without Slack. Lockfile integrity matched
+the release manifest. Strict NodeNext declaration checking, actual library and
+`local-provider` imports, public export resolution and CLI usage checks passed.
+Production dependency audits reported zero findings.
+
+The README now starts with ChatGPT sign-in. A fresh application using the final
+archives and the guide's literal definitions/configuration completed the
+`gpt-6.1-sol` two-agent exercise with an environment API key: Developer used the
+MCP-prefixed discovery/message tools, resumed on Researcher's automatic reply,
+then completed `write`, `read`, `edit` and `bash`. No wait or polling tool was
+needed. Native instructions, entries, tool results, tasks and completed
+submissions were inspected. The same conversation appeared in the Pi terminal
+and Web, accepted a browser follow-up, survived host restart and answered again.
+The terminal intro, agent picker and expanded tool details worked. These simple
+turns returned no provider thinking summaries.
+
+Web was visually reviewed at 1440×900, 1280×720, 768×1024 and 390×844, including
+keyboard sending, tool details, scrolling, mobile Chats/Runs navigation, reload
+and host-disconnect recovery. No browser console or page errors were observed.
+Source build/type checks and documentation links passed. macOS arm64 default,
+frontend and portable archive builds and Linux x86_64 Web/Workers OCI builds
+passed, as did the flake checks on both platforms. Actual archive/image inspection
+and pattern scans found no private application inputs; image matches were the
+same reviewed upstream examples and files as the previous release. This is scoped
+release review, not comprehensive security qualification.
+
+The earlier live ChatGPT sign-in verification below covers the unchanged auth
+implementation. No new Claude, token-expiry/concurrent-refresh, Windows or Linux
+sign-in qualification is claimed. No automated functional tests were run. The
+release uses GitHub archives, not npm-registry publication, and changes no
+installed agents or deployed services.
+
+## Subscription sign-in verification — November 14, 2026
 
 A packed Runner consumer on macOS arm64 / Node 24.22.1 completed Pi 1.5.2's
 ChatGPT browser sign-in, saved private credentials and ran `gpt-6.1-sol` through
@@ -26,8 +65,8 @@ The fresh consumer's dependency audit reported zero findings. No automated
 functional tests were added or run. This is scoped source and local interaction
 review: live Claude login, token-expiry refresh/rotation, simultaneous refreshes,
 Windows/Linux sign-in and provider revocation were not newly qualified.
-The implementation awaits a release; published 0.18.0 archives and deployed
-applications are unchanged.
+This check preceded release preparation; the unchanged implementation is now
+distributed in v0.19.0. Existing deployed applications remain unchanged.
 
 ## Human setup guides — November 14, 2026
 
