@@ -4,6 +4,38 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.18.0 native messaging through MCP — November 13, 2026
+
+[Release v0.18.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.18.0)
+contains eleven archives from `398d5f5bacbff4d8e76442b210764c3cbacc9b6d`.
+All thirteen public assets matched the reviewed bytes and GitHub digests.
+Empty-cache public installs passed strict NodeNext declaration checks and actual
+imports, including the four native messaging client methods. MCP-only and Web-only
+installs resolved their transitive archives; minimal Backend and Fleet consumers
+retained optional integrations. Selected production audits reported zero findings.
+Node 24.22.1 source/type/build checks, Mac arm64 and Linux x86_64 Nix builds and
+flake checks, frontend, portable Mac and both Linux images passed. npm archive
+scans returned no findings; portable Mac and image matches remained the reviewed
+upstream examples and constants.
+
+Live agents used MCP discovery and native messaging to request research with
+`reply:true`. The sender finished its initial turn; the recipient read a knowledge
+base and original conversation evidence, and its answer automatically became a
+new native input that resumed the sender. There was no result polling or second
+human input. Native instructions, tools/results, tasks, submissions and final
+answers were inspected. Manual stdio/HTTP checks covered all four new tools,
+stable retries, conflicting requests, recipient scope and caller-host mismatch,
+observation cancellation and compatible host recovery with retained work.
+
+Web interaction with isolated synthetic state showed the automatic reply and
+sender continuation, keyboard follow-up, retained reload and mobile navigation.
+The whole page was reviewed at all four required sizes; no browser console errors
+were observed. No automated functional tests were added or run. Caller binding
+does not add per-user authorization. Abrupt crash boundaries, hosted TLS, OAuth,
+Windows interaction and the exact fresh-agent setup prompt remain unqualified.
+This is scoped implementation and artifact review, not a comprehensive security
+assessment or qualification of every installation.
+
 ## v0.17.3 portable Slack Markdown — November 13, 2026
 
 [Release v0.17.3](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.17.3)
