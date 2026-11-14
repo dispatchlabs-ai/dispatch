@@ -4,6 +4,33 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## Human setup guides — November 14, 2026
+
+The README and linked guides were checked using fresh applications installed from
+the public v0.18.0 Runner, Web and MCP archives, with Pi Durable 1.5.2. No Dispatch
+source checkout or application build was needed. Manual interaction on macOS
+arm64 covered the credential-free demo, shared CLI/Web history, restart recovery
+and separate demo/live stores. The final two-agent walkthrough used Node 24.22.1
+and its documented OpenAI `gpt-5.4` option.
+
+Developer used MCP-prefixed discovery and messaging with `reply: true`, finished
+its first turn, then resumed automatically when Researcher answered. No wait tool
+or second human input was needed. Stock `write`, `read`, `edit` and `bash` calls
+produced the documented greeting. Thinking summaries, expandable tool results,
+agent/conversation pickers and browser-to-terminal follow-up were observed.
+Restarting with an added agent and enabled skill preserved all prior native
+entries; the new agent appeared in the picker and `read_skill` loaded the example.
+Native instructions, conversations, tool results, tasks and submissions were
+inspected. The demo page was reviewed at all four required viewport sizes, with
+keyboard sending, mobile navigation and no observed browser console errors.
+
+Source build/type checks, the example's strict NodeNext check and documentation
+links passed. No automated functional tests were added or run. This qualifies the
+manual local setup, not every provider or integration: live Anthropic, external
+wiki credentials, channel setup, hosted authentication, Linux/Windows interaction
+and the exact fresh-agent setup prompt were not newly qualified. This documentation
+change releases no packages and changes no deployed installation.
+
 ## v0.18.0 native messaging through MCP — November 13, 2026
 
 [Release v0.18.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.18.0)

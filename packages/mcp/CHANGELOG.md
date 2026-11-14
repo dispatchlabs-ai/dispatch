@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Link complete application setup and a manual automatic-reply exercise that identifies the MCP-prefixed tools explicitly.
+
 ## [0.18.0] - 2026-11-13
 
 - Expose native agent discovery, messaging, status and work waits through the shared host contract. Automatic replies return as new inputs to the sending conversation.

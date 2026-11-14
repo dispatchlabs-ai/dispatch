@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Replace the source-build browser walkthrough with prebuilt package setup and explicit connections to demo or live hosts.
+
 ## [0.16.1] - 2026-11-13
 
 - Show provider thinking summaries while streaming and in saved history, with an accessible expandable Thinking section.

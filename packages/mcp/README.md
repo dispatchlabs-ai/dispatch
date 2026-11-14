@@ -5,6 +5,11 @@ open conversations, send work, inspect progress and results, retrieve artifacts
 and stop work. Web, the terminal and MCP use the same `AgentClient` contract and
 native conversation history. This optional package does not start an agent host.
 
+Starting from an empty directory? [Build your own agents](../runner/docs/create-agents.md)
+provides a complete host configuration, two agents and an automatic-reply example.
+To connect another server's tools **into** an agent, use the separate
+[MCP tools guide](../runner/docs/mcp.md).
+
 ## First conversation
 
 Use Node 24.22.1 or newer and an existing Dispatch application. Install the

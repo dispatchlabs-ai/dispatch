@@ -4,6 +4,9 @@ A host owns execution and the conversation store. A client lists agents, creates
 or finds conversations, sends input, observes changes, reads receipts and explicitly
 stops work. Clients never start, replace, upgrade or reopen an execution owner.
 
+For a complete copyable application, begin with [Build your own agents](create-agents.md).
+This page is the reference for host settings, client operations and network access.
+
 ## Start a host
 
 For a local application with a root `agent.md` (or `agents/NAME/agent.md`), install

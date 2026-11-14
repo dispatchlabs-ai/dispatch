@@ -25,3 +25,20 @@ version and storage compatibility before opening retained stores; do not point
 an older runtime at state it cannot read. Deployment, backups and rollback belong
 to the application operator. Dispatch supplies no machine upgrade or migration
 machinery. Publishing source does not upgrade any running installation.
+
+## Agent definition changes
+
+Changing `agent.md`, `agent.ts`, shared instructions or enabled skills is a
+definition update, not a package upgrade. A plain host refuses changed definitions
+against retained state unless you explicitly configure `updateDefinitions`.
+
+The [application setup](create-agents.md#edit-or-add-an-agent) uses
+`"updateDefinitions": "when-idle"` in `host.json`: restart the host after edits,
+and it applies them when existing work is idle, preserving history. It is not a
+file watcher. `true` applies updates only when the saved work is already idle;
+`"when-idle"` can defer them while recovery completes. Finish or explicitly stop
+work before editing when you need the change to take effect at the next start.
+
+Demo and live execution cannot share a store, regardless of `updateDefinitions`.
+Use `.demo/` for synthetic work and `.state/` for real models. Keep the original
+store when changing execution mode.

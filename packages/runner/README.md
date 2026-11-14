@@ -3,6 +3,10 @@
 Define an agent in one Markdown file, start one host, and connect clients to its
 saved conversations. Pi Durable owns execution, recovery and storage.
 
+For a complete application with a researcher, developer, coding tools and MCP
+replies, follow [Build your own agents](docs/create-agents.md). The one-file path
+below is enough for a conversational agent.
+
 ## Install and start
 
 Use **Node 24.22.1 or newer**, with npm. Nix and a Dispatch
@@ -60,7 +64,7 @@ Provider-supplied thinking summaries appear live and in saved history under
 **Thinking**. A response without a provider summary has no thinking section.
 Tool headings show actual calls; Ctrl+O expands their inputs and results.
 
-Dispatch 0.16.0 uses Pi's terminal UI for interactive `dispatch chat` and
+Runner uses Pi's terminal UI for interactive `dispatch chat` and
 `dispatch-agent run`, including applications that expose either as `npm run chat`.
 
 Retained history appears immediately above a multiline composer. Replies render
@@ -147,6 +151,9 @@ environment; the CLI defaults its working directory to the application root.
 adds repository selection and a restricted private checkout; it is not required
 for the stock tools.
 
+The [complete setup](docs/create-agents.md#give-developer-coding-and-messaging-tools)
+includes dependency installation, this file's location and a real-tool check.
+
 `defineAgent({})` is conversational by default. Tools are explicit grants;
 trusted extensions can supply native Pi tools, documents and tasks. Markdown
 requires a description, model provider/id and instructions. `model.thinking`
@@ -171,6 +178,12 @@ clients use the same tools. An optional `tools` list selects exact server tool
 names. See [MCP setup, lifecycle and current boundaries](docs/mcp.md), including
 authentication prerequisites and the distinction between tools and other MCP
 features.
+
+To expose your agents to an external MCP client, install the separate
+[Dispatch MCP server](../mcp/README.md). The same connector supports
+[native agent messaging and automatic replies](../mcp/README.md#native-messaging-and-automatic-replies).
+See the [two-agent walkthrough](docs/create-agents.md#verify-coding-and-an-automatic-reply)
+for both the sender configuration and the expected continuation.
 
 ## One host, one client contract
 
@@ -227,6 +240,9 @@ agent files. Changes to authored definitions remain explicit host configuration
 (`updateDefinitions` while idle, or `"when-idle"` to defer while work recovers).
 See [ordinary upgrades](docs/upgrade.md) and the optional
 [Nix application builder](docs/nix-releases.md).
+For edits to your own instructions, tools or skills, follow
+[editing agents](docs/create-agents.md#edit-or-add-an-agent); restarting alone
+does not authorize a changed definition against retained state.
 
 ## Host extensions and inspection
 

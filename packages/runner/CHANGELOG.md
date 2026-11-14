@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Document a complete two-agent application with model credentials, coding tools, MCP replies, shared clients and definition updates; separate demo and live state in the root quickstart.
+
 ## [0.18.0] - 2026-11-13
 
 - Share native agent-instance discovery and message-work waits with clients and MCP, reusing the existing delivery tasks and automatic replies.

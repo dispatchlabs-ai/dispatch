@@ -1,10 +1,12 @@
 # Dispatch
 
-Define an AI agent in Markdown. Run one host for its tools and conversation history. Start a conversation in the terminal and pick it up in the browser.
+Define AI agents in your own project. Give each one instructions, a model and the tools it needs. Run one host, talk to it in the terminal or browser, and let agents ask each other for help.
+
+Dispatch is an npm dependency of **your agents application**. You do not need to clone Dispatch, build it, install Nix or generate a scaffold to use it. Pi Durable owns execution, recovery and saved conversations.
 
 ## Quickstart
 
-Use Node 24.22.1 or newer and npm. The demo echoes your messages locally so you can try both clients without a model account.
+Use Node **24.22.1 or newer** and npm on macOS or Linux. This demo echoes your messages locally so you can try both clients without a model account. For real models, tools and multiple agents, continue with [Build your own agents](packages/runner/docs/create-agents.md).
 
 **1. Install Dispatch in a new directory.**
 
@@ -27,38 +29,76 @@ model: { provider: anthropic, id: claude-sonnet-4-6 }
 Answer clearly. Ask for details when you need them.
 EOF_AGENT
 
-npx dispatch serve --demo
+cat > demo.json <<'EOF_CONFIG'
+{ "stateRoot": ".demo" }
+EOF_CONFIG
+
+npx dispatch serve --demo --state .demo
 ```
 
 **3. Talk to the same agent from two clients.** Leave the host running. Open each client in its own terminal from `dispatch-demo`.
 
 | Client | Command | Try it |
 | --- | --- | --- |
-| Terminal | `npx dispatch chat` | Send `Hello from the CLI`. The reply begins with `Demo reply:`. |
-| Browser | `npx dispatch-web` | Open the printed URL and select the CLI conversation in the sidebar. Send a follow-up. |
+| Terminal | `npx dispatch chat --state .demo` | Send `Hello from the CLI`. The reply begins with `Demo reply:`. |
+| Browser | `npx dispatch-web --config demo.json` | Open the printed URL and select the CLI conversation in the sidebar. Send a follow-up. |
 
-Run `npx dispatch chat --history` to see the conversation from both clients. Stop and restart the host with the same command to reopen that conversation. The host stores it in `.state/`. If the default web port is busy, run `npx dispatch-web --port 4329`.
+`demo.json` tells the browser client to connect to the same `.demo/` store. Run `npx dispatch chat --state .demo --history` to read the conversation from both clients. Stop and restart the host with the same command, then reconnect: the messages remain. If the web port is busy, add `--port 4329` to the Web command.
+
+The demo makes no model calls and runs no real tools. Keep `.demo/`, `.state/` and `node_modules/` out of Git. Demo and live execution need separate stores. [Detailed walkthrough and troubleshooting](docs/quickstart.md)
 
 ## Run your own agents
 
-In your own project, select a model in `agent.md`, set its provider credential, and run `npx dispatch serve`. For several agents, give each one a directory such as `agents/researcher/agent.md`. Its directory name is its ID. [Model setup and examples](docs/quickstart.md)
+For the single agent above, stop the demo host and Web process. Set `ANTHROPIC_API_KEY` in the host terminal for the model in `agent.md`, then run `npx dispatch serve`. In other terminals, run `npx dispatch chat` and `npx dispatch-web`. These use `.state/`; the demo history stays in `.demo/`. The key authenticates paid model API requests. A chat subscription alone is not this API credential.
 
-A shared `host.json` can supply a model gateway and named MCP connections. For example, add `mcp: [wiki]` to an agent's frontmatter to give it the wiki tools configured on the host. CLI and Web both connect to that host. You can give the commands short names in your application's `package.json`. [MCP configuration](packages/runner/docs/mcp.md) · [Host and client settings](packages/runner/docs/service.md)
+**[Build your own agents](packages/runner/docs/create-agents.md)** is the complete manual setup for a researcher and developer. It includes every file, model credentials, a shared `host.json`, coding tools, MCP messaging, verification and later edits:
 
-```json
-{
-  "scripts": {
-    "start": "dispatch serve --config host.json",
-    "chat": "dispatch chat --config host.json --agent researcher",
-    "web": "dispatch-web --config host.json"
-  }
-}
+```text
+my-agents/
+  package.json                 # Dispatch dependencies and npm commands
+  host.json                    # Shared model and MCP connections
+  agents/researcher/agent.md    # Instructions and model
+  agents/developer/agent.md
+  agents/developer/agent.ts     # Optional coding and messaging capabilities
 ```
 
-Run `npm start`, then `npm run chat` or `npm run web` in another terminal. To upgrade Dispatch, install matching release archives, commit the updated npm manifest and lockfile, and restart your processes. Your Markdown definitions belong to your application. [Releases](https://github.com/dispatchlabs-ai/dispatch/releases) · [Upgrade guide](packages/runner/docs/upgrade.md)
+After that setup, run these from your application directory in separate terminals:
 
-Dispatch 0.16.0 includes a [Pi terminal UI](packages/runner/README.md#interactive-terminal-ui)
-for `npm run chat`, with streaming Markdown, multiline input and saved conversations.
+| Command | What it does |
+| --- | --- |
+| `npm start` | Starts the host. Wait for `Host ready` and leave it running. |
+| `npm run chat` | Opens the Pi terminal UI. `/agents` or Ctrl+G switches agents; `/chats` or Ctrl+P opens saved conversations. |
+| `npm run web` | Opens access through a browser at the printed local URL. Select the same conversation to continue it. |
+
+Enter sends; Alt+Enter inserts a newline. Ctrl+O expands tool inputs and results. Provider-supplied thinking summaries appear when the model returns them; a greeting may have none. `/stop` stops the current work. `/quit` disconnects the terminal without cancelling it. [Terminal commands](packages/runner/README.md#interactive-terminal-ui) · [Browser guide](docs/web-quickstart.md)
+
+Editing an agent's instructions, model, tools or skills is separate from upgrading Dispatch. The setup guide explains `updateDefinitions` and restarting the host while preserving history. Package upgrades replace matching release archives and the npm lockfile; your definitions stay in your application. [Editing agents](packages/runner/docs/create-agents.md#edit-or-add-an-agent) · [Upgrade guide](packages/runner/docs/upgrade.md)
+
+## What you can give your agents
+
+| Capability | How it works |
+| --- | --- |
+| Coding | Opt into Pi Durable's `CodingTools` in `agent.ts` for `read`, `write`, `edit` and `bash`. The starter grants these to Developer. [Setup](packages/runner/docs/create-agents.md#give-developer-coding-and-messaging-tools) |
+| Knowledge and external tools | Connect an existing MCP server on the host, then select it with `mcp: [name]` in each agent. Connections can differ between agents. [MCP tools](packages/runner/docs/mcp.md) |
+| Agent-to-agent messaging | Send an assignment through MCP and request an automatic reply. The sender can finish its turn and resume when the answer arrives. Each recipient uses its own tools. [Two-agent example](packages/runner/docs/create-agents.md#verify-coding-and-an-automatic-reply) |
+| Shared guidance and skills | Put common instructions in `AGENTS.md`; opt into reusable `skills/` with `skills: true`. [Instructions and skills](packages/runner/docs/create-agents.md#shared-instructions-and-skills) |
+| Scheduled work | Opt into calendar or interval schedules for an agent. Scheduling is not required for chat. [Schedules](packages/runner/docs/schedules.md) |
+
+## Ways to connect
+
+MCP works in both directions: agents can **consume external MCP tools**, and the optional **Dispatch MCP server exposes your agents** to other clients and agents. WebMCP is not implemented.
+
+| Connection | What it provides |
+| --- | --- |
+| [Terminal](packages/runner/README.md#interactive-terminal-ui) and [Web](packages/web/README.md) | Talk to the same agents, see thinking/tool activity and reopen saved conversations. |
+| [MCP server](packages/mcp/README.md) | Discover agents, create or resume conversations, send work, inspect progress/results, retrieve artifacts and stop work. Includes native messaging and automatic replies. |
+| [Slack](packages/slack/README.md) | DMs and configured channels with threaded replies and Stop. Linked threads can receive public conversation updates from Web and CLI. |
+| [Google Chat](packages/google-chat/README.md) | A Chat app for configured agents, with threaded replies, steering and Stop. Requires Google Workspace/app and Pub/Sub setup. |
+| [Email / Gmail](packages/email/README.md) | Labeled incoming mail starts work. Replies and new outgoing messages require sending to be explicitly enabled. |
+| [HTTP/HTTPS API](packages/runner/docs/service.md#authenticated-network-connections) | Let another application create conversations, submit work, stream progress and retrieve results. Remote access requires HTTPS and authentication. |
+| [JavaScript/TypeScript client](packages/runner/docs/service.md#shared-clients-and-company-compositions) | Use `AgentClient` in your own application, in process or through a socket/HTTPS connection. |
+
+Install only the optional packages you use. Channel credentials and routing belong in your host configuration; a working terminal agent does not automatically enable Slack, Google Chat or email.
 
 ## Packages and integrations
 
@@ -69,7 +109,7 @@ for `npm run chat`, with streaming Markdown, multiline input and saved conversat
 | Distribute execution or storage | [Remote](packages/remote/README.md) · [Workers](packages/workers/README.md) · [Fleet](packages/fleet/README.md) · [Postgres](packages/postgres/README.md) |
 | Inspect history or evaluate agents | [Observer](packages/observer/README.md) · [Eval](packages/eval/README.md) |
 
-Dispatch uses [Pi Durable](https://github.com/earendil-works/pi) for execution, recovery and stored conversations. Web and other clients share the host's conversation operations. Local Web binds to loopback. Hosted Web requires HTTPS and application-owned authorization. [Client contract](docs/interfaces.md) · [HTTP API](packages/web/openapi.yaml) · [Security](SECURITY.md) · [Verification](docs/qualification.md)
+Dispatch uses [Pi Durable](https://github.com/earendil-works/pi) for execution, recovery and stored conversations. Local Web binds to loopback. Hosted Web requires HTTPS and application-owned authorization. [Client contract](docs/interfaces.md) · [Web HTTP API](packages/web/openapi.yaml) · [Security](SECURITY.md) · [Verification](docs/qualification.md)
 
 **Use it with your AI agent.** Ask an agent with shell access to run the walkthrough.
 

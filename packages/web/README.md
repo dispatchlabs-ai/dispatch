@@ -7,7 +7,11 @@ operations. Public name: **Web**. See [design](DESIGN_GUIDE.md),
 
 ## Quickstart
 
-From an existing Dispatch application's directory with Node 24.22.1 or newer, install the matching Web archive and add its npm command:
+Use the [browser walkthrough](../../docs/web-quickstart.md) for both demo and live
+hosts, or [Build your own agents](../runner/docs/create-agents.md) for a complete
+application. No source build is required. From an existing application's directory
+with Node 24.22.1 or newer and a complete `host.json`, install the matching Web
+archive and add its npm command:
 
 ```sh
 npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.18.0/dispatch-web-0.18.0.tgz
@@ -16,7 +20,9 @@ npm pkg set 'scripts.web=dispatch-web --config host.json'
 
 Keep the agent host running with `npx dispatch serve --config host.json`. In another terminal run `npm run web` and open the printed address (normally http://127.0.0.1:4319). Open an existing CLI conversation in the sidebar or choose an agent and start a chat. For another port, use `npm run web -- --port 4329`. The explicit port takes precedence over `DISPATCH_PORT`. Ctrl-C closes the browser client process. CLI and Web share the host's saved conversations.
 
-For an agent started with plain `dispatch serve` or `dispatch serve --demo`, run `npx dispatch-web` in the same directory.
+For an agent started with plain `dispatch serve`, run `npx dispatch-web` in the
+same directory. For the quickstart's demo at `.demo/`, use the walkthrough's
+`demo.json` and `npx dispatch-web --config demo.json`. Web has no `--state` flag.
 
 `--config` selects the same socket or authenticated service URL as `dispatch chat`. Keep gateway and MCP credentials on the host. Existing Web installations can still supply `DISPATCH_CONFIG` for named installations and historical sources, or `DISPATCH_CENTRAL_CONFIG` for the central backend.
 

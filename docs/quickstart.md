@@ -1,8 +1,9 @@
 # Your first durable conversation
 
 Install Runner, write one `agent.md`, start its host and talk to it. This
-walkthrough uses synthetic replies so it needs no model account. It qualifies
-storage and client interaction, not model quality.
+walkthrough uses synthetic replies so it needs no model account. It checks
+storage and client interaction, not model quality. For real models, coding tools
+and two agents communicating through MCP, follow [Build your own agents](../packages/runner/docs/create-agents.md).
 
 ## Install
 
@@ -71,8 +72,16 @@ A successful install alone does not verify conversation behavior.
 
 ## Use a real model
 
-Set the API key for the provider selected in `agent.md` in the host's environment
-(`ANTHROPIC_API_KEY` for this example). Start with ordinary state:
+Stop the demo host and any demo Web process. Set the API key for the provider
+selected in `agent.md` in the host's environment. For this example:
+
+```sh
+export ANTHROPIC_API_KEY='replace-with-your-api-key'
+```
+
+Supply a real key with access to the selected model. The host uses your provider
+account for model requests. Keep credentials out of source files and Git; a
+`.env` file is not automatically loaded. Start with ordinary state:
 
 ```sh
 npx dispatch serve
@@ -95,7 +104,7 @@ the same [host/client contract](../packages/runner/docs/service.md).
 - **Host already running:** reconnect to it or stop the process you started before
   restarting. The launcher never takes over another writer.
 - **Changed definition or execution mode:** preserve the current store and follow
-  the explicit [definition update guidance](../packages/runner/README.md#build-upgrade-and-deploy).
+  the explicit [definition update guidance](../packages/runner/docs/create-agents.md#edit-or-add-an-agent).
   Demo and live execution must not share the same state directory.
 
 Stop only the host you started when finished. Keep its state directory to reopen
@@ -103,10 +112,12 @@ history. No machine service, profile or deployed installation was changed.
 
 ## Continue
 
-Add named definitions under `agents/NAME/agent.md` when you need several agents.
-Use [Runner's library API](../packages/runner/README.md) for application code and
-custom providers. Upgrade by installing a newer versioned Runner archive and
-restarting your host; definitions remain application-owned.
+Use [Build your own agents](../packages/runner/docs/create-agents.md) for a
+complete `host.json`, two definitions, coding tools, automatic MCP replies and
+`npm start` / `npm run chat` / `npm run web`. Use
+[Runner's library API](../packages/runner/README.md) for custom application code.
+Upgrade by installing matching newer archives and restarting the host and
+clients; definitions remain application-owned.
 
-The optional [browser walkthrough](web-quickstart.md) builds the Web application
-and connects it to an explicit host. It is separate from this library quickstart.
+The [browser walkthrough](web-quickstart.md) installs the prebuilt Web package
+and connects it to this same host, including the `.demo/` state used above.
