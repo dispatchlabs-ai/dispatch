@@ -1,4 +1,5 @@
 import { homedir } from "node:os";
+import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import { awaitWithContext } from "@earendil-works/chord/context";
 import type { JsonValue } from "@earendil-works/chord/json";
@@ -45,7 +46,6 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
   });
   const connections: { close(): Promise<void> }[] = [];
   const discovered: { server: string; tool: Tool; client: () => Promise<McpClient> }[] = [];
-  const extensions: Record<string, Extension> = Object.create(null);
   let closing: Promise<void> | undefined;
   const close = () => closing ??= (async () => {
     const results = await Promise.allSettled(connections.map(connection => connection.close()));
@@ -101,7 +101,6 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
         if (!tools.some(candidate => candidate.name === tool)) throw new Error(`MCP server ${name} does not advertise configured tool ${tool}.`);
       }
       for (const tool of tools) if (allowed === undefined || allowed.includes(tool.name)) discovered.push({ server: name, tool, client });
-      extensions[name] = { name: `mcp:${name}`, tools: [] };
     }
     // Hash every collision, so names do not change with discovery order.
     const counts = new Map<string, number>();
@@ -109,49 +108,65 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
       const name = createMcpToolName(server, tool.name);
       counts.set(name, (counts.get(name) ?? 0) + 1);
     }
-    const assigned = new Set<string>();
-    for (const { server, tool, client } of discovered) {
-      const name = createMcpToolName(server, tool.name, candidate => (counts.get(candidate) ?? 0) > 1 || assigned.has(candidate));
-      if (assigned.has(name)) throw new Error(`MCP server ${server} advertised a duplicate tool name.`);
-      assigned.add(name);
-      const registration: ToolRegistration = {
-        name, description: tool.description?.trim() || tool.title || `MCP tool ${tool.name} from ${server}`,
-        parameters: normalizeMcpInputSchema(tool.inputSchema),
-        // Pi makes strict model-facing schemas while Durable validates/coerces against the original schema.
-        constrainedSampling: { type: "json_schema", strict: "prefer" },
-        ...(tool.outputSchema === undefined ? {} : { structuredOutputSchema: tool.outputSchema }),
-        // Preserve source evidence. Generic remote tools retain Durable's default unsafe replay policy.
-        outputLimits: { maxBytes: Infinity, maxLines: Infinity },
-        async execute(args, _api, context) {
-          context.abortSignal?.throwIfAborted();
-          const connection = await awaitWithContext(client(), context);
-          try {
-            // Durable validated the arguments against the server's object schema.
-            // Agent work has no predictable duration. Pi's zero disables its default request deadline.
-            const result = await connection.callTool(tool.name, args as Record<string, unknown>, {
-              signal: context.abortSignal, timeoutMs: (servers[server].timeout ?? 0) * 1000,
-            });
-            const output = toLlmContent(result);
-            if (result.isError && !output.some(block => block.type === "text" && block.text.trim())) {
-              output.push({ type: "text", text: `MCP tool ${server}/${tool.name} returned an error.` });
+    const bind = (caller?: { agent: string; stateRoot: string }) => {
+      const extensions: Record<string, Extension> = Object.create(null);
+      for (const { name } of selected) extensions[name] = { name: `mcp:${name}`, tools: [] };
+      const assigned = new Set<string>();
+      for (const { server, tool, client } of discovered) {
+        const name = createMcpToolName(server, tool.name, candidate => (counts.get(candidate) ?? 0) > 1 || assigned.has(candidate));
+        if (assigned.has(name)) throw new Error(`MCP server ${server} advertised a duplicate tool name.`);
+        assigned.add(name);
+        const registration: ToolRegistration = {
+          name, description: tool.description?.trim() || tool.title || `MCP tool ${tool.name} from ${server}`,
+          parameters: normalizeMcpInputSchema(caller && tool._meta?.["ai.dispatch/caller"] === true
+            ? { ...tool.inputSchema, properties: Object.fromEntries(Object.entries(tool.inputSchema.properties ?? {}).filter(([key]) => key !== "caller")),
+              ...(Array.isArray(tool.inputSchema.required) ? { required: tool.inputSchema.required.filter(key => key !== "caller") } : {}) }
+            : tool.inputSchema),
+          // Pi makes strict model-facing schemas while Durable validates/coerces against the original schema.
+          constrainedSampling: { type: "json_schema", strict: "prefer" },
+          ...(tool.outputSchema === undefined ? {} : { structuredOutputSchema: tool.outputSchema }),
+          // Preserve source evidence. Generic remote tools retain Durable's default unsafe replay policy.
+          outputLimits: { maxBytes: Infinity, maxLines: Infinity },
+          async execute(args, api, context) {
+            context.abortSignal?.throwIfAborted();
+            const connection = await awaitWithContext(client(), context);
+            try {
+              // Durable validated the arguments against the server's object schema.
+              // Agent work has no predictable duration. Pi's zero disables its default request deadline.
+              let input = args as Record<string, unknown>;
+              if (caller && tool._meta?.["ai.dispatch/caller"] === true) {
+                const conversation = await api.commit(tx => tx.conversation(api.conversationId), context);
+                if (!conversation || conversation.owner) throw new Error("Private child conversations cannot send independent agent messages.");
+                // The model never supplies or overrides this context. The server checks the host identity.
+                input = { ...input, caller: { from: `${caller.agent}:${api.conversationId}`,
+                  stateRoot: await realpath(caller.stateRoot), requestId: `mcp:tool:${api.taskId}` } };
+              }
+              const result = await connection.callTool(tool.name, input, {
+                signal: context.abortSignal, timeoutMs: (servers[server].timeout ?? 0) * 1000,
+              });
+              const output = toLlmContent(result);
+              if (result.isError && !output.some(block => block.type === "text" && block.text.trim())) {
+                output.push({ type: "text", text: `MCP tool ${server}/${tool.name} returned an error.` });
+              }
+              return {
+                output, isError: result.isError === true,
+                // MCP results arrived as JSON; retain all blocks and structured data even when the model cannot display them.
+                details: result as unknown as JsonValue,
+                ...(tool.outputSchema !== undefined && result.structuredContent !== undefined
+                  ? { structuredOutput: result.structuredContent as JsonValue } : {}),
+              };
+            } catch (error) {
+              // Reconnect on a later call, never automatically replay an uncertain remote operation.
+              if (error instanceof McpConnectionClosedError || error instanceof McpSessionExpiredError) await connection.close();
+              throw error;
             }
-            return {
-              output, isError: result.isError === true,
-              // MCP results arrived as JSON; retain all blocks and structured data even when the model cannot display them.
-              details: result as unknown as JsonValue,
-              ...(tool.outputSchema !== undefined && result.structuredContent !== undefined
-                ? { structuredOutput: result.structuredContent as JsonValue } : {}),
-            };
-          } catch (error) {
-            // Reconnect on a later call, never automatically replay an uncertain remote operation.
-            if (error instanceof McpConnectionClosedError || error instanceof McpSessionExpiredError) await connection.close();
-            throw error;
-          }
-        },
-      };
-      extensions[server] = { ...extensions[server], tools: [...(extensions[server].tools ?? []), registration] };
-    }
-    return { extensions, close };
+          },
+        };
+        extensions[server] = { ...extensions[server], tools: [...(extensions[server].tools ?? []), registration] };
+      }
+      return extensions;
+    };
+    return { extensions: bind(), bind, close };
   } catch (error) {
     try { await close(); }
     catch (cleanup) { throw new AggregateError([error, cleanup], "MCP startup and cleanup failed."); }

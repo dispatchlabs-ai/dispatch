@@ -3,7 +3,7 @@ import type { AttachmentFile } from "./chat-content.js";
 import type { InstanceMessage } from "./messages.js";
 
 export type ServiceOperations = Pick<ChatService, "list" | "create" | "snapshot" | "watch" | "submit" | "stop" | "artifact"> &
-  Partial<Pick<ChatService, "find" | "activity" | "schedules" | "compact" | "receipt" | "wait" | "message" | "messageStatus" | "waitForIdle">> & {
+  Partial<Pick<ChatService, "find" | "activity" | "schedules" | "compact" | "receipt" | "wait" | "message" | "messageStatus" | "agentInstances" | "waitForAgent" | "waitForIdle">> & {
     agents: { id: string; description: string; model?: import("./definition.js").LoadedAgent["model"] }[];
   };
 export type ServiceMetadata = { stateRoot?: string; defaultAgent?: string;
@@ -22,6 +22,8 @@ export type ServiceCommand =
   | { method: "send"; id: string; text: string; requestId: string; mode?: "followUp" | "steer"; source?: Chat["source"]; files?: AttachmentFile[] }
   | { method: "message"; from: string; message: InstanceMessage; requestId: string }
   | { method: "message-status"; from: string; taskId: number }
+  | { method: "agent-instances"; from: string }
+  | { method: "message-wait"; from: string; taskId: number }
   | { method: "receipt" | "wait"; id: string; submissionId: number };
 
 export async function dispatchCommand(service: ServiceOperations, command: ServiceCommand, signal?: AbortSignal) {
@@ -56,6 +58,8 @@ export async function dispatchCommand(service: ServiceOperations, command: Servi
     case "receipt": if (!service.receipt) throw new ServiceError("Unsupported service operation.", 409); return service.receipt(command.id, command.submissionId);
     case "message": if (!service.message) throw new ServiceError("Unsupported service operation.", 409); return service.message(command.from, command.message, command.requestId);
     case "message-status": if (!service.messageStatus) throw new ServiceError("Unsupported service operation.", 409); return service.messageStatus(command.from, command.taskId);
+    case "agent-instances": if (!service.agentInstances) throw new ServiceError("Unsupported service operation.", 409); return service.agentInstances(command.from);
+    case "message-wait": if (!service.waitForAgent) throw new ServiceError("Unsupported service operation.", 409); return service.waitForAgent(command.from, command.taskId, signal);
     default: throw new Error("Unknown service command.");
   }
 }
@@ -78,6 +82,8 @@ export type ServiceResults = {
   compact: Awaited<ReturnType<ChatService["compact"]>>;
   message: Awaited<ReturnType<ChatService["message"]>>;
   "message-status": Awaited<ReturnType<ChatService["messageStatus"]>>;
+  "agent-instances": Awaited<ReturnType<ChatService["agentInstances"]>>;
+  "message-wait": Awaited<ReturnType<ChatService["waitForAgent"]>>;
 };
 
 export class ServiceError extends Error {

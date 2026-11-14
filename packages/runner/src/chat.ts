@@ -400,6 +400,14 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       return messaging(this, from).status(from, taskId, context);
     }
 
+    async agentInstances(from: string) {
+      return messaging(this, from).instances(from);
+    }
+
+    async waitForAgent(from: string, taskId: number, signal?: AbortSignal) {
+      return messaging(this, from).wait(from, taskId, signal ? withAbortSignal(signal, context) : context);
+    }
+
     async stop(id: string) {
       await admit(this, id, async () => {
         const { host, conversation } = await this.resolve(id);

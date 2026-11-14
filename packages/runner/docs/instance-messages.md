@@ -90,6 +90,12 @@ Applications use `ChatService.message(from, message, requestId)` and
 Retain a stable request ID for retries. Reusing it with different content fails;
 the API can omit `instance` to create a new recipient, just like the agent tool.
 
+`AgentClient.agentInstances(from)`, `messageAgent(from, message, requestId)`,
+`messageStatus(from, taskId)` and `waitForAgent(from, taskId, signal?)` expose the
+same operations over the shared host contract. The optional [MCP connector](../../mcp/README.md#native-messaging-and-automatic-replies)
+adapts all four, including automatic replies. Runner binds MCP calls to their
+actual sending conversation; external operator clients name the sender explicitly.
+
 ## Durability, cancellation and scope
 
 The conversation-scoped request receipt and native delivery task are committed

@@ -81,13 +81,16 @@ export async function run(options: RunOptions = {}) {
       for (const name of names) collect(await loadAgent(root, name));
       mcp = await connectMcpServers(options.mcpServers, { cwd: options.cwd ?? root, names: [...requested] });
     }
-    const prepareAgent = (agent: LoadedAgent): LoadedAgent => !agent.mcp?.length ? agent : ({ ...agent,
-      extensions: [...(agent.extensions ?? []), ...(agent.mcp ?? []).map(name => {
-        const extension = mcp?.extensions[name];
+    const prepareAgent = (agent: LoadedAgent): LoadedAgent => {
+      if (!agent.mcp?.length) return agent;
+      const stateRoot = options.stateRoot ?? (!options.open ? resolve(root, ".state") : undefined);
+      const bound = stateRoot ? mcp?.bind({ agent: agent.id, stateRoot: resolve(stateRoot) }) : mcp?.extensions;
+      return { ...agent, extensions: [...(agent.extensions ?? []), ...agent.mcp.map(name => {
+        const extension = bound?.[name];
         if (!extension) throw new Error(`Agent ${agent.id} requires MCP server ${name}; configure it in mcpServers.`);
         return extension;
-      })],
-    });
+      })] };
+    };
     for (const adapter of options.adapters ?? []) adapters.push(await adapter.prepare({ root, runner }));
     const extensions = adapters.map(adapter => adapter.extension);
     // Never broadcast a reply or guess between transports. Legacy destinations

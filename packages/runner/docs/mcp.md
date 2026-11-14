@@ -98,6 +98,15 @@ Configuration `tools` entries use the original names advertised by the server.
 Invalid configurations, unknown requested servers and tools missing from an
 explicit selection fail startup with an error.
 
+Dispatch's [native messaging MCP tools](../../mcp/README.md#native-messaging-and-automatic-replies)
+advertise `ai.dispatch/caller` metadata. For a host with a state-root identity,
+Runner binds their hidden caller context to the executing top-level conversation
+and native tool task, while retaining the ordinary Pi MCP call/validation path.
+The server checks that the identity belongs to its host. Private children cannot
+use that binding to impersonate independent conversations. Other MCP tools and
+their schemas are unchanged. This is context within an authorized connection,
+not a new authorization grant.
+
 Streamable HTTP supports unauthenticated servers and configured headers. This
 integration does not implement interactive OAuth sign-in or an OAuth credential
 store; selecting a server with `oauth` settings fails at startup. For a server requiring another

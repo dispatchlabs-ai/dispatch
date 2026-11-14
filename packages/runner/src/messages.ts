@@ -132,7 +132,23 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
     const { host, conversation } = await service.resolve(from);
     const task = await host.harness.getTask(taskId as TaskId, context);
     if (!task || task.kind !== kind || task.conversationId !== conversation.id) throw new Error("Unknown message task.");
-    return { taskId, message: task.input, state: task.state };
+    return { taskId, message: task.input as Message, state: task.state };
+  }
+
+  async function instances(from: string) {
+    const { chat } = await service.resolve(from);
+    if (chat.agent !== agent.id) throw new Error("The sender belongs to a different agent.");
+    return { self: from, agents: allowed,
+      capabilities: service.agents.filter(target => allowed.includes(target.id))
+        .map(target => ({ agent: target.id, description: target.description, model: target.model })),
+      instances: (await service.list()).filter(chat => allowed.includes(chat.agent))
+        .map(({ id, agent, title, source }) => ({ id, agent, title, source })),
+    };
+  }
+
+  async function wait(from: string, taskId: number, context: Context) {
+    const receipt = await status(from, taskId, context);
+    return waitForMessageWork(service, namespace, from, receipt.message.to, taskId, context);
   }
 
   const extension = defineExtension({
@@ -143,13 +159,7 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
         description: "Find your own instance ID and addressable independent instances. Returns identities, not their private transcripts.",
         parameters: Type.Object({}), replay: "safe",
         async execute(_args, api) {
-          const self = `${agent.id}:${api.conversationId}`;
-          await service.resolve(self);
-          const instances = (await service.list()).filter(chat => allowed.includes(chat.agent))
-            .map(({ id, agent, title, source }) => ({ id, agent, title, source }));
-          const capabilities = service.agents.filter(target => allowed.includes(target.id))
-            .map(target => ({ agent: target.id, description: target.description, model: target.model }));
-          return { output: [{ type: "text", text: JSON.stringify({ self, agents: allowed, capabilities, instances }) }] };
+          return { output: [{ type: "text", text: JSON.stringify(await instances(`${agent.id}:${api.conversationId}`)) }] };
         },
       }),
       defineTool({
@@ -183,16 +193,13 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
         description: "Wait for work admitted by your message_agent task, including its native children, subsequent peer handoffs and replies. Returns the recipient's latest report when that work settles, a blocked/held status, or input_pending to process a queued steering correction. No model polling or new assignment. Prefer reply=false when you will wait; reply=true also queues the initial answer separately. A settled run is not proof of task completion. Use the returned instance for follow-up messages. Cancelling this wait does not cancel independent recipient work.",
         parameters: Type.Object({ taskId: Type.Integer({ minimum: 1 }) }), replay: "safe",
         async execute({ taskId }, api, context) {
-          const from = `${agent.id}:${api.conversationId}`;
-          const receipt = await status(from, taskId, context);
-          const target = receipt.message as Message;
-          const value = await waitForMessageWork(service, namespace, from, target.to, taskId, context);
+          const value = await wait(`${agent.id}:${api.conversationId}`, taskId, context);
           return { output: [{ type: "text", text: JSON.stringify(value) }] };
         },
       }),
     ],
   });
-  return { extension, send, status };
+  return { extension, send, status, instances, wait };
 }
 
 export function instanceMessagingExtension(namespace: string, agent: LoadedAgent, service: ChatService) {

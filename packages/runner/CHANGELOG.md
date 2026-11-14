@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Share native agent-instance discovery and message-work waits with clients and MCP, reusing the existing delivery tasks and automatic replies.
+- Bind MCP messaging calls to the executing top-level conversation; reject cross-host bindings and private-child impersonation.
+
 ## [0.17.2] - 2026-11-13
 
 - Remove the inherited 30-second deadline from MCP tool calls unless the host explicitly configures a timeout. Long agent-to-agent waits remain cancellable without resubmitting work.

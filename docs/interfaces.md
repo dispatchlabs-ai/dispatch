@@ -28,6 +28,16 @@ stdio and authenticated Streamable HTTP: `list_agents`, `list_conversations`,
 receipts, snapshots and artifact validation remain owned by the host. A model can
 use this connector to ask another agent; it does not acquire that agent's tools.
 
+Native messaging is also available through MCP's `agent_instances`,
+`message_agent`, `message_status` and `wait_for_agent`. They call the same host
+`agent-instances`, `message`, `message-status` and `message-wait` operations as
+`AgentClient` and native tools. Recipient selection, attributed automatic replies,
+durable tasks and independent cancellation remain owned by Runner/Pi Durable.
+Runner binds its own calls to the executing top-level conversation; external
+operators explicitly select a sender under their existing host-wide authority.
+The caller context checks host identity; it is not an additional credential or
+a per-agent authorization system.
+
 The [Pi terminal client](../packages/runner/docs/service.md#interactive-terminal-ui)
 uses the same catalog, conversation and watch operations for interactive chat.
 Its pickers, draft retention, scrolling and tool expansion are client behavior;

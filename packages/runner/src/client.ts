@@ -3,6 +3,7 @@ import { request as httpsRequest } from "node:https";
 import { dispatchCommand, ServiceError, type ServiceCommand, type ServiceExpectation, type ServiceMetadata, type ServiceOperations, type ServiceResults } from "./protocol.js";
 import type { Chat, ChatSnapshot } from "./chat.js";
 import type { AttachmentFile } from "./chat-content.js";
+import type { InstanceMessage } from "./messages.js";
 
 export type ClientConnection = { socket: string; url?: never; headers?: never } |
   { url: string; socket?: never; headers?: Record<string, string> | (() => Promise<Record<string, string>>) };
@@ -32,6 +33,14 @@ export class AgentClient {
   snapshot(id: string) { return this.command({ method: "snapshot", id }); }
   receipt(id: string, submissionId: number) { return this.command({ method: "receipt", id, submissionId }); }
   stop(id: string) { return this.command({ method: "stop", id }); }
+  agentInstances(from: string) { return this.command({ method: "agent-instances", from }); }
+  messageAgent(from: string, message: InstanceMessage, requestId: string) {
+    return this.command({ method: "message", from, message, requestId });
+  }
+  messageStatus(from: string, taskId: number) { return this.command({ method: "message-status", from, taskId }); }
+  waitForAgent(from: string, taskId: number, signal?: AbortSignal) {
+    return this.command({ method: "message-wait", from, taskId }, signal);
+  }
   async artifact(id: string, artifactId: string) {
     const value = await this.command({ method: "artifact", id, artifactId });
     return { artifact: value.artifact, bytes: Buffer.from(value.dataBase64, "base64") };

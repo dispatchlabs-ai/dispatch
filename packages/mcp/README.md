@@ -96,6 +96,59 @@ Runner leaves tool calls without a deadline unless that MCP connection explicitl
 sets `timeout`. Long-running `get_result` calls therefore keep waiting, while
 cancellation and `stop_conversation` remain available.
 
+## Native messaging and automatic replies
+
+For an assignment whose answer should arrive later, use native messaging through
+MCP. The sender's `agent.ts` declares `messages: ["researcher"]` in
+`defineAgent(...)`, and its Markdown frontmatter selects `mcp: [agents]`.
+Both agents must be in the same Dispatch host. The recipient keeps its own tools
+and instructions.
+
+| Tool | Behavior |
+| --- | --- |
+| `agent_instances` | Discover the sender's identity, permitted agent types and addressable conversations; no transcript access. |
+| `message_agent` | Send an assignment or correction; omit `instance` to create a recipient, or reuse a returned `to`. Returns `messageId`, `from`, `to`, `taskId` and `requestId`. |
+| `message_status` | Inspect one of the sender's retained native message tasks. |
+| `wait_for_agent` | Observe the message's related work, including native children and recorded peer handoffs; cancellation leaves recipient work running. |
+
+Set `reply: true` on `message_agent` to have the answer delivered automatically
+as a new input to the sender. The sender can continue other work or finish its
+turn; the reply wakes it afterward. It should recognize the reply as an answer
+to its earlier assignment and continue the original request without sending the
+same question again. No result polling or open MCP wait is required. With
+`reply: false`, use `wait_for_agent` when the caller wants to wait explicitly.
+An idle result describes execution state, not whether the business goal succeeded.
+
+For example, an operator with an existing sender conversation can call:
+
+```json
+{"from":"author:10","agent":"researcher","text":"Research the requested topic and cite your sources.","reply":true,"requestId":"research-1"}
+```
+
+Use the actual sender ID from your host. Ordinary external MCP clients supply
+`from` and a stable `requestId`. Runner supplies them for an agent's own call:
+the tools advertise `ai.dispatch/caller` metadata, and Runner injects a hidden
+`caller` argument containing its conversation, state-root identity and native
+tool-task request ID. The server rejects a different host or a conflicting
+explicit sender. Private child conversations cannot impersonate independent
+senders. This context is a trusted host binding, not another credential; an
+authorized operator can still explicitly select a sender under its host-wide
+authority. Custom embedded hosts without a state-root identity use the explicit
+operator arguments.
+
+Reuse the returned `requestId` and identical payload after an uncertain send.
+`followUp` is the default delivery mode; `steer` forwards a correction to active
+work. Native tasks retain delivery and reply identities across compatible host
+restarts. Stopping the sender's background tracking does not stop an already
+admitted recipient. See the [native messaging contract](../runner/docs/instance-messages.md).
+
+Use it with your AI agent, after enabling the connection and recipient:
+
+> Ask the researcher through the agents MCP native messaging tools to research
+> the topic I supply and cite sources. Request an automatic reply, then finish
+> your current turn. When that reply arrives, use it to answer my original
+> question. Keep the returned message identity and do not poll for the answer.
+
 ## Streamable HTTP and authority
 
 For clients that connect over HTTP, supply a private file containing a bearer
