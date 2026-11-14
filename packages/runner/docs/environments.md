@@ -1,5 +1,8 @@
 # Repo-owned environments
 
+Available in current source; released package archives do not yet include these
+commands. Applications can pin this Dispatch source in their Nix lockfile.
+
 An agent can select a runnable package from its application's locked Nix flake:
 
 ```ts
