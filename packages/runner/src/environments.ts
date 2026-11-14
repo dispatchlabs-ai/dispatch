@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { access } from "node:fs/promises";
+import { access, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 /** A package in the application's locked flake, runnable with `nix run`. */
@@ -27,13 +27,14 @@ export function environmentInstructions(environment: AgentEnvironment | undefine
 export async function environmentCommand(
   operation: "describe" | "build" | "run", options: { root?: string; agent?: string }, args: string[] = [],
 ): Promise<void> {
-  const root = resolve(options.root ?? ".");
+  const root = await realpath(resolve(options.root ?? "."));
   const { defaultAgent, loadAgent } = await import("./definition.js");
   const agent = await loadAgent(root, options.agent ?? await defaultAgent(root));
   if (!agent.environment) throw new Error(`Agent ${agent.id} does not select an environment.`);
   if (operation !== "run" && args.length) throw new Error("Only environment run accepts arguments after --.");
-  // Nix's Git-aware path reference excludes ignored credentials and mutable state.
-  const installable = `${root}#${agent.environment.package}`;
+  // Source checkouts retain Nix's Git filtering. Bundled definitions need an
+  // explicit flake path: Nix otherwise treats /nix/store paths as built outputs.
+  const installable = `${root.startsWith("/nix/store/") ? "path:" : ""}${root}#${agent.environment.package}`;
   if (operation === "describe") {
     console.log(JSON.stringify({ agent: agent.id, ...agent.environment, installable,
       build: ["nix", "build", "--no-update-lock-file", "--no-link", "--json", installable],

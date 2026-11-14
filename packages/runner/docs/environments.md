@@ -31,7 +31,8 @@ dispatch environment run --agent helper -- --help
 `describe` prints the selection and exact commands without invoking Nix. `build`
 runs `nix build --no-update-lock-file --no-link --json`; `run` invokes `nix run`
 and forwards arguments after `--` unchanged. Both require a committed lockfile,
-use the Git-aware checkout reference, and leave lock updates explicit. Run these
+use the Git-aware checkout reference (or an explicit flake path for immutable
+definitions bundled in the Nix store), and leave lock updates explicit. Run these
 commands only on trusted repositories: flake builds and launchers execute code.
 The CLI passes `DISPATCH_AGENT_ID` to the launcher and preserves cancellation.
 It does not open a conversation store or start an agent host.
