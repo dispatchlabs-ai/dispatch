@@ -13,15 +13,19 @@ const usage = `dispatch serve [--root DIRECTORY] [--state DIRECTORY] [--socket S
 dispatch serve --config HOST.json
 dispatch chat [--root DIRECTORY] [--state DIRECTORY] [--agent NAME] [--session KEY] [--prompt TEXT] [--history]
 dispatch catalog [--root DIRECTORY]
+dispatch login PROVIDER [--api-key] [--no-browser]
+dispatch logout PROVIDER
+dispatch auth
 
 Create agent.md with YAML frontmatter and instructions:
 ---
 description: A helpful assistant
-model: { provider: anthropic, id: claude-sonnet-4-6 }
+model: { provider: openai, id: gpt-6.1-sol }
 ---
 Answer clearly.
 
-Set the provider's API key (for example ANTHROPIC_API_KEY), then run dispatch serve.
+Run dispatch login openai to use ChatGPT, then dispatch serve.
+API keys in the host environment also work (OPENAI_API_KEY, ANTHROPIC_API_KEY).
 Use --demo for synthetic replies without credentials. State is saved in .state/;
 add that directory to .gitignore. In another terminal here, run dispatch chat.
 Node 24.22.1 or newer is required. Nix is optional.
@@ -40,10 +44,21 @@ try {
     root: { type: "string" }, state: { type: "string" }, config: { type: "string" }, socket: { type: "string" }, demo: { type: "boolean" },
     agent: { type: "string" }, session: { type: "string" }, prompt: { type: "string" },
     "request-id": { type: "string" }, history: { type: "boolean" }, json: { type: "boolean" }, help: { type: "boolean" },
+    "api-key": { type: "boolean" }, "no-browser": { type: "boolean" },
   } });
   if (values.demo && positionals[0] !== "serve") throw new Error("--demo is a host option: use dispatch serve --demo, then dispatch chat.");
+  if ((values["api-key"] || values["no-browser"]) && positionals[0] !== "login") throw new Error("--api-key and --no-browser are login options.");
   if (values.help) console.log(usage);
+  else if ((positionals[0] === "login" || positionals[0] === "logout") && positionals.length === 2) {
+    const { loginCommand, logoutCommand } = await import("./login-cli.js");
+    if (positionals[0] === "login") await loginCommand(positionals[1], { apiKey: values["api-key"], noBrowser: values["no-browser"] });
+    else await logoutCommand(positionals[1]);
+  }
   else if (positionals.length !== 1) throw new Error(usage);
+  else if (positionals[0] === "auth") {
+    const { authStatus } = await import("./login-cli.js");
+    await authStatus();
+  }
   else if (positionals[0] === "serve") {
     if (values.config && (values.root || values.state || values.socket || values.demo)) throw new Error("Use --config HOST.json on its own, or select local host options.");
     const config = values.config ? await readHostConfig(values.config) : await localHostConfig(values);

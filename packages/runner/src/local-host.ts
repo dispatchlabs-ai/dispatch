@@ -1,6 +1,6 @@
 import { createModels } from "@earendil-works/pi-ai/models";
 import { catalog, loadAgent } from "./definition.js";
-import { environmentProvider } from "./environment-provider.js";
+import { localProvider } from "./local-provider.js";
 import { localHostPaths } from "./host-config.js";
 import type { ServiceConfig } from "./service.js";
 
@@ -12,15 +12,15 @@ export async function localHostConfig(options: { root?: string; state?: string; 
     modelProviders: [{ module: "@dispatch/runner/environment-provider", export: "demoProvider" }] };
   const models = createModels({ authContext: { env: async () => undefined, fileExists: async () => false } });
   const providers = [...new Set(agents.map(agent => agent.model.provider))];
-  for (const name of providers) models.setProvider(await environmentProvider(name));
+  for (const name of providers) models.setProvider(await localProvider(name));
   for (const name of providers) {
-    if (!await models.getAuth(name)) throw new Error(`No credentials for ${name}. Set this provider's API key in your shell before starting the host. Use dispatch serve --demo to try synthetic replies without credentials.`);
+    if (!await models.getAuth(name)) throw new Error(`Not signed in to ${name}. Run npx dispatch login ${name}. Use dispatch serve --demo to try synthetic replies without credentials.`);
   }
   await models.refresh({ providers });
   for (const agent of agents) {
     if (!models.getModel(agent.model.provider, agent.model.id)) throw new Error(`Model ${agent.model.provider}/${agent.model.id} is unavailable for ${agent.id}. Check its name and provider access, or configure a custom provider with --config.`);
   }
   return { ...paths, modelProviders: providers.map(name => ({
-    module: "@dispatch/runner/environment-provider", export: "environmentProvider", args: [name],
+    module: "@dispatch/runner/local-provider", export: "localProvider", args: [name],
   })) };
 }

@@ -26,12 +26,13 @@ not certify implementation, package publication or installation qualification.
   turns, return to named conversations and disconnect while work continues.
   Explicit Stop cancels the selected owned work. Display untrusted terminal
   controls as visible escapes without changing stored conversation content.
-- **RUN-008 — Use host-owned credentials:** configure a native store or trusted
-  vault helper, resolve API keys directly into Pi, inspect only source metadata,
-  and explicitly select session/environment compatibility without plaintext
-  fallback; bind trusted native providers to existing agent model names, including
-  a locally authenticated Claude Code subscription. This does not supply isolation
-  for untrusted code or OAuth storage.
+- **RUN-008 — Use host-owned credentials:** sign in through Pi's native provider
+  flows, inspect saved account metadata and log out. Persist local OAuth tokens
+  privately with serialized refresh; use environment API keys when no sign-in is
+  saved. Custom hosts can instead use a native store or trusted vault helper for
+  API keys without plaintext fallback, or bind an existing model gateway or
+  locally authenticated Claude Code provider. These choices do not isolate
+  credentials from trusted host code or grant provider subscription eligibility.
 - **RUN-009 — Work in a repository:** supply each agent with repository instructions
   and its own role instructions, select a saved working directory, and delegate
   bounded assignments to named agents with native ownership and recovery.

@@ -32,6 +32,10 @@
       "types": "./dist/environment-provider.d.ts",
       "import": "./dist/environment-provider.js"
     },
+    "./local-provider": {
+      "types": "./dist/local-provider.d.ts",
+      "import": "./dist/local-provider.js"
+    },
     "./settings": {
       "types": "./dist/settings.d.ts",
       "import": "./dist/settings.js"

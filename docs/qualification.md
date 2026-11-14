@@ -4,6 +4,31 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## Subscription sign-in source preview — November 14, 2026
+
+A packed Runner consumer on macOS arm64 / Node 24.22.1 completed Pi 1.5.2's
+ChatGPT browser sign-in, saved private credentials and ran `gpt-6.1-sol` through
+the public Responses API with `OPENAI_API_KEY` unset. Real `write`, `read`,
+`edit` and `bash` calls completed. A restarted host using the explicit
+`localProvider` binding resumed the same conversation and reused the saved
+account. Native entries, tool results, tasks and completed submissions were
+inspected. Cancelling a new login preserved the existing OAuth credential;
+logout removed it, and startup without another credential failed with sign-in
+guidance. Explicitly supplying an environment API key after logout completed a
+separate live request. Another API account rejected inference despite listing
+the model; catalog visibility does not prove account access. A personal-account
+selection was necessary after the work account's organization policy rejected
+subscription access.
+
+Source build/type checks, Nix build/flake checks, the packed consumer's strict
+NodeNext declaration check, package exports and local documentation links passed.
+The fresh consumer's dependency audit reported zero findings. No automated
+functional tests were added or run. This is scoped source and local interaction
+review: live Claude login, token-expiry refresh/rotation, simultaneous refreshes,
+Windows/Linux sign-in and provider revocation were not newly qualified.
+The implementation awaits a release; published 0.18.0 archives and deployed
+applications are unchanged.
+
 ## Human setup guides — November 14, 2026
 
 The README and linked guides were checked using fresh applications installed from

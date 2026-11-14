@@ -24,7 +24,7 @@ npm install \
 cat > agent.md <<'EOF_AGENT'
 ---
 description: A helpful assistant
-model: { provider: anthropic, id: claude-sonnet-4-6 }
+model: { provider: openai, id: gpt-6.1-sol }
 ---
 Answer clearly. Ask for details when you need them.
 EOF_AGENT
@@ -49,7 +49,9 @@ The demo makes no model calls and runs no real tools. Keep `.demo/`, `.state/` a
 
 ## Run your own agents
 
-For the single agent above, stop the demo host and Web process. Set `ANTHROPIC_API_KEY` in the host terminal for the model in `agent.md`, then run `npx dispatch serve`. In other terminals, run `npx dispatch chat` and `npx dispatch-web`. These use `.state/`; the demo history stays in `.demo/`. The key authenticates paid model API requests. A chat subscription alone is not this API credential.
+The starter uses **OpenAI `gpt-6.1-sol`**. With a ChatGPT subscription, the new setup is `npx dispatch login openai`, then start the host and chat. Sign-in is implemented on `main` and awaiting release; the 0.18.0 archives above still use API keys. [Subscription sign-in and source preview](packages/runner/docs/sign-in.md)
+
+For the published 0.18.0 setup, stop the demo host and Web process, supply `OPENAI_API_KEY` in the host environment, then run `npx dispatch serve`. In other terminals, run `npx dispatch chat` and `npx dispatch-web`. These use `.state/`; the demo history stays in `.demo/`. For Claude, the guide uses `claude-sonnet-5-5` and explains subscription eligibility and API credits.
 
 **[Build your own agents](packages/runner/docs/create-agents.md)** is the complete manual setup for a researcher and developer. It includes every file, model credentials, a shared `host.json`, coding tools, MCP messaging, verification and later edits:
 

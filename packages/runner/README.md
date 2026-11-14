@@ -29,12 +29,12 @@ Create **`agent.md`**:
 ```markdown
 ---
 description: A helpful assistant
-model: { provider: anthropic, id: claude-sonnet-4-6 }
+model: { provider: openai, id: gpt-6.1-sol }
 ---
 Answer clearly. Ask when you need more information.
 ```
 
-With `ANTHROPIC_API_KEY` set in your shell, start the host:
+With `OPENAI_API_KEY` set in your shell, start the host:
 
 ```sh
 npx dispatch serve
@@ -44,6 +44,12 @@ The host reads your definition and selects its built-in Pi provider. It saves
 conversations in `.state/`; add that directory to `.gitignore`. Provider keys
 stay in the host's environment. No host JSON, application code or generated
 agent files are required. The root definition has the stable agent ID `agent`.
+
+**ChatGPT subscribers:** the source preview adds `npx dispatch login openai`
+and automatically uses the saved sign-in in `dispatch serve`. This is awaiting
+release; 0.18.0 archives do not contain the command. See
+[Sign in and choose a model](docs/sign-in.md) for preview installation, current
+Claude examples, account eligibility, storage and logout.
 
 In a second terminal in the same directory:
 

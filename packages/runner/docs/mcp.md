@@ -16,7 +16,7 @@ its connection name to `agent.md`:
 ```markdown
 ---
 description: Research assistant
-model: { provider: anthropic, id: claude-sonnet-4-6 }
+model: { provider: openai, id: gpt-6.1-sol }
 mcp: [wiki]
 ---
 Research questions using the wiki. Read supporting sources and cite their links.
@@ -30,7 +30,7 @@ HTTP server and a token supplied through the host's environment:
   "modelProviders": [{
     "module": "@dispatch/runner/environment-provider",
     "export": "environmentProvider",
-    "args": ["anthropic"]
+    "args": ["openai"]
   }],
   "mcpServers": {
     "wiki": {
@@ -41,12 +41,16 @@ HTTP server and a token supplied through the host's environment:
 }
 ```
 
-Set the server URL. Set `ANTHROPIC_API_KEY` and `WIKI_TOKEN`
+Set the server URL. Set `OPENAI_API_KEY` and `WIKI_TOKEN`
 in the host environment, then run:
 
 ```sh
 npx dispatch serve --config host.json
 ```
+
+For ChatGPT subscription access with the source preview, replace the
+environment-only model binding with `localProvider` and sign in as described in
+[Sign in and choose a model](sign-in.md). The wiki token is still separate.
 
 In another terminal, run `npx dispatch chat --config host.json` and ask a
 question covered by that wiki. The agent receives the server's discovered tool

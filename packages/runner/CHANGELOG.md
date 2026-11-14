@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Add `dispatch login`, `auth` and `logout` using Pi's native provider authentication. Local hosts can use saved subscription sign-ins with Pi-owned token refresh and private, locked credential storage; environment-only and gateway bindings remain available.
+- Use current OpenAI and Claude models in setup examples; document ChatGPT sign-in, Claude eligibility, and the source-preview/released-package boundary.
+
 - Document a complete two-agent application with model credentials, coding tools, MCP replies, shared clients and definition updates; separate demo and live state in the root quickstart.
 
 ## [0.18.0] - 2026-11-13

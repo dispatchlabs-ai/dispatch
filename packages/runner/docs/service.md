@@ -11,11 +11,14 @@ This page is the reference for host settings, client operations and network acce
 
 For a local application with a root `agent.md` (or `agents/NAME/agent.md`), install
 Runner and run `npx dispatch serve`. The launcher selects the definitions' built-in
-Pi providers, reads their API keys from the host environment and saves native work
+Pi providers, uses saved sign-ins or API keys from the host environment and saves native work
 in `.state/`. `npx dispatch chat` connects from the same application directory.
 Use `--state DIRECTORY` on both commands to select another store. No JSON file,
 application entry point or Nix environment is required. See the
 [quickstart](../../../docs/quickstart.md).
+
+Saved sign-ins and `localProvider` are source-preview features awaiting release;
+published 0.18.0 uses environment API keys. See [sign-in setup](sign-in.md).
 
 For explicit custom provider, MCP, channel or network bindings, use `run({root,stateRoot,models,...})` from application code, or keep a `host.json` beside the definition and start `dispatch serve --config host.json` or `dispatch-service host.json serve`.
 
@@ -24,7 +27,7 @@ For explicit custom provider, MCP, channel or network bindings, use `run({root,s
   "modelProviders": [{
     "module": "@dispatch/runner/environment-provider",
     "export": "environmentProvider",
-    "args": ["anthropic"]
+    "args": ["openai"]
   }]
 }
 ```
@@ -39,6 +42,9 @@ Programmatic callers of `startService` continue to supply explicit absolute path
 
 Supply the selected provider's credentials in the host's environment or use your
 own trusted provider binding. The host requires a provider, not a gateway.
+For saved sign-ins, replace the binding above with
+`@dispatch/runner/local-provider` / `localProvider`, keeping the provider's
+`args`, and run `dispatch login openai` as the host's OS user.
 The socket's directory must belong only to its account (0700); the socket is 0600.
 Runner creates an absent directory with those permissions. Keep it outside shared
 `/tmp` itself. `root` contains application-owned `agent.md` or `agents/`; `cwd` is explicit tool

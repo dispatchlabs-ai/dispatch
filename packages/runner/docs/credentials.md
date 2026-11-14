@@ -1,5 +1,9 @@
 # Host-owned API credentials
 
+For the built-in CLI's subscription login, account selection and local token
+storage, see [Sign in and choose a model](sign-in.md). This page describes the
+separate API-key/keychain integration for custom hosts.
+
 `UserCredentials` supplies a Pi `CredentialStore` for trusted local applications.
 It supports native OS storage, a user-approved external vault helper, session-only
 keys and explicitly selected environment compatibility. It never loads `.env`.

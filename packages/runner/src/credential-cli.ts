@@ -2,18 +2,22 @@ import { StringDecoder } from "node:string_decoder";
 import { CredentialError, UserCredentials, validateSecret } from "./credentials.js";
 
 /** Read from the terminal without echoing the value or adding it to history. */
-export async function promptForSecret(message = "API key"): Promise<string> {
+export async function promptForSecret(message = "API key", signal?: AbortSignal): Promise<string> {
+  signal?.throwIfAborted();
   const input = process.stdin;
   if (!input.isTTY) throw new CredentialError("TTY_REQUIRED", "Hidden credential input needs a terminal. For setup, use --stdin with a trusted secret-manager pipe.");
   const previousRaw = input.isRaw;
   const decoder = new StringDecoder("utf8");
-  process.stderr.write(`${message}: `);
+  process.stderr.write(`${message}${message.endsWith(":") ? " " : ": "}`);
   input.setRawMode(true);
   input.resume();
   return new Promise<string>((resolve, reject) => {
     let value = "";
     let escape = "";
+    let finished = false;
     const cleanup = () => {
+      finished = true;
+      signal?.removeEventListener("abort", end);
       input.removeListener("data", data);
       input.removeListener("end", end);
       input.removeListener("error", end);
@@ -23,7 +27,7 @@ export async function promptForSecret(message = "API key"): Promise<string> {
       input.pause();
       process.stderr.write("\n");
     };
-    const end = () => { cleanup(); reject(new CredentialError("CANCELLED", "Credential input cancelled.")); };
+    const end = () => { if (!finished) { cleanup(); reject(new CredentialError("CANCELLED", "Credential input cancelled.")); } };
     const data = (chunk: Buffer) => {
       for (const char of decoder.write(chunk)) {
         if (char === "\u0003" || char === "\u0004") { end(); return; }
@@ -47,6 +51,7 @@ export async function promptForSecret(message = "API key"): Promise<string> {
     input.once("error", end);
     process.once("SIGTERM", end);
     process.once("SIGINT", end);
+    signal?.addEventListener("abort", end, { once: true });
   });
 }
 

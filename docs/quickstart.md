@@ -30,7 +30,7 @@ Create `agent.md` in this directory:
 ```markdown
 ---
 description: A helpful assistant
-model: { provider: anthropic, id: claude-sonnet-4-6 }
+model: { provider: openai, id: gpt-6.1-sol }
 ---
 Answer clearly. Ask when you need more information.
 ```
@@ -76,12 +76,18 @@ Stop the demo host and any demo Web process. Set the API key for the provider
 selected in `agent.md` in the host's environment. For this example:
 
 ```sh
-export ANTHROPIC_API_KEY='replace-with-your-api-key'
+export OPENAI_API_KEY='replace-with-your-api-key'
 ```
 
 Supply a real key with access to the selected model. The host uses your provider
 account for model requests. Keep credentials out of source files and Git; a
-`.env` file is not automatically loaded. Start with ordinary state:
+`.env` file is not automatically loaded.
+
+For ChatGPT subscription access, use the new `dispatch login openai` path in
+[Sign in and choose a model](../packages/runner/docs/sign-in.md). It is available
+in the source preview, awaiting release; the 0.18.0 archive above uses API keys.
+
+Start with ordinary state:
 
 ```sh
 npx dispatch serve

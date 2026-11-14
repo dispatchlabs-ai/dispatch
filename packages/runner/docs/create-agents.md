@@ -5,9 +5,12 @@ using the context you supply, and **developer**, which can read/write files, run
 commands and ask researcher for help through MCP. Both appear in the terminal and
 browser, with the same saved conversations.
 
-Use Node **24.22.1 or newer**, npm, and a model API key. The default example uses
-Anthropic's `claude-sonnet-4-6`; the provider table below also gives an OpenAI
-configuration. Model requests use your provider account. The
+Use Node **24.22.1 or newer** and npm. The default example uses OpenAI's
+`gpt-6.1-sol`; the provider table below also gives a current Claude configuration.
+The published 0.18.0 setup uses a model API key. ChatGPT subscription sign-in is
+implemented on `main`, awaiting release: follow [Sign in and choose a model](sign-in.md)
+to install the source preview and use `dispatch login openai` instead.
+Model requests use your provider account. The
 [credential-free demo](../../../docs/quickstart.md) lets you try conversation
 storage and both clients first. These instructions use a POSIX shell on macOS or
 Linux; no Dispatch source checkout, Nix or application build is needed.
@@ -47,7 +50,7 @@ Create `agents/researcher/agent.md`:
 ```markdown
 ---
 description: Research and design questions using the supplied context
-model: { provider: anthropic, id: claude-sonnet-4-6, thinking: low }
+model: { provider: openai, id: gpt-6.1-sol, thinking: low }
 ---
 Answer clearly and distinguish provided facts from suggestions. You initially
 have no browsing or knowledge-base tools: ask for missing source material rather
@@ -60,7 +63,7 @@ Create `agents/developer/agent.md`:
 ```markdown
 ---
 description: Write and run code, with help from the researcher
-model: { provider: anthropic, id: claude-sonnet-4-6, thinking: low }
+model: { provider: openai, id: gpt-6.1-sol, thinking: low }
 mcp: [agents]
 ---
 Implement the user's request in this application's working directory. Inspect
@@ -113,7 +116,7 @@ Create `host.json` in `my-agents`:
   "modelProviders": [{
     "module": "@dispatch/runner/environment-provider",
     "export": "environmentProvider",
-    "args": ["anthropic"]
+    "args": ["openai"]
   }],
   "mcpServers": {
     "agents": {
@@ -132,12 +135,17 @@ reload files while the host is running.
 In the terminal that will run the host, set your actual API key:
 
 ```sh
-export ANTHROPIC_API_KEY='replace-with-your-api-key'
+export OPENAI_API_KEY='replace-with-your-api-key'
 ```
 
 Keep the key out of agent files, `host.json` and Git. You can supply it using your
 secret manager instead. Creating a `.env` file alone does not load it into this
 command's environment. Other client terminals do not need the model key.
+
+For ChatGPT subscription access in the source preview, use
+`@dispatch/runner/local-provider` / `localProvider` in `host.json` and run
+`npx dispatch login openai` once. Keep `args: ["openai"]`. The
+[sign-in guide](sign-in.md) includes the complete binding and account controls.
 
 For another provider, change `model.provider` and `model.id` in both Markdown
 files, the corresponding `modelProviders` binding, and that provider's API-key
@@ -145,10 +153,10 @@ environment variable. For example:
 
 | Provider | `model` in both Markdown files | Host binding `args` | Host environment |
 | --- | --- | --- | --- |
-| Anthropic (shown above) | `{ provider: anthropic, id: claude-sonnet-4-6, thinking: low }` | `["anthropic"]` | `ANTHROPIC_API_KEY` |
-| OpenAI | `{ provider: openai, id: gpt-5.4, thinking: low }` | `["openai"]` | `OPENAI_API_KEY` |
+| OpenAI (shown above) | `{ provider: openai, id: gpt-6.1-sol, thinking: low }` | `["openai"]` | `OPENAI_API_KEY`, or ChatGPT sign-in with `localProvider` in the source preview |
+| Anthropic | `{ provider: anthropic, id: claude-sonnet-5-5, thinking: low }` | `["anthropic"]` | `ANTHROPIC_API_KEY`; see [Claude subscription eligibility](sign-in.md#claude-subscription-or-api-account) |
 
-For the OpenAI option, use `export OPENAI_API_KEY='replace-with-your-api-key'`
+For the Anthropic option, use `export ANTHROPIC_API_KEY='replace-with-your-api-key'`
 instead. Choose a model available to your account. Add a binding for each provider
 used by your agents. An existing inference gateway can instead supply the shared
 model connection;
