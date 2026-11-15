@@ -19,7 +19,7 @@ source checkout are optional. In a new application directory:
 
 ```sh
 npm init -y --init-type=module
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.19.0/dispatch-runner-0.19.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.20.0/dispatch-runner-0.20.0.tgz
 ```
 
 An existing npm application only needs the install command. Creating a local
@@ -77,7 +77,7 @@ server; Apple local supplies an `fm serve` launch definition and a native Pi
 provider. Project hosts and clients discover `host.json` automatically.
 
 See [Connect providers and choose models](docs/providers.md). These commands are
-in the current source, not the v0.19.0 archives. The sign-in quickstart above
+in the current source, not the v0.20.0 archives. The sign-in quickstart above
 remains valid for that release.
 
 ### Interactive terminal UI

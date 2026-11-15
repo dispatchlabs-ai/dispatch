@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-15
+
 - Add optional Nix-built execution environments with shared tools and Cua desktop builders, application-owned recipes, integrated setup and private per-agent bindings. Docker supplies the Linux builder; npm installation and the existing host/client commands remain unchanged. Reuse existing registered Cua desktops, containers, sandboxes and VMs.
 - Bind environment MCP calls to the assigned Space through Pi's existing client. Keep persistent browser homes across stop/start and explicit rebuilds, and refresh managed registrations on host startup.
 

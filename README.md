@@ -14,8 +14,8 @@ Use Node **24.22.1 or newer** and npm on macOS or Linux. With a ChatGPT subscrip
 mkdir my-agents && cd my-agents
 npm init -y --init-type=module
 npm install \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.19.0/dispatch-runner-0.19.0.tgz \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.19.0/dispatch-web-0.19.0.tgz
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.20.0/dispatch-runner-0.20.0.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.20.0/dispatch-web-0.20.0.tgz
 ```
 
 **2. Write your agent, sign in and start its host.**
@@ -55,7 +55,7 @@ sign in, discover its models and verify a response before saving the connection.
 `npx dispatch models use` assigns a model to an agent. Apple local can have the
 host manage `fm serve`, including readiness, restart and cleanup.
 
-This is **not yet in the v0.19.0 archives** used above. See the
+This is **not yet in the v0.20.0 archives** used above. See the
 [provider setup guide](packages/runner/docs/providers.md) for the source commands,
 custom native providers and local-server ownership.
 
