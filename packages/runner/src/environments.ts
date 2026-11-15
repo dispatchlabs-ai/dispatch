@@ -118,8 +118,8 @@ async function build(agent: LoadedAgent, directory: string) {
     await mkdir(snapshot);
     await softwareSource(source.root, snapshot);
     // Mount a software snapshot, not the live checkout with credentials and retained sessions.
-    await command("docker", ["--context", context, "run", "--name", builderName, "--rm", "--init",
-      "--sysctl", "net.ipv4.ip_unprivileged_port_start=0",
+    await command("docker", ["--context", context, "run", "--name", builderName, "--init",
+      "--sysctl", "net.ipv4.ip_unprivileged_port_start=1024",
       "--mount", `type=volume,src=dispatch-nix-${system},dst=/nix`,
       "--mount", `type=bind,src=${snapshot},dst=/application,readonly`,
       "--mount", `type=bind,src=${nixDirectory},dst=/builder,readonly`,
