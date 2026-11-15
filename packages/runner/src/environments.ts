@@ -110,9 +110,9 @@ async function build(agent: LoadedAgent, directory: string) {
   const builderName = `dispatch-build-${randomUUID()}`;
   const controller = new AbortController();
   const abort = () => controller.abort();
+  await mkdir(staging, { mode: 0o700 });
   process.once("SIGINT", abort);
   process.once("SIGTERM", abort);
-  await mkdir(staging, { mode: 0o700 });
   try {
     const snapshot = join(staging, "source");
     await mkdir(snapshot);
@@ -136,9 +136,10 @@ async function build(agent: LoadedAgent, directory: string) {
     process.off("SIGINT", abort);
     process.off("SIGTERM", abort);
     // A disconnected Docker client does not prove its build container stopped.
-    const remaining = await command("docker", ["--context", context, "ps", "-aq", "--filter", `name=^/${builderName}$`]);
-    if (remaining) await command("docker", ["--context", context, "rm", "--force", builderName]);
-    await rm(staging, { recursive: true, force: true });
+    try {
+      const remaining = await command("docker", ["--context", context, "ps", "-aq", "--filter", `name=^/${builderName}$`]);
+      if (remaining) await command("docker", ["--context", context, "rm", "--force", builderName]);
+    } finally { await rm(staging, { recursive: true, force: true }); }
   }
 }
 
