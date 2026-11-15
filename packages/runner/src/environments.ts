@@ -125,7 +125,7 @@ async function build(agent: LoadedAgent, directory: string) {
       "--mount", `type=bind,src=${nixDirectory},dst=/builder,readonly`,
       "--mount", `type=bind,src=${staging},dst=/result`,
       builder, "sh", "-ec",
-      'out=$(nix-build /builder/environments/build.nix --argstr recipe "$1" --argstr system "$2" --no-out-link --option sandbox false --option filter-syscalls false); cp -L "$out/environment.json" /result/environment.json; cp -L "$out/image.tar.gz" /result/image.tar.gz; chmod 644 /result/*',
+      'out=$(nix-build /builder/environments/build.nix --argstr recipe "$1" --argstr system "$2" --no-out-link --option sandbox false --option filter-syscalls false); cp -L "$out/environment.json" /result/environment.json; cp -L "$out/image.tar.gz" /result/image.tar.gz; chmod 644 /result/environment.json /result/image.tar.gz',
       "dispatch-build", `/application/${source.recipe}`, system], { stream: true, signal: controller.signal });
     const manifest: Manifest = JSON.parse(await readFile(join(staging, "environment.json"), "utf8"));
     if (manifest.version !== 1 || manifest.driver !== "docker" || !manifest.image || !manifest.volumes
