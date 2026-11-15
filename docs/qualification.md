@@ -6,13 +6,21 @@ installation, model-quality or security qualification.
 
 ## Execution environments — November 15, 2026 UTC
 
-The v0.20.0 candidate archives were prepared from clean source
+The [v0.20.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.20.0)
+archives were prepared from clean source
 `6f83fb03f38a803b7e2a3d53795b4493172a448e`. Source builds and type checks passed,
 as did macOS arm64 default, Runner, frontend, portable archive and flake checks,
 and Linux arm64 Web/Workers OCI builds. External consumers passed strict NodeNext
 declaration checking with upstream declarations enabled. Separate installs covered
 Web alone, MCP alone, Runner/Backend without central peers and Fleet without Slack.
 Production dependency audits reported zero findings.
+
+After publication, all thirteen downloads and GitHub asset digests matched the
+reviewed archives, manifest and checksums. Empty-cache GitHub URL installation
+passed for all five consumer combinations above and a fresh application clone.
+Every installed Dispatch archive's integrity matched the release manifest.
+Strict declaration checking and real imports passed again from the published
+packages. All six production dependency audits reported zero findings.
 
 A clean application installed the exact candidate bytes through an isolated npm
 cache at their intended release URLs. Its ordinary `npm start`, terminal client
@@ -53,7 +61,7 @@ operation were not newly qualified. Existing installed applications were not
 upgraded. The [environment guide](../packages/runner/docs/environments.md) describes
 the supported setup, customization and retained-state rebuild workflow.
 
-## Generic provider setup — November 14, 2026 (unreleased)
+## Generic provider setup — November 14, 2026
 
 Provider setup uses Pi 1.5.2's native registry, authentication prompts, credential
 store, model discovery and inference interfaces. On macOS arm64 / Node 24.22.1,
@@ -79,8 +87,8 @@ strict NodeNext declaration check passed. The consumer dependency audit reported
 zero findings. Source, documentation links and the Runner archive received scoped
 privacy/secret review. No automated functional tests were added or run.
 
-The commands and Apple integration are source features, not part of the existing
-v0.19.0 release archives. No application or deployed service was upgraded. Live
+The commands and Apple integration are included in the v0.20.0 archives above;
+they are absent from v0.19.0. No application or deployed service was upgraded. Live
 Windows/Linux sign-in, token-expiry/concurrent refresh and long-context Apple
 compaction quality were not newly qualified. The native compaction budgets fit
 small contexts; that does not establish suitability for complex agent tasks.
