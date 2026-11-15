@@ -53,8 +53,8 @@ Paths are relative to the application root. Recipes are trusted source code;
 they receive pinned `pkgs` and shared `environments` builders. Keep credentials,
 machine addresses and browser profiles outside recipes and their imported files.
 The builder snapshots Git's tracked and nonignored worktree files, including new
-recipes before commit. Host settings, local settings, environment files, dependencies
-and `.state` are excluded. Keep other private inputs ignored; source links must
+recipes before commit. Host settings, local settings, environment files, dependencies,
+`.state` and the configured host state directory are excluded. Keep other private inputs ignored; source links must
 resolve within the repository. There is no live-checkout mount in the builder.
 
 After installing the Runner package that contains this feature:

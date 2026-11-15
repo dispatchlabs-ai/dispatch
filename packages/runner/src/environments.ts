@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { cp, mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import lockfile from "proper-lockfile";
 import type { LoadedAgent } from "./definition.js";
@@ -40,7 +40,8 @@ function command(executable: string, args: string[], options: { env?: NodeJS.Pro
   });
 }
 
-async function softwareSource(root: string, destination: string) {
+async function softwareSource(root: string, destination: string, stateRoot: string) {
+  const privateRoot = await realpath(stateRoot);
   const paths = (await command("git", ["-C", root, "ls-files", "--cached", "--others", "--exclude-standard", "-z"], { raw: true })).split("\0").filter(Boolean);
   for (const path of new Set(paths)) {
     if (path.split("/").some(part => [".git", ".state", "node_modules"].includes(part))
@@ -51,6 +52,7 @@ async function softwareSource(root: string, destination: string) {
       throw error;
     });
     if (!resolved) continue;
+    if (resolved === privateRoot || resolved.startsWith(privateRoot + sep)) continue;
     const child = relative(root, resolved);
     if (child.startsWith("..") || isAbsolute(child)) throw new Error(`Build input ${path} points outside the application repository.`);
     const target = join(destination, path);
@@ -99,7 +101,7 @@ async function recipePath(agent: LoadedAgent) {
 }
 
 /** Docker supplies the Linux builder on macOS too. No host Nix installation or remote builder is required. */
-async function build(agent: LoadedAgent, directory: string) {
+async function build(agent: LoadedAgent, directory: string, stateRoot: string) {
   const source = await recipePath(agent);
   const context = await command("docker", ["context", "show"]);
   const platform = await command("docker", ["info", "--format", "{{.Architecture}}"]);
@@ -116,7 +118,7 @@ async function build(agent: LoadedAgent, directory: string) {
   try {
     const snapshot = join(staging, "source");
     await mkdir(snapshot);
-    await softwareSource(source.root, snapshot);
+    await softwareSource(source.root, snapshot, stateRoot);
     // Mount a software snapshot, not the live checkout with credentials and retained sessions.
     await command("docker", ["--context", context, "run", "--name", builderName, "--init",
       "--sysctl", "net.ipv4.ip_unprivileged_port_start=1024",
@@ -207,7 +209,7 @@ export async function environmentOperation(agent: LoadedAgent, stateRoot: string
         : instance?.space ? "attached" : "not configured";
       return { agent: agent.id, recipe: agent.environment!.recipe, status, ...instance };
     }
-    if (action === "build") return build(agent, directory);
+    if (action === "build") return build(agent, directory, stateRoot);
     if (action === "stop") {
       if (!instance?.docker) throw new Error("Only a Dispatch-managed container can be stopped here. Use its existing owner for an attached Space.");
       await docker(instance, ["stop", instance.docker.name]);
@@ -247,7 +249,7 @@ export async function environmentOperation(agent: LoadedAgent, stateRoot: string
     }
     if (instance && options.identity) { instance.identity = options.identity; await save(join(directory, "instance.json"), instance); }
     if (instance && !options.rebuild) return { agent: agent.id, ...await refresh(instance, directory) };
-    const artifact = await build(agent, directory);
+    const artifact = await build(agent, directory, stateRoot);
     if (artifact.manifest.port) await command("cua", ["--version"]);
     const key = createHash("sha256").update(await realpath(directory)).digest("hex").slice(0, 16);
     const name = `dispatch-${agent.id}-${key}`;
