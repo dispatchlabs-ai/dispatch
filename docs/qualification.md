@@ -4,6 +4,48 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.21.0 definition and messaging cleanup — November 15, 2026 UTC
+
+The [v0.21.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.21.0)
+archives were prepared from clean source
+`f04d2d4f68d43e1618bef1a9eeab4b10d6f72a54`. Source builds and type checks passed,
+as did macOS arm64 default, Runner, frontend, portable archive and flake checks
+with the measured dependency hash, and Linux arm64 Web/Workers OCI builds in the
+pinned Docker Nix builder. Known-pattern scans found no hits in the eleven npm
+archives; image findings matched the upstream files reviewed for v0.20.0.
+
+Before publication, five external installs (all packages, Web alone, MCP alone,
+Runner/Backend without central peers, Fleet without Slack) resolved the reviewed
+bytes at their release URLs and passed strict NodeNext declaration checking, real
+imports and zero-finding production audits. After publication, all thirteen
+downloads and GitHub asset digests matched the reviewed archives, manifest and
+checksums, and empty-cache URL installs of the same five combinations repeated
+those results with lockfile integrity matching the manifest. A demo host and Web
+client installed from the release URLs passed keyboard send, reply, reload with
+retained history and mobile navigation at 1440×900, 1280×720, 768×1024 and 390×844.
+
+A clean application with real gateway models verified the changed behavior and
+retained its native stores for review:
+
+- An `AGENTS.md` file matching the definition's copy was sent once. After its
+  second paragraph was deleted while the host ran, the next request showed the
+  shortened file marked as replacing the copy, and the answer stopped following
+  the deleted instruction. After restart the update applied and the file was again
+  sent once.
+- A native `wait_for_agent` call interrupted by a killed host recovered after
+  `messageTools: false` was added, while the deferred update kept the saved
+  definition. An idle restart then hid the four native tools in that existing
+  conversation; removing the setting and restarting offered them again. An agent
+  created with the setting messaged through MCP with an automatic reply.
+- Unsupported frontmatter keys failed `dispatch catalog` with the documented
+  guidance.
+
+An existing personal application upgraded from 0.20.0 with idle stores: all prior
+native entries stayed byte-identical, the definition update applied to every
+retained conversation, Slack reconnected and a real two-agent MCP delegation
+completed. No automated tests were added or run. Linux x86_64 images, Windows,
+hosted Web and Google Chat or email channels were not newly qualified.
+
 ## Execution environments — November 15, 2026 UTC
 
 The [v0.20.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.20.0)
