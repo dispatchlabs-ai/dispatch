@@ -4,6 +4,55 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## Execution environments — November 15, 2026 UTC
+
+The v0.20.0 candidate archives were prepared from clean source
+`6f83fb03f38a803b7e2a3d53795b4493172a448e`. Source builds and type checks passed,
+as did macOS arm64 default, Runner, frontend, portable archive and flake checks,
+and Linux arm64 Web/Workers OCI builds. External consumers passed strict NodeNext
+declaration checking with upstream declarations enabled. Separate installs covered
+Web alone, MCP alone, Runner/Backend without central peers and Fleet without Slack.
+Production dependency audits reported zero findings.
+
+A clean application installed the exact candidate bytes through an isolated npm
+cache at their intended release URLs. Its ordinary `npm start`, terminal client
+and Web client used one host configuration. Desktop setup built through the
+pinned Docker Nix builder without host Nix. The first Linux build exposed Docker's
+nonstandard low-port permissions; the builder now restores the standard 1024
+boundary. Final builds reused the already qualified, identical patched Node
+closure from the Nix cache; a complete cold Node compilation was not repeated.
+
+Real native agent tool calls verified the desktop, browser extension, export tool
+and download directory. Adding a package and rebuilding retained a file, browser
+bookmark and control identity. A discovered stale Chromium profile lock was fixed
+in shared initialization; the rebuilt browser then opened its configured page.
+Two agents reused one image with independent homes and control identities. An
+existing Space attached successfully, and a plain container built and started
+with Cua absent from PATH. Host startup refreshed the managed Space binding.
+
+Complete native instructions, conversations, tool calls/results, submissions,
+tasks and document state were inspected. All submissions finished, with no pending
+tasks; retained entries survived restart unchanged. One GUI action reported
+unsupported background delivery and recovered through the documented foreground
+route. Host-bound Space arguments remained in native tool evidence while omitted
+from model input. The terminal conversation and final result also appeared in Web.
+Rendered interaction at 1440×900, 1280×720, 768×1024 and 390×844 covered keyboard
+send, mobile navigation, reload and retained history.
+
+Outgoing source, package contents, notices and built artifacts received scoped
+review. Known-pattern scans found no hits in the eleven npm archives. Application
+archive/image matches were inspected as upstream examples, parser strings, npm
+configuration and SDK source paths. No automated repository tests were added or
+run; this is not comprehensive security qualification.
+
+The bundled desktop is Linux ARM64, qualified through Docker on Apple Silicon.
+Other registered desktops, containers, sandboxes and VMs can be attached; fresh
+VM disks and cloud provisioning are not supplied by this driver. Website sign-in,
+financial retrieval, live channel delivery, Windows and Linux x86_64 desktop
+operation were not newly qualified. Existing installed applications were not
+upgraded. The [environment guide](../packages/runner/docs/environments.md) describes
+the supported setup, customization and retained-state rebuild workflow.
+
 ## Generic provider setup — November 14, 2026 (unreleased)
 
 Provider setup uses Pi 1.5.2's native registry, authentication prompts, credential
