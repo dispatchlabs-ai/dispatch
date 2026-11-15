@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-11-15
+
 - Add a shared architecture reference and correct provider setup availability in the READMEs and guides: the commands shipped in 0.20.0.
 - Send each `AGENTS.md` to the model once. The per-request repository section omits a file only when the conversation holds this definition's copies and the file's complete current text matches; an edited, shortened or replaced file is shown in its current version, marked as replacing that copy. Nested working-directory guidance is unchanged.
 - **Breaking:** reject unsupported `agent.md` frontmatter keys at load. Earlier versions ignored them but still changed the definition fingerprint. Move Dispatch settings to `agent.ts`, descriptive notes such as `writes:` into the instructions, and configuration your application reads into an application-owned file with its reader. See the [upgrade guide](docs/upgrade.md#unsupported-frontmatter-keys).
