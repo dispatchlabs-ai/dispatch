@@ -41,5 +41,5 @@ are added or run in Dispatch. [Upstream MIT notice](NOTICE).
 
 The reusable runtime closure is prepared for public npm publication; this source
 change is not a registry release. For dependency-order builds, reviewed archives,
-external consumers and separately authorized publishing, follow the
+external consumers and publishing, follow the
 [package release path](https://github.com/dispatchlabs-ai/dispatch/blob/main/scripts/README.md).

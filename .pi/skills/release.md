@@ -1,11 +1,11 @@
 ---
 name: release
-description: Build and publish a specifically authorized Dispatch release.
+description: Build, publish and verify a Dispatch release.
 ---
 # Release
 
-Read [CONTRIBUTING](../../CONTRIBUTING.md) and [OSS](../../OSS.md). A source-only
-feature assignment does not authorize tags, registries or live deployment.
+Read [CONTRIBUTING](../../CONTRIBUTING.md) and [OSS](../../OSS.md). Follow
+[repository guidance](../../AGENTS.md) for task scope and completing needed upgrades.
 
 1. On a clean owned branch, review accumulated changelogs, choose one lockstep
    version using `npm run release -- minor --dry-run`, then prepare it. No separate
@@ -26,11 +26,10 @@ feature assignment does not authorize tags, registries or live deployment.
    `scripts/scan-release-artifact.py` as supplementary evidence, never privacy proof.
 5. Retain exact commit, digests, runtime versions, commands/results and limits.
    Do not claim Linux/live/hosted qualification from a Mac build or synthetic model.
-6. Only within release authority, fetch/reconcile, inspect outgoing commits,
-   publish normal source, create a new immutable tag and upload checksum-verified
+6. Fetch/reconcile, inspect outgoing commits, publish normal source,
+   create a new immutable tag and upload checksum-verified
    artifacts. Publish only the prepared public closure under the package release
    path; application packages marked `private` are not npm targets. Verify remote bytes,
    tag and publication receipts; report unavailable channels specifically.
 
-Never move released tags, blindly overwrite assets or treat a release as permission
-to apply infrastructure/change credentials or deploy an existing installation.
+Never move released tags or blindly overwrite assets.

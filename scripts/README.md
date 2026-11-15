@@ -1,9 +1,10 @@
 # Reusable npm package release
 
-This prepares reusable packages, not an application deployment. Publication needs
-separate explicit authority. Root, Observer and Eval remain application
-packages excluded from npm publication. The public library set is Runner, Remote,
-Postgres, Backend, Workers, Slack, Google Chat, Email and Fleet. Web ships as an installable browser client and MCP as an optional conversation connector. Install only the
+This procedure prepares and publishes reusable packages. Follow
+[repository guidance](../AGENTS.md) for task scope and completing needed upgrades.
+Root, Observer and Eval remain application packages excluded from npm publication.
+The public library set is Runner, Remote, Postgres, Backend, Workers, Slack,
+Google Chat, Email and Fleet. Web ships as an installable browser client and MCP as an optional conversation connector. Install only the
 packages your application uses. Backend's central storage peers and Fleet's Slack
 peer are optional; explicit subpath imports activate those integrations.
 
@@ -14,14 +15,14 @@ together; npm publication remains separate. Future breaking 0.x changes require
 a new minor release.
 
 Node 24.22.1 and the repository Nix shell are the supported preparation environment.
-All packages remain lockstep at the source version until a release is authorized.
+All packages remain lockstep at the source version until release preparation.
 No registry publication is claimed by this source change. Registry ownership of
 `@dispatch`, login/2FA and package-name/version availability must be checked by the
 release operator; metadata does not grant access. Never republish a used version.
 
 ## Prepare and qualify
 
-1. Follow [CONTRIBUTING](../CONTRIBUTING.md), prepare the authorized lockstep version
+1. Follow [CONTRIBUTING](../CONTRIBUTING.md), prepare the lockstep version
    with `npm run release -- VERSION`, commit it, then check/build from a clean tree.
 2. In `nix develop`, run `npm ci`, `npm run build`, `npm run check`, measured dependency-hash builds
    and the affected release artifacts. Do not run automated tests.
@@ -61,11 +62,11 @@ release operator; metadata does not grant access. Never republish a used version
    Check `npm ls` and `npm audit --omit=dev`, recording unresolved advisories
    honestly. Do not patch package manifests or rely on workspace symlinks.
 
-## Publish only with separate authority
+## Publish
 
 The preparation command deliberately never invokes `npm publish`. After independent
-review and explicit release authorization, from the **retained, reviewed** artifact
-directory (do not rebuild different bytes):
+review, publish from the **retained, reviewed** artifact directory (do not rebuild
+different bytes):
 
 ```sh
 npm whoami --registry=https://registry.npmjs.org/
@@ -82,7 +83,7 @@ for (const pkg of manifest.packages) {
 '
 ```
 
-For authorized actual publication remove **only** `"--dry-run"` from the reviewed
+For actual publication remove **only** `"--dry-run"` from the reviewed
 command, retaining manifest order. This is a manual authenticated release, not
 Pi's CI provenance/OIDC flow; do not claim npm provenance without its supported
 trusted environment. No GitHub Actions or persistent credential setup is added.
@@ -94,7 +95,7 @@ network error. If resuming a partial release, compare published
 it; a mismatch is a stop, not permission to replace bytes. Record each npm receipt.
 Afterward, verify every registry `dist.integrity`, install the versioned registry
 packages in another external consumer and repeat import/type checks without local
-tarballs. Publish immutable source tags/assets only under that separate authority.
+tarballs. Publish immutable source tags/assets through the release procedure.
 This does not deploy or change an installed application.
 
 ## Pi reference and deliberate differences

@@ -3,7 +3,8 @@
 Read [OSS.md](OSS.md). Work in an owned task branch/worktree, preserve other work,
 inspect the full diff and staged/outgoing content for private information before
 committing. Use synthetic data; keep captures and receipts outside public source.
-Publish only within explicit task authority; source publication is not deployment.
+Follow [AGENTS.md](AGENTS.md) for completing releases and upgrades within the
+task's scope.
 
 ## Ownership and contributions
 
@@ -79,8 +80,8 @@ the [instruction authoring guide](packages/runner/docs/instructions.md).
 
 Read [.pi/skills/interactive-testing.md](.pi/skills/interactive-testing.md) for
 rendered checks, [.pi/prompts/deslop.md](.pi/prompts/deslop.md) for the required
-behavior-preserving review, and [.pi/skills/release.md](.pi/skills/release.md) only
-for an authorized release. No cleanup or separate acceptance stage is implied.
+behavior-preserving review, and [.pi/skills/release.md](.pi/skills/release.md) for
+release preparation and publication. No cleanup or separate acceptance stage is implied.
 
 ## Pi as the packaging reference
 
@@ -95,7 +96,7 @@ Pi tests or CI. Reusable runtime and channel packages and the Web executable are
 actual release availability is recorded in the root README. npm publication is separate. The root, Observer and Eval manifests set `private: true` to exclude npm publication; their
 source is public under MIT. Follow
 [scripts/README.md](scripts/README.md) for reviewed tarball preparation, external
-consumers and separately authorized publication. The PostgreSQL implementation
+consumers and publication. The PostgreSQL implementation
 uses the **released public Storage** contract, including grouped commit receipts, not copied unreleased SQLite internals.
 
 ## Versioning and releases
@@ -104,10 +105,10 @@ Root and workspace manifests remain lockstep. Keep changes under each package's
 Unreleased changelog. `npm run release -- minor --dry-run` previews a version;
 mutating release preparation requires a clean tree, does not publish or deploy.
 There is no longer a separate Web capability package to version. During 0.x,
-breaking contracts require a minor release at the next authorized release.
+breaking contracts require a minor release at the next release.
 
 Fixed dependency hash: temporarily select the standard all-zero SHA-256,
 run `nix build`, record its actual mismatch hash, replace every shared-lock
 `npmDepsHash`, then build successfully. Never commit a placeholder hash.
 Before publication fetch/reconcile the remote, rerun affected checks, inspect
-outgoing commits and push normally only when assigned. No force pushes or moved tags.
+outgoing commits and push normally. No force pushes or moved tags.

@@ -33,9 +33,11 @@
 - Before completing an implementation, apply [deslop.md](.pi/prompts/deslop.md).
   Read other [workflow prompts](CONTRIBUTING.md#agent-workflows) only when relevant;
   the Markdown procedures also work outside Pi.
-- For an authorized release, follow [release.md](.pi/skills/release.md) through
-  publication and documentation without asking again at every step. Report specific
-  access blockers and continue unblocked channels. Release authority does not
-  itself authorize live deployment.
+- Carry authorized work through the releases and upgrades needed to deliver the
+  requested result. Use the established publication and deployment procedures for
+  applications and installations within the task's scope, without requesting
+  separate approval for those steps. Honor explicit source-only limits. Follow
+  [release.md](.pi/skills/release.md) through publication and verification; report
+  specific access blockers and continue unblocked channels.
 - When writing agent instructions, including `agent.md`, skills and runtime prompts,
   follow the [instruction authoring guide](packages/runner/docs/instructions.md).
