@@ -64,7 +64,9 @@
     "CHANGELOG.md",
     "docs",
     "LICENSE",
-    "AGENT-CHAT-LICENSE"
+    "AGENT-CHAT-LICENSE",
+    "nix/environments",
+    "nix/runtime.nix"
   ],
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.json",

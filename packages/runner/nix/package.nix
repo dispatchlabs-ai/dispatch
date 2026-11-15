@@ -32,6 +32,8 @@ buildNpmPackage {
       ../src
       ../native
       ../scripts
+      ./environments
+      ./runtime.nix
     ] ++ lib.optionals withBackend [ ../../remote/src ../../remote/tsconfig.json ../../postgres/src ../../postgres/tsconfig.json ../../postgres/NOTICE ../../backend/src ../../backend/tsconfig.json ../../backend/AGENT-CHAT-LICENSE ]
       ++ lib.optionals withGoogleChat [ ../../google-chat/src ../../google-chat/tsconfig.json ]
       ++ lib.optionals withSlack [ ../../slack/src ../../slack/tsconfig.json ]
@@ -57,7 +59,7 @@ buildNpmPackage {
     cp packages/runner/AGENT-CHAT-LICENSE "$app/packages/runner/AGENT-CHAT-LICENSE"
     cp -R node_modules "$app/"
     cp packages/runner/package.json "$app/packages/runner/"
-    cp -R packages/runner/{dist,native,scripts} "$app/packages/runner/"
+    cp -R packages/runner/{dist,native,scripts,nix} "$app/packages/runner/"
     if test -d packages/runner/node_modules; then
       cp -R packages/runner/node_modules "$app/packages/runner/"
     fi

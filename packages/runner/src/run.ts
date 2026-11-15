@@ -1,5 +1,6 @@
 import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
+import { createHash } from "node:crypto";
 import type { Models } from "@earendil-works/pi-ai/models";
 import type { StorageFactory, OpenOptions } from "./runtime.js";
 import type { Extension } from "@earendil-works/pi-durable";
@@ -11,6 +12,7 @@ import type { ArtifactOptions, ArtifactSink } from "./artifacts.js";
 import { localClient } from "./client.js";
 import { catalog, defaultAgent, loadAgent, type LoadedAgent } from "./definition.js";
 import { connectMcpServers, type McpServers } from "./mcp.js";
+import { environmentConnections } from "./environments.js";
 
 export type PreparedAdapter = {
   extension: Extension;
@@ -70,26 +72,39 @@ export async function run(options: RunOptions = {}) {
     }
   })();
   try {
-    if (options.mcpServers !== undefined) {
-      const names = options.names?.length ? options.names : (await catalog(root)).filter(agent => agent.runnable).map(agent => agent.id);
-      const requested = new Set<string>();
-      const collect = (agent: LoadedAgent) => {
-        for (const name of agent.mcp ?? []) requested.add(name);
-        for (const child of agent.delegateAgents ?? []) collect(child);
-        if (agent.handoffAgent) collect(agent.handoffAgent);
-      };
-      for (const name of names) collect(await loadAgent(root, name));
-      mcp = await connectMcpServers(options.mcpServers, { cwd: options.cwd ?? root, names: [...requested] });
+    const names = options.names?.length ? options.names : (await catalog(root)).filter(agent => agent.runnable).map(agent => agent.id);
+    const requested = new Set<string>();
+    const definitions: LoadedAgent[] = [];
+    const collect = (agent: LoadedAgent) => {
+      definitions.push(agent);
+      for (const name of agent.mcp ?? []) requested.add(name);
+      for (const child of agent.delegateAgents ?? []) collect(child);
+      if (agent.handoffAgent) collect(agent.handoffAgent);
+    };
+    for (const name of names) collect(await loadAgent(root, name));
+    const environments = await environmentConnections(definitions, resolve(options.stateRoot ?? resolve(root, ".state")));
+    for (const name of Object.keys(environments.servers)) {
+      if (options.mcpServers?.[name]) throw new Error(`MCP name ${name} is reserved for the selected environment.`);
+      requested.add(name);
     }
+    if (requested.size || options.mcpServers !== undefined) mcp = await connectMcpServers({ ...options.mcpServers, ...environments.servers },
+      { cwd: options.cwd ?? root, names: [...requested], argumentsByServer: environments.argumentsByServer });
     const prepareAgent = (agent: LoadedAgent): LoadedAgent => {
-      if (!agent.mcp?.length) return agent;
+      const environment = environments.selected.get(agent.id);
+      const connections = [...(agent.mcp ?? []), ...(environment?.server ? [environment.server] : [])];
       const stateRoot = options.stateRoot ?? (!options.open ? resolve(root, ".state") : undefined);
       const bound = stateRoot ? mcp?.bind({ agent: agent.id, stateRoot: resolve(stateRoot) }) : mcp?.extensions;
-      return { ...agent, extensions: [...(agent.extensions ?? []), ...agent.mcp.map(name => {
-        const extension = bound?.[name];
-        if (!extension) throw new Error(`Agent ${agent.id} requires MCP server ${name}; configure it in mcpServers.`);
-        return extension;
-      })] };
+      return { ...agent, ...(environment ? {
+        instructions: agent.instructions + "\n\n" + environment.instructions,
+        fingerprint: createHash("sha256").update(agent.fingerprint).update(environment.identity).digest("hex"),
+      } : {}),
+        ...(agent.delegateAgents ? { delegateAgents: agent.delegateAgents.map(prepareAgent) } : {}),
+        ...(agent.handoffAgent ? { handoffAgent: prepareAgent(agent.handoffAgent) } : {}),
+        extensions: [...(agent.extensions ?? []), ...connections.map(name => {
+          const extension = bound?.[name];
+          if (!extension) throw new Error(`Agent ${agent.id} requires MCP server ${name}; configure it in mcpServers.`);
+          return extension;
+        })] };
     };
     for (const adapter of options.adapters ?? []) adapters.push(await adapter.prepare({ root, runner }));
     const extensions = adapters.map(adapter => adapter.extension);

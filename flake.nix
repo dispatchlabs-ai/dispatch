@@ -69,6 +69,11 @@
           };
         };
     in {
+      lib.executionEnvironments = { system }:
+        let base = import nixpkgs { inherit system; };
+        in import ./packages/runner/nix/environments {
+          pkgs = base // (import ./packages/runner/nix/runtime.nix { pkgs = base; });
+        };
       lib.agentRuntime = { system }:
         import ./packages/runner/nix/runtime.nix { pkgs = import nixpkgs { inherit system; }; };
       lib.mkAgentRelease = { system, withSlack ? false, withFleet ? false, withGoogleChat ? false, execution ? null, ... }@args:

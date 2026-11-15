@@ -14,7 +14,9 @@ import {
 export type McpServers = Record<string, McpServerConfig & { tools?: string[] }>;
 
 /** Connect the servers selected by definitions, discovering native Durable tools before recovery starts. */
-export async function connectMcpServers(servers: McpServers, options: { cwd: string; names: string[] }) {
+export async function connectMcpServers(servers: McpServers, options: { cwd: string; names: string[];
+  /** Host-owned arguments removed from model-facing schemas and supplied on every call. */
+  argumentsByServer?: Record<string, Record<string, Record<string, JsonValue>>> }) {
   if (!servers || typeof servers !== "object" || Array.isArray(servers)) throw new Error("mcpServers must be an object.");
   const validated = new Map<string, Exclude<ReturnType<typeof validateMcpServerConfig>, { kind: "invalid" }>>();
   const namespaces = new Set<string>();
@@ -113,14 +115,19 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
       for (const { name } of selected) extensions[name] = { name: `mcp:${name}`, tools: [] };
       const assigned = new Set<string>();
       for (const { server, tool, client } of discovered) {
+        const fixed = options.argumentsByServer?.[server]?.[tool.name] ?? {};
+        for (const key of Object.keys(fixed)) {
+          if (!Object.hasOwn(tool.inputSchema.properties ?? {}, key)) throw new Error(`MCP ${server}/${tool.name} cannot bind unsupported argument ${key}.`);
+        }
+        const hidden = new Set([...Object.keys(fixed), ...(caller && tool._meta?.["ai.dispatch/caller"] === true ? ["caller"] : [])]);
         const name = createMcpToolName(server, tool.name, candidate => (counts.get(candidate) ?? 0) > 1 || assigned.has(candidate));
         if (assigned.has(name)) throw new Error(`MCP server ${server} advertised a duplicate tool name.`);
         assigned.add(name);
         const registration: ToolRegistration = {
           name, description: tool.description?.trim() || tool.title || `MCP tool ${tool.name} from ${server}`,
-          parameters: normalizeMcpInputSchema(caller && tool._meta?.["ai.dispatch/caller"] === true
-            ? { ...tool.inputSchema, properties: Object.fromEntries(Object.entries(tool.inputSchema.properties ?? {}).filter(([key]) => key !== "caller")),
-              ...(Array.isArray(tool.inputSchema.required) ? { required: tool.inputSchema.required.filter(key => key !== "caller") } : {}) }
+          parameters: normalizeMcpInputSchema(hidden.size
+            ? { ...tool.inputSchema, properties: Object.fromEntries(Object.entries(tool.inputSchema.properties ?? {}).filter(([key]) => !hidden.has(key))),
+              ...(Array.isArray(tool.inputSchema.required) ? { required: tool.inputSchema.required.filter(key => !hidden.has(key)) } : {}) }
             : tool.inputSchema),
           // Pi makes strict model-facing schemas while Durable validates/coerces against the original schema.
           constrainedSampling: { type: "json_schema", strict: "prefer" },
@@ -133,7 +140,7 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
             try {
               // Durable validated the arguments against the server's object schema.
               // Agent work has no predictable duration. Pi's zero disables its default request deadline.
-              let input = args as Record<string, unknown>;
+              let input: Record<string, unknown> = { ...args as Record<string, unknown>, ...fixed };
               if (caller && tool._meta?.["ai.dispatch/caller"] === true) {
                 const conversation = await api.commit(tx => tx.conversation(api.conversationId), context);
                 if (!conversation || conversation.owner) throw new Error("Private child conversations cannot send independent agent messages.");

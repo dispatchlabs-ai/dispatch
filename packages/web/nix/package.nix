@@ -11,6 +11,7 @@ buildNpmPackage {
       ../../../LICENSE ../../../package.json ../../../package-lock.json ../../../scripts
       ../../runner/AGENT-CHAT-LICENSE
       ../../runner/package.json ../../runner/tsconfig.json ../../runner/src ../../runner/native
+      ../../runner/nix/environments ../../runner/nix/runtime.nix
       ../../remote/package.json ../../remote/tsconfig.json ../../remote/src
       ../../postgres/package.json ../../postgres/tsconfig.json ../../postgres/src
       ../../backend/package.json ../../backend/tsconfig.json ../../backend/src
@@ -48,6 +49,7 @@ buildNpmPackage {
       if test -d packages/$package/node_modules; then cp -R packages/$package/node_modules "$app/packages/$package/"; fi
     done
     cp -R packages/runner/native "$app/packages/runner/"
+    cp -R packages/runner/nix "$app/packages/runner/"
     cp packages/runner/AGENT-CHAT-LICENSE "$app/packages/runner/"
     cp packages/web/openapi.yaml "$app/packages/web/"
     cp -R packages/web/licenses "$app/packages/web/"

@@ -7,6 +7,11 @@ For a complete application with a researcher, developer, coding tools and MCP
 replies, follow [Build your own agents](docs/create-agents.md). The one-file path
 below is enough for a conversational agent.
 
+For optional shared Nix-built desktops and other execution environments, see
+[execution environments](docs/environments.md). Recipes select software and
+agent-specific settings; the installed Runner handles setup and Cua connections
+without changing the application's npm startup or clients.
+
 ## Install and start
 
 Use **Node 24.22.1 or newer**, with npm. Nix and a Dispatch

@@ -12,6 +12,8 @@ const usage = `dispatch serve [--root DIRECTORY] [--state DIRECTORY] [--socket S
 dispatch serve --config HOST.json
 dispatch chat [--root DIRECTORY] [--state DIRECTORY] [--agent NAME] [--session KEY] [--prompt TEXT] [--history]
 dispatch catalog [--root DIRECTORY]
+dispatch environment describe|build|setup|status|start|stop --agent NAME [--config HOST.json]
+dispatch environment setup --agent NAME [--space CUA_ID] [--identity ACCOUNT] [--vault-server HTTPS_ORIGIN] [--rebuild]
 dispatch login PROVIDER [--api-key] [--no-browser]
 dispatch logout PROVIDER
 dispatch auth
@@ -51,8 +53,11 @@ try {
     "request-id": { type: "string" }, history: { type: "boolean" }, json: { type: "boolean" }, help: { type: "boolean" },
     "api-key": { type: "boolean" }, "no-browser": { type: "boolean" },
     provider: { type: "string" }, model: { type: "string" }, module: { type: "string" }, export: { type: "string" }, "base-url": { type: "string" },
+    space: { type: "string" }, identity: { type: "string" }, "vault-server": { type: "string" }, rebuild: { type: "boolean" },
   } });
   if (values.demo && positionals[0] !== "serve") throw new Error("--demo is a host option: use dispatch serve --demo, then dispatch chat.");
+  if ((values.space || values.identity || values["vault-server"] || values.rebuild) && positionals[0] !== "environment")
+    throw new Error("Environment settings belong to dispatch environment setup.");
   if ((values["api-key"] || values["no-browser"]) && !["login", "providers"].includes(positionals[0])) throw new Error("--api-key and --no-browser are sign-in options.");
   if (values.help) console.log(usage);
   else if ((positionals[0] === "login" || positionals[0] === "logout") && positionals.length === 2) {
@@ -67,6 +72,16 @@ try {
   else if (positionals[0] === "models" && ["list", "use"].includes(positionals[1]) && positionals.length === 2) {
     const { modelCommand } = await import("./provider-cli.js");
     await modelCommand(positionals[1] as "list" | "use", values);
+  }
+  else if (positionals[0] === "environment" && positionals.length === 2) {
+    if (!values.agent) throw new Error("Select --agent NAME for this environment operation.");
+    const config = values.config ? await readHostConfig(values.config)
+      : await readProjectHostConfig(values) ?? await localHostPaths(values);
+    const { environmentOperation } = await import("./environments.js");
+    const agent = await loadAgent(config.root, values.agent);
+    console.log(JSON.stringify(await environmentOperation(agent, config.stateRoot, positionals[1], {
+      space: values.space, identity: values.identity, vaultServer: values["vault-server"], rebuild: values.rebuild,
+    }), null, 2));
   }
   else if (positionals.length !== 1) throw new Error(usage);
   else if (positionals[0] === "auth") {

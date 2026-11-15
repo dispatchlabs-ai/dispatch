@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Add optional Nix-built execution environments with shared tools and Cua desktop builders, application-owned recipes, integrated setup and private per-agent bindings. Docker supplies the Linux builder; npm installation and the existing host/client commands remain unchanged. Reuse existing registered Cua desktops, containers, sandboxes and VMs.
+- Bind environment MCP calls to the assigned Space through Pi's existing client. Keep persistent browser homes across stop/start and explicit rebuilds, and refresh managed registrations on host startup.
+
 - Add generic `providers add/list` and `models list/use` commands using Pi's native provider registry, authentication, credentials and discovery. Verify a response before saving connections; share `host.json` automatically across the local host and clients.
 - Add Apple local as a native Pi provider and manage `fm serve` through a generic host-owned process supervisor, with readiness, cancellation, restart and descendant cleanup. Custom provider bindings can use the same process settings.
 - Fit native compaction defaults to small model contexts while preserving explicit host budgets and native conversation model overrides.

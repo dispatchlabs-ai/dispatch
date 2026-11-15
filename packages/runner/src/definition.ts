@@ -7,6 +7,7 @@ import { parse } from "yaml";
 import { loadSkills, type Skill } from "./skills.js";
 import { formatRepositoryInstructions, loadRepositoryInstructions, type RepositoryInstruction } from "./instructions.js";
 import { validateSchedules, type AgentSchedule } from "./schedules.js";
+import type { AgentEnvironment } from "./environments.js";
 
 export type Trigger =
   | { mode: "manual" }
@@ -14,6 +15,8 @@ export type Trigger =
   | { mode: "interval"; everyMs: number; runImmediately?: boolean };
 
 export type AgentDefinition = {
+  /** Application-owned Nix recipe; optional host-managed execution environment. */
+  environment?: AgentEnvironment;
   trigger?: Trigger;
   /** The input sent for each scheduled iteration. */
   input?: string;
@@ -57,6 +60,9 @@ export function defineAgent(definition: AgentDefinition = {}): AgentDefinition &
   if (definition.input !== undefined && typeof definition.input !== "string") throw new Error("Agent input must be text.");
   if (trigger.mode !== "manual" && !definition.input?.trim()) throw new Error("A scheduled agent needs a nonempty input.");
   validateSchedules(definition.schedules);
+  if (definition.environment !== undefined && (!definition.environment || typeof definition.environment.recipe !== "string"
+    || !definition.environment.recipe.endsWith(".nix") || definition.environment.recipe.startsWith("/")
+    || definition.environment.recipe.split(/[\\/]/).includes(".."))) throw new Error("environment.recipe must be an application-relative .nix path.");
   if (definition.mcp !== undefined && (!Array.isArray(definition.mcp)
     || definition.mcp.some(name => typeof name !== "string" || !/^[A-Za-z0-9_-]+$/.test(name))
     || new Set(definition.mcp).size !== definition.mcp.length)) throw new Error("mcp must be a list of unique MCP server names.");
@@ -141,7 +147,8 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
   // An agent module is trusted application code, loaded once per process.
   const module = code !== undefined ? await import(pathToFileURL(join(folder, "agent.ts")).href) : undefined;
   if (module && !Object.hasOwn(module, "default")) throw new Error(`${source.replace(/\.md$/, ".ts")} must export its definition as default.`);
-  const definition = defineAgent({ ...module?.default, ...(meta.mcp !== undefined ? { mcp: meta.mcp } : {}) });
+  const definition = defineAgent({ ...module?.default, ...(meta.mcp !== undefined ? { mcp: meta.mcp } : {}),
+    ...(meta.environment !== undefined ? { environment: meta.environment } : {}) });
   const skillCatalog = definition.skills ? await loadSkills(root, id) : [];
   const repositoryInstructions = await loadRepositoryInstructions(folder, root);
   const handoffAgent = definition.handoff
