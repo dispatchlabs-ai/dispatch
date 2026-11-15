@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-11-15
+
 - Keep tool-only activity inline at its native conversation position, including after later messages and reloads, without empty assistant bubbles. Show commentary once when it repeats the message text.
 
 ## [0.19.0] - 2026-11-14
