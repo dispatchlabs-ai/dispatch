@@ -238,7 +238,6 @@ export async function environmentOperation(agent: LoadedAgent, stateRoot: string
       const running = (await inspect(instance))?.State.Running;
       if (running) throw new Error("Stop the environment before rebuilding or changing browser settings so its browser can save its profile.");
     }
-    await command("cua", ["--version"]);
     const settings = join(directory, "settings");
     await privateStateDirectory(settings);
     if (options.vaultServer) {
@@ -249,6 +248,7 @@ export async function environmentOperation(agent: LoadedAgent, stateRoot: string
     if (instance && options.identity) { instance.identity = options.identity; await save(join(directory, "instance.json"), instance); }
     if (instance && !options.rebuild) return { agent: agent.id, ...await refresh(instance, directory) };
     const artifact = await build(agent, directory);
+    if (artifact.manifest.port) await command("cua", ["--version"]);
     const key = createHash("sha256").update(await realpath(directory)).digest("hex").slice(0, 16);
     const name = `dispatch-${agent.id}-${key}`;
     if (instance?.docker) {
