@@ -4,6 +4,30 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.21.1 inline tool history — November 15, 2026 UTC
+
+[Release v0.21.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.21.1)
+was prepared from clean source `d190e3f51fdeabaeef0b53160adfe733385d10b5`.
+Source/type/build checks, macOS arm64 default/Runner/frontend/portable builds and
+flake checks, and Linux arm64 Web/Workers OCI builds passed. Eleven npm archives
+had no known-pattern scan hits; Linux image findings matched the previously
+reviewed upstream files. Five external consumer combinations installed before
+and after publication, passed dependency checks and reported no production
+audit findings. The all-package consumer also passed strict declaration checks
+and real imports. All thirteen published assets and installed lockfile
+integrities matched the reviewed release bytes.
+
+Real browser interaction verified tool-only entries, text with tools, follow-up
+prompts, keyboard detail expansion, cancellation and reload at 1440×900,
+1280×720, 768×1024 and 390×844, including phone navigation and focus restoration.
+Local SQLite and PostgreSQL/outbound-worker histories preserved tool order.
+A clean Web-only package installation used the ordinary explicit host and Web
+commands, completed native tools and retained its history on reload. An existing
+application upgraded normally and displayed its retained conversation inline;
+all 435 prior native entries remained byte-identical and its stores passed
+integrity checks. No automated tests were added or run. Windows, Linux x86_64,
+hosted authorization and external model behavior were not newly qualified.
+
 ## v0.21.0 definition and messaging cleanup — November 15, 2026 UTC
 
 The [v0.21.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.21.0)
