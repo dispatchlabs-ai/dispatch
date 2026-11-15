@@ -9,6 +9,18 @@
 - Read affected package contracts when changing behavior. Historical handoffs are
   evidence, not current scope; label draft decisions and unresolved requirements.
   Keep code, specifications, guides and changelogs with their owning package.
+- Preserve the consumer contract: ordinary npm installation, small application-owned
+  agent definitions, one explicit host shared by clients, and normal dependency
+  upgrades. Optional capabilities extend this model.
+- Implement reusable connection, lifecycle and setup behavior in Dispatch or the
+  appropriate upstream component. Consumers select capabilities and supply settings
+  without implementing generic adapters or startup glue.
+- Nix may build environment artifacts and optional application packages. Adding a
+  Nix-built environment must not require replacing the consumer's existing
+  application runtime or startup path.
+- Review setup changes from the consumer's perspective. Explain any additional
+  required file, dependency, configuration value or command by the user need it
+  serves; remove avoidable assembly steps.
 - Use stock Pi Durable's public interfaces for durable execution and recovery.
   For package structure or publishing changes, inspect the pinned Pi source using
   [the packaging reference](CONTRIBUTING.md#pi-as-the-packaging-reference).
