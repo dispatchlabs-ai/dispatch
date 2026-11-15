@@ -39,19 +39,32 @@ export async function loadRepositoryInstructions(directory: string, fallbackRoot
   return sources;
 }
 
-export function formatRepositoryInstructions(sources: readonly RepositoryInstruction[], agentRoot?: string): string {
+/** The heading that marks a file in an agent's definition instructions. */
+const definitionHeading = (agentRoot: string, directory: string) => `# AGENTS.md from ${relative(agentRoot, directory) || "."}`;
+
+export function formatRepositoryInstructions(sources: readonly RepositoryInstruction[], agentRoot: string): string {
   if (!sources.length) return "";
-  const heading = agentRoot
-    ? "These AGENTS.md files define this agent's shared rules. Source paths are relative to the agent definition repository, not the working directory. Apply their agent-behavior rules to every assignment. Repository-specific contributor commands and paths apply only to their source repository. More specific files refine the shared rules."
-    : "Target repository instructions apply within their named directories. More specific files govern their subtree.";
-  return heading + "\n\n" + sources.map(source => {
-    const folder = agentRoot ? relative(agentRoot, dirname(source.path)) || "." : dirname(source.path);
-    return `# AGENTS.md from ${folder}\n${source.text}`;
-  }).join("\n\n");
+  return "These AGENTS.md files define this agent's shared rules. Source paths are relative to the agent definition repository, not the working directory. Apply their agent-behavior rules to every assignment. Repository-specific contributor commands and paths apply only to their source repository. More specific files refine the shared rules.\n\n"
+    + sources.map(source => `${definitionHeading(agentRoot, dirname(source.path))}\n${source.text}`).join("\n\n");
 }
 
-/** Refresh target-repository guidance before each model request, including recovery. */
-export function repositoryInstructionsExtension() {
+/** Where a target file already appears among the agent's definition instructions. */
+function definitionCopy(instructions: string, header: string, text: string): "same" | "changed" | undefined {
+  let found: "changed" | undefined;
+  for (let index = instructions.indexOf(header); index >= 0; index = instructions.indexOf(header, index + 1)) {
+    if (index > 0 && instructions[index - 1] !== "\n") continue;
+    const start = index + header.length;
+    if (instructions.startsWith(text, start) && (start + text.length === instructions.length
+      || instructions.startsWith("\n\n", start + text.length))) return "same";
+    found = "changed";
+  }
+  return found;
+}
+
+/** Refresh target-repository guidance before each model request, including recovery.
+ * A file already in the agent's definition instructions is not repeated; a file edited
+ * since the definition loaded is shown in its current version, marked as replacing that copy. */
+export function repositoryInstructionsExtension(definitionRoot: string) {
   return defineExtension({
     name: "dispatch.repository-instructions",
     sections: [section("repository_instructions", async (input, context) => {
@@ -70,15 +83,26 @@ export function repositoryInstructionsExtension() {
         if (parent === current) break;
         current = parent;
       }
-      const sources: RepositoryInstruction[] = [];
+      const definition = input.agent.instructions ?? "";
+      const blocks: string[] = [];
+      const included: string[] = [];
       for (const directory of repository ? directories : [currentDirectory]) {
         const path = getOrThrow(await env.joinPath([directory, "AGENTS.md"], context));
         if (!getOrThrow(await env.exists(path, context))) continue;
-        const text = getOrThrow(await env.readTextFile(path, context));
-        if (text.trim()) sources.push({ path, text: text.trim(), revision: createHash("sha256").update(text).digest("hex") });
+        const text = getOrThrow(await env.readTextFile(path, context)).trim();
+        if (!text) continue;
+        const copy = definitionCopy(definition, `${definitionHeading(definitionRoot, directory)}\n`, text);
+        if (copy === "same") included.push(directory);
+        else blocks.push(copy === "changed"
+          ? `# AGENTS.md from ${directory} (edited since this agent's definition loaded; this current version replaces that copy in your instructions)\n${text}`
+          : `# AGENTS.md from ${directory}\n${text}`);
       }
-      return formatRepositoryInstructions(sources) ||
-        `Working directory: ${cwd}. No applicable AGENTS.md exists in this repository yet.`;
+      const note = included.length
+        ? `Already part of your instructions: ${included.map(directory => `AGENTS.md from ${directory}`).join(", ")}.` : "";
+      if (!blocks.length) return included.length ? `Working directory: ${cwd}. ${note}`
+        : `Working directory: ${cwd}. No applicable AGENTS.md exists in this repository yet.`;
+      return ["Target repository instructions apply within their named directories. More specific files govern their subtree.",
+        ...blocks, ...(note ? [note] : [])].join("\n\n");
     })],
   });
 }

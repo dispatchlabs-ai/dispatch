@@ -7,7 +7,11 @@ Safe retries reuse that task; unsafe interrupted effects retain Pi's unknown
 outcome rather than being replayed. No second model runs.
 
 `dispatch-native-tools --state PATH --workspace PATH --socket PATH` serves
-`POST /commands` over an owner-only Unix socket:
+`POST /commands` over an owner-only Unix socket. The command is installed by
+Runner's Nix package (`nix build .#runner`, and releases built with
+`mkAgentRelease`); the npm archive does not provide it as a bin. From an npm
+installation, run `node node_modules/@dispatch/runner/dist/native-tools-cli.js`
+with the same arguments, or call `openNativeTools` directly.
 
 - `{tool:"coding", arguments:{name,arguments}, requestId}` — execute/recover.
 - `{tool:"status"}` — inspect pending native tasks.

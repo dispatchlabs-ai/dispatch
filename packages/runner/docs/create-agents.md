@@ -24,9 +24,9 @@ mkdir my-agents
 cd my-agents
 npm init -y --init-type=module
 npm install \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.19.0/dispatch-runner-0.19.0.tgz \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.19.0/dispatch-web-0.19.0.tgz \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.19.0/dispatch-mcp-0.19.0.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.20.0/dispatch-runner-0.20.0.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.20.0/dispatch-web-0.20.0.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.20.0/dispatch-mcp-0.20.0.tgz \
   @earendil-works/pi-durable@1.5.2
 mkdir -p agents/researcher agents/developer
 cat > .gitignore <<'EOF_IGNORE'
@@ -105,6 +105,9 @@ not needed for these tools.
 `messages` selects native messaging recipients. The MCP connection below also
 exposes ordinary conversation operations with host-wide authority; this example
 is a trusted local application, not an isolation boundary between agents.
+With both, the model sees two equivalent sets of messaging tools: native
+`message_agent` and MCP `mcp__agents__message_agent`. To keep only the MCP set,
+add `messageTools: false`; `messages` still grants and checks the recipients.
 
 ## Configure the shared host
 
@@ -295,7 +298,9 @@ To edit an agent's instructions, model, tools or skills:
 2. Edit its `agent.md`, optional `agent.ts`, shared instructions or skill files.
 3. Run `npm start` again. This guide's `updateDefinitions: "when-idle"` applies
    the new definition when saved work is idle, preserving conversation history.
-   If unfinished work must recover first, the update waits for it to become idle.
+   If unfinished work must recover first, the host warns that the saved definition
+   remains active for existing conversations; new conversations use the edited one.
+   Restart again after that work finishes to update existing conversations.
 4. Reconnect clients and verify the changed behavior in a new turn.
 
 For another agent, add `agents/NAME/agent.md`, with a unique lowercase ID using
@@ -355,6 +360,7 @@ new agent definitions over your own. See [upgrades](upgrade.md), the
 | Authentication or model error | Set the selected provider's key in the **host** environment and verify account/model access. Restart after changing the environment. |
 | `host.json` not found | Create the complete file above and run the npm commands from `my-agents`. |
 | `definition changed` | Set `updateDefinitions` in the host configuration and follow the edit/restart procedure; preserve saved state. |
+| `unsupported frontmatter key` | `agent.md` frontmatter accepts `description`, `model` (`provider`, `id`, `thinking`), `mcp` and `environment`. Move settings such as `messages` or `skills` to `agent.ts`; remove other keys. |
 | `demo/live mode changed` | Keep `.demo/` for synthetic work and `.state/` for real models. Do not switch execution mode on the same store. |
 | No tools or thinking displayed | A greeting may invoke neither. Check `agent.ts`, the agent's `mcp` selection, host connections and actual tool results; summaries require provider-returned text. |
 | Another process owns the store | Reconnect to that host, or stop the process you started before restarting. Do not start a second owner or delete its state. |

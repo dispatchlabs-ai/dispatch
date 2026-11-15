@@ -64,8 +64,8 @@ demand. Skills supply instructions and resources, not tool permissions.
 
 A definition fingerprint detects authored changes. Updating a retained agent is
 an explicit startup policy. `updateDefinitions: "when-idle"` skips a changed
-definition if work is pending; it applies on a later startup that finds the
-store idle. It is not a background file watcher. Working-directory guidance has
+definition if work is pending, with a startup warning; it applies on a later
+startup that finds the store idle. It is not a background file watcher. Working-directory guidance has
 a separate per-request refresh path. See [instructions](../packages/runner/docs/instructions.md)
 and [editing agents](../packages/runner/docs/create-agents.md#edit-or-add-an-agent).
 
@@ -163,8 +163,9 @@ retried delivery and reply admission safe.
 Native messaging tools and the Dispatch MCP tools use the same delivery
 machinery. Runner binds MCP calls to the actual calling conversation. Their
 outer tool recovery differs: native messaging tools declare safe replay, while
-generic MCP calls do not. Once admitted, the durable delivery task still has
-its own recovery. Stopping the sender does not cancel independent recipient
+generic MCP calls do not. An agent that uses only the MCP route sets
+`messageTools: false`; `messages` still grants its recipients. Once admitted,
+the durable delivery task still has its own recovery. Stopping the sender does not cancel independent recipient
 work. See [instance messaging](../packages/runner/docs/instance-messages.md) and
 [MCP messaging](../packages/mcp/README.md#native-messaging-and-automatic-replies).
 

@@ -26,9 +26,10 @@ See the [host/client contract](../runner/docs/service.md).
 
 `runtime.service` supplies `agents`, `sources`, `list`, `has`, `create`, `submit`,
 `stop` and `artifact`. `runtime.presentation` supplies `snapshot` and `watch`;
-watch returns `{closed,stop}` and follows the host's live stream without full-history
-polling. `catalog()` refreshes agents; `summary()` batches sidebar activity without
-loading every transcript. Exported contracts live at `@dispatch/backend/contracts`.
+watch returns `{closed,stop}`. For a host connection it follows the host's live
+stream without polling; the central runtime polls snapshots every 500 ms.
+`catalog()` refreshes agents; `summary()` batches sidebar activity without
+loading every transcript (Web's sidebar stream calls it every 2 s). Exported contracts live at `@dispatch/backend/contracts`.
 
 Human sends steer active work, and retain their caller's request ID. Uncertain
 transport failures never cause automatic resubmission or owner replacement.

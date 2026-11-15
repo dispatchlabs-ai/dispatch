@@ -151,9 +151,11 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
     return waitForMessageWork(service, namespace, from, receipt.message.to, taskId, context);
   }
 
+  // messageTools: false omits only the model's tools. Permission checks, the delivery task and
+  // the host message operation used by the MCP connector are unchanged.
   const extension = defineExtension({
     name: `${namespace}.instance-messages.${agent.id}`, tasks: [delivery],
-    tools: [
+    tools: agent.messageTools === false ? [] : [
       defineTool({
         name: "agent_instances",
         description: "Find your own instance ID and addressable independent instances. Returns identities, not their private transcripts.",

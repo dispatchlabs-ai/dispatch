@@ -111,6 +111,18 @@ use that binding to impersonate independent conversations. Other MCP tools and
 their schemas are unchanged. This is context within an authorized connection,
 not a new authorization grant.
 
+### Dispatch messaging through MCP
+
+An agent with both `messages` and a Dispatch MCP connection is offered native
+`message_agent` and `mcp__<server>__message_agent`, which reach the same host
+operation. Set `messageTools: false` in its `agent.ts` to offer only the MCP set.
+The two differ after a host crash during the call. Native `message_agent` is
+replay-safe: on restart it runs again with the same request identity and returns
+the original receipt. MCP calls are never replayed, so a call cut off by the
+crash returns an `interrupted` error and the message may already be admitted.
+Check `agent_instances` and the recipient's conversation before sending again;
+a new call carries a new request identity.
+
 Streamable HTTP supports unauthenticated servers and configured headers. This
 integration does not implement interactive OAuth sign-in or an OAuth credential
 store; selecting a server with `oauth` settings fails at startup. For a server requiring another

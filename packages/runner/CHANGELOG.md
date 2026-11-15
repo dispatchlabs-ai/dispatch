@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 - Add a shared architecture reference and correct provider setup availability in the READMEs and guides: the commands shipped in 0.20.0.
+- Send each `AGENTS.md` to the model once. The per-request repository section skips files already in the agent's definition instructions and marks a file edited since the definition loaded as replacing that copy. Nested working-directory guidance is unchanged.
+- Reject unsupported `agent.md` frontmatter keys at load, naming where `agent.ts` settings belong. Previously they were ignored but still changed the definition fingerprint.
+- Add `messageTools: false` for agents that message through the Dispatch MCP connector: `messages` keeps granting recipients and delivery, while the model is offered no native message tools.
+- Warn at host startup when `updateDefinitions: "when-idle"` defers a changed definition, stating that existing conversations keep the saved definition until a later idle start.
+- Correct guides: install examples use the current archives, `dispatch-native-tools` is a Nix package command, and removed `artifacts`/`workspace` host settings are replaced by the embedding options that remain.
+- Release preparation updates every documented archive URL and the current-release pointer only, rejects stale install URLs, and leaves dated version references unchanged.
 
 ## [0.20.0] - 2026-11-15
 

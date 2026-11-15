@@ -54,7 +54,7 @@ import { createHandoffs } from "./handoff.js";
 import { createCoding } from "./coding.js";
 import type { ReplySink } from "./replies.js";
 import { privateStateDirectory, privateStateFiles } from "./private-state.js";
-import { reportError } from "./terminal-output.js";
+import { reportError, terminalText } from "./terminal-output.js";
 import { scheduleTaskKind } from "./schedules.js";
 import { ArtifactStore, type ArtifactOptions, type createArtifacts } from "./artifacts.js";
 import { compactionExtension } from "./compaction.js";
@@ -292,7 +292,10 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
         if (deferred && options.updateDefinitions !== "when-idle") {
           throw new Error(`${agent.id} has pending work. Finish or stop that work with its previous definition before updating.`);
         }
-        if (deferred) deferredDefinitionUpdates.add(agent.id);
+        if (deferred) {
+          deferredDefinitionUpdates.add(agent.id);
+          console.warn(terminalText(`[${agent.id}] Definition changed while saved work is unfinished. Existing conversations keep their saved definition; new conversations use the updated one. Restart the host after that work finishes to update existing conversations.`));
+        }
         else await harness.commit(async tx => {
           let cursor: Cursor | undefined;
           const conversations = [];

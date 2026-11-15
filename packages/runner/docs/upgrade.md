@@ -53,8 +53,11 @@ The [application setup](create-agents.md#edit-or-add-an-agent) uses
 `"updateDefinitions": "when-idle"` in `host.json`: restart the host after edits,
 and it applies them when existing work is idle, preserving history. It is not a
 file watcher. `true` applies updates only when the saved work is already idle;
-`"when-idle"` can defer them while recovery completes. Finish or explicitly stop
-work before editing when you need the change to take effect at the next start.
+`"when-idle"` can defer them while recovery completes. The host then warns that
+existing conversations keep their saved definition while new conversations use
+the edited one; restart again after that work finishes to update them. Finish or
+explicitly stop work before editing when you need the change to take effect at
+the next start.
 
 Demo and live execution cannot share a store, regardless of `updateDefinitions`.
 Use `.demo/` for synthetic work and `.state/` for real models. Keep the original

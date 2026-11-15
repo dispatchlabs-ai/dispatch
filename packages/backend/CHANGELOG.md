@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Document that central-runtime watches poll every 500 ms; host watches stream without polling.
+
 ## [0.16.1] - 2026-11-13
 
 - Carry optional thinking and partialThinking summary text in the shared chat contract.

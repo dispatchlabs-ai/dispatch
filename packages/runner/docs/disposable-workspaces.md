@@ -137,30 +137,24 @@ the live guest, including files on its temporary filesystems. Transfers verify
 regular files and do not follow a final symlink; exports remain inside
 `/workspace`.
 
-## On-demand agent CLI
+## Connect a host
 
-In the ordinary CLI host config add:
+`host.json` and `dispatch serve` have no workspace setting, and the CLI has no
+workspace command. A host that embeds Runner selects the controller command and
+run itself, then supplies the workspace as the native execution environment:
 
-```json
-{
-  "workspace": {
-    "agents": ["development"],
-    "command": ["sudo", "-n", "/usr/local/libexec/example-workspace"]
-  }
-}
+```ts
+import { run, WorkspaceClient } from "@dispatch/runner";
+
+const workspace = new WorkspaceClient(["sudo", "-n", "/usr/local/libexec/example-workspace"], "change-1");
+const host = await run({ root, models, env: () => workspace.environment() });
 ```
 
-The release wrapper passes its manifest automatically. Run a named session as
-usual, or prepare the desktop before importing source:
+The host runs the controller's lifecycle operations in the table above, such as
+`ensure` before work and `finish` once outputs are accepted.
 
-```sh
-example-agents workspace --config /etc/example/host.json --agent development --session change-1 --action ensure
-example-agents run --config /etc/example/host.json --agent development --session change-1 --prompt 'Inspect the imported project.'
-example-agents workspace --config /etc/example/host.json --agent development --session change-1 --action suspend
-```
-
-The session key is also the controller run ID. Every agent participating in that
-session uses the same workspace environment. Repository instructions are read
+The run ID identifies the workspace. Every agent the host opens with that
+environment uses the same workspace. Repository instructions are read
 through that environment. The read-only `read_definition_resource` tool reads
 UTF-8 files and lists directories within the session's pinned definition
 package, including workflow references linked from agent instructions. Relative
@@ -184,9 +178,9 @@ their pinned closure; retain these roots with the run record for history access.
 The privileged host controller is maintained separately and must continue to support
 the saved `dispatch-workspace-v1` contract. Updating the default application
 release affects new sessions. Reusing an existing session
-never migrates its pinned release or image. End a workspace explicitly with
-`--action finish` after its outputs are accepted. The on-demand process waits for admitted peer assignments and automatic replies
-before exiting. Exiting a terminal turn alone does not finish the workspace.
+never migrates its pinned release or image. End a workspace explicitly with the
+controller's `finish` operation after its outputs are accepted. Exiting a
+terminal turn alone does not finish the workspace.
 
 Recovery archives omit Git-ignored dependencies and caches and preserve Git
 metadata plus tracked and untracked source. Initialized submodules, including

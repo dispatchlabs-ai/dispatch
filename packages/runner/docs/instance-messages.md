@@ -25,6 +25,11 @@ Missing recipients fail startup before stores are opened. An allowlist does not
 silently enable definitions, and cycles between messaging definitions are valid.
 Definitions without `messages` receive no messaging tools.
 
+An agent that sends through the [Dispatch MCP connector](mcp.md#dispatch-messaging-through-mcp)
+can set `messageTools: false` beside `messages`. Its model is then offered only
+the MCP equivalents. `messages` still decides which agents it may address, and
+the delivery task, receipts and automatic replies are unchanged.
+
 The enabled agent can use:
 
 - `agent_instances`: its own ID, allowed agent names, capability descriptions and

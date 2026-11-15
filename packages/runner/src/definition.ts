@@ -35,6 +35,9 @@ export type AgentDefinition = {
   clones?: boolean;
   /** Agent types addressable as independent instances in the same ChatService. */
   messages?: string[];
+  /** Default true. False keeps messages' permission and delivery but gives the model no native message tools,
+   * for an agent that sends through the Dispatch MCP connector instead. */
+  messageTools?: boolean;
   handoff?: { target: string; progressEveryMs: number };
 };
 
@@ -70,6 +73,8 @@ export function defineAgent(definition: AgentDefinition = {}): AgentDefinition &
     || new Set(definition.delegates).size !== definition.delegates.length)) throw new Error("Delegates must be unique agent names.");
   if (definition.messages && (!Array.isArray(definition.messages) || definition.messages.some(id => !agentName.test(id))
     || new Set(definition.messages).size !== definition.messages.length)) throw new Error("Message recipients must be unique agent names.");
+  if (definition.messageTools !== undefined && typeof definition.messageTools !== "boolean") throw new Error("messageTools must be a boolean.");
+  if (definition.messageTools === false && !definition.messages?.length) throw new Error("messageTools: false applies only to an agent with messages.");
   if (!trigger || !["manual", "continuous", "interval"].includes(trigger.mode)) {
     throw new Error("Trigger mode must be manual, continuous, or interval.");
   }
@@ -90,6 +95,27 @@ export function defineAgent(definition: AgentDefinition = {}): AgentDefinition &
     throw new Error("A handoff needs a target agent and a positive progressEveryMs.");
   }
   return { ...definition, trigger, input: definition.input ?? "" };
+}
+
+const frontmatterKeys = ["description", "model", "mcp", "environment"];
+const modelKeys = ["provider", "id", "thinking"];
+const agentModuleKeys = ["trigger", "input", "schedules", "extensions", "coding", "skills", "delegates", "clones", "messages", "messageTools", "handoff"];
+
+/** Settings Dispatch does not read must not silently change an agent's fingerprint. */
+function validateFrontmatter(meta: unknown, source: string): void {
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) throw new Error(`${source} frontmatter must be a YAML mapping.`);
+  const module = source.replace(/\.md$/, ".ts");
+  for (const key of Object.keys(meta)) {
+    if (frontmatterKeys.includes(key)) continue;
+    if (agentModuleKeys.includes(key)) throw new Error(`${source}: ${key} is set in ${module} with defineAgent({ ${key} }), not in frontmatter.`);
+    throw new Error(`${source}: unsupported frontmatter key ${key}. Frontmatter accepts ${frontmatterKeys.join(", ")}; remove ${key} or keep that note in the instructions.`);
+  }
+  const model = (meta as { model?: unknown }).model;
+  if (model && typeof model === "object" && !Array.isArray(model)) {
+    for (const key of Object.keys(model)) {
+      if (!modelKeys.includes(key)) throw new Error(`${source}: unsupported model setting ${key}. model accepts ${modelKeys.join(", ")}.`);
+    }
+  }
 }
 
 async function hasRootAgent(root: string): Promise<boolean> {
@@ -137,6 +163,7 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/.exec(markdown);
   if (!match) throw new Error(`${source} must contain YAML frontmatter followed by instructions.`);
   const meta = parse(match[1]);
+  validateFrontmatter(meta, source);
   if (!meta || typeof meta.description !== "string" || !meta.description.trim()
     || typeof meta.model?.provider !== "string" || !meta.model.provider.trim()
     || typeof meta.model?.id !== "string" || !meta.model.id.trim()

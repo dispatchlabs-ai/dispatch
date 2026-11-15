@@ -89,14 +89,23 @@ function main() {
   contract.info.version = next;
   updates.set(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
 
-  // Public installation instructions name the immutable runtime archive.
-  for (const path of ["README.md", "packages/runner/README.md", "packages/web/README.md", "packages/mcp/README.md", "docs/quickstart.md", "packages/runner/docs/upgrade.md", "scripts/README.md"]) {
+  // Installation instructions name the immutable release archives. Rewrite only those
+  // URLs and the current-release pointer; dated text such as "available since vX" stays.
+  // Changelogs and the verification record are historical and keep their versions.
+  const archive = /releases\/download\/v(\d+\.\d+\.\d+[^/]*)\/[a-z-]+-(\d+\.\d+\.\d+[^/]*?)\.tgz/g;
+  const pointer = `The [v${current} release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v${current})`;
+  let pointers = 0;
+  for (const path of git("ls-files", "*.md").split("\n").filter(Boolean)) {
+    if (path.endsWith("CHANGELOG.md") || path === "docs/qualification.md") continue;
     const source = readFileSync(resolve(root, path), "utf8");
-    if (!source.includes(`v${current}`)) throw new Error(`${path} does not name v${current}.`);
-    updates.set(path, source.replaceAll(`v${current}`, `v${next}`)
-      .replaceAll(`-${current}.tgz`, `-${next}.tgz`)
-      .replaceAll(`currently ${current}`, `currently ${next}`));
+    const stale = [...source.matchAll(archive)].filter(match => match[1] !== current || match[2] !== current);
+    if (stale.length) throw new Error(`${path} installs ${stale[0][0]}; update it to v${current} before preparing a release.`);
+    pointers += source.split(pointer).length - 1;
+    const updated = source.replace(archive, url => url.replaceAll(current, next))
+      .replaceAll(pointer, `The [v${next} release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v${next})`);
+    if (updated !== source) updates.set(path, updated);
   }
+  if (!pointers) throw new Error(`scripts/README.md does not name the v${current} release.`);
 
   const date = new Date().toISOString().slice(0, 10);
   let changed = false;
