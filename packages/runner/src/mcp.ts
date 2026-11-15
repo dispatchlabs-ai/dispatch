@@ -158,7 +158,7 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
               return {
                 output, isError: result.isError === true,
                 // MCP results arrived as JSON; retain all blocks and structured data even when the model cannot display them.
-                details: result as unknown as JsonValue,
+                details: { ...result, ...(Object.keys(fixed).length ? { dispatchBoundArguments: fixed } : {}) } as unknown as JsonValue,
                 ...(tool.outputSchema !== undefined && result.structuredContent !== undefined
                   ? { structuredOutput: result.structuredContent as JsonValue } : {}),
               };
