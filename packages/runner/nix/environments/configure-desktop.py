@@ -11,6 +11,13 @@ for directory in [".config", ".local", ".local/share", ".local/share/keyrings", 
     os.chown(path, 1000, 1000)
     os.chmod(path, 0o700)
 
+# Each instance owns its home volume, and entrypoint runs before browser services.
+# Locks from a stopped container refer to processes and sockets that no longer exist.
+for name in ["SingletonLock", "SingletonSocket", "SingletonCookie"]:
+    lock = home / ".config/chromium" / name
+    if lock.is_symlink():
+        lock.unlink()
+
 policy = Path("/etc/chromium/policies/managed/dispatch-private.json")
 settings = Path("/run/dispatch-settings/browser.json")
 if settings.exists():

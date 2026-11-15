@@ -159,7 +159,7 @@ async function inspect(instance: Instance) {
 async function createContainer(instance: Instance, directory: string) {
   const { name, manifest } = instance.docker!;
   const key = createHash("sha256").update(await realpath(directory)).digest("hex").slice(0, 16);
-  await docker(instance, ["create", "--name", name, "--init", "--platform", manifest.platform,
+  await docker(instance, ["create", "--name", name, "--hostname", name, "--init", "--platform", manifest.platform,
     "--label", `ai.dispatch.environment=${key}`, "--shm-size", "1g",
     ...Object.entries(manifest.volumes).flatMap(([target, volume]) => ["--mount", `type=volume,src=${name}-${volume},dst=${target}`]),
     "--mount", `type=bind,src=${join(directory, "settings")},dst=/run/dispatch-settings,readonly`,
