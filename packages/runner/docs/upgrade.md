@@ -59,6 +59,24 @@ the edited one; restart again after that work finishes to update them. Finish or
 explicitly stop work before editing when you need the change to take effect at
 the next start.
 
+### Unsupported frontmatter keys
+
+**Breaking in the release after 0.20.0.** Runner now rejects `agent.md`
+frontmatter keys it does not read. Earlier versions ignored them, although they
+still changed the definition fingerprint. Before upgrading, check every
+`agent.md` and handle each extra key by what uses it:
+
+| The key is | Do this |
+| --- | --- |
+| A Dispatch setting in the wrong file, such as `messages`, `skills` or `schedules` | Move it to `agent.ts` with `defineAgent`. |
+| A descriptive note for people or the model, such as `writes: none` | Move the note into the instruction body, where the model can read it. Rewrite it as guidance if it should affect behavior. |
+| Configuration your application's own code reads from the file | Move it to an application-owned file, such as a JSON file beside the agent or a module the reader imports, and change the reader in the same commit. Removing the key alone breaks that reader. |
+
+`dispatch catalog` reports the first unsupported key in each definition without
+starting a host or opening stores. Moving text into the instructions, or any
+change to `agent.md` or `agent.ts`, is a definition update; apply it with the
+procedure above.
+
 Demo and live execution cannot share a store, regardless of `updateDefinitions`.
 Use `.demo/` for synthetic work and `.state/` for real models. Keep the original
 store when changing execution mode.

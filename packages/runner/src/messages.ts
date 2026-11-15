@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import { withAbortSignal, type Context } from "@earendil-works/chord/context";
 import { Type } from "typebox";
 import {
-  AssistantEntry, defineDoc, defineExtension, defineTask, defineTool,
-  type SubmissionId, type TaskId,
+  AgentDoc, AssistantEntry, defineDoc, defineExtension, defineTask, defineTool,
+  type ConversationId, type SubmissionId, type TaskId, type Tx,
 } from "@earendil-works/pi-durable";
 import type { ChatService } from "./chat.js";
 import type { LoadedAgent } from "./definition.js";
@@ -151,11 +151,9 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
     return waitForMessageWork(service, namespace, from, receipt.message.to, taskId, context);
   }
 
-  // messageTools: false omits only the model's tools. Permission checks, the delivery task and
-  // the host message operation used by the MCP connector are unchanged.
   const extension = defineExtension({
     name: `${namespace}.instance-messages.${agent.id}`, tasks: [delivery],
-    tools: agent.messageTools === false ? [] : [
+    tools: [
       defineTool({
         name: "agent_instances",
         description: "Find your own instance ID and addressable independent instances. Returns identities, not their private transcripts.",
@@ -202,6 +200,24 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
     ],
   });
   return { extension, send, status, instances, wait };
+}
+
+const messageToolNames = ["agent_instances", "message_agent", "message_status", "wait_for_agent"];
+
+/** messageTools: false hides the native tools through Pi's saved modelTools filter. They stay
+ * registered, so a saved call recovers, and the choice changes with the agent's definition:
+ * call this wherever the definition's configuration is applied to a conversation. */
+export async function selectMessageTools(tx: Tx, id: ConversationId, agent: LoadedAgent) {
+  if (!agent.messages?.length) return;
+  const state = await tx.doc(AgentDoc, id);
+  const current = state.modelTools;
+  // An explicit list already names exactly the tools the model is offered.
+  if (Array.isArray(current)) return;
+  const remove = (current?.remove ?? []).filter(name => !messageToolNames.includes(name));
+  if (agent.messageTools === false) remove.push(...messageToolNames);
+  const next = { ...(current?.add?.length ? { add: current.add } : {}), ...(remove.length ? { remove } : {}) };
+  if (Object.keys(next).length) state.modelTools = next;
+  else if (current !== undefined) delete state.modelTools;
 }
 
 export function instanceMessagingExtension(namespace: string, agent: LoadedAgent, service: ChatService) {

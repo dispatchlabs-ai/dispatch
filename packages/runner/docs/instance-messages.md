@@ -28,7 +28,10 @@ Definitions without `messages` receive no messaging tools.
 An agent that sends through the [Dispatch MCP connector](mcp.md#dispatch-messaging-through-mcp)
 can set `messageTools: false` beside `messages`. Its model is then offered only
 the MCP equivalents. `messages` still decides which agents it may address, and
-the delivery task, receipts and automatic replies are unchanged.
+the delivery task, receipts and automatic replies are unchanged. The native tools
+stay registered and are hidden through Pi's saved `modelTools` filter: new
+conversations get the setting at creation, existing ones when the definition
+update applies, so a call saved before the change still recovers.
 
 The enabled agent can use:
 

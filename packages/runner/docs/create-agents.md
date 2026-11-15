@@ -360,7 +360,7 @@ new agent definitions over your own. See [upgrades](upgrade.md), the
 | Authentication or model error | Set the selected provider's key in the **host** environment and verify account/model access. Restart after changing the environment. |
 | `host.json` not found | Create the complete file above and run the npm commands from `my-agents`. |
 | `definition changed` | Set `updateDefinitions` in the host configuration and follow the edit/restart procedure; preserve saved state. |
-| `unsupported frontmatter key` | `agent.md` frontmatter accepts `description`, `model` (`provider`, `id`, `thinking`), `mcp` and `environment`. Move settings such as `messages` or `skills` to `agent.ts`; remove other keys. |
+| `unsupported frontmatter key` | `agent.md` frontmatter accepts `description`, `model` (`provider`, `id`, `thinking`), `mcp` and `environment`. Move settings such as `messages` or `skills` to `agent.ts`. See [upgrading past unsupported frontmatter](upgrade.md#unsupported-frontmatter-keys) for notes and application-owned settings. |
 | `demo/live mode changed` | Keep `.demo/` for synthetic work and `.state/` for real models. Do not switch execution mode on the same store. |
 | No tools or thinking displayed | A greeting may invoke neither. Check `agent.ts`, the agent's `mcp` selection, host connections and actual tool results; summaries require provider-returned text. |
 | Another process owns the store | Reconnect to that host, or stop the process you started before restarting. Do not start a second owner or delete its state. |

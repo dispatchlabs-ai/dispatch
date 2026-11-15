@@ -48,23 +48,13 @@ export function formatRepositoryInstructions(sources: readonly RepositoryInstruc
     + sources.map(source => `${definitionHeading(agentRoot, dirname(source.path))}\n${source.text}`).join("\n\n");
 }
 
-/** Where a target file already appears among the agent's definition instructions. */
-function definitionCopy(instructions: string, header: string, text: string): "same" | "changed" | undefined {
-  let found: "changed" | undefined;
-  for (let index = instructions.indexOf(header); index >= 0; index = instructions.indexOf(header, index + 1)) {
-    if (index > 0 && instructions[index - 1] !== "\n") continue;
-    const start = index + header.length;
-    if (instructions.startsWith(text, start) && (start + text.length === instructions.length
-      || instructions.startsWith("\n\n", start + text.length))) return "same";
-    found = "changed";
-  }
-  return found;
-}
-
 /** Refresh target-repository guidance before each model request, including recovery.
- * A file already in the agent's definition instructions is not repeated; a file edited
- * since the definition loaded is shown in its current version, marked as replacing that copy. */
-export function repositoryInstructionsExtension(definitionRoot: string) {
+ * A file is omitted only when the conversation's instructions verifiably hold this definition's
+ * copies and the file's complete current text equals its copy. Anything else is shown in full. */
+export function repositoryInstructionsExtension(definition: { root: string; sources: readonly RepositoryInstruction[] }) {
+  // The formatted files open the definition's instructions, followed by its role heading.
+  const prefix = definition.sources.length
+    ? `${formatRepositoryInstructions(definition.sources, definition.root)}\n\n# Role instructions from ` : undefined;
   return defineExtension({
     name: "dispatch.repository-instructions",
     sections: [section("repository_instructions", async (input, context) => {
@@ -83,7 +73,10 @@ export function repositoryInstructionsExtension(definitionRoot: string) {
         if (parent === current) break;
         current = parent;
       }
-      const definition = input.agent.instructions ?? "";
+      const instructions = input.agent.instructions ?? "";
+      // An older saved definition or another agent's conversation has different copies: show every file.
+      const copies = new Map(prefix !== undefined && instructions.startsWith(prefix)
+        ? definition.sources.map(source => [source.path, source.text]) : []);
       const blocks: string[] = [];
       const included: string[] = [];
       for (const directory of repository ? directories : [currentDirectory]) {
@@ -91,10 +84,11 @@ export function repositoryInstructionsExtension(definitionRoot: string) {
         if (!getOrThrow(await env.exists(path, context))) continue;
         const text = getOrThrow(await env.readTextFile(path, context)).trim();
         if (!text) continue;
-        const copy = definitionCopy(definition, `${definitionHeading(definitionRoot, directory)}\n`, text);
-        if (copy === "same") included.push(directory);
-        else blocks.push(copy === "changed"
-          ? `# AGENTS.md from ${directory} (edited since this agent's definition loaded; this current version replaces that copy in your instructions)\n${text}`
+        const copy = copies.get(path);
+        const heading = `\n${definitionHeading(definition.root, directory)}\n`;
+        if (copy === text) included.push(directory);
+        else blocks.push(copy !== undefined || `\n${instructions}`.includes(heading)
+          ? `# AGENTS.md from ${directory} (current version; it replaces this file's copy in your instructions)\n${text}`
           : `# AGENTS.md from ${directory}\n${text}`);
       }
       const note = included.length

@@ -14,7 +14,7 @@ export function createConfiguration(codingExtension: ReturnType<typeof createCod
     agent: LoadedAgent, directory: string, demo: boolean, adapters: Extension[], sink?: ReplySink, cwd?: string,
     shared: Extension[] = [],
   ): Promise<AgentSetup> {
-    const repositoryInstructions = repositoryInstructionsExtension(agent.root);
+    const repositoryInstructions = repositoryInstructionsExtension({ root: agent.root, sources: agent.repositoryInstructions });
     const extensions: Extension[] = [repositoryInstructions, ...(agent.extensions ?? [])];
     for (const name of agent.mcp ?? []) {
       if (!extensions.some(extension => extension.name === `mcp:${name}`))

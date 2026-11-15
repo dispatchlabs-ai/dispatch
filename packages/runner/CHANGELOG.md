@@ -3,9 +3,9 @@
 ## [Unreleased]
 
 - Add a shared architecture reference and correct provider setup availability in the READMEs and guides: the commands shipped in 0.20.0.
-- Send each `AGENTS.md` to the model once. The per-request repository section skips files already in the agent's definition instructions and marks a file edited since the definition loaded as replacing that copy. Nested working-directory guidance is unchanged.
-- Reject unsupported `agent.md` frontmatter keys at load, naming where `agent.ts` settings belong. Previously they were ignored but still changed the definition fingerprint.
-- Add `messageTools: false` for agents that message through the Dispatch MCP connector: `messages` keeps granting recipients and delivery, while the model is offered no native message tools.
+- Send each `AGENTS.md` to the model once. The per-request repository section omits a file only when the conversation holds this definition's copies and the file's complete current text matches; an edited, shortened or replaced file is shown in its current version, marked as replacing that copy. Nested working-directory guidance is unchanged.
+- **Breaking:** reject unsupported `agent.md` frontmatter keys at load. Earlier versions ignored them but still changed the definition fingerprint. Move Dispatch settings to `agent.ts`, descriptive notes such as `writes:` into the instructions, and configuration your application reads into an application-owned file with its reader. See the [upgrade guide](docs/upgrade.md#unsupported-frontmatter-keys).
+- Add `messageTools: false` for agents that message through the Dispatch MCP connector. It hides the native message tools through Pi's saved `modelTools` filter, applied when a conversation is created or its definition updates; the tools stay registered, so saved calls recover across the change. `messages` keeps granting recipients and delivery.
 - Warn at host startup when `updateDefinitions: "when-idle"` defers a changed definition, stating that existing conversations keep the saved definition until a later idle start.
 - Correct guides: install examples use the current archives, `dispatch-native-tools` is a Nix package command, and removed `artifacts`/`workspace` host settings are replaced by the embedding options that remain.
 - Release preparation updates every documented archive URL and the current-release pointer only, rejects stale install URLs, and leaves dated version references unchanged.

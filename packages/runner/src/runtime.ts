@@ -59,6 +59,7 @@ import { scheduleTaskKind } from "./schedules.js";
 import { ArtifactStore, type ArtifactOptions, type createArtifacts } from "./artifacts.js";
 import { compactionExtension } from "./compaction.js";
 import { definitionResourcesExtension } from "./definition-resources.js";
+import { selectMessageTools } from "./messages.js";
 
 const context = BACKGROUND_CONTEXT;
 export type RunnerState = {
@@ -266,7 +267,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
         onReport: (report) => reportError(`[${agent.id}] Pi Durable (${report.kind}):`, report.error),
       }, context);
       root = await harness.root(context, {
-        agent: configuration,
+        agent: configuration, init: (tx, id) => selectMessageTools(tx, id, agent),
       });
       const existing = await harness.snapshot(RunnerDoc, context);
       let deferred = false;
@@ -314,7 +315,10 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
           };
           // Keep each private child's configured agent and complete history.
           for (const conversation of conversations) {
-            if (!conversation.owner) await update(conversation.id, setup);
+            if (!conversation.owner) {
+              await update(conversation.id, setup);
+              await selectMessageTools(tx, conversation.id, agent);
+            }
           }
         }, context);
       }

@@ -108,7 +108,7 @@ function validateFrontmatter(meta: unknown, source: string): void {
   for (const key of Object.keys(meta)) {
     if (frontmatterKeys.includes(key)) continue;
     if (agentModuleKeys.includes(key)) throw new Error(`${source}: ${key} is set in ${module} with defineAgent({ ${key} }), not in frontmatter.`);
-    throw new Error(`${source}: unsupported frontmatter key ${key}. Frontmatter accepts ${frontmatterKeys.join(", ")}; remove ${key} or keep that note in the instructions.`);
+    throw new Error(`${source}: unsupported frontmatter key ${key}. Frontmatter accepts ${frontmatterKeys.join(", ")}. Move a descriptive note into the instructions; if your application's code reads ${key}, move it to an application-owned file together with that reader.`);
   }
   const model = (meta as { model?: unknown }).model;
   if (model && typeof model === "object" && !Array.isArray(model)) {

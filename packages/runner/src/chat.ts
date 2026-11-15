@@ -30,7 +30,7 @@ import { createHandoffs } from "./handoff.js";
 import { privateStateDirectory } from "./private-state.js";
 import { publicCommentary } from "./commentary.js";
 import { recordRequestCancellation } from "./request-completion.js";
-import { createInstanceMessaging, instanceMessagingExtension, type InstanceMessage } from "./messages.js";
+import { createInstanceMessaging, instanceMessagingExtension, selectMessageTools, type InstanceMessage } from "./messages.js";
 import { createSchedules, scheduleTaskKind } from "./schedules.js";
 import type { Artifact, ArtifactRecord, ArtifactOptions, createArtifacts } from "./artifacts.js";
 
@@ -305,7 +305,9 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
         }
         const conversation = await tx.createConversation({ ownership: { kind: "ownerless" } });
         await configure(tx, conversation.id, host.configuration);
-        if (this.agents.find(definition => definition.id === agent)?.handoff) await tx.doc(Handoffs, conversation.id);
+        const definition = this.agents.find(definition => definition.id === agent)!;
+        await selectMessageTools(tx, conversation.id, definition);
+        if (definition.handoff) await tx.doc(Handoffs, conversation.id);
         const chat: Chat = {
           id: `${agent}:${conversation.id}`, agent, conversationId: conversation.id,
           source, ...(origin ? { origin } : {}), title: title.trim().slice(0, 120) || "New chat", createdAt: new Date().toISOString(),
