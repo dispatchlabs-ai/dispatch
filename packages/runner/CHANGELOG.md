@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Add a shared architecture reference and correct provider setup availability in the READMEs and guides: the commands shipped in 0.20.0.
+
 ## [0.20.0] - 2026-11-15
 
 - Add optional Nix-built execution environments with shared tools and Cua desktop builders, application-owned recipes, integrated setup and private per-agent bindings. Docker supplies the Linux builder; npm installation and the existing host/client commands remain unchanged. Reuse existing registered Cua desktops, containers, sandboxes and VMs.

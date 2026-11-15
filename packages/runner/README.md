@@ -3,6 +3,9 @@
 Define an agent in one Markdown file, start one host, and connect clients to its
 saved conversations. Pi Durable owns execution, recovery and storage.
 
+The [architecture reference](../../docs/architecture.md) explains how application
+definitions, the shared host and Pi's durable execution fit together.
+
 For a complete application with a researcher, developer, coding tools and MCP
 replies, follow [Build your own agents](docs/create-agents.md). The one-file path
 below is enough for a conversational agent.
@@ -68,7 +71,7 @@ turn and `/quit` to disconnect. `--session NAME` selects another conversation.
 Stopping the host with Ctrl-C preserves its history and unfinished work; start it
 with the same command to recover. Clients never start replacement owners.
 
-### Provider setup (unreleased)
+### Provider setup
 
 `dispatch providers add` uses Pi's native provider registry, authentication prompts
 and model discovery, verifies a response and saves `host.json`. `dispatch models
@@ -76,9 +79,9 @@ use` selects an agent's default model. The host can manage a local inference
 server; Apple local supplies an `fm serve` launch definition and a native Pi
 provider. Project hosts and clients discover `host.json` automatically.
 
-See [Connect providers and choose models](docs/providers.md). These commands are
-in the current source, not the v0.20.0 archives. The sign-in quickstart above
-remains valid for that release.
+These commands are included in the v0.20.0 archives. See
+[Connect providers and choose models](docs/providers.md); the sign-in quickstart
+above remains a valid setup path.
 
 ### Interactive terminal UI
 

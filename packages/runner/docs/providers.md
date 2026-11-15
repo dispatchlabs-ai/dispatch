@@ -1,8 +1,7 @@
 # Connect providers and choose models
 
-**Unreleased source feature; not included in the v0.19.0 archives.** The existing
-[sign-in commands](sign-in.md) remain supported. Use a build of this source until
-a release containing provider setup is published.
+Provider setup is included in the v0.20.0 package archives. The existing
+[sign-in commands](sign-in.md) remain supported.
 
 Run setup in your agents application, on the computer that will run its host:
 

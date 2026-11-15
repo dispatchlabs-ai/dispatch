@@ -4,6 +4,9 @@ Define AI agents in your own project. Give each one instructions, a model and th
 
 Dispatch is an npm dependency of **your agents application**. You do not need to clone Dispatch, build it, install Nix or generate a scaffold to use it. Pi Durable owns execution, recovery and saved conversations.
 
+[How Dispatch works](docs/architecture.md) explains the application, shared host,
+Pi Durable, agent messaging and optional execution environments.
+
 ## Quickstart
 
 Use Node **24.22.1 or newer** and npm on macOS or Linux. With a ChatGPT subscription, sign in once on the computer that will run your agents. No OpenAI API key, Dispatch source checkout or build is required.
@@ -48,15 +51,14 @@ Run `npx dispatch chat --history` to read the conversation from both clients. St
 
 **Try it without an account:** follow the [credential-free demo](docs/quickstart.md). It echoes messages locally, uses separate `.demo/` state and makes no model or tool calls.
 
-## Provider setup in the current source
+## Provider setup
 
-The next release adds `npx dispatch providers add`: choose a native Pi provider,
+Dispatch 0.20.0 includes `npx dispatch providers add`: choose a native Pi provider,
 sign in, discover its models and verify a response before saving the connection.
 `npx dispatch models use` assigns a model to an agent. Apple local can have the
 host manage `fm serve`, including readiness, restart and cleanup.
 
-This is **not yet in the v0.20.0 archives** used above. See the
-[provider setup guide](packages/runner/docs/providers.md) for the source commands,
+See the [provider setup guide](packages/runner/docs/providers.md) for commands,
 custom native providers and local-server ownership.
 
 ## Run your own agents

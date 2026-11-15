@@ -7,11 +7,11 @@ stops work. Clients never start, replace, upgrade or reopen an execution owner.
 For a complete copyable application, begin with [Build your own agents](create-agents.md).
 This page is the reference for host settings, client operations and network access.
 
-## Provider setup in the current source
+## Provider setup
 
-The unreleased [provider setup commands](providers.md) save native provider IDs or
-trusted factory bindings in `host.json`. `serve` and clients discover that file
-from the project directory; `--config` selects a different file. Without a file,
+The [provider setup commands](providers.md), available since 0.20.0, save native
+provider IDs or trusted factory bindings in `host.json`. `serve` and clients
+discover that file from the project directory; `--config` selects a different file. Without a file,
 the local launcher still derives built-in providers from the agent definitions.
 For local socket hosts, `--state` derives another store/socket pair and `--socket`
 selects an explicit socket. `--demo` retains its separate synthetic setup.
