@@ -5,7 +5,7 @@ import { ArrowUp, ChevronRight, FileText, LoaderCircle, Lock, Menu, Paperclip, P
 import { Button } from '@/components/ui/button';
 import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from '@/components/ai-elements/conversation';
 import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
-import type { Agent, Chat, Snapshot, SourceStatus, SidebarSnapshot } from '@/lib/contracts';
+import type { Agent, Chat, Snapshot, SourceStatus, SidebarSnapshot, ToolCall } from '@/lib/contracts';
 
 import { api, isDefiniteRejection } from '@/lib/api';
 import { loadDelivery, saveDelivery, type Pending } from '@/lib/delivery';
@@ -301,9 +301,17 @@ export default function App() {
   const outcome = lastTurn?.status === 'unanswered' ? lastTurn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${lastTurn.reason})` : '';
   const status = readingFiles ? 'Reading files…' : busy ? `${activity}${stopNotice?.id === selected ? ' · Stop requested' : ''}${snapshot?.queued ? ` · ${snapshot.queued} pending` : ''}` : selected && snapshot && connection !== 'Connected' ? connection : outcome;
   const failure = error || snapshot?.error;
-  const visible = (snapshot?.messages ?? []).filter(visibleMessage).map((message, index, all) => {
+  const toolsByMessage = new Map<string, ToolCall[]>();
+  for (const call of snapshot?.toolCalls ?? []) {
+    if (call.name === 'request_status') continue;
+    const calls = toolsByMessage.get(call.afterMessageId) ?? [];
+    calls.push(call);
+    toolsByMessage.set(call.afterMessageId, calls);
+  }
+  // Tool-only assistant entries still anchor activity in the native conversation order.
+  const visible = (snapshot?.messages ?? []).filter(message => visibleMessage(message) || toolsByMessage.has(message.id)).map((message, index, all) => {
     let previous = index - 1;
-    while (previous >= 0 && all[previous].provenance === 'runtime') previous--;
+    while (previous >= 0 && (all[previous].provenance === 'runtime' || !visibleMessage(all[previous]))) previous--;
     return { message, continued: message.provenance === 'runtime' ? index > 0 : previous >= 0 && authorKey(snapshot!.chat.agent, all[previous]) === authorKey(snapshot!.chat.agent, message) };
   });
   return <div className="app-shell">
@@ -332,12 +340,14 @@ export default function App() {
           {(!selected && !link || snapshot && !snapshot.messages.length && !snapshot.partial && !snapshot.partialThinking && !itemContext) && <ConversationEmptyState title={`Message ${agentName(snapshot?.chat.agent ?? agent) || 'an agent'}`} description=""/>}
           {link && !linkReady && <p className="empty-loading">Opening linked conversation…</p>}
           {selected && !snapshot && <p className="empty-loading">{connection}</p>}
-          {snapshot && visible.map(({ message, continued }) => message.provenance === 'runtime'
-            ? <MessageScrollerItem key={message.id} messageId={message.id} className={continued ? 'continued' : undefined}><TaskInput text={message.text}/><ToolTrace calls={(snapshot.toolCalls ?? []).filter(call => call.afterMessageId === message.id && call.name !== 'request_status')}/></MessageScrollerItem>
+          {snapshot && visible.map(({ message, continued }) => !visibleMessage(message)
+            ? <MessageScrollerItem key={message.id} messageId={message.id} className={continued ? 'continued' : undefined}><ToolTrace calls={toolsByMessage.get(message.id) ?? []}/></MessageScrollerItem>
+            : message.provenance === 'runtime'
+            ? <MessageScrollerItem key={message.id} messageId={message.id} className={continued ? 'continued' : undefined}><TaskInput text={message.text}/><ToolTrace calls={toolsByMessage.get(message.id) ?? []}/></MessageScrollerItem>
             : <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.provenance === 'user'} className={continued ? 'continued' : undefined}><Message align={message.provenance === 'user' ? 'end' : 'start'}><MessageContent>
               {!continued && <span className="message-author"><Avatar user={message.provenance === 'user'} identity={authorAgent(snapshot.chat.agent, message.author)} available={avatars}/>{message.provenance === 'user' ? 'You' : message.author ?? agentName(snapshot.chat.agent)}</span>}
-              <Bubble align={message.provenance === 'user' ? 'end' : 'start'} variant={message.provenance === 'user' ? 'muted' : 'ghost'}><BubbleContent>{message.thinking && <ThinkingSummary text={message.thinking}/>} {message.background && message.at !== undefined && <p className="commentary"><time dateTime={new Date(message.at).toISOString()}>{sentAt(message.at)}</time></p>}{message.commentary && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{snapshot.turns?.filter(turn => turn.status === 'unanswered' && String(turn.entryId) === message.id.split(':')[0]).map(turn => <p key={turn.submissionId} className="message-note">{turn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${turn.reason})`}</p>)}{message.attachments?.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt={file.name} src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle><a download={file.name} href={`data:${file.mimeType || 'text/plain'};base64,${file.data}`}>{file.name}</a></AttachmentTitle></AttachmentContent></Attachment>)}{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => snapshot.chat.capabilities?.artifacts === false ? <span key={artifact.id} className="artifact-link">{artifact.name} · Download unavailable</span> : <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</BubbleContent></Bubble></MessageContent></Message>{message.details && <ReplyDetails details={message.details}/>}<ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.afterMessageId===message.id && call.name!=='request_status')}/></MessageScrollerItem>)}
-          {snapshot && <ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.name!=='request_status' && !snapshot.messages.some(message=>message.id===call.afterMessageId && visibleMessage(message)))}/>}
+              <Bubble align={message.provenance === 'user' ? 'end' : 'start'} variant={message.provenance === 'user' ? 'muted' : 'ghost'}><BubbleContent>{message.thinking && <ThinkingSummary text={message.thinking}/>} {message.background && message.at !== undefined && <p className="commentary"><time dateTime={new Date(message.at).toISOString()}>{sentAt(message.at)}</time></p>}{message.commentary && message.commentary.trim() !== message.text.trim() && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{snapshot.turns?.filter(turn => turn.status === 'unanswered' && String(turn.entryId) === message.id.split(':')[0]).map(turn => <p key={turn.submissionId} className="message-note">{turn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${turn.reason})`}</p>)}{message.attachments?.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt={file.name} src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle><a download={file.name} href={`data:${file.mimeType || 'text/plain'};base64,${file.data}`}>{file.name}</a></AttachmentTitle></AttachmentContent></Attachment>)}{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => snapshot.chat.capabilities?.artifacts === false ? <span key={artifact.id} className="artifact-link">{artifact.name} · Download unavailable</span> : <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</BubbleContent></Bubble></MessageContent></Message>{message.details && <ReplyDetails details={message.details}/>}<ToolTrace calls={toolsByMessage.get(message.id) ?? []}/></MessageScrollerItem>)}
+          {snapshot && <ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.name!=='request_status' && !snapshot.messages.some(message=>message.id===call.afterMessageId))}/>}
           {(snapshot?.partial || snapshot?.partialThinking) && <Message align="start"><MessageContent><span className="message-author"><Avatar identity={snapshot.chat.agent} available={avatars}/>{agentName(snapshot.chat.agent)}</span>{snapshot.partialThinking && <ThinkingSummary text={snapshot.partialThinking}/>} {snapshot.partial && <MessageResponse>{snapshot.partial}</MessageResponse>}</MessageContent></Message>}
         </ConversationContent>
         <ConversationScrollButton aria-label="Scroll to latest message"/>

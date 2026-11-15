@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Keep tool-only activity inline at its native conversation position, including after later messages and reloads, without empty assistant bubbles. Show commentary once when it repeats the message text.
+
 ## [0.19.0] - 2026-11-14
 
 - Replace the source-build browser walkthrough with prebuilt package setup and explicit connections to demo or live hosts.
