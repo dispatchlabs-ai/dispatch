@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-16
+
 - Preview the normal agent definition, host tools, installed environment and working directory under the selected roster identity. Keep per-person conversations separate from prior fixture histories.
 
 ## [0.24.0] - 2026-11-16

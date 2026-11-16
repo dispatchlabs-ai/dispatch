@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-16
+
 - Route a preview agent's connection to its own Dispatch host to the selected person's preview instances.
 
 ## [0.19.0] - 2026-11-14
