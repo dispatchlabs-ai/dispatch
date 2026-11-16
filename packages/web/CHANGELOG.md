@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-16
+
 - Serve authenticated loopback Web previews with switchable identities and a fresh password for each launch.
 
 ## [0.23.0] - 2026-11-16

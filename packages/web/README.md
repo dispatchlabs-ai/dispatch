@@ -14,7 +14,7 @@ with Node 24.22.1 or newer and a complete `host.json`, install the matching Web
 archive and add its npm command:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.23.0/dispatch-web-0.23.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.24.0/dispatch-web-0.24.0.tgz
 npm pkg set 'scripts.web=dispatch-web --config host.json'
 ```
 
