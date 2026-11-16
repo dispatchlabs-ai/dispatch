@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-16
+
 - Link authenticated people across supported clients with an optional application roster and private Markdown context for each model request.
 
 ## [0.21.0] - 2026-11-15

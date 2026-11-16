@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-16
+
 - Admit a rostered sender and group participants for the configured agent, retaining per-message identity.
 
 ## [0.22.0] - 2026-11-16

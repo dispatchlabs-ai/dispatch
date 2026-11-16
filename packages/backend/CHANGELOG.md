@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-16
+
 - Carry verified browser identity to native hosts and retain public human authorship.
 
 ## [0.21.0] - 2026-11-15

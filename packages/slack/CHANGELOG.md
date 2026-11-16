@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-16
+
 - Resolve authenticated workspace members through the shared roster and attribute cross-client posts to their authors.
 
 ## [0.17.3] - 2026-11-13
