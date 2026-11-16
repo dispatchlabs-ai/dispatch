@@ -4,6 +4,18 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.27.0 Incoming Messages photos — November 16, 2026 UTC
+
+The Messages adapter passed two screenshots from a remote Mac to an image-capable
+model in one turn. Replays with and without a caption preserved both original
+file hashes and their order. The model distinguished the two screens; replies
+were captured privately. A lookup with a different message GUID was rejected.
+
+All 14 [GitHub release assets](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.27.0)
+matched the reviewed files. macOS arm64 build and flake checks, Linux arm64 Web
+and Workers OCI builds, external package installs and strict imports passed. A
+clean install from the release URLs reconnected the application to Messages.
+
 ## v0.26.0 Messages table attachments — November 16, 2026 UTC
 
 All 14 GitHub assets matched the inspected bytes and SHA-256 digests for
