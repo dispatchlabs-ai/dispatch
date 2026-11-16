@@ -16,7 +16,7 @@ Use Node 24.22.1 or newer and an existing Dispatch application. Install the
 matching MCP archive; it resolves its Runner dependency from the same release.
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.21.1/dispatch-mcp-0.21.1.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.22.0/dispatch-mcp-0.22.0.tgz
 npx dispatch serve --config host.json
 ```
 
