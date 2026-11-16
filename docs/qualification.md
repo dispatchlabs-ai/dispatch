@@ -4,6 +4,24 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.24.0 agent preview — November 16, 2026 UTC
+
+All 14 published files and GitHub digests matched the inspected release for
+`0b4f74851bc0ea79b3b92b8d6837bc3aca67568e`. The workspace build and type
+checks, macOS arm64 flake checks and distribution builds, and Linux arm64 Web
+and Workers OCI builds passed. Five external package combinations installed.
+Strict NodeNext imports passed and the production npm audit returned zero
+findings. The twelve package archives had zero known-pattern scan hits.
+[Release v0.24.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.24.0).
+
+A Runner-only application sent a terminal turn, reopened its history through
+the connection file and retained it across a headless restart. A clean Web
+application installed from the release URLs with `npm ci` and started its
+configured agent with `npm run preview`. Terminal and signed-in Web turns
+appeared in the same native conversation, with the same roster identity.
+Switching identity opened a separate history. Browser checks included both
+desktop sizes, tablet and phone navigation.
+
 ## v0.23.0 shared users — November 16, 2026 UTC
 
 The twelve npm archives, manifest and checksums matched the published bytes
