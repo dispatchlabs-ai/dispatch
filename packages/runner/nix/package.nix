@@ -23,6 +23,7 @@ buildNpmPackage {
       ../../slack/package.json
       ../../google-chat/package.json
       ../../observer/package.json
+      ../../imsg/package.json
       ../../email/package.json
       ../../mcp/package.json
       ../../fleet/package.json

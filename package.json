@@ -11,6 +11,7 @@
     "packages/workers",
     "packages/slack",
     "packages/google-chat",
+    "packages/imsg",
     "packages/email",
     "packages/fleet",
     "packages/observer",

@@ -52,6 +52,8 @@ servers belong to the explicit host, and client disconnect does not stop them.
 See [provider setup](../packages/runner/docs/providers.md) for availability and
 lifecycle details.
 
+The [Messages adapter](../packages/imsg/README.md) admits attributed text and delivers the final answer to the same Messages chat. Its transport address is the connection and chat GUID.
+
 ## Authority
 
 - **Local-first use:** CLI and local Web act with the local account's filesystem

@@ -1,0 +1,37 @@
+# Dispatch Messages
+
+Connect an agent to text conversations in the Mac Messages app. Texts from the same conversation share agent history. Each final answer goes back to its originating chat GUID, including group chats, using the service Messages associates with that chat.
+
+## Use it with your AI agent
+
+> Add the Messages channel to my Dispatch host using the [setup below](https://github.com/dispatchlabs-ai/dispatch/tree/main/packages/imsg#setup). Use my chosen agent and allowed family or team handles. Verify the original chat receives a reply.
+
+## Setup
+
+On the Mac, sign in to Messages and install [imsg](https://github.com/openclaw/imsg). The adapter uses protocol 1 with the v0.21.0 replay and chat lookup methods. Grant the process access to Messages history and permission to send with Messages. For carrier texts, configure forwarding on the iPhone and verify the Mac can send and receive in that conversation.
+
+Install the matching `@dispatch/imsg`, `@dispatch/runner` and Pi Durable versions from the [Dispatch release](https://github.com/dispatchlabs-ai/dispatch/releases). Add this entry to `adapters` in the existing host configuration:
+
+```json
+{ "module": "@dispatch/imsg", "optionsFile": "imsg.local.json" }
+```
+
+In the private options file, choose an agent defined by the application and a stable name for this Messages database:
+
+```json
+{
+  "connection": "team-mac",
+  "agent": "assistant",
+  "allowedHandles": ["+12025550101", "+12025550102"]
+}
+```
+
+The default command is `imsg rpc`. To connect to another Mac, add `"command": "ssh"` and `"args": ["-T", "-o", "BatchMode=yes", "messages-mac", "/path/to/imsg rpc"]`. Configure host-key verification and an unattended SSH identity on the application host. Arguments go directly to the executable.
+
+Start the host as usual. After the first “Messages connection … ready” line, send a text from an allowed handle. Check for the reply in the same conversation. For a group, check that the other participant can see the reply there as well.
+
+## Routing and recovery
+
+With `allowedHandles` configured, the sender and all remote members of the current chat must be in the list. Use the exact phone or email handles Messages reports. Omitting the list admits all participants. Incoming text is attributed to its sender. Outgoing echoes, reactions and attachment-only messages do not start a turn.
+
+The first connection establishes a baseline at the current end of history. Subsequent connections replay from the saved database cursor. Use a new connection name if the Messages database is replaced or restored. Durable submissions and replies retain their incoming and outgoing identifiers. If the send result is lost, Dispatch checks fresh outgoing history in that chat. Ambiguous delivery leaves a failed task for inspection; review Messages before sending again.

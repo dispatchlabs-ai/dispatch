@@ -1,0 +1,52 @@
+{
+  "name": "@dispatch/imsg",
+  "version": "0.21.1",
+  "description": "Apple Messages text transport for Dispatch Runner",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24.22.1"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "USE_CASES.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "pretypecheck": "npm run build --workspace @dispatch/runner",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "typescript": "6.0.3"
+  },
+  "peerDependencies": {
+    "@dispatch/runner": "0.21.1",
+    "@earendil-works/pi-durable": "1.5.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dispatchlabs-ai/dispatch.git",
+    "directory": "packages/imsg"
+  },
+  "homepage": "https://github.com/dispatchlabs-ai/dispatch/tree/main/packages/imsg#readme",
+  "bugs": {
+    "url": "https://github.com/dispatchlabs-ai/dispatch/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts"
+}
