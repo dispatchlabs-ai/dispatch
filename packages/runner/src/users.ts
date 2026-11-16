@@ -55,9 +55,9 @@ export class Users {
     return [...this.people.values()].filter(user => user.agents.includes(agent));
   }
 
-  static preview(person: Pick<Person, "id" | "name" | "contextFile">, agent: string, identities: UserIdentity[]) {
+  static preview(person: Pick<Person, "id" | "name" | "contextFile"> & { agents?: string[] }, agent: string, identities: UserIdentity[]) {
     const users = new Users();
-    users.add({ ...person, agents: [agent], identities });
+    users.add({ ...person, agents: person.agents ?? [agent], identities });
     return users;
   }
 

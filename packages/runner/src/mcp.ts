@@ -14,7 +14,7 @@ import {
 export type McpServers = Record<string, McpServerConfig & { tools?: string[] }>;
 
 /** Connect the servers selected by definitions, discovering native Durable tools before recovery starts. */
-export async function connectMcpServers(servers: McpServers, options: { cwd: string; names: string[];
+export async function connectMcpServers(servers: McpServers, options: { cwd: string; names: string[]; stdioEnv?: Record<string, string>;
   /** Host-owned arguments removed from model-facing schemas and supplied on every call. */
   argumentsByServer?: Record<string, Record<string, Record<string, JsonValue>>> }) {
   if (!servers || typeof servers !== "object" || Array.isArray(servers)) throw new Error("mcpServers must be an object.");
@@ -68,7 +68,8 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
       const values = (entries: Record<string, string> | undefined) => entries === undefined ? undefined
         : Object.fromEntries(Object.entries(entries).map(([key, value]) => [key, expand(value)]));
       const transport = () => server.kind === "stdio" ? new StdioTransport({
-        command: path(server.config.command), args: server.config.args?.map(path), env: values(server.config.env),
+        command: path(server.config.command), args: server.config.args?.map(path),
+        env: { ...values(server.config.env), ...options.stdioEnv },
         cwd: resolve(options.cwd, path(server.config.cwd ?? ".")), maxMessageBytes: Infinity,
       }) : new StreamableHttpTransport({ url: server.config.url, headers: values(server.config.headers), maxMessageBytes: Infinity });
       let current: McpClient | undefined;

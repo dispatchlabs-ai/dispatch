@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Route a preview agent's connection to its own Dispatch host to the selected person's preview instances.
+
 ## [0.19.0] - 2026-11-14
 
 - Link complete application setup and a manual automatic-reply exercise that identifies the MCP-prefixed tools explicitly.

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Preview the normal agent definition, host tools, installed environment and working directory under the selected roster identity. Keep per-person conversations separate from prior fixture histories.
+
 ## [0.24.0] - 2026-11-16
 
 - Add `dispatch preview --agent NAME` with isolated per-person service connections, `dispatch chat --preview NAME --as USER`, optional Web and application-owned sample tools.

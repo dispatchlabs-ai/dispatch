@@ -28,6 +28,7 @@ export type PreparedAdapter = {
 export type Adapter = { prepare(options: { root: string; runner: Runner }): Promise<PreparedAdapter> };
 export type RunOptions = {
   usersFile?: string;
+  users?: Users;
   storage?: StorageFactory;
   /** Native host policy, including model retry; not part of agent definitions. */
   settings?: OpenOptions["settings"];
@@ -40,6 +41,10 @@ export type RunOptions = {
   runner?: Runner;
   models?: Models;
   names?: string[];
+  agents?: LoadedAgent[];
+  /** Installed environment bindings can be shared with a host using a separate conversation store. */
+  environmentStateRoot?: string;
+  mcpStdioEnv?: Record<string, string>;
   demo?: boolean;
   updateDefinitions?: boolean | "when-idle";
   /** Skip automatic recovery/schedules when inspecting saved conversations. */
@@ -74,8 +79,9 @@ export async function run(options: RunOptions = {}) {
     }
   })();
   try {
-    const names = options.names?.length ? options.names : (await catalog(root)).filter(agent => agent.runnable).map(agent => agent.id);
-    const users = options.usersFile === undefined ? undefined : await Users.load(resolve(root, options.usersFile), names);
+    const names = options.agents?.map(agent => agent.id) ?? (options.names?.length ? options.names
+      : (await catalog(root)).filter(agent => agent.runnable).map(agent => agent.id));
+    const users = options.users ?? (options.usersFile === undefined ? undefined : await Users.load(resolve(root, options.usersFile), names));
     const requested = new Set<string>();
     const definitions: LoadedAgent[] = [];
     const collect = (agent: LoadedAgent) => {
@@ -84,14 +90,15 @@ export async function run(options: RunOptions = {}) {
       for (const child of agent.delegateAgents ?? []) collect(child);
       if (agent.handoffAgent) collect(agent.handoffAgent);
     };
-    for (const name of names) collect(await loadAgent(root, name));
-    const environments = await environmentConnections(definitions, resolve(options.stateRoot ?? resolve(root, ".state")));
+    const agents = options.agents ?? await Promise.all(names.map(name => loadAgent(root, name)));
+    for (const agent of agents) collect(agent);
+    const environments = await environmentConnections(definitions, resolve(options.environmentStateRoot ?? options.stateRoot ?? resolve(root, ".state")));
     for (const name of Object.keys(environments.servers)) {
       if (options.mcpServers?.[name]) throw new Error(`MCP name ${name} is reserved for the selected environment.`);
       requested.add(name);
     }
     if (requested.size || options.mcpServers !== undefined) mcp = await connectMcpServers({ ...options.mcpServers, ...environments.servers },
-      { cwd: options.cwd ?? root, names: [...requested], argumentsByServer: environments.argumentsByServer });
+      { cwd: options.cwd ?? root, names: [...requested], argumentsByServer: environments.argumentsByServer, stdioEnv: options.mcpStdioEnv });
     const prepareAgent = (agent: LoadedAgent): LoadedAgent => {
       const environment = environments.selected.get(agent.id);
       const connections = [...(agent.mcp ?? []), ...(environment?.server ? [environment.server] : [])];
@@ -129,8 +136,7 @@ export async function run(options: RunOptions = {}) {
       if (!options.models) throw new Error("Supply a Pi Models catalog or an open callback.");
       service = await runner.ChatService.open({
         root, stateRoot: resolve(options.stateRoot ?? resolve(root, ".state")),
-        models: options.models, demo: options.demo ?? false, names: options.names,
-        prepareAgent,
+        models: options.models, demo: options.demo ?? false, agents: agents.map(prepareAgent),
         updateDefinitions: options.updateDefinitions, initialize: options.initialize,
         resume: options.resume, schedules: options.schedules,
         deferResume: true,
@@ -144,7 +150,7 @@ export async function run(options: RunOptions = {}) {
     for (const adapter of adapters) await adapter.start(service);
     if (options.resume !== false) await service.start();
     const stateRoot = options.stateRoot ?? (!options.open ? resolve(root, ".state") : undefined);
-    const preferredAgent = await defaultAgent(root).catch(() => undefined);
+    const preferredAgent = options.agents?.[0]?.id ?? await defaultAgent(root).catch(() => undefined);
     const client = localClient(service, {
       ...(users ? { usersConfigured: true } : {}),
       ...(stateRoot ? { stateRoot: await realpath(stateRoot) } : {}),

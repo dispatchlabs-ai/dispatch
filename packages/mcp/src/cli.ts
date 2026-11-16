@@ -29,7 +29,12 @@ async function main() {
     return value;
   }
   if (port !== undefined) await token();
-  const settings = await readClientConnection(values.config);
+  let settings = await readClientConnection(values.config);
+  // A host preview has its own agent instances. Keep connections to other hosts as configured.
+  if (process.env.DISPATCH_MCP_PREVIEW) {
+    const { source, socket } = JSON.parse(process.env.DISPATCH_MCP_PREVIEW);
+    if (source === (settings.socket ?? settings.url)) settings = { socket };
+  }
   const connecting = new AbortController();
   let connection: Promise<AgentClient> | undefined;
   // Discovery must work before the host listens: an agent in that same host

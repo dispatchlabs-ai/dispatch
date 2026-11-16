@@ -115,9 +115,12 @@ keep the plain interface. See the [client guide](docs/service.md#interactive-ter
 ## Preview an agent
 
 Run `npx dispatch preview --agent NAME` from your application. This starts
-private Dispatch service connections using the agent's Markdown, repository
-instructions and configured model. Each enrolled person gets a separate history
-and their usual profile. An application without a roster gets one local identity.
+private Dispatch service connections using the agent's normal definition, model,
+skills, coding tools, MCP connections and installed environment. Each enrolled
+person gets a separate conversation history and their current profile. Tools
+use the same working directory, data and credentials as the host. Changes they
+make to files or external services are real. An application without a roster
+gets one local identity.
 
 In another terminal, run `npx dispatch chat --preview NAME --as USER` using an
 identity printed at startup. Omit `--as` for the local identity. Other service
@@ -129,16 +132,19 @@ When the matching Web package is installed, preview also serves a loopback
 client on port 4330. Open the printed URL and sign in with the temporary
 password. Use `--no-web` for a headless host or `--port` to select another
 port. Restart preview to pick up definition changes and reopen the histories
-in `.demo/NAME/`. Add `.demo/` to your application's `.gitignore`.
+in `.demo/.live/NAME/`. Add `.demo/` to your application's `.gitignore`.
+The local Dispatch MCP connector sends agent-to-agent messages within that
+person's preview host. The application's channel listeners and scheduled work
+continue to belong to the regular host.
 
-For sample tools or skills, place an optional `preview.ts` next to `agent.md`.
-It exports an object satisfying `AgentPreview`. For example, a preview can
-select `skills: ["agent/order-status"]` and pass an extension backed by sample
-orders in `extensions`. These are the only application tools enabled for preview.
-The production `agent.ts`, MCP servers, channels, environments and schedules
-stay disconnected. `skills: true` selects all scoped skills. Set
-`includeSelf: false` to omit the operator's local roster identity, or set
-`history` to reuse a named preview directory and conversation key.
+No preview file is required. An optional `preview.ts` next to `agent.md` can
+export `{ includeSelf: false }` to omit the operator or `{ history: "orders" }`
+to choose a history name. Both keep the normal definition.
+
+For an explicit fixture, export `extensions` or `skills` in `preview.ts`.
+Those fields select the entire set of preview tools and skills, in place of
+the normal agent bindings. Fixture histories retain their original
+`.demo/NAME/` location, separate from conversations that use real tools.
 
 ## Try it without credentials
 

@@ -5,11 +5,12 @@ import { userInfo } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createModels } from "@earendil-works/pi-ai/models";
-import { agentName, catalog, loadPreviewAgent } from "./definition.js";
-import { localHostPaths, readHostConfig, readProjectHostConfig } from "./host-config.js";
+import { agentName, catalog, loadAgent, loadPreviewAgent } from "./definition.js";
+import { configuredClientConnection, localHostPaths, readHostConfig, readProjectHostConfig } from "./host-config.js";
 import { hostModels } from "./host-models.js";
 import { createRunner } from "./index.js";
 import { privateStateDirectory } from "./private-state.js";
+import { run } from "./run.js";
 import { serveService, type ServiceConfig } from "./service.js";
 import { serviceSettings } from "./settings.js";
 import { Users } from "./users.js";
@@ -44,17 +45,26 @@ export async function previewCommand(id: string, options: { root?: string; confi
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("The Web port must be an integer from 1 to 65535.");
   const config: ServiceConfig = options.config ? await readHostConfig(options.config)
     : await readProjectHostConfig(options) ?? await localHostPaths(options);
+  process.chdir(config.cwd);
   const previewWeb = options.noWeb ? undefined : await webClient(config.root);
-  const { agent, history, includeSelf } = await loadPreviewAgent(config.root, id);
+  const names = config.names?.length ? config.names : (await catalog(config.root)).filter(item => item.runnable).map(item => item.id);
+  if (!names.includes(id)) throw new Error(`Agent ${id} is not served by this host.`);
+  const { agent, fixtures, history, includeSelf } = await loadPreviewAgent(config.root, id);
+  const agents = [agent];
+  for (const sender of agents) for (const target of sender.messages ?? []) {
+    if (!names.includes(target)) throw new Error(`${sender.id} messages ${target}; include both agents in this service's names.`);
+    if (!agents.some(peer => peer.id === target)) agents.push(await loadAgent(config.root, target));
+  }
   const owner = userInfo().username;
-  const roster = config.usersFile ? await Users.load(config.usersFile, (await catalog(config.root)).filter(item => item.runnable).map(item => item.id)) : undefined;
+  const roster = config.usersFile ? await Users.load(config.usersFile, names) : undefined;
   const operator = roster?.find({ channel: "local", handle: owner }, id);
   const people = roster ? roster.forAgent(id).filter(person => includeSelf || person.id !== operator?.id)
-    .sort((a, b) => a.id.localeCompare(b.id)) : [{ id: "local", name: owner }];
+    .sort((a, b) => a.id.localeCompare(b.id)) : [{ id: "local", name: owner, agents: agents.map(peer => peer.id) }];
   if (!people.length) throw new Error(`No enrolled users match this preview for ${id}.`);
 
   const base = join(await realpath(config.root), ".demo");
-  const directory = join(base, history);
+  const histories = fixtures ? base : join(base, ".live");
+  const directory = join(histories, history);
   const live = await realpath(config.stateRoot).catch((error: NodeJS.ErrnoException) => {
     if (error.code !== "ENOENT") throw error;
     return resolve(config.stateRoot);
@@ -62,21 +72,24 @@ export async function previewCommand(id: string, options: { root?: string; confi
   if (directory === live || directory.startsWith(live + sep) || live.startsWith(directory + sep))
     throw new Error("Preview history overlaps the configured host state. Choose a separate preview history.");
   await privateStateDirectory(base);
+  if (!fixtures) await privateStateDirectory(histories);
   await privateStateDirectory(directory);
   const clients = dirname(previewClientFile(config.root, id));
   await privateStateDirectory(dirname(clients));
   await privateStateDirectory(clients);
 
   const provider = hostModels(config.gateway || config.modelProviders ? config : {
-    modelProviders: [{ provider: agent.model.provider }],
+    modelProviders: [...new Set(agents.map(peer => peer.model.provider))].map(provider => ({ provider })),
   }, config.cwd);
   const controller = new AbortController();
   const stop = () => controller.abort();
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
   const runner = createRunner({ namespace: config.namespace });
-  const services: Awaited<ReturnType<typeof runner.ChatService.open>>[] = [];
+  const hosts: Awaited<ReturnType<typeof run>>[] = [];
   const listeners: Awaited<ReturnType<typeof serveService>>[] = [];
+  const endpoint = configuredClientConnection(config);
+  const source = endpoint?.socket ?? endpoint?.url;
   try {
     const models = createModels({ authContext: { env: async () => undefined, fileExists: async () => false } });
     await provider.connect(models, controller.signal);
@@ -88,16 +101,16 @@ export async function previewCommand(id: string, options: { root?: string; confi
       const { stateRoot, socket } = await localHostPaths({ root: config.root, state: join(directory, key) });
       const users = Users.preview(person, id, [{ channel: "local", handle: owner },
         { channel: "web", scope: `http://127.0.0.1:${port}`, handle: owner }]);
-      const service = await runner.ChatService.open({ root: config.root, cwd: directory, stateRoot, agents: [agent],
-        extensions: [users.extension(runner.namespace)], models, settings, demo: config.demo ?? false,
-        deferResume: true, schedules: false, updateDefinitions: "when-idle" });
-      services.push(service);
-      service.users = users;
-      await service.start();
+      const host = await run({ root: config.root, cwd: fixtures ? directory : config.cwd, stateRoot, agents,
+        runner, users, models, settings, demo: config.demo, definitionResources: config.definitionResources,
+        mcpServers: fixtures ? undefined : config.mcpServers, environmentStateRoot: config.stateRoot,
+        mcpStdioEnv: !fixtures && source ? { DISPATCH_MCP_PREVIEW: JSON.stringify({ source, socket }) } : undefined,
+        schedules: false, updateDefinitions: config.updateDefinitions ?? "when-idle",
+        beforeStart: async service => { listeners.push(await serveService(service, socket, [], { stateRoot, defaultAgent: id, usersConfigured: true })); } });
+      hosts.push(host);
       const label = `Preview as ${person.name}`;
-      const chat = await service.create(id, previewWeb ? "web" : "cli", history, label);
-      listeners.push(await serveService(service, socket, [], { stateRoot, defaultAgent: id, usersConfigured: true }));
-      installations.push({ id: `preview-${key}`, label, service: { socket, expectedStateRoot: stateRoot, label } });
+      const chat = await host.service.create(id, previewWeb ? "web" : "cli", history, label);
+      installations.push({ id: fixtures ? `preview-${key}` : `live-${id}-${key}`, label, service: { socket, expectedStateRoot: stateRoot, label } });
       const file = previewClientFile(config.root, id, person.id);
       const temporary = file + "." + randomUUID();
       try {
@@ -121,7 +134,7 @@ export async function previewCommand(id: string, options: { root?: string; confi
   } finally {
     try { await Promise.all(listeners.map(listener => listener.close())); }
     finally {
-      try { await Promise.all(services.map(service => service.close())); }
+      try { await Promise.all(hosts.map(host => host.close())); }
       finally {
         process.off("SIGINT", stop);
         process.off("SIGTERM", stop);

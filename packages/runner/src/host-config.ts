@@ -80,7 +80,12 @@ export async function readHostConfig(filename: string): Promise<FileConfig> {
 export async function readClientConnection(filename?: string): Promise<ClientConnection> {
   filename ??= await projectHostConfig();
   if (filename === undefined) return { socket: (await localHostPaths({})).socket };
-  const { socket, url, tokenFile, http, conversation } = await readHostConfig(filename);
+  const connection = configuredClientConnection(await readHostConfig(filename));
+  if (!connection) throw new Error("Configure a service socket, a loopback HTTP listener, or a client URL for the running host.");
+  return connection;
+}
+
+export function configuredClientConnection({ socket, url, tokenFile, http, conversation }: FileConfig): ClientConnection | undefined {
   if (conversation !== undefined && (typeof conversation !== "string" || !conversation.trim())) throw new Error("A client conversation must be a retained conversation ID.");
   const selected = conversation ? { conversation } : {};
   if (socket) return { socket, ...selected };
@@ -91,7 +96,6 @@ export async function readClientConnection(filename?: string): Promise<ClientCon
       return { ...tokenConnection(`http://${host === "::1" ? "[::1]" : host}:${http.port}`, http.tokenFile), ...selected };
     }
   }
-  throw new Error("Configure a service socket, a loopback HTTP listener, or a client URL for the running host.");
 }
 
 function tokenConnection(url: string, tokenFile?: string): ClientConnection {

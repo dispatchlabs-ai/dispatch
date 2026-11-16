@@ -58,7 +58,7 @@ export type LoadedAgent = AgentDefinition & {
 
 export const agentName = /^[a-z][a-z0-9-]*$/;
 
-/** Optional preview.ts next to agent.md. Only these bindings enter a preview. */
+/** Optional preview.ts next to agent.md. Explicit tool or skill fixtures replace the live bindings. */
 export type AgentPreview = {
   extensions?: Extension[];
   /** Scoped skill IDs, or true to include the whole skill catalog. */
@@ -193,8 +193,9 @@ export async function loadPreviewAgent(root: string, id: string) {
     (preview.history !== undefined && (typeof preview.history !== "string" || !agentName.test(preview.history)))) {
     throw new Error("preview.ts accepts extensions, skills (true or scoped skill IDs), a history name and includeSelf.");
   }
-  return { agent: await readDefinition(root, id, folder, [], { ...preview, code }), history: preview.history ?? id,
-    includeSelf: preview.includeSelf ?? true };
+  const fixtures = preview.extensions !== undefined || preview.skills !== undefined;
+  return { agent: await readDefinition(root, id, folder, [], fixtures ? { ...preview, code } : undefined),
+    fixtures, history: preview.history ?? id, includeSelf: preview.includeSelf ?? true };
 }
 
 async function readDefinition(root: string, id: string, folder: string, ancestors: string[], preview?: AgentPreview & { code: string }): Promise<LoadedAgent> {
