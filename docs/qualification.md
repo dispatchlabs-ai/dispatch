@@ -4,6 +4,32 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.23.0 shared users — November 16, 2026 UTC
+
+The twelve npm archives, manifest and checksums matched the published bytes
+and GitHub digests for tag `ba7dda9195829c510338950133fffaa23bcd8f83`.
+Workspace build and type checks, macOS arm64 flake and distribution builds,
+and both Linux arm64 OCI builds passed. Five external package combinations
+installed, all-package strict imports passed, and the production npm audit
+reported zero findings. Archive scans returned zero known-pattern findings.
+[Release v0.23.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.23.0).
+
+A clean consumer ran `npm ci`, `npm start`, `npm run chat` and `npm run web`.
+Pi chat and signed-in local Web recorded the same user ID in one conversation.
+External inference used revised Markdown on the next turn without a restart.
+A second authenticated Web identity received its own notes. The stored
+transcript contained the speaker attribution and omitted the private Markdown.
+An unauthenticated browser received HTTP 401. Browser checks covered the four
+documented viewport sizes and phone navigation.
+
+An existing installation upgraded in place, preserved every prior native entry
+and completed turns through Pi chat and Web. A text from the same person was
+recorded under the same user ID. The outgoing phone log showed exactly one
+reply in the original Messages chat, matching the agent's completed answer.
+The Slack adapter connected and an existing DM sender matched the roster.
+An unlisted Messages handle had no match. A fresh Slack round trip and
+group-device delivery remain open.
+
 ## v0.22.0 Messages channel — November 16, 2026 UTC
 
 The [release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.22.0)
