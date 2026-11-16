@@ -1,11 +1,11 @@
-import { createHash } from "node:crypto";
-import { realpath } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { realpath, rename, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { userInfo } from "node:os";
-import { join, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createModels } from "@earendil-works/pi-ai/models";
-import { catalog, loadPreviewAgent } from "./definition.js";
+import { agentName, catalog, loadPreviewAgent } from "./definition.js";
 import { localHostPaths, readHostConfig, readProjectHostConfig } from "./host-config.js";
 import { hostModels } from "./host-models.js";
 import { createRunner } from "./index.js";
@@ -13,6 +13,7 @@ import { privateStateDirectory } from "./private-state.js";
 import { serveService, type ServiceConfig } from "./service.js";
 import { serviceSettings } from "./settings.js";
 import { Users } from "./users.js";
+import { reportError, terminalText } from "./terminal-output.js";
 
 type Installation = { id: string; label: string; service: { socket: string; expectedStateRoot: string; label: string } };
 
@@ -21,7 +22,7 @@ async function webClient(root: string) {
   try { entry = createRequire(join(root, "package.json")).resolve("@dispatch/web/preview.js"); }
   catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "MODULE_NOT_FOUND") throw error;
-    throw new Error("Preview needs the matching @dispatch/web package installed in this application.");
+    return undefined;
   }
   return (await import(pathToFileURL(entry).href)).previewWeb as (options: {
     installations: Installation[]; port: number; username: string; signal: AbortSignal;
@@ -33,12 +34,17 @@ function personKey(id: string) {
   return /^[a-z0-9][a-z0-9_-]*$/.test(id) ? id : "_" + createHash("sha256").update(id).digest("hex");
 }
 
-export async function previewCommand(id: string, options: { root?: string; config?: string; port?: string }) {
+export function previewClientFile(root: string, agent: string, person = "local") {
+  if (!agentName.test(agent)) throw new Error(`Invalid agent name: ${agent}`);
+  return join(root, ".demo", ".clients", agent, personKey(person) + ".json");
+}
+
+export async function previewCommand(id: string, options: { root?: string; config?: string; port?: string; noWeb?: boolean }) {
   const port = Number(options.port ?? process.env.DISPATCH_PORT ?? 4330);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("The Web port must be an integer from 1 to 65535.");
   const config: ServiceConfig = options.config ? await readHostConfig(options.config)
     : await readProjectHostConfig(options) ?? await localHostPaths(options);
-  const previewWeb = await webClient(config.root);
+  const previewWeb = options.noWeb ? undefined : await webClient(config.root);
   const { agent, history, includeSelf } = await loadPreviewAgent(config.root, id);
   const owner = userInfo().username;
   const roster = config.usersFile ? await Users.load(config.usersFile, (await catalog(config.root)).filter(item => item.runnable).map(item => item.id)) : undefined;
@@ -57,6 +63,9 @@ export async function previewCommand(id: string, options: { root?: string; confi
     throw new Error("Preview history overlaps the configured host state. Choose a separate preview history.");
   await privateStateDirectory(base);
   await privateStateDirectory(directory);
+  const clients = dirname(previewClientFile(config.root, id));
+  await privateStateDirectory(dirname(clients));
+  await privateStateDirectory(clients);
 
   const provider = hostModels(config.gateway || config.modelProviders ? config : {
     modelProviders: [{ provider: agent.model.provider }],
@@ -77,7 +86,8 @@ export async function previewCommand(id: string, options: { root?: string; confi
       controller.signal.throwIfAborted();
       const key = personKey(person.id);
       const { stateRoot, socket } = await localHostPaths({ root: config.root, state: join(directory, key) });
-      const users = Users.preview(person, id, { channel: "web", scope: `http://127.0.0.1:${port}`, handle: owner });
+      const users = Users.preview(person, id, [{ channel: "local", handle: owner },
+        { channel: "web", scope: `http://127.0.0.1:${port}`, handle: owner }]);
       const service = await runner.ChatService.open({ root: config.root, cwd: directory, stateRoot, agents: [agent],
         extensions: [users.extension(runner.namespace)], models, settings, demo: config.demo ?? false,
         deferResume: true, schedules: false, updateDefinitions: "when-idle" });
@@ -85,12 +95,27 @@ export async function previewCommand(id: string, options: { root?: string; confi
       service.users = users;
       await service.start();
       const label = `Preview as ${person.name}`;
-      await service.create(id, "web", history, label);
+      const chat = await service.create(id, previewWeb ? "web" : "cli", history, label);
       listeners.push(await serveService(service, socket, [], { stateRoot, defaultAgent: id, usersConfigured: true }));
       installations.push({ id: `preview-${key}`, label, service: { socket, expectedStateRoot: stateRoot, label } });
+      const file = previewClientFile(config.root, id, person.id);
+      const temporary = file + "." + randomUUID();
+      try {
+        await writeFile(temporary, JSON.stringify({ root: config.root, stateRoot, socket, conversation: chat.id }) + "\n", { mode: 0o600, flag: "wx" });
+        await rename(temporary, file);
+      } finally { await rm(temporary, { force: true }); }
+      const as = /^[A-Za-z0-9_-]+$/.test(person.id) ? person.id : "'" + person.id.replaceAll("'", "'\\''") + "'";
+      console.log(terminalText(`${label}: npx dispatch chat --preview ${id} --as ${as}\n  Client config: ${relative(config.root, file)}`));
     }
     controller.signal.throwIfAborted();
-    await previewWeb({ installations, port, username: owner, signal: controller.signal });
+    if (previewWeb) {
+      try { await previewWeb({ installations, port, username: owner, signal: controller.signal }); }
+      catch (error) { if (!controller.signal.aborted) reportError("Preview Web stopped:", error); }
+    } else if (!options.noWeb) console.log("Install the matching @dispatch/web package to also open the browser client.");
+    if (!controller.signal.aborted) {
+      console.log("Preview host ready. Connect from the application directory. Press Ctrl-C to stop.");
+      await new Promise<void>(resolve => controller.signal.addEventListener("abort", () => resolve(), { once: true }));
+    }
   } catch (error) {
     if (!controller.signal.aborted) throw error;
   } finally {

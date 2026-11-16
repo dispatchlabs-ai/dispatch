@@ -114,16 +114,22 @@ keep the plain interface. See the [client guide](docs/service.md#interactive-ter
 
 ## Preview an agent
 
-With the matching Web package installed, run `npx dispatch preview --agent NAME`
-from your application. Open the printed loopback address and sign in with the
-temporary password. The default port is 4330. Use `--port` to choose another.
-Preview reads the selected agent's Markdown, repository instructions and model.
-It uses the application's provider settings and starts its own private histories
-in `.demo/NAME/`. Add `.demo/` to your application's `.gitignore`.
+Run `npx dispatch preview --agent NAME` from your application. This starts
+private Dispatch service connections using the agent's Markdown, repository
+instructions and configured model. Each enrolled person gets a separate history
+and their usual profile. An application without a roster gets one local identity.
 
-Each enrolled person gets a separate conversation and their usual profile.
-An application without a roster gets one local conversation. Restart the command
-to pick up definition changes and reopen the saved histories.
+In another terminal, run `npx dispatch chat --preview NAME --as USER` using an
+identity printed at startup. Omit `--as` for the local identity. Other service
+clients can use the printed connection JSON with `--config` or
+`readClientConnection()`. Its `conversation` field identifies the starting
+chat. Clients using the same identity share history and can open more chats.
+
+When the matching Web package is installed, preview also serves a loopback
+client on port 4330. Open the printed URL and sign in with the temporary
+password. Use `--no-web` for a headless host or `--port` to select another
+port. Restart preview to pick up definition changes and reopen the histories
+in `.demo/NAME/`. Add `.demo/` to your application's `.gitignore`.
 
 For sample tools or skills, place an optional `preview.ts` next to `agent.md`.
 It exports an object satisfying `AgentPreview`. For example, a preview can

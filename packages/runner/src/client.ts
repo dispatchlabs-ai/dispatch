@@ -5,8 +5,11 @@ import type { Chat, ChatSnapshot } from "./chat.js";
 import type { AttachmentFile } from "./chat-content.js";
 import type { InstanceMessage } from "./messages.js";
 
-export type ClientConnection = { socket: string; url?: never; headers?: never } |
-  { url: string; socket?: never; headers?: Record<string, string> | (() => Promise<Record<string, string>>) };
+export type ClientConnection = ({ socket: string; url?: never; headers?: never } |
+  { url: string; socket?: never; headers?: Record<string, string> | (() => Promise<Record<string, string>>) }) & {
+    /** Optional retained conversation selected by a client connection file. */
+    conversation?: string;
+  };
 export type ChatWatch = { closed: Promise<void>; stop(): Promise<void> };
 type Request = <C extends ServiceCommand>(command: C, signal?: AbortSignal) => Promise<ServiceResults[C["method"]]>;
 type Watch = (id: string, listener: (snapshot: ChatSnapshot) => void | Promise<void>, signal?: AbortSignal) => Promise<ChatWatch>;

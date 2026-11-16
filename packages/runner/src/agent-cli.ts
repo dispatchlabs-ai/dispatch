@@ -11,7 +11,8 @@ import { localHostPaths, readHostConfig, readClientConnection, projectHostConfig
 const usage = `dispatch serve [--root DIRECTORY] [--state DIRECTORY] [--socket SOCKET] [--demo]
 dispatch serve --config HOST.json
 dispatch chat [--root DIRECTORY] [--state DIRECTORY] [--agent NAME] [--session KEY] [--prompt TEXT] [--history]
-dispatch preview --agent NAME [--root DIRECTORY | --config HOST.json] [--port PORT]
+dispatch preview --agent NAME [--root DIRECTORY | --config HOST.json] [--no-web | --port PORT]
+dispatch chat --preview NAME [--as USER] [--session KEY] [--prompt TEXT] [--history]
 dispatch catalog [--root DIRECTORY]
 dispatch environment describe|build|setup|status|start|stop --agent NAME [--config HOST.json]
 dispatch environment setup --agent NAME [--space CUA_ID] [--identity ACCOUNT] [--vault-server HTTPS_ORIGIN] [--rebuild]
@@ -51,12 +52,16 @@ try {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     root: { type: "string" }, state: { type: "string" }, config: { type: "string" }, socket: { type: "string" }, demo: { type: "boolean" },
     agent: { type: "string" }, port: { type: "string" }, session: { type: "string" }, prompt: { type: "string" },
+    preview: { type: "string" }, as: { type: "string" }, "no-web": { type: "boolean" },
     "request-id": { type: "string" }, history: { type: "boolean" }, json: { type: "boolean" }, help: { type: "boolean" },
     "api-key": { type: "boolean" }, "no-browser": { type: "boolean" },
     provider: { type: "string" }, model: { type: "string" }, module: { type: "string" }, export: { type: "string" }, "base-url": { type: "string" },
     space: { type: "string" }, identity: { type: "string" }, "vault-server": { type: "string" }, rebuild: { type: "boolean" },
   } });
-  if (values.port && positionals[0] !== "preview") throw new Error("--port is a preview option.");
+  if ((values.port || values["no-web"]) && positionals[0] !== "preview") throw new Error("--port and --no-web are preview host options.");
+  if (values.preview && (positionals[0] !== "chat" || values.socket || values.state || (values.agent && values.agent !== values.preview)))
+    throw new Error("Use dispatch chat --preview NAME to connect to that agent's preview.");
+  if (values.as && !values.preview) throw new Error("--as selects a person when connecting with chat --preview NAME.");
   if (values.demo && positionals[0] !== "serve") throw new Error("--demo is a host option: use dispatch serve --demo, then dispatch chat.");
   if ((values.space || values.identity || values["vault-server"] || values.rebuild) && positionals[0] !== "environment")
     throw new Error("Environment settings belong to dispatch environment setup.");
@@ -90,7 +95,7 @@ try {
     if (!values.agent) throw new Error("Select --agent NAME to preview.");
     if (values.state || values.socket || (values.config && values.root)) throw new Error("Preview uses private state. Select --root or --config.");
     const { previewCommand } = await import("./preview.js");
-    await previewCommand(values.agent, values);
+    await previewCommand(values.agent, { ...values, noWeb: values["no-web"] });
   }
   else if (positionals[0] === "auth") {
     const { authStatus } = await import("./login-cli.js");
@@ -121,7 +126,15 @@ try {
     ]);
   } else if (positionals[0] === "run" || positionals[0] === "chat") {
     let connection: ClientConnection;
-    if (values.socket) connection = { socket: resolve(values.socket) };
+    if (values.preview) {
+      const { previewClientFile } = await import("./preview.js");
+      const config = values.config ? await readHostConfig(values.config) : await readProjectHostConfig({ root: values.root });
+      const root = config?.root ?? resolve(values.root ?? ".");
+      connection = await readClientConnection(previewClientFile(root, values.preview, values.as)).catch(error => {
+        if (error.code !== "ENOENT") throw error;
+        throw new Error(`Start dispatch preview --agent ${values.preview} and select one of its printed --as identities.`);
+      });
+    } else if (values.socket) connection = { socket: resolve(values.socket) };
     else if (values.config) connection = await readClientConnection(values.config);
     else if (positionals[0] === "chat") {
       const configured = await readProjectHostConfig(values);
@@ -130,10 +143,12 @@ try {
     }
     else throw new Error("Configure a socket or URL for the running owner. Start it with dispatch serve.");
     try {
-      await connectInTerminal({ connection, agent: values.agent, session: values.session ?? (positionals[0] === "chat" ? "main" : undefined),
+      const id = !values.session && (!values.agent || connection.conversation?.startsWith(values.agent + ":")) ? connection.conversation : undefined;
+      await connectInTerminal({ connection, id, agent: values.agent, session: values.session ?? (positionals[0] === "chat" ? "main" : undefined),
         prompt: values.prompt, history: values.history, requestId: values["request-id"] });
     } catch (error) {
       if (positionals[0] === "chat" && ["ENOENT", "ECONNREFUSED"].includes((error as NodeJS.ErrnoException).code ?? "")) {
+        if (values.preview) throw new Error(`No preview is running for this person. Start dispatch preview --agent ${values.preview}.`);
         throw new Error("No host is listening at this connection. Start npx dispatch serve in another terminal, then reconnect. Use --history to inspect saved messages before resending.");
       }
       throw error;

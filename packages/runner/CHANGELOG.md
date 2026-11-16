@@ -4,7 +4,7 @@
 
 ## [0.24.0] - 2026-11-16
 
-- Add `dispatch preview --agent NAME` to chat with an agent using isolated per-person histories and application-owned sample tools.
+- Add `dispatch preview --agent NAME` with isolated per-person service connections, `dispatch chat --preview NAME --as USER`, optional Web and application-owned sample tools.
 
 ## [0.23.0] - 2026-11-16
 

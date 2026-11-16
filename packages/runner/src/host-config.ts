@@ -48,7 +48,7 @@ function settingPath(directory: string, value: string) {
   return resolve(directory, value);
 }
 
-type FileConfig = ServiceConfig & { url?: string; tokenFile?: string };
+type FileConfig = ServiceConfig & { url?: string; tokenFile?: string; conversation?: string };
 
 /** Resolve CLI file settings before changing directories or connecting a client. */
 export async function readHostConfig(filename: string): Promise<FileConfig> {
@@ -80,13 +80,15 @@ export async function readHostConfig(filename: string): Promise<FileConfig> {
 export async function readClientConnection(filename?: string): Promise<ClientConnection> {
   filename ??= await projectHostConfig();
   if (filename === undefined) return { socket: (await localHostPaths({})).socket };
-  const { socket, url, tokenFile, http } = await readHostConfig(filename);
-  if (socket) return { socket };
-  if (url) return tokenConnection(url, tokenFile);
+  const { socket, url, tokenFile, http, conversation } = await readHostConfig(filename);
+  if (conversation !== undefined && (typeof conversation !== "string" || !conversation.trim())) throw new Error("A client conversation must be a retained conversation ID.");
+  const selected = conversation ? { conversation } : {};
+  if (socket) return { socket, ...selected };
+  if (url) return { ...tokenConnection(url, tokenFile), ...selected };
   if (http) {
     const host = http.host ?? "127.0.0.1";
     if (host === "127.0.0.1" || host === "localhost" || host === "::1") {
-      return tokenConnection(`http://${host === "::1" ? "[::1]" : host}:${http.port}`, http.tokenFile);
+      return { ...tokenConnection(`http://${host === "::1" ? "[::1]" : host}:${http.port}`, http.tokenFile), ...selected };
     }
   }
   throw new Error("Configure a service socket, a loopback HTTP listener, or a client URL for the running host.");
