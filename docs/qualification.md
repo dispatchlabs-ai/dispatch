@@ -4,6 +4,24 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.22.0 Messages channel — November 16, 2026 UTC
+
+The [release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.22.0)
+contains twelve npm archives from clean source `2acbf5348696d1fc5b06e1a06dac46ac13f09a14`.
+All remote asset digests matched the reviewed bytes. The locked workspace build,
+type checks, arm64 macOS flake, frontend and portable application builds passed.
+Both Linux arm64 OCI builds passed. External strict imports and package installs
+passed, including an ordinary application install from the published URLs.
+
+A fresh consumer ran `npm ci` and `npm start` with both Slack and Messages
+connected. The live Messages adapter admitted a direct SMS, ran an agent using
+external inference, and sent one final answer to the original Mac Messages chat
+over SSH. The sender saw that answer in the same conversation. A separate
+group-device test remains open. The web example retained its conversation on
+reload and exposed its controls at all four documented viewport sizes.
+The npm package archive scan produced zero hits. npm registry publication and a
+comprehensive security review were outside this qualification.
+
 ## v0.21.1 inline tool history — November 15, 2026 UTC
 
 [Release v0.21.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.21.1)
