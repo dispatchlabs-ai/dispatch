@@ -129,6 +129,7 @@ Editing an agent's instructions, model, tools or skills is separate from upgradi
 | Knowledge and external tools | Connect an existing MCP server on the host, then select it with `mcp: [name]` in each agent. Connections can differ between agents. [MCP tools](packages/runner/docs/mcp.md) |
 | Agent-to-agent messaging | Send an assignment through MCP and request an automatic reply. The sender can finish its turn and resume when the answer arrives. Each recipient uses its own tools. [Two-agent example](packages/runner/docs/create-agents.md#verify-coding-and-an-automatic-reply) |
 | Shared guidance and skills | Put common instructions in `AGENTS.md`; opt into reusable `skills/` with `skills: true`. [Instructions and skills](packages/runner/docs/create-agents.md#shared-instructions-and-skills) |
+| Reviewed reminders | Declare a source, timing, eligibility and destination in the agent definition. Ask for a read-only check in live preview, or start reminders in a private chat. [Reviewed reminders](packages/runner/docs/reminders.md) |
 | Scheduled work | Opt into calendar or interval schedules for an agent. Scheduling is not required for chat. [Schedules](packages/runner/docs/schedules.md) |
 
 ## Ways to connect

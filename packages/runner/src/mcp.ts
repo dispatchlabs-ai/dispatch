@@ -1,3 +1,5 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { homedir } from "node:os";
 import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -7,14 +9,28 @@ import type { Extension, ToolRegistration } from "@earendil-works/pi-durable";
 import {
   McpClient, McpConnectionClosedError, McpSessionExpiredError, StdioTransport, StreamableHttpTransport,
   createMcpToolName, mcpNamespace, normalizeMcpInputSchema, toLlmContent, validateMcpServerConfig,
-  type McpServerConfig, type Tool,
+  type CallToolResult, type McpServerConfig, type Tool,
 } from "@earendil-works/pi-mcp";
 
 /** Host-owned connections. Omit tools to expose every discovered tool; an explicit list uses server tool names. */
-export type McpServers = Record<string, McpServerConfig & { tools?: string[] }>;
+export type McpServers = Record<string, McpServerConfig & { tools?: string[]; headersCommand?: string[] }>;
+
+export type ReminderCall = (tool: string, args: Record<string, unknown>, signal?: AbortSignal,
+  beforeCall?: () => Promise<void>) => Promise<CallToolResult>;
+
+const executeFile = promisify(execFile);
+async function credentialHeaders(name: string, command: string[], cwd: string): Promise<Record<string, string>> {
+  try {
+    const { stdout } = await executeFile(command[0], command.slice(1), { cwd });
+    const headers: unknown = JSON.parse(stdout);
+    if (headers && typeof headers === "object" && !Array.isArray(headers)
+      && Object.values(headers).every(value => typeof value === "string")) return headers as Record<string, string>;
+  } catch { /* Credential helper output can contain secrets. */ }
+  throw new Error(`MCP server ${name}: headersCommand must return a JSON object of HTTP headers.`);
+}
 
 /** Connect the servers selected by definitions, discovering native Durable tools before recovery starts. */
-export async function connectMcpServers(servers: McpServers, options: { cwd: string; names: string[]; stdioEnv?: Record<string, string>;
+export async function connectMcpServers(servers: McpServers, options: { cwd: string; names: string[]; privateNames?: string[]; stdioEnv?: Record<string, string>;
   /** Host-owned arguments removed from model-facing schemas and supplied on every call. */
   argumentsByServer?: Record<string, Record<string, Record<string, JsonValue>>> }) {
   if (!servers || typeof servers !== "object" || Array.isArray(servers)) throw new Error("mcpServers must be an object.");
@@ -31,7 +47,7 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
       || new Set(tools).size !== tools.length)) throw new Error(`MCP server ${name}: tools must be unique, nonempty server tool names.`);
     validated.set(name, result);
   }
-  const selected = [...new Set(options.names)].map(name => {
+  const selected = [...new Set([...options.names, ...(options.privateNames ?? [])])].map(name => {
     const server = validated.get(name);
     if (!server) throw new Error(`Agent requires MCP server ${name}; add it to mcpServers.`);
     if (server.config.enabled === false) throw new Error(`Agent requires disabled MCP server ${name}.`);
@@ -40,13 +56,19 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
     }
     // Other MCP hosts can assign permissions through additional fields. Never silently drop those grants or restrictions.
     const supported = ["type", "tools", "description", "enabled", "timeout",
-      ...(server.kind === "stdio" ? ["command", "args", "cwd", "env"] : ["url", "headers"])];
+      ...(server.kind === "stdio" ? ["command", "args", "cwd", "env"] : ["url", "headers", "headersCommand"])];
     for (const key of Object.keys(server.config)) {
       if (!supported.includes(key)) throw new Error(`MCP server ${name}: unsupported setting ${key}. Select the permitted server tools with tools[].`);
+    }
+    const command = servers[name].headersCommand;
+    if (command !== undefined && (server.kind !== "http" || new URL(server.config.url).protocol !== "https:"
+      || !Array.isArray(command) || !command.length || command.some(arg => typeof arg !== "string" || !arg.trim()))) {
+      throw new Error(`MCP server ${name}: headersCommand requires HTTPS and a nonempty argument array.`);
     }
     return { name, server };
   });
   const connections: { close(): Promise<void> }[] = [];
+  const privateCalls = new Map<string, ReminderCall>();
   const discovered: { server: string; tool: Tool; client: () => Promise<McpClient> }[] = [];
   let closing: Promise<void> | undefined;
   const close = () => closing ??= (async () => {
@@ -67,11 +89,14 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
       };
       const values = (entries: Record<string, string> | undefined) => entries === undefined ? undefined
         : Object.fromEntries(Object.entries(entries).map(([key, value]) => [key, expand(value)]));
-      const transport = () => server.kind === "stdio" ? new StdioTransport({
+      const transport = async () => server.kind === "stdio" ? new StdioTransport({
         command: path(server.config.command), args: server.config.args?.map(path),
         env: { ...values(server.config.env), ...options.stdioEnv },
         cwd: resolve(options.cwd, path(server.config.cwd ?? ".")), maxMessageBytes: Infinity,
-      }) : new StreamableHttpTransport({ url: server.config.url, headers: values(server.config.headers), maxMessageBytes: Infinity });
+      }) : new StreamableHttpTransport({ url: server.config.url, headers: {
+        ...values(server.config.headers), ...(servers[name].headersCommand
+          ? await credentialHeaders(name, servers[name].headersCommand.map(path), options.cwd) : {}),
+      }, maxMessageBytes: Infinity });
       let current: McpClient | undefined;
       let connecting: Promise<McpClient> | undefined;
       let closed = false;
@@ -85,8 +110,9 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
         current = next;
         connecting = (async () => {
           await previous?.close();
+          const nextTransport = await transport();
           if (closed) throw new Error(`MCP server ${name} is shutting down.`);
-          await next.connect(transport());
+          await next.connect(nextTransport);
           return next;
         })().finally(() => { connecting = undefined; });
         return connecting;
@@ -97,6 +123,21 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
         const pending = connecting?.catch(() => {});
         try { await current?.close(); } finally { await pending; }
       } });
+      if (options.privateNames?.includes(name)) privateCalls.set(name, async (tool, args, signal, beforeCall) => {
+        if (servers[name].tools && !servers[name].tools.includes(tool)) throw new Error(`MCP server ${name} does not grant ${tool}.`);
+        signal?.throwIfAborted();
+        const connection = await client();
+        await beforeCall?.();
+        signal?.throwIfAborted();
+        try {
+          return await connection.callTool(tool, { ...args, ...options.argumentsByServer?.[name]?.[tool] },
+            { signal, timeoutMs: (servers[name].timeout ?? 0) * 1000 });
+        } catch (error) {
+          if (error instanceof McpConnectionClosedError || error instanceof McpSessionExpiredError) await connection.close();
+          throw error;
+        }
+      });
+      if (!options.names.includes(name)) continue;
       const connected = await client();
       const tools = connected.serverCapabilities?.tools ? await connected.listTools() : [];
       const allowed = servers[name].tools;
@@ -174,7 +215,12 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
       }
       return extensions;
     };
-    return { extensions: bind(), bind, close };
+    const reminderCall = (name: string) => {
+      const call = privateCalls.get(name);
+      if (!call) throw new Error(`Missing reminder connection ${name}.`);
+      return call;
+    };
+    return { extensions: bind(), bind, reminderCall, close };
   } catch (error) {
     try { await close(); }
     catch (cleanup) { throw new AggregateError([error, cleanup], "MCP startup and cleanup failed."); }

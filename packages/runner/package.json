@@ -20,6 +20,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./reminders": {
+      "types": "./dist/reminders.d.ts",
+      "import": "./dist/reminders.js"
+    },
     "./watch-reader": {
       "types": "./dist/watch-reader.d.ts",
       "import": "./dist/watch-reader.js"

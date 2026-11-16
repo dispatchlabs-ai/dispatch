@@ -55,6 +55,7 @@ import { createCoding } from "./coding.js";
 import type { ReplySink } from "./replies.js";
 import { privateStateDirectory, privateStateFiles } from "./private-state.js";
 import { reportError, terminalText } from "./terminal-output.js";
+import { sleepingReminder } from "./reminders.js";
 import { scheduleTaskKind } from "./schedules.js";
 import { ArtifactStore, type ArtifactOptions, type createArtifacts } from "./artifacts.js";
 import { compactionExtension } from "./compaction.js";
@@ -287,9 +288,9 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
           throw new Error(`${agent.id}'s definition changed. Set updateDefinitions in the host configuration when its saved work is idle, or use a new stateRoot.`);
         }
         const inspection = await harness.inspect(context);
-        deferred = inspection.tasks.some(task => task.record.kind !== scheduleTaskKind(namespace)
+        deferred = inspection.tasks.some(task => !sleepingReminder(namespace, task) && (task.record.kind !== scheduleTaskKind(namespace)
           || (task.record.state.status !== "terminal"
-            && (task.record.state.checkpoint as { phase?: string }).phase !== "wait")) || inspection.submissions.length > 0;
+            && (task.record.state.checkpoint as { phase?: string }).phase !== "wait"))) || inspection.submissions.length > 0;
         if (deferred && options.updateDefinitions !== "when-idle") {
           throw new Error(`${agent.id} has pending work. Finish or stop that work with its previous definition before updating.`);
         }

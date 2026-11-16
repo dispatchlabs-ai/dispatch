@@ -105,7 +105,7 @@ export async function previewCommand(id: string, options: { root?: string; confi
         runner, users, models, settings, demo: config.demo, definitionResources: config.definitionResources,
         mcpServers: fixtures ? undefined : config.mcpServers, environmentStateRoot: config.stateRoot,
         mcpStdioEnv: !fixtures && source ? { DISPATCH_MCP_PREVIEW: JSON.stringify({ source, socket }) } : undefined,
-        schedules: false, updateDefinitions: config.updateDefinitions ?? "when-idle",
+        preview: true, schedules: false, updateDefinitions: config.updateDefinitions ?? "when-idle",
         beforeStart: async service => { listeners.push(await serveService(service, socket, [], { stateRoot, defaultAgent: id, usersConfigured: true })); } });
       hosts.push(host);
       const label = `Preview as ${person.name}`;

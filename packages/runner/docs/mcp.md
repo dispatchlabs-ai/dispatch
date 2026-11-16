@@ -89,6 +89,11 @@ the host account's home directory. Keep actual credentials and local settings
 out of source control. Stdio servers are trusted programs: they inherit the host
 process environment, with configured `env` entries adding or overriding values.
 
+An HTTPS connection can use `headersCommand`, an array containing a credential
+helper executable and its arguments. On connection the host runs it directly and
+merges its JSON object of string headers over `headers`. A leading `~/` resolves
+to the host account's home. Keep credential contents in the helper's private store.
+
 Both transports accept these settings:
 
 | Setting | Meaning |

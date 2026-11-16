@@ -225,6 +225,8 @@ Scheduling is optional. A non-manual `trigger` requires `input`. An optional
 all definitions are available for chat and no schedules start. A single agent is
 automatically the default. See [schedules](docs/schedules.md).
 
+For event-driven notifications, add [reviewed reminders](docs/reminders.md) in the agent definition. The enrolled owner can check a real source in preview and start or stop delivery from a private chat.
+
 ## MCP connections
 
 Add `mcp: [wiki]` to an agent's Markdown frontmatter and configure `wiki` under

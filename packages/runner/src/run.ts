@@ -1,5 +1,6 @@
+import { isReminder } from "./reminders.js";
 import { Users } from "./users.js";
-import { realpath } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import type { Models } from "@earendil-works/pi-ai/models";
@@ -55,6 +56,8 @@ export type RunOptions = {
   mcpServers?: McpServers;
   replySink?: ReplySink;
   schedules?: boolean;
+  /** Preview hosts can review real reminders but cannot start timers or deliver them. */
+  preview?: boolean;
   artifacts?: ArtifactOptions;
   /** Attach domain workflows to the same host before adapters begin receiving. */
   open?: (options: { extensions: Extension[]; replySink?: ReplySink; settings?: OpenOptions["settings"]; artifacts?: ArtifactOptions;
@@ -83,10 +86,15 @@ export async function run(options: RunOptions = {}) {
       : (await catalog(root)).filter(agent => agent.runnable).map(agent => agent.id));
     const users = options.users ?? (options.usersFile === undefined ? undefined : await Users.load(resolve(root, options.usersFile), names));
     const requested = new Set<string>();
+    const privateNames = new Set<string>();
     const definitions: LoadedAgent[] = [];
     const collect = (agent: LoadedAgent) => {
       definitions.push(agent);
       for (const name of agent.mcp ?? []) requested.add(name);
+      for (const extension of agent.extensions ?? []) if (isReminder(extension)) {
+        privateNames.add(extension.reminderConnections.source);
+        if (!options.preview) privateNames.add(extension.reminderConnections.destination);
+      }
       for (const child of agent.delegateAgents ?? []) collect(child);
       if (agent.handoffAgent) collect(agent.handoffAgent);
     };
@@ -97,8 +105,8 @@ export async function run(options: RunOptions = {}) {
       if (options.mcpServers?.[name]) throw new Error(`MCP name ${name} is reserved for the selected environment.`);
       requested.add(name);
     }
-    if (requested.size || options.mcpServers !== undefined) mcp = await connectMcpServers({ ...options.mcpServers, ...environments.servers },
-      { cwd: options.cwd ?? root, names: [...requested], argumentsByServer: environments.argumentsByServer, stdioEnv: options.mcpStdioEnv });
+    if (requested.size || privateNames.size || options.mcpServers !== undefined) mcp = await connectMcpServers({ ...options.mcpServers, ...environments.servers },
+      { cwd: options.cwd ?? root, names: [...requested], privateNames: [...privateNames], argumentsByServer: environments.argumentsByServer, stdioEnv: options.mcpStdioEnv });
     const prepareAgent = (agent: LoadedAgent): LoadedAgent => {
       const environment = environments.selected.get(agent.id);
       const connections = [...(agent.mcp ?? []), ...(environment?.server ? [environment.server] : [])];
@@ -110,7 +118,14 @@ export async function run(options: RunOptions = {}) {
       } : {}),
         ...(agent.delegateAgents ? { delegateAgents: agent.delegateAgents.map(prepareAgent) } : {}),
         ...(agent.handoffAgent ? { handoffAgent: prepareAgent(agent.handoffAgent) } : {}),
-        extensions: [...(agent.extensions ?? []), ...connections.map(name => {
+        extensions: [...(agent.extensions ?? []).map(extension => isReminder(extension) ? extension.bindReminder({
+          namespace: runner.namespace, agent: agent.id, preview: options.preview === true, enrolled: owner => users?.forAgent(agent.id).some(person => person.id === owner) === true,
+          profile: async owner => {
+            const person = users?.forAgent(agent.id).find(person => person.id === owner);
+            return person?.contextFile ? readFile(person.contextFile, "utf8") : undefined;
+          },
+          call: name => mcp!.reminderCall(name),
+        }) : extension), ...connections.map(name => {
           const extension = bound?.[name];
           if (!extension) throw new Error(`Agent ${agent.id} requires MCP server ${name}; configure it in mcpServers.`);
           return extension;

@@ -20,7 +20,7 @@ import { isDeepStrictEqual } from "node:util";
 import { join, resolve } from "node:path";
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import {
-  configure, defineDoc, LiveDoc, type ConversationId, type ConversationView, type Cursor,
+  configure, defineDoc, LiveDoc, type ConversationId, type ConversationView, type Cursor, type TaskInspection,
   type SubmissionDraft, type EntryRecord, type TaskRecord, type Extension, type LiveState, type SubmissionId, type Tx, type JsonObject,
 } from "@earendil-works/pi-durable";
 import { catalog, enabledAgents, loadAgent, type LoadedAgent } from "./definition.js";
@@ -32,6 +32,7 @@ import { privateStateDirectory } from "./private-state.js";
 import { publicCommentary } from "./commentary.js";
 import { recordRequestCancellation } from "./request-completion.js";
 import { createInstanceMessaging, instanceMessagingExtension, selectMessageTools, type InstanceMessage } from "./messages.js";
+import { sleepingReminder } from "./reminders.js";
 import { createSchedules, scheduleTaskKind } from "./schedules.js";
 import type { Artifact, ArtifactRecord, ArtifactOptions, createArtifacts } from "./artifacts.js";
 
@@ -112,6 +113,8 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     finally { if (pending.get(id) === next) pending.delete(id); }
   }
 
+  const foregroundWork = (task: TaskInspection) =>
+    !sleepingReminder(namespace, task) && (task.record.kind !== scheduleTaskKind(namespace) || task.state.kind !== "sleeping");
   class ChatService {
     users?: Users;
     readonly hosts = new Map<string, AgentHost>();
@@ -218,8 +221,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     async busy() {
       return (await Promise.all([...this.hosts.values()].map(async host => {
         const state = await host.harness.inspect(context);
-        return state.submissions.length > 0 || state.tasks.some(task =>
-          task.record.kind !== scheduleTaskKind(namespace) || task.state.kind !== "sleeping");
+        return state.submissions.length > 0 || state.tasks.some(foregroundWork);
       }))).some(Boolean);
     }
 
@@ -236,8 +238,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
           const observed = revision;
           const states = await Promise.all([...this.hosts.values()].map(host => host.harness.inspect(context)));
           if (revision !== observed) continue;
-          const tasks = states.flatMap(state => state.tasks).filter(task =>
-            task.record.kind !== scheduleTaskKind(namespace) || task.state.kind !== "sleeping");
+          const tasks = states.flatMap(state => state.tasks).filter(foregroundWork);
           const submissions = states.flatMap(state => state.submissions);
           if (!tasks.length && !submissions.length) return;
           const blocked = tasks.find(task => task.state.kind === "blocked");
@@ -259,7 +260,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     async activity() {
       const hosts = await Promise.all([...this.hosts].map(async ([agent, host]) => {
         const state = await host.harness.inspect(context);
-        const tasks = state.tasks.filter(task => task.record.kind !== scheduleTaskKind(namespace) || task.state.kind !== "sleeping");
+        const tasks = state.tasks.filter(foregroundWork);
         const ids = new Set([...tasks.map(task => task.record.conversationId), ...state.submissions.map(item => item.conversationId)]);
         const conversations = await Promise.all([...ids].map(async id => {
           const live = await host.harness.snapshot(LiveDoc, id, context);

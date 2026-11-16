@@ -145,6 +145,8 @@ records the agreed boundaries and existing foundations.
   agent's computer, and uses it through the existing application host and clients.
   See [execution environments](docs/environments.md) for supported builds and bindings.
 
+- **RUN-036 — Review upcoming reminders:** An enrolled owner checks, starts or stops reminders in a private conversation. The agent authors a notification for each eligible due occurrence. [Reviewed reminders](docs/reminders.md)
+
 Remote persistence and connectivity belong to
 [Remote's goals](../remote/USE_CASES.md#2-portable-service-additions);
 provider placement and reusable infrastructure consumption belong to

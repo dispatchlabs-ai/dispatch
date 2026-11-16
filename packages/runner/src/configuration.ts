@@ -7,6 +7,8 @@ import { skillExtension, skillInstructions } from "./skills.js";
 import { repositoryInstructionsExtension } from "./instructions.js";
 import { delegationExtension } from "./delegation.js";
 
+import { reminderReviewExtension } from "./reminders.js";
+
 export type AgentSetup = { configuration: AgentChange; installed: Extension[]; delegate?: AgentSetup };
 
 export function createConfiguration(codingExtension: ReturnType<typeof createCoding>["codingExtension"], handoffExtension: ReturnType<typeof createHandoffs>["handoffExtension"], progressInstructions?: (agent: LoadedAgent) => string) {
@@ -20,7 +22,7 @@ export function createConfiguration(codingExtension: ReturnType<typeof createCod
       if (!extensions.some(extension => extension.name === `mcp:${name}`))
         throw new Error(`${agent.id} requires MCP server ${name}. Use run/startService with mcpServers, or bind its native extension before opening the agent.`);
     }
-    const installed: Extension[] = [];
+    const installed: Extension[] = extensions.flatMap(reminderReviewExtension);
     if (agent.skillCatalog?.length) extensions.push(skillExtension(agent.id, agent.skillCatalog));
     let delegate: AgentSetup | undefined;
     const model = demo ? { provider: "faux", modelId: "faux-1" } : { provider: agent.model.provider, modelId: agent.model.id };

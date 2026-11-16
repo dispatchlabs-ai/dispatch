@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Add owner-scoped reviewed reminders with code-only polling, private review connections, durable delivery, read-only live preview and HTTPS credential helpers.
+
 ## [0.25.0] - 2026-11-16
 
 - Preview the normal agent definition, host tools, installed environment and working directory under the selected roster identity. Keep per-person conversations separate from prior fixture histories.
