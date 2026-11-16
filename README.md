@@ -51,6 +51,41 @@ Run `npx dispatch chat --history` to read the conversation from both clients. St
 
 **Try it without an account:** follow the [credential-free demo](docs/quickstart.md). It echoes messages locally, uses separate `.demo/` state and makes no model or tool calls.
 
+## Preview an agent
+
+Preview runs your existing agent with its usual instructions, model, skills,
+MCP connections and environment. Tools declared in `agent.ts`, such as
+`CodingTools`, are already available. **Tool actions are real.** File edits
+change files in the configured working directory, and external services use
+the host’s configured credentials.
+
+From the quickstart application directory, start the preview host for `agent.md`
+and leave it running.
+
+```sh
+npx dispatch preview --agent agent
+```
+
+Open a second terminal in the same directory to chat as the local user.
+
+```sh
+npx dispatch chat --preview agent
+```
+
+For `agents/developer/agent.md`, use `developer` in both commands. With a user
+roster, choose a printed command such as `npx dispatch chat --preview developer --as riley`.
+The agent sees Riley’s sender identity and current profile. Each person’s preview
+history persists separately from their regular chats. [User rosters](packages/runner/docs/service.md#shared-human-identities)
+
+With `@dispatch/web` installed, sign in at the printed URL (default port 4330)
+and choose the same person to continue the conversation. Other Dispatch clients
+can use that person’s printed connection file. Channel listeners and schedules
+run on the regular host.
+
+Use `--no-web` for a headless preview or `--port 4331` for another Web port.
+To use sample data, supply replacement tools in an optional `preview.ts`.
+[Preview settings and fixtures](packages/runner/README.md#preview-an-agent)
+
 ## Provider setup
 
 Dispatch 0.20.0 includes `npx dispatch providers add`: choose a native Pi provider,
