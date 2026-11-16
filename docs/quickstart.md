@@ -14,7 +14,7 @@ optional. Choose a new directory:
 mkdir dispatch-demo
 cd dispatch-demo
 npm init -y --init-type=module
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.27.0/dispatch-runner-0.27.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.28.0/dispatch-runner-0.28.0.tgz
 ```
 
 Initialize `package.json` in this directory before installing. Otherwise npm can

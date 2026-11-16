@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-16
+
 - Add owner-scoped reviewed reminders with code-only polling, private review connections, durable delivery, read-only live preview and HTTPS credential helpers.
 
 ## [0.25.0] - 2026-11-16
