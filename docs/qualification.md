@@ -4,6 +4,28 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.26.0 Messages table attachments — November 16, 2026 UTC
+
+All 14 GitHub assets matched the inspected bytes and SHA-256 digests for
+`5ec305bb61cc43690b57866ffffa0039c059a5de`. The workspace build and type
+checks, macOS arm64 flake and release builds, and Linux arm64 Web and Workers
+OCI builds passed. Five independent consumers installed the archives. Strict
+NodeNext imports passed, the production dependency audit had zero findings,
+and distribution scan matches were identical to the prior release.
+[Release v0.26.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.26.0).
+
+A native agent answered private direct and two-person group conversations.
+The capture peer on a remote Messages Mac received one and two PNGs respectively
+in the originating chats. Every PNG matched the corresponding saved table.
+Intermediate text and a link preserved their order. A pre-send interruption
+and missing acknowledgments recovered without duplicate parts. The installed
+remote helper staged and removed a byte-identical PNG alongside the stock RPC.
+The upgraded consumer host reconnected after a clean release-URL install.
+
+An unaddressed iPhone simulator draft displayed the generated PNG. Web rendered
+the saved Markdown at four viewport sizes and opened the table fullscreen on
+mobile. These checks did not send a message over a carrier.
+
 ## v0.25.1 Messages formatting — November 16, 2026 UTC
 
 All 14 downloaded release assets and their GitHub digests matched the clean
