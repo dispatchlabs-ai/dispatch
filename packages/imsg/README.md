@@ -2,6 +2,8 @@
 
 Connect an agent to text conversations in the Mac Messages app. Texts from the same conversation share agent history. Each final answer goes back to its originating chat GUID, including group chats, using the service Messages associates with that chat.
 
+Messages presents Markdown tables as lists or labeled rows that fit a phone screen. Links include their destinations, and code keeps its literal text. Other clients can open the same conversation with its original Markdown.
+
 ## Use it with your AI agent
 
 > Add the Messages channel to my Dispatch host using the [setup below](https://github.com/dispatchlabs-ai/dispatch/tree/main/packages/imsg#setup). Use my chosen agent and allowed family or team handles. Verify the original chat receives a reply.

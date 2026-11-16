@@ -3,6 +3,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { AssistantEntry, defineDoc, defineExtension, defineTask, type ConversationId, type TaskId, type Tx } from "@earendil-works/pi-durable";
 import { context, publicAnswer, type Adapter, type ChatService, type ReplyDestination, type Runner } from "@dispatch/runner";
 import { MessagesRpc, RpcError, scan, type Chat, type Message, type RpcCommand } from "./rpc.js";
+import { messageText } from "./text.js";
 
 export type ImsgOptions = RpcCommand & {
   connection: string;
@@ -13,7 +14,7 @@ export type ImsgOptions = RpcCommand & {
 
 type Destination = ReplyDestination & { chatId: number };
 type Delivery = { destination: Destination; key: string; text: string; previous?: number };
-type SendState = { phase: "deliver"; since?: number; attemptedAt?: number };
+type SendState = { phase: "deliver"; since?: number; attemptedAt?: number; sentText?: string };
 const aborted = { status: "terminal", outcome: { status: "aborted" } } as const;
 const done = { status: "terminal", outcome: { status: "completed", result: null } } as const;
 const failed = (message: string) => ({ status: "terminal", outcome: { status: "failed", error: { message } } }) as const;
@@ -75,10 +76,12 @@ function prepare(runner: Runner, options: ImsgOptions) {
           return;
         }
         if (state.since !== undefined) {
+          // Attempts from before phone formatting sent the original task text.
+          const body = state.sentText ?? text;
           const matches: string[] = [];
           await scan(rpc, state.since, async page => {
             for (const row of page.messages)
-              if (row.is_from_me && row.text === text && row.guid) matches.push(row.guid);
+              if (row.is_from_me && row.text === body && row.guid) matches.push(row.guid);
           }, chat.id);
           if (matches.length === 1) { await sent(matches[0]!); return; }
           if (!matches.length && runtime.now() - state.attemptedAt! < 60_000) {
@@ -89,10 +92,11 @@ function prepare(runner: Runner, options: ImsgOptions) {
         }
         const cursor = (await runtime.snapshot(Inbox, ctx))?.cursor ?? 0;
         const since = await scan(rpc, cursor, async () => {}, chat.id);
-        attempted = { phase: "deliver", since, attemptedAt: runtime.now() };
+        const body = messageText(text);
+        attempted = { phase: "deliver", since, attemptedAt: runtime.now(), sentText: body };
         await runtime.commit(() => ({ status: "running", checkpoint: attempted }), ctx);
         try {
-          const receipt = await rpc.call<{ ok: boolean; guid?: string }>("send", { chat_guid: chat.guid, text });
+          const receipt = await rpc.call<{ ok: boolean; guid?: string }>("send", { chat_guid: chat.guid, text: body });
           if (receipt.ok && receipt.guid) await sent(receipt.guid);
         } catch (error) {
           runtime.signal.throwIfAborted();

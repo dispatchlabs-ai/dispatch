@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Render replies for phone screens, with readable table rows, lists and links. Match recovered deliveries against the text sent to Messages.
+
 ## [0.23.0] - 2026-11-16
 
 - Admit a rostered sender and group participants for the configured agent, retaining per-message identity.
