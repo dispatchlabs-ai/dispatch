@@ -2,7 +2,7 @@
 
 Connect an agent to text conversations in the Mac Messages app. Texts from the same conversation share agent history. Each final answer goes back to its originating chat GUID, including group chats, using the service Messages associates with that chat.
 
-Messages presents Markdown tables as lists or labeled rows that fit a phone screen. Links include their destinations, and code keeps its literal text. Other clients can open the same conversation with its original Markdown.
+Each Markdown table becomes a PNG in the original Messages conversation. Surrounding text and tappable links follow the answer’s order. Other clients can open the same conversation with its original Markdown.
 
 ## Use it with your AI agent
 
@@ -28,7 +28,7 @@ In the private options file, choose an agent defined by the application and a st
 }
 ```
 
-The default command is `imsg rpc`. To connect to another Mac, add `"command": "ssh"` and `"args": ["-T", "-o", "BatchMode=yes", "messages-mac", "/path/to/imsg rpc"]`. Configure host-key verification and an unattended SSH identity on the application host. Arguments go directly to the executable.
+The default command is `imsg rpc`. For a remote Messages Mac, copy `node_modules/@dispatch/imsg/bin/dispatch-imsg-rpc` to that Mac and make it executable. It uses the system Perl to stage each PNG in a private temporary directory and runs the installed `imsg`. Add `"command": "ssh"` and `"args": ["-T", "-o", "BatchMode=yes", "messages-mac", "/path/to/dispatch-imsg-rpc /path/to/imsg"]`. Configure host-key verification and an unattended SSH identity. An RPC-only SSH key can use the same two absolute paths as its forced command.
 
 Start the host as usual. After the first “Messages connection … ready” line, send a text from an allowed handle. Check for the reply in the same conversation. For a group, check that the other participant can see the reply there as well.
 

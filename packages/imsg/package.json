@@ -1,7 +1,7 @@
 {
   "name": "@dispatch/imsg",
   "version": "0.25.1",
-  "description": "Apple Messages text transport for Dispatch Runner",
+  "description": "Apple Messages transport for Dispatch Runner",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -14,18 +14,22 @@
     }
   },
   "files": [
+    "bin/dispatch-imsg-rpc",
     "dist",
     "README.md",
     "USE_CASES.md",
     "CHANGELOG.md",
     "LICENSE"
   ],
+  "bin": { "dispatch-imsg-rpc": "./bin/dispatch-imsg-rpc" },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "pretypecheck": "npm run build --workspace @dispatch/runner",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "5.3.0",
+    "@napi-rs/canvas": "1.1.1",
     "mdast-util-from-markdown": "2.1.0",
     "mdast-util-gfm": "3.1.0",
     "micromark-extension-gfm": "3.0.0",

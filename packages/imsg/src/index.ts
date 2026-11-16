@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
+import { basename } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { AssistantEntry, defineDoc, defineExtension, defineTask, type ConversationId, type TaskId, type Tx } from "@earendil-works/pi-durable";
 import { context, publicAnswer, type Adapter, type ChatService, type ReplyDestination, type Runner } from "@dispatch/runner";
-import { MessagesRpc, RpcError, scan, type Chat, type Message, type RpcCommand } from "./rpc.js";
-import { messageText } from "./text.js";
+import { matchesPart, MessagesRpc, RpcError, scan, type Chat, type Message, type RpcCommand } from "./rpc.js";
+import { stageTable } from "./attachments.js";
+import { messageParts, type MessagePart } from "./text.js";
 
 export type ImsgOptions = RpcCommand & {
   connection: string;
@@ -14,7 +16,7 @@ export type ImsgOptions = RpcCommand & {
 
 type Destination = ReplyDestination & { chatId: number };
 type Delivery = { destination: Destination; key: string; text: string; previous?: number };
-type SendState = { phase: "deliver"; since?: number; attemptedAt?: number; sentText?: string };
+type SendState = { phase: "deliver"; parts?: MessagePart[]; index?: number; since?: number; attemptedAt?: number; sentText?: string };
 const aborted = { status: "terminal", outcome: { status: "aborted" } } as const;
 const done = { status: "terminal", outcome: { status: "completed", result: null } } as const;
 const failed = (message: string) => ({ status: "terminal", outcome: { status: "failed", error: { message } } }) as const;
@@ -64,25 +66,37 @@ function prepare(runner: Runner, options: ImsgOptions) {
       const rpc = active;
       if (!rpc) { await runtime.sleepUntil(runtime.now() + retryMs, state, ctx); return; }
       requireRoute(destination);
+      // In-flight sends from earlier versions have only the original text or sentText.
+      const parts = state.parts ?? (state.since === undefined ? messageParts(text) : [{ text: state.sentText ?? text }]);
+      const index = state.index ?? 0;
+      const part = parts[index]!;
+      const ready: SendState = { phase: "deliver", parts, index };
       const sent = async (guid: string) => runtime.commit(async tx => {
+        if (index + 1 < parts.length) return { status: "running", checkpoint: { ...ready, index: index + 1 } } as const;
         (await tx.doc(Thread, runtime.conversationId)).receipts[key] = guid;
         return done;
       }, ctx);
-      let attempted: SendState = state;
+      let attempted: SendState = state.since === undefined ? ready : state;
+      let attachment: Awaited<ReturnType<typeof stageTable>> | undefined;
       try {
+        if (state.since === undefined && "table" in part) {
+          if (!rpc.stagesFiles && basename(options.command ?? "imsg") === "ssh") {
+            await runtime.commit(() => failed("Install dispatch-imsg-rpc on the remote Messages Mac to deliver table images."), ctx);
+            return;
+          }
+          attachment = await stageTable(rpc, part.table);
+        }
         const chat = await rpc.call<Chat>("chats.get", { chat_id: destination.chatId });
         if (chat.guid !== destination.thread || !membersAllowed(chat)) {
           await runtime.commit(() => failed("Messages chat identity or membership changed. Review delivery."), ctx);
           return;
         }
         if (state.since !== undefined) {
-          // Attempts from before phone formatting sent the original task text.
-          const body = state.sentText ?? text;
           const matches: string[] = [];
           await scan(rpc, state.since, async page => {
             for (const row of page.messages)
-              if (row.is_from_me && row.text === body && row.guid) matches.push(row.guid);
-          }, chat.id);
+              if (matchesPart(row, part)) matches.push(row.guid);
+          }, chat.id, "table" in part);
           if (matches.length === 1) { await sent(matches[0]!); return; }
           if (!matches.length && runtime.now() - state.attemptedAt! < 60_000) {
             await runtime.sleepUntil(runtime.now() + retryMs, state, ctx); return;
@@ -92,16 +106,16 @@ function prepare(runner: Runner, options: ImsgOptions) {
         }
         const cursor = (await runtime.snapshot(Inbox, ctx))?.cursor ?? 0;
         const since = await scan(rpc, cursor, async () => {}, chat.id);
-        const body = messageText(text);
-        attempted = { phase: "deliver", since, attemptedAt: runtime.now(), sentText: body };
+        attempted = { ...ready, since, attemptedAt: runtime.now() };
         await runtime.commit(() => ({ status: "running", checkpoint: attempted }), ctx);
         try {
-          const receipt = await rpc.call<{ ok: boolean; guid?: string }>("send", { chat_guid: chat.guid, text: body });
+          const payload = "text" in part ? { text: part.text } : { file: attachment!.file };
+          const receipt = await rpc.call<{ ok: boolean; guid?: string }>("send", { chat_guid: chat.guid, ...payload });
           if (receipt.ok && receipt.guid) await sent(receipt.guid);
         } catch (error) {
           runtime.signal.throwIfAborted();
           if (error instanceof RpcError && error.data?.retry_safe === true && error.data.disposition === "not_started")
-            await runtime.sleepUntil(runtime.now() + retryMs, { phase: "deliver" }, ctx);
+            await runtime.sleepUntil(runtime.now() + retryMs, ready, ctx);
           else runtime.report(new Error("Messages send outcome unknown. Checking outgoing history."));
         }
       } catch (error) {
@@ -109,6 +123,8 @@ function prepare(runner: Runner, options: ImsgOptions) {
         runtime.report(error);
         // A receipt commit can fail after send. Retain the persisted attempt marker.
         await runtime.sleepUntil(runtime.now() + retryMs, attempted, ctx);
+      } finally {
+        if (attachment) await attachment.release().catch(error => runtime.report(error));
       }
     } },
     async abort(_task, runtime, ctx) { await runtime.commit(() => aborted, ctx); },
@@ -180,6 +196,7 @@ function prepare(runner: Runner, options: ImsgOptions) {
         const status = await rpc.call<{ database: { ready: boolean }; methods: string[] }>("initialize", { protocol_version: 1 });
         if (!status.database?.ready || !["messages.after", "watch.subscribe", "chats.get", "send"].every(m => status.methods.includes(m)))
           throw new Error("imsg needs a readable Messages database and the protocol 1 replay, watch and send methods.");
+        rpc.stagesFiles = ["dispatch.attachments.put", "dispatch.attachments.remove"].every(m => status.methods.includes(m));
         const checkpoint = await host.harness.snapshot(Inbox, context);
         let cursor = checkpoint?.cursor;
         const save = async (next: number) => host.harness.commit(async tx => { (await tx.doc(Inbox)).cursor = next; }, context);

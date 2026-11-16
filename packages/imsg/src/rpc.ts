@@ -1,12 +1,20 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
+import { basename } from "node:path";
+import type { MessagePart } from "./text.js";
 
 export type RpcCommand = { command?: string; args?: string[] };
 export type Chat = { id: number; guid: string; service: string; is_group: boolean; participants: string[] };
 export type Message = {
   id: number; guid: string; chat_id: number; chat_guid?: string; sender: string; is_from_me: boolean;
   text?: string; is_reaction?: boolean; unsent_at?: string;
+  attachments?: { transfer_name?: string; filename?: string; original_path?: string }[];
 };
+export function matchesPart(row: Message, part: MessagePart) {
+  if (!row.is_from_me || !row.guid) return false;
+  if ("text" in part) return row.text === part.text;
+  return row.attachments?.some(a => [a.transfer_name, a.filename, a.original_path].some(path => path && basename(path) === part.table.name));
+}
 export type Page = { messages: Message[]; next_rowid: number; has_more: boolean };
 
 export class RpcError extends Error {
@@ -18,6 +26,7 @@ export class RpcError extends Error {
 /** One imsg rpc stdio session. Losing the pipe rejects every outstanding call,
  * including mutations whose outcome the caller must reconcile. */
 export class MessagesRpc {
+  stagesFiles = false;
   private readonly child;
   private sequence = 0;
   private failure?: Error;
@@ -64,16 +73,16 @@ export class MessagesRpc {
     });
   }
 
-  after(since: number, chatId?: number) {
-    return this.call<Page>("messages.after", { since_rowid: since, limit: 500, ...(chatId ? { chat_id: chatId } : {}) });
+  after(since: number, chatId?: number, attachments = false) {
+    return this.call<Page>("messages.after", { since_rowid: since, limit: 500, ...(chatId ? { chat_id: chatId } : {}), ...(attachments ? { attachments: true } : {}) });
   }
 
   close() { this.child.stdin.end(); this.child.kill(); }
 }
 
-export async function scan(rpc: MessagesRpc, since: number, page: (value: Page) => Promise<void>, chatId?: number) {
+export async function scan(rpc: MessagesRpc, since: number, page: (value: Page) => Promise<void>, chatId?: number, attachments = false) {
   for (;;) {
-    const result = await rpc.after(since, chatId);
+    const result = await rpc.after(since, chatId, attachments);
     if (!Number.isSafeInteger(result.next_rowid) || result.next_rowid < since || (result.has_more && result.next_rowid === since))
       throw new Error("Messages returned an invalid replay cursor.");
     await page(result);

@@ -1,0 +1,87 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use Fcntl qw(O_CREAT O_EXCL O_WRONLY);
+use File::Temp qw(tempdir);
+use IO::Handle;
+use IO::Select;
+use IPC::Open2;
+use JSON::PP qw(decode_json encode_json);
+use MIME::Base64 qw(decode_base64 encode_base64);
+
+# Standard imsg owns all Messages operations. This extension stages PNG bytes
+# on the same Mac when the Dispatch host is across an SSH connection.
+@ARGV == 1 or die "Usage: dispatch-imsg-rpc /absolute/path/to/imsg\n";
+my $dir = tempdir("dispatch-imsg-XXXXXXXX", TMPDIR => 1, CLEANUP => 1);
+my $pid = open2(my $out, my $in, $ARGV[0], "rpc");
+binmode($_, ":raw") for (\*STDIN, \*STDOUT, $in, $out);
+STDOUT->autoflush(1);
+$in->autoflush(1);
+$SIG{TERM} = $SIG{HUP} = sub { die "Messages connection closed\n" };
+$SIG{PIPE} = "IGNORE";
+
+sub stage {
+    my ($method, $params) = @_;
+    my $name = $params->{name} // "";
+    $name =~ /\ATable-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\.png\z/ or die "Invalid table filename";
+    my $path = "$dir/$name";
+    if ($method eq "dispatch.attachments.remove") {
+        unlink($path) or die "Cannot remove staged table" if -e $path;
+        return {};
+    }
+    my $encoded = $params->{png} // "";
+    my $data = decode_base64($encoded);
+    substr($data, 0, 8) eq "\x89PNG\r\n\x1a\n" && encode_base64($data, "") eq $encoded or die "Invalid PNG";
+    if (-e $path) {
+        open(my $old, "<:raw", $path) or die "Cannot read staged table";
+        local $/;
+        $data eq <$old> or die "Conflicting staged table";
+    } else {
+        sysopen(my $file, $path, O_WRONLY | O_CREAT | O_EXCL, 0600) or die "Cannot stage table";
+        binmode($file);
+        unless (print({$file} $data) && close($file)) { unlink($path); die "Cannot write staged table"; }
+    }
+    return {file => $path};
+}
+
+my $reads = IO::Select->new(\*STDIN, $out);
+my %buffers;
+LOOP: while (my @ready = $reads->can_read) {
+    for my $handle (@ready) {
+        my $fd = fileno($handle);
+        my $client = $fd == fileno(STDIN);
+        my $count = sysread($handle, my $bytes, 65536);
+        defined $count or die "Cannot read Messages RPC";
+        unless ($count) {
+            last LOOP unless $client;
+            $reads->remove($handle);
+            close($in);
+            next;
+        }
+        $buffers{$fd} .= $bytes;
+        while ((my $end = index($buffers{$fd}, "\n")) >= 0) {
+            my $line = substr($buffers{$fd}, 0, $end + 1, "");
+            my $packet = eval { decode_json($line) };
+            if ($client) {
+                my $method = ref($packet) eq "HASH" ? $packet->{method} // "" : "";
+                if ($method eq "dispatch.attachments.put" || $method eq "dispatch.attachments.remove") {
+                    my $reply = {jsonrpc => "2.0", id => $packet->{id}};
+                    $reply->{result} = eval { stage($method, $packet->{params}) };
+                    if ($@) { delete $reply->{result}; $reply->{error} = {code => -32602, message => "Could not stage or remove the table PNG"}; }
+                    print STDOUT encode_json($reply), "\n" or last LOOP;
+                } else {
+                    print {$in} $line or last LOOP;
+                }
+            } else {
+                my $result = ref($packet) eq "HASH" ? $packet->{result} : undef;
+                if (ref($result) eq "HASH" && exists($result->{protocol_version}) && ref($result->{methods}) eq "ARRAY") {
+                    push @{$result->{methods}}, "dispatch.attachments.put", "dispatch.attachments.remove";
+                    $line = encode_json($packet) . "\n";
+                }
+                print STDOUT $line or last LOOP;
+            }
+        }
+    }
+}
+close($in) if defined fileno($in);
+waitpid($pid, 0);
