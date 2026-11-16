@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-16
+
 - Receive photos and screenshots as native image input, with or without accompanying text, in local and remote Messages chats.
 
 ## [0.26.0] - 2026-11-16
