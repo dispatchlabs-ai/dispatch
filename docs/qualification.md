@@ -4,6 +4,26 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.25.1 Messages formatting — November 16, 2026 UTC
+
+All 14 downloaded release assets and their GitHub digests matched the clean
+package source `d4fc7559c1796a86a069bd5d125767692ce68d0f`. Locked builds and
+type checks, the macOS arm64 flake and distribution builds, and Linux arm64
+Web and Workers OCI builds passed. Five external package combinations
+installed, strict NodeNext imports passed, and the production npm audit
+reported zero findings. Package scans found no known-pattern matches.
+Distribution scan matches were the same upstream files as the previous checks.
+[Release v0.25.1](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.25.1).
+
+Direct and two-participant group conversations through the released adapter
+kept their Markdown tables in native history. An isolated RPC peer received
+readable text on the originating chat and omitted its send receipt. Both
+deliveries recovered from the outgoing history without a second send.
+Apple Messages displayed an unsent sample on an iPhone simulator. Web rendered
+the saved Markdown as a table at all four supported review sizes, including the
+phone fullscreen view. The application host reconnected to Messages after a
+clean release-URL install. Carrier delivery was outside this private check.
+
 ## v0.25.0 live agent preview — November 16, 2026 UTC
 
 All 14 downloaded files matched the release digests for
