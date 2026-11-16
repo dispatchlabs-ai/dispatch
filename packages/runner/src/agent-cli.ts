@@ -11,6 +11,7 @@ import { localHostPaths, readHostConfig, readClientConnection, projectHostConfig
 const usage = `dispatch serve [--root DIRECTORY] [--state DIRECTORY] [--socket SOCKET] [--demo]
 dispatch serve --config HOST.json
 dispatch chat [--root DIRECTORY] [--state DIRECTORY] [--agent NAME] [--session KEY] [--prompt TEXT] [--history]
+dispatch preview --agent NAME [--root DIRECTORY | --config HOST.json] [--port PORT]
 dispatch catalog [--root DIRECTORY]
 dispatch environment describe|build|setup|status|start|stop --agent NAME [--config HOST.json]
 dispatch environment setup --agent NAME [--space CUA_ID] [--identity ACCOUNT] [--vault-server HTTPS_ORIGIN] [--rebuild]
@@ -49,12 +50,13 @@ Clients never start, replace or upgrade an owner. Disconnect leaves its work run
 try {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     root: { type: "string" }, state: { type: "string" }, config: { type: "string" }, socket: { type: "string" }, demo: { type: "boolean" },
-    agent: { type: "string" }, session: { type: "string" }, prompt: { type: "string" },
+    agent: { type: "string" }, port: { type: "string" }, session: { type: "string" }, prompt: { type: "string" },
     "request-id": { type: "string" }, history: { type: "boolean" }, json: { type: "boolean" }, help: { type: "boolean" },
     "api-key": { type: "boolean" }, "no-browser": { type: "boolean" },
     provider: { type: "string" }, model: { type: "string" }, module: { type: "string" }, export: { type: "string" }, "base-url": { type: "string" },
     space: { type: "string" }, identity: { type: "string" }, "vault-server": { type: "string" }, rebuild: { type: "boolean" },
   } });
+  if (values.port && positionals[0] !== "preview") throw new Error("--port is a preview option.");
   if (values.demo && positionals[0] !== "serve") throw new Error("--demo is a host option: use dispatch serve --demo, then dispatch chat.");
   if ((values.space || values.identity || values["vault-server"] || values.rebuild) && positionals[0] !== "environment")
     throw new Error("Environment settings belong to dispatch environment setup.");
@@ -84,6 +86,12 @@ try {
     }), null, 2));
   }
   else if (positionals.length !== 1) throw new Error(usage);
+  else if (positionals[0] === "preview") {
+    if (!values.agent) throw new Error("Select --agent NAME to preview.");
+    if (values.state || values.socket || (values.config && values.root)) throw new Error("Preview uses private state. Select --root or --config.");
+    const { previewCommand } = await import("./preview.js");
+    await previewCommand(values.agent, values);
+  }
   else if (positionals[0] === "auth") {
     const { authStatus } = await import("./login-cli.js");
     await authStatus();

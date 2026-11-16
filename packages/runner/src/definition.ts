@@ -58,6 +58,17 @@ export type LoadedAgent = AgentDefinition & {
 
 export const agentName = /^[a-z][a-z0-9-]*$/;
 
+/** Optional preview.ts next to agent.md. Only these bindings enter a preview. */
+export type AgentPreview = {
+  extensions?: Extension[];
+  /** Scoped skill IDs, or true to include the whole skill catalog. */
+  skills?: true | string[];
+  /** Stable directory and conversation key under .demo/. Defaults to the agent ID. */
+  history?: string;
+  /** Include the current operator when enrolled in the application roster. Defaults to true. */
+  includeSelf?: boolean;
+};
+
 export function defineAgent(definition: AgentDefinition = {}): AgentDefinition & { trigger: Trigger; input: string } {
   const trigger = definition.trigger ?? { mode: "manual" };
   if (definition.input !== undefined && typeof definition.input !== "string") throw new Error("Agent input must be text.");
@@ -142,9 +153,8 @@ export async function catalog(root: string): Promise<{ id: string; runnable: boo
   return agents;
 }
 
-export async function loadAgent(root: string, id: string, ancestors: string[] = []): Promise<LoadedAgent> {
+async function agentFolder(root: string, id: string) {
   if (!agentName.test(id)) throw new Error(`Invalid agent name: ${id}`);
-  if (ancestors.includes(id)) throw new Error(`Circular agent dependency: ${[...ancestors, id].join(" → ")}`);
   let folder = join(root, "agents", id);
   if (id === "agent" && await hasRootAgent(root)) {
     await access(join(folder, "agent.md")).then(() => {
@@ -152,14 +162,44 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
     }, error => { if (error.code !== "ENOENT") throw error; });
     folder = root;
   }
+  return folder;
+}
+
+async function agentModule(folder: string, filename: string) {
+  const path = join(folder, filename);
+  const code = await readFile(path, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== "ENOENT") throw error;
+  });
+  if (code === undefined) return { code: "", value: undefined };
+  const module = await import(pathToFileURL(path).href);
+  if (!Object.hasOwn(module, "default")) throw new Error(`${path} must export its definition as default.`);
+  return { code, value: module.default };
+}
+
+export async function loadAgent(root: string, id: string, ancestors: string[] = []): Promise<LoadedAgent> {
+  if (ancestors.includes(id)) throw new Error(`Circular agent dependency: ${[...ancestors, id].join(" → ")}`);
+  return readDefinition(root, id, await agentFolder(root, id), ancestors);
+}
+
+export async function loadPreviewAgent(root: string, id: string) {
+  const folder = await agentFolder(root, id);
+  const { code, value } = await agentModule(folder, "preview.ts");
+  const preview: AgentPreview = value ?? {};
+  if (typeof preview !== "object" || Array.isArray(preview) ||
+    Object.keys(preview).some(key => !["extensions", "skills", "history", "includeSelf"].includes(key)) ||
+    (preview.includeSelf !== undefined && typeof preview.includeSelf !== "boolean") ||
+    (preview.extensions !== undefined && !Array.isArray(preview.extensions)) ||
+    (preview.skills !== undefined && preview.skills !== true && (!Array.isArray(preview.skills) || preview.skills.some(id => typeof id !== "string"))) ||
+    (preview.history !== undefined && (typeof preview.history !== "string" || !agentName.test(preview.history)))) {
+    throw new Error("preview.ts accepts extensions, skills (true or scoped skill IDs), a history name and includeSelf.");
+  }
+  return { agent: await readDefinition(root, id, folder, [], { ...preview, code }), history: preview.history ?? id,
+    includeSelf: preview.includeSelf ?? true };
+}
+
+async function readDefinition(root: string, id: string, folder: string, ancestors: string[], preview?: AgentPreview & { code: string }): Promise<LoadedAgent> {
   const source = relative(root, join(folder, "agent.md")).replaceAll("\\", "/");
-  const [markdown, code] = await Promise.all([
-    readFile(join(folder, "agent.md"), "utf8"),
-    readFile(join(folder, "agent.ts"), "utf8").catch((error) => {
-      if (error.code === "ENOENT") return undefined;
-      throw error;
-    }),
-  ]);
+  const markdown = await readFile(join(folder, "agent.md"), "utf8");
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/.exec(markdown);
   if (!match) throw new Error(`${source} must contain YAML frontmatter followed by instructions.`);
   const meta = parse(match[1]);
@@ -171,12 +211,19 @@ export async function loadAgent(root: string, id: string, ancestors: string[] = 
     || !match[2].trim()) {
     throw new Error(`${source} requires description, model.provider, model.id, and instructions.`);
   }
-  // An agent module is trusted application code, loaded once per process.
-  const module = code !== undefined ? await import(pathToFileURL(join(folder, "agent.ts")).href) : undefined;
-  if (module && !Object.hasOwn(module, "default")) throw new Error(`${source.replace(/\.md$/, ".ts")} must export its definition as default.`);
-  const definition = defineAgent({ ...module?.default, ...(meta.mcp !== undefined ? { mcp: meta.mcp } : {}),
+  const { code, value } = preview ? { code: preview.code, value: undefined } : await agentModule(folder, "agent.ts");
+  const definition = preview ? defineAgent({ extensions: preview.extensions, skills: !!preview.skills }) :
+    defineAgent({ ...value, ...(meta.mcp !== undefined ? { mcp: meta.mcp } : {}),
     ...(meta.environment !== undefined ? { environment: meta.environment } : {}) });
-  const skillCatalog = definition.skills ? await loadSkills(root, id) : [];
+  let skillCatalog = definition.skills ? await loadSkills(root, id) : [];
+  if (Array.isArray(preview?.skills)) {
+    const available = new Map(skillCatalog.map(skill => [skill.id, skill]));
+    skillCatalog = preview.skills.map(id => {
+      const skill = available.get(id);
+      if (!skill) throw new Error(`Unknown preview skill: ${id}`);
+      return skill;
+    });
+  }
   const repositoryInstructions = await loadRepositoryInstructions(folder, root);
   const handoffAgent = definition.handoff
     ? await loadAgent(root, definition.handoff.target, [...ancestors, id]) : undefined;

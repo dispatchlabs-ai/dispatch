@@ -35,16 +35,30 @@ export class Users {
         user.contextFile = resolve(dirname(file), user.contextFile);
         await readFile(user.contextFile, "utf8");
       }
-      directory.people.set(id, user);
-      for (const subject of user.identities) {
-        if ((subject.channel === "slack" || subject.channel === "web") && !subject.scope)
-          throw new Error(`A ${subject.channel} identity requires its scope for user ${id}.`);
-        const key = identityKey(subject);
-        if (directory.identities.has(key)) throw new Error(`Duplicate ${subject.channel} identity for user ${id}.`);
-        directory.identities.set(key, user);
-      }
+      directory.add(user);
     }
     return directory;
+  }
+
+  private add(user: Person) {
+    this.people.set(user.id, user);
+    for (const subject of user.identities) {
+      if ((subject.channel === "slack" || subject.channel === "web") && !subject.scope)
+        throw new Error(`A ${subject.channel} identity requires its scope for user ${user.id}.`);
+      const key = identityKey(subject);
+      if (this.identities.has(key)) throw new Error(`Duplicate ${subject.channel} identity for user ${user.id}.`);
+      this.identities.set(key, user);
+    }
+  }
+
+  forAgent(agent: string) {
+    return [...this.people.values()].filter(user => user.agents.includes(agent));
+  }
+
+  static preview(person: Pick<Person, "id" | "name" | "contextFile">, agent: string, identity: UserIdentity) {
+    const users = new Users();
+    users.add({ ...person, agents: [agent], identities: [identity] });
+    return users;
   }
 
   find(identity: UserIdentity, agent: string) {

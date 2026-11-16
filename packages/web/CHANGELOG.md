@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Serve authenticated loopback Web previews with switchable identities and a fresh password for each launch.
+
 ## [0.23.0] - 2026-11-16
 
 - Use verified hosted sign-in or a private local browser link for roster-aware chat; display the actual human author.

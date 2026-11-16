@@ -27,7 +27,7 @@ buildNpmPackage {
       ../../observer/index.html ../../observer/vite.config.ts
       ../../eval
       ../package.json ../tsconfig.json ../tsconfig.server.json ../vite.config.ts
-      ../index.html ../src ../server ../openapi.yaml ../licenses ../LICENSE ../THIRD_PARTY.md
+      ../index.html ../src ../server ../preview.js ../openapi.yaml ../licenses ../LICENSE ../THIRD_PARTY.md
     ];
   };
   npmDepsHash = "sha256-eTpfPOMkAgg63/sOBs2yfp9tla9Valx8JOHYZjoE8IU=";
@@ -52,7 +52,7 @@ buildNpmPackage {
     cp -R packages/runner/native "$app/packages/runner/"
     cp -R packages/runner/nix "$app/packages/runner/"
     cp packages/runner/AGENT-CHAT-LICENSE "$app/packages/runner/"
-    cp packages/web/openapi.yaml "$app/packages/web/"
+    cp packages/web/openapi.yaml packages/web/preview.js "$app/packages/web/"
     cp -R packages/web/licenses "$app/packages/web/"
     cp packages/web/LICENSE packages/web/THIRD_PARTY.md "$app/packages/web/"
     cp packages/web/THIRD_PARTY.md "$out/share/dispatch-web/THIRD_PARTY.md"

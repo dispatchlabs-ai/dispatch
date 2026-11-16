@@ -112,6 +112,28 @@ and payloads print on exit so they remain available for deliberate recovery.
 `--prompt`, `--history`, file submissions, redirected streams and `TERM=dumb`
 keep the plain interface. See the [client guide](docs/service.md#interactive-terminal-ui).
 
+## Preview an agent
+
+With the matching Web package installed, run `npx dispatch preview --agent NAME`
+from your application. Open the printed loopback address and sign in with the
+temporary password. The default port is 4330. Use `--port` to choose another.
+Preview reads the selected agent's Markdown, repository instructions and model.
+It uses the application's provider settings and starts its own private histories
+in `.demo/NAME/`. Add `.demo/` to your application's `.gitignore`.
+
+Each enrolled person gets a separate conversation and their usual profile.
+An application without a roster gets one local conversation. Restart the command
+to pick up definition changes and reopen the saved histories.
+
+For sample tools or skills, place an optional `preview.ts` next to `agent.md`.
+It exports an object satisfying `AgentPreview`. For example, a preview can
+select `skills: ["agent/order-status"]` and pass an extension backed by sample
+orders in `extensions`. These are the only application tools enabled for preview.
+The production `agent.ts`, MCP servers, channels, environments and schedules
+stay disconnected. `skills: true` selects all scoped skills. Set
+`includeSelf: false` to omit the operator's local roster identity, or set
+`history` to reuse a named preview directory and conversation key.
+
 ## Try it without credentials
 
 Use the same `agent.md` with an explicitly synthetic host:

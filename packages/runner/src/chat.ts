@@ -130,6 +130,8 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
 
     static async open(options: {
       root: string; stateRoot: string; demo: boolean; names?: string[]; extensions?: Extension[];
+      /** Definitions already loaded by this host, including explicit preview tool bindings. */
+      agents?: LoadedAgent[];
       replySink?: ReplySink; updateDefinitions?: boolean | "when-idle"; models: Models; initialize?: ChatInitializer;
       resume?: boolean;
       /** The host starts recovery after its adapters and bindings are ready. */
@@ -146,8 +148,6 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       artifacts?: ArtifactOptions;
     }) {
       const stateRoot = resolve(options.stateRoot);
-      const names = options.names?.length ? options.names :
-        (await catalog(options.root)).filter(entry => entry.runnable).map(entry => entry.id);
       const prepare = async (definition: LoadedAgent): Promise<LoadedAgent> => {
         const agent = options.prepareAgent ? await options.prepareAgent(definition) : definition;
         return { ...agent,
@@ -155,7 +155,9 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
           ...(agent.handoffAgent ? { handoffAgent: await prepare(agent.handoffAgent) } : {}),
         };
       };
-      const agents = await Promise.all(names.map(async name => prepare(await loadAgent(options.root, name))));
+      const definitions = options.agents ?? await Promise.all((options.names?.length ? options.names :
+        (await catalog(options.root)).filter(entry => entry.runnable).map(entry => entry.id)).map(name => loadAgent(options.root, name)));
+      const agents = await Promise.all(definitions.map(prepare));
       const service = new ChatService(agents, options.demo, options.initialize);
       const enabled = options.schedules === false ? [] : await enabledAgents(options.root);
       for (const id of enabled) service.enabled.add(id);

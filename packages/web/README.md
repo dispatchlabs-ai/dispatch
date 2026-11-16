@@ -28,6 +28,10 @@ same directory. For the quickstart's demo at `.demo/`, use the walkthrough's
 
 With a [roster-enabled host](../runner/docs/service.md#shared-human-identities), open the private sign-in file printed by the loopback Web launcher in the browser on that Mac or PC. Subsequent visits use the browser session. Hosted deployments keep their existing authorization. The supplied Basic and cookie modules return the verified login name; a custom module may return `{ handle }` after authentication. The Web backend passes this identity over the owner-private service socket. A boolean-only authorizer grants its existing installation access without identifying a human for roster-aware submissions.
 
+For manual agent testing, run `npx dispatch preview --agent NAME` from the
+application. Web opens the signed-in chat and identity picker for its isolated
+preview conversations. See [Preview an agent](../runner/README.md#preview-an-agent).
+
 ## Build from source
 
 The [synthetic local composition](../../examples/chat/README.md) includes a runnable demo.
