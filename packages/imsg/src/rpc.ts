@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { basename } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { MessagePart } from "./text.js";
 
 export type RpcCommand = { command?: string; args?: string[] };
@@ -27,13 +28,17 @@ export class RpcError extends Error {
  * including mutations whose outcome the caller must reconcile. */
 export class MessagesRpc {
   stagesFiles = false;
+  readsImages = false;
   private readonly child;
   private sequence = 0;
   private failure?: Error;
   private readonly pending = new Map<number, { resolve(value: unknown): void; reject(error: Error): void }>();
 
   constructor(options: RpcCommand, wake: () => void) {
-    this.child = spawn(options.command ?? "imsg", options.args ?? ["rpc"], { stdio: ["pipe", "pipe", "inherit"] });
+    const command = options.command ?? "imsg", args = options.args ?? ["rpc"];
+    const local = basename(command) === "imsg" && args.length === 1 && args[0] === "rpc";
+    this.child = spawn(local ? fileURLToPath(new URL("../bin/dispatch-imsg-rpc", import.meta.url)) : command,
+      local ? [command] : args, { stdio: ["pipe", "pipe", "inherit"] });
     const fail = (error: Error) => {
       if (this.failure) return;
       this.failure = error;

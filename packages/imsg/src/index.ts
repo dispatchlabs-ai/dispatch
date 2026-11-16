@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 import { basename } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { AssistantEntry, defineDoc, defineExtension, defineTask, type ConversationId, type TaskId, type Tx } from "@earendil-works/pi-durable";
-import { context, publicAnswer, type Adapter, type ChatService, type ReplyDestination, type Runner } from "@dispatch/runner";
+import { ContentError, context, publicAnswer, type Adapter, type ChatService, type ReplyDestination, type Runner } from "@dispatch/runner";
 import { matchesPart, MessagesRpc, RpcError, scan, type Chat, type Message, type RpcCommand } from "./rpc.js";
-import { stageTable } from "./attachments.js";
+import { incomingImages, stageTable } from "./attachments.js";
 import { messageParts, type MessagePart } from "./text.js";
 
 export type ImsgOptions = RpcCommand & {
@@ -160,20 +160,30 @@ function prepare(runner: Runner, options: ImsgOptions) {
     async abort(_task, runtime, ctx) { await runtime.commit(() => aborted, ctx); },
   });
   async function receive(rpc: MessagesRpc, row: Message) {
-    if (row.is_from_me !== false || row.is_reaction || row.unsent_at || !row.guid || !row.text?.trim() || !allowed(row.sender)) return;
+    const caption = (row.text ?? "").replaceAll("\uFFFC", "").trim();
+    if (row.is_from_me !== false || row.is_reaction || row.unsent_at || !row.guid || (!caption && !row.attachments?.length) || !allowed(row.sender)) return;
     const host = service.host(agent);
     const key = JSON.stringify([connection, row.guid]);
     if ((await host.harness.snapshot(Inbox, context))?.seen[key]) return;
     const chat = await rpc.call<Chat>("chats.get", { chat_id: row.chat_id });
     if (!chat.guid || (row.chat_guid && row.chat_guid !== chat.guid) || !membersAllowed(chat)) return;
+    const images = await incomingImages(rpc, row);
+    if (!images) return;
+    const { files, unavailable } = images;
+    const text = [caption, ...(unavailable.length ? ["Attachments unavailable as images: " + unavailable.join(", ")] : [])].filter(Boolean).join("\n");
     const destination: Destination = { transport: "imsg", channel: connection, thread: chat.guid, chatId: chat.id, user: row.sender };
     const conversationKey = JSON.stringify(["imsg", connection, chat.guid]);
-    const record = await service.create(agent, "imsg", conversationKey, row.text, { imsg: { connection, chatGuid: chat.guid } });
+    const record = await service.create(agent, "imsg", conversationKey, caption || files[0]?.name || "Attachment", { imsg: { connection, chatGuid: chat.guid } });
     const { conversation } = await service.resolve(record.id);
-    const draft = await service.prepareInput(record.id, `Messages text from ${row.sender}:\n${row.text}`, key, {
+    const input = `Messages from ${row.sender}:${text ? "\n" + text : ""}`;
+    const options = {
       source: "imsg", identity: identity(row.sender),
       ...(chat.is_group ? { audience: chat.participants.map(identity) } : {}),
-      metadata: { destination, text: row.text, user: row.sender, messageGuid: row.guid, service: chat.service, group: chat.is_group },
+      metadata: { destination, text, user: row.sender, messageGuid: row.guid, service: chat.service, group: chat.is_group },
+    };
+    const draft = await service.prepareInput(record.id, input, key, { ...options, files }).catch(error => {
+      if (!(error instanceof ContentError) || !files.length) throw error;
+      return service.prepareInput(record.id, input + "\nImages unavailable: " + error.message, key, options);
     });
     await host.harness.commit(async tx => {
       const inbox = await tx.doc(Inbox);
@@ -197,6 +207,8 @@ function prepare(runner: Runner, options: ImsgOptions) {
         if (!status.database?.ready || !["messages.after", "watch.subscribe", "chats.get", "send"].every(m => status.methods.includes(m)))
           throw new Error("imsg needs a readable Messages database and the protocol 1 replay, watch and send methods.");
         rpc.stagesFiles = ["dispatch.attachments.put", "dispatch.attachments.remove"].every(m => status.methods.includes(m));
+        rpc.readsImages = status.methods.includes("dispatch.attachments.read");
+        if (!rpc.readsImages) console.warn("Install the current dispatch-imsg-rpc on the Messages Mac to receive images.");
         const checkpoint = await host.harness.snapshot(Inbox, context);
         let cursor = checkpoint?.cursor;
         const save = async (next: number) => host.harness.commit(async tx => { (await tx.doc(Inbox)).cursor = next; }, context);
@@ -212,7 +224,7 @@ function prepare(runner: Runner, options: ImsgOptions) {
           cursor = await scan(rpc, cursor, async page => {
             for (const row of page.messages) await receive(rpc, row);
             if (page.next_rowid !== cursor) await save(page.next_rowid);
-          });
+          }, undefined, true);
           if (!stop.signal.aborted) await wake.promise;
         }
       } catch (error) {

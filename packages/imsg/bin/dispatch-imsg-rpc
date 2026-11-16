@@ -1,7 +1,9 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
-use Fcntl qw(O_CREAT O_EXCL O_WRONLY);
+use Cwd qw(realpath);
+use Fcntl qw(O_CREAT O_EXCL O_WRONLY O_RDONLY O_NOFOLLOW);
+use File::Basename qw(basename);
 use File::Temp qw(tempdir);
 use IO::Handle;
 use IO::Select;
@@ -9,8 +11,7 @@ use IPC::Open2;
 use JSON::PP qw(decode_json encode_json);
 use MIME::Base64 qw(decode_base64 encode_base64);
 
-# Standard imsg owns all Messages operations. This extension stages PNG bytes
-# on the same Mac when the Dispatch host is across an SSH connection.
+# imsg owns chat lookup and delivery. Read or stage attachments on its Mac.
 @ARGV == 1 or die "Usage: dispatch-imsg-rpc /absolute/path/to/imsg\n";
 my $dir = tempdir("dispatch-imsg-XXXXXXXX", TMPDIR => 1, CLEANUP => 1);
 my $pid = open2(my $out, my $in, $ARGV[0], "rpc");
@@ -44,8 +45,60 @@ sub stage {
     return {file => $path};
 }
 
+sub image_file {
+    my ($attachment, $name) = @_;
+    my $path = $attachment->{original_path} || $attachment->{filename} || "";
+    $path =~ s{\A~/}{$ENV{HOME}/};
+    my $root = realpath("$ENV{HOME}/Library/Messages/Attachments");
+    $path = realpath($path);
+    return unless defined($root) && defined($path) && index($path, "$root/") == 0 && -f $path;
+    sysopen(my $file, $path, O_RDONLY | O_NOFOLLOW) or return;
+    binmode($file);
+    read($file, my $header, 12) or return;
+    my $mime = substr($header, 0, 8) eq "\x89PNG\r\n\x1a\n" ? "image/png"
+        : substr($header, 0, 3) eq "\xff\xd8\xff" ? "image/jpeg"
+        : $header =~ /\ARIFF....WEBP/s ? "image/webp" : undef;
+    my $data;
+    if ($mime) {
+        local $/;
+        $data = $header . (<$file> // "");
+    } else {
+        # Camera photos and other ImageIO formats need a model-readable still.
+        return unless ($attachment->{mime_type} // "") =~ m{\Aimage/}i
+            || $name =~ /\.(?:heic|heif|gif|tiff?|avif|bmp)\z/i;
+        my $tmp = File::Temp->new(TEMPLATE => "image-XXXXXXXX", DIR => $dir, SUFFIX => ".png");
+        my $outpath = $tmp->filename;
+        close($tmp);
+        open(my $sips, "-|", "/usr/bin/sips", "-s", "format", "png", $path, "--out", $outpath) or return;
+        1 while <$sips>;
+        my $ok = close($sips);
+        if ($ok && open(my $png, "<:raw", $outpath)) { local $/; $data = <$png>; }
+        return unless defined($data) && substr($data, 0, 8) eq "\x89PNG\r\n\x1a\n";
+        $name =~ s/\.[^.]+\z//;
+        $name .= ".png";
+        $mime = "image/png";
+    }
+    return { name => $name, mimeType => $mime, data => encode_base64($data, "") };
+}
+
+# Resolve by incoming message identity, never a caller-supplied filesystem path.
+sub incoming {
+    my ($request, $result) = @_;
+    my $row = $result->{messages}[0];
+    ref($row) eq "HASH" && defined($row->{is_from_me}) && !$row->{is_from_me}
+        && $row->{id} == $request->{row_id} && $row->{chat_id} == $request->{chat_id}
+        && $row->{guid} eq $request->{guid} or die "Incoming message no longer matches";
+    my (@files, @unavailable);
+    for my $attachment (@{$row->{attachments} // []}) {
+        my $name = basename($attachment->{transfer_name} || $attachment->{filename} || "Attachment");
+        my $image = image_file($attachment, $name);
+        if ($image) { push @files, $image; } else { push @unavailable, $name; }
+    }
+    return {files => \@files, unavailable => \@unavailable};
+}
+
 my $reads = IO::Select->new(\*STDIN, $out);
-my %buffers;
+my (%buffers, %lookups);
 LOOP: while (my @ready = $reads->can_read) {
     for my $handle (@ready) {
         my $fd = fileno($handle);
@@ -69,13 +122,30 @@ LOOP: while (my @ready = $reads->can_read) {
                     $reply->{result} = eval { stage($method, $packet->{params}) };
                     if ($@) { delete $reply->{result}; $reply->{error} = {code => -32602, message => "Could not stage or remove the table PNG"}; }
                     print STDOUT encode_json($reply), "\n" or last LOOP;
+                } elsif ($method eq "dispatch.attachments.read") {
+                    my $p = $packet->{params};
+                    unless (ref($p) eq "HASH" && ($p->{row_id} // "") =~ /\A[1-9][0-9]*\z/
+                        && ($p->{chat_id} // "") =~ /\A[1-9][0-9]*\z/ && length($p->{guid} // "")) {
+                        print STDOUT encode_json({jsonrpc => "2.0", id => $packet->{id},
+                            error => {code => -32602, message => "Expected incoming message identity"}}), "\n" or last LOOP;
+                        next;
+                    }
+                    $lookups{$packet->{id}} = $p;
+                    print {$in} encode_json({jsonrpc => "2.0", id => $packet->{id}, method => "messages.after",
+                        params => {since_rowid => $p->{row_id} - 1, chat_id => $p->{chat_id}, limit => 1,
+                            attachments => JSON::PP::true}}), "\n" or last LOOP;
                 } else {
                     print {$in} $line or last LOOP;
                 }
             } else {
                 my $result = ref($packet) eq "HASH" ? $packet->{result} : undef;
-                if (ref($result) eq "HASH" && exists($result->{protocol_version}) && ref($result->{methods}) eq "ARRAY") {
-                    push @{$result->{methods}}, "dispatch.attachments.put", "dispatch.attachments.remove";
+                my $lookup = defined($packet->{id}) ? delete $lookups{$packet->{id}} : undef;
+                if ($lookup && !$packet->{error}) {
+                    $packet->{result} = eval { incoming($lookup, $result) };
+                    if ($@) { delete $packet->{result}; $packet->{error} = {code => -32004, message => "Incoming message unavailable"}; }
+                    $line = encode_json($packet) . "\n";
+                } elsif (ref($result) eq "HASH" && exists($result->{protocol_version}) && ref($result->{methods}) eq "ARRAY") {
+                    push @{$result->{methods}}, "dispatch.attachments.put", "dispatch.attachments.remove", "dispatch.attachments.read";
                     $line = encode_json($packet) . "\n";
                 }
                 print STDOUT $line or last LOOP;

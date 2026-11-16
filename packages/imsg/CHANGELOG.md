@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Receive photos and screenshots as native image input, with or without accompanying text, in local and remote Messages chats.
+
 ## [0.26.0] - 2026-11-16
 
 - Send each Markdown table as a PNG in its original chat, with ordered text and tappable links. The bundled remote helper stages images on the Messages Mac.
