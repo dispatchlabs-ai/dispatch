@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/imsg",
-  "version": "0.25.1",
+  "version": "0.26.0",
   "description": "Apple Messages transport for Dispatch Runner",
   "license": "MIT",
   "type": "module",
@@ -21,7 +21,9 @@
     "CHANGELOG.md",
     "LICENSE"
   ],
-  "bin": { "dispatch-imsg-rpc": "./bin/dispatch-imsg-rpc" },
+  "bin": {
+    "dispatch-imsg-rpc": "./bin/dispatch-imsg-rpc"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "pretypecheck": "npm run build --workspace @dispatch/runner",
@@ -41,7 +43,7 @@
     "typescript": "6.0.3"
   },
   "peerDependencies": {
-    "@dispatch/runner": "0.25.1",
+    "@dispatch/runner": "0.26.0",
     "@earendil-works/pi-durable": "1.5.2"
   },
   "repository": {

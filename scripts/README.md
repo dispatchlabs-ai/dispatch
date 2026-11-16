@@ -4,12 +4,12 @@ This procedure prepares and publishes reusable packages. Follow
 [repository guidance](../AGENTS.md) for task scope and completing needed upgrades.
 Root, Observer and Eval remain application packages excluded from npm publication.
 The public library set is Runner, Remote, Postgres, Backend, Workers, Slack,
-Google Chat, Email and Fleet. Web ships as an installable browser client and MCP as an optional conversation connector. Install only the
+Google Chat, Messages, Email and Fleet. Web ships as an installable browser client and MCP as an optional conversation connector. Install only the
 packages your application uses. Backend's central storage peers and Fleet's Slack
 peer are optional; explicit subpath imports activate those integrations.
 
-The [v0.25.1 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.25.1)
-provides the nine library archives, Web client and MCP connector archives with their source manifest and SHA-256 checksums.
+The [v0.26.0 release](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.26.0)
+provides the ten library archives, Web client and MCP connector archives with their source manifest and SHA-256 checksums.
 Web’s GitHub archive references its exact Runner and Backend release archives; MCP references Runner, so npm can resolve either client from its URL. Graph edges in the source workspace stay at the lockstep version. Install matching library archives
 together; npm publication remains separate. Future breaking 0.x changes require
 a new minor release.
