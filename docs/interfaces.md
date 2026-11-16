@@ -78,7 +78,7 @@ The [Messages adapter](../packages/imsg/README.md) admits attributed text and de
   operations, not alternatives to ordinary service authorization.
 
 The network client uses installation-level bearer authorization and HTTPS.
-Machine-principal enrollment and multi-human grants remain future work. MCP is an
+The optional [human roster](../packages/runner/docs/service.md#shared-human-identities) links authenticated Pi chat, Web, Slack and Messages senders, selects their agents and supplies Markdown for agent judgment. Machine-principal enrollment and per-human history or tool grants remain future work. MCP is an
 optional connector package; WebMCP is not implemented.
 
 ## Errors and recovery

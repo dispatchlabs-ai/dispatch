@@ -7,7 +7,7 @@ import type { createResponseDelivery } from "./responses.js";
 export function createHistorySync(runner: Runner, responses: ReturnType<typeof createResponseDelivery>, options: {
   team: string;
   accepts: (channel: string, agent: string) => boolean;
-  allowedUser: (user: string) => boolean;
+  enrolled: (service: ChatService, user: string, agent: string) => boolean;
   allowProgressText?: (id: number, inputs: readonly number[]) => boolean | Promise<boolean>;
 }) {
   const watches = new Map<string, { watch: ConversationWatch; pending: Promise<void> }>();
@@ -37,7 +37,7 @@ export function createHistorySync(runner: Runner, responses: ReturnType<typeof c
                 || await options.allowProgressText(conversation.id, live.run.inputs));
               let more: boolean;
               do {
-                ({ more } = await conversation.commit(tx => responses.queueHistory(tx, conversation.id, { channel, thread }, options.allowedUser, host.conversation.id,
+                ({ more } = await conversation.commit(tx => responses.queueHistory(tx, conversation.id, { channel, thread }, user => options.enrolled(service, user, agent), host.conversation.id,
                   allowed && live?.generation?.message ? { generation: live.run!.taskId, first: live.run!.first ?? 0 } : undefined), context));
               } while (more && !closing);
               host.harness.resume();

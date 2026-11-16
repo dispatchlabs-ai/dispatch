@@ -20,6 +20,6 @@ export async function passwordVerifier(path: string | undefined) {
     });
     return timingSafeEqual(derived, expected) && username === credential.username;
   };
-  return Object.assign(verify, { credentialDigest: createHash("sha256")
+  return Object.assign(verify, { username: credential.username as string, credentialDigest: createHash("sha256")
     .update(JSON.stringify([credential.username, credential.salt, credential.hash])).digest("hex") });
 }

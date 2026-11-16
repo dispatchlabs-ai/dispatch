@@ -50,6 +50,7 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
       provenance: message.provenance ?? "runtime" })) };
   };
   return {
+    usersConfigured: metadata.usersConfigured,
     stateRoot: metadata.stateRoot ?? config.socket ?? config.url!,
     catalog,
     summary: async () => {
@@ -97,9 +98,9 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
         if (sourceId !== source) throw new AdmissionError("Choose this service's configured source.");
         return project(await call({ method: "create", agent, source: transport, key }));
       },
-      submit: async (id, text, requestId, _mode, transport, files = []) => {
+      submit: async (id, text, requestId, _mode, transport, files = [], user) => {
         if (files.length) requireCapability("attachments");
-        return call({ method: "send", id, text, requestId, mode: "steer", source: transport, files });
+        return call({ method: "send", id, text, requestId, mode: "steer", source: transport, files, ...(user ? { user } : {}) });
       },
       stop: async id => { await call({ method: "stop", id }); },
       artifact: async (id, artifactId) => {

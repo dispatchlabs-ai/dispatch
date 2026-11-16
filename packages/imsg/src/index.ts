@@ -8,7 +8,7 @@ export type ImsgOptions = RpcCommand & {
   connection: string;
   agent: string;
   /** Exact Messages handles. Every remote member of a group must be included. */
-  allowedHandles?: string[];
+  allowedHandles?: string[] | "users";
 };
 
 type Destination = ReplyDestination & { chatId: number };
@@ -21,7 +21,7 @@ const retryMs = 5_000;
 
 export function createAdapter(options: ImsgOptions): Adapter {
   if (!options.connection?.trim() || !options.agent?.trim() ||
-      (options.allowedHandles !== undefined && (!Array.isArray(options.allowedHandles) ||
+      (options.allowedHandles !== undefined && options.allowedHandles !== "users" && (!Array.isArray(options.allowedHandles) ||
         options.allowedHandles.some(handle => typeof handle !== "string" || !handle.trim()))) ||
       (options.command !== undefined && !options.command.trim()) ||
       (options.args !== undefined && (!Array.isArray(options.args) || options.args.some(arg => typeof arg !== "string"))))
@@ -32,9 +32,11 @@ export function createAdapter(options: ImsgOptions): Adapter {
 function prepare(runner: Runner, options: ImsgOptions) {
   const { connection, agent } = options;
   const name = `${runner.namespace}.imsg.${createHash("sha256").update(connection).digest("hex")}`;
-  const handles = options.allowedHandles && new Set(options.allowedHandles.map(handle => handle.trim().toLowerCase()));
-  const allowed = (handle: string) => !!handle && (!handles || handles.has(handle.toLowerCase()));
-  const membersAllowed = (chat: Chat) => !handles || (chat.participants.length > 0 && chat.participants.every(allowed));
+  const handles = Array.isArray(options.allowedHandles) ? new Set(options.allowedHandles.map(handle => handle.trim().toLowerCase())) : undefined;
+  const identity = (handle: string) => ({ channel: "imsg", handle });
+  const allowed = (handle: string) => !!handle && (!handles || handles.has(handle.toLowerCase())) &&
+    (!service.users || !!service.users.find(identity(handle), agent));
+  const membersAllowed = (chat: Chat) => (!handles && !service.users) || (chat.participants.length > 0 && chat.participants.every(allowed));
   const Inbox = defineDoc<{ cursor?: number; seen: Record<string, boolean> }>({
     kind: name + ".inbox", version: 1, scope: "session", initial: () => ({ seen: {} as Record<string, boolean> }),
     checkpointWhen: () => false,
@@ -149,7 +151,9 @@ function prepare(runner: Runner, options: ImsgOptions) {
     const record = await service.create(agent, "imsg", conversationKey, row.text, { imsg: { connection, chatGuid: chat.guid } });
     const { conversation } = await service.resolve(record.id);
     const draft = await service.prepareInput(record.id, `Messages text from ${row.sender}:\n${row.text}`, key, {
-      source: "imsg", metadata: { destination, text: row.text, user: row.sender, messageGuid: row.guid, service: chat.service, group: chat.is_group },
+      source: "imsg", identity: identity(row.sender),
+      ...(chat.is_group ? { audience: chat.participants.map(identity) } : {}),
+      metadata: { destination, text: row.text, user: row.sender, messageGuid: row.guid, service: chat.service, group: chat.is_group },
     });
     await host.harness.commit(async tx => {
       const inbox = await tx.doc(Inbox);
@@ -198,7 +202,10 @@ function prepare(runner: Runner, options: ImsgOptions) {
   }
   return {
     transport: "imsg", extension: defineExtension({ name, tasks: [answer, delivery] }), queueReply: enqueue,
-    async start(host: ChatService) { service = host; service.host(agent); intake = listen(); },
+    async start(host: ChatService) {
+      if (options.allowedHandles === "users" && !host.users) throw new Error("Messages requires a configured usersFile.");
+      service = host; service.host(agent); intake = listen();
+    },
     async close() { stop.abort(); child?.close(); await intake; },
   };
 }

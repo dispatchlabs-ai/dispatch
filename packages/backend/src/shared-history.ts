@@ -81,6 +81,7 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
   const catalog = async () => await read(runtime => runtime.catalog?.() ?? Promise.resolve(runtime.service.agents)) ?? [];
   const agents = await catalog();
   return {
+    get usersConfigured() { return connected?.usersConfigured; },
     openKeyedChat: (key, title, installation) => mutate(async runtime => {
       if (installation !== undefined) throw new AdmissionError("Keyed conversation links require a named installation binding.");
       const chat = await runtime.openKeyedChat!(key, title);
@@ -119,7 +120,7 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
         stores.invalidate();
         return project(chat);
       }),
-      submit: (id, text, requestId, _mode, source, files) => mutate(async runtime => runtime.service.submit(await owned(runtime, id), text, requestId, "steer", source, files)),
+      submit: (id, text, requestId, _mode, source, files, user) => mutate(async runtime => runtime.service.submit(await owned(runtime, id), text, requestId, "steer", source, files, user)),
       stop: id => mutate(async runtime => runtime.service.stop(await owned(runtime, id))),
       async artifact(id, artifactId) {
         if (config.capabilities?.artifacts === false) throw new AdmissionError("This installation does not support artifacts.");

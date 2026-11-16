@@ -94,9 +94,7 @@ existing durable queue. Startup catches up missing turns, including history
 written before this feature was installed, using retained entry/generation IDs
 to avoid reposting delivered responses. Catch-up posts appear at the end of the
 Slack thread; Slack cannot insert them at their original historical positions.
-Human messages use the bot's identity with an explicit source label. The shared
-client contract does not carry a verified human name; the Slack recipient is not
-assumed to be the author. Long user messages retain attribution and quotation on
+Human messages use the bot's identity with an explicit source label. With a [shared human roster](../runner/docs/service.md#shared-human-identities), a verified person’s name replaces the generic user label. Set `"allowedUsers": "users"` on the Slack connection to require the roster. Each account is scoped to this Slack workspace. Long user messages retain attribution and quotation on
 every part. Tables render outside the quote under that same heading, because
 Slack does not render pipe tables inside blockquotes. The saved Markdown is
 unchanged across clients. Stop does not discard an already-saved human message.

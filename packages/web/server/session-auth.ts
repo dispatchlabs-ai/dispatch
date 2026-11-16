@@ -166,7 +166,7 @@ async function authorizeSerial(request: IncomingMessage, response: ServerRespons
       streams.set(key, active); active.add(response);
       response.once("close", () => { active.delete(response); if (!active.size) streams.delete(key); });
     }
-    return true;
+    return { handle: verify.username };
   }
   if (path === "/" && request.method === "GET") redirect(response, `/login?${new URLSearchParams({returnTo: linkTarget(request.url ?? "/")})}`);
   else response.writeHead(401, { "content-type": "application/json" })

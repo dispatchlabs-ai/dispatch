@@ -392,6 +392,8 @@ Agents must explicitly grant file/shell tools, for example `CodingTools` from
 access. This is a working-directory choice, not a filesystem sandbox; the existing
 `coding: true` adapter retains its own environment and restrictions.
 
+The optional [human roster](docs/service.md#shared-human-identities) links people across clients and supplies private per-person Markdown to the agent.
+
 ## Persistence and boundaries
 
 `createRunner({ namespace })` derives native document/task identities. Keep the

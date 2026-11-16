@@ -32,6 +32,8 @@ Start the host as usual. After the first “Messages connection … ready” lin
 
 ## Routing and recovery
 
-With `allowedHandles` configured, the sender and all remote members of the current chat must be in the list. Use the exact phone or email handles Messages reports. Omitting the list admits all participants. Incoming text is attributed to its sender. Outgoing echoes, reactions and attachment-only messages do not start a turn.
+Set `"allowedHandles": "users"` to require the host’s [shared roster](../runner/docs/service.md#shared-human-identities). This checks the sender and current group membership against the selected agent before admission and checks membership again at delivery.
+
+With an `allowedHandles` list configured, the sender and all remote members of the current chat must be in the list. Use the exact phone or email handles Messages reports. With neither a roster nor a list, all participants are admitted. Incoming text is attributed to its sender. Outgoing echoes, reactions and attachment-only messages do not start a turn.
 
 The first connection establishes a baseline at the current end of history. Subsequent connections replay from the saved database cursor. Use a new connection name if the Messages database is replaced or restored. Durable submissions and replies retain their incoming and outgoing identifiers. If the send result is lost, Dispatch checks fresh outgoing history in that chat. Ambiguous delivery leaves a failed task for inspection; review Messages before sending again.

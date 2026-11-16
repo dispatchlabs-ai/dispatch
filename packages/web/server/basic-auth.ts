@@ -8,7 +8,7 @@ export async function authorize(request: IncomingMessage, response: ServerRespon
     const decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
     const separator = decoded.indexOf(":");
     if (separator >= 0 && await verify(decoded.slice(0, separator), decoded.slice(separator + 1)))
-      return true;
+      return { handle: decoded.slice(0, separator) };
   }
   response.writeHead(401, {
     "www-authenticate": 'Basic realm="Dispatch", charset="UTF-8"',

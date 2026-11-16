@@ -1,6 +1,6 @@
 import { request as httpRequest, type RequestOptions } from "node:http";
 import { request as httpsRequest } from "node:https";
-import { dispatchCommand, ServiceError, type ServiceCommand, type ServiceExpectation, type ServiceMetadata, type ServiceOperations, type ServiceResults } from "./protocol.js";
+import { dispatchCommand, ServiceError, type ClientUser, type ServiceCommand, type ServiceExpectation, type ServiceMetadata, type ServiceOperations, type ServiceResults } from "./protocol.js";
 import type { Chat, ChatSnapshot } from "./chat.js";
 import type { AttachmentFile } from "./chat-content.js";
 import type { InstanceMessage } from "./messages.js";
@@ -27,8 +27,8 @@ export class AgentClient {
   create(agent: string, source: string, key: string, title?: string, origin?: Chat["origin"]) {
     return this.command({ method: "create", agent, source, key, title, origin });
   }
-  submit(id: string, text: string, requestId: string, mode: "followUp" | "steer" = "steer", source = "cli", files?: AttachmentFile[]) {
-    return this.command({ method: "send", id, text, requestId, mode, source, files });
+  submit(id: string, text: string, requestId: string, mode: "followUp" | "steer" = "steer", source = "cli", files?: AttachmentFile[], user?: ClientUser) {
+    return this.command({ method: "send", id, text, requestId, mode, source, files, ...(user ? { user } : {}) });
   }
   snapshot(id: string) { return this.command({ method: "snapshot", id }); }
   receipt(id: string, submissionId: number) { return this.command({ method: "receipt", id, submissionId }); }
@@ -68,7 +68,7 @@ export function localClient(service: ServiceOperations, metadata: ServiceMetadat
       const [activity, adapterBusy] = await Promise.all([service.activity(), isAdapterBusy()]);
       return { ...activity, adapterBusy, busy: activity.busy || adapterBusy } as ServiceResults[C["method"]];
     }
-    return await dispatchCommand(service, command, signal) as ServiceResults[C["method"]];
+    return await dispatchCommand(service, command, signal, true) as ServiceResults[C["method"]];
   };
   return new AgentClient(request, async (id, listener, signal) => {
     signal?.throwIfAborted();

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import type { ClientUser } from "@dispatch/runner";
+import { localWebUser } from "./local-user.js";
 import { observeSidebar } from "./sidebar.js";
 import { loadAvatars } from "./avatars.js";
 import {
@@ -6,7 +8,7 @@ import {
   type IncomingMessage,
   type ServerResponse,
 } from "node:http";
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { resolve, extname, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -82,7 +84,7 @@ async function bodyOf(request: IncomingMessage) {
     throw new HttpError(400, "Provide a JSON object.");
   }
 }
-async function protect(request: IncomingMessage, response: ServerResponse, path: string) {
+async function protect(request: IncomingMessage, response: ServerResponse, path: string): Promise<false | true | ClientUser> {
   if (request.headers.host !== new URL(origin).host)
     throw new HttpError(403, `Use ${origin}.`);
   if (request.headers.origin && request.headers.origin !== origin)
@@ -101,10 +103,15 @@ async function protect(request: IncomingMessage, response: ServerResponse, path:
     throw new HttpError(403, "Cross-site access is not allowed.");
   if (request.method !== "GET" && request.headers.origin !== origin)
     throw new HttpError(403, "Writes require the exact app Origin.");
-  if (authorize && !(await authorize(request, response))) {
-    if (response.writableEnded) return false;
-    throw new HttpError(403, "Access denied.");
+  if (authorize) {
+    const result = await authorize(request, response);
+    if (!result) {
+      if (response.writableEnded) return false;
+      throw new HttpError(403, "Access denied.");
+    }
+    if (typeof result.handle === "string") return { channel: "web", scope: origin, handle: result.handle };
   }
+  if (localSignIn) return await localSignIn.authorize(request, response) ? "local" : false;
   return true;
 }
 const central = process.env.DISPATCH_CENTRAL_CONFIG;
@@ -126,6 +133,7 @@ if (process.env.DISPATCH_TITLES) {
   if (!isAbsolute(process.env.DISPATCH_TITLES)) throw new Error("DISPATCH_TITLES must be an absolute trusted JSON configuration path.");
   runtime = await withConversationTitles(runtime, JSON.parse(await readFile(process.env.DISPATCH_TITLES, "utf8")));
 }
+const localSignIn = !hosted && !authorize && runtime.usersConfigured ? await localWebUser(origin, runtime.stateRoot) : undefined;
 const service = runtime.service;
 const sidebar = observeSidebar(runtime);
 const avatars = await loadAvatars();
@@ -148,7 +156,8 @@ const server = createServer(async (request, response) => {
       json(response, 200, { status: "ready" });
       return;
     }
-    if (!(await protect(request, response, path))) return;
+    const person = await protect(request, response, path);
+    if (!person) return;
     if (path.startsWith("/api/avatars/") && method === "GET") {
       const image = avatars.get(decodeURIComponent(path.slice("/api/avatars/".length)));
       if (!image) throw new HttpError(404, "Artwork unavailable.");
@@ -260,6 +269,7 @@ const server = createServer(async (request, response) => {
             "steer",
             "web",
             files,
+            person === true ? undefined : person,
           ),
         );
         void sidebar.refresh();
@@ -403,6 +413,7 @@ async function close() {
   server.closeIdleConnections();
   try {
     await runtime.close();
+    if (localSignIn) await rm(localSignIn.directory, { recursive: true, force: true });
     process.exit(0);
   } catch {
     console.error(
@@ -420,6 +431,7 @@ server.on("error", async () => {
     "Cannot bind app port; the existing listener was not replaced.",
   );
   await runtime.close();
+  if (localSignIn) await rm(localSignIn.directory, { recursive: true, force: true });
   process.exit(1);
 });
 server.listen(
@@ -427,6 +439,6 @@ server.listen(
   hosted ? (process.env.DISPATCH_HOST ?? "127.0.0.1") : "127.0.0.1",
   () =>
     console.log(
-      `Web: ${origin} (PID ${process.pid}; native state ${runtime.stateRoot})`,
+      `Web: ${localSignIn?.link ?? origin} (PID ${process.pid}; native state ${runtime.stateRoot})`,
     ),
 );

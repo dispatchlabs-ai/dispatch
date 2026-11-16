@@ -115,7 +115,7 @@ export async function chatInTerminal(options: ServiceTerminalOptions): Promise<v
     render();
     const sending = (async () => {
       try {
-        await call({ method: "send", id: item.chatId, text: item.text, requestId: item.id, mode: "steer", source: "cli" });
+        await call({ method: "send", id: item.chatId, text: item.text, requestId: item.id, mode: "steer", source: "cli", user: "local" });
         pending.delete(item.id);
       } catch (error) {
         // A definite rejection now does not disprove admission by an earlier attempt.

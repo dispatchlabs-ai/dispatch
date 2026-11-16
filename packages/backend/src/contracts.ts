@@ -35,6 +35,7 @@ export interface ChatMessage {
   commentary?: string;
   thinking?: string;
   author?: string;
+  userId?: string;
   background?: boolean;
   /** A background reply's supporting material, shown collapsed under its text. */
   details?: { label: string; text: string };

@@ -58,6 +58,7 @@ export async function readHostConfig(filename: string): Promise<FileConfig> {
   const root = input.root === undefined ? directory : settingPath(directory, input.root);
   const paths = hostPaths(root, input.stateRoot === undefined ? undefined : settingPath(directory, input.stateRoot));
   const config: FileConfig = { ...input, ...paths };
+  if (input.usersFile !== undefined) config.usersFile = settingPath(directory, input.usersFile);
   if (input.cwd !== undefined) config.cwd = settingPath(directory, input.cwd);
   if (input.socket !== undefined) config.socket = settingPath(directory, input.socket);
   else if (input.http || input.url) delete config.socket;

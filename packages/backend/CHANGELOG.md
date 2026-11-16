@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Carry verified browser identity to native hosts and retain public human authorship.
+
 ## [0.21.0] - 2026-11-15
 
 - Document that central-runtime watches poll every 500 ms; host watches stream without polling.

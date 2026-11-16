@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Link authenticated people across supported clients with an optional application roster and private Markdown context for each model request.
+
 ## [0.21.0] - 2026-11-15
 
 - Add a shared architecture reference and correct provider setup availability in the READMEs and guides: the commands shipped in 0.20.0.

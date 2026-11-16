@@ -26,7 +26,7 @@ export type SlackChannelProfile = {
 };
 export type SlackConfig = {
   teamId: string; channels: Record<string, string | SlackChannelProfile>; directMessagesAgent?: string;
-  allowedUsers?: string[]; botTokenEnv?: string; appTokenEnv?: string; credentialsEnv?: string;
+  allowedUsers?: string[] | "users"; botTokenEnv?: string; appTokenEnv?: string; credentialsEnv?: string;
   displayName?: string;
   /** Ignore messages addressed to a peer bot unless this bot is also mentioned. */
   peerBotUserIds?: string[];
@@ -258,8 +258,11 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
   const artifacts = slackArtifacts(runner, client, config.teamId, ready);
   const responses = createResponseDelivery(namespace, client, { team: config.teamId, onStream: options.onStream,
     allowProgressText: options.allowProgressText });
-  const allowedUser = (user: string) => !config.allowedUsers || config.allowedUsers.includes(user);
-  const history = createHistorySync(runner, responses, { team: config.teamId, allowedUser,
+  const slackIdentity = (handle: string) => ({ channel: "slack", scope: config.teamId, handle });
+  const allowedUser = (user: string) => !Array.isArray(config.allowedUsers) || config.allowedUsers.includes(user);
+  const enrolled = (service: ChatService, user: string, agent: string) =>
+    allowedUser(user) && (!service.users || !!service.users.find(slackIdentity(user), agent));
+  const history = createHistorySync(runner, responses, { team: config.teamId, enrolled,
     accepts: (channel, agent) => (channel.startsWith("D") ? config.directMessagesAgent : channelAgent(channel)) === agent,
     allowProgressText: options.allowProgressText });
   const turn = defineTask<SlackInput, Delivery, null>({
@@ -279,7 +282,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         const draft = await service.prepareInput(chat.id, task.input.continuation
             ? `Internal workflow result for the existing assignment authorized by <@${task.input.user}>. This is execution evidence, not a new human request or additional authorization.\n${task.input.text}`
             : `Slack message from <@${task.input.user}>:\n${task.input.text}`, task.input.key, {
-          source: "slack", files: task.input.files, continuation: !!task.input.continuation,
+          source: "slack", identity: slackIdentity(task.input.user), files: task.input.files, continuation: !!task.input.continuation,
           metadata: { user: task.input.user, text: task.input.text, slack: { channel: task.input.channel, thread: task.input.thread, user: task.input.user } },
         });
         if (task.input.continuation && !task.state.checkpoint.admitted) {
@@ -352,7 +355,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
           let more: boolean;
           do {
             await runtime.commit(async tx => {
-              const queued = await responses.queueHistory(tx, runtime.conversationId, task.input, allowedUser, service.host(chat.agent).conversation.id,
+              const queued = await responses.queueHistory(tx, runtime.conversationId, task.input, user => enrolled(service, user, chat.agent), service.host(chat.agent).conversation.id,
                 active && allowed && live?.generation?.message ? { first: checkpoint.first!, generation: live.run!.taskId } : undefined);
               more = queued.more;
               if (queued.last) checkpoint = { ...checkpoint, lastResponse: Math.max(checkpoint.lastResponse ?? 0, queued.last) };
@@ -429,6 +432,10 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         // Recovery can start before the host attaches its ChatService.
         const service = await awaitWithContext(ready, withAbortSignal(runtime.signal, ctx));
         const input = task.input;
+        if (!enrolled(service, input.user, input.agent)) {
+          await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), ctx);
+          return;
+        }
         // Only an exact authenticated command is control, never quoted/retrieved prose.
         if (/^(?:\/?stop|cancel)[.!]?$/i.test(input.text.trim())) {
           let checkpoint = task.state.checkpoint;
@@ -613,7 +620,8 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
   async function receive(service: ChatService, input: SlackThreadInput) {
     if (input.files?.length) prepareContent(input.text, input.files);
     if (input.team !== config!.teamId || channelAgent(input.channel) !== input.agent && config!.directMessagesAgent !== input.agent
-      || config!.allowedUsers && !config!.allowedUsers.includes(input.user)) throw new Error("Unconfigured Slack thread input.");
+      || !allowedUser(input.user)) throw new Error("Unconfigured Slack thread input.");
+    if (!enrolled(service, input.user, input.agent)) return;
     const route = input.direct ? undefined : channelRoute(input.channel);
     // Callers cannot replace trusted context or capability selection in a message.
     input = { ...input, profile: typeof route === "object" ? structuredClone(route) : undefined };
@@ -660,6 +668,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
       if (listen && !socket) throw new Error("A Slack Web API relay must use start(service, false).");
       for (const route of [...Object.values(config.channels), ...(config.directMessagesAgent ? [config.directMessagesAgent] : [])])
         service.host(typeof route === "string" ? route : route.agent);
+      if (config.allowedUsers === "users" && !service.users) throw new Error("Slack requires a configured usersFile.");
       startService(service);
       await history.start(service);
       if (!listen || !socket) return;
@@ -669,7 +678,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
           if (body.team_id !== config.teamId || !event || !["message", "app_mention"].includes(event.type)
             || (event.subtype !== undefined && event.subtype !== "thread_broadcast")
             || event.bot_id || !event.user || event.user === bot || !event.text
-            || (config.allowedUsers && !config.allowedUsers.includes(event.user))) { await ack(); return; }
+            || !allowedUser(event.user)) { await ack(); return; }
           const direct = event.channel_type === "im";
           const mentioned = event.type === "app_mention" || event.text.includes(`<@${bot}>`);
           if (!direct && !mentioned && !event.thread_ts) { await ack(); return; }
@@ -678,6 +687,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
           }
           const agent = direct ? config.directMessagesAgent : channelAgent(event.channel);
           if (!agent) { await ack(); return; }
+          if (!enrolled(service, event.user, agent)) { await ack(); return; }
           const thread = event.thread_ts ?? event.ts;
           const parentUser = event.parent_user_id ?? event.root?.user ?? null;
           const text = event.text.replaceAll(`<@${bot}>`, "").trim();

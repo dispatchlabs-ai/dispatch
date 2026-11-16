@@ -24,12 +24,14 @@ interface NativeService {
     mode: "steer",
     source: runner.Chat["source"],
     files?: AttachmentFile[],
+    user?: runner.ClientUser,
   ): Promise<{ submissionId: number }>;
   snapshot(id: string): Promise<Snapshot>;
   stop(id: string): Promise<void>;
   close(): Promise<void>;
 }
 export interface Runtime {
+  usersConfigured?: boolean;
   stateRoot: string;
   summary?(): Promise<import("./contracts.js").SidebarSnapshot>;
   /** Refresh a connected owner's current catalog without creating a writer. */
@@ -73,6 +75,7 @@ export async function openRuntime(options?: Config): Promise<Runtime> {
     (await (runtime.catalog?.() ?? Promise.resolve(runtime.service.agents))).map(agent => ({ ...agent, id: qualify(name, agent.id),
       description: `${config.installations!.find(binding => binding.id === name)!.label}: ${agent.description}` }))))).flat();
   return {
+    usersConfigured: [...contexts.values()].some(runtime => runtime.usersConfigured),
     stateRoot: [...contexts.values()].map(runtime => runtime.stateRoot).join(", "),
     summary: async () => {
       const values = await Promise.all([...contexts].map(async ([name, runtime]) => {
@@ -110,7 +113,7 @@ export async function openRuntime(options?: Config): Promise<Runtime> {
         const target = sourceId ?? binding.service.sourceId;
         return project(name, await runtime.service.create(local, source, key, target));
       },
-      submit: (id, text, requestId, _mode, source, files) => { const { local, runtime } = context(id); return runtime.service.submit(local, text, requestId, "steer", source, files); },
+      submit: (id, text, requestId, _mode, source, files, user) => { const { local, runtime } = context(id); return runtime.service.submit(local, text, requestId, "steer", source, files, user); },
       stop: id => { const { local, runtime } = context(id); return runtime.service.stop(local); },
       artifact: (id, artifactId) => { const { local, runtime } = context(id); return runtime.service.artifact(local, artifactId); },
     },

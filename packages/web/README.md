@@ -26,6 +26,8 @@ same directory. For the quickstart's demo at `.demo/`, use the walkthrough's
 
 `--config` selects the same socket or authenticated service URL as `dispatch chat`. Keep gateway and MCP credentials on the host. Existing Web installations can still supply `DISPATCH_CONFIG` for named installations and historical sources, or `DISPATCH_CENTRAL_CONFIG` for the central backend.
 
+With a [roster-enabled host](../runner/docs/service.md#shared-human-identities), open the private sign-in file printed by the loopback Web launcher in the browser on that Mac or PC. Subsequent visits use the browser session. Hosted deployments keep their existing authorization. The supplied Basic and cookie modules return the verified login name; a custom module may return `{ handle }` after authentication. The Web backend passes this identity over the owner-private service socket. A boolean-only authorizer grants its existing installation access without identifying a human for roster-aware submissions.
+
 ## Build from source
 
 The [synthetic local composition](../../examples/chat/README.md) includes a runnable demo.

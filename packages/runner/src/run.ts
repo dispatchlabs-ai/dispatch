@@ -1,3 +1,4 @@
+import { Users } from "./users.js";
 import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
@@ -26,6 +27,7 @@ export type PreparedAdapter = {
 };
 export type Adapter = { prepare(options: { root: string; runner: Runner }): Promise<PreparedAdapter> };
 export type RunOptions = {
+  usersFile?: string;
   storage?: StorageFactory;
   /** Native host policy, including model retry; not part of agent definitions. */
   settings?: OpenOptions["settings"];
@@ -73,6 +75,7 @@ export async function run(options: RunOptions = {}) {
   })();
   try {
     const names = options.names?.length ? options.names : (await catalog(root)).filter(agent => agent.runnable).map(agent => agent.id);
+    const users = options.usersFile === undefined ? undefined : await Users.load(resolve(root, options.usersFile), names);
     const requested = new Set<string>();
     const definitions: LoadedAgent[] = [];
     const collect = (agent: LoadedAgent) => {
@@ -108,6 +111,7 @@ export async function run(options: RunOptions = {}) {
     };
     for (const adapter of options.adapters ?? []) adapters.push(await adapter.prepare({ root, runner }));
     const extensions = adapters.map(adapter => adapter.extension);
+    if (users) extensions.push(users.extension(runner.namespace));
     // Never broadcast a reply or guess between transports. Legacy destinations
     // without a transport remain supported with exactly one adapter.
     const replySink: ReplySink = options.replySink ?? (async (...args) => {
@@ -135,12 +139,14 @@ export async function run(options: RunOptions = {}) {
         extensions, replySink, artifacts,
       });
     }
+    service.users = users;
     await options.beforeStart?.(service);
     for (const adapter of adapters) await adapter.start(service);
     if (options.resume !== false) await service.start();
     const stateRoot = options.stateRoot ?? (!options.open ? resolve(root, ".state") : undefined);
     const preferredAgent = await defaultAgent(root).catch(() => undefined);
     const client = localClient(service, {
+      ...(users ? { usersConfigured: true } : {}),
       ...(stateRoot ? { stateRoot: await realpath(stateRoot) } : {}),
       defaultAgent: preferredAgent ?? (service.agents.length === 1 ? service.agents[0].id : undefined),
     },

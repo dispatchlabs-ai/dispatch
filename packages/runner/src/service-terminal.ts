@@ -100,7 +100,7 @@ export async function connectInTerminal(options: ServiceTerminalOptions) {
     const send = async (text: string, requestId: string = randomUUID(), files: AttachmentFile[] = []) => {
       // Print before admission so an uncertain transport can be retried explicitly.
       process.stderr.write(terminalText(`Request: ${requestId}\n`));
-      return call({ method: "send", id: chatId, text, requestId, files, mode: "steer", source: "cli" });
+      return call({ method: "send", id: chatId, text, requestId, files, mode: "steer", source: "cli", user: "local" });
     };
     let observationError: unknown;
     const observe = async () => {

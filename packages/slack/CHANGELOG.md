@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Resolve authenticated workspace members through the shared roster and attribute cross-client posts to their authors.
+
 ## [0.17.3] - 2026-11-13
 
 - Make mirrored user messages distinct with bold source attribution and a quoted

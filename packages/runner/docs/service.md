@@ -121,6 +121,33 @@ owners or import agent definitions. A channel adapter may map its external threa
 key to the same chat. Sources are open strings; adding a client requires no Runner
 source-code change.
 
+### Shared human identities
+
+Set `"usersFile": "users.local.json"` in the host config to enable a private application roster. Each record links authenticated channel identities to a stable person and lists the agents they may contact. Keep real rosters and Markdown private.
+
+```json
+{
+  "users": {
+    "riley": {
+      "name": "Riley Example",
+      "agents": ["helper"],
+      "contextFile": "users/riley.md",
+      "identities": [
+        { "channel": "local", "handle": "riley" },
+        { "channel": "slack", "scope": "TEXAMPLE", "handle": "UEXAMPLE" },
+        { "channel": "imsg", "handle": "+12025550101" }
+      ]
+    }
+  }
+}
+```
+
+Use the operating-system login for Pi chat and the signed-in loopback Web client on an owner-private socket. For a hosted Web participant, link `{"channel":"web","scope":"https://chat.example.com","handle":"riley"}` to the account verified by the Web authorization module. A shared service bearer alone identifies an installation. Slack uses the authenticated workspace/member pair. Messages uses the sender handle and checks all remote participants in a group.
+
+A missing or ambiguous configured identity prevents admission on these human channels. A missing or malformed roster fails host startup. Agents, schedules and machine clients retain their own provenance. The agent's tools remain in its definition. The roster supplies attribution and prose guidance for agent judgment. Existing installation-level read access still applies to trusted clients.
+
+`contextFile` is optional and relative to the roster. Edit the Markdown to change the guidance on the next model request, including a tool follow-up. Restart the host to apply roster changes. Public messages retain the sender name and ID; private notes are supplied to inference separately.
+
 ### Interactive terminal UI
 
 The intro advertises agent and conversation selection. Chat messages expose

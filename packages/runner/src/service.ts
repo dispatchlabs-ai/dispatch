@@ -23,6 +23,7 @@ export type ServiceConfig = ServicePolicy & HostModelsConfig & {
   /** Put TLS in front of a network listener; its private token authorizes this installation. */
   http?: { host?: string; port: number; tokenFile: string };
   namespace?: string;
+  usersFile?: string;
   names?: string[];
   /** Explicit synthetic inference; retained stores cannot switch between demo and live. */
   demo?: boolean;
@@ -113,7 +114,7 @@ export async function serveService(owner: ServiceOperations | (() => ServiceOper
         const disconnected = () => observation.abort();
         response.once("close", disconnected);
         options.onCommand?.(command.method, "start");
-        try { result = await dispatchCommand(service, command, observation.signal); }
+        try { result = await dispatchCommand(service, command, observation.signal, typeof listener === "string"); }
         finally { response.off("close", disconnected); options.onCommand?.(command.method, "end"); }
       }
       response.end(JSON.stringify({ result }));
@@ -183,7 +184,7 @@ export async function startService(config: ServiceConfig, options: { signal?: Ab
       adapters.push(await module.createAdapter(options, { cwd: config.cwd, connectModels } satisfies ServiceAdapterContext));
     }
     await privateStateDirectory(config.stateRoot);
-    const metadata: ServiceMetadata = { stateRoot: await realpath(config.stateRoot), defaultAgent: await defaultAgent(config.root).catch(() => undefined) };
+    const metadata: ServiceMetadata = { ...(config.usersFile ? { usersConfigured: true } : {}), stateRoot: await realpath(config.stateRoot), defaultAgent: await defaultAgent(config.root).catch(() => undefined) };
     if (config.socket) listeners.push(await serveService(() => runtime?.service, config.socket, preparedAdapters, metadata));
     if (config.http) {
       const secret = (await readFile(config.http.tokenFile, "utf8")).trim();

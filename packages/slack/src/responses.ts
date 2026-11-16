@@ -264,7 +264,7 @@ export function createResponseDelivery(namespace: string, client: SlackWebApi, o
     const queued = await tx.doc(Queue, conversation);
     for (const entry of page.items) {
       state.cursor = entry.id;
-      const data = entry.data as { source?: string; actor?: string; text?: string;
+      const data = entry.data as { source?: string; actor?: string; text?: string; userId?: string; author?: string;
         attachments?: { name: string }[]; slack?: Destination } | undefined;
       // Only Slack admission supplies this metadata. A common client's source
       // label is not enough to bind or impersonate a Slack participant.
@@ -277,13 +277,13 @@ export function createResponseDelivery(namespace: string, client: SlackWebApi, o
         await queue(tx, conversation, { ...destination, first: entry.id, entry: entry.id,
           ...(entry.byTaskId ? { generation: entry.byTaskId } : {}) });
       } else if (entry.kind === `${namespace}.message` && message?.role === "user" && data?.actor === "user" && data.source !== "slack") {
-        const text = data.attachments?.length ? data.text ?? "" : typeof message.content === "string" ? message.content
+        const text = data.userId || data.attachments?.length ? data.text ?? "" : typeof message.content === "string" ? message.content
           : message.content.flatMap(part => part.type === "text" ? [part.text] : []).join("\n");
         const label = data.source === "web" ? "Web" : data.source === "terminal" || data.source === "cli" ? "CLI" : "another client";
         const files = data.attachments?.length ? `\n\nAttachments: ${data.attachments.map(file => file.name).join(", ")}` : "";
         if (text || files) await queue(tx, conversation, { ...destination, first: entry.id, entry: entry.id,
           // Stop cancels inference, not delivery of a human message already saved.
-          text: `${text}${files}`, attribution: `User · ${label}` }, owner);
+          text: `${text}${files}`, attribution: `${data.userId && data.author || "User"} · ${label}` }, owner);
       }
     }
     if (!page.next && stream && state.destination && allowedUser(state.destination.user))

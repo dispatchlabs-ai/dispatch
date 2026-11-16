@@ -1,3 +1,5 @@
+import { userInfo } from "node:os";
+import type { UserIdentity } from "./users.js";
 import type { ChatService, Chat, ChatSnapshot } from "./chat.js";
 import type { AttachmentFile } from "./chat-content.js";
 import type { InstanceMessage } from "./messages.js";
@@ -6,7 +8,9 @@ export type ServiceOperations = Pick<ChatService, "list" | "create" | "snapshot"
   Partial<Pick<ChatService, "find" | "activity" | "schedules" | "compact" | "receipt" | "wait" | "message" | "messageStatus" | "agentInstances" | "waitForAgent" | "waitForIdle">> & {
     agents: { id: string; description: string; model?: import("./definition.js").LoadedAgent["model"] }[];
   };
-export type ServiceMetadata = { stateRoot?: string; defaultAgent?: string;
+/** Verified by the interactive client, accepted only over an owner-private connection. */
+export type ClientUser = "local" | { channel: "web"; scope: string; handle: string };
+export type ServiceMetadata = { usersConfigured?: boolean; stateRoot?: string; defaultAgent?: string;
   /** Stable trusted installation identity for opaque/custom facades without one native root. */
   identity?: string;
 };
@@ -19,14 +23,14 @@ export type ServiceCommand =
   | { method: "find"; key: string; agent?: string }
   | { method: "compact"; id: string; instructions?: string }
   | { method: "artifact"; id: string; artifactId: string }
-  | { method: "send"; id: string; text: string; requestId: string; mode?: "followUp" | "steer"; source?: Chat["source"]; files?: AttachmentFile[] }
+  | { method: "send"; id: string; text: string; requestId: string; mode?: "followUp" | "steer"; source?: Chat["source"]; files?: AttachmentFile[]; user?: ClientUser }
   | { method: "message"; from: string; message: InstanceMessage; requestId: string }
   | { method: "message-status"; from: string; taskId: number }
   | { method: "agent-instances"; from: string }
   | { method: "message-wait"; from: string; taskId: number }
   | { method: "receipt" | "wait"; id: string; submissionId: number };
 
-export async function dispatchCommand(service: ServiceOperations, command: ServiceCommand, signal?: AbortSignal) {
+export async function dispatchCommand(service: ServiceOperations, command: ServiceCommand, signal?: AbortSignal, privateClient = false) {
   switch (command.method) {
     case "agents": return service.agents.map(({ id, description, model }) => ({ id, description, model }));
     case "chats": return service.list();
@@ -52,7 +56,13 @@ export async function dispatchCommand(service: ServiceOperations, command: Servi
     case "send": {
       const source = command.source ?? "cli";
       const mode = source === "agent" || source === "schedule" ? command.mode ?? "followUp" : "steer";
-      return service.submit(command.id, command.text, command.requestId, mode, source, command.files);
+      let identity: UserIdentity | undefined;
+      if (privateClient && command.user === "local" && (source === "cli" || source === "web"))
+        identity = { channel: "local", handle: userInfo().username };
+      else if (privateClient && source === "web" && command.user && typeof command.user === "object" &&
+        command.user.channel === "web" && typeof command.user.scope === "string" && typeof command.user.handle === "string")
+        identity = { channel: "web", scope: command.user.scope, handle: command.user.handle };
+      return service.submit(command.id, command.text, command.requestId, mode, source, command.files, identity);
     }
     case "wait": if (!service.wait) throw new ServiceError("Unsupported service operation.", 409); return service.wait(command.id, command.submissionId, signal);
     case "receipt": if (!service.receipt) throw new ServiceError("Unsupported service operation.", 409); return service.receipt(command.id, command.submissionId);

@@ -1,7 +1,8 @@
+import type { Users, UserIdentity } from "./users.js";
 import { prepareContent, ContentError, type AttachmentFile } from "./chat-content.js";
 import { projectChatTurns, type ChatTurn } from "./chat-turns.js";
 import { projectChatTools, type ChatToolCall } from "./chat-tools.js";
-export type ChatMessage = { provenance?: "user" | "agent" | "runtime"; id: string; role: string; text: string; at?: number; commentary?: string; thinking?: string; author?: string; background?: boolean;
+export type ChatMessage = { provenance?: "user" | "agent" | "runtime"; id: string; role: string; text: string; at?: number; commentary?: string; thinking?: string; author?: string; userId?: string; background?: boolean;
   /** A background reply's supporting material (publishReply details), shown collapsed. */
   details?: { label: string; text: string }; error?: string; attachments?: AttachmentFile[]; artifacts?: Artifact[] };
 export type ChatSnapshot = {
@@ -69,14 +70,15 @@ export function projectChatMessages(namespace: string, entries: readonly EntryRe
       const thinking = message.role === "assistant" ? messageThinking(message.content) : "";
       const error = message.role === "assistant" ? message.errorMessage : undefined;
       const at = message.timestamp + (message.role === "assistant" ? message.durationMs ?? 0 : 0);
-      const data = entry.data as { source?: string; actor?: "user" | "agent" | "runtime"; text?: string; attachments?: AttachmentFile[] } | undefined;
+      const data = entry.data as { source?: string; author?: string; userId?: string; actor?: "user" | "agent" | "runtime"; text?: string; attachments?: AttachmentFile[] } | undefined;
       const attached = message.role === "user" && entry.kind === `${namespace}.message` && data?.attachments?.length ? data.attachments : undefined;
       const hasTools = message.role === "assistant" && Array.isArray(message.content) && message.content.some(part => part.type === "toolCall");
       const provenance = message.role !== "user" ? "agent" as const
         : entry.kind === `${namespace}.message` && data?.actor ? data.actor
         : entry.kind === `${namespace}.message` && data?.source && !["agent", "schedule"].includes(data.source) ? "user" as const
           : entry.kind === `${namespace}.instance-message` ? "agent" as const : "runtime" as const;
-      return text || thinking || error || attached || hasTools ? [{ provenance, ...(entry.kind === `${namespace}.instance-message` ? {author: (entry.data as {from?: string})?.from} : {}), id: `${entry.id}:${index}`, role: message.role, text: attached ? data?.text ?? "" : text, at,
+      return text || thinking || error || attached || hasTools ? [{ provenance, ...(entry.kind === `${namespace}.instance-message` ? {author: (entry.data as {from?: string})?.from} : {}), id: `${entry.id}:${index}`, role: message.role, text: attached || (message.role === "user" && data?.userId) ? data?.text ?? "" : text, at,
+        ...(message.role === "user" && data?.userId ? { author: data.author, userId: data.userId } : {}),
         ...(attached ? { attachments: attached } : {}),
         ...(thinking ? { thinking } : {}),
         ...(message.role === "assistant" ? { commentary: publicCommentary(message) } : {}), ...(error ? { error } : {}) }] : [];
@@ -111,6 +113,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
   }
 
   class ChatService {
+    users?: Users;
     readonly hosts = new Map<string, AgentHost>();
     readonly agents: LoadedAgent[];
     readonly demo: boolean;
@@ -346,10 +349,10 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
      * Tasks can commit the resulting draft with their delivery receipt in one native transaction. */
     async prepareInput(id: string, text: string, requestId: string, options: {
       source?: string; mode?: "followUp" | "steer"; files?: AttachmentFile[];
-      metadata?: JsonObject; continuation?: boolean;
+      metadata?: JsonObject; continuation?: boolean; identity?: UserIdentity; audience?: UserIdentity[];
     } = {}): Promise<SubmissionDraft> {
       const { source = "web", mode = "followUp", files = [], metadata = {}, continuation = false } = options;
-      const content = prepareContent(text, files);
+      const original = prepareContent(text, files);
       if (typeof requestId !== "string" || !requestId.trim()) throw new Error("A request ID is required.");
       if (typeof source !== "string" || !source.trim()) throw new Error("A source is required.");
       const { chat } = await this.resolve(id);
@@ -358,18 +361,21 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
         if (!modelCatalogs.get(this)?.getModel(agent.model.provider, agent.model.id)?.input.includes("image"))
           throw new ContentError("This authored model does not accept images. Remove the image or choose an image-capable agent.");
       }
+      const sender = !continuation && this.users?.attribution(chat.agent, source, options.identity, options.audience);
+      const content = !sender ? original : typeof original === "string" ? `${sender.label}:\n${original}`
+        : [{ type: "text" as const, text: sender.label + ":" }, ...original];
       const internal = source === "agent" || source === "schedule";
       return {
         type: "input", content, requestId, whenBusy: continuation ? "reject" : internal ? mode : "steer",
-        entry: { kind: `${namespace}.message`, data: { ...metadata, source,
+        entry: { kind: `${namespace}.message`, data: { ...metadata, ...(sender ? { ...sender.data, text: metadata.text ?? text } : {}), source,
           actor: continuation || source === "schedule" ? "runtime" : source === "agent" ? "agent" : "user",
           ...(files.length ? { text: metadata.text ?? text, attachments: files } : {}) } },
       };
     }
 
-    async submit(id: string, text: string, requestId: string, mode: "followUp" | "steer" = "followUp", source: Chat["source"] = "web", files: AttachmentFile[] = []) {
+    async submit(id: string, text: string, requestId: string, mode: "followUp" | "steer" = "followUp", source: Chat["source"] = "web", files: AttachmentFile[] = [], identity?: UserIdentity) {
       return admit(this, id, async () => {
-        const draft = await this.prepareInput(id, text, requestId, { mode, source, files });
+        const draft = await this.prepareInput(id, text, requestId, { mode, source, files, identity });
         const { chat, conversation } = await this.resolve(id);
         const submission = await conversation.submit(draft, context);
         if (chat.title === "New chat") await this.rename(id, text || files[0]?.name || "Attachment");
