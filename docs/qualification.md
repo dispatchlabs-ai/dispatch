@@ -4,6 +4,26 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.25.0 live agent preview — November 16, 2026 UTC
+
+All 14 downloaded files matched the release digests for
+`c6ce943a087ef7395ade7ba0554eefe21f23b6cb`. Workspace build and type checks,
+macOS arm64 flake and distribution builds, and both Linux arm64 OCI builds
+passed. Five external npm combinations installed, strict NodeNext imports
+compiled, and the production dependency audit returned zero findings.
+[Release v0.25.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.25.0).
+
+A preview with no agent-specific setup used its existing coding tool to read
+a file from the configured project. Its local Dispatch MCP connector found a
+peer, delivered a message and returned the automatic reply to the same preview.
+A second agent used its installed data connection under the selected roster
+identity. An explicit fixture opened without importing the regular bindings.
+The terminal reopened a saved live history after reinstall. Signed-in Web and
+terminal messages shared a history across clients, and selecting another person
+opened their own history. Browser interactions covered both desktop sizes,
+tablet and phone. A clean installation from the public release URLs started
+with the consumer's regular preview command.
+
 ## v0.24.0 agent preview — November 16, 2026 UTC
 
 All 14 published files and GitHub digests matched the inspected release for
