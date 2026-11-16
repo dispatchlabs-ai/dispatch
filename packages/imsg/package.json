@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/imsg",
-  "version": "0.25.0",
+  "version": "0.25.1",
   "description": "Apple Messages text transport for Dispatch Runner",
   "license": "MIT",
   "type": "module",
@@ -37,7 +37,7 @@
     "typescript": "6.0.3"
   },
   "peerDependencies": {
-    "@dispatch/runner": "0.25.0",
+    "@dispatch/runner": "0.25.1",
     "@earendil-works/pi-durable": "1.5.2"
   },
   "repository": {
