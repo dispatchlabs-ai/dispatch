@@ -4,6 +4,23 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.28.0 Reviewed reminders — November 16, 2026 UTC
+
+An installed host polled an empty source without a model turn. A private review
+approved one occurrence and skipped another. An occurrence removed before
+delivery was withdrawn. After a host restart, the approved notice reached a
+local recorder once at its deadline. A fresh consumer's owner preview read a
+live source and rendered the review without delivery. Another user could not
+retrieve the private reminder.
+
+All 14 [release assets](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.28.0)
+matched the reviewed files and published digests. The macOS arm64 flake and
+release builds, x86_64 Linux Web and Workers image builds, and strict NodeNext
+reminder imports passed. Web and MCP installed separately from release URLs
+with empty caches. Package scans and the external production dependency audits
+reported zero findings. Distribution scan matches were upstream examples,
+library constants and configuration paths.
+
 ## v0.27.0 Incoming Messages photos — November 16, 2026 UTC
 
 The Messages adapter passed two screenshots from a remote Mac to an image-capable
