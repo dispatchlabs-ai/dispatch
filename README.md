@@ -88,7 +88,7 @@ To use sample data, supply replacement tools in an optional `preview.ts`.
 
 ## Provider setup
 
-Dispatch 0.20.0 includes `npx dispatch providers add`: choose a native Pi provider,
+Use `npx dispatch providers add` to choose a native Pi provider,
 sign in, discover its models and verify a response before saving the connection.
 `npx dispatch models use` assigns a model to an agent. Apple local can have the
 host manage `fm serve`, including readiness, restart and cleanup.
@@ -127,6 +127,7 @@ Editing an agent's instructions, model, tools or skills is separate from upgradi
 | --- | --- |
 | Coding | Opt into Pi Durable's `CodingTools` in `agent.ts` for `read`, `write`, `edit` and `bash`. The starter grants these to Developer. [Setup](packages/runner/docs/create-agents.md#give-developer-coding-and-messaging-tools) |
 | Knowledge and external tools | Connect an existing MCP server on the host, then select it with `mcp: [name]` in each agent. Connections can differ between agents. [MCP tools](packages/runner/docs/mcp.md) |
+| Execution environments | Optionally build a Nix-defined desktop or attach an existing Cua Space. Keep the same npm application, host and clients. [Setup and prerequisites](packages/runner/docs/environments.md) |
 | Agent-to-agent messaging | Send an assignment through MCP and request an automatic reply. The sender can finish its turn and resume when the answer arrives. Each recipient uses its own tools. [Two-agent example](packages/runner/docs/create-agents.md#verify-coding-and-an-automatic-reply) |
 | Shared guidance and skills | Put common instructions in `AGENTS.md`; opt into reusable `skills/` with `skills: true`. [Instructions and skills](packages/runner/docs/create-agents.md#shared-instructions-and-skills) |
 | Reviewed reminders | Declare a source, timing, eligibility and destination in the agent definition. Ask for a read-only check in live preview, or start reminders in a private chat. [Reviewed reminders](packages/runner/docs/reminders.md) |
@@ -142,7 +143,7 @@ MCP works in both directions: agents can **consume external MCP tools**, and the
 | [MCP server](packages/mcp/README.md) | Discover agents, create or resume conversations, send work, inspect progress/results, retrieve artifacts and stop work. Includes native messaging and automatic replies. |
 | [Slack](packages/slack/README.md) | DMs and configured channels with threaded replies and Stop. Linked threads can receive public conversation updates from Web and CLI. |
 | [Google Chat](packages/google-chat/README.md) | A Chat app for configured agents, with threaded replies, steering and Stop. Requires Google Workspace/app and Pub/Sub setup. |
-| [Messages](packages/imsg/README.md) | Direct and group texts through an existing Mac Messages account, with replies in the original chat. |
+| [Messages](packages/imsg/README.md) | Direct and group texts through an existing Mac Messages account, with incoming photos and screenshots for image-capable agents and replies in the original chat. |
 | [Email / Gmail](packages/email/README.md) | Labeled incoming mail starts work. Replies and new outgoing messages require sending to be explicitly enabled. |
 | [HTTP/HTTPS API](packages/runner/docs/service.md#authenticated-network-connections) | Let another application create conversations, submit work, stream progress and retrieve results. Remote access requires HTTPS and authentication. |
 | [JavaScript/TypeScript client](packages/runner/docs/service.md#shared-clients-and-company-compositions) | Use `AgentClient` in your own application, in process or through a socket/HTTPS connection. |

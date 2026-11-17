@@ -79,7 +79,7 @@ use` selects an agent's default model. The host can manage a local inference
 server; Apple local supplies an `fm serve` launch definition and a native Pi
 provider. Project hosts and clients discover `host.json` automatically.
 
-These commands are included in the v0.20.0 archives. See
+These commands have been available since v0.20.0. See
 [Connect providers and choose models](docs/providers.md); the sign-in quickstart
 above remains a valid setup path.
 

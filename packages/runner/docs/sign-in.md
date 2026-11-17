@@ -7,9 +7,9 @@ Clients do not need model credentials.
 Available in **v0.19.0 and later**. Install the matching release archives using the
 [quickstart](../../../README.md#quickstart) or [two-agent setup](create-agents.md).
 
-For the current source's interactive provider/model setup and managed Apple local
-server, see [Connect providers and choose models](providers.md). That feature is
-unreleased; the commands below work with v0.19.0.
+For interactive provider/model setup and a managed Apple local server, available
+since v0.20.0, see [Connect providers and choose models](providers.md). The sign-in
+commands below remain supported.
 
 ## ChatGPT subscription
 
