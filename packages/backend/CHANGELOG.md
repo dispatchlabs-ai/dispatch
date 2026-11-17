@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-17
+
 - Carry host-supplied agent artwork through single and named installations without requiring local access to definition files.
 
 ## [0.23.0] - 2026-11-16

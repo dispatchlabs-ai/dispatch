@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-17
+
 - Show avatars found beside the connected host's agent definitions automatically; retain explicit artwork bindings as overrides and initials when no image is available.
 
 ## [0.24.0] - 2026-11-16
