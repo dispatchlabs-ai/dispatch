@@ -4,6 +4,27 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.29.0 Agent avatars — November 17, 2026 UTC
+
+A fresh nested application ran its ordinary `npm start` and `npm run web`
+commands. Web displayed raster artwork beside root and child agent definitions
+through an authenticated host connection. A separate Web process used the same
+artwork without access to those definitions. Named installations, explicit
+overrides, missing-image initials, malformed-image handling and reload passed.
+Browser checks covered both desktop sizes, tablet, phone and keyboard navigation.
+An existing application upgraded from the release URLs, retained its saved
+conversations and displayed its original agent portrait after restart.
+
+All 14 [release assets](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.29.0)
+matched the reviewed files and GitHub digests. Workspace build/type checks,
+macOS arm64 flake and release builds, Linux x86_64 Web/Workers image builds,
+five external package combinations and strict NodeNext imports passed. Web
+installed independently from the published URLs with an empty cache. External
+production dependency audits and package scans reported zero findings.
+Distribution scan matches were upstream examples, library constants and
+configuration paths. These checks did not assess every deployed consumer or
+constitute a comprehensive security review.
+
 ## v0.28.0 Reviewed reminders — November 16, 2026 UTC
 
 An installed host polled an empty source without a model turn. A private review
