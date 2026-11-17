@@ -9,6 +9,7 @@ import { createArtifacts } from "./artifacts.js";
 import type { LoadedAgent } from "./definition.js";
 
 export * from "./definition.js";
+export type { AgentAvatar } from "./avatars.js";
 export type { AgentEnvironment, EnvironmentKind } from "./environments.js";
 export { connectMcpServers } from "./mcp.js";
 export type { McpServers } from "./mcp.js";

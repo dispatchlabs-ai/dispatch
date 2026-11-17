@@ -32,6 +32,10 @@ For manual agent testing, run `npx dispatch preview --agent NAME` from the
 application. Web opens the signed-in chat and identity picker for its isolated
 preview conversations. See [Preview an agent](../runner/README.md#preview-an-agent).
 
+For an agent portrait, place `avatar.png`, `avatar.jpg`, `avatar.jpeg` or
+`avatar.webp` beside its `agent.md`, then restart the host and Web. Artwork loads
+automatically through the host connection; no additional configuration is needed.
+
 ## Build from source
 
 The [synthetic local composition](../../examples/chat/README.md) includes a runnable demo.

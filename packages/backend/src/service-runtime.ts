@@ -39,7 +39,7 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
     }
   };
   const metadata = await call({ method: "info" });
-  const catalog = async () => (await call({ method: "agents" })).map(agent => ({ ...agent, capabilities }));
+  const catalog = async () => (await call({ method: "agents" })).map(({ avatar: _avatar, ...agent }) => ({ ...agent, capabilities }));
   const agents = await catalog();
   let lastChats: Chat[] = [];
   // Chat.source names the configured source; the native value is the starting transport.
@@ -53,6 +53,7 @@ export async function openServiceRuntime(config: ServiceConnection): Promise<Run
     usersConfigured: metadata.usersConfigured,
     stateRoot: metadata.stateRoot ?? config.socket ?? config.url!,
     catalog,
+    avatars: async () => (await call({ method: "agents" })).some(agent => agent.avatar) ? call({ method: "avatars" }) : [],
     summary: async () => {
       let currentAgents, chats;
       try { [currentAgents, chats] = await Promise.all([catalog(), call({ method: "chats" })]); lastChats = chats.map(project); }

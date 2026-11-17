@@ -7,6 +7,7 @@ Durable channel delivery tasks are optional extensions in the same owner.
 | Operation | Web / HTTP | Runner local service / CLI | Other packages |
 | --- | --- | --- | --- |
 | List agents and histories | Agent, chat and source routes | `agents`, `chats`; same owner catalog | Observer reads configured stores; channel routing is installation configuration |
+| Agent artwork | Authenticated avatar route; automatic definition artwork with optional overrides | `agents` advertises availability; `avatars` returns approved raster bytes | Definition-relative discovery works over local and network host connections |
 | Create | Stable conversation creation key | `create`, native Chats identity | Channels map external threads into native conversations |
 | Send and steer | Retained `requestId` | `send`, native admission receipt | Each channel preserves its admission and delivery identities |
 | Observe | Snapshot and SSE | `snapshot`, `receipt`, native event stream | Observer is read-only; channels publish their documented public response projection |

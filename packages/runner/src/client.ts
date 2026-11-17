@@ -25,6 +25,7 @@ export class AgentClient {
   }
   info() { return this.command({ method: "info" }); }
   agents() { return this.command({ method: "agents" }); }
+  avatars() { return this.command({ method: "avatars" }); }
   list() { return this.command({ method: "chats" }); }
   find(agent: string | undefined, key: string) { return this.command({ method: "find", agent, key }); }
   create(agent: string, source: string, key: string, title?: string, origin?: Chat["origin"]) {

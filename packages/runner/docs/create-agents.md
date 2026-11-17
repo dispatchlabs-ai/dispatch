@@ -309,6 +309,14 @@ letters, digits and hyphens, beginning with a letter. Give it any optional
 or the Web agent selector to find it. A root `agent.md` has ID `agent`; it can
 coexist with named agents but not with `agents/agent/agent.md`.
 
+Put an optional `avatar.png`, `avatar.jpg`, `avatar.jpeg` or `avatar.webp` beside
+that agent's `agent.md`. The host loads the first valid image in that order and
+Web displays it automatically. This is relative to the definition, including a
+root `agent.md` or an application nested inside a larger repository. No manifest
+or environment variable is needed. Restart the host and Web after changing artwork;
+missing or invalid artwork keeps the initials. Images are presentation data and
+do not change the agent's instructions or saved definition fingerprint.
+
 The npm chat command chooses Developer initially. Change its `--agent` value to
 choose another initial agent, or use the picker. An optional `factory.yaml` can
 select `defaultAgent` and enable [scheduled work](schedules.md); it is not needed

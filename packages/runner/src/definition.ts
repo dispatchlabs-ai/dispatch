@@ -8,6 +8,7 @@ import { loadSkills, type Skill } from "./skills.js";
 import { formatRepositoryInstructions, loadRepositoryInstructions, type RepositoryInstruction } from "./instructions.js";
 import { validateSchedules, type AgentSchedule } from "./schedules.js";
 import type { AgentEnvironment } from "./environments.js";
+import { loadAgentAvatar, type AgentAvatar } from "./avatars.js";
 
 export type Trigger =
   | { mode: "manual" }
@@ -48,6 +49,8 @@ export type LoadedAgent = AgentDefinition & {
   id: string;
   instructions: string;
   description: string;
+  /** Presentation only; never included in model instructions or the definition fingerprint. */
+  avatar?: AgentAvatar;
   model: { provider: string; id: string; thinking: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" };
   fingerprint: string;
   skillCatalog?: Skill[];
@@ -234,6 +237,7 @@ async function readDefinition(root: string, id: string, folder: string, ancestor
     `# Role instructions from ${source}\n${match[2].trim()}`].filter(Boolean).join("\n\n");
   return {
     ...definition, root, id, instructions,
+    avatar: await loadAgentAvatar(folder),
     repositoryInstructions, description: meta.description, model: { ...meta.model, thinking: meta.model.thinking ?? "off" },
     ...(handoffAgent ? { handoffAgent } : {}),
     ...(delegateAgents ? { delegateAgents } : {}),

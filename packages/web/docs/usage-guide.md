@@ -179,12 +179,20 @@ Drag the desktop divider to resize navigation; Left/Right, Home and End work whe
 it has keyboard focus. Width is remembered locally and constrained only to leave
 a usable message pane. Small screens keep the focus-trapped drawer.
 
-Optional trusted server bindings, never browser-supplied paths:
+Web automatically uses `avatar.png`, `.jpg`, `.jpeg` or `.webp` beside each
+connected host's `agent.md`, in that order. The host supplies the image bytes over
+its existing connection; Web does not need access to the definition directory.
+This also works for named installations and applications nested in larger repos.
+Restart the host and Web to load changed artwork. Missing or invalid images keep
+the initials.
+
+Optional trusted server overrides, never browser-supplied paths:
 
 - `DISPATCH_AVATARS`: absolute JSON file with `agents` mapping **exact public agent
   IDs** to approved absolute PNG/JPEG/WebP paths, plus optional `user` artwork.
   For example `{"agents":{"studio~helper":"/opt/studio/art/helper.png"}}`.
-  Explicit maps work with service-only installations. Files are loaded at startup,
+  Explicit entries override discovered artwork and can add user artwork or serve
+  installations whose hosts do not supply images. Files are loaded at startup,
   served same-origin under existing authorization, and never copied into public
   Dispatch packages. Missing/failed images use the same placeholder. A background
   author's role resolves in the conversation's installation, not the main agent.

@@ -1000,7 +1000,7 @@
     "/api/avatars/{key}": {
       "get": {
         "operationId": "getAvatar",
-        "summary": "Read explicitly approved consumer artwork",
+        "summary": "Read host definition artwork or an explicit consumer override",
         "tags": [
           "Presentation"
         ],
@@ -1017,7 +1017,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Authenticated PNG/JPEG/WebP bytes loaded from trusted startup bindings."
+            "description": "Authenticated PNG/JPEG/WebP bytes supplied by the connected host from beside agent.md, or loaded from an explicit trusted startup override."
           },
           "401": {
             "$ref": "#/components/responses/Error401"

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Carry host-supplied agent artwork through single and named installations without requiring local access to definition files.
+
 ## [0.23.0] - 2026-11-16
 
 - Carry verified browser identity to native hosts and retain public human authorship.

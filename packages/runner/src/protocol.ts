@@ -3,10 +3,11 @@ import type { UserIdentity } from "./users.js";
 import type { ChatService, Chat, ChatSnapshot } from "./chat.js";
 import type { AttachmentFile } from "./chat-content.js";
 import type { InstanceMessage } from "./messages.js";
+import type { AgentAvatar } from "./avatars.js";
 
 export type ServiceOperations = Pick<ChatService, "list" | "create" | "snapshot" | "watch" | "submit" | "stop" | "artifact"> &
   Partial<Pick<ChatService, "find" | "activity" | "schedules" | "compact" | "receipt" | "wait" | "message" | "messageStatus" | "agentInstances" | "waitForAgent" | "waitForIdle">> & {
-    agents: { id: string; description: string; model?: import("./definition.js").LoadedAgent["model"] }[];
+    agents: { id: string; description: string; model?: import("./definition.js").LoadedAgent["model"]; avatar?: AgentAvatar }[];
   };
 /** Verified by the interactive client, accepted only over an owner-private connection. */
 export type ClientUser = "local" | { channel: "web"; scope: string; handle: string };
@@ -16,7 +17,7 @@ export type ServiceMetadata = { usersConfigured?: boolean; stateRoot?: string; d
 };
 export type ServiceExpectation = { stateRoot?: string; identity?: string };
 export type ServiceCommand =
-  | { method: "agents" | "chats" | "status" | "schedules" | "info" }
+  | { method: "agents" | "avatars" | "chats" | "status" | "schedules" | "info" }
   | { method: "create"; agent: string; key: string; title?: string; source?: Chat["source"]; origin?: Chat["origin"] }
   | { method: "snapshot" | "stop"; id: string }
   | { method: "drain" }
@@ -32,7 +33,8 @@ export type ServiceCommand =
 
 export async function dispatchCommand(service: ServiceOperations, command: ServiceCommand, signal?: AbortSignal, privateClient = false) {
   switch (command.method) {
-    case "agents": return service.agents.map(({ id, description, model }) => ({ id, description, model }));
+    case "agents": return service.agents.map(({ id, description, model, avatar }) => ({ id, description, model, ...(avatar ? { avatar: true } : {}) }));
+    case "avatars": return service.agents.flatMap(({ id, avatar }) => avatar ? [{ id, ...avatar }] : []);
     case "chats": return service.list();
     case "schedules": return service.schedules?.() ?? [];
     case "create":
@@ -77,7 +79,8 @@ export async function dispatchCommand(service: ServiceOperations, command: Servi
 export type ServiceResults = {
   info: ServiceMetadata;
   drain: Record<string, never>;
-  agents: { id: string; description: string; model?: import("./definition.js").LoadedAgent["model"] }[];
+  agents: { id: string; description: string; model?: import("./definition.js").LoadedAgent["model"]; avatar?: boolean }[];
+  avatars: (AgentAvatar & { id: string })[];
   chats: Chat[];
   find: Chat | null;
   create: Chat;

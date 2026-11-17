@@ -36,6 +36,8 @@ export interface Runtime {
   summary?(): Promise<import("./contracts.js").SidebarSnapshot>;
   /** Refresh a connected owner's current catalog without creating a writer. */
   catalog?(): Promise<Agent[]>;
+  /** Host-supplied artwork; no client access to the host's definition paths. */
+  avatars?(): Promise<(runner.AgentAvatar & { id: string })[]>;
   /** Open only explicitly opted-in native keyed conversations, without submitting input. */
   openKeyedChat?(key: string, title: string, installation?: string): Promise<Chat>;
   /** Resolve an exact native ID within a named installation, without creating work. */
@@ -85,6 +87,8 @@ export async function openRuntime(options?: Config): Promise<Runtime> {
       return { agents: values.flatMap(value => value.agents), chats: values.flatMap(value => value.chats), sources: values.flatMap(value => value.sources) };
     },
     catalog,
+    avatars: async () => (await Promise.all([...contexts].map(async ([name, runtime]) =>
+      (await runtime.avatars?.() ?? []).map(avatar => ({ ...avatar, id: qualify(name, avatar.id) }))))).flat(),
     openKeyedChat: async (key, title, installation) => {
       const runtime = installation && contexts.get(installation);
       if (!runtime) throw new AdmissionError("Unknown linked installation.");

@@ -136,7 +136,7 @@ if (process.env.DISPATCH_TITLES) {
 const localSignIn = !hosted && !authorize && runtime.usersConfigured ? await localWebUser(origin, runtime.stateRoot) : undefined;
 const service = runtime.service;
 const sidebar = observeSidebar(runtime);
-const avatars = await loadAvatars();
+const avatars = await loadAvatars(runtime);
 const streams = new Set<() => void>();
 const server = createServer(async (request, response) => {
   response.setHeader("x-content-type-options", "nosniff");

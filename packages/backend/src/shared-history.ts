@@ -82,6 +82,7 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
   const agents = await catalog();
   return {
     get usersConfigured() { return connected?.usersConfigured; },
+    avatars: async () => await read(async runtime => await runtime.avatars?.() ?? []) ?? [],
     openKeyedChat: (key, title, installation) => mutate(async runtime => {
       if (installation !== undefined) throw new AdmissionError("Keyed conversation links require a named installation binding.");
       const chat = await runtime.openKeyedChat!(key, title);

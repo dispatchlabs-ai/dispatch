@@ -1,9 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute } from "node:path";
+import type { Runtime } from "@dispatch/backend";
 
-/** Only explicitly approved consumer files can be served; never a browser path. */
-export async function loadAvatars(path = process.env.DISPATCH_AVATARS) {
+/** Host definition artwork and trusted overrides only; never a browser-supplied path. */
+export async function loadAvatars(runtime: Runtime, path = process.env.DISPATCH_AVATARS) {
   const images = new Map<string, { bytes: Buffer; mime: string }>();
+  for (const avatar of await runtime.avatars?.() ?? [])
+    images.set(`agent:${avatar.id}`, { bytes: Buffer.from(avatar.dataBase64, "base64"), mime: avatar.mimeType });
   if (!path) return images;
   if (!isAbsolute(path)) throw new Error("DISPATCH_AVATARS must be an absolute JSON manifest path.");
   const value = JSON.parse(await readFile(path, "utf8")) as { agents?: Record<string, string>; user?: string };

@@ -231,11 +231,17 @@ as filesystem access. Hosted Web's participant authorization remains its own lay
 
 ## Operations and wire format
 
-`AgentClient` exposes `info`, `agents`, `list`, `find`, `create`, `submit`, `snapshot`,
+`AgentClient` exposes `info`, `agents`, `avatars`, `list`, `find`, `create`, `submit`, `snapshot`,
 `watch`, `receipt`, `wait`, `artifact`, `stop` and `close`. `command()` exposes
 additional host operations including status, schedules, compaction and instance
 messaging. Exact inputs/results are the exported `ServiceCommand` and
 `ServiceResults` types in `@dispatch/runner/client`.
+
+`agents` advertises `avatar: true` when definition artwork is available. `avatars`
+returns those agents' IDs, image MIME types and base64 bytes, without filesystem
+paths. It uses the same authenticated connection as the other read operations.
+Clients of older hosts without that catalog field keep their placeholders or
+explicit artwork bindings.
 
 - `POST /v1/commands` accepts `{command,expected?}` and replies `{result}` or
   `{error}`. `command.method` selects the operation. Artifact bytes use base64.
