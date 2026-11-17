@@ -96,9 +96,10 @@ conversation and input. The timer never waits for the model's answer. External
 agent effects still need their own domain receipts; this is not an exactly-once
 banking or shell guarantee.
 
-A program's native task and the timer's admission receipt commit together. Host
-shutdown stops the running command through Pi's execution environment and suspends
-its task. Recovery reruns the same occurrence with the same ID; a crash after an
+A program's native task and the timer's admission receipt commit together.
+Graceful host shutdown stops the running command through Pi's execution
+environment and suspends its task. Recovery reruns the same occurrence with the
+same ID; a crash after an
 external effect but before its receipt can repeat that effect. Programs must be
 safe to retry, or deduplicate their effects using the occurrence ID. Successful
 exit completes the task; a nonzero exit or launch error fails it without stopping

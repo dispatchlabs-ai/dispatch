@@ -4,6 +4,29 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## v0.30.0 Scheduled programs — November 17, 2026 UTC
+
+Real macOS calendar runs covered literal command arguments, application working
+directories, captured output, nonzero exits, launch errors and overlapping runs.
+Graceful shutdown stopped running commands; recovery reused their native task
+and occurrence identities. Disabling calendars prevented future admission while
+admitted programs completed. A v0.29.0 prompt schedule retained its timer and
+receipts after upgrade. Web chat, reload and retained run navigation passed at
+all four required sizes with the synthetic provider.
+
+The twelve [v0.30.0 package archives](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.30.0),
+manifest and checksums matched reviewed source `d56efe1` and downloaded bytes.
+Workspace checks, macOS arm64 flake/release builds, Linux x86_64 image builds,
+five external package combinations and strict NodeNext imports passed. An
+empty-cache Web URL install resolved Runner and Backend and ran a program-only
+schedule through ordinary `npm start` on Node 24.22.1, without a model call.
+
+Production consumer audits and package scans reported zero findings. Distribution
+scan matches were reviewed upstream examples, constants and configuration paths.
+The source development dependency audit still reports five high advisories in
+the Vite/glob dependency chain. No full security review, external inference or
+deployed application upgrade is claimed.
+
 ## v0.29.0 Agent avatars — November 17, 2026 UTC
 
 A fresh nested application ran its ordinary `npm start` and `npm run web`
