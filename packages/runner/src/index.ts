@@ -18,7 +18,7 @@ export { WorkspaceClient, WorkspaceEnvironment } from "./workspace.js";
 export type { WorkspaceImage, WorkspaceRelease, WorkspaceRecord, WorkspaceTransport } from "./workspace.js";
 export { privateStateDirectory } from "./private-state.js";
 export { nextScheduleAt } from "./schedules.js";
-export type { AgentSchedule } from "./schedules.js";
+export type { AgentSchedule, PromptSchedule, ProgramSchedule } from "./schedules.js";
 export { instanceMessagingExtension } from "./messages.js";
 export { createWorkflowProgress } from "./workflow-progress.js";
 export type { WorkflowWatch, WorkflowObservation } from "./workflow-progress.js";

@@ -67,9 +67,10 @@ not certify implementation, package publication or installation qualification.
   [email package](../email/USE_CASES.md), sharing conversations, tasks and recovery
   rather than embedding email policy or a second runtime in Runner.
 
-- **RUN-013 — Schedule agent-local assignments:** define named schedules and
-  predefined prompts beside an agent, including daily calendar-time execution
-  in an explicit timezone, with shared Runner admission and native Pi recovery.
+- **RUN-013 — Schedule agent-local work:** declare prompts or deterministic
+  programs beside an agent, including calendar-time execution in an explicit
+  timezone, with shared Runner admission and native Pi recovery. Program tasks
+  retain exit status and output without invoking a model.
   See the [calendar contract and recovery](docs/schedules.md).
 
 - **RUN-017 — Own process trees:** supervise trusted POSIX workers and inherited

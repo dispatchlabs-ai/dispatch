@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Allow agent-local cron schedules to declare a program with `command` instead of a prompt. Run it through the agent's execution environment with durable admission/recovery, stable occurrence IDs, exit status and captured output.
+
 ## [0.29.0] - 2026-11-17
 
 - Discover raster avatars beside each agent definition and expose their bytes through the shared authenticated client contract, without changing model instructions or definition fingerprints.

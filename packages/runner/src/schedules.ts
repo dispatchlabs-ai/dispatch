@@ -6,17 +6,25 @@ import type { LoadedAgent } from "./definition.js";
 import type { AgentHost } from "./runtime.js";
 import type { ChatService } from "./chat.js";
 
-export type AgentSchedule = {
+type ScheduleTiming = {
   id: string;
   cron: string;
   timezone: string;
-  instance: { mode: "new" } | { mode: "existing"; id: string };
-  input: string;
   /** Offline occurrences: discard old minutes, or admit only the latest one. */
   missed: "skip" | "latest";
   /** Optional exclusive, absolute expiry, including Z or an explicit offset. */
   endAt?: string;
 };
+
+export type PromptSchedule = ScheduleTiming & {
+  instance: { mode: "new" } | { mode: "existing"; id: string };
+  input: string;
+};
+export type ProgramSchedule = ScheduleTiming & {
+  /** Executable and literal arguments, run in the agent's execution environment. */
+  command: string[];
+};
+export type AgentSchedule = PromptSchedule | ProgramSchedule;
 
 const context = BACKGROUND_CONTEXT;
 export const scheduleTaskKind = (namespace: string) => `${namespace}.calendar-schedule`;
@@ -44,10 +52,21 @@ export function validateSchedules(schedules: AgentSchedule[] | undefined): void 
     if (typeof schedule.timezone !== "string" || !schedule.timezone.trim()) throw new Error(`${schedule.id}: a timezone is required.`);
     new Intl.DateTimeFormat("en", { timeZone: schedule.timezone });
     if (!["skip", "latest"].includes(schedule.missed)) throw new Error(`${schedule.id}: choose missed: skip or latest.`);
-    if (typeof schedule.input !== "string" || !schedule.input.trim()) throw new Error(`${schedule.id}: input is required.`);
-    if (!schedule.instance || !["new", "existing"].includes(schedule.instance.mode)
-      || (schedule.instance.mode === "existing" && !/^[a-z][a-z0-9-]*:[1-9]\d*$/.test(schedule.instance.id))) {
-      throw new Error(`${schedule.id}: choose a new or exact existing instance.`);
+    if (("input" in schedule) === ("command" in schedule)) {
+      throw new Error(`${schedule.id}: choose exactly one of input or command.`);
+    }
+    if ("command" in schedule) {
+      if (!Array.isArray(schedule.command) || !schedule.command.length
+        || schedule.command.some(arg => typeof arg !== "string" || arg.includes("\0")) || !schedule.command[0].trim()) {
+        throw new Error(`${schedule.id}: command must contain an executable and optional string arguments.`);
+      }
+      if ("instance" in schedule) throw new Error(`${schedule.id}: instance applies only to prompt schedules.`);
+    } else {
+      if (typeof schedule.input !== "string" || !schedule.input.trim()) throw new Error(`${schedule.id}: input is required.`);
+      if (!schedule.instance || !["new", "existing"].includes(schedule.instance.mode)
+        || (schedule.instance.mode === "existing" && !/^[a-z][a-z0-9-]*:[1-9]\d*$/.test(schedule.instance.id))) {
+        throw new Error(`${schedule.id}: choose a new or exact existing instance.`);
+      }
     }
     if (schedule.endAt !== undefined && (typeof schedule.endAt !== "string"
       || !/(Z|[+-]\d\d:\d\d)$/.test(schedule.endAt) || !Number.isFinite(Date.parse(schedule.endAt)))) {
@@ -58,18 +77,42 @@ export function validateSchedules(schedules: AgentSchedule[] | undefined): void 
   }
 }
 
-type Admission = { at: number; id: string; chat: string; submissionId: number };
+type Admission = { at: number; id: string } & ({ chat: string; submissionId: number } | { taskId: number });
 type SavedSchedule = {
   signature: string; definition: AgentSchedule; enabled: boolean; taskId: number | null;
   nextAt: number | null; last: Admission | null;
 };
 
-/** Calendar admission only. The native task never waits for the agent's answer. */
+/** Calendar admission only. Each prompt or program runs independently of the timer. */
 export function createSchedules(namespace: string, agent: LoadedAgent, service: ChatService, active: boolean) {
   const kind = scheduleTaskKind(namespace);
   const Schedules = defineDoc<{ entries: Record<string, SavedSchedule> }>({
     kind: `${namespace}.schedules`, version: 1, scope: "session",
     checkpointWhen: () => false, initial: () => ({ entries: {} }),
+  });
+  type ProgramResult = { startedAt: number; finishedAt: number; exitCode: number | null; stdout: string; stderr: string };
+  const program = defineTask<{ id: string; at: number; command: string[] }, { phase: "run" }, ProgramResult>({
+    name: kind + ".program", version: 1, initial: () => ({ phase: "run" }),
+    phases: { async run(task, runtime, context) {
+      const ctx = withAbortSignal(runtime.signal, context);
+      const env = await runtime.env(ctx);
+      if (!env) throw new Error("Scheduled programs require the agent's execution environment or a host working directory.");
+      const startedAt = runtime.now();
+      const stdout: string[] = [], stderr: string[] = [];
+      const execution = await env.exec(task.input.command, {
+        env: { DISPATCH_SCHEDULE_OCCURRENCE: task.input.id, DISPATCH_SCHEDULED_AT: new Date(task.input.at).toISOString() },
+        onOutput: (text, _ctx, info) => (info.stream === "stdout" ? stdout : stderr).push(text),
+      }, ctx);
+      // Closing the host suspends this native task; recovery repeats the same occurrence.
+      runtime.signal.throwIfAborted();
+      const result = { startedAt, finishedAt: runtime.now(), exitCode: execution.ok ? execution.value.exitCode : null,
+        stdout: stdout.join(""), stderr: stderr.join("") };
+      await runtime.commit(() => ({ status: "terminal", outcome: execution.ok && execution.value.exitCode === 0
+        ? { status: "completed", result }
+        : { status: "failed", result, error: { message: execution.ok
+          ? `Scheduled program exited with code ${execution.value.exitCode}.` : execution.error.message } } }), ctx);
+    } },
+    abort: (_task, runtime, ctx) => runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx),
   });
   type Input = { schedule: AgentSchedule; firstAt: number };
   type Checkpoint = { phase: "wait"; at: number } | { phase: "admit"; at: number };
@@ -113,17 +156,24 @@ export function createSchedules(namespace: string, agent: LoadedAgent, service: 
         const schedule = task.input.schedule;
         const at = task.state.checkpoint.at;
         const id = `schedule:${agent.id}:${schedule.id}:${at}`;
-        const chat = schedule.instance.mode === "new"
-          ? await service.create(agent.id, "schedule", id, `${schedule.id} · ${new Date(at).toISOString()}`,
-            { schedule: schedule.id, scheduledAt: at })
-          : (await service.resolve(schedule.instance.id)).chat;
-        if (chat.agent !== agent.id) throw new Error("An existing schedule instance must belong to its owning agent.");
-        runtime.signal.throwIfAborted();
-        const { submissionId } = await service.submit(chat.id, schedule.input, id, "followUp", "schedule");
+        let prompt: Admission | undefined;
+        if (!("command" in schedule)) {
+          const chat = schedule.instance.mode === "new"
+            ? await service.create(agent.id, "schedule", id, `${schedule.id} · ${new Date(at).toISOString()}`,
+              { schedule: schedule.id, scheduledAt: at })
+            : (await service.resolve(schedule.instance.id)).chat;
+          if (chat.agent !== agent.id) throw new Error("An existing schedule instance must belong to its owning agent.");
+          runtime.signal.throwIfAborted();
+          const { submissionId } = await service.submit(chat.id, schedule.input, id, "followUp", "schedule");
+          prompt = { at, id, chat: chat.id, submissionId };
+        }
         const nextAt = nextScheduleAt(schedule, Math.max(at, runtime.now()));
         await runtime.commit(async tx => {
           const saved = (await tx.doc(Schedules)).entries[schedule.id];
-          const last = { at, id, chat: chat.id, submissionId };
+          const last: Admission = "command" in schedule
+            ? { at, id, taskId: await tx.createTask(program, { id, at, command: schedule.command },
+              { ownership: { kind: "conversation" }, background: true }) }
+            : prompt!;
           saved.last = last;
           saved.nextAt = nextAt;
           await tx.appendEntry(runtime.conversationId, { kind: `${namespace}.schedule-admission`, data: last });
@@ -142,7 +192,7 @@ export function createSchedules(namespace: string, agent: LoadedAgent, service: 
   async function reconcile(host: AgentHost, enabled: boolean) {
     const definitions = new Map((agent.schedules ?? []).map(schedule => [schedule.id, schedule]));
     if (enabled) for (const schedule of definitions.values()) {
-      if (schedule.instance.mode === "existing") {
+      if ("instance" in schedule && schedule.instance.mode === "existing") {
         const { chat } = await service.resolve(schedule.instance.id);
         if (chat.agent !== agent.id) throw new Error("An existing schedule instance must belong to its owning agent.");
       }
@@ -182,8 +232,11 @@ export function createSchedules(namespace: string, agent: LoadedAgent, service: 
     const entries = (await host.harness.snapshot(Schedules, context))?.entries ?? {};
     return Promise.all(Object.entries(entries).map(async ([id, saved]) => {
       const task = saved.taskId ? await host.harness.getTask(saved.taskId as TaskId, context) : undefined;
-      return { agent: agent.id, id, ...saved, state: task?.state ?? null };
+      const run = saved.last && "taskId" in saved.last
+        ? await host.harness.getTask(saved.last.taskId as TaskId<ProgramResult>, context) : undefined;
+      return { agent: agent.id, id, ...saved, state: task?.state ?? null,
+        last: run ? { ...saved.last!, state: run.state } : saved.last };
     }));
   }
-  return { extension: defineExtension({ name: `${namespace}.schedules`, tasks: [calendar] }), reconcile, inspect };
+  return { extension: defineExtension({ name: `${namespace}.schedules`, tasks: [calendar, program] }), reconcile, inspect };
 }
