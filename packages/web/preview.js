@@ -23,8 +23,7 @@ export async function previewWeb({ installations, port, username, signal }) {
     const credential = await write("credential.json", JSON.stringify({
       username, salt: salt.toString("hex"), hash: scryptSync(password, salt, 64).toString("hex"),
     }));
-    const signIn = process.stdout.isTTY ? `Preview password: ${password}`
-      : `Private preview password file: ${await write("sign-in-code", password + "\n")}`;
+    const signIn = `Private preview password file: ${await write("sign-in-code", password + "\n")}`;
     const cli = new URL(manifest.bin["dispatch-web"], import.meta.url);
     signal.throwIfAborted();
     const web = spawn(process.execPath, [fileURLToPath(cli), "--port", String(port)], {
