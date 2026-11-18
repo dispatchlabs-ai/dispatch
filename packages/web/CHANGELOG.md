@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Keep preview passwords in a private temporary file instead of printing them to terminal logs.
+
 ## [0.29.0] - 2026-11-17
 
 - Show avatars found beside the connected host's agent definitions automatically; retain explicit artwork bindings as overrides and initials when no image is available.

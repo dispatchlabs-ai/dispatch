@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Confine receipt-file access to the private state directory and construct inference requests from the configured origin and validated route components, rejecting dot-segment connection IDs.
+
 ## [0.13.0] - 2026-11-13
 
 - Prepare a public reusable package. Move Slack integration to the explicit /slack subpath and make the Slack peer optional.

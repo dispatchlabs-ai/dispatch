@@ -10,10 +10,14 @@ export function verifiedPostgresConfig(connectionString: string, ca: string): Cl
     // parameters, including libpq options/service/socket overrides, not just sslmode.
     if (!["postgres:", "postgresql:"].includes(url.protocol) || !url.hostname || !url.username || url.pathname.length < 2 || url.pathname.slice(1).includes("/") || url.href.includes("?") || url.href.includes("#"))
       throw new Error("Invalid PostgreSQL URL.");
-    const pemPattern = /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g;
-    const certificates = ca.match(pemPattern);
-    if (!certificates?.length || ca.replace(pemPattern, "").trim()) throw new Error("Invalid CA bundle.");
-    for (const pem of certificates) if (!new X509Certificate(pem).ca) throw new Error("Expected CA certificate.");
+    const begin = "-----BEGIN CERTIFICATE-----", end = "-----END CERTIFICATE-----";
+    const certificates = ca.split(begin);
+    if (certificates.shift()!.trim() || !certificates.length) throw new Error("Invalid CA bundle.");
+    for (const part of certificates) {
+      const boundary = part.indexOf(end);
+      if (boundary < 0 || part.slice(boundary + end.length).trim()) throw new Error("Invalid CA bundle.");
+      if (!new X509Certificate(begin + part.slice(0, boundary) + end).ca) throw new Error("Expected CA certificate.");
+    }
     const expectedHost = url.hostname.replace(/^\[|\]$/g, "");
     return { connectionString, ssl: {
       ca, rejectUnauthorized: true, minVersion: "TLSv1.2",

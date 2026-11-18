@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { chmod, lstat, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { createConnection } from "node:net";
@@ -73,7 +73,12 @@ export async function startFleetRelay(options: FleetRelayOptions) {
     await unlink(options.socket);
   } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   const writes = new Map<string, Promise<void>>();
-  const recordPath = (run: string) => join(options.stateRoot, run + ".json");
+  const receiptRoot = resolve(options.stateRoot) + sep;
+  const recordPath = (run: string) => {
+    const path = resolve(receiptRoot, run + ".json");
+    if (!path.startsWith(receiptRoot)) throw new Error("Invalid fleet receipt path.");
+    return path;
+  };
   async function receipts(run: string): Promise<Receipts> {
     try { return JSON.parse(await readFile(recordPath(run), "utf8")); }
     catch (error) {
@@ -200,8 +205,15 @@ export async function startFleetRelay(options: FleetRelayOptions) {
     const bytes = Buffer.concat(chunks);
     if (path.startsWith("/v1/")) {
       if (effectsBlocked && request.method !== "GET") throw new Error("The Slack thread is closing.");
-      if (!(request.method === "GET" && path === "/v1/catalog") && !(request.method === "POST" && /^\/v1\/(responses|connections\/[a-zA-Z0-9_.:-]+(?:\/messages)?)$/.test(path))) throw new Error("Unsupported inference route.");
-      const upstream = await fetch(new URL(path, inference), {
+      const target = new URL(inference);
+      if (request.method === "GET" && path === "/v1/catalog") target.pathname = "/v1/catalog";
+      else if (request.method === "POST" && path === "/v1/responses") target.pathname = "/v1/responses";
+      else {
+        const connection = /^\/v1\/connections\/([a-zA-Z0-9_.:-]+)(\/messages)?$/.exec(path);
+        if (request.method !== "POST" || !connection || [".", ".."].includes(connection[1])) throw new Error("Unsupported inference route.");
+        target.pathname = `/v1/connections/${encodeURIComponent(connection[1])}${connection[2] ? "/messages" : ""}`;
+      }
+      const upstream = await fetch(target, {
         method: request.method, redirect: "error", signal,
         headers: { authorization: `Bearer ${options.inference.key}`, "content-type": "application/json" },
         ...(request.method === "POST" ? { body: bytes } : {}),
