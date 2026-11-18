@@ -4,13 +4,15 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import lockfile from "proper-lockfile";
+import type { HarnessOptions } from "@earendil-works/pi-durable";
 import type { Models } from "@earendil-works/pi-ai/models";
 import type { LoadedAgent } from "./definition.js";
 import { connectMcpServers, type McpServers } from "./mcp.js";
 import { bindDestination, type MonitorDestination } from "./monitors.js";
 import { privateStateDirectory } from "./private-state.js";
 import type { ReviewRun } from "./run-evidence.js";
-import { githubPublisher, type ReviewPull } from "./review-github.js";
+import { familyReports, reviewFamily, ReviewPending } from "./review-group.js";
+import { githubPublisher, proposalBranch, type OpenPull, type ReviewPull } from "./review-github.js";
 import { proposeReview, proposalRevision, type Decision } from "./review-proposal.js";
 import { localReviewBase, repositoryName, reviewSource } from "./review-source.js";
 
@@ -19,10 +21,10 @@ export type ReviewCompletedHandler = (review: CompletedReview, options: { signal
 export type ReviewPolicy = {
   /** Application module or installed package with a default ReviewCompletedHandler export. */
   onReviewComplete?: string;
-  onActionableReview?: { openDraftPR: { repository: string; paths?: string[] }; onPROpened?: { notify: string } };
+  onActionableReview?: { paused?: boolean; openDraftPR: { repository: string; paths?: string[] }; onPROpened?: { notify: string } };
 };
 type Config = ReviewPolicy & { root: string; stateRoot: string; cwd?: string; mcpServers?: McpServers };
-type Input = { agent: string; run: ReviewRun; report: string; models: Models; model: LoadedAgent["model"] };
+type Input = { agent: string; run: ReviewRun; report: string; models: Models; settings?: HarnessOptions["settings"]; model: LoadedAgent["model"] };
 export type RunReviewActions = (input: Input, signal?: AbortSignal, prepareOnly?: boolean) => Promise<string | undefined>;
 type Result = { kind: "skip"; reason: string } | { kind: "pr"; pull: ReviewPull };
 const hash = (value: string) => createHash("sha256").update(value).digest("hex").slice(0, 32);
@@ -100,24 +102,46 @@ export function configuredReviewActions(config: Config): RunReviewActions | unde
       });
     }
     if (!repository || !event.complete) return;
+    const family = reviewFamily(join(config.stateRoot, input.agent, "session.sqlite"), input.run);
+    if (family.owned) return "Private review saved for the owning top-level run.";
+    if (policy?.paused && !prepareOnly) throw new ReviewPending("Draft publication is paused in the host configuration.");
+    if (family.pending) throw new ReviewPending("Waiting for owned runs and their private reviews.");
     const shared = join(config.stateRoot, ".review-actions", hash(repository));
-    const directory = join(room, "actions", hash(repository));
+    const receipts = join(room, "actions", hash(repository), ...(family.members.length ? ["group"] : []));
+    const directory = prepareOnly ? join(receipts, "preview") : receipts;
     await privateStateDirectory(directory);
-    return locked(shared, signal, async () => {
-      const file = join(directory, "result.json");
+    // Local preparation has no GitHub side effects and remains available during a publication hold.
+    return locked(prepareOnly ? directory : shared, signal, async () => {
+      const file = join(receipts, "result.json");
       let result = await saved<Result>(file);
+      const github = !result && !prepareOnly ? await githubPublisher(repository, appRoot, signal) : undefined;
+      const intent = join(directory, "publishing.json");
+      if (github) {
+        const attempt = await saved<{ branch: string }>(intent);
+        const pull = attempt && await github.find(attempt.branch);
+        if (pull) { result = { kind: "pr", pull }; await saveJson(file, result); }
+      }
       if (!result) {
-        const github = prepareOnly ? undefined : await githubPublisher(repository, appRoot, signal);
+        const reports = await familyReports(input.report, text, family.members);
         const base = github ? (await github.current()).sha : await localReviewBase(appRoot, repository);
         const source = await reviewSource(github ? "https://github.com/" + repository + ".git" : appRoot, base, paths, signal);
         try {
           const open = github ? await github.recent() : [];
           const planFile = join(directory, "proposal.json");
-          const context = hash(JSON.stringify([proposalRevision, paths, open.map(p => [p.number, p.title])]));
+          const fingerprint = (pulls: OpenPull[]) => hash(JSON.stringify([
+            proposalRevision, paths, prepareOnly, reports.map(hash), pulls.map(p => [p.number, p.title, p.head]),
+          ]));
+          const context = fingerprint(open);
           const cache = await saved<{ base: string; context: string; decision: Decision }>(planFile);
-          const reusable = cache?.context === context && (cache.base === base ||
-            cache.decision.kind === "change" && await source.unchanged(cache.base, cache.decision.proposal.edits.map(edit => edit.path)));
-          const decision = reusable ? cache.decision : await proposeReview(source, text, open, input.models, input.model, signal);
+          const diffs = () => source.pullDiffs(open).catch(async error => {
+            if (github && fingerprint(await github.recent()) !== context)
+              throw new ReviewPending("An open PR changed while fetching. Refreshing the comparison.");
+            throw error;
+          });
+          const decision = cache?.context === context && cache.base === base ? cache.decision :
+            await proposeReview(source, reports, await diffs(), input.models, input.model, directory, input.settings, signal);
+          if (github && (fingerprint(await github.recent()) !== context || (await github.current()).sha !== base))
+            throw new ReviewPending("The base or an open PR changed. Refreshing the proposal comparison.");
           if (decision.kind === "skip") result = { kind: "skip", reason: decision.reason };
           else if (decision.kind === "existing") {
             const pull = open.find(p => p.number === decision.number);
@@ -131,6 +155,8 @@ export function configuredReviewActions(config: Config): RunReviewActions | unde
             await saveJson(planFile, { base, context, decision });
             if (!github) return "Prepared: " + diff;
             const body = proposal.reason + "\n\nChecked each edit against the committed source and ran `git diff --check`. A future agent run can verify the behavior.";
+            // A crash after GitHub accepts the PR must recover it before planning against a new set of diffs.
+            await saveJson(intent, { branch: proposalBranch(proposal.edits) });
             const pull = await github.publish(base, files, proposal, body);
             result = { kind: "pr", pull };
           }

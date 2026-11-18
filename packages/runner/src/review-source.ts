@@ -3,6 +3,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { ReviewPending } from "./review-group.js";
+import type { OpenPull } from "./review-github.js";
+
 export type SourceEdit = { path: string; before: string; after: string };
 export type Proposal = { title: string; reason: string; edits: SourceEdit[] };
 export type SourceView = { base: string; files: string[]; read(path: string): Promise<string> };
@@ -66,11 +69,25 @@ export async function reviewSource(origin: string, base: string, paths: string[]
       return value;
     };
     return { base, files: [...entries.keys()], read, close,
-      async unchanged(since: string, files: string[]) {
-        if (!/^[a-f0-9]{40,64}$/.test(since) || !files.length || files.some(path => !entries.has(path))) return false;
-        const list = (rev: string) => run(["--literal-pathspecs", "ls-tree", "-z", rev, "--", ...files]);
-        try { return await list(since) === await list(base); }
-        catch { signal?.throwIfAborted(); return false; }
+      async pullDiffs(pulls: OpenPull[]) {
+        if (!pulls.length) return [];
+        const refs = pulls.map(pull => {
+          if (!Number.isSafeInteger(pull.number) || pull.number <= 0 || !/^[a-f0-9]{40,64}$/.test(pull.head))
+            throw new Error("Invalid GitHub pull request identity.");
+          return `refs/pull/${pull.number}/head:refs/review/${pull.number}`;
+        });
+        await git(directory, [...transport, "fetch", "--quiet", "--no-tags", origin, ...refs], signal);
+        const scope = paths.filter(p => p !== ".").map(p => ":(top,literal)" + p.replace(/\/$/, ""));
+        if (paths.includes(".")) scope.length = 0;
+        scope.push(":(top,exclude).github/workflows/**");
+        const patches = [];
+        for (const pull of pulls) {
+          if ((await run(["rev-parse", `refs/review/${pull.number}`])).trim() !== pull.head)
+            throw new ReviewPending("A pull request changed while reading its diff. Refresh the comparison.");
+          const diff = await run(["diff", "--no-ext-diff", "--no-textconv", "--no-renames", base + "..." + pull.head, "--", ...scope]);
+          patches.push({ number: pull.number, title: pull.title, diff });
+        }
+        return patches;
       },
       async stage(proposal: Proposal) {
         const changes = new Map<string, string>();

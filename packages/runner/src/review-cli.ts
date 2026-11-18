@@ -9,6 +9,7 @@ import type { ServiceConfig } from "./service.js";
 import { serviceSettings } from "./settings.js";
 import { terminalText } from "./terminal-output.js";
 
+import { ReviewPending } from "./review-group.js";
 import { configuredReviewActions } from "./review-actions.js";
 
 export async function reviewCommand(config: ServiceConfig, name: string, submission: number, action?: "prepare" | "publish") {
@@ -26,7 +27,8 @@ export async function reviewCommand(config: ServiceConfig, name: string, submiss
     if (action) {
       const handler = configuredReviewActions(config);
       if (!handler) throw new Error("Configure a review action in the host file first.");
-      const output = await handler({ agent: agent.id, run, report: result.report, model, models }, undefined, action === "prepare");
+      const output = await handler({ agent: agent.id, run, report: result.report, model, models, settings: serviceSettings(config, models) }, undefined, action === "prepare")
+        .catch(error => { if (error instanceof ReviewPending) return error.message; throw error; });
       if (output) console.error(terminalText(output));
     }
   } finally { await connection.close(); }

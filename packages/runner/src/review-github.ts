@@ -1,11 +1,20 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { ReviewPending } from "./review-group.js";
 import { repositoryName, type Proposal } from "./review-source.js";
 
 type Repo = { id: number; full_name: string; default_branch: string };
-type Pull = { number: number; html_url: string; state: string; draft: boolean; title: string; head: { ref: string; repo: Repo | null }; base: { ref: string; repo: Repo } };
+type Pull = { number: number; html_url: string; state: string; draft: boolean; title: string; head: { ref: string; sha: string; repo: Repo | null }; base: { ref: string; repo: Repo } };
 export type ReviewPull = { number: number; url: string; title: string; state: string; draft: boolean; branch: string };
+export type OpenPull = ReviewPull & { head: string };
 export type ChangedFile = { path: string; mode: string; content: string };
+
+function branchName(key: string[][]) {
+  return "dispatch-eval/" + createHash("sha256").update(JSON.stringify(key)).digest("hex").slice(0, 32);
+}
+export function proposalBranch(edits: Proposal["edits"]) {
+  return branchName(edits.toSorted((a, b) => a.path.localeCompare(b.path)).map(({ path, before, after }) => [path, before, after]));
+}
 
 /** The trusted publisher selects the repository, method and endpoint. No endpoint or ref comes from a model. */
 export async function githubPublisher(repository: string, cwd: string, signal?: AbortSignal) {
@@ -32,13 +41,15 @@ export async function githubPublisher(repository: string, cwd: string, signal?: 
   const target = await api<Repo>("");
   if (target.full_name.toLowerCase() !== repository) throw new Error("GitHub returned a different target repository.");
   const base = target.default_branch;
-  const own = (item: Pull) => item.base.repo.id === target.id && item.head.repo?.id === target.id && item.base.ref === base;
+  const targetsBase = (item: Pull) => item.base.repo.id === target.id && item.base.ref === base;
+  const own = (item: Pull) => targetsBase(item) && item.head.repo?.id === target.id && /^dispatch-eval\/[a-f0-9]{32}$/.test(item.head.ref);
   const receipt = (item: Pull): ReviewPull => {
-    if (!own(item) || !/^dispatch-eval\/[a-f0-9]{32}$/.test(item.head.ref) || item.html_url !== `https://github.com/${target.full_name}/pull/${item.number}`)
-      throw new Error("GitHub returned an unexpected proposal.");
+    if (!targetsBase(item) || item.html_url !== `https://github.com/${target.full_name}/pull/${item.number}`)
+      throw new Error("GitHub returned an unexpected pull request.");
     return { number: item.number, url: item.html_url, title: item.title, state: item.state, draft: item.draft, branch: item.head.ref };
   };
   async function find(branch: string) {
+    if (!/^dispatch-eval\/[a-f0-9]{32}$/.test(branch)) return;
     const params = new URLSearchParams({ head: repository.split("/")[0] + ":" + branch, base, state: "all" });
     const match = (await api<Pull[]>("/pulls?" + params)).find(p => own(p) && p.head.ref === branch);
     return match && receipt(match);
@@ -48,17 +59,15 @@ export async function githubPublisher(repository: string, cwd: string, signal?: 
   }
   return { current, find,
     async recent() {
-      const results: ReviewPull[] = [];
+      const results: OpenPull[] = [];
       for (let page = 1;; page++) {
-        const list = await api<Pull[]>("/pulls?state=open&per_page=100&page=" + page);
-        results.push(...list.filter(p => own(p) && /^dispatch-eval\/[a-f0-9]{32}$/.test(p.head.ref)).map(receipt));
-        if (list.length < 100) return results;
+        const list = await api<Pull[]>("/pulls?state=open&base=" + encodeURIComponent(base) + "&per_page=100&page=" + page);
+        results.push(...list.filter(targetsBase).map(p => ({ ...receipt(p), head: p.head.sha })));
+        if (list.length < 100) return results.sort((a, b) => a.number - b.number);
       }
     },
     async publish(baseCommit: string, files: ChangedFile[], { edits, title }: Proposal, body: string) {
-      const branchName = (key: string[][]) => "dispatch-eval/" + createHash("sha256").update(JSON.stringify(key)).digest("hex").slice(0, 32);
-      const ordered = edits.toSorted((a, b) => a.path.localeCompare(b.path));
-      const branch = branchName(ordered.map(({ path, before, after }) => [path, before, after]));
+      const branch = proposalBranch(edits);
       if (branch === base) throw new Error("The proposal branch cannot be the default branch.");
       const prior = await find(branch);
       if (prior) return prior;
@@ -80,7 +89,7 @@ export async function githubPublisher(repository: string, cwd: string, signal?: 
         if (matched && !expected.size) return legacy;
       }
       const parent = await current();
-      if (parent.sha !== baseCommit) throw new Error("The default branch advanced. Prepare the proposal against its current contents.");
+      if (parent.sha !== baseCommit) throw new ReviewPending("The default branch advanced. Refreshing the proposal comparison.");
       const treeFor = (baseTree: string) => api<{ sha: string }>("/git/trees", { base_tree: baseTree,
         tree: files.map(({ path, mode, content }) => ({ path, mode, type: "blob", content })) });
       // Only create a new reference. On a retry, verify the existing branch still represents this exact edit.
@@ -105,7 +114,7 @@ export async function githubPublisher(repository: string, cwd: string, signal?: 
         if (!found) throw error;
         return found;
       }
-      if (!created.draft) throw new Error("GitHub did not confirm a draft pull request.");
+      if (!created.draft || !own(created) || created.head.ref !== branch) throw new Error("GitHub did not confirm a draft pull request.");
       return receipt(created);
     },
   };

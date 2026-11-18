@@ -1,7 +1,23 @@
 import { createHash } from "node:crypto";
-import type { Context } from "@earendil-works/chord/context";
+import { join } from "node:path";
+import { BACKGROUND_CONTEXT, type Context } from "@earendil-works/chord/context";
 import { estimateTextTokens } from "@earendil-works/pi-ai/utils/estimate";
-import { AssistantEntry, configure, defineDoc, type AgentChange, type ConversationId, type Harness } from "@earendil-works/pi-durable";
+import { AssistantEntry, configure, createRegistry, defineDoc, Harness, type AgentChange, type ConversationId, type HarnessOptions } from "@earendil-works/pi-durable";
+import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
+import { privateStateFiles } from "./private-state.js";
+
+export async function withReviewSession<T>(directory: string, host: Pick<HarnessOptions, "models" | "settings">, ctx: Context, work: (harness: Harness) => Promise<T>) {
+  await privateStateFiles(directory);
+  const storage = await openNodeSqliteStorage(join(directory, "session.sqlite"));
+  let harness: Harness | undefined;
+  try {
+    harness = await Harness.open(storage, { ...host, registry: createRegistry() }, ctx);
+    return await work(harness);
+  } finally {
+    if (harness) await harness.close(BACKGROUND_CONTEXT);
+    else await storage.close(BACKGROUND_CONTEXT);
+  }
+}
 
 const stages = defineDoc<{ conversations: Record<string, ConversationId> }>({
   kind: "dispatch.review-stages", version: 1, scope: "session",

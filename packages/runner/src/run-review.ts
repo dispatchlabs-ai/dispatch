@@ -3,13 +3,13 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import lockfile from "proper-lockfile";
-import { BACKGROUND_CONTEXT, withAbortSignal, type Context } from "@earendil-works/chord/context";
+import { withAbortSignal, type Context } from "@earendil-works/chord/context";
 import type { Models } from "@earendil-works/pi-ai/models";
-import { GenerationTask, Harness, createRegistry, defineExtension, defineTask, hook, runEndTask, type HarnessOptions } from "@earendil-works/pi-durable";
-import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
+import { GenerationTask, defineExtension, defineTask, hook, runEndTask, type HarnessOptions } from "@earendil-works/pi-durable";
+import { ReviewPending } from "./review-group.js";
 import type { LoadedAgent } from "./definition.js";
-import { privateStateDirectory, privateStateFiles } from "./private-state.js";
-import { assessEvidence } from "./review-evidence-sections.js";
+import { privateStateDirectory } from "./private-state.js";
+import { assessEvidence, withReviewSession } from "./review-evidence-sections.js";
 import { runEvidence, type ReviewRun } from "./run-evidence.js";
 import { reportError, terminalText } from "./terminal-output.js";
 
@@ -70,23 +70,14 @@ export async function reviewRun(host: ReviewHost, run: ReviewRun, ctx: Context, 
     const evidence = await frozenEvidence(root, revision, "evidence.ndjson", () => runEvidence(database, run, "run"));
     const model = host.models.getModel(host.model.provider, host.model.id);
     if (!model) throw new Error("The review model is unavailable.");
-    await privateStateFiles(directory);
-    const storage = await openNodeSqliteStorage(join(directory, "session.sqlite"));
-    let harness: Harness | undefined;
-    try {
-      harness = await Harness.open(storage, { registry: createRegistry(), models: host.models, settings: host.settings }, ctx);
-      const text = await assessEvidence({
-        harness, agent: { instructions, model: { provider: host.model.provider, modelId: host.model.id }, thinkingLevel: host.model.thinking },
-        instructions, assignment: `Evaluate ${host.agent}, conversation ${run.conversation}, entries ${run.first} through ${run.last}, answer ${run.answer}.`,
-        evidence, earlierEvidence: () => frozenEvidence(root, revision, "context.ndjson", () => runEvidence(database, run, "context")),
-        contextWindow: model.contextWindow, maxTokens: model.maxTokens, retryFailed, ctx,
-      });
-      await saveText(report, text + "\n");
-      return { text, report };
-    } finally {
-      if (harness) await harness.close(BACKGROUND_CONTEXT);
-      else await storage.close(BACKGROUND_CONTEXT);
-    }
+    const text = await withReviewSession(directory, { models: host.models, settings: host.settings }, ctx, harness => assessEvidence({
+      harness, agent: { instructions, model: { provider: host.model.provider, modelId: host.model.id }, thinkingLevel: host.model.thinking },
+      instructions, assignment: `Evaluate ${host.agent}, conversation ${run.conversation}, entries ${run.first} through ${run.last}, answer ${run.answer}.`,
+      evidence, earlierEvidence: () => frozenEvidence(root, revision, "context.ndjson", () => runEvidence(database, run, "context")),
+      contextWindow: model.contextWindow, maxTokens: model.maxTokens, retryFailed, ctx,
+    }));
+    await saveText(report, text + "\n");
+    return { text, report };
   } finally { await release(); }
 }
 
@@ -101,7 +92,12 @@ export function runReviewExtension(host: ReviewHost, enabled: boolean) {
   const actions = defineTask<{ run: ReviewRun; report: string }, { phase: "deliver" }, string | null>({
     name: "dispatch.run-review-actions", version: 1, initial: () => ({ phase: "deliver" }),
     phases: { async deliver(task, runtime, ctx) {
-      const detail = await host.actions?.({ ...host, ...task.input }, runtime.signal);
+      let detail;
+      try { detail = await host.actions?.({ ...host, ...task.input }, runtime.signal); }
+      catch (error) {
+        if (error instanceof ReviewPending) return runtime.sleepUntil(runtime.now() + 60_000, task.state.checkpoint, ctx);
+        throw error;
+      }
       if (detail) console.log(terminalText(detail));
       await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: detail ?? null } }), ctx);
     } },

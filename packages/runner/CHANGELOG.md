@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Group draft proposals by top-level run, compare findings with current open PR diffs and allow hosts to pause publication while retaining reviews.
+
 ## [0.37.0] - 2026-11-18
 
 - Carry optional keyed conversation settings from the shared host file to its clients.
