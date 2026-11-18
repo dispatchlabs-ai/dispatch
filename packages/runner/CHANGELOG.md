@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Agents post short progress notes in their current chat by default. Notes appear during running tools, survive reconnects and use Pi's retry-safe writes.
+
 ## [0.38.1] - 2026-11-18
 
 - Send concurrent gateway model requests on independent streams or connections, including POSTs from parallel agent conversations.

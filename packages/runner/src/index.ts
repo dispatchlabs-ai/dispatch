@@ -38,6 +38,7 @@ export type { AgentSetup } from "./configuration.js";
 export type { Chat, ChatInitializer, ChatMessage, ChatService, ChatSnapshot } from "./chat.js";
 export type { ReplyDestination, ReplyDetails, ReplySink, StatusSink } from "./replies.js";
 export { context, projectChatMessages } from "./chat.js";
+export { batchProgress } from "./progress.js";
 export { run } from "./run.js";
 export { AgentClient, connectClient } from "./client.js";
 export type { ClientConnection, ChatWatch } from "./client.js";
@@ -65,8 +66,8 @@ export function createRunner(options: { namespace?: string; workspacePrefix?: st
   const replies = createReplies(namespace);
   const coding = createCoding(namespace, options.workspacePrefix);
   const handoffs = createHandoffs(namespace, progress.Progress, replies.publishReply);
-  const configuration = createConfiguration(coding.codingExtension, handoffs.handoffExtension, options.progressInstructions);
-  const runtime = createRuntime(namespace, configuration.agentConfiguration, handoffs.Handoffs, coding.codingEnvironment, artifacts);
+  const configuration = createConfiguration(coding.codingExtension, handoffs.handoffExtension, progress.ProgressTools, options.progressInstructions);
+  const runtime = createRuntime(namespace, configuration.agentConfiguration, handoffs.Handoffs, coding.codingEnvironment, artifacts, progress.ProgressTools);
   const chats = createChats(namespace, runtime.openAgent, handoffs.Handoffs, artifacts.Artifacts);
   return { namespace, ...progress, ...artifacts, ...replies, ...coding, ...handoffs, ...configuration, ...runtime, ...chats };
 }

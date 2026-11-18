@@ -83,7 +83,7 @@ export type RunnerState = {
 
 export type StartOptions = { conversationId?: ConversationId; input?: string };
 
-export function createRuntime(namespace: string, agentConfiguration: ReturnType<typeof createConfiguration>["agentConfiguration"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"], codingEnvironment: ReturnType<typeof createCoding>["codingEnvironment"], artifacts: ReturnType<typeof createArtifacts>) {
+export function createRuntime(namespace: string, agentConfiguration: ReturnType<typeof createConfiguration>["agentConfiguration"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"], codingEnvironment: ReturnType<typeof createCoding>["codingEnvironment"], artifacts: ReturnType<typeof createArtifacts>, progressTools: Extension) {
   const RunnerDoc = defineDoc<RunnerState>({
     kind: `${namespace}.runner`, version: 1, scope: "session",
     checkpointWhen: () => false,
@@ -330,7 +330,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
           }
         }, context);
       }
-      // Install host summary policy before scheduling resumes, preserving every
+      // Install conversation-wide policies before scheduling resumes, preserving every
       // conversation's model, instructions, tools and existing extension order.
       await harness.commit(async tx => {
         let cursor: Cursor | undefined;
@@ -340,7 +340,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
           conversations.push(...page.items);
           cursor = page.next;
         } while (cursor);
-        const added = policy.map(extension => extension.name);
+        const added = [...policy, progressTools].map(extension => extension.name);
         for (const conversation of conversations) {
           const state = await tx.doc(AgentDoc, conversation.id);
           const selected = state.extensions;

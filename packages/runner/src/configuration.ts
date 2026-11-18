@@ -11,7 +11,7 @@ import { reminderReviewExtension } from "./reminders.js";
 
 export type AgentSetup = { configuration: AgentChange; installed: Extension[]; delegate?: AgentSetup };
 
-export function createConfiguration(codingExtension: ReturnType<typeof createCoding>["codingExtension"], handoffExtension: ReturnType<typeof createHandoffs>["handoffExtension"], progressInstructions?: (agent: LoadedAgent) => string) {
+export function createConfiguration(codingExtension: ReturnType<typeof createCoding>["codingExtension"], handoffExtension: ReturnType<typeof createHandoffs>["handoffExtension"], progressTools: Extension, progressInstructions?: (agent: LoadedAgent) => string) {
   async function agentConfiguration(
     agent: LoadedAgent, directory: string, demo: boolean, adapters: Extension[], sink?: ReplySink, cwd?: string,
     shared: Extension[] = [],
@@ -49,6 +49,7 @@ export function createConfiguration(codingExtension: ReturnType<typeof createCod
       extensions.push(delegationExtension(agent.id, delegates, agent.clones));
     }
     extensions.push(...shared, ...adapters);
+    if (!extensions.some(extension => extension.name === progressTools.name)) extensions.push(progressTools);
     installed.push(...extensions);
     return {
       configuration: { model, thinkingLevel: agent.model.thinking, instructions: agent.instructions + skillInstructions(agent.skillCatalog ?? []), extensions, ...(cwd ? { cwd } : {}) },

@@ -214,7 +214,15 @@ for the stock tools.
 The [complete setup](docs/create-agents.md#give-developer-coding-and-messaging-tools)
 includes dependency installation, this file's location and a real-tool check.
 
-`defineAgent({})` is conversational by default. Tools are explicit grants;
+Every agent can post progress in its current chat with `report_progress`. During
+sustained work it shares short updates when there are new findings or blockers.
+For a long tool that processes a batch, `await batchProgress(api, context, "review")`
+returns a reporter. Call it with the completed count and a public summary as
+receipts arrive. It groups parallel results into updates roughly every 45 seconds.
+Pass `true` as its third argument for a phase change or blocker. Replaying the
+tool reuses its saved notes.
+
+`defineAgent({})` is conversational by default. Application tools are explicit grants;
 trusted extensions can supply native Pi tools, documents and tasks. Markdown
 requires a description, model provider/id and instructions. `model.thinking`
 defaults to `off`; supported values are `off`, `minimal`, `low`, `medium`, `high`,

@@ -1,5 +1,33 @@
 import { Type } from "typebox";
-import { defineDoc, defineExtension, defineTool } from "@earendil-works/pi-durable";
+import type { Context } from "@earendil-works/chord/context";
+import { defineDoc, defineExtension, defineTool, type ToolExecutionApi } from "@earendil-works/pi-durable";
+
+type BatchNote = { completed: number; summary: string; at: number };
+
+/** Report a long tool's verified receipts in its own conversation. Counts increase within each named phase. */
+export async function batchProgress(api: ToolExecutionApi, context: Context, phase: string) {
+  let slot = 0;
+  const key = () => `progress:${encodeURIComponent(phase)}:${slot}`;
+  let saved = await api.memo<BatchNote>(key(), context);
+  let last: BatchNote | undefined;
+  let pending = Promise.resolve();
+  return (completed: number, summary: string, milestone = false): Promise<void> => {
+    const at = api.now();
+    // Parallel receipts arrive while the preceding note is being committed.
+    pending = pending.then(async () => {
+      if (last && completed <= last.completed) return;
+      if (saved ? completed < saved.completed : last && !milestone && at - last.at < 45_000) return;
+      // Reuse the original count and wording if recovery collects receipts in a different order.
+      const note = saved ?? await api.memo(key(), { completed, summary, at }, context);
+      const result = await api.executeTool("report_progress", { summary: note.summary }, context, { key: key(), progress: false });
+      if (result.isError) api.diagnostic({ severity: "warn", message: result.diagnostics[0]?.message ?? "Could not post the progress note." });
+      last = note;
+      slot++;
+      saved = await api.memo<BatchNote>(key(), context);
+    });
+    return pending;
+  };
+}
 
 export function createProgress(namespace: string) {
   const Progress = defineDoc<{ summary: string; sequence: number; at?: number }>({
@@ -14,19 +42,31 @@ export function createProgress(namespace: string) {
       key: "public-progress",
       async render({ conversationId, read }, context) {
         const progress = await read.snapshot(Progress, conversationId, context);
-        return "Keep the user informed during sustained work with report_progress. At meaningful transitions, give one or two complete sentences: what you established, and what you are checking next. Aim for a useful update roughly every 30–60 seconds when new evidence is available. Include discoveries, failed checks and changes of direction; do not repeat the assignment, old authorization limits or a heartbeat. Public assistant commentary is also visible to the user. Long tools may keep running without a new report; never invent progress to fill the gap."
+        return "During sustained work, post one or two sentences in this chat with report_progress. Say what you found or decided and what you are checking next. Aim for an update every 30–60 seconds when there is new evidence, and surface a blocker promptly. Before a long tool call, share what you are about to check if that would help the reader. Group delegated results into a single update. Skip repeated commentary and routine heartbeats. Quick requests can go straight to the answer."
           + (progress?.at ? ` Your last recorded progress update was ${Math.max(0, Math.floor((Date.now() - progress.at) / 1000))} seconds ago.` : "");
       },
     }],
     tools: [defineTool({
       name: "report_progress",
-      description: "Record one or two public sentences about a new finding, completed step, next action or blocker for the supervising agent and user. Report meaningful transitions during longer work. Do not repeat the assignment, old permissions, private reasoning or raw command output.",
+      description: "Post a short progress note in the current chat about a new finding, decision, next step or blocker. Use facts appropriate for everyone in this conversation.",
       parameters: Type.Object({ summary: Type.String({ minLength: 1 }) }),
       replay: "safe",
       async execute({ summary }, api, context) {
+        const text = summary.trim();
+        if (!text) throw new Error("A progress note needs text.");
+        const conversation = await api.conversation(api.conversationId, context);
+        if (!conversation) throw new Error("Progress conversation is unavailable.");
+        const requestId = `${namespace}.progress:${api.taskId}`;
         await api.commit(async tx => {
           const state = await tx.doc(Progress, api.conversationId);
-          if (state.summary !== summary) { state.summary = summary; state.sequence++; state.at = api.now(); }
+          if (state.summary === text || await tx.submissionByRequest(api.conversationId, requestId)) return;
+          const at = api.now();
+          await conversation.submit(tx, { type: "write", requestId,
+            entry: { kind: `${namespace}.background-reply`, data: { text, at, key: requestId } },
+          });
+          state.summary = text;
+          state.sequence++;
+          state.at = at;
         }, context);
         return { output: [{ type: "text", text: "Progress recorded." }] };
       },

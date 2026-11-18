@@ -60,9 +60,9 @@ export function projectChatMessages(namespace: string, entries: readonly EntryRe
       return [{ provenance: "agent", id: `${entry.id}:artifact`, role: "assistant", text: "", artifacts: [artifact] }];
     }
     if (entry.kind === `${namespace}.background-reply`) {
-      const data = entry.data as { author: string; text: string; details?: { label: string; text: string } };
-      const at = entry.model?.[0]?.timestamp;
-      return [{ provenance: "agent", id: `${entry.id}:background`, role: "assistant", text: data.text, author: data.author, background: true,
+      const data = entry.data as { author?: string; text: string; at?: number; details?: { label: string; text: string } };
+      const at = data.at ?? entry.model?.[0]?.timestamp;
+      return [{ provenance: "agent", id: `${entry.id}:background`, role: "assistant", text: data.text, ...(data.author ? { author: data.author } : {}), background: true,
         ...(typeof at === "number" ? { at } : {}), ...(data.details ? { details: data.details } : {}) }];
     }
     return (entry.model ?? []).flatMap((message, index) => {
