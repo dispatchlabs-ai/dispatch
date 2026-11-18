@@ -35,6 +35,24 @@ answers can also select [request completion](request-completion.md).
 
 ## Who owns a delegated child
 
+When the model calls an application tool, that tool can issue an assignment
+with `api.executeTool("delegate", …)`. In the child, a specialist tool can
+read the original assignment from Runner.
+
+```ts
+const { task, callerTaskId } = await requireDelegatedTask(
+  { coordinator: "editor", agent: "reviewer", tool: "review_document" }, api, ctx,
+);
+```
+
+Import `requireDelegatedTask` from `@dispatch/runner`. It verifies the named
+coordinator, specialist and calling tool against the stored delegation.
+`task` is the original assignment text. `callerTaskId` identifies the tool
+that invoked `delegate`, so the child can read evidence stored on that tool's
+task. A direct request or a different caller is rejected. This check establishes
+the origin of the assignment. The run-lifetime policy below covers later changes
+in authority.
+
 Since 0.11.1 a delegated or cloned child conversation is owned by a background
 worker task, `dispatch.delegation.OWNER.worker`, not by the tool call that
 asked for it. That task is owned by the coordinator's conversation and has no

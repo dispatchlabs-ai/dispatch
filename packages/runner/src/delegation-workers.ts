@@ -1,9 +1,9 @@
 import { Type } from "typebox";
 import { withCancel, type Context } from "@earendil-works/chord/context";
 import {
-  InboxDoc, configure, defineDoc, defineTask, defineTool,
+  AssistantEntry, InboxDoc, ToolTask, configure, defineDoc, defineTask, defineTool,
   type AgentChange, type ConversationId, type ModelRef,
-  type SubmissionId, type TaskId, type ToolExecutionApi, type ToolExecutionResult,
+  type SubmissionId, type TaskId, type ToolExecutionApi, type ToolExecutionResult, type ToolTaskInput,
 } from "@earendil-works/pi-durable";
 import { delegationResult } from "./delegation-receipts.js";
 import { recordRequestCancellation } from "./request-completion.js";
@@ -26,10 +26,42 @@ type WorkerInput = {
   fingerprint?: string; model?: ModelRef; thinking: string;
 };
 
+function workerKind(coordinator: string) {
+  return `dispatch.delegation.${coordinator}.worker`;
+}
+
+/** Resolve an owned worker's original assignment and the application tool that issued it. */
+export async function requireDelegatedTask(expected: { coordinator: string; agent: string; tool: string },
+  api: Pick<ToolExecutionApi, "conversationId" | "commit">, context: Context) {
+  const assignment = await api.commit(async tx => {
+    const owner = (await tx.conversation(api.conversationId))?.owner;
+    const worker = owner && await tx.task(owner.taskId);
+    if (!worker || worker.kind !== workerKind(expected.coordinator)) return;
+    const input = worker.input as WorkerInput;
+    if (input.agent !== expected.agent || !input.sourceTool || typeof input.task !== "string") return;
+
+    const delegate = await tx.task(input.sourceTool as TaskId);
+    if (delegate?.kind !== ToolTask.definition.name || delegate.conversationId !== worker.conversationId) return;
+    const nested = delegate.input as ToolTaskInput;
+    if (nested.kind !== "nested" || nested.call.name !== "delegate" || delegate.owner !== nested.parent) return;
+
+    const caller = await tx.task(nested.parent);
+    if (caller?.kind !== ToolTask.definition.name || caller.conversationId !== worker.conversationId) return;
+    const invocation = caller.input as ToolTaskInput;
+    if (invocation.kind !== "model") return;
+    const message = (await tx.entry(AssistantEntry, invocation.assistant))?.model?.[0];
+    if (message?.role !== "assistant" || !message.content.some(part =>
+      part.type === "toolCall" && part.id === invocation.callId && part.name === expected.tool)) return;
+    return { task: input.task, callerTaskId: caller.id };
+  }, context);
+  if (!assignment) throw new Error(`This operation requires ${expected.coordinator}'s ${expected.tool} tool to delegate to ${expected.agent}.`);
+  return assignment;
+}
+
 export function createDelegationWorkers(owner: string) {
   /** A background ownership boundary lets the foreground tool yield without abandoning its child. */
   const DelegationWorker = defineTask<WorkerInput, { phase: "answer" }, ToolExecutionResult>({
-    name: `dispatch.delegation.${owner}.worker`, version: 1, initial: () => ({ phase: "answer" }),
+    name: workerKind(owner), version: 1, initial: () => ({ phase: "answer" }),
     phases: {
       async answer(task, runtime, context) {
         const state = await runtime.snapshot(WorkerState, task.id, context);
