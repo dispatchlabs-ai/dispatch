@@ -15,12 +15,23 @@ export type MonitorSource = {
   find?(key: string, signal: AbortSignal): Promise<MonitorItem>;
   tools?: ToolRegistration[];
 };
-export type MonitorDestination = {
-  connection: string; maxTitleLength?: number; maxMessageLength?: number;
-  send(call: ReminderCall, event: { id: string; notice: ReminderNotice }, signal: AbortSignal,
-    beforeSend: () => Promise<void>): Promise<string>;
-  cancel(call: ReminderCall, id: string, signal?: AbortSignal): Promise<string>;
-};
+type NoticeEvent = { id: string; notice: ReminderNotice };
+type BoundDestination = { send(event: NoticeEvent, signal: AbortSignal | undefined, beforeSend: () => Promise<void>): Promise<string>;
+  cancel(id: string, signal?: AbortSignal): Promise<string> };
+export type MonitorDestination = { maxTitleLength?: number; maxMessageLength?: number } & (
+  | { connection: string;
+      send(call: ReminderCall, event: NoticeEvent, signal: AbortSignal | undefined, beforeSend: () => Promise<void>): Promise<string>;
+      cancel(call: ReminderCall, id: string, signal?: AbortSignal): Promise<string> }
+  | (BoundDestination & { connection?: undefined })
+);
+
+/** Bind the private MCP client only for destinations that use one. */
+export function bindDestination(destination: MonitorDestination, connect: (name: string) => ReminderCall): BoundDestination {
+  if (destination.connection === undefined) return destination;
+  const call = () => connect(destination.connection);
+  return { send: (event, signal, beforeSend) => destination.send(call(), event, signal, beforeSend),
+    cancel: (id, signal) => destination.cancel(call(), id, signal) };
+}
 export type MonitorOptions = {
   id: string; owner: string; source: MonitorSource; refreshEveryMinutes: number;
   briefing: { cron: string; timezone: string };
@@ -28,27 +39,7 @@ export type MonitorOptions = {
   deliverTo: MonitorDestination; prompt: string;
 };
 
-/** Attention's authenticated MCP contract; the host supplies the selected sender connection. */
-export function attentionAlerts(connection = "attention"): MonitorDestination {
-  const receipt = (id: string, result: Awaited<ReturnType<ReminderCall>>) => {
-    const text = result.content.find(block => block.type === "text")?.text;
-    if (result.isError) throw new Error(text || "Attention operation could not be confirmed.");
-    const value = result.structuredContent ?? JSON.parse(text ?? "null");
-    if (value?.event_id !== id || typeof value.status !== "string") throw new Error("Attention did not confirm the occurrence.");
-    return value.status;
-  };
-  return { connection, maxTitleLength: 120, maxMessageLength: 500,
-    async send(call, { id, notice }, signal, beforeSend) {
-      return receipt(id, await call("send_alert", { event_id: id, ...notice }, signal, beforeSend));
-    },
-    async cancel(call, id, signal) {
-      const status = receipt(id, await call("cancel_alert", { event_id: id, reason: "source_resolved_or_monitor_stopped" }, signal));
-      if (status !== "cancelled") throw new Error("Attention did not confirm cancellation.");
-      return status;
-    },
-  };
-}
-type MonitorExtension = Extension & { monitorConnections: { review: string[]; destination: string }; bindMonitor(host: PrivateReviewHost): Extension };
+type MonitorExtension = Extension & { monitorConnections: { review: string[]; destination?: string }; bindMonitor(host: PrivateReviewHost): Extension };
 export function isMonitor(extension: Extension): extension is MonitorExtension {
   return "bindMonitor" in extension && typeof extension.bindMonitor === "function" && "monitorConnections" in extension;
 }
@@ -80,6 +71,7 @@ export function monitors(options: MonitorOptions): MonitorExtension {
 
 function bind(options: MonitorOptions, host: PrivateReviewHost): Extension {
   const { owner, source, deliverTo } = options;
+  const destination = bindDestination(deliverTo, host.call);
   const prefix = host.namespace + ".monitor." + hash([host.agent, options.id, owner]);
   const interval = options.refreshEveryMinutes * 60_000;
   const state = defineDoc<Ledger>({ kind: prefix, version: 1, scope: "session", checkpointWhen: () => false,
@@ -183,7 +175,7 @@ function bind(options: MonitorOptions, host: PrivateReviewHost): Extension {
           const outdated = Object.values(saved!.deliveries).filter(delivery => delivery.status !== "cancelled"
             && delivery.cases.some(id => !relevant(delivery, saved!.cases[id])));
           for (const delivery of outdated) {
-            const receipt = await deliverTo.cancel(host.call(deliverTo.connection), delivery.id, runtime.signal);
+            const receipt = await destination.cancel(delivery.id, runtime.signal);
             await runtime.commit(async tx => {
               const saved = await tx.doc(state), record = saved.deliveries[delivery.id];
               if (record.status === "pending") for (const key of record.cases) if (saved.cases[key]?.status === "open")
@@ -260,7 +252,7 @@ function bind(options: MonitorOptions, host: PrivateReviewHost): Extension {
               withdrawn = delivery.cases.some(id => !relevant(delivery, saved.cases[id]));
             }, ctx);
             if (withdrawn) {
-              const receipt = await deliverTo.cancel(host.call(deliverTo.connection), id, runtime.signal);
+              const receipt = await destination.cancel(id, runtime.signal);
               await runtime.commit(async tx => {
                 const saved = await tx.doc(state), record = saved.deliveries[id];
                 for (const key of record.cases) if (saved.cases[key]?.status === "open") saved.cases[key][record.kind === "alert" ? "alerted" : "briefed"] = false;
@@ -276,7 +268,7 @@ function bind(options: MonitorOptions, host: PrivateReviewHost): Extension {
                 throw new Error("Monitor stopped or a request needs fresh review.");
             };
             await beforeSend();
-            const receipt = await deliverTo.send(host.call(deliverTo.connection), { id, notice: delivery.notice }, runtime.signal, beforeSend);
+            const receipt = await destination.send({ id, notice: delivery.notice }, runtime.signal, beforeSend);
             await runtime.commit(async tx => { const saved = await tx.doc(state), record = saved.deliveries[id];
               if (record.status === "pending") { record.status = receipt === "cancelled" ? "cancelled" : "delivered"; record.receipt = receipt; } delete saved.issues["delivery:" + task.id]; }, ctx);
           }
@@ -340,7 +332,7 @@ function bind(options: MonitorOptions, host: PrivateReviewHost): Extension {
         if (host.preview) throw new Error("Monitor preview is read-only.");
         await api.commit(async tx => { (await tx.doc(state)).scanner = null; }, ctx);
         for (const delivery of Object.values(saved?.deliveries ?? {})) if (delivery.status !== "cancelled") {
-          const receipt = await deliverTo.cancel(host.call(deliverTo.connection), delivery.id, ctx.abortSignal);
+          const receipt = await destination.cancel(delivery.id, ctx.abortSignal);
           await api.commit(async tx => { const item = (await tx.doc(state)).deliveries[delivery.id]; item.status = "cancelled"; item.receipt = receipt; }, ctx);
         }
         return output({ status: "stopped" });

@@ -24,6 +24,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./follow-ups": {
+      "types": "./dist/follow-ups.d.ts",
+      "import": "./dist/follow-ups.js"
     }
   },
   "dependencies": {

@@ -101,7 +101,7 @@ export async function run(options: RunOptions = {}) {
       }
       for (const extension of agent.extensions ?? []) if (isMonitor(extension)) {
         for (const name of extension.monitorConnections.review) { privateNames.add(name); reviewNames.add(name); }
-        if (!options.preview) privateNames.add(extension.monitorConnections.destination);
+        if (!options.preview && extension.monitorConnections.destination) privateNames.add(extension.monitorConnections.destination);
       }
       for (const child of agent.delegateAgents ?? []) collect(child);
       if (agent.handoffAgent) collect(agent.handoffAgent);

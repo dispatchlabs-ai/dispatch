@@ -10,7 +10,7 @@ export type PrivateReviewHost = {
   tools(selection: Record<string, string[]>): ToolRegistration[];
 };
 
-export function privateMonitor(id: string, review: string[], destination: string, bindMonitor: (host: PrivateReviewHost) => Extension) {
+export function privateMonitor(id: string, review: string[], destination: string | undefined, bindMonitor: (host: PrivateReviewHost) => Extension) {
   return { name: "monitor:" + id, monitorConnections: { review, destination }, bindMonitor };
 }
 

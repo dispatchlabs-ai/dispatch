@@ -11,6 +11,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./monitor": {
+      "types": "./dist/monitor.d.ts",
+      "import": "./dist/monitor.js"
     }
   },
   "files": [

@@ -230,7 +230,7 @@ For event-driven notifications, add [reviewed reminders](docs/reminders.md) in t
 For an owner-selected topic across sources, [persistent follow-ups](docs/follow-ups.md) can alert on the first qualifying reply and track each outstanding question through a confirmed answer.
 
 For ongoing requests, use [attention monitors](docs/monitors.md): deterministic
-SlackGo polling, private per-thread research, individual request state, consolidated
+Slack Web API polling, private per-thread research, individual request state, consolidated
 alerts and scheduled briefings, with owner-only preview and controls.
 
 ## MCP connections

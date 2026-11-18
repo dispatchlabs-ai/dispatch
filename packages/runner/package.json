@@ -59,10 +59,6 @@
     "./follow-ups": {
       "types": "./dist/follow-ups.d.ts",
       "import": "./dist/follow-ups.js"
-    },
-    "./slack-monitor": {
-      "types": "./dist/slack-monitor.d.ts",
-      "import": "./dist/slack-monitor.js"
     }
   },
   "bin": {

@@ -7,6 +7,7 @@ import lockfile from "proper-lockfile";
 import type { Models } from "@earendil-works/pi-ai/models";
 import type { LoadedAgent } from "./definition.js";
 import { connectMcpServers, type McpServers } from "./mcp.js";
+import { bindDestination, type MonitorDestination } from "./monitors.js";
 import { privateStateDirectory } from "./private-state.js";
 import type { ReviewRun } from "./run-evidence.js";
 import { githubPublisher, type ReviewPull } from "./review-github.js";
@@ -49,24 +50,28 @@ async function locked<T>(directory: string, signal: AbortSignal | undefined, fn:
   }
 }
 
-async function notify(config: Config, connection: string, repository: string, pull: ReviewPull, directory: string, signal?: AbortSignal) {
+async function notify(config: Config, module: string, repository: string, pull: ReviewPull, directory: string, signal?: AbortSignal) {
   if (pull.state !== "open" || !pull.draft) return;
   const id = "dispatch.eval." + hash(repository) + ".pr." + pull.number;
-  const receipt = join(directory, hash(connection) + "-pr-" + pull.number + ".json");
+  const specifier = module.startsWith(".") ? pathToFileURL(resolve(config.root, module)).href : module;
+  const destination = (await import(specifier)).default as MonitorDestination;
+  if (!destination || typeof destination.send !== "function") throw new Error("The PR notification module must export a destination.");
+  // Preserve receipts from a previously configured recipient-bound connection.
+  const receipt = join(directory, hash(destination.connection ?? module) + "-pr-" + pull.number + ".json");
   if (await saved(receipt)) return;
   const publisher = await githubPublisher(repository, config.root, signal);
   const live = await publisher.find(pull.branch);
   if (!live || live.number !== pull.number || live.state !== "open" || !live.draft) return;
-  const mcp = await connectMcpServers(config.mcpServers ?? {}, { cwd: config.cwd ?? config.root, names: [], privateNames: [connection] });
+  const mcp = destination.connection ? await connectMcpServers(config.mcpServers ?? {}, {
+    cwd: config.cwd ?? config.root, names: [], privateNames: [destination.connection],
+  }) : undefined;
   try {
-    const result = await mcp.reminderCall(connection)("send_alert", { event_id: id, title: "Draft PR ready for review",
-      message: `Review proposal #${pull.number} in ${repository}.`, link: pull.url }, signal);
-    if (result.isError) throw new Error("The notification service declined the PR alert.");
-    const content = result.content.find(c => c.type === "text");
-    const value = (result.structuredContent ?? (content?.type === "text" ? JSON.parse(content.text) : null)) as { event_id?: string; status?: string } | null;
-    if (!value || value.event_id !== id || !value.status) throw new Error("The notification service did not confirm this event ID.");
-    await saveJson(receipt, value);
-  } finally { await mcp.close(); }
+    const sink = bindDestination(destination, name => mcp!.reminderCall(name));
+    const status = await sink.send({ id, notice: { title: "Draft PR ready for review",
+      message: `Review proposal #${pull.number} in ${repository}.`, link: pull.url } }, signal, async () => { signal?.throwIfAborted(); });
+    if (!status) throw new Error("The notification destination did not confirm delivery.");
+    await saveJson(receipt, { event_id: id, status });
+  } finally { await mcp?.close(); }
 }
 
 export function configuredReviewActions(config: Config): RunReviewActions | undefined {
@@ -75,7 +80,7 @@ export function configuredReviewActions(config: Config): RunReviewActions | unde
   const repository = policy && repositoryName(policy.openDraftPR.repository);
   const paths = policy?.openDraftPR.paths ?? ["."];
   const destination = policy?.onPROpened?.notify;
-  if (policy?.onPROpened && (!destination || !config.mcpServers?.[destination])) throw new Error("Select a configured recipient-bound notification connection.");
+  if (policy?.onPROpened && !destination?.trim()) throw new Error("Select a recipient-bound notification module.");
   const appRoot = resolve(config.root);
   return async (input, signal, prepareOnly = false) => {
     const text = await readFile(input.report, "utf8");

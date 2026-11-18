@@ -7,31 +7,33 @@ delivery payloads in the application's existing store.
 
 ```ts
 import { defineAgent } from "@dispatch/runner";
-import { monitors, attentionAlerts } from "@dispatch/runner/monitors";
-import { slackGo } from "@dispatch/runner/slack-monitor";
+import { monitors } from "@dispatch/runner/monitors";
+import { slackMonitor } from "@dispatch/slack/monitor";
+import notifications from "./notifications.js";
 
 export default defineAgent({
   skills: true,
   extensions: [monitors({
     id: "attention-monitor", owner: "riley",
-    source: slackGo({ workspaces: ["example-team"] }),
+    source: slackMonitor({ workspaces: ["example-team"], credentialsFile: "slack-monitor.local.json" }),
     refreshEveryMinutes: 5,
     briefing: { cron: "30 8,16 * * 1-5", timezone: "America/New_York" },
     reviewTools: {},
-    deliverTo: attentionAlerts("notifications"),
+    deliverTo: notifications,
     prompt: "Research each distinct request. Alert for a ready decision that needs Riley today; queue less urgent decisions for the briefing. Record work owned by others and resolve only the specifically answered request.",
   })],
 });
 ```
 
-Keep the normal npm application and host commands. Enroll the owner in the
-[user directory](../README.md). Install SlackGo on the host and sign into the selected
-workspaces. Optional `command` and `credentialsFile` settings select its executable
-and private credential file. Configure the destination's authenticated MCP
-connection in `host.json`; `attentionAlerts` needs `send_alert` and `cancel_alert`.
-Credentials stay outside the agent definition. Other destinations implement
-`MonitorDestination` and must support idempotent delivery and cancellation of
-uncertain sends by the original occurrence ID.
+Enroll the owner in the [user directory](../README.md) and configure a
+[Slack user grant](../../slack/README.md#read-only-monitoring) for each selected workspace.
+
+The application's `notifications.js` exports a recipient-bound `MonitorDestination`.
+Its `send(event, signal, beforeSend)` calls `beforeSend()` immediately before delivery,
+uses `event.id` as the idempotency key, and returns the confirmed provider status.
+Its `cancel(id, signal)` withdraws that occurrence even if a previous send had an
+uncertain outcome. A destination using MCP declares its private `connection` name
+and receives the bound tool-call function as its first argument to both methods.
 
 Run `npx dispatch preview --agent assistant --no-web`, then
 `npx dispatch chat --preview assistant --as riley`. Ask to preview

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Provide read-only Gmail thread and search sources for persistent follow-ups using an authorized mailbox and the existing OAuth credential format.
+
 ## [0.13.0] - 2026-11-13
 
 - Prepare a public reusable package. Use shared host input admission policy while retaining per-thread delivery and attachment identities.

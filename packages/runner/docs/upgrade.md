@@ -26,6 +26,16 @@ an older runtime at state it cannot read. Deployment, backups and rollback belon
 to the application operator. Dispatch supplies no machine upgrade or migration
 machinery. Publishing source does not upgrade any running installation.
 
+## Upgrading monitors from 0.35
+
+Move the Slack monitor import to `slackMonitor` from `@dispatch/slack/monitor`
+and configure its [workspace user grants](../../slack/README.md#read-only-monitoring).
+Keep existing monitor IDs, workspace aliases, source names and saved state.
+Supply your recipient-bound [notification destination](monitors.md) to `deliverTo`.
+For draft PR alerts, change `onPROpened.notify` from the connection name to the
+module that exports that destination. Keeping its MCP connection name preserves
+existing PR delivery receipts.
+
 ## Upgrading from 0.18 to 0.19
 
 Version 0.19 adds `dispatch login`, `dispatch auth`, `dispatch logout` and

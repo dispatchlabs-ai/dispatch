@@ -34,6 +34,27 @@ Install both `files:write` and `files:read` scopes and reauthorize existing apps
 Native upload identities survive retries; success requires a matching Slack
 file/thread receipt. Text replies and image observations are not file delivery.
 
+## Read-only monitoring
+
+`slackMonitor({ workspaces: ["example-team"], credentialsFile: "slack-monitor.local.json" })`
+from `@dispatch/slack/monitor` supplies the source for a [reviewed monitor](../runner/docs/monitors.md).
+Its `followUp` source reads a selected `workspace:channel:root_timestamp` thread.
+Both use the Slack Web API and can run without starting the chat transport.
+
+Install a Slack app with user OAuth scopes for the conversations being read.
+Workspace search uses `search:read`, author names use `users:read`, and thread
+reads use the applicable `channels:history`, `groups:history`, `im:history` and
+`mpim:history` scopes. Complete user authorization in each workspace. Record
+the authorized user's team and user IDs and token in an owner-only file (mode
+`0600`). The reader verifies both IDs with `auth.test` before reading.
+
+```json
+{ "example-team": { "teamId": "TEAM_ID", "userId": "USER_ID", "userToken": "USER_OAUTH_TOKEN" } }
+```
+
+Slack visibility, search indexing and rate limits apply. A failed read reports
+incomplete coverage for that workspace. See Slack's [search](https://docs.slack.dev/reference/methods/search.messages/) and [thread history](https://docs.slack.dev/reference/methods/conversations.replies/) contracts.
+
 ## Package and host contract
 
 Install the matching prepared package archive beside Runner. `createAdapter(options)`

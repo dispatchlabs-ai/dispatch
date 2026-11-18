@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Move Slack monitoring to the optional Slack package. Monitors, follow-ups and draft PRs use the application’s recipient-bound notification destination. See the [0.35 upgrade notes](docs/upgrade.md#upgrading-monitors-from-035).
+
 ## [0.35.0] - 2026-11-18
 
 - Application tools can verify a user's private request with `requirePrivateUser` and read the originating tool and task of an owned assignment with `requireDelegatedTask`.

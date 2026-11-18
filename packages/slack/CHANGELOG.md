@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Read monitored workspaces and named follow-up threads through the Slack Web API with a verified user OAuth grant for each workspace.
+
 ## [0.23.0] - 2026-11-16
 
 - Resolve authenticated workspace members through the shared roster and attribute cross-client posts to their authors.

@@ -96,14 +96,14 @@ An application can select a review policy once in its host file:
 {
   "onActionableReview": {
     "openDraftPR": { "repository": "example-org/example-agents", "paths": ["agents", "skills"] },
-    "onPROpened": { "notify": "review-alerts" }
+    "onPROpened": { "notify": "./notifications.js" }
   }
 }
 ```
 
 With `DISPATCH_EVAL=1 npm start`, a complete review can propose a small edit to current committed application files. The publisher requires Git and GitHub CLI access to the selected repository with Contents and Pull requests write permissions. It checks the edits against the source and runs `git diff --check`. Its only branch write is creating a new `dispatch-eval/…` reference, and it opens a draft against the default branch. GitHub credentials with Contents write may have broader permissions than this operation. Repository-level rules can restrict that credential independently. Source files provide evidence to a proposer with no shell or publishing tools. Choose the application paths it may edit. A compatible GitHub plan is required for native drafts.
 
-The optional notification names a recipient-bound MCP connection from `mcpServers`. Its `send_alert` tool receives `event_id`, `title`, `message` and the confirmed HTTPS PR `link` and acknowledges that ID. An existing proposal uses the same notification ID. Remove `onPROpened` to keep PRs without alerts. Remove `onActionableReview` for saved reviews only.
+The optional `notify` setting names an application module (relative to the app root) or an installed package. Its default export is the same recipient-bound [notification destination](monitors.md) used by monitors. It receives a stable event ID and the confirmed HTTPS draft PR link. Returning a provider receipt records delivery. Omit `onPROpened` for proposals without notifications, or omit `onActionableReview` for saved reviews only.
 
 A custom policy can set `"onReviewComplete": "./review-completed.mjs"`. Export a default function conforming to `ReviewCompletedHandler` from `@dispatch/runner`. It receives the agent, stable review ID, run boundaries, private report path and text, coverage status, and an abort signal. The host saves its receipt after the handler returns. Use the review ID as the idempotency key for external effects.
 
