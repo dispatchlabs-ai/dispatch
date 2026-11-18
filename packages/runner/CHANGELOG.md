@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-11-18
+
 - Application tools can verify a user's private request with `requirePrivateUser` and read the originating tool and task of an owned assignment with `requireDelegatedTask`.
 
 ## [0.34.0] - 2026-11-18
