@@ -95,7 +95,7 @@ export function slackMonitor(options: { workspaces: string[]; credentialsFile: s
       }
       const next = response_metadata?.next_cursor ?? (messages.pagination as { next_cursor?: string } | undefined)?.next_cursor;
       if (!next) {
-        if (messages.total === undefined || matches.length < messages.total) throw new Error("Slack search coverage is incomplete.");
+        if (messages.total !== undefined && matches.length < messages.total) throw new Error("Slack search coverage is incomplete.");
         return matches;
       }
       if (next === cursor || cursors.has(next)) throw new Error("Slack search pagination did not advance.");
