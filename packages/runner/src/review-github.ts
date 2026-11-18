@@ -62,16 +62,19 @@ export async function githubPublisher(repository: string, cwd: string, signal?: 
       if (prior) return prior;
       const parent = await current();
       if (parent.sha !== baseCommit) throw new Error("The default branch advanced. Prepare the proposal against its current contents.");
-      const tree = await api<{ sha: string }>("/git/trees", { base_tree: parent.commit.tree.sha,
+      const treeFor = (baseTree: string) => api<{ sha: string }>("/git/trees", { base_tree: baseTree,
         tree: files.map(({ path, mode, content }) => ({ path, mode, type: "blob", content })) });
       // Only create a new reference. On a retry, verify the existing branch still represents this exact edit.
       const refs = await api<{ ref: string; object: { sha: string } }[]>("/git/matching-refs/heads/" + branch);
       const ref = refs.find(r => r.ref === "refs/heads/" + branch);
       async function verifyHead() {
         const remote = await api<{ tree: { sha: string }; parents: { sha: string }[] }>("/git/commits/" + (await api<{ object: { sha: string } }>("/git/ref/heads/" + branch)).object.sha);
-        if (remote.tree.sha !== tree.sha || remote.parents[0]?.sha !== parent.sha) throw new Error("A different commit already owns the proposal branch.");
+        if (remote.parents.length !== 1) throw new Error("A different commit already owns the proposal branch.");
+        const original = await api<{ tree: { sha: string } }>("/git/commits/" + remote.parents[0].sha);
+        if ((await treeFor(original.tree.sha)).sha !== remote.tree.sha) throw new Error("A different edit already owns the proposal branch.");
       }
       if (!ref) {
+        const tree = await treeFor(parent.commit.tree.sha);
         const commit = await api<{ sha: string }>("/git/commits", { message: title, parents: [parent.sha], tree: tree.sha });
         try { await api("/git/refs", { ref: "refs/heads/" + branch, sha: commit.sha }); }
         catch (error) { await verifyHead().catch(() => { throw error; }); }

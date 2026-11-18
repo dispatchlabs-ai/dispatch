@@ -110,8 +110,9 @@ export function configuredReviewActions(config: Config): RunReviewActions | unde
           const planFile = join(directory, "proposal.json");
           const context = hash(JSON.stringify([proposalRevision, paths, open.map(p => [p.number, p.title])]));
           const cache = await saved<{ base: string; context: string; decision: Decision }>(planFile);
-          const decision = cache?.base === base && cache.context === context
-            ? cache.decision : await proposeReview(source, text, open, input.models, input.model, signal);
+          const reusable = cache?.context === context && (cache.base === base ||
+            cache.decision.kind === "change" && await source.unchanged(cache.base, cache.decision.proposal.edits.map(edit => edit.path)));
+          const decision = reusable ? cache.decision : await proposeReview(source, text, open, input.models, input.model, signal);
           if (decision.kind === "skip") result = { kind: "skip", reason: decision.reason };
           else if (decision.kind === "existing") {
             const pull = open.find(p => p.number === decision.number);

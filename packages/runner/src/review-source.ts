@@ -66,6 +66,12 @@ export async function reviewSource(origin: string, base: string, paths: string[]
       return value;
     };
     return { base, files: [...entries.keys()], read, close,
+      async unchanged(since: string, files: string[]) {
+        if (!/^[a-f0-9]{40,64}$/.test(since) || !files.length || files.some(path => !entries.has(path))) return false;
+        const list = (rev: string) => run(["--literal-pathspecs", "ls-tree", "-z", rev, "--", ...files]);
+        try { return await list(since) === await list(base); }
+        catch { signal?.throwIfAborted(); return false; }
+      },
       async stage(proposal: Proposal) {
         const changes = new Map<string, string>();
         for (const { path, before, after } of proposal.edits) {
