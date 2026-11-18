@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-11-18
+
 - Keep preview passwords in a private temporary file instead of printing them to terminal logs.
 
 ## [0.37.0] - 2026-11-18

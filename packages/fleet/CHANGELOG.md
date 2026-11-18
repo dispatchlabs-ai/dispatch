@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-11-18
+
 - Confine receipt-file access to the private state directory and construct inference requests from the configured origin and validated route components, rejecting dot-segment connection IDs.
 
 ## [0.13.0] - 2026-11-13

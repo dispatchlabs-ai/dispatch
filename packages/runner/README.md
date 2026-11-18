@@ -22,7 +22,7 @@ source checkout are optional. In a new application directory:
 
 ```sh
 npm init -y --init-type=module
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.37.0/dispatch-runner-0.37.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.38.0/dispatch-runner-0.38.0.tgz
 ```
 
 An existing npm application only needs the install command. Creating a local

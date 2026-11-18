@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-11-18
+
 - Group draft proposals by top-level run, compare findings with current open PR diffs and allow hosts to pause publication while retaining reviews.
 
 ## [0.37.0] - 2026-11-18

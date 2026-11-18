@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-11-18
+
 - Parse CA certificate bundles without a backtracking regular expression, preserving certificate and surrounding-content validation.
 
 ## [0.8.0] - 2026-11-12
