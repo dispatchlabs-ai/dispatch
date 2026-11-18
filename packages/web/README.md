@@ -59,8 +59,8 @@ while streaming and in saved history. It starts open. No section is invented for
 responses without summary text; redacted content and opaque replay signatures
 are not displayed. CLI and Web read the same native summaries.
 
-Actual tool inputs/results and native status are expandable in the corresponding
-turn; parallel calls retain distinct identities. Missing result is never success.
+Open **Tool activity** to see the calls for a turn, then select a call for its
+input, result and native status. Progress notes appear directly in the chat.
 Use Attach files for UTF-8 text/Markdown/CSV/JSON/source documents and PNG/JPEG/WebP
 images; preview/remove files before Send. Images require an image-capable authored
 model. Unsupported PDF/Office/binary files are explicitly rejected. Native input

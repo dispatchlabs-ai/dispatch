@@ -6,9 +6,46 @@ import { CodeBlock, CodeBlockContent } from './ui/code-block';
 import type { ToolCall } from '@/lib/contracts';
 const title = (call: ToolCall) => {if(call.name==='request_status')return 'Request status';const input=call.input as Record<string,unknown> | undefined;const detail=input?.command ?? input?.path ?? input?.query;return typeof detail==='string' ? `${call.name} · ${detail.split('\n')[0]}` : call.name;};
 const formatted = (value: unknown) => typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+export function ToolActivity({calls}: {calls: ToolCall[]}) {
+  const failures = calls.filter(call => call.status === 'failed').length;
+  return <Trace className="tool-trace">
+    <TraceCollapsible>
+      <TraceCollapsibleTrigger>
+        <TraceLine>
+          <TraceIcon><Terminal/></TraceIcon>
+          <TraceTitle>Tool activity</TraceTitle>
+          <TraceDescription>{calls.length.toLocaleString()} {calls.length === 1 ? 'call' : 'calls'}{failures > 0 && ` · ${failures} failed`}</TraceDescription>
+        </TraceLine>
+      </TraceCollapsibleTrigger>
+      <TraceCollapsibleContent><ToolTrace calls={calls}/></TraceCollapsibleContent>
+    </TraceCollapsible>
+  </Trace>;
+}
 export function ToolTrace({calls}: {calls: ToolCall[]}) {
   if (!calls.length) return null;
-  return <Trace className="tool-trace" aria-label="Native tool calls">{calls.map(call => <TraceCollapsible key={call.id}><TraceCollapsibleTrigger><TraceLine status={call.status === 'failed' ? 'error' : call.status === 'running' ? 'running' : undefined}><TraceIcon>{call.status === 'completed' ? <Check/> : call.status === 'running' ? <LoaderCircle className="animate-spin"/> : call.status === 'cancelled' ? <CircleStop/> : call.status === 'pending' || call.status === 'waiting' ? <Clock/> : call.status === 'failed' ? <CircleAlert/> : <Terminal/>}</TraceIcon><TraceTitle title={title(call)}>{title(call)}</TraceTitle><TraceDescription>{call.status === 'unavailable' ? 'No retained result' : call.status === 'completed' ? 'Recorded' : call.status}</TraceDescription></TraceLine></TraceCollapsibleTrigger><TraceCollapsibleContent><small>Call {call.callId} · native entry {call.entryId} · turn {call.turnId}{call.parentCallId ? ` · child of ${call.parentCallId}` : ""}</small>{[['Input',call.input],['Result',call.output],['Details',call.details],['Live output',call.progress]].map(([title,value]) => value !== undefined && <CodeBlock key={title as string}><strong>{title as string}</strong><CodeBlockContent wrap>{formatted(value)}</CodeBlockContent></CodeBlock>)}{call.output === undefined && <p>{call.status === 'running' || call.status === 'pending' || call.status === 'waiting' ? 'Awaiting a native result.' : 'Result payload unavailable. This does not establish success or cancellation.'}</p>}</TraceCollapsibleContent></TraceCollapsible>)}</Trace>;
+  return <Trace className="tool-trace" aria-label="Native tool calls">
+    {calls.map(call => <TraceCollapsible key={call.id}>
+      <TraceCollapsibleTrigger>
+        <TraceLine status={call.status === 'failed' ? 'error' : call.status === 'running' ? 'running' : undefined}>
+          <TraceIcon>{call.status === 'completed' ? <Check/> : call.status === 'running' ? <LoaderCircle className="animate-spin"/> : call.status === 'cancelled' ? <CircleStop/> : call.status === 'pending' || call.status === 'waiting' ? <Clock/> : call.status === 'failed' ? <CircleAlert/> : <Terminal/>}</TraceIcon>
+          <TraceTitle title={title(call)}>{title(call)}</TraceTitle>
+          <TraceDescription>{call.status === 'unavailable' ? 'No retained result' : call.status === 'completed' ? 'Recorded' : call.status}</TraceDescription>
+        </TraceLine>
+      </TraceCollapsibleTrigger>
+      <TraceCollapsibleContent><CallDetails call={call}/></TraceCollapsibleContent>
+    </TraceCollapsible>)}
+  </Trace>;
+}
+
+function CallDetails({call}: {call: ToolCall}) {
+  const fields = [['Input', call.input], ['Result', call.output], ['Details', call.details], ['Live output', call.progress]] as const;
+  return <>
+    <small>Call {call.callId} · native entry {call.entryId} · turn {call.turnId}{call.parentCallId ? ` · child of ${call.parentCallId}` : ''}</small>
+    {fields.map(([label, value]) => value !== undefined && <CodeBlock key={label}>
+      <strong>{label}</strong><CodeBlockContent wrap>{formatted(value)}</CodeBlockContent>
+    </CodeBlock>)}
+    {call.output === undefined && <p>{call.status === 'running' || call.status === 'pending' || call.status === 'waiting' ? 'Awaiting a native result.' : 'Result payload unavailable. This does not establish success or cancellation.'}</p>}
+  </>;
 }
 /** A background reply's supporting material (native publishReply details): one collapsed row; Markdown mounts when opened. */
 export function ReplyDetails({details}: {details: {label: string; text: string}}) {

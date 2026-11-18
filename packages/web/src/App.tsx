@@ -14,7 +14,7 @@ import { MessageScrollerItem } from '@/components/ui/message-scroller';
 import { Bubble, BubbleContent } from '@/components/ui/bubble';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group';
 import { Attachment, AttachmentMedia, AttachmentContent, AttachmentTitle } from '@/components/ui/attachment';
-import { ToolTrace, TaskInput, ReplyDetails } from '@/components/tool-trace';
+import { ToolActivity, ToolTrace, TaskInput, ReplyDetails } from '@/components/tool-trace';
 import { ItemContext } from '@/components/item-context';
 import { ConversationSidebar } from '@/components/conversation-sidebar';
 import { agentName, installationName } from '@/lib/names';
@@ -30,6 +30,51 @@ const authorAgent = (agent: string, author?: string) => {
 const authorKey = (agent: string, message: Snapshot['messages'][number]) => message.provenance === 'user' ? `user:${message.userId ?? ''}` : `agent:${authorAgent(agent, message.author)}`;
 // Task inputs render as collapsed rows; other entries need visible content (no empty turns).
 const visibleMessage = (message: Snapshot['messages'][number]) => message.provenance === 'runtime' ? !!message.text : !!(message.text || message.thinking || message.commentary || message.error || message.attachments?.length || message.artifacts?.length);
+type ConversationItem =
+  | { kind: 'message'; message: Snapshot['messages'][number]; continued: boolean }
+  | { kind: 'activity'; turnId: string; calls: ToolCall[] };
+
+function conversationItems(snapshot: Snapshot) {
+  const items: ConversationItem[] = [];
+  const byMessage = new Map<string, ToolCall[]>();
+  for (const call of snapshot.toolCalls ?? []) {
+    if (call.name === 'request_status') continue;
+    const calls = byMessage.get(call.afterMessageId);
+    if (calls) calls.push(call);
+    else byMessage.set(call.afterMessageId, [call]);
+  }
+
+  // Place a turn's disclosure at its first call and keep the native message order inside it.
+  const byTurn = new Map<string, ToolCall[]>();
+  function addCalls(calls: ToolCall[]) {
+    for (const call of calls) {
+      const group = byTurn.get(call.turnId);
+      if (group) group.push(call);
+      else {
+        const first = [call];
+        byTurn.set(call.turnId, first);
+        items.push({ kind: 'activity', turnId: call.turnId, calls: first });
+      }
+    }
+  }
+
+  let previousAuthor: string | undefined;
+  for (const message of snapshot.messages) {
+    if (visibleMessage(message)) {
+      const runtime = message.provenance === 'runtime';
+      const author = authorKey(snapshot.chat.agent, message);
+      items.push({ kind: 'message', message, continued: runtime ? items.length > 0 : author === previousAuthor });
+      if (!runtime) previousAuthor = author;
+    }
+    const calls = byMessage.get(message.id);
+    if (calls) {
+      addCalls(calls);
+      byMessage.delete(message.id);
+    }
+  }
+  for (const calls of byMessage.values()) addCalls(calls);
+  return items;
+}
 // A background reply shows when it arrived (it may predate the conversation that follows), not a label.
 const sentAt = (at: number) => new Date(at).toLocaleString([], new Date(at).toDateString() === new Date().toDateString() ? { hour: 'numeric', minute: '2-digit' } : { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 // Touch keyboards have no Shift+Enter, so Return adds a line there and Send sends.
@@ -301,19 +346,6 @@ export default function App() {
   const outcome = lastTurn?.status === 'unanswered' ? lastTurn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${lastTurn.reason})` : '';
   const status = readingFiles ? 'Reading files…' : busy ? `${activity}${stopNotice?.id === selected ? ' · Stop requested' : ''}${snapshot?.queued ? ` · ${snapshot.queued} pending` : ''}` : selected && snapshot && connection !== 'Connected' ? connection : outcome;
   const failure = error || snapshot?.error;
-  const toolsByMessage = new Map<string, ToolCall[]>();
-  for (const call of snapshot?.toolCalls ?? []) {
-    if (call.name === 'request_status') continue;
-    const calls = toolsByMessage.get(call.afterMessageId) ?? [];
-    calls.push(call);
-    toolsByMessage.set(call.afterMessageId, calls);
-  }
-  // Tool-only assistant entries still anchor activity in the native conversation order.
-  const visible = (snapshot?.messages ?? []).filter(message => visibleMessage(message) || toolsByMessage.has(message.id)).map((message, index, all) => {
-    let previous = index - 1;
-    while (previous >= 0 && (all[previous].provenance === 'runtime' || !visibleMessage(all[previous]))) previous--;
-    return { message, continued: message.provenance === 'runtime' ? index > 0 : previous >= 0 && authorKey(snapshot!.chat.agent, all[previous]) === authorKey(snapshot!.chat.agent, message) };
-  });
   return <div className="app-shell">
     {navigation && <button className="nav-scrim" aria-label="Close conversation navigation" onClick={() => setNavigation(false)}/>}
     <aside style={narrow ? undefined : { width: Math.max(220, Math.min(sidebarWidth, viewportWidth - 360)) }} ref={sidebar} inert={narrow && !navigation} className={navigation ? 'sidebar open' : 'sidebar'} aria-label="Conversations">
@@ -340,14 +372,18 @@ export default function App() {
           {(!selected && !link || snapshot && !snapshot.messages.length && !snapshot.partial && !snapshot.partialThinking && !itemContext) && <ConversationEmptyState title={`Message ${agentName(snapshot?.chat.agent ?? agent) || 'an agent'}`} description=""/>}
           {link && !linkReady && <p className="empty-loading">Opening linked conversation…</p>}
           {selected && !snapshot && <p className="empty-loading">{connection}</p>}
-          {snapshot && visible.map(({ message, continued }) => !visibleMessage(message)
-            ? <MessageScrollerItem key={message.id} messageId={message.id} className={continued ? 'continued' : undefined}><ToolTrace calls={toolsByMessage.get(message.id) ?? []}/></MessageScrollerItem>
-            : message.provenance === 'runtime'
-            ? <MessageScrollerItem key={message.id} messageId={message.id} className={continued ? 'continued' : undefined}><TaskInput text={message.text}/><ToolTrace calls={toolsByMessage.get(message.id) ?? []}/></MessageScrollerItem>
+          {snapshot && conversationItems(snapshot).map(item => {
+            if (item.kind === 'activity') {
+              const id = `activity-${item.turnId}`;
+              return <MessageScrollerItem key={id} messageId={id}><ToolActivity calls={item.calls}/></MessageScrollerItem>;
+            }
+            const { message, continued } = item;
+            return message.provenance === 'runtime'
+            ? <MessageScrollerItem key={message.id} messageId={message.id} className={continued ? 'continued' : undefined}><TaskInput text={message.text}/></MessageScrollerItem>
             : <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.provenance === 'user'} className={continued ? 'continued' : undefined}><Message align={message.provenance === 'user' ? 'end' : 'start'}><MessageContent>
               {!continued && <span className="message-author"><Avatar user={message.provenance === 'user'} identity={authorAgent(snapshot.chat.agent, message.author)} available={avatars}/>{message.provenance === 'user' ? message.author ?? 'You' : message.author ?? agentName(snapshot.chat.agent)}</span>}
-              <Bubble align={message.provenance === 'user' ? 'end' : 'start'} variant={message.provenance === 'user' ? 'muted' : 'ghost'}><BubbleContent>{message.thinking && <ThinkingSummary text={message.thinking}/>} {message.background && message.at !== undefined && <p className="commentary"><time dateTime={new Date(message.at).toISOString()}>{sentAt(message.at)}</time></p>}{message.commentary && message.commentary.trim() !== message.text.trim() && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{snapshot.turns?.filter(turn => turn.status === 'unanswered' && String(turn.entryId) === message.id.split(':')[0]).map(turn => <p key={turn.submissionId} className="message-note">{turn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${turn.reason})`}</p>)}{message.attachments?.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt={file.name} src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle><a download={file.name} href={`data:${file.mimeType || 'text/plain'};base64,${file.data}`}>{file.name}</a></AttachmentTitle></AttachmentContent></Attachment>)}{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => snapshot.chat.capabilities?.artifacts === false ? <span key={artifact.id} className="artifact-link">{artifact.name} · Download unavailable</span> : <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</BubbleContent></Bubble></MessageContent></Message>{message.details && <ReplyDetails details={message.details}/>}<ToolTrace calls={toolsByMessage.get(message.id) ?? []}/></MessageScrollerItem>)}
-          {snapshot && <ToolTrace calls={(snapshot.toolCalls ?? []).filter(call=>call.name!=='request_status' && !snapshot.messages.some(message=>message.id===call.afterMessageId))}/>}
+              <Bubble align={message.provenance === 'user' ? 'end' : 'start'} variant={message.provenance === 'user' ? 'muted' : 'ghost'}><BubbleContent>{message.thinking && <ThinkingSummary text={message.thinking}/>} {message.background && message.at !== undefined && <p className="commentary"><time dateTime={new Date(message.at).toISOString()}>{sentAt(message.at)}</time></p>}{message.commentary && message.commentary.trim() !== message.text.trim() && <p className="commentary">{message.commentary}</p>}<MessageResponse>{message.text}</MessageResponse>{snapshot.turns?.filter(turn => turn.status === 'unanswered' && String(turn.entryId) === message.id.split(':')[0]).map(turn => <p key={turn.submissionId} className="message-note">{turn.reason === 'aborted' ? 'Stopped · this turn was not completed' : `Not answered (${turn.reason})`}</p>)}{message.attachments?.map((file,index)=><Attachment key={index} size="sm"><AttachmentMedia>{file.mimeType.startsWith('image/') ? <img alt={file.name} src={`data:${file.mimeType};base64,${file.data}`}/> : <FileText/>}</AttachmentMedia><AttachmentContent><AttachmentTitle><a download={file.name} href={`data:${file.mimeType || 'text/plain'};base64,${file.data}`}>{file.name}</a></AttachmentTitle></AttachmentContent></Attachment>)}{message.error && <p className="message-error">{message.error}</p>}{message.artifacts?.map(artifact => snapshot.chat.capabilities?.artifacts === false ? <span key={artifact.id} className="artifact-link">{artifact.name} · Download unavailable</span> : <a key={artifact.id} className="artifact-link" href={`${route(selected!)}/artifacts/${encodeURIComponent(artifact.id)}`}>Download {artifact.name}</a>)}</BubbleContent></Bubble></MessageContent></Message>{message.details && <ReplyDetails details={message.details}/>}</MessageScrollerItem>;
+          })}
           {(snapshot?.partial || snapshot?.partialThinking) && <Message align="start"><MessageContent><span className="message-author"><Avatar identity={snapshot.chat.agent} available={avatars}/>{agentName(snapshot.chat.agent)}</span>{snapshot.partialThinking && <ThinkingSummary text={snapshot.partialThinking}/>} {snapshot.partial && <MessageResponse>{snapshot.partial}</MessageResponse>}</MessageContent></Message>}
         </ConversationContent>
         <ConversationScrollButton aria-label="Scroll to latest message"/>

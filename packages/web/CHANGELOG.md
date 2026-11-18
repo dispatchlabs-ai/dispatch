@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Group each turn’s tool calls under one collapsed Tool activity row so progress notes stay visible.
+
 ## [0.38.0] - 2026-11-18
 
 - Keep preview passwords in a private temporary file instead of printing them to terminal logs.
