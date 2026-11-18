@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.38.1] - 2026-11-18
+
 - Send concurrent gateway model requests on independent streams or connections, including POSTs from parallel agent conversations.
 
 ## [0.38.0] - 2026-11-18
