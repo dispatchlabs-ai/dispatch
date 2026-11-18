@@ -44,7 +44,13 @@ For a new agents repo, follow the [Dispatch quickstart](../../README.md#quicksta
    JS
    ```
 
-3. Start Web from the same directory, using your real HTTPS origin. Keep these environment settings with your private deployment. If your host uses a configuration file, pass it to Web as usual, for example `npx dispatch-web --config host.json`.
+3. Start Web from the same agents repo, using your real HTTPS origin. Hosted Web needs an explicit connection to the running host. If you already pass `--config host.json` to your host, pass that same file to Web. For the single-agent quickstart, create `web-client.json` beside `agent.md` with this content:
+
+   ```json
+   { "stateRoot": ".state" }
+   ```
+
+   Keep these environment settings with your private deployment and substitute your configuration filename if it differs.
 
    ```sh
    export DISPATCH_ORIGIN=https://chat.example.com
@@ -53,7 +59,7 @@ For a new agents repo, follow the [Dispatch quickstart](../../README.md#quicksta
    export DISPATCH_AUTH_MODULE="$PWD/node_modules/@dispatch/web/dist/server/server/session-auth.js"
    export DISPATCH_SESSION_AUTH_FILE="$PWD/.state/web-auth/login.json"
    export DISPATCH_SESSION_STATE_FILE="$PWD/.state/web-auth/sessions.json"
-   npx dispatch-web
+   npx dispatch-web --config web-client.json
    ```
 
 4. If your agents repo uses a user roster, link the verified Web username to its person with a Web channel identity such as `{"channel":"web","scope":"https://chat.example.com","handle":"owner"}`, then restart the host. Open the HTTPS site in Safari on the iPhone and sign in to confirm the address and credentials. Use the same values in the app. [Hosted Web configuration](../../packages/web/docs/usage-guide.md#configuration) · [Shared human identities](../../packages/runner/docs/service.md#shared-human-identities)

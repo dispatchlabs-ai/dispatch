@@ -14,6 +14,10 @@ after relaunch, and both messages were visible in Dispatch Web in Safari.
 A development-signed Release build installed and launched on a physical iPhone
 running iOS 27.2.1. The authenticated chat interaction was exercised on the simulator.
 
+A second fresh quickstart application used the documented hosted Web commands
+with its ordinary `dispatch serve` host. The generated login opened its agent
+catalog over HTTPS. Anonymous access and reuse of the signed-out session returned 401.
+
 ## v0.30.0 Scheduled programs — November 17, 2026 UTC
 
 Real macOS calendar runs covered literal command arguments, application working
