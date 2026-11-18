@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
+import { setTimeout as delay } from "node:timers/promises";
 import { WebClient, WebAPIPlatformError } from "@slack/web-api";
 import { defineTool, type JsonObject } from "@earendil-works/pi-durable";
 import type { JsonValue } from "@earendil-works/chord/json";
@@ -26,7 +27,16 @@ export function slackMonitor(options: { workspaces: string[]; credentialsFile: s
     if (!entry || !entry.teamId || !entry.userId || !entry.userToken) throw new Error("Configure a Slack user OAuth grant for " + domain + ".");
     const client = new WebClient(entry.userToken, { retryConfig: { retries: 0 }, rejectRateLimitedCalls: true,
       maxRequestConcurrency: Infinity,
-      fetch: (url, init) => fetch(url, { ...init, signal: signal && init?.signal ? AbortSignal.any([signal, init.signal]) : signal ?? init?.signal }) });
+      fetch: async (url, init) => {
+        const requestSignal = signal && init?.signal ? AbortSignal.any([signal, init.signal]) : signal ?? init?.signal;
+        for (;;) {
+          const response = await fetch(url, { ...init, signal: requestSignal });
+          const retry = response.headers.get("retry-after");
+          if (response.status !== 429 || !retry || !/^\d+$/.test(retry)) return response;
+          await response.body?.cancel();
+          await delay(Number(retry) * 1000, undefined, { signal: requestSignal ?? undefined });
+        }
+      } });
     const auth = await client.auth.test();
     if (auth.team_id !== entry.teamId || auth.user_id !== entry.userId || auth.bot_id || !auth.url)
       throw new Error("Slack OAuth grant does not match the configured workspace and user.");
@@ -38,7 +48,7 @@ export function slackMonitor(options: { workspaces: string[]; credentialsFile: s
     const byId = new Map<string, Message>(), cursors = new Set<string>();
     let cursor: string | undefined;
     do {
-      const page = await auth.client.conversations.replies({ channel, ts: root, ...(cursor ? { cursor } : {}) });
+      const page = await auth.client.conversations.replies({ channel, ts: root, limit: 200, ...(cursor ? { cursor } : {}) });
       if (!Array.isArray(page.messages)) throw new Error("Slack returned an incomplete thread.");
       for (const message of page.messages) {
         const m = message as typeof message & { subtype?: string };
@@ -73,23 +83,23 @@ export function slackMonitor(options: { workspaces: string[]; credentialsFile: s
   }
 
   async function search(client: WebClient, query: string) {
-    const matches: JsonObject[] = [];
-    for (let page = 1; ; page++) {
-      const { messages } = await client.search.messages({ query, count: 100, sort: "timestamp", sort_dir: "asc", page });
+    const matches: JsonObject[] = [], cursors = new Set<string>();
+    let cursor = "*";
+    for (;;) {
+      const { messages, response_metadata } = await client.search.messages({ query, count: 100, sort: "timestamp", sort_dir: "asc", cursor });
       if (!messages || !Array.isArray(messages.matches)) throw new Error("Slack returned incomplete search results.");
       for (const m of messages.matches) {
-        const reply = m as typeof m & { thread_ts?: string };
+        const reply = m as typeof m & { thread_ts?: string; subtype?: string };
         matches.push({ ts: m.ts ?? null, channel: m.channel?.id ?? null, permalink: m.permalink ?? null,
-          thread_ts: reply.thread_ts ?? null, text: m.text ?? null, user: m.user ?? null });
+          thread_ts: reply.thread_ts ?? null, subtype: reply.subtype ?? null, text: m.text ?? null, user: m.user ?? null });
       }
-      const pages = messages.pagination?.page_count ?? messages.paging?.pages;
-      const current = messages.pagination?.page ?? messages.paging?.page;
-      if (messages.total === 0 && !matches.length) return matches;
-      if (pages === undefined || current !== page || messages.total === undefined) throw new Error("Slack search coverage is unknown.");
-      if (page >= pages) {
-        if (matches.length < messages.total) throw new Error("Slack search results were truncated.");
+      const next = response_metadata?.next_cursor ?? (messages.pagination as { next_cursor?: string } | undefined)?.next_cursor;
+      if (!next) {
+        if (messages.total === undefined || matches.length < messages.total) throw new Error("Slack search coverage is incomplete.");
         return matches;
       }
+      if (next === cursor || cursors.has(next)) throw new Error("Slack search pagination did not advance.");
+      cursors.add(next); cursor = next;
     }
   }
   async function find(key: string, signal: AbortSignal) {
@@ -105,7 +115,7 @@ export function slackMonitor(options: { workspaces: string[]; credentialsFile: s
       const baseline = typeof cursor === "string" ? cursor : checkpoint?.since;
       if (typeof baseline !== "string" || !Number.isFinite(Date.parse(baseline)))
         throw new Error("Slack monitoring requires an absolute initial checkpoint.");
-      const through = { ...object(checkpoint.through) }, seen = { ...object(checkpoint.threads) };
+      const through = { ...object(checkpoint.through) }, seen = { ...object(checkpoint.threads) }, pending = { ...object(checkpoint.pending) };
       // Each workspace owns its checkpoint: unavailable evidence cannot advance it or
       // prevent complete coverage of the other selected workspaces from committing.
       const results = await Promise.allSettled(options.workspaces.map(async domain => {
@@ -117,8 +127,9 @@ export function slackMonitor(options: { workspaces: string[]; credentialsFile: s
         const after = new Date(Date.parse(since) - 2 * 86_400_000).toISOString().slice(0, 10);
         const matches = await search(identity.client, "after:" + after);
         const roots = new Map<string, { channel: string; root: string; matches: JsonObject[] }>();
-        const prior = object(seen[domain]), signatures: JsonObject = {};
+        const prior = object(seen[domain]), retryThreads = object(pending[domain]), signatures: JsonObject = {};
         for (const match of matches) {
+          if (match.subtype === "channel_join" || match.subtype === "channel_leave") continue;
           if (typeof match.ts !== "string" || !Number.isFinite(Number(match.ts))) throw new Error("Slack search result has no timestamp.");
           if (Number(match.ts) * 1000 < Date.parse(baseline)) continue;
           const channel = match.channel;
@@ -130,16 +141,28 @@ export function slackMonitor(options: { workspaces: string[]; credentialsFile: s
           roots.get(key)!.matches.push({ ts: match.ts, text: match.text, user: match.user });
         }
         const tracked = new Set((active as Thread[]).filter(item => item.workspace === domain).map(item => item.channel + ":" + item.thread));
+        for (const key of Object.keys(retryThreads)) {
+          const [channel, root] = key.split(":");
+          if (!roots.has(key)) roots.set(key, { channel, root, matches: [] });
+        }
         for (const item of active as Thread[]) if (item.workspace === domain && !roots.has(item.channel + ":" + item.thread))
           roots.set(item.channel + ":" + item.thread, { channel: item.channel, root: item.thread, matches: [] });
-        const items: MonitorItem[] = [];
+        const items: MonitorItem[] = [], failures: JsonObject = {};
         for (const [key, { channel, root, matches }] of roots) {
           const signature = createHash("sha256").update(JSON.stringify(matches.sort((a, b) => Number(a.ts) - Number(b.ts)))).digest("hex");
-          if (tracked.has(key) || signature !== prior[key]) items.push(await thread(domain, channel, root, identity));
+          if (tracked.has(key) || signature !== prior[key] || Object.hasOwn(retryThreads, key)) {
+            try { items.push(await thread(domain, channel, root, identity)); }
+            catch (error) {
+              signal.throwIfAborted();
+              failures[key] = String(error);
+              continue;
+            }
+          }
           signatures[key] = signature;
         }
-        return { items, signatures, coverage: { workspace: domain, viewer: identity.viewer, since, through: started,
-          matches: matches.length, threads: roots.size, refreshed: items.length, complete: true } };
+        return { items, signatures, failures, coverage: { workspace: domain, viewer: identity.viewer, since, through: started,
+          scope: "Slack search index and tracked threads", matches: matches.length, threads: roots.size,
+          refreshed: items.length, complete: !Object.keys(failures).length } };
       }));
       signal.throwIfAborted();
       const items: MonitorItem[] = [], coverage: JsonObject[] = [], issues: string[] = [];
@@ -147,12 +170,14 @@ export function slackMonitor(options: { workspaces: string[]; credentialsFile: s
         const domain = options.workspaces[index];
         if (result.status === "fulfilled") {
           items.push(...result.value.items); coverage.push(result.value.coverage); through[domain] = started; seen[domain] = result.value.signatures;
+          pending[domain] = result.value.failures;
+          for (const [key, error] of Object.entries(result.value.failures)) issues.push(domain + ":" + key + ": " + error);
         } else {
           const error = domain + ": " + String(result.reason);
           issues.push(error); coverage.push({ workspace: domain, complete: false, error });
         }
       }
-      return { items, cursor: { since: baseline, through, threads: seen }, issues, coverage: { workspaces: coverage } };
+      return { items, cursor: { since: baseline, through, threads: seen, pending }, issues, coverage: { workspaces: coverage } };
     },
     async refresh(item, signal) {
       const selected = item as Thread;

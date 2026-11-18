@@ -6,7 +6,9 @@ import { authorizePrivateReview, privateMonitor, type PrivateReviewHost } from "
 import { reviewConversation } from "./review-conversation.js";
 
 /** Use the same message ID when a search and a named thread return the same evidence. */
-export type FollowUpMessage = { id: string; at: number; author: string; text: string; link: string; outbound?: boolean; automatic?: boolean };
+export type FollowUpMessage = { id: string; at: number; author: string; text: string; link: string; outbound?: boolean; automatic?: boolean;
+  /** The provider assigns a new ID for new content. Presentation changes do not revise a previously seen message. */
+  immutable?: true };
 export type FollowUpSource = {
   description: string;
   connection?: string;
@@ -75,7 +77,10 @@ function bind(options: FollowUpOptions, host: PrivateReviewHost) {
         if (!c || !active(c, runtime.taskId)) return runtime.commit(terminal, ctx);
         const { messages, coverage, issues } = await readSources(options, host, c.spec, runtime.signal);
         const fingerprints = Object.fromEntries(messages.map(m => [hash(m.id), hash(m)]));
-        const incoming = messages.filter(m => !m.outbound && !m.automatic && c.seen[hash(m.id)] !== fingerprints[hash(m.id)]);
+        const incoming = messages.filter(m => {
+          const key = hash(m.id), previous = c.seen[key];
+          return !m.outbound && !m.automatic && (previous === undefined || (!m.immutable && previous !== fingerprints[key]));
+        });
         let decision: Decision = { first: null, updates: [], message: "" };
         let error: string | null = null;
         if (incoming.length) {

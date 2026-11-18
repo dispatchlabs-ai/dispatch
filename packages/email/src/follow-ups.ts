@@ -45,7 +45,7 @@ export function gmailFollowUpSources(options: { accountsFile: string }): Record<
       result.push({ id: ["mail", a.alias, m.id].join(":"), at, author: mailHeader(m.payload, "From"),
         text: [subject, body.trim(), ...(files.length ? ["Attached: " + files.join(", ")] : [])].filter(Boolean).join("\n\n"),
         link: "https://mail.google.com/mail/u/" + encodeURIComponent(a.mailbox) + "/#all/" + encodeURIComponent(id),
-        outbound: !!m.labelIds?.includes("SENT"),
+        immutable: true, outbound: !!m.labelIds?.includes("SENT"),
         automatic: (!!submitted && !/^no(?:\s*;|$)/i.test(submitted)) || /^(?:automatic reply|auto(?:matic)?[- ]response|out[- ]of[- ]office)\s*:/i.test(subject) });
     }
     return result;

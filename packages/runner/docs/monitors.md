@@ -46,11 +46,12 @@ outstanding notifications; it does not approve their underlying requests.
 
 Polling continues while individual reviews run. A quiet source poll uses no
 inference. Search fingerprints avoid full reads of unchanged inactive threads. Full pagination and thread reads include read messages and replies;
-active requests are refreshed even without a search hit. Each workspace keeps its own checkpoint; failed coverage does not advance it or
-prevent successful workspaces from progressing. Slack search is an index, not a change stream:
-edits or deletions outside the overlapping search window and tracked threads
-are not guaranteed to be discovered. Missing threads are coverage failures,
-never evidence that a request was resolved.
+active requests are refreshed even without a search hit. A failed workspace search
+keeps its checkpoint. After a successful search, unreadable threads stay queued
+individually while other threads proceed. Coverage describes Slack’s search index
+and the tracked threads. Slack applies the user’s search filters and can group
+nearby matches. Use a named thread watch when every reply in that thread matters.
+A missing thread remains a coverage issue.
 
 An application can select additional read-only MCP tools with
 `reviewTools: { knowledge: ["search", "read"] }`, using the server's original tool
