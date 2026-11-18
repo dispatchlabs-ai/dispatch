@@ -331,7 +331,8 @@ for choosing what belongs in shared rules, role instructions and skills.
 
 To enable reusable skills for Developer, add `skills: true` to its existing
 `defineAgent` options. Put shared skills at `skills/NAME/SKILL.md`, or that agent's
-skills at `agents/developer/skills/NAME/SKILL.md`. For example:
+skills at `agents/developer/skills/NAME/SKILL.md`. To offer Developer only some
+skills, list their IDs instead, such as `skills: ["company/code-review"]`. For example:
 
 ```markdown
 ---

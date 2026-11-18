@@ -28,8 +28,8 @@ export type AgentDefinition = {
   mcp?: string[];
   /** Native coding tools, with a private checkout selected by the agent. */
   coding?: boolean;
-  /** Discover company skills and this agent's own skills. Opt-in for existing stores. */
-  skills?: boolean;
+  /** Company skills and this agent's own: true for the whole catalog, or the skill IDs this agent may read. Opt-in for existing stores. */
+  skills?: boolean | string[];
   /** Named agents available for native foreground delegation. */
   delegates?: string[];
   /** Fresh task-owned children inheriting the calling conversation's native agent configuration. */
@@ -62,6 +62,7 @@ export type LoadedAgent = AgentDefinition & {
 };
 
 export const agentName = /^[a-z][a-z0-9-]*$/;
+const skillId = /^(company|agent)\/[a-z][a-z0-9-]*$/;
 
 /** Optional preview.ts next to agent.md. Explicit tool or skill fixtures replace the live bindings. */
 export type AgentPreview = {
@@ -105,7 +106,11 @@ export function defineAgent(definition: AgentDefinition = {}): AgentDefinition &
     throw new Error("runImmediately must be a boolean.");
   }
   if (definition.coding !== undefined && typeof definition.coding !== "boolean") throw new Error("coding must be a boolean.");
-  if (definition.skills !== undefined && typeof definition.skills !== "boolean") throw new Error("skills must be a boolean.");
+  if (definition.skills !== undefined && typeof definition.skills !== "boolean" && !(Array.isArray(definition.skills)
+    && definition.skills.length && definition.skills.every(id => typeof id === "string" && skillId.test(id))
+    && new Set(definition.skills).size === definition.skills.length)) {
+    throw new Error("skills must be a boolean or a list of distinct skill IDs such as company/code-review.");
+  }
   if (definition.clones !== undefined && typeof definition.clones !== "boolean") throw new Error("clones must be a boolean.");
   if (definition.handoff && (!agentName.test(definition.handoff.target)
     || !Number.isSafeInteger(definition.handoff.progressEveryMs) || definition.handoff.progressEveryMs <= 0)) {
@@ -226,11 +231,12 @@ async function readDefinition(root: string, id: string, folder: string, ancestor
     ...(meta.progressNotes !== undefined ? { progressNotes: meta.progressNotes } : {}),
   });
   let skillCatalog = definition.skills ? await loadSkills(root, id) : [];
-  if (Array.isArray(preview?.skills)) {
+  const listed = Array.isArray(preview?.skills) ? preview.skills : Array.isArray(definition.skills) ? definition.skills : undefined;
+  if (listed) {
     const available = new Map(skillCatalog.map(skill => [skill.id, skill]));
-    skillCatalog = preview.skills.map(id => {
-      const skill = available.get(id);
-      if (!skill) throw new Error(`Unknown preview skill: ${id}`);
+    skillCatalog = listed.map(listedId => {
+      const skill = available.get(listedId);
+      if (!skill) throw new Error(preview ? `Unknown preview skill: ${listedId}` : `Agent ${id} lists an unknown skill: ${listedId}`);
       return skill;
     });
   }

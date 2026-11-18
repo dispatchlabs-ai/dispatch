@@ -359,6 +359,11 @@ definitions are unchanged unless they opt in. The loader discovers
 requires YAML `name` (matching its folder), `description` and a nonempty body.
 Company and local IDs are distinct: `company/<name>` and `agent/<name>`.
 
+To give an agent only some of them, list their IDs instead:
+`skills: ["company/code-review", "agent/release-notes"]`. That agent sees and can
+read only the listed skills, and only they contribute to its fingerprint. An ID
+with no matching skill stops startup.
+
 Only names and descriptions enter the initial instructions. `read_skill({ id,
 path? })` returns `SKILL.md` by default, its content revision and the available
 resource paths. Supporting UTF-8 text is read through the same tool. Resources
