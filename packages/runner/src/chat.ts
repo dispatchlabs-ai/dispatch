@@ -144,6 +144,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       cwd?: string;
       env?: OpenOptions["env"];
       definitionResources?: OpenOptions["definitionResources"];
+      reviewActions?: OpenOptions["reviewActions"];
       storage?: StorageFactory;
       settings?: OpenOptions["settings"];
       /** Trusted host binding, applied recursively to primaries and their private children before opening stores. */
@@ -185,7 +186,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
             replySink: options.replySink, updateDefinitions: options.updateDefinitions,
             registryExtensions: [calendar.extension],
             cwd: options.cwd, env: options.env, storage: options.storage, settings: options.settings,
-            definitionResources: options.definitionResources,
+            definitionResources: options.definitionResources, reviewActions: options.reviewActions,
             artifacts: options.artifacts,
           });
           service.hosts.set(agent.id, host);

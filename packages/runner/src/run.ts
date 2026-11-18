@@ -30,6 +30,7 @@ export type PreparedAdapter = {
 };
 export type Adapter = { prepare(options: { root: string; runner: Runner }): Promise<PreparedAdapter> };
 export type RunOptions = {
+  reviewActions?: OpenOptions["reviewActions"];
   usersFile?: string;
   users?: Users;
   storage?: StorageFactory;
@@ -167,7 +168,7 @@ export async function run(options: RunOptions = {}) {
         resume: options.resume, schedules: options.schedules,
         deferResume: true,
         cwd: options.cwd, env: options.env, storage: options.storage, settings: options.settings,
-        definitionResources: options.definitionResources,
+        definitionResources: options.definitionResources, reviewActions: options.preview || options.demo ? undefined : options.reviewActions,
         extensions, replySink, artifacts,
       });
     }

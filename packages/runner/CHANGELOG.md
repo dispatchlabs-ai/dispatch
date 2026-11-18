@@ -4,6 +4,10 @@
 
 - Application tools can verify a user's private request with `requirePrivateUser` and read the originating tool and task of an owned assignment with `requireDelegatedTask`.
 
+## [0.34.0] - 2026-11-18
+
+- Let applications handle completed reviews, prepare a checked patch, open a same-repository draft PR and notify a configured recipient.
+
 ## [0.33.1] - 2026-11-18
 
 - Return follow-up creation and stop receipts before closing their native transaction.
