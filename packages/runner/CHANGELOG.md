@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Add owner-scoped attention monitors with deterministic SlackGo polling, independent private reviews, request-level state, consolidated notices, scheduled briefings and durable delivery/cancellation.
+- Keep user-request completion hooks out of task-owned reminder and monitor reviews so restricted evidence tools can complete their structured answer.
+
 ## [0.30.0] - 2026-11-17
 
 - Allow agent-local cron schedules to declare a program with `command` instead of a prompt. Run it through the agent's execution environment with durable admission/recovery, stable occurrence IDs, exit status and captured output.

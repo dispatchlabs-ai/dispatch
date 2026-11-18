@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
 import { withAbortSignal } from "@earendil-works/chord/context";
 import {
-  configure, defineDoc, defineExtension, defineTask, defineTool, LiveDoc,
-  type ConversationId, type Cursor, type Extension, type JsonObject, type ToolRegistration, type TaskId, type TaskInspection, type Tx,
+  configure, defineDoc, defineExtension, defineTask, defineTool,
+  type ConversationId, type Extension, type JsonObject, type ToolRegistration, type TaskId, type TaskInspection, type Tx,
 } from "@earendil-works/pi-durable";
 import type { JsonValue } from "@earendil-works/chord/json";
 import type { ReminderCall } from "./mcp.js";
+import { authorizePrivateReview } from "./private-review.js";
+import { RequestCompletion } from "./request-completion.js";
 
 export type { ReminderCall } from "./mcp.js";
 export type ReminderItem = JsonObject & { key: string; revision?: string; link?: string | null };
@@ -36,7 +38,8 @@ export function reminderReviewExtension(extension: Extension): Extension[] {
   return "reviewExtension" in extension ? [extension.reviewExtension as Extension] : [];
 }
 export function sleepingReminder(namespace: string, task: TaskInspection): boolean {
-  return task.state.kind === "sleeping" && task.record.kind.startsWith(namespace + ".reminder.") && task.record.kind.endsWith(".scan");
+  return task.state.kind === "sleeping" && task.record.kind.endsWith(".scan")
+    && (task.record.kind.startsWith(namespace + ".reminder.") || task.record.kind.startsWith(namespace + ".monitor."));
 }
 
 export function reminders<T extends ReminderItem>(options: ReminderOptions<T>): ReminderExtension {
@@ -85,27 +88,7 @@ function bind<T extends ReminderItem>(options: ReminderOptions<T>, host: Binding
   function requireOwner() {
     if (!host.enrolled(owner)) throw new Error("This reminder requires its enrolled owner's private conversation.");
   }
-  // The runtime stamps the sender, transport and audience. Model-supplied names cannot grant access.
-  async function authorize(tx: Tx, conversation: ConversationId) {
-    requireOwner();
-    if ((await tx.conversation(conversation))?.owner) throw new Error("Open the owner's private chat.");
-    const inputs = (await tx.doc(LiveDoc, conversation)).run?.inputs ?? [];
-    const current = new Set((await Promise.all(inputs.map(input => tx.submission(input)))).map(input => input?.entry));
-    let human = false, cursor: Cursor | undefined;
-    do {
-      const page = await tx.scanEntries({ conversationId: conversation, order: "descending" }, 100, cursor);
-      for (const entry of page.items) {
-        const data = entry.data as { actor?: string; userId?: string; audience?: string[]; source?: string; group?: boolean; slack?: { channel?: string } } | undefined;
-        if (entry.kind !== host.namespace + ".message" || data?.actor !== "user") continue;
-        const direct = ["cli", "terminal", "web", "imsg"].includes(data.source ?? "") || data.source === "slack" && data.slack?.channel?.startsWith("D");
-        if (!direct || data.group || data.userId !== owner || data.audience?.some(member => member !== owner))
-          throw new Error("Open the enrolled owner's private chat for these reminders.");
-        if (current.has(entry.id)) human = true;
-      }
-      cursor = page.next;
-    } while (cursor);
-    if (!human) throw new Error("The enrolled owner must request this in private.");
-  }
+  const authorize = (tx: Tx, conversation: ConversationId) => authorizePrivateReview(host, owner, tx, conversation);
   type Occurrence = { key: string; item: T; due: number; expires: number };
   async function read(now: number, signal?: AbortSignal) {
     requireOwner();
@@ -158,7 +141,7 @@ function bind<T extends ReminderItem>(options: ReminderOptions<T>, host: Binding
             if (saved.attempt !== phase.attempt || saved.child === null) {
               const record = await tx.createConversation({ ownership: { kind: "task", taskId: runtime.taskId } });
               await configure(tx, record.id, { model: parent.model, thinkingLevel: parent.thinkingLevel, cwd: parent.cwd,
-                extensions: [...parent.extensions, reviewExtension], instructions: parent.instructions,
+                extensions: [...parent.extensions.filter(extension => extension.name !== RequestCompletion.name), reviewExtension], instructions: parent.instructions,
                 tools: reviewExtension.tools ?? [], modelTools: reviewExtension.tools ?? [] });
               saved.child = record.id;
               saved.attempt = phase.attempt;

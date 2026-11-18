@@ -51,6 +51,14 @@
     "./records": {
       "types": "./dist/records.d.ts",
       "import": "./dist/records.js"
+    },
+    "./monitors": {
+      "types": "./dist/monitors.d.ts",
+      "import": "./dist/monitors.js"
+    },
+    "./slack-monitor": {
+      "types": "./dist/slack-monitor.d.ts",
+      "import": "./dist/slack-monitor.js"
     }
   },
   "bin": {

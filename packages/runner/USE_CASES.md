@@ -147,6 +147,7 @@ records the agreed boundaries and existing foundations.
   See [execution environments](docs/environments.md) for supported builds and bindings.
 
 - **RUN-036 — Review upcoming reminders:** An enrolled owner checks, starts or stops reminders in a private conversation. The agent authors a notification for each eligible due occurrence. [Reviewed reminders](docs/reminders.md)
+- **RUN-037 — Review attention requests:** An enrolled owner monitors source conversations, receives consolidated notices for researched human actions, and withdraws resolved requests. Polling, private reviews and delivery recover independently in the native store. [Attention monitors](docs/monitors.md)
 
 Remote persistence and connectivity belong to
 [Remote's goals](../remote/USE_CASES.md#2-portable-service-additions);

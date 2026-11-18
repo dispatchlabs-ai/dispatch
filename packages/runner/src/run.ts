@@ -1,4 +1,6 @@
 import { isReminder } from "./reminders.js";
+import { isMonitor } from "./monitors.js";
+import type { PrivateReviewHost } from "./private-review.js";
 import { Users } from "./users.js";
 import { readFile, realpath } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -87,6 +89,7 @@ export async function run(options: RunOptions = {}) {
     const users = options.users ?? (options.usersFile === undefined ? undefined : await Users.load(resolve(root, options.usersFile), names));
     const requested = new Set<string>();
     const privateNames = new Set<string>();
+    const reviewNames = new Set<string>();
     const definitions: LoadedAgent[] = [];
     const collect = (agent: LoadedAgent) => {
       definitions.push(agent);
@@ -94,6 +97,10 @@ export async function run(options: RunOptions = {}) {
       for (const extension of agent.extensions ?? []) if (isReminder(extension)) {
         privateNames.add(extension.reminderConnections.source);
         if (!options.preview) privateNames.add(extension.reminderConnections.destination);
+      }
+      for (const extension of agent.extensions ?? []) if (isMonitor(extension)) {
+        for (const name of extension.monitorConnections.review) { privateNames.add(name); reviewNames.add(name); }
+        if (!options.preview) privateNames.add(extension.monitorConnections.destination);
       }
       for (const child of agent.delegateAgents ?? []) collect(child);
       if (agent.handoffAgent) collect(agent.handoffAgent);
@@ -106,26 +113,30 @@ export async function run(options: RunOptions = {}) {
       requested.add(name);
     }
     if (requested.size || privateNames.size || options.mcpServers !== undefined) mcp = await connectMcpServers({ ...options.mcpServers, ...environments.servers },
-      { cwd: options.cwd ?? root, names: [...requested], privateNames: [...privateNames], argumentsByServer: environments.argumentsByServer, stdioEnv: options.mcpStdioEnv });
+      { cwd: options.cwd ?? root, names: [...requested], privateNames: [...privateNames], reviewNames: [...reviewNames], argumentsByServer: environments.argumentsByServer, stdioEnv: options.mcpStdioEnv });
     const prepareAgent = (agent: LoadedAgent): LoadedAgent => {
       const environment = environments.selected.get(agent.id);
       const connections = [...(agent.mcp ?? []), ...(environment?.server ? [environment.server] : [])];
       const stateRoot = options.stateRoot ?? (!options.open ? resolve(root, ".state") : undefined);
       const bound = stateRoot ? mcp?.bind({ agent: agent.id, stateRoot: resolve(stateRoot) }) : mcp?.extensions;
+      const privateHost: PrivateReviewHost = {
+        namespace: runner.namespace, agent: agent.id, preview: options.preview === true,
+        enrolled: owner => users?.forAgent(agent.id).some(person => person.id === owner) === true,
+        profile: async owner => {
+          const person = users?.forAgent(agent.id).find(person => person.id === owner);
+          return person?.contextFile ? readFile(person.contextFile, "utf8") : undefined;
+        },
+        call: name => mcp!.reminderCall(name),
+        tools: selection => Object.keys(selection).length ? mcp!.privateTools(selection) : [],
+      };
       return { ...agent, ...(environment ? {
         instructions: agent.instructions + "\n\n" + environment.instructions,
         fingerprint: createHash("sha256").update(agent.fingerprint).update(environment.identity).digest("hex"),
       } : {}),
         ...(agent.delegateAgents ? { delegateAgents: agent.delegateAgents.map(prepareAgent) } : {}),
         ...(agent.handoffAgent ? { handoffAgent: prepareAgent(agent.handoffAgent) } : {}),
-        extensions: [...(agent.extensions ?? []).map(extension => isReminder(extension) ? extension.bindReminder({
-          namespace: runner.namespace, agent: agent.id, preview: options.preview === true, enrolled: owner => users?.forAgent(agent.id).some(person => person.id === owner) === true,
-          profile: async owner => {
-            const person = users?.forAgent(agent.id).find(person => person.id === owner);
-            return person?.contextFile ? readFile(person.contextFile, "utf8") : undefined;
-          },
-          call: name => mcp!.reminderCall(name),
-        }) : extension), ...connections.map(name => {
+        extensions: [...(agent.extensions ?? []).map(extension => isReminder(extension) ? extension.bindReminder(privateHost)
+          : isMonitor(extension) ? extension.bindMonitor(privateHost) : extension), ...connections.map(name => {
           const extension = bound?.[name];
           if (!extension) throw new Error(`Agent ${agent.id} requires MCP server ${name}; configure it in mcpServers.`);
           return extension;

@@ -30,7 +30,7 @@ async function credentialHeaders(name: string, command: string[], cwd: string): 
 }
 
 /** Connect the servers selected by definitions, discovering native Durable tools before recovery starts. */
-export async function connectMcpServers(servers: McpServers, options: { cwd: string; names: string[]; privateNames?: string[]; stdioEnv?: Record<string, string>;
+export async function connectMcpServers(servers: McpServers, options: { cwd: string; names: string[]; privateNames?: string[]; reviewNames?: string[]; stdioEnv?: Record<string, string>;
   /** Host-owned arguments removed from model-facing schemas and supplied on every call. */
   argumentsByServer?: Record<string, Record<string, Record<string, JsonValue>>> }) {
   if (!servers || typeof servers !== "object" || Array.isArray(servers)) throw new Error("mcpServers must be an object.");
@@ -137,7 +137,7 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
           throw error;
         }
       });
-      if (!options.names.includes(name)) continue;
+      if (!options.names.includes(name) && !options.reviewNames?.includes(name)) continue;
       const connected = await client();
       const tools = connected.serverCapabilities?.tools ? await connected.listTools() : [];
       const allowed = servers[name].tools;
@@ -220,7 +220,25 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
       if (!call) throw new Error(`Missing reminder connection ${name}.`);
       return call;
     };
-    return { extensions: bind(), bind, reminderCall, close };
+    const privateTools = (selection: Record<string, string[]>): ToolRegistration[] => Object.entries(selection).flatMap(([server, names]) => {
+      if (!options.privateNames?.includes(server)) throw new Error(`Missing private review connection ${server}.`);
+      return names.map(name => {
+        const found = discovered.find(item => item.server === server && item.tool.name === name);
+        if (!found) throw new Error(`Private review connection ${server} does not grant ${name}.`);
+        if (found.tool._meta?.["ai.dispatch/caller"] === true) throw new Error("Private reviews cannot use tools requiring an independent agent caller.");
+        const registration: ToolRegistration = {
+          name: createMcpToolName(server, name, candidate => (counts.get(candidate) ?? 0) > 1), description: found.tool.description ?? found.tool.title ?? name,
+          parameters: normalizeMcpInputSchema(found.tool.inputSchema), replay: "safe",
+          outputLimits: { maxBytes: Infinity, maxLines: Infinity },
+          async execute(args, _api, context) {
+            const result = await reminderCall(server)(name, args as Record<string, unknown>, context.abortSignal);
+            return { output: toLlmContent(result), isError: result.isError === true, details: result as unknown as JsonValue };
+          },
+        };
+        return registration;
+      });
+    });
+    return { extensions: bind(), bind, reminderCall, privateTools, close };
   } catch (error) {
     try { await close(); }
     catch (cleanup) { throw new AggregateError([error, cleanup], "MCP startup and cleanup failed."); }
