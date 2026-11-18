@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Give distinct review proposals separate pull requests when they replace the same source passage with different changes.
+
 ## [0.35.0] - 2026-11-18
 
 - Application tools can verify a user's private request with `requirePrivateUser` and read the originating tool and task of an owned assignment with `requireDelegatedTask`.
