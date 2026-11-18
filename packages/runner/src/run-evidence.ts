@@ -5,7 +5,6 @@ import type { DocumentRecord, EntryRecord, RunSummary, SubmissionRecord } from "
 import { openSqliteSnapshot, readSqliteDocument, redact, transcriptSegments } from "./records.js";
 
 export type ReviewRun = { conversation: number; first: number; answer: number; last: number; reason: RunSummary["reason"] };
-export const reviewPageSize = 48_000;
 
 function submissions(db: DatabaseSync, conversation: number, answer: number) {
   return db.prepare("SELECT record FROM submissions WHERE conversation_id=? AND status='done' AND json_extract(record,'$.answer')=? ORDER BY id")

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Review long runs in model-sized sections, reuse their frozen evidence on retry and publish assessments only after a complete model answer.
+
 ## [0.36.0] - 2026-11-18
 
 - Move Slack monitoring to the optional Slack package. Monitors, follow-ups and draft PRs use the application’s recipient-bound notification destination. See the [0.35 upgrade notes](docs/upgrade.md#upgrading-monitors-from-035).
