@@ -4,7 +4,7 @@ import { defineDoc, defineExtension, defineTask, defineTool,
   type Agent, type ConversationId, type Extension, type JsonObject, type TaskId, type ToolRegistration, type Tx } from "@earendil-works/pi-durable";
 import type { JsonValue } from "@earendil-works/chord/json";
 import type { ReminderCall, ReminderNotice } from "./reminders.js";
-import { authorizePrivateReview, type PrivateReviewHost } from "./private-review.js";
+import { authorizePrivateReview, privateMonitor, type PrivateReviewHost } from "./private-review.js";
 import { reviewConversation } from "./review-conversation.js";
 
 export type MonitorItem = JsonObject & { key: string; revision: string; link: string | null };
@@ -75,8 +75,7 @@ export function monitors(options: MonitorOptions): MonitorExtension {
     || !Number.isFinite(options.refreshEveryMinutes) || options.refreshEveryMinutes <= 0)
     throw new Error("Monitors require an ID, owner, prompt and positive refresh interval.");
   CronExpressionParser.parse(options.briefing.cron, { tz: options.briefing.timezone });
-  return { name: "monitor:" + options.id,
-    monitorConnections: { review: Object.keys(options.reviewTools), destination: options.deliverTo.connection }, bindMonitor: host => bind(options, host) };
+  return privateMonitor(options.id, Object.keys(options.reviewTools), options.deliverTo.connection, host => bind(options, host));
 }
 
 function bind(options: MonitorOptions, host: PrivateReviewHost): Extension {

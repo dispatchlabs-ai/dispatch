@@ -1,4 +1,4 @@
-import { LiveDoc, type ConversationId, type Cursor, type ToolRegistration, type Tx } from "@earendil-works/pi-durable";
+import { LiveDoc, type ConversationId, type Cursor, type Extension, type ToolRegistration, type Tx } from "@earendil-works/pi-durable";
 import type { ReminderCall } from "./mcp.js";
 
 export type PrivateReviewHost = {
@@ -8,6 +8,10 @@ export type PrivateReviewHost = {
   call(name: string): ReminderCall;
   tools(selection: Record<string, string[]>): ToolRegistration[];
 };
+
+export function privateMonitor(id: string, review: string[], destination: string, bindMonitor: (host: PrivateReviewHost) => Extension) {
+  return { name: "monitor:" + id, monitorConnections: { review, destination }, bindMonitor };
+}
 
 /** Authority comes from the transport's current human input, never a name in model arguments. */
 export async function authorizePrivateReview(host: Pick<PrivateReviewHost, "namespace" | "enrolled">,

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Add persistent, owner-requested follow-ups across selected sources, with evidence for each answer and recoverable notification delivery.
+
 ## [0.32.0] - 2026-11-18
 
 - Review completed SQLite runs in an independent native conversation. Enable automatic reviews with `DISPATCH_EVAL=1` or inspect a retained submission with `dispatch review`.

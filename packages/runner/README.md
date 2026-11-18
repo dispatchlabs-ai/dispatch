@@ -227,6 +227,8 @@ automatically the default. See [schedules](docs/schedules.md).
 
 For event-driven notifications, add [reviewed reminders](docs/reminders.md) in the agent definition. The enrolled owner can check a real source in preview and start or stop delivery from a private chat.
 
+For an owner-selected topic across sources, [persistent follow-ups](docs/follow-ups.md) can alert on the first qualifying reply and track each outstanding question through a confirmed answer.
+
 For ongoing requests, use [attention monitors](docs/monitors.md): deterministic
 SlackGo polling, private per-thread research, individual request state, consolidated
 alerts and scheduled briefings, with owner-only preview and controls.
