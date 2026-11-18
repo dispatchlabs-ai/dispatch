@@ -1,6 +1,13 @@
 import { getSupportedThinkingLevels } from '@earendil-works/pi-ai/models';
 import { stream as piStream } from '@earendil-works/pi-ai/api/pi-messages';
 import { AssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream';
+import { Agent, Dispatcher1Wrapper } from 'undici';
+
+// Native fetch's dispatcher interface changed in Undici 8. Use the fixed
+// connection pool for gateway POSTs, including on Node's older fetch interface.
+const gatewayPool = new Agent();
+const gatewayDispatcher = parseInt(process.versions.undici ?? '0', 10) >= 8
+  ? gatewayPool : new Dispatcher1Wrapper(gatewayPool);
 
 export type ModelChoice = { provider: string; providerName: string; id: string; name: string; levels: string[]; images?: boolean; hidden?: boolean };
 export type GatewayAliases = Record<string, string | { target: string; hidden?: boolean }>;
@@ -22,7 +29,8 @@ export async function refreshGatewayModels(origin: string, models: any, key?: st
       if (typeof key === 'function' && !token) throw new Error('Gateway authorization returned an empty token.');
       const headers = new Headers(request.headers);
       if (token) headers.set('authorization', `Bearer ${token}`);
-      return fetch(request.clone(), { headers, redirect: 'error', signal });
+      const transport = { headers, redirect: 'error' as const, signal, dispatcher: gatewayDispatcher };
+      return fetch(request.clone(), transport);
     };
     const response = await send(false);
     // Gateway authentication failures precede admission; never replay accepted work.
