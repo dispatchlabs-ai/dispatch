@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-11-18
+
 - Let applications handle completed reviews, prepare a checked patch, open a same-repository draft PR and notify a configured recipient.
 
 ## [0.33.1] - 2026-11-18
