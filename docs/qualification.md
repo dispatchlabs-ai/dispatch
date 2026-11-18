@@ -1088,3 +1088,11 @@ sizes, opened the phone table view and recovered it after reload. Delivery
 qualification used a local sink; physical push display was outside this check.
 
 [Release v0.31.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.31.0).
+
+## v0.32.0 independent run reviews — November 18, 2026
+
+Release `c3ccb1b` passed locked build and type checks, the macOS flake and distribution builds, and x86_64 Linux Web and Workers image builds. Clean npm consumers installed the published archives and passed strict public-import checks. The twelve package archives had no known-pattern scan findings. Distribution scan matches agreed with the previously reviewed dependencies. All fourteen published assets matched the prepared bytes and GitHub digests.
+
+With real inference, a clean SQLite application answered with reviews disabled, then resumed the same chat with reviews enabled. A Web follow-up produced its answer and one saved independent assessment. The evaluator read the earlier context using its scoped tool. The conversation remained usable after reload at phone and desktop sizes. A retained submission was also reviewed through the published CLI alongside its active owner. This release qualifies advisory SQLite reviews of answered and tool-terminated runs; the live interactions exercised ordinary answers.
+
+[Release v0.32.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.32.0).
