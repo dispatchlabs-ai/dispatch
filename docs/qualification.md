@@ -1110,3 +1110,9 @@ Release `c3ccb1b` passed locked build and type checks, the macOS flake and distr
 With real inference, a clean SQLite application answered with reviews disabled, then resumed the same chat with reviews enabled. A Web follow-up produced its answer and one saved independent assessment. The evaluator read the earlier context using its scoped tool. A tool-terminated run also queued one review, including the result entry after the tool call. The conversation remained usable after reload at phone and desktop sizes. A retained submission was reviewed through the published CLI alongside its active owner.
 
 [Release v0.32.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.32.0).
+
+## v0.34.0 application review actions — November 18, 2026
+
+Release `4b42997` passed source builds and type checks, macOS flake and distribution builds, and x86_64 Linux Web and Workers image builds. Archive and distribution scans matched the reviewed baseline. Clean npm consumers verified public imports, real inference and all fourteen release assets.
+
+A Web submission invoked the application’s completion handler once. Removing its policy and restarting the same host preserved evaluation and left the handler idle. A retained review prepared a patch and opened a native draft on a new branch of the selected repository. The notification service accepted the confirmed PR link. Replaying the request reused the branch, PR and delivery receipt.
