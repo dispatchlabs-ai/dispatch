@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-18
+
 - Open stable item links and exact native chat links on a single host. Named installations continue to use explicit installation IDs.
 
 ## [0.29.0] - 2026-11-17

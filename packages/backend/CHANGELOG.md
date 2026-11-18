@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-18
+
 - Use the trusted host connection’s keyed creation policy for single-host Web clients.
 
 ## [0.29.0] - 2026-11-17
