@@ -7,7 +7,7 @@ import type { MonitorItem, MonitorSource } from "@dispatch/runner/monitors";
 import type { FollowUpSource } from "@dispatch/runner/follow-ups";
 
 const object = (value: JsonValue | undefined): JsonObject => value && typeof value === "object" && !Array.isArray(value) ? value : {};
-type Message = JsonObject & { id: string; author: string; authorName: string; text: string; automatic: boolean };
+type Message = JsonObject & { id: string; author: string; authorName: string; text: string; subtype: string | null };
 type Thread = MonitorItem & { link: string; workspace: string; channel: string; thread: string; viewer: string; messages: Message[] };
 type Credentials = { teamId: string; userId: string; userToken: string };
 
@@ -25,7 +25,7 @@ export function slackMonitor(options: { workspaces: string[]; credentialsFile: s
     const entry = Object.hasOwn(config, domain) && config[domain];
     if (!entry || !entry.teamId || !entry.userId || !entry.userToken) throw new Error("Configure a Slack user OAuth grant for " + domain + ".");
     const client = new WebClient(entry.userToken, { retryConfig: { retries: 0 }, rejectRateLimitedCalls: true,
-      maxRequestConcurrency: Infinity, timeout: 15_000,
+      maxRequestConcurrency: Infinity,
       fetch: (url, init) => fetch(url, { ...init, signal: signal && init?.signal ? AbortSignal.any([signal, init.signal]) : signal ?? init?.signal }) });
     const auth = await client.auth.test();
     if (auth.team_id !== entry.teamId || auth.user_id !== entry.userId || auth.bot_id || !auth.url)
@@ -57,8 +57,9 @@ export function slackMonitor(options: { workspaces: string[]; credentialsFile: s
         }
         const details: JsonObject = JSON.parse(JSON.stringify({ reactions: m.reactions ?? [], files: m.files ?? [],
           attachments: m.attachments ?? [], edited: m.edited ?? null }));
-        byId.set(m.ts, { ...details, id: m.ts, author, authorName: auth.names.get(author) || m.bot_profile?.name || author,
-          text: m.text ?? "", subtype: m.subtype ?? null, automatic: !!m.bot_id || m.subtype === "bot_message" });
+        // Field order participates in the revision of threads already stored by Runner.
+        byId.set(m.ts, { id: m.ts, author, authorName: auth.names.get(author) || m.bot_profile?.name || author,
+          text: m.text ?? "", subtype: m.bot_id ? "bot_message" : m.subtype ?? null, ...details });
       }
       cursor = page.response_metadata?.next_cursor;
       if ((page.has_more && !cursor) || (cursor && cursors.has(cursor))) throw new Error("Slack thread pagination is incomplete.");
@@ -182,7 +183,7 @@ export function slackMonitor(options: { workspaces: string[]; credentialsFile: s
         link.searchParams.set("thread_ts", item.thread);
         return { id: ["slack", item.workspace, item.channel, message.id].join(":"), at: Number(message.id) * 1000,
           author: message.authorName, text: message.text, link: link.href,
-          outbound: message.author === item.viewer, automatic: message.automatic };
+          outbound: message.author === item.viewer, automatic: message.subtype === "bot_message" };
       });
     },
   };
