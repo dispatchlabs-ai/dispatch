@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Review completed SQLite runs in an independent native conversation. Enable automatic reviews with `DISPATCH_EVAL=1` or inspect a retained submission with `dispatch review`.
+
 ## [0.31.0] - 2026-11-18
 
 - Add owner-scoped attention monitors with deterministic SlackGo polling, independent private reviews, request-level state, consolidated notices, scheduled briefings and durable delivery/cancellation.

@@ -32,6 +32,7 @@ buildNpmPackage {
       ../tsconfig.json
       ../src
       ../native
+      ../prompts
       ../scripts
       ./environments
       ./runtime.nix
@@ -60,7 +61,7 @@ buildNpmPackage {
     cp packages/runner/AGENT-CHAT-LICENSE "$app/packages/runner/AGENT-CHAT-LICENSE"
     cp -R node_modules "$app/"
     cp packages/runner/package.json "$app/packages/runner/"
-    cp -R packages/runner/{dist,native,scripts,nix} "$app/packages/runner/"
+    cp -R packages/runner/{dist,native,prompts,scripts,nix} "$app/packages/runner/"
     if test -d packages/runner/node_modules; then
       cp -R packages/runner/node_modules "$app/packages/runner/"
     fi

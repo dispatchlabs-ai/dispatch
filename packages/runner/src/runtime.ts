@@ -55,6 +55,7 @@ import { createCoding } from "./coding.js";
 import type { ReplySink } from "./replies.js";
 import { privateStateDirectory, privateStateFiles } from "./private-state.js";
 import { reportError, terminalText } from "./terminal-output.js";
+import { evaluationEnabled, runReviewExtension } from "./run-review.js";
 import { sleepingReminder } from "./reminders.js";
 import { scheduleTaskKind } from "./schedules.js";
 import { ArtifactStore, type ArtifactOptions, type createArtifacts } from "./artifacts.js";
@@ -209,6 +210,8 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
     const directory = resolve(options.directory);
     const cwd = options.cwd ? (options.env ? options.cwd : await realpath(resolve(options.cwd))) : undefined;
     const execution = options.execution ?? "live";
+    const evaluate = evaluationEnabled();
+    if (evaluate && options.storage) throw new Error("DISPATCH_EVAL=1 requires the native SQLite store.");
     const now = options.now ?? Date.now;
     await privateStateDirectory(directory);
     let compromised: Error | undefined;
@@ -254,12 +257,15 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       const artifactStore = new ArtifactStore(join(directory, "artifacts"));
       const artifactExtension = artifacts.artifactExtension(artifactStore, options.artifacts);
       const compaction = compactionExtension(namespace, () => harness!);
+      const reviews = runReviewExtension({ directory, agent: agent.id, models, settings: options.settings,
+        model: execution === "demo" ? { provider: "faux", id: "faux-1", thinking: "off" } : agent.model }, evaluate);
       const resources = options.definitionResources ? [await definitionResourcesExtension(agent.root)] : [];
+      const policy = [compaction, ...resources, ...(evaluate ? [reviews] : [])];
       const setup = await agentConfiguration(
-        agent, directory, execution === "demo", [loopExtension, ...(options.extensions ?? [])], options.replySink, cwd, [artifactExtension, compaction, ...resources],
+        agent, directory, execution === "demo", [loopExtension, ...(options.extensions ?? [])], options.replySink, cwd, [artifactExtension, ...policy],
       );
       const { configuration, installed } = setup;
-      for (const extension of new Map([...installed, ...(options.registryExtensions ?? [])].map(extension => [extension.name, extension])).values()) registry.install(extension);
+      for (const extension of new Map([...installed, reviews, ...(options.registryExtensions ?? [])].map(extension => [extension.name, extension])).values()) registry.install(extension);
       storage = options.storage ? await options.storage(agent) : await openNodeSqliteStorage(join(directory, "session.sqlite"));
       harness = await Harness.open(storage, {
         models, registry, now, settings: options.settings,
@@ -333,7 +339,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
           conversations.push(...page.items);
           cursor = page.next;
         } while (cursor);
-        const added = [compaction, ...resources].map(extension => extension.name);
+        const added = policy.map(extension => extension.name);
         for (const conversation of conversations) {
           const state = await tx.doc(AgentDoc, conversation.id);
           const selected = state.extensions;

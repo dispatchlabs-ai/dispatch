@@ -148,6 +148,7 @@ records the agreed boundaries and existing foundations.
 
 - **RUN-036 — Review upcoming reminders:** An enrolled owner checks, starts or stops reminders in a private conversation. The agent authors a notification for each eligible due occurrence. [Reviewed reminders](docs/reminders.md)
 - **RUN-037 — Review attention requests:** An enrolled owner monitors source conversations, receives consolidated notices for researched human actions, and withdraws resolved requests. Polling, private reviews and delivery recover independently in the native store. [Attention monitors](docs/monitors.md)
+- **RUN-038 — Inspect completed work:** A host operator can request an independent assessment of a retained SQLite run or enable one after each answer. Each assessment identifies its evidence and suggests improvements. [Run reviews](docs/service.md#run-reviews)
 
 Remote persistence and connectivity belong to
 [Remote's goals](../remote/USE_CASES.md#2-portable-service-additions);

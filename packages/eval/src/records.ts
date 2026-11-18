@@ -9,7 +9,8 @@ import { chmod, copyFile, mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
-import { openSqliteSnapshot, readSqliteDocument } from "@dispatch/runner/records";
+export { redact } from "@dispatch/runner/records";
+import { openSqliteSnapshot, readSqliteDocument, redact, transcriptSegments } from "@dispatch/runner/records";
 import type { JsonValue } from "@earendil-works/chord/json";
 import type { ConversationRecord, DocumentRecord, EntryRecord } from "@earendil-works/pi-durable";
 
@@ -18,21 +19,6 @@ type Row = Record<string, string | number | null>;
 type Chat = { id: string; agent: string; conversationId: number; title: string; key: string };
 type Document = { record: DocumentRecord; seq: number; value: JsonValue };
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
-
-/** Opaque provider state and credentials have no explanatory value. */
-export function redact(value: unknown): unknown {
-  if (typeof value === "string") return value
-    .replace(/\b(?:xox[baprs]-[A-Za-z0-9-]+|xapp-[A-Za-z0-9-]+|sk-[A-Za-z0-9_-]{16,}|(?:AKIA|ASIA)[A-Z0-9]{16})\b/g, "[credential redacted]")
-    .replace(/\b([A-Z][A-Z0-9_]*(?:PASSWORD|SECRET|TOKEN|API_KEY|ACCESS_KEY_ID))\s*=\s*(?:"[^"\n]*"|'[^'\n]*'|[^\s\n]+)/g, "$1=[redacted]")
-    .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, "Bearer [redacted]")
-    .replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/g, "[private key redacted]");
-  if (Array.isArray(value)) return value.map(redact);
-  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key,
-    /^(?:authorization|cookie|set-cookie|headers|password|secret|credentials|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|signing[_-]?secret|botToken|appToken|privateKey|thinkingSignature|textSignature|encrypted_content)$|(?:^|_)(?:PASSWORD|SECRET|TOKEN|API_KEY|ACCESS_KEY_ID)$/i.test(key)
-      ? "[redacted]" : redact(item),
-  ]));
-  return value;
-}
 
 /** One page of a redacted value as text, with the hash of the whole text. */
 export function textPage(value: unknown, offset = 0) {
@@ -161,17 +147,7 @@ export class NativeRecords {
   }
   /** The conversations whose entries are visible from `id`: its fork ancestors up to each fork point, then itself. */
   segments(id: number) {
-    const segments: { id: number; through: number }[] = [];
-    const seen = new Set<number>();
-    let current = this.record<ConversationRecord>("conversations", id), through = Number.MAX_SAFE_INTEGER;
-    for (;;) {
-      if (seen.has(current.id)) throw new Error("Invalid fork ancestry.");
-      seen.add(current.id); segments.unshift({ id: current.id, through });
-      if (!current.parent) break;
-      through = Math.min(through, current.parent.at);
-      current = this.record<ConversationRecord>("conversations", current.parent.conversationId);
-    }
-    return segments;
+    return transcriptSegments(this.db, id);
   }
   /** A page of entries as redacted excerpts, in ascending ID order, including inherited fork history. */
   entries(id: number, after: number, limit: number, query?: string) {

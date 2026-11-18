@@ -10,6 +10,7 @@ import { localHostPaths, readHostConfig, readClientConnection, projectHostConfig
 
 const usage = `dispatch serve [--root DIRECTORY] [--state DIRECTORY] [--socket SOCKET] [--demo]
 dispatch serve --config HOST.json
+dispatch review --agent NAME --submission ID [--config HOST.json]
 dispatch chat [--root DIRECTORY] [--state DIRECTORY] [--agent NAME] [--session KEY] [--prompt TEXT] [--history]
 dispatch preview --agent NAME [--root DIRECTORY | --config HOST.json] [--no-web | --port PORT]
 dispatch chat --preview NAME [--as USER] [--session KEY] [--prompt TEXT] [--history]
@@ -54,6 +55,7 @@ try {
     agent: { type: "string" }, port: { type: "string" }, session: { type: "string" }, prompt: { type: "string" },
     preview: { type: "string" }, as: { type: "string" }, "no-web": { type: "boolean" },
     "request-id": { type: "string" }, history: { type: "boolean" }, json: { type: "boolean" }, help: { type: "boolean" },
+    submission: { type: "string" },
     "api-key": { type: "boolean" }, "no-browser": { type: "boolean" },
     provider: { type: "string" }, model: { type: "string" }, module: { type: "string" }, export: { type: "string" }, "base-url": { type: "string" },
     space: { type: "string" }, identity: { type: "string" }, "vault-server": { type: "string" }, rebuild: { type: "boolean" },
@@ -91,6 +93,13 @@ try {
     }), null, 2));
   }
   else if (positionals.length !== 1) throw new Error(usage);
+  else if (positionals[0] === "review") {
+    const submission = Number(values.submission);
+    if (!values.agent || !Number.isSafeInteger(submission) || submission < 1) throw new Error("Use dispatch review --agent NAME --submission ID.");
+    const config = values.config ? await readHostConfig(values.config) : await localHostConfig(values);
+    const { reviewCommand } = await import("./review-cli.js");
+    await reviewCommand(config, values.agent, submission);
+  }
   else if (positionals[0] === "preview") {
     if (!values.agent) throw new Error("Select --agent NAME to preview.");
     if (values.state || values.socket || (values.config && values.root)) throw new Error("Preview uses private state. Select --root or --config.");

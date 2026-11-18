@@ -80,6 +80,14 @@ An application may call `serveService(host.service, socket, host.adapters,
 {stateRoot})` after `run()`. Closing that listener disconnects clients only;
 the application still closes its host. The JSON launcher uses these same APIs.
 
+## Run reviews
+
+Start the SQLite host with `DISPATCH_EVAL=1 npm start` (or `DISPATCH_EVAL=1 npx dispatch serve`). Each answered or tool-terminated working run queues a background review. Unset the variable or set it to `0` to disable new reviews. Failures and aborts in the working agent do not trigger Pi's `afterRun` hook.
+
+To review a retained request, run `npx dispatch review --agent NAME --submission ID` in the application directory. Supply `--config HOST.json` to select a host configuration. This local administration command needs read access to the source SQLite store and a configured model connection. Older continuations and tool-terminated runs require their recorded hook boundaries.
+
+The evaluator uses the owning agent's model connection in an independent conversation with one read-only evidence tool. It reviews the run's instructions, submissions, messages, calls, results and task outcomes through the completion boundary. The console prints the assessment and the path to `review.md` under the agent's private `evaluations/` directory. The same directory holds the redacted evidence and the evaluator's native session. Repeating the command retrieves the saved result for that instruction revision. A revised evaluator prompt produces a separate assessment. Each new evaluation consumes model tokens.
+
 ## Shared clients and company compositions
 
 The optional [MCP connector](../../mcp/README.md) exposes these conversation

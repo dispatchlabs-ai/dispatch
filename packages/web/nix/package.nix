@@ -10,7 +10,7 @@ buildNpmPackage {
       ../../postgres/NOTICE ../../backend/AGENT-CHAT-LICENSE
       ../../../LICENSE ../../../package.json ../../../package-lock.json ../../../scripts
       ../../runner/AGENT-CHAT-LICENSE
-      ../../runner/package.json ../../runner/tsconfig.json ../../runner/src ../../runner/native
+      ../../runner/package.json ../../runner/tsconfig.json ../../runner/src ../../runner/native ../../runner/prompts
       ../../runner/nix/environments ../../runner/nix/runtime.nix
       ../../remote/package.json ../../remote/tsconfig.json ../../remote/src
       ../../postgres/package.json ../../postgres/tsconfig.json ../../postgres/src
@@ -49,7 +49,7 @@ buildNpmPackage {
       cp -R packages/$package/dist "$app/packages/$package/"
       if test -d packages/$package/node_modules; then cp -R packages/$package/node_modules "$app/packages/$package/"; fi
     done
-    cp -R packages/runner/native "$app/packages/runner/"
+    cp -R packages/runner/{native,prompts} "$app/packages/runner/"
     cp -R packages/runner/nix "$app/packages/runner/"
     cp packages/runner/AGENT-CHAT-LICENSE "$app/packages/runner/"
     cp packages/web/openapi.yaml packages/web/preview.js "$app/packages/web/"
