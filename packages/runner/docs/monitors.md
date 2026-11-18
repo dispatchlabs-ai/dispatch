@@ -43,7 +43,7 @@ and cases, or stop it in an ordinary private conversation. Stop also cancels
 outstanding notifications; it does not approve their underlying requests.
 
 Polling continues while individual reviews run. A quiet source poll uses no
-inference. Full pagination and thread reads include read messages and replies;
+inference. Search fingerprints avoid full reads of unchanged inactive threads. Full pagination and thread reads include read messages and replies;
 active requests are refreshed even without a search hit. Each workspace keeps its own checkpoint; failed coverage does not advance it or
 prevent successful workspaces from progressing. Slack search is an index, not a change stream:
 edits or deletions outside the overlapping search window and tracked threads

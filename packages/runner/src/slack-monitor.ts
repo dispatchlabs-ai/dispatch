@@ -7,6 +7,7 @@ import type { JsonValue } from "@earendil-works/chord/json";
 import type { MonitorItem, MonitorSource } from "./monitors.js";
 
 const execute = promisify(execFile);
+const object = (value: JsonValue | undefined): JsonObject => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 type Message = { ts: string; user: string; user_display?: string; text: string; thread_ts?: string;
   reply_count?: number; subtype?: string; reactions?: JsonValue; files?: JsonValue; attachments?: JsonValue; raw?: JsonObject };
 type Thread = MonitorItem & { workspace: string; channel: string; thread: string; viewer: string; messages: JsonObject[] };
@@ -81,12 +82,11 @@ export function slackGo(options: { workspaces: string[]; command?: string; crede
     },
     async read(cursor, active, signal) {
       const started = new Date().toISOString();
-      const checkpoint = cursor && typeof cursor === "object" && !Array.isArray(cursor) ? cursor : null;
+      const checkpoint = object(cursor);
       const baseline = typeof cursor === "string" ? cursor : checkpoint?.since;
       if (typeof baseline !== "string" || !Number.isFinite(Date.parse(baseline)))
         throw new Error("Slack monitoring requires an absolute initial checkpoint.");
-      const through = checkpoint?.through && typeof checkpoint.through === "object" && !Array.isArray(checkpoint.through)
-        ? { ...checkpoint.through } : {};
+      const through = { ...object(checkpoint.through) }, seen = { ...object(checkpoint.threads) };
       const catalog = await run<{ items: { workspace: { domain: string; user_id: string } }[] }>(["workspaces"], signal);
       // Each workspace owns its checkpoint: unavailable evidence cannot advance it or
       // prevent complete coverage of the other selected workspaces from committing.
@@ -95,10 +95,12 @@ export function slackGo(options: { workspaces: string[]; command?: string; crede
         if (typeof since !== "string" || !Number.isFinite(Date.parse(since))) throw new Error("Invalid workspace checkpoint.");
         const identity = catalog.items.find(item => item.workspace.domain === domain)?.workspace;
         if (!identity?.user_id) throw new Error("Slack workspace is unavailable: " + domain);
-        // Re-read the boundary day for indexing delay; revisions determine new work.
-        const after = new Date(Date.parse(since) - 86_400_000).toISOString().slice(0, 10);
+        // Slack after: excludes the named calendar date in its search timezone.
+        // Include the preceding UTC day as well, including across midnight.
+        const after = new Date(Date.parse(since) - 2 * 86_400_000).toISOString().slice(0, 10);
         const matches = await search(domain, "after:" + after, signal);
-        const roots = new Map<string, { channel: string; root: string }>();
+        const roots = new Map<string, { channel: string; root: string; matches: JsonObject[] }>();
+        const prior = object(seen[domain]), signatures: JsonObject = {};
         for (const match of matches) {
           if (typeof match.ts !== "string" || !Number.isFinite(Number(match.ts))) throw new Error("Slack search result has no timestamp.");
           if (Number(match.ts) * 1000 < Date.parse(baseline)) continue;
@@ -106,27 +108,34 @@ export function slackGo(options: { workspaces: string[]; command?: string; crede
           const permalink = typeof match.permalink === "string" && URL.canParse(match.permalink) ? new URL(match.permalink) : null;
           const root = match.thread_ts || permalink?.searchParams.get("thread_ts") || match.ts;
           if (typeof channel !== "string" || typeof root !== "string") throw new Error("Slack search result has no stable thread identity.");
-          roots.set(channel + ":" + root, { channel, root });
+          const key = channel + ":" + root;
+          if (!roots.has(key)) roots.set(key, { channel, root, matches: [] });
+          roots.get(key)!.matches.push({ ts: match.ts, text: match.text, user: match.user });
         }
-        for (const item of active as Thread[]) if (item.workspace === domain) roots.set(item.channel + ":" + item.thread,
-          { channel: item.channel, root: item.thread });
+        const tracked = new Set((active as Thread[]).filter(item => item.workspace === domain).map(item => item.channel + ":" + item.thread));
+        for (const item of active as Thread[]) if (item.workspace === domain && !roots.has(item.channel + ":" + item.thread))
+          roots.set(item.channel + ":" + item.thread, { channel: item.channel, root: item.thread, matches: [] });
         const items: MonitorItem[] = [];
-        for (const { channel, root } of roots.values()) items.push(await thread(domain, channel, root, identity.user_id, signal));
-        return { items, coverage: { workspace: domain, viewer: identity.user_id, since, through: started,
-          matches: matches.length, threads: roots.size, complete: true } };
+        for (const [key, { channel, root, matches }] of roots) {
+          const signature = createHash("sha256").update(JSON.stringify(matches.sort((a, b) => Number(a.ts) - Number(b.ts)))).digest("hex");
+          if (tracked.has(key) || signature !== prior[key]) items.push(await thread(domain, channel, root, identity.user_id, signal));
+          signatures[key] = signature;
+        }
+        return { items, signatures, coverage: { workspace: domain, viewer: identity.user_id, since, through: started,
+          matches: matches.length, threads: roots.size, refreshed: items.length, complete: true } };
       }));
       signal.throwIfAborted();
       const items: MonitorItem[] = [], coverage: JsonObject[] = [], issues: string[] = [];
       for (const [index, result] of results.entries()) {
         const domain = options.workspaces[index];
         if (result.status === "fulfilled") {
-          items.push(...result.value.items); coverage.push(result.value.coverage); through[domain] = started;
+          items.push(...result.value.items); coverage.push(result.value.coverage); through[domain] = started; seen[domain] = result.value.signatures;
         } else {
           const error = domain + ": " + String(result.reason);
           issues.push(error); coverage.push({ workspace: domain, complete: false, error });
         }
       }
-      return { items, cursor: { since: baseline, through }, issues, coverage: { workspaces: coverage } };
+      return { items, cursor: { since: baseline, through, threads: seen }, issues, coverage: { workspaces: coverage } };
     },
     refresh(item, signal) {
       const selected = item as Thread;
