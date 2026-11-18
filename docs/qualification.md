@@ -1067,3 +1067,24 @@ The public commands require no private repository or deployment configuration.
 
 Keep private logs, machine identifiers and screenshots outside public source.
 Publish only sanitized observations with revision, platform and explicit limits.
+
+## v0.31.0 Attention monitors — November 18, 2026 UTC
+
+Release source `7582c01f627ce931a47b60f2fec67530133de696` passed locked
+build/type checks, the macOS flake and distribution builds, and Linux x86_64
+Web/Workers OCI builds. Twelve package archives passed external consumer
+installation and strict public-import checks; production audits reported zero
+findings. All 14 GitHub assets matched retained bytes and published digests.
+Package scans found no known-pattern matches. Distribution findings remained
+reviewed upstream examples and library strings. No comprehensive audit is claimed.
+
+Native interactions verified private review completion, distinct request
+approvals, scheduled briefings, cancellation, exact-payload retries, restart,
+source failure/recovery and owner Stop. Live read-only Slack checks covered
+calendar boundaries, full pagination, unchanged results and an unavailable
+workspace. A clean npm application ran its actual private review successfully.
+Web submitted a status request, rendered the saved result at all four required
+sizes, opened the phone table view and recovered it after reload. Delivery
+qualification used a local sink; physical push display was outside this check.
+
+[Release v0.31.0](https://github.com/dispatchlabs-ai/dispatch/releases/tag/v0.31.0).
