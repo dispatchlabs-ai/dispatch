@@ -48,7 +48,7 @@ function settingPath(directory: string, value: string) {
   return resolve(directory, value);
 }
 
-type FileConfig = ServiceConfig & { url?: string; tokenFile?: string; conversation?: string };
+type FileConfig = ServiceConfig & Pick<ClientConnection, "conversation" | "keyedCreation"> & { url?: string; tokenFile?: string };
 
 /** Resolve CLI file settings before changing directories or connecting a client. */
 export async function readHostConfig(filename: string): Promise<FileConfig> {
@@ -85,9 +85,9 @@ export async function readClientConnection(filename?: string): Promise<ClientCon
   return connection;
 }
 
-export function configuredClientConnection({ socket, url, tokenFile, http, conversation }: FileConfig): ClientConnection | undefined {
+export function configuredClientConnection({ socket, url, tokenFile, http, conversation, keyedCreation }: FileConfig): ClientConnection | undefined {
   if (conversation !== undefined && (typeof conversation !== "string" || !conversation.trim())) throw new Error("A client conversation must be a retained conversation ID.");
-  const selected = conversation ? { conversation } : {};
+  const selected = { ...(conversation && { conversation }), ...(keyedCreation !== undefined && { keyedCreation }) };
   if (socket) return { socket, ...selected };
   if (url) return { ...tokenConnection(url, tokenFile), ...selected };
   if (http) {

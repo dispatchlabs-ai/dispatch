@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-18
+
+- Carry optional keyed conversation settings from the shared host file to its clients.
+
 ## [0.36.1] - 2026-11-18
 
 - Review long runs in model-sized sections, reuse their frozen evidence on retry and publish assessments only after a complete model answer.

@@ -4,6 +4,10 @@
 
 - Keep preview passwords in a private temporary file instead of printing them to terminal logs.
 
+## [0.37.0] - 2026-11-18
+
+- Open stable item links and exact native chat links on a single host. Named installations continue to use explicit installation IDs.
+
 ## [0.29.0] - 2026-11-17
 
 - Show avatars found beside the connected host's agent definitions automatically; retain explicit artwork bindings as overrides and initials when no image is available.

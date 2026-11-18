@@ -9,6 +9,8 @@ export type ClientConnection = ({ socket: string; url?: never; headers?: never }
   { url: string; socket?: never; headers?: Record<string, string> | (() => Promise<Record<string, string>>) }) & {
     /** Optional retained conversation selected by a client connection file. */
     conversation?: string;
+    /** Trusted Web policy for opening an item in a native conversation. */
+    keyedCreation?: { agent: string; keyPrefix: string };
   };
 export type ChatWatch = { closed: Promise<void>; stop(): Promise<void> };
 type Request = <C extends ServiceCommand>(command: C, signal?: AbortSignal) => Promise<ServiceResults[C["method"]]>;

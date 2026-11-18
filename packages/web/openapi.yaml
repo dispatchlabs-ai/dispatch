@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Web API",
-    "version": "0.36.1",
+    "version": "0.37.0",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
@@ -850,7 +850,7 @@
     "/api/chat-link": {
       "get": {
         "operationId": "resolveChatLink",
-        "summary": "Resolve an exact native conversation in a named installation without creating or resending work",
+        "summary": "Resolve a native conversation on the connected host or in a named installation",
         "tags": [
           "Conversations"
         ],
@@ -858,11 +858,12 @@
           {
             "name": "installation",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string",
               "minLength": 1
-            }
+            },
+            "description": "Required for named installations. Omit on a single host."
           },
           {
             "name": "chat",
@@ -917,7 +918,8 @@
                 "properties": {
                   "installation": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "description": "Required for named installations. Omit on a single host."
                   },
                   "key": {
                     "type": "string",
@@ -929,7 +931,6 @@
                   }
                 },
                 "required": [
-                  "installation",
                   "key",
                   "title"
                 ],

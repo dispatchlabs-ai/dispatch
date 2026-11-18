@@ -65,8 +65,8 @@ no filesystem access to its owner's state.
 A service can set `capabilities:{create:false,attachments:false,artifacts:false}`
 for restricted Web surfaces. Omitted capabilities are supported. Optional
 `keyedCreation:{agent:"helper",keyPrefix:"item:"}` permits stable item links;
-`openKeyedChat(key,title,installation)` creates/reuses without submitting input.
-`resolveChat(nativeId,installation)` observes an existing exact native ID.
+`openKeyedChat(key,title,installation?)` creates or reopens the conversation without submitting input. Single-host clients omit the installation argument.
+`resolveChat(nativeId,installation?)` observes an existing exact native ID.
 Keyed creation is a separate explicit grant from general creation.
 
 ## Optional central PostgreSQL deployment
