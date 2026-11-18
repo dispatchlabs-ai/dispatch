@@ -17,6 +17,8 @@ Durable channel delivery tasks are optional extensions in the same owner.
 | Evaluate | Local host administration | `dispatch review` for a SQLite submission, `dispatch-eval` for a use-case package | Independent saved review or package assessment |
 | Upgrade | Application deployment | Bump the package and restart the explicit host | No runtime version takeover or machine migration command |
 
+The native [iPhone app](../apps/ios/README.md) uses the authenticated Web agent, conversation, message, stop, artifact and event-stream routes. It shares the Web participant’s identity and discovers agents from that installation. Xcode signs the client for the owner’s device.
+
 The versioned [Web OpenAPI contract](../packages/web/openapi.yaml) defines exact
 paths, schemas and errors. [Backend](../packages/backend/README.md) documents
 in-process operations; the [service guide](../packages/runner/docs/service.md)

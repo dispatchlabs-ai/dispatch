@@ -47,6 +47,8 @@ Choose the ChatGPT account whose plan you want to use and approve access in the 
 
 Run `npx dispatch chat --history` to read the conversation from both clients. Stop and restart the host with the same command, then reconnect: the messages remain in `.state/`. Keep `.state/`, `.demo/` and `node_modules/` out of Git. If the web port is busy, add `--port 4329` to the Web command. [Browser walkthrough](docs/web-quickstart.md)
 
+**On iPhone:** Build the native app in Xcode with your own Apple Account. Connect it to your agents repo’s authenticated HTTPS Dispatch Web address to pick up the same conversations. [Personal iPhone setup](apps/ios/README.md)
+
 **Other authentication options:** supply `OPENAI_API_KEY` in the host environment, or save a key with `npx dispatch login openai --api-key`. For Claude, use `claude-sonnet-5-5` and follow the [Claude subscription and API setup](packages/runner/docs/sign-in.md#claude-subscription-or-api-account); account eligibility differs from ChatGPT.
 
 **Try it without an account:** follow the [credential-free demo](docs/quickstart.md). It echoes messages locally, uses separate `.demo/` state and makes no model or tool calls.
@@ -139,7 +141,7 @@ MCP works in both directions: agents can **consume external MCP tools**, and the
 
 | Connection | What it provides |
 | --- | --- |
-| [Terminal](packages/runner/README.md#interactive-terminal-ui) and [Web](packages/web/README.md) | Talk to the same agents, see thinking/tool activity and reopen saved conversations. |
+| [Terminal](packages/runner/README.md#interactive-terminal-ui), [Web](packages/web/README.md) and [iPhone](apps/ios/README.md) | Talk to the same agents, see thinking/tool activity and reopen saved conversations. |
 | [MCP server](packages/mcp/README.md) | Discover agents, create or resume conversations, send work, inspect progress/results, retrieve artifacts and stop work. Includes native messaging and automatic replies. |
 | [Slack](packages/slack/README.md) | DMs and configured channels with threaded replies and Stop. Linked threads can receive public conversation updates from Web and CLI. |
 | [Google Chat](packages/google-chat/README.md) | A Chat app for configured agents, with threaded replies, steering and Stop. Requires Google Workspace/app and Pub/Sub setup. |
