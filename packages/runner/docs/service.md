@@ -154,6 +154,13 @@ Use the operating-system login for Pi chat and the signed-in loopback Web client
 
 A missing or ambiguous configured identity prevents admission on these human channels. A missing or malformed roster fails host startup. Agents, schedules and machine clients retain their own provenance. The agent's tools remain in its definition. The roster supplies attribution and prose guidance for agent judgment. Existing installation-level read access still applies to trusted clients.
 
+In an application tool, `await requirePrivateUser("riley", api, ctx)` verifies
+that the current run includes an authenticated direct input from Riley and
+that the conversation's human messages are private to Riley. Import it from
+`@dispatch/runner` and supply the roster ID from application policy. The check
+uses the attribution recorded at admission and rejects owned child conversations.
+Pass a fourth argument for a custom Runner namespace.
+
 `contextFile` is optional and relative to the roster. Edit the Markdown to change the guidance on the next model request, including a tool follow-up. Restart the host to apply roster changes. Public messages retain the sender name and ID; private notes are supplied to inference separately.
 
 ### Interactive terminal UI

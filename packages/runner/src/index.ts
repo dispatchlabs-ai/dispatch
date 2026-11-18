@@ -43,6 +43,8 @@ export { AgentClient, connectClient } from "./client.js";
 export type { ClientConnection, ChatWatch } from "./client.js";
 export type { ClientUser } from "./protocol.js";
 export { Users, type UserIdentity } from "./users.js";
+export { requirePrivateUser } from "./private-review.js";
+export { requireDelegatedTask } from "./delegation-workers.js";
 export type { Adapter, PreparedAdapter, RunOptions } from "./run.js";
 export { ProcessScope, serveProcess, cancelService } from "./process-scope.js";
 export { nativeToolProxies, openNativeTools } from "./native-tools.js";

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Application tools can verify a user's private request with `requirePrivateUser` and read the originating tool and task of an owned assignment with `requireDelegatedTask`.
+
 ## [0.33.1] - 2026-11-18
 
 - Return follow-up creation and stop receipts before closing their native transaction.
