@@ -12,6 +12,7 @@ export type OpenOptions = {
   settings?: HarnessOptions["settings"];
   now?: () => number;
   onStatus?: (state: RunnerState) => void;
+  reviewActions?: import("./review-actions.js").RunReviewActions;
   /** Host adapters, shared by every conversation of this agent. */
   extensions?: Extension[];
   /** Available to domain-created conversations without granting root-agent tools. */
@@ -257,7 +258,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       const artifactStore = new ArtifactStore(join(directory, "artifacts"));
       const artifactExtension = artifacts.artifactExtension(artifactStore, options.artifacts);
       const compaction = compactionExtension(namespace, () => harness!);
-      const reviews = runReviewExtension({ directory, agent: agent.id, models, settings: options.settings,
+      const reviews = runReviewExtension({ directory, agent: agent.id, models, settings: options.settings, actions: options.reviewActions,
         model: execution === "demo" ? { provider: "faux", id: "faux-1", thinking: "off" } : agent.model }, evaluate);
       const resources = options.definitionResources ? [await definitionResourcesExtension(agent.root)] : [];
       const policy = [compaction, ...resources, ...(evaluate ? [reviews] : [])];

@@ -88,6 +88,27 @@ To review a retained request, run `npx dispatch review --agent NAME --submission
 
 The evaluator uses the owning agent's model connection in an independent conversation with one read-only evidence tool. It reviews the run's instructions, submissions, messages, calls, results and task outcomes through the completion boundary. The console prints the assessment and the path to `review.md` under the agent's private `evaluations/` directory. The same directory holds the redacted evidence and the evaluator's native session. Repeating the command retrieves the saved result for that instruction revision. A revised evaluator prompt produces a separate assessment. Each new evaluation consumes model tokens.
 
+### Choose what happens after a review
+
+An application can select a review policy once in its host file:
+
+```json
+{
+  "onActionableReview": {
+    "openDraftPR": { "repository": "example-org/example-agents", "paths": ["agents", "skills"] },
+    "onPROpened": { "notify": "review-alerts" }
+  }
+}
+```
+
+With `DISPATCH_EVAL=1 npm start`, a complete review can propose a small edit to current committed application files. The publisher requires Git and GitHub CLI access to the selected repository with Contents and Pull requests write permissions. It checks the edits against the source and runs `git diff --check`. Its only branch write is creating a new `dispatch-eval/…` reference, and it opens a draft against the default branch. GitHub credentials with Contents write may have broader permissions than this operation. Repository-level rules can restrict that credential independently. Source files provide evidence to a proposer with no shell or publishing tools. Choose the application paths it may edit. A compatible GitHub plan is required for native drafts.
+
+The optional notification names a recipient-bound MCP connection from `mcpServers`. Its `send_alert` tool receives `event_id`, `title`, `message` and the confirmed HTTPS PR `link` and acknowledges that ID. An existing proposal uses the same notification ID. Remove `onPROpened` to keep PRs without alerts. Remove `onActionableReview` for saved reviews only.
+
+A custom policy can set `"onReviewComplete": "./review-completed.mjs"`. Export a default function conforming to `ReviewCompletedHandler` from `@dispatch/runner`. It receives the agent, stable review ID, run boundaries, private report path and text, coverage status, and an abort signal. The host saves its receipt after the handler returns. Use the review ID as the idempotency key for external effects.
+
+For a retained review, use `npx dispatch review --agent NAME --submission ID --prepare` from a Git checkout to inspect the patch privately, or `--actions` to run the configured handlers and publisher. Repeating `--actions` recovers the saved proposal and notification receipts. The command without either option displays the assessment. Action results live under the report's `actions/` directory.
+
 ## Shared clients and company compositions
 
 The optional [MCP connector](../../mcp/README.md) exposes these conversation

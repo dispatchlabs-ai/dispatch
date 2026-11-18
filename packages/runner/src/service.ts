@@ -15,7 +15,9 @@ import { serviceSettings, type ServicePolicy } from "./settings.js";
 import { privateStateDirectory } from "./private-state.js";
 import type { McpServers } from "./mcp.js";
 
-export type ServiceConfig = ServicePolicy & HostModelsConfig & {
+import { configuredReviewActions, type ReviewPolicy } from "./review-actions.js";
+
+export type ServiceConfig = ServicePolicy & HostModelsConfig & ReviewPolicy & {
   root: string;
   stateRoot: string;
   cwd: string;
@@ -196,7 +198,7 @@ export async function startService(config: ServiceConfig, options: { signal?: Ab
       }, preparedAdapters, metadata));
     }
     const runner = createRunner({ namespace: config.namespace });
-    runtime = await run({ ...config, runner, models, adapters, settings });
+    runtime = await run({ ...config, runner, models, adapters, settings, reviewActions: configuredReviewActions(config) });
     preparedAdapters.push(...runtime.adapters);
     options.signal?.throwIfAborted();
   } catch (error) {

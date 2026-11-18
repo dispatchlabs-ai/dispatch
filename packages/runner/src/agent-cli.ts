@@ -10,7 +10,7 @@ import { localHostPaths, readHostConfig, readClientConnection, projectHostConfig
 
 const usage = `dispatch serve [--root DIRECTORY] [--state DIRECTORY] [--socket SOCKET] [--demo]
 dispatch serve --config HOST.json
-dispatch review --agent NAME --submission ID [--config HOST.json]
+dispatch review --agent NAME --submission ID [--config HOST.json] [--prepare | --actions]
 dispatch chat [--root DIRECTORY] [--state DIRECTORY] [--agent NAME] [--session KEY] [--prompt TEXT] [--history]
 dispatch preview --agent NAME [--root DIRECTORY | --config HOST.json] [--no-web | --port PORT]
 dispatch chat --preview NAME [--as USER] [--session KEY] [--prompt TEXT] [--history]
@@ -55,7 +55,7 @@ try {
     agent: { type: "string" }, port: { type: "string" }, session: { type: "string" }, prompt: { type: "string" },
     preview: { type: "string" }, as: { type: "string" }, "no-web": { type: "boolean" },
     "request-id": { type: "string" }, history: { type: "boolean" }, json: { type: "boolean" }, help: { type: "boolean" },
-    submission: { type: "string" },
+    submission: { type: "string" }, prepare: { type: "boolean" }, actions: { type: "boolean" },
     "api-key": { type: "boolean" }, "no-browser": { type: "boolean" },
     provider: { type: "string" }, model: { type: "string" }, module: { type: "string" }, export: { type: "string" }, "base-url": { type: "string" },
     space: { type: "string" }, identity: { type: "string" }, "vault-server": { type: "string" }, rebuild: { type: "boolean" },
@@ -68,6 +68,7 @@ try {
   if ((values.space || values.identity || values["vault-server"] || values.rebuild) && positionals[0] !== "environment")
     throw new Error("Environment settings belong to dispatch environment setup.");
   if ((values["api-key"] || values["no-browser"]) && !["login", "providers"].includes(positionals[0])) throw new Error("--api-key and --no-browser are sign-in options.");
+  if ((values.prepare || values.actions) && positionals[0] !== "review") throw new Error("--prepare and --actions apply to dispatch review.");
   if (values.help) console.log(usage);
   else if ((positionals[0] === "login" || positionals[0] === "logout") && positionals.length === 2) {
     const { loginCommand, logoutCommand } = await import("./login-cli.js");
@@ -98,7 +99,8 @@ try {
     if (!values.agent || !Number.isSafeInteger(submission) || submission < 1) throw new Error("Use dispatch review --agent NAME --submission ID.");
     const config = values.config ? await readHostConfig(values.config) : await localHostConfig(values);
     const { reviewCommand } = await import("./review-cli.js");
-    await reviewCommand(config, values.agent, submission);
+    if (values.prepare && values.actions) throw new Error("Choose --prepare or --actions.");
+    await reviewCommand(config, values.agent, submission, values.prepare ? "prepare" : values.actions ? "publish" : undefined);
   }
   else if (positionals[0] === "preview") {
     if (!values.agent) throw new Error("Select --agent NAME to preview.");

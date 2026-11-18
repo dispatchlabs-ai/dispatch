@@ -14,7 +14,7 @@ Durable channel delivery tasks are optional extensions in the same owner.
 | Schedule | No calendar editor or schedule route in Web | Agent-local declarations; `schedules` returns timer state and prompt/program admission receipts | Native program tasks retain exit status and output; configuration remains host administration |
 | Stop | Selected conversation's stop route | `stop CHAT` | Channel controls are adapter-specific; independent recipients keep their own lifecycle |
 | Files | Validated native input blocks and artifact routes | Native attachments and retained artifacts | MIME types and delivery receipts depend on the channel |
-| Evaluate | Local host administration | `dispatch review` for a SQLite submission, `dispatch-eval` for a use-case package | Independent saved review or package assessment |
+| Evaluate | Local host administration | `dispatch review` for a SQLite submission, `dispatch-eval` for a use-case package | Saved review, optional application handler or proposal, or package assessment |
 | Upgrade | Application deployment | Bump the package and restart the explicit host | No runtime version takeover or machine migration command |
 
 The native [iPhone app](../apps/ios/README.md) uses the authenticated Web agent, conversation, message, stop, artifact and event-stream routes. It shares the Web participant’s identity and discovers agents from that installation. Xcode signs the client for the owner’s device.

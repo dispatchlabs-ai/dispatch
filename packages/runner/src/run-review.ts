@@ -13,7 +13,9 @@ import { privateStateDirectory, privateStateFiles } from "./private-state.js";
 import { reviewPageSize, runEvidence, type ReviewRun } from "./run-evidence.js";
 import { reportError, terminalText } from "./terminal-output.js";
 
-type ReviewHost = { directory: string; agent: string; model: LoadedAgent["model"]; models: Models; settings?: HarnessOptions["settings"] };
+import type { RunReviewActions } from "./review-actions.js";
+
+type ReviewHost = { directory: string; agent: string; model: LoadedAgent["model"]; models: Models; settings?: HarnessOptions["settings"]; actions?: RunReviewActions };
 
 function reviewer(database: string, run: ReviewRun, evidence: string) {
   const pages = Math.ceil(evidence.length / reviewPageSize);
@@ -145,13 +147,25 @@ export function evaluationEnabled(value = process.env.DISPATCH_EVAL) {
 
 /** afterRun waits only for durable admission. The original answer and the next input never wait for model inference. */
 export function runReviewExtension(host: ReviewHost, enabled: boolean) {
+  const actions = defineTask<{ run: ReviewRun; report: string }, { phase: "deliver" }, string | null>({
+    name: "dispatch.run-review-actions", version: 1, initial: () => ({ phase: "deliver" }),
+    phases: { async deliver(task, runtime, ctx) {
+      const detail = await host.actions?.({ ...host, ...task.input }, runtime.signal);
+      if (detail) console.log(terminalText(detail));
+      await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: detail ?? null } }), ctx);
+    } },
+    abort: (_task, runtime, ctx) => runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx),
+  });
   const review = defineTask<ReviewRun, { phase: "review" }, string>({
     name: "dispatch.review-run", version: 1, initial: () => ({ phase: "review" }),
     phases: { async review(task, runtime, ctx) {
       try {
         const result = await reviewRun(host, task.input, withAbortSignal(runtime.signal, ctx));
         console.log(terminalText(`Evaluation: ${host.agent} / conversation ${task.input.conversation} / answer ${task.input.answer}\n${result.text}\nSaved: ${result.report}`));
-        await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: result.report } }), ctx);
+        await runtime.commit(async tx => {
+          if (host.actions) await tx.createTask(actions, { run: task.input, report: result.report }, { ownership: { kind: "conversation" }, background: true });
+          return { status: "terminal", outcome: { status: "completed", result: result.report } };
+        }, ctx);
       } catch (error) {
         runtime.signal.throwIfAborted();
         reportError(`Could not evaluate ${host.agent} / answer ${task.input.answer}:`, error);
@@ -170,7 +184,7 @@ export function runReviewExtension(host: ReviewHost, enabled: boolean) {
     } },
     abort: (_task, runtime, ctx) => runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), ctx),
   });
-  return defineExtension({ name: "dispatch.run-reviews", tasks: [queue, review], hooks: enabled ? [hook(GenerationTask, {
+  return defineExtension({ name: "dispatch.run-reviews", tasks: [queue, review, actions], hooks: enabled ? [hook(GenerationTask, {
     afterRun(run, api) { return { tasks: [runEndTask(queue, { conversation: api.conversationId, ...run })] }; },
   })] : [] });
 }
