@@ -93,14 +93,14 @@ export default function App() {
     if (!link || !deliveryReady) return;
     let active = true;
     setLinkReady(false); setLinkError('');
-    if (link.has('key') && (link.has('chat') || !link.get('installation') || !link.get('title') || !link.get('key')?.startsWith('attention-item:') || link.get('key') === 'attention-item:' || /[\u0000-\u001f\u007f-\u009f]/.test(link.get('key')!))) {
+    if (link.has('key') && (link.has('chat') || !link.get('title') || !link.get('key'))) {
       setLinkError('Invalid keyed conversation link.'); setLinkReady(true); return;
     }
     if (link.has('key') && pending) {
       setLinkError('Resolve the pending message before opening this conversation link.'); setLinkReady(true); return;
     }
     const request = link.has('key')
-      ? api<Chat>('/api/chat-link', { installation: link.get('installation'), key: link.get('key'), title: link.get('title') })
+      ? api<Chat>('/api/chat-link', { installation: link.get('installation') ?? undefined, key: link.get('key'), title: link.get('title') })
       : api<Chat>(`/api/chat-link?${link}`);
     void request.then(chat => {
       if (!active) return;
@@ -253,7 +253,7 @@ export default function App() {
         if (link?.has('key')) {
           const current = await api<Snapshot>(route(chatId));
           if (!current.messages.some(message => message.provenance === 'user'))
-            text = `About this Attention item: ${link.get('title')}\n${link.get('context') ?? ''}\n\n${draft}`;
+            text = `About this item: ${link.get('title')}\n${link.get('context') ?? ''}\n\n${draft}`;
         }
         await deliver({ chatId, text, draftText: draft, requestId, attachments: files });
       };

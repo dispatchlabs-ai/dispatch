@@ -213,7 +213,9 @@ Optional trusted server overrides, never browser-supplied paths:
 
 ### Keyed item links
 
-An installation can explicitly enable keyed chat links while ordinary creation
+On a single host, set `"keyedCreation":{"agent":"helper","keyPrefix":"item:"}` in the same host configuration used by Web and the CLI. An item link such as `/?key=item%3A42&title=Review+report&context=Choose+a+format` opens or reopens its conversation. An existing native conversation opens with `/?chat=helper%3A42`.
+
+A named installation can explicitly enable keyed chat links while ordinary creation
 remains disabled. For example, set its trusted service binding to
 `"keyedCreation":{"agent":"helper","keyPrefix":"attention-item:"}` alongside
 `"capabilities":{"create":false,"attachments":false,"artifacts":false}`.
@@ -234,7 +236,7 @@ Until the first message, `context` is shown as the item's title, summary and sou
 at the top of the conversation (labelled `Title:`, `Summary:`, `Source:` and
 `Source URL:` lines are displayed as content), retained in the URL through sign-in
 and reload. On your first explicit send, if a fresh native snapshot has no user
-message, Web prepends an “About this Attention item” block containing title/context
+message, Web prepends an “About this item” block containing title/context
 to your text in one normal message. The transcript shows that complete text.
 Later messages are unchanged. Nothing is sent or modeled on open/reload/reconnect;
 the composer starts empty unless this tab already has a retained draft.

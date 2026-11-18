@@ -7,13 +7,13 @@ import { AdmissionError } from "./config.js";
 import type { Runtime } from "./runtime.js";
 import type { Capabilities, Chat, Snapshot } from "./contracts.js";
 
-export type ServiceConnection = ClientConnection & { sourceId?: string; label?: string; expectedStateRoot?: string; expectedIdentity?: string; capabilities?: Capabilities; keyedCreation?: { agent: string; keyPrefix: string } }
+export type ServiceConnection = ClientConnection & { sourceId?: string; label?: string; expectedStateRoot?: string; expectedIdentity?: string; capabilities?: Capabilities }
 
 /** Connect to the authorized local native owner; closing this client never stops it. */
 export async function openServiceRuntime(config: ServiceConnection): Promise<Runtime> {
   if (!config || config.socket && !isAbsolute(config.socket)) throw new Error("Provide an absolute service socket or a service URL.");
   const keyed = config.keyedCreation;
-  if (keyed && (!/^[a-zA-Z0-9_-]+$/.test(keyed.agent) || !/^[a-z][a-z0-9-]*:$/.test(keyed.keyPrefix)))
+  if (keyed !== undefined && (!keyed || typeof keyed.agent !== "string" || !/^[a-zA-Z0-9_-]+$/.test(keyed.agent) || typeof keyed.keyPrefix !== "string" || !/^[a-z][a-z0-9-]*:$/.test(keyed.keyPrefix)))
     throw new Error("Provide keyedCreation agent and keyPrefix in trusted service configuration.");
   const capabilities = config.capabilities;
   if (capabilities && (typeof capabilities !== "object" || Object.entries(capabilities).some(([key, value]) =>
