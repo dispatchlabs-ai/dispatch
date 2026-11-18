@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-11-18
+
 - Add owner-scoped attention monitors with deterministic SlackGo polling, independent private reviews, request-level state, consolidated notices, scheduled briefings and durable delivery/cancellation.
 - Keep user-request completion hooks out of task-owned reminder and monitor reviews so restricted evidence tools can complete their structured answer.
 

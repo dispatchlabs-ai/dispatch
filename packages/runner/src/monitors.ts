@@ -331,7 +331,7 @@ function bind(options: MonitorOptions, host: PrivateReviewHost): Extension {
       await api.commit(tx => authorizePrivateReview(host, owner, tx, api.conversationId), ctx);
       const saved = await api.snapshot(state, ctx);
       if (input.action === "status") return output(saved ? { enabled: saved.scanner !== null, task: saved.scanner,
-        coverage: saved.coverage, issues: saved.issues,
+        checkpoint: saved.cursor, coverage: saved.coverage, issues: saved.issues,
         sources: Object.values(saved.items).filter(slot => !input.key || slot.item.key === input.key).map(slot =>
           ({ key: slot.item.key, revision: slot.item.revision, reviewed: slot.reviewed, worker: slot.worker })),
         cases: Object.values(saved.cases).filter(item => !input.key || item.sourceKey === input.key),

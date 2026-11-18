@@ -12,7 +12,7 @@ If you have no application yet, start with the
 In your application's directory, beside its `package.json`:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.30.0/dispatch-web-0.30.0.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.31.0/dispatch-web-0.31.0.tgz
 ```
 
 Use the release matching your installed Runner. The two-agent setup already
