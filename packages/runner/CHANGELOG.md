@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-11-18
+
 - Review completed SQLite runs in an independent native conversation. Enable automatic reviews with `DISPATCH_EVAL=1` or inspect a retained submission with `dispatch review`.
 
 ## [0.31.0] - 2026-11-18
