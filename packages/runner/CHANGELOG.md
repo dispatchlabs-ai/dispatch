@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-11-18
+
 - Agents post short progress notes in their current chat by default. Notes appear during running tools, survive reconnects and use Pi's retry-safe writes.
 
 ## [0.38.1] - 2026-11-18
