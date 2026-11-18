@@ -17,8 +17,8 @@ Use Node **24.22.1 or newer** and npm on macOS or Linux. With a ChatGPT subscrip
 mkdir my-agents && cd my-agents
 npm init -y --init-type=module
 npm install \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.36.0/dispatch-runner-0.36.0.tgz \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.36.0/dispatch-web-0.36.0.tgz
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.36.1/dispatch-runner-0.36.1.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.36.1/dispatch-web-0.36.1.tgz
 ```
 
 **2. Write your agent, sign in and start its host.**
