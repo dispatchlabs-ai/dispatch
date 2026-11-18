@@ -2,6 +2,7 @@ import type { AgentChange, Extension } from "@earendil-works/pi-durable";
 import type { LoadedAgent } from "./definition.js";
 import { createCoding } from "./coding.js";
 import { createHandoffs } from "./handoff.js";
+import type { createProgress } from "./progress.js";
 import type { ReplySink } from "./replies.js";
 import { skillExtension, skillInstructions } from "./skills.js";
 import { repositoryInstructionsExtension } from "./instructions.js";
@@ -11,7 +12,7 @@ import { reminderReviewExtension } from "./reminders.js";
 
 export type AgentSetup = { configuration: AgentChange; installed: Extension[]; delegate?: AgentSetup };
 
-export function createConfiguration(codingExtension: ReturnType<typeof createCoding>["codingExtension"], handoffExtension: ReturnType<typeof createHandoffs>["handoffExtension"], progressTools: Extension, progressInstructions?: (agent: LoadedAgent) => string) {
+export function createConfiguration(codingExtension: ReturnType<typeof createCoding>["codingExtension"], handoffExtension: ReturnType<typeof createHandoffs>["handoffExtension"], progress: ReturnType<typeof createProgress>, progressInstructions?: (agent: LoadedAgent) => string) {
   async function agentConfiguration(
     agent: LoadedAgent, directory: string, demo: boolean, adapters: Extension[], sink?: ReplySink, cwd?: string,
     shared: Extension[] = [],
@@ -33,7 +34,7 @@ export function createConfiguration(codingExtension: ReturnType<typeof createCod
       installed.push(...child.installed);
       extensions.push(handoffExtension({
         target: agent.handoff.target, supervisorName: agent.id, configuration: child.configuration,
-        progressEveryMs: agent.handoff.progressEveryMs, sink,
+        progressEveryMs: agent.handoff.progressEveryMs, progressNotes: progress.enabled(agent), sink,
         supervisor: {
           model, thinkingLevel: agent.model.thinking, extensions: [repositoryInstructions], cwd,
           instructions: agent.instructions + "\n\n" + (progressInstructions?.(agent) ?? `You are ${agent.id}, giving the user a brief progress update about ${agent.handoff.target}'s work. Use only the supplied public milestones and tool status. In one or two clear sentences explain what has been learned, what is being checked next, or what is blocked. Speak to a nontechnical colleague; avoid tool names and implementation jargon. Do not infer completed work, reveal private reasoning, promise a completion time, or ask questions. If there is no meaningful change from the last update, answer exactly NO_UPDATE.`),
@@ -49,7 +50,7 @@ export function createConfiguration(codingExtension: ReturnType<typeof createCod
       extensions.push(delegationExtension(agent.id, delegates, agent.clones));
     }
     extensions.push(...shared, ...adapters);
-    if (!extensions.some(extension => extension.name === progressTools.name)) extensions.push(progressTools);
+    extensions.push(progress.forAgent(agent));
     installed.push(...extensions);
     return {
       configuration: { model, thinkingLevel: agent.model.thinking, instructions: agent.instructions + skillInstructions(agent.skillCatalog ?? []), extensions, ...(cwd ? { cwd } : {}) },

@@ -216,6 +216,9 @@ includes dependency installation, this file's location and a real-tool check.
 
 Every agent can post progress in its current chat with `report_progress`. During
 sustained work it shares short updates when there are new findings or blockers.
+Set `"progressNotes": false` in `host.json` to turn notes off for the installation,
+or `progressNotes: false` in one agent's Markdown frontmatter to silence that
+agent. The host setting takes precedence. Restart the host after a change.
 For a long tool that processes a batch, `await batchProgress(api, context, "review")`
 returns a reporter. Call it with the completed count and a public summary as
 receipts arrive. It groups parallel results into updates roughly every 45 seconds.

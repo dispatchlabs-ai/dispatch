@@ -25,6 +25,7 @@ export type ServiceConfig = ServicePolicy & HostModelsConfig & ReviewPolicy & {
   /** Put TLS in front of a network listener; its private token authorizes this installation. */
   http?: { host?: string; port: number; tokenFile: string };
   namespace?: string;
+  progressNotes?: boolean;
   usersFile?: string;
   names?: string[];
   /** Explicit synthetic inference; retained stores cannot switch between demo and live. */
@@ -197,7 +198,7 @@ export async function startService(config: ServiceConfig, options: { signal?: Ab
         authorize: request => timingSafeEqual(digest(request.headers.authorization ?? ""), expected),
       }, preparedAdapters, metadata));
     }
-    const runner = createRunner({ namespace: config.namespace });
+    const runner = createRunner({ namespace: config.namespace, progressNotes: config.progressNotes });
     runtime = await run({ ...config, runner, models, adapters, settings, reviewActions: configuredReviewActions(config) });
     preparedAdapters.push(...runtime.adapters);
     options.signal?.throwIfAborted();

@@ -1,11 +1,13 @@
 import { Type } from "typebox";
 import type { Context } from "@earendil-works/chord/context";
-import { defineDoc, defineExtension, defineTool, type ToolExecutionApi } from "@earendil-works/pi-durable";
+import { defineDoc, defineExtension, defineTool, wrapSection, type ToolExecutionApi, type ToolRegistration, type Wrap } from "@earendil-works/pi-durable";
+import type { LoadedAgent } from "./definition.js";
 
 type BatchNote = { completed: number; summary: string; at: number };
 
 /** Report a long tool's verified receipts in its own conversation. Counts increase within each named phase. */
 export async function batchProgress(api: ToolExecutionApi, context: Context, phase: string) {
+  if (!(await api.agent(context)).callable.some(tool => tool.name === "report_progress")) return async () => {};
   let slot = 0;
   const key = () => `progress:${encodeURIComponent(phase)}:${slot}`;
   let saved = await api.memo<BatchNote>(key(), context);
@@ -29,7 +31,15 @@ export async function batchProgress(api: ToolExecutionApi, context: Context, pha
   };
 }
 
-export function createProgress(namespace: string) {
+export function createProgress(namespace: string, hostEnabled = true) {
+  if (typeof hostEnabled !== "boolean") throw new Error("progressNotes must be a boolean.");
+  const enabled = (agent: LoadedAgent) => hostEnabled && agent.progressNotes !== false;
+  const muted: Wrap[] = [
+    wrapSection("public-progress", section => ({ ...section, render: () => undefined })),
+    { tool: "report_progress", wrap: (tool: ToolRegistration): ToolRegistration => ({
+      ...tool, callers: [], execute: async () => ({ output: [{ type: "text", text: "Progress notes are off." }] }),
+    }) },
+  ];
   const Progress = defineDoc<{ summary: string; sequence: number; at?: number }>({
     kind: `${namespace}.progress`, version: 1, scope: "conversation", history: "latest", fork: "initial",
     checkpointWhen: () => false,
@@ -38,6 +48,7 @@ export function createProgress(namespace: string) {
 
   const ProgressTools = defineExtension({
     name: `${namespace}.progress`,
+    wraps: hostEnabled ? [] : muted,
     sections: [{
       key: "public-progress",
       async render({ conversationId, read }, context) {
@@ -73,5 +84,9 @@ export function createProgress(namespace: string) {
     })],
   });
 
-  return { Progress, ProgressTools };
+  // A saved worker keeps its role's selection when host settings or its definition change.
+  const forAgent = (agent: LoadedAgent) => defineExtension({
+    ...ProgressTools, name: `${ProgressTools.name}.${agent.id}`, wraps: enabled(agent) ? [] : muted,
+  });
+  return { Progress, ProgressTools, forAgent, enabled };
 }

@@ -83,7 +83,7 @@ async function runStep(args: string[], releaseManifest: string | undefined) {
     await sessionAgent(definitions, stateRoot, owner);
     process.env.DISPATCH_SESSION_STATE_ROOT = stateRoot;
     process.chdir(config.cwd);
-    app = await run({ root: definitions, stateRoot, cwd: config.cwd, runner: createRunner({ namespace: config.namespace }), models, names: [owner],
+    app = await run({ root: definitions, stateRoot, cwd: config.cwd, runner: createRunner({ namespace: config.namespace, progressNotes: config.progressNotes }), models, names: [owner],
       schedules: false, settings: serviceSettings(config), resume: false, updateDefinitions: "when-idle" });
     const host = app.service.host(owner);
     const chat = await app.service.create(owner, "cli", `terminal:${session}`, "Evaluation");

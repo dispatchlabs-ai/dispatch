@@ -58,18 +58,18 @@ export { ArtifactStore, artifactFilename, artifactMimeType } from "./artifacts.j
 export type { Artifact, ArtifactRecord, ArtifactDelivery, ArtifactSource, ArtifactSink, ArtifactOptions } from "./artifacts.js";
 
 /** Keep a namespace fixed for the lifetime of its persisted native sessions. */
-export function createRunner(options: { namespace?: string; workspacePrefix?: string; progressInstructions?: (agent: LoadedAgent) => string } = {}) {
+export function createRunner(options: { namespace?: string; workspacePrefix?: string; progressNotes?: boolean; progressInstructions?: (agent: LoadedAgent) => string } = {}) {
   const namespace = options.namespace ?? "dispatch";
   if (!/^[a-z][a-z0-9-]*$/.test(namespace)) throw new Error("Invalid durable namespace.");
-  const progress = createProgress(namespace);
+  const progress = createProgress(namespace, options.progressNotes);
   const artifacts = createArtifacts(namespace);
   const replies = createReplies(namespace);
   const coding = createCoding(namespace, options.workspacePrefix);
   const handoffs = createHandoffs(namespace, progress.Progress, replies.publishReply);
-  const configuration = createConfiguration(coding.codingExtension, handoffs.handoffExtension, progress.ProgressTools, options.progressInstructions);
+  const configuration = createConfiguration(coding.codingExtension, handoffs.handoffExtension, progress, options.progressInstructions);
   const runtime = createRuntime(namespace, configuration.agentConfiguration, handoffs.Handoffs, coding.codingEnvironment, artifacts, progress.ProgressTools);
   const chats = createChats(namespace, runtime.openAgent, handoffs.Handoffs, artifacts.Artifacts);
-  return { namespace, ...progress, ...artifacts, ...replies, ...coding, ...handoffs, ...configuration, ...runtime, ...chats };
+  return { namespace, Progress: progress.Progress, ProgressTools: progress.ProgressTools, ...artifacts, ...replies, ...coding, ...handoffs, ...configuration, ...runtime, ...chats };
 }
 
 export type Runner = ReturnType<typeof createRunner>;

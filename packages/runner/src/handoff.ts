@@ -35,7 +35,7 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
 
   function handoffExtension(options: {
     target: string; supervisorName: string; configuration: AgentChange; supervisor: AgentChange;
-    progressEveryMs: number; sink?: ReplySink;
+    progressEveryMs: number; progressNotes?: boolean; sink?: ReplySink;
   }) {
     const { target, sink } = options;
     const anchor = defineTask<null, { phase: "done" }, null>({
@@ -109,7 +109,7 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
           }
           const state = await runtime.snapshot(Handoffs, runtime.conversationId, context);
           const jobs = Object.values(state?.jobs ?? {}).filter(job => job.status === "working");
-          if (!jobs.length || !state?.child) {
+          if (options.progressNotes === false || !jobs.length || !state?.child) {
             await runtime.commit(async tx => {
               (await tx.doc(Handoffs, runtime.conversationId)).monitor = null;
               return { status: "terminal", outcome: { status: "completed", result: null } };
@@ -173,7 +173,7 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
           await runtime.commit(async tx => {
             const state = await tx.doc(Handoffs, runtime.conversationId);
             const jobs = Object.values(state.jobs).filter(job => job.status === "working");
-            if (!state.stopping && jobs.length && answer && text && text !== "NO_UPDATE" && text !== state.summary) {
+            if (options.progressNotes !== false && !state.stopping && jobs.length && answer && text && text !== "NO_UPDATE" && text !== state.summary) {
               await publishReply(tx, runtime.conversationId, options.supervisorName, answer, `progress:${task.id}:${checkpoint.cycle}`, sink, jobs.at(-1)?.destination);
               state.summary = text;
             }
@@ -228,7 +228,7 @@ export function createHandoffs(namespace: string, Progress: ReturnType<typeof cr
           state.jobs[String(api.taskId)] = {
             taskId, question, status: "working", ...(destination ? { destination } : {}),
           };
-          if (state.monitor === null) {
+          if (state.monitor === null && options.progressNotes !== false) {
             state.monitor = await tx.createTask(monitor, { firstAt: api.now() + options.progressEveryMs }, background);
           }
           return { child: state.child, taskId, acknowledged: hasAcknowledgement };

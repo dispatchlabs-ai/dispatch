@@ -39,6 +39,8 @@ export type AgentDefinition = {
   /** Default true. False keeps messages' permission and delivery but gives the model no native message tools,
    * for an agent that sends through the Dispatch MCP connector instead. */
   messageTools?: boolean;
+  /** Post progress notes in this agent's conversation. Defaults to the host setting. */
+  progressNotes?: boolean;
   handoff?: { target: string; progressEveryMs: number };
 };
 
@@ -88,6 +90,7 @@ export function defineAgent(definition: AgentDefinition = {}): AgentDefinition &
   if (definition.messages && (!Array.isArray(definition.messages) || definition.messages.some(id => !agentName.test(id))
     || new Set(definition.messages).size !== definition.messages.length)) throw new Error("Message recipients must be unique agent names.");
   if (definition.messageTools !== undefined && typeof definition.messageTools !== "boolean") throw new Error("messageTools must be a boolean.");
+  if (definition.progressNotes !== undefined && typeof definition.progressNotes !== "boolean") throw new Error("progressNotes must be a boolean.");
   if (definition.messageTools === false && !definition.messages?.length) throw new Error("messageTools: false applies only to an agent with messages.");
   if (!trigger || !["manual", "continuous", "interval"].includes(trigger.mode)) {
     throw new Error("Trigger mode must be manual, continuous, or interval.");
@@ -111,7 +114,7 @@ export function defineAgent(definition: AgentDefinition = {}): AgentDefinition &
   return { ...definition, trigger, input: definition.input ?? "" };
 }
 
-const frontmatterKeys = ["description", "model", "mcp", "environment"];
+const frontmatterKeys = ["description", "model", "mcp", "environment", "progressNotes"];
 const modelKeys = ["provider", "id", "thinking"];
 const agentModuleKeys = ["trigger", "input", "schedules", "extensions", "coding", "skills", "delegates", "clones", "messages", "messageTools", "handoff"];
 
@@ -216,9 +219,12 @@ async function readDefinition(root: string, id: string, folder: string, ancestor
     throw new Error(`${source} requires description, model.provider, model.id, and instructions.`);
   }
   const { code, value } = preview ? { code: preview.code, value: undefined } : await agentModule(folder, "agent.ts");
-  const definition = preview ? defineAgent({ extensions: preview.extensions, skills: !!preview.skills }) :
-    defineAgent({ ...value, ...(meta.mcp !== undefined ? { mcp: meta.mcp } : {}),
-    ...(meta.environment !== undefined ? { environment: meta.environment } : {}) });
+  const definition = defineAgent({
+    ...(preview ? { extensions: preview.extensions, skills: !!preview.skills } :
+      { ...value, ...(meta.mcp !== undefined ? { mcp: meta.mcp } : {}),
+        ...(meta.environment !== undefined ? { environment: meta.environment } : {}) }),
+    ...(meta.progressNotes !== undefined ? { progressNotes: meta.progressNotes } : {}),
+  });
   let skillCatalog = definition.skills ? await loadSkills(root, id) : [];
   if (Array.isArray(preview?.skills)) {
     const available = new Map(skillCatalog.map(skill => [skill.id, skill]));

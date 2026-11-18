@@ -4,7 +4,7 @@
 
 ## [0.39.0] - 2026-11-18
 
-- Agents post short progress notes in their current chat by default. Notes appear during running tools, survive reconnects and use Pi's retry-safe writes.
+- Agents post short progress notes in their current chat by default. Notes appear during running tools, survive reconnects and use Pi's retry-safe writes. Hosts and individual agents can turn notes off with `progressNotes: false`.
 
 ## [0.38.1] - 2026-11-18
 

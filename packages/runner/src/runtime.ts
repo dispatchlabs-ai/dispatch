@@ -340,10 +340,22 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
           conversations.push(...page.items);
           cursor = page.next;
         } while (cursor);
-        const added = [...policy, progressTools].map(extension => extension.name);
+        const policies = policy.map(extension => extension.name);
+        const progressPrefix = `${progressTools.name}.`;
+        const roles = new Set(installed.map(extension => extension.name).filter(name => name.startsWith(progressPrefix)));
         for (const conversation of conversations) {
           const state = await tx.doc(AgentDoc, conversation.id);
           const selected = state.extensions;
+          const names = Array.isArray(selected) ? selected : selected?.add ?? [];
+          let role = names.find(name => roles.has(name));
+          if (!role) {
+            // Older conversations predate role-specific progress. Named workers retain their assignment.
+            const owner = conversation.owner && await tx.task(conversation.owner.taskId);
+            const assigned = owner?.kind.startsWith("dispatch.delegation.") ? (owner.input as { agent?: string }).agent :
+              owner?.kind === `${namespace}.handoff-anchor` ? agent.handoff?.target : undefined;
+            role = assigned && roles.has(progressPrefix + assigned) ? progressPrefix + assigned : progressPrefix + agent.id;
+          }
+          const added = [...policies, role];
           // configure's object form replaces the selection; it does not patch it.
           state.extensions = Array.isArray(selected)
             ? [...new Set([...selected, ...added])]

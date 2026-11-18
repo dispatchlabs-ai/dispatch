@@ -85,7 +85,7 @@ export async function previewCommand(id: string, options: { root?: string; confi
   const stop = () => controller.abort();
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
-  const runner = createRunner({ namespace: config.namespace });
+  const runner = createRunner({ namespace: config.namespace, progressNotes: config.progressNotes });
   const hosts: Awaited<ReturnType<typeof run>>[] = [];
   const listeners: Awaited<ReturnType<typeof serveService>>[] = [];
   const endpoint = configuredClientConnection(config);
