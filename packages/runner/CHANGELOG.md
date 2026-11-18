@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.33.1] - 2026-11-18
+
 - Return follow-up creation and stop receipts before closing their native transaction.
 
 ## [0.33.0] - 2026-11-18
