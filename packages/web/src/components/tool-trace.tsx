@@ -10,7 +10,7 @@ export function ToolActivity({calls}: {calls: ToolCall[]}) {
   const failures = calls.filter(call => call.status === 'failed').length;
   return <Trace className="tool-trace">
     <TraceCollapsible>
-      <TraceCollapsibleTrigger>
+      <TraceCollapsibleTrigger className="m-1 min-h-8 px-1.5">
         <TraceLine>
           <TraceIcon><Terminal/></TraceIcon>
           <TraceTitle>Tool activity</TraceTitle>
