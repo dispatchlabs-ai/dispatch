@@ -41,7 +41,7 @@ buildNpmPackage {
       ++ lib.optionals withSlack [ ../../slack/src ../../slack/tsconfig.json ]
       ++ lib.optionals withFleet [ ../../fleet/src ../../fleet/scripts ../../fleet/tsconfig.json ]);
   };
-  npmDepsHash = "sha256-+y5DQlJkyzgdbXC0THr1CQpXgIBnMQl7XsxlJXgAChg=";
+  npmDepsHash = "sha256-TXxJJbG7MVkNgvVyAd8UynW4cfx74dLN9FWQ1h8eNAE=";
   npmInstallFlags = [ "--workspace=@dispatch/runner" "--include-workspace-root=false" ]
     ++ lib.optionals withBackend [ "--workspace=@dispatch/remote" "--workspace=@dispatch/postgres" "--workspace=@dispatch/backend" ]
     ++ lib.optional withGoogleChat "--workspace=@dispatch/google-chat"

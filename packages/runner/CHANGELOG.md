@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-11-18
+
 - Add persistent, owner-requested follow-ups across selected sources, with evidence for each answer and recoverable notification delivery.
 
 ## [0.32.0] - 2026-11-18
