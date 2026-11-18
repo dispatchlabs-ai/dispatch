@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-11-18
+
 - Read monitored workspaces and named follow-up threads through the Slack Web API with a verified user OAuth grant for each workspace.
 
 ## [0.23.0] - 2026-11-16

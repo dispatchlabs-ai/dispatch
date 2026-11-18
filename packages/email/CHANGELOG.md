@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-11-18
+
 - Provide read-only Gmail thread and search sources for persistent follow-ups using an authorized mailbox and the existing OAuth credential format.
 
 ## [0.13.0] - 2026-11-13
