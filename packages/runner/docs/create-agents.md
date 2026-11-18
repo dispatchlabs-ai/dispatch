@@ -24,9 +24,9 @@ mkdir my-agents
 cd my-agents
 npm init -y --init-type=module
 npm install \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.39.1/dispatch-runner-0.39.1.tgz \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.39.1/dispatch-web-0.39.1.tgz \
-  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.39.1/dispatch-mcp-0.39.1.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.39.2/dispatch-runner-0.39.2.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.39.2/dispatch-web-0.39.2.tgz \
+  https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.39.2/dispatch-mcp-0.39.2.tgz \
   @earendil-works/pi-durable@1.5.2
 mkdir -p agents/researcher agents/developer
 cat > .gitignore <<'EOF_IGNORE'
