@@ -171,36 +171,36 @@ function bind(options: FollowUpOptions, host: PrivateReviewHost) {
         return out(input.id ? cases[key] ? display(cases[key]) : { status: "missing" } : Object.values(cases).map(display));
       }
       if (host.preview || !input.id?.trim()) throw new Error("A live private request and case ID are required.");
-      if (input.action === "stop") return out(await api.commit(async tx => {
-        const saved = (await tx.doc(state)).cases[key]; if (!saved) return { status: "missing" };
+      if (input.action === "stop") return api.commit(async tx => {
+        const saved = (await tx.doc(state)).cases[key]; if (!saved) return out({ status: "missing" });
         if (saved.status === "watching") {
           saved.status = "stopped";
           saved.error = null;
         }
-        return display(saved);
-      }, ctx));
+        return out(display(saved));
+      }, ctx);
       const since = input.since ? Date.parse(input.since) : api.now();
       if (!input.title?.trim() || !input.sources?.length || (!input.notifyOn?.trim() && !input.questions?.length)
         || !Number.isFinite(since) || input.since && !/(Z|[+-]\d\d:\d\d)$/.test(input.since))
         throw new Error("Supply a title, sources, an absolute baseline, and a first notification condition or completion questions.");
       if (options.deliverTo.maxTitleLength && input.title.length > options.deliverTo.maxTitleLength) throw new Error("Shorten the title to fit the notification destination.");
       const spec: Spec = { id: input.id, title: input.title, since, notifyOn: input.notifyOn?.trim() ?? "", questions: input.questions ?? [], sources: input.sources };
-      return out(await api.commit(async tx => {
+      return api.commit(async tx => {
         const saved = await tx.doc(state);
         const existing = saved.cases[key];
         if (existing) {
           const requested = { ...spec, since: input.since ? since : existing.spec.since };
           if (hash(requested) !== hash(existing.spec))
             throw new Error("That case ID already has different instructions. Inspect its status before choosing a new ID.");
-          return { existing: true, ...display(existing) };
+          return out({ existing: true, ...display(existing) });
         }
         const task = await tx.createTask(poll, { key }, { ownership: { kind: "conversation" }, conversationId: api.conversationId, background: true });
         saved.cases[key] = {
           spec, task, status: "watching", first: null, answers: spec.questions.map(() => null),
           seen: {}, checkedAt: null, coverage: [], issues: [], error: null, pending: null, receipts: []
         };
-        return display(saved.cases[key]);
-      }, ctx));
+        return out(display(saved.cases[key]));
+      }, ctx);
     },
   });
   return Object.assign(defineExtension({ name: prefix, tasks: [poll], tools: [tool] }), { reviewExtension });
