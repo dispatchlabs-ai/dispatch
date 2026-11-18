@@ -4,6 +4,16 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## Native iPhone personal builds — November 18, 2026 UTC
+
+Xcode 27 built the checked-in project from a clean clone. An iOS 18.5 simulator
+signed in over HTTPS to a separate agents repository using the v0.32.0 release
+packages and the demo provider. The native app discovered the agent, created a
+conversation, sent a message and displayed its reply. The conversation reappeared
+after relaunch, and both messages were visible in Dispatch Web in Safari.
+A development-signed Release build installed and launched on a physical iPhone
+running iOS 27.2.1. The authenticated chat interaction was exercised on the simulator.
+
 ## v0.30.0 Scheduled programs — November 17, 2026 UTC
 
 Real macOS calendar runs covered literal command arguments, application working
