@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Move Slack monitoring to the optional Slack package. Monitors, follow-ups and draft PRs use the application’s recipient-bound notification destination. See the [0.35 upgrade notes](docs/upgrade.md#upgrading-monitors-from-035).
+- Give distinct review proposals separate pull requests when they replace the same source passage with different changes.
 
 ## [0.35.0] - 2026-11-18
 

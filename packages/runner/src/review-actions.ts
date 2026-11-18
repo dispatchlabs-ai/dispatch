@@ -130,9 +130,8 @@ export function configuredReviewActions(config: Config): RunReviewActions | unde
             await save(diff, patch);
             await saveJson(planFile, { base, context, decision });
             if (!github) return "Prepared: " + diff;
-            const key = JSON.stringify(proposal.edits.map(({ path, before }) => [path, before]).sort());
             const body = proposal.reason + "\n\nChecked each edit against the committed source and ran `git diff --check`. A future agent run can verify the behavior.";
-            const pull = await github.publish(base, files, key, proposal.title, body);
+            const pull = await github.publish(base, files, proposal, body);
             result = { kind: "pr", pull };
           }
           if (decision.kind !== "change") await saveJson(planFile, { base, context, decision });

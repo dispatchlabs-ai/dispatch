@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { repositoryName } from "./review-source.js";
+import { repositoryName, type Proposal } from "./review-source.js";
 
 type Repo = { id: number; full_name: string; default_branch: string };
 type Pull = { number: number; html_url: string; state: string; draft: boolean; title: string; head: { ref: string; repo: Repo | null }; base: { ref: string; repo: Repo } };
@@ -55,11 +55,30 @@ export async function githubPublisher(repository: string, cwd: string, signal?: 
         if (list.length < 100) return results;
       }
     },
-    async publish(baseCommit: string, files: ChangedFile[], key: string, title: string, body: string) {
-      const branch = "dispatch-eval/" + createHash("sha256").update(key).digest("hex").slice(0, 32);
+    async publish(baseCommit: string, files: ChangedFile[], { edits, title }: Proposal, body: string) {
+      const branchName = (key: string[][]) => "dispatch-eval/" + createHash("sha256").update(JSON.stringify(key)).digest("hex").slice(0, 32);
+      const ordered = edits.toSorted((a, b) => a.path.localeCompare(b.path));
+      const branch = branchName(ordered.map(({ path, before, after }) => [path, before, after]));
       if (branch === base) throw new Error("The proposal branch cannot be the default branch.");
       const prior = await find(branch);
       if (prior) return prior;
+      // Older branches identified only the original passage. Reuse one only if
+      // GitHub confirms every resulting file, including its proposed replacement.
+      const legacy = await find(branchName(edits.map(({ path, before }) => [path, before]).sort()));
+      if (legacy) {
+        const expected = new Map(files.map(({ path, content }) => [path, createHash("sha1")
+          .update("blob " + Buffer.byteLength(content) + "\0").update(content).digest("hex")]));
+        let matched = true;
+        for (let page = 1; ; page++) {
+          const changed = await api<{ filename: string; sha: string }[]>(`/pulls/${legacy.number}/files?per_page=100&page=${page}`);
+          for (const file of changed) {
+            if (expected.get(file.filename) !== file.sha) matched = false;
+            expected.delete(file.filename);
+          }
+          if (!matched || changed.length < 100) break;
+        }
+        if (matched && !expected.size) return legacy;
+      }
       const parent = await current();
       if (parent.sha !== baseCommit) throw new Error("The default branch advanced. Prepare the proposal against its current contents.");
       const treeFor = (baseTree: string) => api<{ sha: string }>("/git/trees", { base_tree: baseTree,
