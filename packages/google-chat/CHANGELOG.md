@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Deliver the turn's text when request-status bookkeeping closes it after the reply was written.
+
 ## [0.13.0] - 2026-11-13
 
 - Prepare a public reusable package. Share host input validation and preserve native transactional continuation and delivery receipts.

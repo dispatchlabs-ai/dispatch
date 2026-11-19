@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Track an independent message separately from a request awaiting input. Recover the turn's reply for channels that deliver after request-status bookkeeping.
+
 ## [0.39.2] - 2026-11-18
 
 - `skills` in `defineAgent` also accepts a list of skill IDs, such as `["company/code-review"]`. That agent's catalog, `read_skill` and fingerprint then cover only the listed skills, so a shared skill meant for other agents stays out of its instructions. `skills: true` still means the whole catalog.

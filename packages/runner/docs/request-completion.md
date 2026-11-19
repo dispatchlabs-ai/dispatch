@@ -16,7 +16,9 @@ The agent uses `request_status` to record the original request, remaining work,
 completion evidence and any indispensable external input. `request_status({})`
 reads the record. Native `RequestWork` document state retains it through restarts
 and compaction and puts it back into each request's prompt. The original request
-cannot be replaced while unfinished; follow-ups can update the remaining work.
+stays attached to related follow-ups. A separate request in a later turn can
+leave a blocked request waiting under its stable ID. Use `request_status` with
+that ID as `resume` and a status update when the user returns to it.
 
 Pi Durable's `GenerationTask.onYield` continues the same run when the model tries
 to finish without a current assessment or while the request is `active`. The
@@ -25,13 +27,15 @@ and there is no pass limit, second scheduler or new submission per continuation.
 New native input invalidates an earlier assessment, including input admitted at
 the final-answer boundary. Pi retains ownership of steering and cancellation.
 
-When an answer was already delivered but its assessment is missing, continuation
+When an answer was written but its assessment is missing, continuation
 asks for the status tool only, not another user-facing bookkeeping reply. A terminal
 status update returns Pi's native `control.terminate` only when committed history
 contains the immediate sequence of a text answer, native continuation, and a
 status-only tool round after this run’s latest placed input. Any intervening work
 or tool round invalidates that answer’s termination eligibility. An assessment
 before the answer does not suppress that answer; active work still continues.
+For channels that wait for settlement before sending, the runner resolves the
+text from that same turn when the final receipt points to the status-only round.
 Web keeps these real calls/arguments/results under compact Request details rather
 than manufacturing an extra conversation turn. Other clients retain native entries.
 
@@ -45,8 +49,8 @@ The record is not new authority to act or to override tool and host permissions.
 
 A question can complete with its answer. A partial status report does not complete
 an action request. A blocked part does not justify ending independent work.
-After a real input pause, the next user input resumes assessment of the same
-unfinished request. Process close suspends native work; explicit abort cancels
+After an input pause, a related user message resumes the unfinished request.
+Process close suspends native work; explicit abort cancels
 execution and is never overridden by this extension. Changing an existing
 definition requires its ordinary idle-state definition update.
 
