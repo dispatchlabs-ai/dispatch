@@ -60,8 +60,8 @@ export function repositoryInstructionsExtension(definition: { root: string; sour
     name: "dispatch.repository-instructions",
     sections: [section("repository_instructions", async (input, context) => {
       if (!input.env?.cwd) return undefined;
-      // Reading a chat's workspace here would start it on every request, including turns that never use it.
-      if (input.env instanceof WorkspaceEnvironment && input.env.client.started === false) return undefined;
+      // Reading here would create a workspace for a chat that never uses one.
+      if (input.env instanceof WorkspaceEnvironment && input.env.client.created === false) return undefined;
       const cwd = input.env.cwd;
       const env = input.env;
       const currentDirectory = getOrThrow(await env.canonicalPath(cwd, context));

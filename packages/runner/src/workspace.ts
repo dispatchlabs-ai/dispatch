@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { realpath } from "node:fs/promises";
 import { posix } from "node:path";
-import type { Context } from "@earendil-works/chord/context";
+import { BACKGROUND_CONTEXT, type Context } from "@earendil-works/chord/context";
 import { defineDoc, type ConversationId, type Harness, type HarnessOptions } from "@earendil-works/pi-durable";
 import {
   ExecutionError, FileError, LineScanner, err, ok,
@@ -21,8 +21,8 @@ export type WorkspaceRecord = { run: string; release: WorkspaceRelease; state: s
 /** A host-owned, run-bound route to the workspace controller. */
 export interface WorkspaceTransport {
   readonly run: string;
-  /** False until this host has started the workspace; absent when the embedding host starts it before work. */
-  readonly started?: boolean;
+  /** False while this chat has never had a workspace; absent when the embedding host creates it before work. */
+  readonly created?: boolean;
   request<T>(request: Record<string, unknown>, signal?: AbortSignal, output?: ShellExecOptions["onOutput"], context?: Context): Promise<T>;
 }
 
@@ -199,23 +199,37 @@ export function chatWorkspaceHost(value: unknown): ChatWorkspaceHost {
   return { command: host.command, image: host.image };
 }
 
-/** Starts a chat's workspace on its first tool request, so a turn without shell or file work creates none. */
+// The controller's answer for a guest that is not running.
+const NOT_RUNNING = "Workspace is not running";
+
+/** Creates a chat's workspace on its first tool request, so a turn without shell or file work creates none. */
 class ChatWorkspace implements WorkspaceTransport {
-  started = false;
-  private starting?: Promise<void>;
-  constructor(private readonly client: WorkspaceClient, private readonly release: () => Promise<Omit<WorkspaceRelease, "runtimeEntryPoint">>) {}
+  private ready?: Promise<void>;
+  constructor(private readonly client: WorkspaceClient, private readonly release: () => Promise<Omit<WorkspaceRelease, "runtimeEntryPoint">>,
+    public created: boolean, private readonly record: () => Promise<void>) {}
   get run() { return this.client.run; }
   // One caller's cancellation must not interrupt a start that other tool calls are waiting for.
   private start() {
-    return this.starting ??= (async () => {
+    return this.ready ??= (async () => {
       await this.client.request({ op: "bind", release: await this.release() });
       await this.client.request({ op: "ensure" });
-      this.started = true;
-    })().catch(error => { this.starting = undefined; throw error; });
+      if (!this.created) { await this.record(); this.created = true; }
+    })().catch(error => { this.ready = undefined; throw error; });
   }
   async request<T>(request: Record<string, unknown>, signal?: AbortSignal, output?: ShellExecOptions["onOutput"], context?: Context): Promise<T> {
-    await this.start();
-    return this.client.request<T>(request, signal, output, context);
+    const ready = this.start();
+    await ready;
+    try { return await this.client.request<T>(request, signal, output, context); }
+    catch (error) {
+      // The guest stopped after this host last started it. The controller refuses a file request before running
+      // it, so that request is asked again. It gives the same answer for a shell command the stop cut off, so a
+      // shell command is never repeated.
+      if (!String(error).includes(NOT_RUNNING)) throw error;
+      if (this.ready === ready) this.ready = undefined;
+      await this.start();
+      if (request.op === "shell") throw new Error("The workspace had stopped and has been started again. This command was not repeated and may have been cut off.");
+      return this.client.request<T>(request, signal, output, context);
+    }
   }
 }
 
@@ -228,8 +242,9 @@ export type ChatWorkspaces = {
 };
 
 export function createChatWorkspaces(namespace: string): ChatWorkspaces {
-  // A random value saved with the store keeps each chat's workspace identity with its Pi state.
-  const Identity = defineDoc<{ store: string }>({
+  // A random value saved with the store keeps each chat's workspace identity with its Pi state. `created` names
+  // the chats that have a workspace, so a restarted host still reads their repository instructions.
+  const Identity = defineDoc<{ store: string; created?: Record<string, true> }>({
     kind: `${namespace}.chat-workspaces`, version: 1, scope: "session",
     checkpointWhen: () => false, initial: () => ({ store: "" }),
   });
@@ -254,10 +269,18 @@ export function createChatWorkspaces(namespace: string): ChatWorkspaces {
         chats.set(target.conversationId, chat);
       }
       // identify() saved this before the host resumed any work.
-      const { store } = (await target.read.snapshot(Identity, context))!;
+      const { store, created } = (await target.read.snapshot(Identity, context))!;
       const run = createHash("sha256").update(`${store}\0${chat}`).digest("hex");
       let workspace = workspaces.get(run);
-      if (!workspace) workspaces.set(run, workspace = new ChatWorkspace(new WorkspaceClient(host.command, run), release));
+      if (!workspace) {
+        const key = String(chat);
+        workspaces.set(run, workspace = new ChatWorkspace(new WorkspaceClient(host.command, run), release, created?.[key] === true,
+          () => harness().commit(async tx => {
+            const saved = await tx.doc(Identity);
+            // Assign a whole value: the document records assignments, not later changes to an assigned object.
+            saved.created = { ...saved.created, [key]: true };
+          }, BACKGROUND_CONTEXT)));
+      }
       // The conversation's saved working directory is a host path; the guest has its own.
       return new WorkspaceEnvironment(workspace, "/workspace");
     };

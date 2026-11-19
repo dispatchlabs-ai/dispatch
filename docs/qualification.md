@@ -27,6 +27,15 @@ On macOS arm64 the same build refused to start an agent that selects the option
 when the host has no `workspace` setting. Desktop tools, suspension and
 restoration, a real model, concurrent load and arm64 guests were not exercised.
 
+A following change ran on macOS arm64 against a stand-in controller that records
+requests and starts nothing. The host refused an agent that delegates to a
+`workspace: "chat"` agent without selecting the option, and an embedding host
+that supplies its own `env`. A guest reported as stopped was started again by
+the next request: a refused file request was repeated and a refused shell
+command was not. After a host restart, a chat that already had a workspace read
+its repository instructions on its first request, and a new chat started
+nothing. These three behaviors have not run against a real guest.
+
 ## Native iPhone personal builds — November 18, 2026 UTC
 
 Xcode 27 built the checked-in project from a clean clone. An iOS 18.5 simulator

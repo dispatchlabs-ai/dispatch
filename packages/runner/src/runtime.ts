@@ -5,7 +5,7 @@ export type OpenOptions = {
   cwd?: string;
   /** A trusted host supplies remote execution before any local environment is considered. */
   env?: HarnessOptions["env"];
-  /** Gives each chat of a `workspace: "chat"` agent its own disposable workspace. Ignored when `env` is supplied. */
+  /** Gives each chat of a `workspace: "chat"` agent its own disposable workspace. A host that supplies `env` cannot open such an agent. */
   workspace?: ChatWorkspaceHost;
   /** Read-only packaged references, shared with this agent's native children. */
   definitionResources?: boolean;
@@ -85,6 +85,15 @@ export type RunnerState = {
 };
 
 export type StartOptions = { conversationId?: ConversationId; input?: string };
+
+/** The first agent among this one, its delegates and its handoff target that asks for a workspace per chat. */
+function workspaceAgent(agent: LoadedAgent): string | undefined {
+  if (agent.workspace) return agent.id;
+  for (const child of [...(agent.delegateAgents ?? []), ...(agent.handoffAgent ? [agent.handoffAgent] : [])]) {
+    const found = workspaceAgent(child);
+    if (found) return found;
+  }
+}
 
 export function createRuntime(namespace: string, agentConfiguration: ReturnType<typeof createConfiguration>["agentConfiguration"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"], codingEnvironment: ReturnType<typeof createCoding>["codingEnvironment"], artifacts: ReturnType<typeof createArtifacts>, progressTools: Extension) {
   const RunnerDoc = defineDoc<RunnerState>({
@@ -212,7 +221,15 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
     if (agent.messages?.length && !options.extensions?.some(extension => extension.name === `${namespace}.instance-messages.${agent.id}`)) {
       throw new Error(`${agent.id} needs instance messaging. Open it through ChatService, or supply instanceMessagingExtension with the owning service.`);
     }
-    if (agent.workspace && !options.env && !options.workspace) {
+    // Delegated and handed-off work runs in this agent's store, with this agent's execution environment.
+    const isolated = workspaceAgent(agent);
+    if (isolated && options.env) {
+      throw new Error(`${isolated} selects workspace: "chat", but this host supplies its own execution environment. Remove env or the agent's workspace option.`);
+    }
+    if (isolated && !agent.workspace) {
+      throw new Error(`${isolated} selects workspace: "chat". ${agent.id} gives it work, so ${agent.id} must select workspace: "chat" too.`);
+    }
+    if (isolated && !options.workspace) {
       throw new Error(`${agent.id} selects workspace: "chat". Add workspace to the host settings.`);
     }
     const directory = resolve(options.directory);
@@ -275,7 +292,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       const { configuration, installed } = setup;
       for (const extension of new Map([...installed, reviews, ...(options.registryExtensions ?? [])].map(extension => [extension.name, extension])).values()) registry.install(extension);
       storage = options.storage ? await options.storage(agent) : await openNodeSqliteStorage(join(directory, "session.sqlite"));
-      const chatWorkspace = agent.workspace && options.workspace && !options.env
+      const chatWorkspace = agent.workspace && options.workspace
         ? chatWorkspaces.environment(options.workspace, agent, () => harness!) : undefined;
       harness = await Harness.open(storage, {
         models, registry, now, settings: options.settings,

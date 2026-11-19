@@ -172,11 +172,19 @@ with the chat's native state. The host refuses to start an agent that selects
 `workspace: "chat"` without this setting. Agents without the option keep their
 existing tools and working directory.
 
+Delegated and handed-off work uses the workspace of the chat that started it.
+An agent that delegates or hands off to an agent with `workspace: "chat"` must
+therefore select it too, and a host that supplies its own `env` cannot serve
+such an agent. The host refuses both at startup.
+
 The controller binds each workspace to the application root and the agent's
 definition fingerprint, so `allowedReleaseRoots` must cover the application
-root. Repository instructions inside a workspace are read once this host has
-started it. The host does not yet suspend or finish these workspaces, and
-desktop tools are not bound per chat.
+root. Repository instructions inside a workspace are read once the chat has
+one. After a host restart, the first request of such a chat starts its
+workspace again to read them. If a guest has stopped, the next request starts it
+again. A file request is then repeated. A shell command is reported as possibly
+cut off and is not repeated. The host does not yet suspend or finish these
+workspaces, and desktop tools are not bound per chat.
 
 ### An embedding host
 
