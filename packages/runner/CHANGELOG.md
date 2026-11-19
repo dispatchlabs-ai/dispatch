@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.40.1] - 2026-11-19
+
 - Start workspaces after a chat's SQLite store closes and reopens. Record the guest before startup so a later host can reclaim it, and allow idle suspension of workspaces with a Git repository that has no commits.
 
 ## [0.40.0] - 2026-11-19

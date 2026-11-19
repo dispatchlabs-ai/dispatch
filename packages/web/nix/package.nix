@@ -28,7 +28,7 @@ buildNpmPackage {
       ../index.html ../src ../server ../preview.js ../openapi.yaml ../licenses ../LICENSE ../THIRD_PARTY.md
     ];
   };
-  npmDepsHash = "sha256-omvPLyTT3weU8D1b/D9E2JGROsrLpjfl4SRTvlEEjyU=";
+  npmDepsHash = "sha256-HqHuS4sY6OINFojShmleJItbaMxJNK/snPipw69EKS4=";
   npmBuildScript = "build";
   doCheck = true;
   checkPhase = "npm run typecheck";
