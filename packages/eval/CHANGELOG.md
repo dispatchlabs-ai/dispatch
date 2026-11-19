@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Quote custom SQLite table names during schema-1 conversion and clarify that conversion is for trusted Dispatch stores only.
+
 ## [0.13.0] - 2026-11-13
 
 - Reuse Runner read-only SQLite snapshots and document-revision decoding; remove machine runtime-selection wiring.

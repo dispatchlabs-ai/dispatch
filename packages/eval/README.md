@@ -239,7 +239,8 @@ Each use case has one SQLite store, `assessments.sqlite` in its data directory, 
 in `store_meta`). Units carry their domain attributes as JSON in `labels`; no column names a domain. A store on
 another version is refused, never altered silently.
 
-A store written before versions were recorded (schema 1) is upgraded with:
+Convert only trusted Dispatch stores: the converter replays custom table and index definitions from the source
+store to preserve them. To upgrade a store written before versions were recorded (schema 1), run:
 
 ```sh
 dispatch-eval convert --data-dir DIR [--bundle-root DIR] [--clock-kind KIND] [--runtime DISPATCH_REVISION,PI_DURABLE_VERSION]

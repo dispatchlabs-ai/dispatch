@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Refuse to ensure a disposable workspace unless the Dispatch-managed nftables table contains the expected isolation rules.
+
 - `workspace: "chat"` in `defineAgent`, with a `workspace` host setting, gives each chat of that agent its own disposable workspace under `dispatch serve`. The workspace starts on the chat's first shell or file tool call, and delegated children of the chat share it. The host refuses a delegation or an embedding host that could not provide it. Automatic suspension and per-chat desktop tools are not included.
 
 ## [0.39.2] - 2026-11-18
