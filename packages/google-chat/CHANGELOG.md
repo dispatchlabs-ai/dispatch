@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 - Deliver the turn's text when request-status bookkeeping closes it after the reply was written.
-- Works with the runner's per-chat stores: each turn is created in its chat's store and per-thread state lives there. Google Chat has not yet run against its live channel in this layout.
+- Works with the runner's per-chat stores: each turn is created in its chat's store and per-thread state lives there. Google Chat ran against a live space in this layout: two threads, with a request sent while the host was stopped.
 
 ## [0.13.0] - 2026-11-13
 

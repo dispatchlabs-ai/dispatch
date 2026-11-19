@@ -8,8 +8,8 @@ its build and relevant checks. For an application using only Runner:
 npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.39.2/dispatch-runner-0.39.2.tgz
 ```
 
-Releases after 0.39.2 keep each chat in its own store and do not convert chats
-saved by earlier releases. The host refuses a state folder that holds earlier
+From 0.40.0 each chat is kept in its own store. Chats saved by earlier releases
+are not converted. The host refuses a state folder that holds earlier
 chats and names it. Move that folder aside, or choose a new `stateRoot`, to start
 fresh; the earlier folder is left as it was.
 

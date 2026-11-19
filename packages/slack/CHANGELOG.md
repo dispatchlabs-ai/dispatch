@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 - A reply's delivery identity names its chat, so two agents answering in one thread cannot mistake each other's posts for their own.
-- Works with the runner's per-chat stores: each turn is created in its chat's store and per-thread state lives there. Slack has not yet run against its live channel in this layout.
+- Works with the runner's per-chat stores: each turn is created in its chat's store and per-thread state lives there. Slack ran against a live channel in this layout: two threads, with a host restart between requests.
 
 ## [0.36.0] - 2026-11-18
 

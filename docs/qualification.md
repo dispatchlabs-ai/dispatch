@@ -44,6 +44,25 @@ The host, Pi Durable, the controller, gVisor and the guests were real.
 Desktop state, a Git repository in the workspace, a real model, a checkpoint of
 more than a few bytes and concurrent load were not exercised.
 
+## Slack and Google Chat on per-chat stores — November 19, 2026 UTC
+
+A `dispatch serve` host at `fff4811` on macOS arm64 ran one agent with a scripted
+model: once with the Slack adapter on a trial app in one channel, and once with
+the Google Chat adapter on a trial Workspace add-on that publishes to Pub/Sub.
+
+- Slack: two threads with two requests each. Every request got one reply in its
+  own thread. The host was stopped and started again between the requests, with
+  one follow-up admitted before the stop and the other sent after the start.
+- Google Chat: two threads with two requests each. Every request got one reply
+  in its own thread. The host was stopped after both first replies. A follow-up
+  sent while it was stopped was answered in its thread by the next process.
+- Each thread was one chat with its own store, and each store recorded two
+  completed requests.
+
+A host killed in the middle of a reply, two agents answering in one thread,
+attachments and a real model were not exercised. Email and Messages have not run
+in this layout.
+
 ## Per-chat stores — November 19, 2026 UTC
 
 A `dispatch serve` host on macOS arm64 ran two agents with a scripted model and
