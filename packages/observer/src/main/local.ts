@@ -155,15 +155,26 @@ export async function localWork(saved: Connection[]): Promise<LocalWork> {
       // A validated Runner store establishes its installation directory. Inspect
       // only immediate sibling agent/session.sqlite files, never transcript paths.
       if (runner) {
-        const root = await realpath(dirname(dirname(path)));
+        // A chat's store sits two levels below its agent's directory.
+        const agentDirectory = basename(dirname(dirname(path))) === "chats" ? dirname(dirname(dirname(path))) : dirname(path);
+        const root = await realpath(dirname(agentDirectory));
         if (!scanned.has(root)) {
           scanned.add(root);
           try {
+            const stores: { name: string; path: string }[] = [];
             for (const child of await readdir(root, {
               withFileTypes: true,
             })) {
               if (!child.isDirectory() || child.isSymbolicLink()) continue;
-              const sibling = join(root, child.name, "session.sqlite");
+              stores.push({ name: child.name, path: join(root, child.name, "session.sqlite") });
+              // Each chat has its own store beside its agent's.
+              for (const chat of await readdir(join(root, child.name, "chats"), { withFileTypes: true }).catch(() => [])) {
+                if (chat.isDirectory() && !chat.isSymbolicLink())
+                  stores.push({ name: `${child.name}:${chat.name}`, path: join(root, child.name, "chats", chat.name, "session.sqlite") });
+              }
+            }
+            for (const child of stores) {
+              const sibling = child.path;
               try {
                 const stat = await lstat(sibling);
                 if (!stat.isFile() || stat.isSymbolicLink()) continue;

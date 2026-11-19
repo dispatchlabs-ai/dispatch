@@ -85,11 +85,12 @@ async function runStep(args: string[], releaseManifest: string | undefined) {
     process.chdir(config.cwd);
     app = await run({ root: definitions, stateRoot, cwd: config.cwd, runner: createRunner({ namespace: config.namespace, progressNotes: config.progressNotes }), models, names: [owner],
       schedules: false, settings: serviceSettings(config), resume: false, updateDefinitions: "when-idle" });
-    const host = app.service.host(owner);
     const chat = await app.service.create(owner, "cli", `terminal:${session}`, "Evaluation");
+    // The evaluation runs in the chat's own store.
+    const { host } = await app.service.resolve(chat.id);
     const input = { package: pkg, bindings: bindingsFile, action: opt.collect ? "collect" as const : opt.run ? "run" as const : "grade" as const,
       ...(opt.run ? { run: opt.run } : {}), ...(opt.limit ? { limit: Number(opt.limit) } : {}) };
-    const step = await host.harness.commit(tx => evaluation.ensureEvaluation(tx, chat.conversationId, input, Date.now()), context);
+    const step = await app.service.inChat(chat.id, (tx, id) => evaluation.ensureEvaluation(tx, id, input, Date.now()));
     const build = JSON.parse(process.env.DISPATCH_EVAL_BUILD!);
     const log = (event: string, extra: object) => console.log(JSON.stringify({ event, at: new Date().toISOString(), session,
       release: build.release, definitions: build.definitions.revision, dispatch: build.dispatch.revision, usecase: usecase.name, ...extra }));

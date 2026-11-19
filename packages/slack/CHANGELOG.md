@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Works with the runner's per-chat stores: each turn is created in its chat's store and per-thread state lives there. Slack has not yet run against its live channel in this layout.
+
 ## [0.36.0] - 2026-11-18
 
 - Read monitored workspaces and named follow-up threads through the Slack Web API with a verified user OAuth grant for each workspace.

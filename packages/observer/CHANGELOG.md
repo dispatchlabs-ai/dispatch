@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Finds each chat's own store beside its agent's and names a chat's conversation from that store. Not yet opened against a live installation in this layout.
+
 ## [0.13.0] - 2026-11-13
 
 - Reuse Runner read-only SQLite snapshots and released document-revision decoding instead of a separate implementation.

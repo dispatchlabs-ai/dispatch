@@ -4,6 +4,32 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## Per-chat stores — November 19, 2026 UTC
+
+A `dispatch serve` host on macOS arm64 ran two agents with a scripted model and
+the default SQLite stores.
+
+- Each created chat had its own store under `<stateRoot>/<agent>/chats/<n>`. A
+  delegated child conversation was saved in its parent chat's store.
+- `message_agent` with `reply: true` delivered between two chats' stores and woke
+  the sender with the reply.
+- After 100 seconds without use, all three chat stores had closed and the chat
+  lists marked none open. A follow-up reopened only its own chat's store.
+- The host was killed in the middle of a turn. Restarted after its ownership
+  lock expired, it reopened the marked chats and finished that turn with no new
+  message.
+- A state folder with a chat created by Dispatch 0.21.0 was refused with the
+  message that names the folder.
+- `dispatch-watch --session . --json` listed each agent's store and each chat's,
+  the chats by their IDs with their titles, and a delegated child under its parent.
+- Dispatch Web listed the chats, showed one chat's full history and delivered a
+  new message typed in the browser.
+
+Slack, Google Chat, email and Messages were converted and type-checked only;
+none ran against its live channel. The observer's reader, remote SQLite, the
+workers package, Fleet and the central PostgreSQL mode were not exercised, and
+the last three refuse to create a chat.
+
 ## Per-chat workspaces — November 19, 2026 UTC
 
 A `dispatch serve` host with the unreleased `workspace: "chat"` option ran on an

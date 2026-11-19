@@ -8,6 +8,8 @@ export type WatchRun = {
 export type WatchCursor = { sequence: number; entryId: number };
 export type WatchConversation = {
   key: string; agent: string; conversationId: number; title: string; parentKey?: string;
+  /** The store file that holds this conversation, and its parent's number there. */
+  store: string; parentConversationId?: number;
   active: number; failed: number; status: "working" | "waiting" | "idle" | "unanswered" | "unavailable";
   activity: string; updatedAt?: number; startedAt?: number; entryCount: number;
   latestMessage?: WatchActivity;
@@ -28,7 +30,7 @@ export type WatchPage = {
 };
 
 /** Navigation metadata only; catalog reads do not infer execution status. */
-export type WatchCatalogConversation = Pick<WatchConversation, "key" | "agent" | "conversationId" | "title" | "parentKey" | "startedAt"> & {
+export type WatchCatalogConversation = Pick<WatchConversation, "key" | "agent" | "conversationId" | "title" | "parentKey" | "store" | "parentConversationId" | "startedAt"> & {
   /** Present in the native chat index (an addressable chat), not only a stored conversation. */
   registered: boolean;
   /** Indexed chat's originating transport, e.g. cli, web, slack, agent or schedule. */

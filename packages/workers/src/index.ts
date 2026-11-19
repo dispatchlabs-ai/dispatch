@@ -168,7 +168,8 @@ export async function startWorker(config: WorkerConfig) {
           cwd: config.host.cwd,
           definitionResources: true,
           settings: serviceSettings(config.host),
-          storage: async (agent) => {
+          storage: async (agent, chat) => {
+            if (chat) throw new Error("Workers are not converted to per-chat stores, so this host cannot create a chat.");
             const storage = await RemoteStorage.open((request) =>
               storageCall(agent.id, request),
             );

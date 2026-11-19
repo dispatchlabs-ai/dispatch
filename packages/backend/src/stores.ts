@@ -24,6 +24,9 @@ export interface CatalogConversation {
   conversationId: number;
   title: string;
   parentKey?: string;
+  /** The store file that holds this conversation, and its parent's number there. */
+  store?: string;
+  parentConversationId?: number;
   startedAt?: number;
   registered?: boolean;
   transport?: string;
@@ -87,8 +90,8 @@ function catalogChat(conversation: CatalogConversation, store: Store, run: Run, 
     addressable: conversation.registered === true,
     ...(conversation.transport
       ? { transport: conversation.transport as Chat["transport"] } : {}),
-    ...(conversation.parentKey
-      ? { parentId: identity(store.path, Number(conversation.parentKey.split(":").at(-1))) }
+    ...(conversation.parentConversationId !== undefined
+      ? { parentId: identity(store.path, conversation.parentConversationId) }
       : {}),
   };
 }
@@ -146,9 +149,7 @@ export function createStores(config: { sources: Source[] }, reader: Reader) {
           const snapshot = await reader.readWatchCatalog({ ...run, issues: [] });
           status.issues.push(...snapshot.issues);
           for (const conversation of snapshot.conversations) {
-            const store = run.stores.find(
-              (item) => item.agent === conversation.agent,
-            )!;
+            const store = run.stores.find((item) => item.path === conversation.store)!;
             const chat = catalogChat(conversation, store, run, source);
             next.set(chat.id, { chat, store, run, conversation, source });
           }
@@ -183,7 +184,7 @@ export function createStores(config: { sources: Source[] }, reader: Reader) {
           const catalog = await reader.readWatchCatalog(run);
           if (catalog.issues.length) { invalidated = true; continue; }
           for (const conversation of catalog.conversations) {
-            const store = run.stores.find(store => store.agent === conversation.agent)!;
+            const store = run.stores.find(store => store.path === conversation.store)!;
             const fresh = catalogChat(conversation, store, run, source);
             const previous = selections.get(fresh.id);
             // Keep the first observed creation time; index metadata may arrive later.

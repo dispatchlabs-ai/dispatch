@@ -96,7 +96,8 @@ const environments = new Set<WorkspaceEnvironment>();
 const context: FleetRunContext = {
   assignment, root, namespace: descriptor.namespace, roles: descriptor.roles,
   stateRoot: join(directory, "native"), runtimeRoot,
-  async storage(agent) {
+  async storage(agent, chat) {
+    if (chat) throw new Error("Fleet runs are not converted to per-chat stores, so this run cannot create a chat.");
     const role = typeof agent === "string" ? agent : agent.id;
     if (!descriptor.roles.includes(role)) throw new Error("Store is outside this immutable run profile.");
     return createRemoteStorage(role, socketPath);

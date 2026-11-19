@@ -112,7 +112,10 @@ export class NativeRecords {
   }
   identities() {
     const identities = new Map<number, { agent: string; chatId?: string; handoffEntryId?: number }>();
-    for (const chat of this.chats()) identities.set(chat.conversationId, { agent: chat.agent, chatId: chat.id });
+    // A chat's own store names the chat its root conversation is. An agent's own store lists chats that live elsewhere.
+    const own = this.documents().find(doc => typeof doc.kind === "string" && doc.kind.endsWith(".chat"));
+    const chat = own && this.document(own.id).value as { id?: string };
+    if (chat?.id) identities.set(1, { agent: chat.id.split(":")[0], chatId: chat.id });
     for (const row of this.rows(`SELECT e.id, json_extract(m.value, '$.details.agent') AS agent,
       json_extract(m.value, '$.details.conversationId') AS child
       FROM entries e, json_each(e.record, '$.model') m

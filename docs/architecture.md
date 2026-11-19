@@ -79,15 +79,21 @@ MCP client ── Dispatch MCP ────┤  AgentClient commands and watch s
                     dispatch serve
                     ├─ ChatService
                     ├─ researcher → Harness → .state/researcher/session.sqlite
+                    │    └─ each chat → Harness → .state/researcher/chats/<n>/session.sqlite
                     ├─ developer  → Harness → .state/developer/session.sqlite
                     ├─ configured providers and MCP connections
                     └─ optional channel adapters (Slack, Google Chat, email)
 ```
 
-The default local host opens one SQLite store and Harness per agent. An ownership
-lock prevents a second writer. Many conversations share each agent's store;
-clients use identities such as `researcher:<conversation-id>` instead of opening
-the database. Artifact files and environment state can live outside SQLite.
+The default local host keeps one SQLite store for each agent and one for each
+chat. An agent's own store holds its chat list, schedules and channel adapter
+state. A chat's store holds that chat's conversation, its private children and
+their work. The host opens a chat's store on the chat's first use and closes it
+once nothing there is runnable or sleeping. The chat list marks chats with
+unsettled work, and a restarted host reopens exactly those. An ownership lock
+prevents a second writer of any store. Clients use identities such as
+`researcher:12`, a chat number, instead of opening a database. Artifact files
+and environment state can live outside SQLite.
 
 Before resuming saved work, the host loads definitions, connects model providers
 and MCP servers, registers extensions, opens stores and starts configured adapters.
@@ -108,7 +114,7 @@ reopens with compatible definitions and extensions.
 ## One request
 
 1. The client creates or reuses a chat with a stable creation key. Runner records
-   its conversation identity in the agent's native chat-index document.
+   the chat in the agent's chat list and opens the chat's own store.
 2. The client submits input with a stable request ID. For an idle conversation,
    Pi admits the input, submission and generation work in a native commit.
 3. `pi.generation` prepares a model request and streams its response. Tool calls

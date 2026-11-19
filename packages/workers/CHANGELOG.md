@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Not converted to the runner's per-chat stores: creating a chat on a worker host fails with a message.
+
 ## [0.13.0] - 2026-11-13
 
 - Use Runner's shared message provenance directly instead of scanning native history a second time.

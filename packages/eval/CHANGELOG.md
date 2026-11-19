@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Quote custom SQLite table names during schema-1 conversion and clarify that conversion is for trusted Dispatch stores only.
+- Evaluations run in their chat's own store.
 
 ## [0.13.0] - 2026-11-13
 

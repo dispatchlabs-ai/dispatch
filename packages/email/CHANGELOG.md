@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Works with the runner's per-chat stores: each turn is created in its chat's store and per-thread state lives there. Email has not yet run against its live channel in this layout.
+
 ## [0.36.0] - 2026-11-18
 
 - Provide read-only Gmail thread and search sources for persistent follow-ups using an authorized mailbox and the existing OAuth credential format.

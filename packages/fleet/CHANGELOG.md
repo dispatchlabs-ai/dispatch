@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Not converted to the runner's per-chat stores: creating a chat in a fleet run fails with a message.
+
 ## [0.38.0] - 2026-11-18
 
 - Confine receipt-file access to the private state directory and construct inference requests from the configured origin and validated route components, rejecting dot-segment connection IDs.

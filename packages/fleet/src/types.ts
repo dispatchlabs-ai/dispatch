@@ -27,7 +27,7 @@ export type FleetRunContext = {
   roles: readonly string[];
   stateRoot: string;
   runtimeRoot: string;
-  storage(agent: { id: string } | string): Promise<Storage>;
+  storage(agent: { id: string } | string, chat?: string): Promise<Storage>;
   workspace: WorkspaceTransport;
   env(target: { cwd?: string }): WorkspaceEnvironment;
   relay<T = unknown>(path: string, body?: unknown, options?: { method?: "GET" | "POST"; signal?: AbortSignal }): Promise<T>;

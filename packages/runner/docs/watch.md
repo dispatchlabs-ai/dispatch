@@ -95,8 +95,10 @@ discovery does not grant access to another service account or remote machine.
 ## Discovery and limits
 
 On macOS and Linux, `lsof` discovers same-user runtime processes holding writable
-native `AGENT/session.sqlite` files anywhere under the configured `stateRoot`.
-The parent of each agent directory identifies its session. Discovery uses open
+native `AGENT/session.sqlite` and `AGENT/chats/N/session.sqlite` files anywhere
+under the configured `stateRoot`. The parent of each agent directory identifies
+its session. A chat's own conversation is named by the chat's ID; any other
+conversation is named `STORE/NUMBER`, where the store is an agent or a chat. Discovery uses open
 handles rather than recursively scanning the filesystem. Native schema, Runner
 namespace and agent identity are checked; immediate sibling stores supply other
 participants. Read-only viewer handles do

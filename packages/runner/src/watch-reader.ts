@@ -316,7 +316,9 @@ export async function readWatchCatalog(run: WatchRun): Promise<WatchCatalog> {
           const firstMessage = first && messages(first)[0];
           return [{ key: conversationKey(store, id), agent: store.agent, conversationId: id,
             title: redact(chat?.title) || openingTitle(first) || store.agent,
-            parentKey: Number.isSafeInteger(record.owner?.conversationId) ? conversationKey(store, record.owner.conversationId) : undefined,
+            store: store.path,
+            ...(Number.isSafeInteger(record.owner?.conversationId)
+              ? { parentKey: conversationKey(store, record.owner.conversationId), parentConversationId: record.owner.conversationId as number } : {}),
             startedAt: timestamp(chat?.createdAt) ?? timestamp(firstMessage?.timestamp),
             registered: Boolean(chat), ...(typeof chat?.source === "string" ? { transport: chat.source } : {}) }];
         });
@@ -389,7 +391,9 @@ export async function readWatchRun(run: WatchRun, key?: string): Promise<WatchSn
           const firstMessage = first && messages(first)[0];
           conversations.push({ key: conversationKey(store, id), agent: store.agent, conversationId: id,
             title: redact(chat?.title) || openingTitle(first) || store.agent,
-            parentKey: Number.isSafeInteger(record.owner?.conversationId) ? conversationKey(store, record.owner.conversationId) : undefined,
+            store: store.path,
+            ...(Number.isSafeInteger(record.owner?.conversationId)
+              ? { parentKey: conversationKey(store, record.owner.conversationId), parentConversationId: record.owner.conversationId as number } : {}),
             active: active.length, failed: number(row.failed), status, activity: detail.replace(/\s+/g, " ").slice(0, 240),
             updatedAt: last?.at, startedAt: timestamp(chat?.createdAt) ?? timestamp(firstMessage?.timestamp), entryCount,
             latestMessage, currentTools: toolCalls });

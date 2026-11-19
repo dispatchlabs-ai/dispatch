@@ -2,8 +2,8 @@
 
 The storage host owns its local SQLite databases. Each logical store contains
 one native Pi session, its application documents, and remote ownership/receipt
-tables. This implementation retains the runner's per-agent store layout;
-individual chats are native conversations inside that store.
+tables. The service serves a fixed list of stores. The runner now also keeps one
+store for each chat, which this service does not yet create on demand.
 
 Each runner process generates a new random session identity. Opening a store
 claims it durably. Only that owner can read or mutate it. A second process

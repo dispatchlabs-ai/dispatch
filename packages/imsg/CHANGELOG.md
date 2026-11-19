@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Works with the runner's per-chat stores: each turn is created in its chat's store and per-thread state lives there. Messages has not yet run against its live channel in this layout.
+
 ## [0.27.0] - 2026-11-16
 
 - Receive photos and screenshots as native image input, with or without accompanying text, in local and remote Messages chats.

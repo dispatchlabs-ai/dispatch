@@ -234,7 +234,14 @@ export function project(raw: RawSnapshot, source: Connection): Snapshot {
     }
   for (const doc of documents) {
     const value = doc.value as RecordData | undefined;
-    if (!value?.byId) continue;
+    // A chat's own store names the chat its root conversation is.
+    if (doc.kind.endsWith(".chat") && typeof value?.id === "string") {
+      names.set(1, value.id);
+      if (typeof value.source === "string")
+        chats.set(1, { agent: value.id.split(":")[0], namespace: doc.kind.slice(0, -".chat".length), channel: value.source, createdAt: timestamp(undefined) });
+    }
+    // An agent's chat list names chats that live in their own stores, not conversations in this one.
+    if (!value?.byId || value.layout === 2) continue;
     for (const chat of Object.values(value.byId) as RecordData[]) {
       if (typeof chat?.conversationId !== "number") continue;
       if (typeof (chat.title ?? chat.agent) === "string")

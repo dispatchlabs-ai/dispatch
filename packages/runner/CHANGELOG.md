@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 - Refuse to ensure a disposable workspace unless the Dispatch-managed nftables table contains the expected isolation rules.
+- **Breaking:** each chat now has its own store under `<stateRoot>/<agent>/chats/<n>`. An agent's own store keeps its chat list, schedules and channel adapter state. A chat's store opens on first use, closes when nothing there is runnable or sleeping, and reopens after a restart if the chat has unsettled work. Chat IDs keep their form; the number is now a chat number. Chats saved by an earlier release are not converted: the host refuses that state folder and asks you to move it aside or choose a new `stateRoot`.
+- `ChatService` adds `inChat`, `resume`, `onChatOpen` and `stores`, and the runner exports `ChatIdentity`, the record in a chat's store of its chat, channel and origin. A `StorageFactory` receives the chat ID for a chat's store and must return a different store for each. The watch reader reports each conversation's store and names conversations other than a chat's own as `<store>/<number>`. `dispatch review` accepts a chat ID.
 
 - `workspace: "chat"` in `defineAgent`, with a `workspace` host setting, gives each chat of that agent its own disposable workspace under `dispatch serve`. The workspace starts on the chat's first shell or file tool call, and delegated children of the chat share it. The host refuses a delegation or an embedding host that could not provide it. Automatic suspension and per-chat desktop tools are not included.
 

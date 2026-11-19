@@ -24,9 +24,10 @@ export async function openSharedHistory(config: SharedHistoryConnection, sources
   if (session === ".." || session.startsWith("../") || isAbsolute(session))
     throw new Error("service.stateRoot must be a native session directory at or within its configured source.");
   const stores = createStores({ sources }, reader);
-  const idFor = (chat: Chat) => identity(join(root, chat.agent, "session.sqlite"), chat.conversationId);
-  const project = (chat: Chat): Chat => ({ ...chat, capabilities: config.capabilities, addressable: true, id: idFor(chat), source: source.id, sourceLabel: source.label, session,
-    ...(chat.parentId ? { parentId: identity(join(root, chat.agent, "session.sqlite"), Number(chat.parentId.split(":").at(-1))) } : {}) });
+  // Each chat has its own store, named by the number in its ID.
+  const storeFor = (chat: Chat) => join(root, chat.agent, "chats", chat.id.slice(chat.id.lastIndexOf(":") + 1), "session.sqlite");
+  const idFor = (chat: Chat) => identity(storeFor(chat), chat.conversationId);
+  const project = (chat: Chat): Chat => ({ ...chat, capabilities: config.capabilities, addressable: true, id: idFor(chat), source: source.id, sourceLabel: source.label, session });
   let connected: Runtime | undefined;
   let connecting: Promise<Runtime> | undefined;
   let closed = false;

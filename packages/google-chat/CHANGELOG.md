@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Works with the runner's per-chat stores: each turn is created in its chat's store and per-thread state lives there. Google Chat has not yet run against its live channel in this layout.
+
 ## [0.13.0] - 2026-11-13
 
 - Prepare a public reusable package. Share host input validation and preserve native transactional continuation and delivery receipts.
