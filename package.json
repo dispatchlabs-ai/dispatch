@@ -27,7 +27,7 @@
     "typecheck": "npm run typecheck --workspaces",
     "check": "npm run typecheck && npm run build",
     "start": "npm start --workspace @dispatch/web",
-    "release": "tsx scripts/release.ts",
+    "release": "node scripts/release.ts",
     "pack:packages": "node scripts/pack-packages.mjs"
   },
   "type": "module"
