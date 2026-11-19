@@ -120,7 +120,7 @@ export async function run(options: RunOptions = {}) {
       const environment = environments.selected.get(agent.id);
       const connections = [...(agent.mcp ?? []), ...(environment?.server ? [environment.server] : [])];
       const stateRoot = options.stateRoot ?? (!options.open ? resolve(root, ".state") : undefined);
-      const bound = stateRoot ? mcp?.bind({ agent: agent.id, stateRoot: resolve(stateRoot) }) : mcp?.extensions;
+      const bound = stateRoot ? mcp?.bind({ agent: agent.id, stateRoot: resolve(stateRoot), namespace: runner.namespace }) : mcp?.extensions;
       const privateHost: PrivateReviewHost = {
         namespace: runner.namespace, agent: agent.id, preview: options.preview === true,
         enrolled: owner => users?.forAgent(agent.id).some(person => person.id === owner) === true,

@@ -20,7 +20,7 @@ import { isDeepStrictEqual } from "node:util";
 import { join, resolve } from "node:path";
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import {
-  configure, defineDoc, LiveDoc, type ConversationId, type ConversationView, type Cursor, type TaskInspection,
+  defineDoc, LiveDoc, ROOT_CONVERSATION_ID, type ConversationView, type Cursor, type TaskInspection,
   type SubmissionDraft, type EntryRecord, type TaskRecord, type Extension, type LiveState, type SubmissionId, type Tx, type JsonObject,
 } from "@earendil-works/pi-durable";
 import { catalog, enabledAgents, loadAgent, type LoadedAgent } from "./definition.js";
@@ -29,12 +29,14 @@ import { createRuntime, type AgentHost, type StorageFactory, type OpenOptions } 
 import type { ReplySink } from "./replies.js";
 import { createHandoffs } from "./handoff.js";
 import { privateStateDirectory } from "./private-state.js";
+import { reportError } from "./terminal-output.js";
 import { publicCommentary } from "./commentary.js";
 import { recordRequestCancellation } from "./request-completion.js";
 import { createInstanceMessaging, instanceMessagingExtension, selectMessageTools, type InstanceMessage } from "./messages.js";
 import { sleepingReminder } from "./reminders.js";
 import { createSchedules, scheduleTaskKind } from "./schedules.js";
 import type { Artifact, ArtifactRecord, ArtifactOptions, createArtifacts } from "./artifacts.js";
+import { chatIdentity } from "./chat-identity.js";
 
 export const context = BACKGROUND_CONTEXT;
 export type Chat = {
@@ -88,13 +90,19 @@ export function projectChatMessages(namespace: string, entries: readonly EntryRe
 }
 
 export function createChats(namespace: string, openAgent: ReturnType<typeof createRuntime>["openAgent"], Handoffs: ReturnType<typeof createHandoffs>["Handoffs"], Artifacts: ReturnType<typeof createArtifacts>["Artifacts"]) {
+  // An agent's own store lists its chats. Each chat's conversation and work live in that chat's store.
+  // `open` names the chats whose stores may hold unsettled work, so a restarted host reopens exactly those.
   const Chats = defineDoc<{
-    byId: Record<string, Chat>; keys: Record<string, string>;
+    byId: Record<string, Chat>; keys: Record<string, string>; next?: number; open?: Record<string, true>; layout?: 2;
   }>({
     kind: `${namespace}.chats`, version: 1, scope: "session",
     checkpointWhen: () => false,
     initial: () => ({ byId: {}, keys: {} }),
   });
+  const Identity = chatIdentity(namespace);
+  const chatNumber = (id: string) => id.slice(id.lastIndexOf(":") + 1);
+  // A chat store with nothing runnable and no sleeping task closes after this long without use.
+  const idleCloseMs = 60_000;
 
   function messaging(service: ChatService, from: string) {
     const agent = service.agents.find(candidate => candidate.id === from.split(":")[0]);
@@ -111,6 +119,80 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     pending.set(id, next);
     try { return await next; }
     finally { if (pending.get(id) === next) pending.delete(id); }
+  }
+
+  // Open chat stores, kept beside the service because its exported class type cannot carry private members.
+  type Owner = { agents: LoadedAgent[]; initialize?: ChatInitializer; host(agent: string): AgentHost };
+  type OpenStores = {
+    chats: Map<string, Promise<AgentHost>>; closing: Map<string, Promise<void>>;
+    used: Map<string, number>; watched: Map<string, number>;
+    open?: (agent: LoadedAgent, chat: Chat) => Promise<AgentHost>; started: boolean; sweep?: ReturnType<typeof setInterval>;
+  };
+  const openStores = new WeakMap<object, OpenStores>();
+  const storesOf = (service: object) => {
+    let stores = openStores.get(service);
+    if (!stores) openStores.set(service, stores = { chats: new Map(), closing: new Map(), used: new Map(), watched: new Map(), started: false });
+    return stores;
+  };
+
+  /** Open a chat's store, or share the one already open. */
+  function chatStore(service: Owner, chat: Chat): Promise<AgentHost> {
+    const stores = storesOf(service);
+    stores.used.set(chat.id, Date.now());
+    const opened = stores.chats.get(chat.id);
+    if (opened) return opened;
+    const open = stores.open;
+    if (!open) throw new Error("This service was attached to stores it did not open and cannot open a chat's store.");
+    const agent = service.agents.find(agent => agent.id === chat.agent)!;
+    const pending: Promise<AgentHost> = (async () => {
+      await stores.closing.get(chat.id);
+      // Mark first: a host that dies while this store holds work finds the mark and reopens the store.
+      await service.host(chat.agent).harness.commit(async tx => {
+        const index = await tx.doc(Chats);
+        if (!index.open?.[chat.id]) index.open = { ...index.open, [chat.id]: true };
+      }, context);
+      const host = await open(agent, chat);
+      try {
+        await host.harness.commit(async tx => {
+          const identity = await tx.doc(Identity);
+          if (identity.id) return;
+          identity.id = chat.id;
+          if (agent.handoff) await tx.doc(Handoffs, ROOT_CONVERSATION_ID);
+          await service.initialize?.(tx, chat, host);
+        }, context);
+        if (stores.started) host.harness.resume();
+        return host;
+      } catch (error) { await host.close(); throw error; }
+    })();
+    stores.chats.set(chat.id, pending);
+    pending.catch(() => { if (stores.chats.get(chat.id) === pending) stores.chats.delete(chat.id); });
+    return pending;
+  }
+
+  /** Close chat stores with nothing runnable and nothing sleeping, so an idle chat holds no open store. */
+  async function closeIdle(service: Owner) {
+    const stores = storesOf(service);
+    const quiet = (id: string) => !stores.watched.get(id) && Date.now() - (stores.used.get(id) ?? 0) >= idleCloseMs;
+    for (const [id, opened] of stores.chats) {
+      if (!quiet(id)) continue;
+      const host = await opened.catch(() => undefined);
+      // The chat may have been used, watched or replaced while its store finished opening.
+      if (!host || stores.chats.get(id) !== opened || !quiet(id)) continue;
+      const wake = host.harness.wake();
+      if (wake.active || wake.at !== undefined) continue;
+      stores.chats.delete(id);
+      stores.used.delete(id);
+      const closed: Promise<void> = (async () => {
+        await host.close();
+        await service.host(id.split(":")[0]).harness.commit(async tx => {
+          const index = await tx.doc(Chats);
+          if (index.open?.[id]) { const { [id]: _settled, ...open } = index.open; index.open = open; }
+        }, context);
+      })().catch(error => reportError(`[${id}] Could not close an idle chat store:`, error))
+        .finally(() => { if (stores.closing.get(id) === closed) stores.closing.delete(id); });
+      stores.closing.set(id, closed);
+      await closed;
+    }
   }
 
   const foregroundWork = (task: TaskInspection) =>
@@ -176,24 +258,33 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       if (!options.demo && agents.some(agent => !models.getProvider(agent.model.provider))) throw new Error("Register every agent's provider in the supplied Models catalog.");
       try {
         await privateStateDirectory(stateRoot);
+        // An agent's own store and each of its chats' stores open the same way, with the same capabilities.
+        const openStore = (agent: LoadedAgent, directory: string, chat?: string) => openAgent({
+          agent, directory, chat, models,
+          execution: options.demo ? "demo" : "live",
+          extensions: [...(options.extensions ?? []),
+            ...(agent.messages?.length ? [instanceMessagingExtension(namespace, agent, service)] : [])],
+          replySink: options.replySink, updateDefinitions: options.updateDefinitions,
+          registryExtensions: [service.calendars.get(agent.id)!.extension],
+          cwd: options.cwd, env: options.env, workspace: options.workspace, storage: options.storage, settings: options.settings,
+          definitionResources: options.definitionResources, reviewActions: options.reviewActions,
+          artifacts: options.artifacts,
+        });
+        storesOf(service).open = (agent, chat) => openStore(agent, join(stateRoot, agent.id, "chats", chatNumber(chat.id)), chat.id);
         const results = await Promise.allSettled(agents.map(async agent => {
-          const calendar = createSchedules(namespace, agent, service, options.resume !== false);
-          service.calendars.set(agent.id, calendar);
-          const host = await openAgent({
-            agent, directory: join(stateRoot, agent.id), models,
-            execution: options.demo ? "demo" : "live",
-            extensions: [...(options.extensions ?? []),
-              ...(agent.messages?.length ? [instanceMessagingExtension(namespace, agent, service)] : [])],
-            replySink: options.replySink, updateDefinitions: options.updateDefinitions,
-            registryExtensions: [calendar.extension],
-            cwd: options.cwd, env: options.env, workspace: options.workspace, storage: options.storage, settings: options.settings,
-            definitionResources: options.definitionResources, reviewActions: options.reviewActions,
-            artifacts: options.artifacts,
-          });
-          service.hosts.set(agent.id, host);
+          service.calendars.set(agent.id, createSchedules(namespace, agent, service, options.resume !== false));
+          service.hosts.set(agent.id, await openStore(agent, join(stateRoot, agent.id)));
         }));
         const failure = results.find(result => result.status === "rejected");
         if (failure?.status === "rejected") throw failure.reason;
+        for (const [agent, host] of service.hosts) {
+          const index = await host.harness.snapshot(Chats, context);
+          if (index && index.layout !== 2 && Object.keys(index.byId).length) {
+            throw new Error(`${join(stateRoot, agent)} holds chats saved by an earlier Dispatch. Each chat now has its own store, and earlier chats are not converted. Move ${stateRoot} aside or choose a new stateRoot to start fresh.`);
+          }
+        }
+        const sweep = storesOf(service).sweep = setInterval(() => { void closeIdle(service); }, idleCloseMs / 2);
+        sweep.unref();
         if (options.resume !== false) {
           for (const agent of agents) await service.calendars.get(agent.id)!.reconcile(service.host(agent.id), enabled.includes(agent.id));
         }
@@ -209,11 +300,23 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     }
 
     async start() {
+      storesOf(this).started = true;
       for (const agent of this.agents) {
         const host = this.host(agent.id);
         host.harness.resume();
         if (this.enabled.has(agent.id) && agent.trigger.mode !== "manual") await host.start();
+        const index = await host.harness.snapshot(Chats, context);
+        for (const id of Object.keys(index?.open ?? {})) if (index!.byId[id]) await chatStore(this, index!.byId[id]);
       }
+    }
+
+    /** Every open store: each agent's own, then each open chat's. A closed chat store holds no runnable work. */
+    async stores() {
+      const chats = await Promise.all([...storesOf(this).chats].map(async ([id, opened]) => {
+        const host = await opened.catch(() => undefined);
+        return host ? [{ agent: id.split(":")[0], chat: id, host }] : [];
+      }));
+      return [...[...this.hosts].map(([agent, host]) => ({ agent, chat: undefined as string | undefined, host })), ...chats.flat()];
     }
 
     async schedules() {
@@ -221,7 +324,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     }
 
     async busy() {
-      return (await Promise.all([...this.hosts.values()].map(async host => {
+      return (await Promise.all((await this.stores()).map(async ({ host }) => {
         const state = await host.harness.inspect(context);
         return state.submissions.length > 0 || state.tasks.some(foregroundWork);
       }))).some(Boolean);
@@ -231,15 +334,19 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     async waitForIdle(signal?: AbortSignal) {
       let revision = 0;
       let wake: (() => void) | undefined;
-      const unsubscribe = [...this.hosts.values()].map(host => host.harness.observeCommits({ advance: () => {
-        revision++; wake?.();
-      }, end: () => { revision++; wake?.(); } }));
+      const observed = new Map<AgentHost, { detach(): void }>();
+      const unsubscribe = { [Symbol.iterator]: () => observed.values() };
       try {
         while (true) {
           signal?.throwIfAborted();
-          const observed = revision;
-          const states = await Promise.all([...this.hosts.values()].map(host => host.harness.inspect(context)));
-          if (revision !== observed) continue;
+          // A delivery can open another chat's store while this waits; its opening commit advances a watched store.
+          const hosts = (await this.stores()).map(store => store.host);
+          for (const host of hosts) if (!observed.has(host)) observed.set(host, host.harness.observeCommits({ advance: () => {
+            revision++; wake?.();
+          }, end: () => { revision++; wake?.(); } }));
+          const seen = revision;
+          const states = await Promise.all(hosts.map(host => host.harness.inspect(context)));
+          if (revision !== seen) continue;
           const tasks = states.flatMap(state => state.tasks).filter(foregroundWork);
           const submissions = states.flatMap(state => state.submissions);
           if (!tasks.length && !submissions.length) return;
@@ -252,7 +359,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
             wake = finish;
             signal?.addEventListener("abort", abort, { once: true });
             if (signal?.aborted) abort();
-            else if (revision !== observed) finish();
+            else if (revision !== seen) finish();
           });
         }
       } finally { for (const observation of unsubscribe) observation.detach(); }
@@ -260,7 +367,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
 
     /** Unfinished is not necessarily executing: failed runs may retain queued input. */
     async activity() {
-      const hosts = await Promise.all([...this.hosts].map(async ([agent, host]) => {
+      const hosts = await Promise.all((await this.stores()).map(async ({ agent, chat, host }) => {
         const state = await host.harness.inspect(context);
         const tasks = state.tasks.filter(foregroundWork);
         const ids = new Set([...tasks.map(task => task.record.conversationId), ...state.submissions.map(item => item.conversationId)]);
@@ -268,13 +375,15 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
           const live = await host.harness.snapshot(LiveDoc, id, context);
           const pending = state.submissions.filter(item => item.conversationId === id);
           const work = tasks.filter(task => task.record.conversationId === id);
-          return { id: `${agent}:${id}`, queued: pending.filter(item => item.status === "queued").length,
+          // Other conversations are private children of a chat, or an agent's own scheduled work.
+          return { id: chat && id === ROOT_CONVERSATION_ID ? chat : `${chat ?? agent}/${id}`,
+            queued: pending.filter(item => item.status === "queued").length,
             held: pending.length > 0 && work.length === 0,
             tasks: work.map(task => ({ id: task.record.id, kind: task.record.kind, state: task.state.kind })),
             ...(live?.compactions?.length ? { compactions: live.compactions } : {}),
             ...(live?.compactionFailure ? { compactionFailure: live.compactionFailure } : {}) };
         }));
-        return { agent, scheduling: state.scheduling, conversations, busy: tasks.length > 0 || state.submissions.length > 0 };
+        return { agent, ...(chat ? { chat } : {}), scheduling: state.scheduling, conversations, busy: tasks.length > 0 || state.submissions.length > 0 };
       }));
       return { busy: hosts.some(host => host.busy), hosts };
     }
@@ -298,33 +407,31 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     }
 
     async create(agent: string, source: Chat["source"], key: string, title = "New chat", origin?: JsonObject): Promise<Chat> {
-      const host = this.host(agent);
-      return host.harness.commit(async tx => {
+      const created = await this.host(agent).harness.commit(async tx => {
         const index = await tx.doc(Chats);
         const existing = index.keys[key];
         if (existing) {
           const chat = index.byId[existing];
           if (origin && chat.origin && !isDeepStrictEqual(origin, chat.origin)) throw new Error("Conversation already has a different origin.");
-          if (origin && !chat.origin) {
-            chat.origin = origin;
-            await this.initialize?.(tx, chat, host);
-          }
-          return JSON.parse(JSON.stringify(chat)) as Chat;
+          const adopted = !!origin && !chat.origin;
+          if (adopted) chat.origin = origin;
+          return { chat: JSON.parse(JSON.stringify(chat)) as Chat, adopted };
         }
-        const conversation = await tx.createConversation({ ownership: { kind: "ownerless" } });
-        await configure(tx, conversation.id, host.configuration);
-        const definition = this.agents.find(definition => definition.id === agent)!;
-        await selectMessageTools(tx, conversation.id, definition);
-        if (definition.handoff) await tx.doc(Handoffs, conversation.id);
+        const number = (index.next ?? 0) + 1;
         const chat: Chat = {
-          id: `${agent}:${conversation.id}`, agent, conversationId: conversation.id,
+          id: `${agent}:${number}`, agent, conversationId: ROOT_CONVERSATION_ID,
           source, ...(origin ? { origin } : {}), title: title.trim().slice(0, 120) || "New chat", createdAt: new Date().toISOString(),
         };
-        await this.initialize?.(tx, chat, host);
+        index.next = number;
+        index.layout = 2;
         index.byId[chat.id] = chat;
         index.keys[key] = chat.id;
-        return chat;
+        return { chat, adopted: false };
       }, context);
+      // Opening the store configures the chat's conversation. A crash before this leaves an entry that the next use opens.
+      const host = await chatStore(this, created.chat);
+      if (created.adopted) await host.harness.commit(tx => this.initialize?.(tx, created.chat, host), context);
+      return created.chat;
     }
 
     async find(agent: string, key: string) {
@@ -333,20 +440,19 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       return id ? index!.byId[id] : undefined;
     }
 
+    /** The chat's entry, its open store and its conversation. Use the store for this operation; an idle one closes later. */
     async resolve(id: string) {
-      const agent = id.split(":")[0];
-      const host = this.host(agent);
-      const chat = (await host.harness.snapshot(Chats, context))?.byId[id];
+      const chat = (await this.host(id.split(":")[0]).harness.snapshot(Chats, context))?.byId[id];
       if (!chat) throw new Error("Unknown conversation.");
-      const conversation = await host.harness.conversation(chat.conversationId as ConversationId, context);
-      if (!conversation) throw new Error("Conversation storage is missing.");
-      return { host, chat, conversation };
+      const host = await chatStore(this, chat);
+      return { host, chat, conversation: host.conversation };
     }
 
     async rename(id: string, title: string) {
-      const { host } = await this.resolve(id);
-      await host.harness.commit(async tx => {
-        (await tx.doc(Chats)).byId[id].title = title.trim().slice(0, 120) || "New chat";
+      await this.host(id.split(":")[0]).harness.commit(async tx => {
+        const chat = (await tx.doc(Chats)).byId[id];
+        if (!chat) throw new Error("Unknown conversation.");
+        chat.title = title.trim().slice(0, 120) || "New chat";
       }, context);
     }
 
@@ -439,6 +545,16 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
 
     async watch(id: string, listener: (snapshot: ChatSnapshot) => Promise<void>) {
       const { host, conversation } = await this.resolve(id);
+      const { watched, used } = storesOf(this);
+      watched.set(id, (watched.get(id) ?? 0) + 1);
+      let watching = true;
+      const unwatch = () => {
+        if (!watching) return;
+        watching = false;
+        const others = watched.get(id)! - 1;
+        if (others) watched.set(id, others); else watched.delete(id);
+        used.set(id, Date.now());
+      };
       // Attach before loading history so commits during history reads are not lost.
       const watch = await conversation.watch(context);
       const handoffWatch = await host.harness.watchDoc(Handoffs, conversation.id, context);
@@ -502,8 +618,10 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
         return pending;
       };
       const stop = async () => {
-        await Promise.all([watch.stop(), handoffWatch?.stop()]);
-        await pending;
+        try {
+          await Promise.all([watch.stop(), handoffWatch?.stop()]);
+          await pending;
+        } finally { unwatch(); }
       };
       try {
         await notify(watch.value);
@@ -528,7 +646,22 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     }
 
     async close() {
-      const results = await Promise.allSettled([...this.hosts.values()].map(host => host.close()));
+      const open = storesOf(this);
+      clearInterval(open.sweep);
+      await Promise.allSettled(open.closing.values());
+      const chats = (await this.stores()).filter(store => store.chat);
+      const settled = chats.filter(({ host }) => { const wake = host.harness.wake(); return !wake.active && wake.at === undefined; });
+      const results = await Promise.allSettled(chats.map(({ host }) => host.close()));
+      open.chats.clear();
+      // A chat with nothing left to do needs no reopening; any other keeps its mark for the next start.
+      for (const [agent, host] of this.hosts) {
+        const ids = settled.filter(store => store.agent === agent).map(store => store.chat!);
+        if (ids.length) await host.harness.commit(async tx => {
+          const index = await tx.doc(Chats);
+          index.open = Object.fromEntries(Object.entries(index.open ?? {}).filter(([id]) => !ids.includes(id)));
+        }, context).catch(error => reportError(`[${agent}] Could not record settled chats:`, error));
+      }
+      results.push(...await Promise.allSettled([...this.hosts.values()].map(host => host.close())));
       this.hosts.clear();
       const failure = results.find(result => result.status === "rejected");
       if (failure?.status === "rejected") throw failure.reason;

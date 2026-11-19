@@ -1,6 +1,8 @@
 export type OpenOptions = {
   agent: LoadedAgent;
   directory: string;
+  /** The chat this store holds. Absent for the agent's own store. */
+  chat?: string;
   /** Trusted local checkout. Tools run with the host user's filesystem access. */
   cwd?: string;
   /** A trusted host supplies remote execution before any local environment is considered. */
@@ -33,7 +35,8 @@ export type OpenOptions = {
 /** Agents opened in this process whose changed definition waits for their saved work to finish. */
 export const deferredDefinitionUpdates = new Set<string>();
 
-export type StorageFactory = (agent: LoadedAgent) => Promise<Storage>;
+/** `chat` names a chat's own store. Return a different store for each chat and for the agent's own. */
+export type StorageFactory = (agent: LoadedAgent, chat?: string) => Promise<Storage>;
 export type StatusFile = {
   agent: string; pid: number; hostRunning: boolean; updatedAt: string;
   conversationId: number; state: RunnerState;
@@ -291,7 +294,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       );
       const { configuration, installed } = setup;
       for (const extension of new Map([...installed, reviews, ...(options.registryExtensions ?? [])].map(extension => [extension.name, extension])).values()) registry.install(extension);
-      storage = options.storage ? await options.storage(agent) : await openNodeSqliteStorage(join(directory, "session.sqlite"));
+      storage = options.storage ? await options.storage(agent, options.chat) : await openNodeSqliteStorage(join(directory, "session.sqlite"));
       const chatWorkspace = agent.workspace && options.workspace
         ? chatWorkspaces.environment(options.workspace, agent, () => harness!) : undefined;
       harness = await Harness.open(storage, {

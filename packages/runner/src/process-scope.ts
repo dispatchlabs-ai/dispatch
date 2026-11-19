@@ -92,11 +92,11 @@ export class ProcessScope {
 
 /** Mark every task before enabling native abort cleanup: no pending tool gets replayed. */
 export async function cancelService(service: ChatService) {
-  const chats = [...service.hosts.values()].map(host => ({ host, conversation: host.conversation }));
-  chats.push(...await Promise.all((await service.list()).map(chat => service.resolve(chat.id))));
+  // A chat whose store is closed has nothing to cancel.
+  const chats = (await service.stores()).map(({ host }) => ({ host, conversation: host.conversation }));
   await Promise.all(chats.map(({ host, conversation }) =>
     recordRequestCancellation(host.harness, conversation.id, context)));
-  for (const host of service.hosts.values()) {
+  for (const { host } of chats) {
     const state = await host.harness.inspect(context);
     for (const task of state.tasks) await host.harness.abortTask(task.record.id, context);
   }

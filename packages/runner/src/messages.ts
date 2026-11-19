@@ -8,6 +8,7 @@ import {
 import type { ChatService } from "./chat.js";
 import type { LoadedAgent } from "./definition.js";
 import { waitForMessageWork } from "./message-wait.js";
+import { callerChat } from "./chat-identity.js";
 
 export type InstanceMessage = {
   agent: string; instance?: string; title?: string; text: string; reply?: boolean; mode?: "followUp" | "steer";
@@ -158,8 +159,8 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
         name: "agent_instances",
         description: "Find your own instance ID and addressable independent instances. Returns identities, not their private transcripts.",
         parameters: Type.Object({}), replay: "safe",
-        async execute(_args, api) {
-          return { output: [{ type: "text", text: JSON.stringify(await instances(`${agent.id}:${api.conversationId}`)) }] };
+        async execute(_args, api, context) {
+          return { output: [{ type: "text", text: JSON.stringify(await instances(await callerChat(namespace, agent.id, api, context))) }] };
         },
       }),
       defineTool({
@@ -174,7 +175,7 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
         }),
         replay: "safe",
         async execute(args, api, context) {
-          const from = `${agent.id}:${api.conversationId}`;
+          const from = await callerChat(namespace, agent.id, api, context);
           const details = await send(from, args, `tool:${api.taskId}`, context);
           return { output: [{ type: "text", text: JSON.stringify(details) }], details };
         },
@@ -184,7 +185,7 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
         description: "Inspect a message task returned by message_agent when status is needed. Do not poll while awaiting an automatic reply.",
         parameters: Type.Object({ taskId: Type.Integer({ minimum: 1 }) }), replay: "safe",
         async execute({ taskId }, api, context) {
-          const value = await status(`${agent.id}:${api.conversationId}`, taskId, context);
+          const value = await status(await callerChat(namespace, agent.id, api, context), taskId, context);
           return { output: [{ type: "text", text: JSON.stringify(value) }] };
         },
       }),
@@ -193,7 +194,7 @@ export function createInstanceMessaging(namespace: string, agent: LoadedAgent, s
         description: "Wait for work admitted by your message_agent task, including its native children, subsequent peer handoffs and replies. Returns the recipient's latest report when that work settles, a blocked/held status, or input_pending to process a queued steering correction. No model polling or new assignment. Prefer reply=false when you will wait; reply=true also queues the initial answer separately. A settled run is not proof of task completion. Use the returned instance for follow-up messages. Cancelling this wait does not cancel independent recipient work.",
         parameters: Type.Object({ taskId: Type.Integer({ minimum: 1 }) }), replay: "safe",
         async execute({ taskId }, api, context) {
-          const value = await wait(`${agent.id}:${api.conversationId}`, taskId, context);
+          const value = await wait(await callerChat(namespace, agent.id, api, context), taskId, context);
           return { output: [{ type: "text", text: JSON.stringify(value) }] };
         },
       }),

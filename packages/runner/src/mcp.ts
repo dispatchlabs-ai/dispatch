@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { awaitWithContext } from "@earendil-works/chord/context";
 import type { JsonValue } from "@earendil-works/chord/json";
 import type { Extension, ToolRegistration } from "@earendil-works/pi-durable";
+import { callerChat } from "./chat-identity.js";
 import {
   McpClient, McpConnectionClosedError, McpSessionExpiredError, StdioTransport, StreamableHttpTransport,
   createMcpToolName, mcpNamespace, normalizeMcpInputSchema, toLlmContent, validateMcpServerConfig,
@@ -152,7 +153,7 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
       const name = createMcpToolName(server, tool.name);
       counts.set(name, (counts.get(name) ?? 0) + 1);
     }
-    const bind = (caller?: { agent: string; stateRoot: string }) => {
+    const bind = (caller?: { agent: string; stateRoot: string; namespace: string }) => {
       const extensions: Record<string, Extension> = Object.create(null);
       for (const { name } of selected) extensions[name] = { name: `mcp:${name}`, tools: [] };
       const assigned = new Set<string>();
@@ -187,7 +188,7 @@ export async function connectMcpServers(servers: McpServers, options: { cwd: str
                 const conversation = await api.commit(tx => tx.conversation(api.conversationId), context);
                 if (!conversation || conversation.owner) throw new Error("Private child conversations cannot send independent agent messages.");
                 // The model never supplies or overrides this context. The server checks the host identity.
-                input = { ...input, caller: { from: `${caller.agent}:${api.conversationId}`,
+                input = { ...input, caller: { from: await callerChat(caller.namespace, caller.agent, api, context),
                   stateRoot: await realpath(caller.stateRoot), requestId: `mcp:tool:${api.taskId}` } };
               }
               const result = await connection.callTool(tool.name, input, {
