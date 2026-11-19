@@ -141,8 +141,7 @@ their own outstanding delegated assignments before reporting completion.
 Native tasks, submissions, tool arguments/results and conversation history stay
 in the existing Pi store. Retain domain traces separately when evaluating another
 system; the QA child's own transcript is not the system-under-test's trace.
-Inspect saved state through the existing read-only APIs/Observer, not a second
-writer. History display can omit tool bodies; it is not a full-trace review.
+Inspect saved state through the existing read-only APIs or [Dispatch Watch](watch.md). History display can omit tool bodies; it is not a full-trace review.
 
 ## QA assignment pattern
 

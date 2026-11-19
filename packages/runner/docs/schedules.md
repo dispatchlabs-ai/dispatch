@@ -135,7 +135,7 @@ identify their native task and current state. A finished program includes its
 start/finish timestamps, exit code (`null` on launch error), stdout and stderr in
 the task outcome. Each admission also
 appends a native `schedule-admission` entry in the owning root conversation for
-Observer/history inspection. `last` means admitted, not successfully completed;
+history inspection. `last` means admitted, not successfully completed;
 inspect the linked submission or program task outcome for success.
 Future sleeping timers alone do not make `status` / `idle` busy; ordinary work,
 active admission and adapter work do.

@@ -22,16 +22,13 @@ buildNpmPackage {
       ../../email/package.json ../../email/tsconfig.json ../../email/src
       ../../mcp/package.json ../../mcp/tsconfig.json ../../mcp/src
       ../../fleet/package.json ../../fleet/tsconfig.json ../../fleet/src
-      ../../observer/package.json ../../observer/tsconfig.json ../../observer/src
-      ../../fleet/scripts ../../observer/scripts ../../observer/licenses
-      ../../observer/index.html ../../observer/vite.config.ts
+      ../../fleet/scripts
       ../../eval
       ../package.json ../tsconfig.json ../tsconfig.server.json ../vite.config.ts
       ../index.html ../src ../server ../preview.js ../openapi.yaml ../licenses ../LICENSE ../THIRD_PARTY.md
     ];
   };
-  npmDepsHash = "sha256-Rbvp/Ufvl/ZPCH9HpcOl1aFs7sFFtMFOHNTPiBT83Ac=";
-  ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
+  npmDepsHash = "sha256-s7z6CBy7u58o9I6IuKM6Rdg+nVsvznIXTN8GVMGAhsM=";
   npmBuildScript = "build";
   doCheck = true;
   checkPhase = "npm run typecheck";
@@ -43,7 +40,7 @@ buildNpmPackage {
     cp package.json LICENSE "$app/"
     cp -R node_modules "$app/"
     rm "$app/node_modules/@dispatch/eval" # installed by the agent release builder, not served by Web
-    for package in runner remote postgres backend workers slack google-chat imsg email mcp fleet observer web; do
+    for package in runner remote postgres backend workers slack google-chat imsg email mcp fleet web; do
       mkdir -p "$app/packages/$package"
       cp packages/$package/package.json "$app/packages/$package/"
       cp -R packages/$package/dist "$app/packages/$package/"

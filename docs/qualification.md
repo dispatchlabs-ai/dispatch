@@ -26,9 +26,9 @@ the default SQLite stores.
   new message typed in the browser.
 
 Slack, Google Chat, email and Messages were converted and type-checked only;
-none ran against its live channel. The observer's reader, remote SQLite, the
-workers package, Fleet and the central PostgreSQL mode were not exercised, and
-the last three refuse to create a chat.
+none ran against its live channel. Remote SQLite, the workers package, Fleet and
+the central PostgreSQL mode were not exercised. The last three refuse to
+create a chat.
 
 ## Per-chat workspaces — November 19, 2026 UTC
 

@@ -2,7 +2,7 @@
 
 This procedure prepares and publishes reusable packages. Follow
 [repository guidance](../AGENTS.md) for task scope and completing needed upgrades.
-Root, Observer and Eval remain application packages excluded from npm publication.
+Root and Eval remain application packages excluded from npm publication.
 The public library set is Runner, Remote, Postgres, Backend, Workers, Slack,
 Google Chat, Messages, Email and Fleet. Web ships as an installable browser client and MCP as an optional conversation connector. Install only the
 packages your application uses. Backend's central storage peers and Fleet's Slack

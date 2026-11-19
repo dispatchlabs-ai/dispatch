@@ -337,7 +337,7 @@ and [Fleet](../fleet/README.md) are explicit deployments of that ownership model
 
 `dispatch-watch --config HOST.json --session .` inspects saved native work without
 starting it. The shared `@dispatch/runner/records` reader handles read-only SQLite
-snapshots and document revisions for Runner, Observer and Eval. See
+snapshots and document revisions for Runner and Eval. See
 [watch](docs/watch.md), [artifacts](docs/artifacts.md),
 [workflow progress](docs/workflow-progress.md), [request completion](docs/request-completion.md),
 [use cases](USE_CASES.md) and [changes](CHANGELOG.md).
@@ -463,7 +463,7 @@ handoff children; applications with pinned domain configurations use the
 code is not transitively hashed.
 
 Runner source builds now pin Pi 1.5.2, including the terminal UI dependency.
-Remote, Observer, Web and the transport adapters also pin 1.5.2. Custom storage providers
+Remote, Web and the transport adapters also pin 1.5.2. Custom storage providers
 must implement Pi 1.5 grouped commits before use
 with this runner. Pi 1.5 writes newer native live-document and task versions that
 Pi 1.4 cannot resume. Before upgrading, stop the owner and back up

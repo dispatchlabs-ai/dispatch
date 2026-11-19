@@ -93,7 +93,7 @@ Read its Durable manifest (exports/types/files/exact dependencies),
 Use the pinned release's public contracts, not unreleased storage internals.
 Dispatch follows packed, external consumer checks and emitted types/files, not
 Pi tests or CI. Reusable runtime and channel packages and the Web executable are prepared together as versioned archives;
-actual release availability is recorded in the root README. npm publication is separate. The root, Observer and Eval manifests set `private: true` to exclude npm publication; their
+actual release availability is recorded in the root README. npm publication is separate. The root and Eval manifests set `private: true` to exclude npm publication; their
 source is public under MIT. Follow
 [scripts/README.md](scripts/README.md) for reviewed tarball preparation, external
 consumers and publication. The PostgreSQL implementation

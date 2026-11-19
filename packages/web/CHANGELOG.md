@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Retire the separate Dispatch Observer desktop app. Use Web or the iPhone app to browse saved conversations.
+
 ## [0.39.1] - 2026-11-18
 
 - Group each turn’s tool calls under one collapsed Tool activity row so progress notes stay visible.

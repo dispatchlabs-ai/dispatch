@@ -14,7 +14,6 @@
     "packages/imsg",
     "packages/email",
     "packages/fleet",
-    "packages/observer",
     "packages/eval",
     "packages/web"
   ],

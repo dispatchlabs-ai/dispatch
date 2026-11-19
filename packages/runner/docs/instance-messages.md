@@ -144,9 +144,8 @@ Private delegates cannot impersonate a top-level sender.
 
 Use the existing service/transport conversation list to find both instances.
 `snapshot` shows user/assistant text and active tool names, not complete tool
-arguments/results. [Dispatch Observer](../../observer/README.md) reads the native
-stores without opening another Harness owner and exposes tool calls, results,
-message tasks, entries and submissions. Message bodies and results can contain
+arguments/results. [Dispatch Watch](watch.md) reads saved tool calls and their results
+without opening a second Harness owner. Message bodies and results can contain
 sensitive repository or user data; protect the stores accordingly.
 
 Adding `messages` changes the definition fingerprint. Update idle definitions

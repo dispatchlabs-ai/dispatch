@@ -6,11 +6,11 @@ Durable channel delivery tasks are optional extensions in the same owner.
 
 | Operation | Web / HTTP | Runner local service / CLI | Other packages |
 | --- | --- | --- | --- |
-| List agents and histories | Agent, chat and source routes | `agents`, `chats`; same owner catalog | Observer reads configured stores; channel routing is installation configuration |
+| List agents and histories | Agent, chat and source routes | `agents`, `chats`; same owner catalog | The iPhone app uses the authenticated Web catalog |
 | Agent artwork | Authenticated avatar route; automatic definition artwork with optional overrides | `agents` advertises availability; `avatars` returns approved raster bytes | Definition-relative discovery works over local and network host connections |
 | Create | Stable conversation creation key | `create`, native Chats identity | Channels map external threads into native conversations |
 | Send and steer | Retained `requestId` | `send`, native admission receipt | Each channel preserves its admission and delivery identities |
-| Observe | Snapshot and SSE | `snapshot`, `receipt`, native event stream | Observer is read-only; channels publish their documented public response projection |
+| Observe | Snapshot and SSE | `snapshot`, `receipt`, native event stream | Channels publish their documented public response projection |
 | Schedule | No calendar editor or schedule route in Web | Agent-local declarations; `schedules` returns timer state and prompt/program admission receipts | Native program tasks retain exit status and output; configuration remains host administration |
 | Stop | Selected conversation's stop route | `stop CHAT` | Channel controls are adapter-specific; independent recipients keep their own lifecycle |
 | Files | Validated native input blocks and artifact routes | Native attachments and retained artifacts | MIME types and delivery receipts depend on the channel |

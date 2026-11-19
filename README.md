@@ -159,7 +159,7 @@ Install only the optional packages you use. Channel credentials and routing belo
 | Run agents and build clients | [Runner](packages/runner/README.md) · [Web](packages/web/README.md) · [Backend](packages/backend/README.md) |
 | Add a channel | [MCP](packages/mcp/README.md) · [Slack](packages/slack/README.md) · [Google Chat](packages/google-chat/README.md) · [Messages](packages/imsg/README.md) · [Email](packages/email/README.md) |
 | Distribute execution or storage | [Remote](packages/remote/README.md) · [Workers](packages/workers/README.md) · [Fleet](packages/fleet/README.md) · [Postgres](packages/postgres/README.md) |
-| Inspect history or evaluate agents | [Observer](packages/observer/README.md) · [Eval](packages/eval/README.md) |
+| Inspect history or evaluate agents | [Watch](packages/runner/docs/watch.md) · [Eval](packages/eval/README.md) |
 
 Dispatch uses [Pi Durable](https://github.com/earendil-works/pi) for execution, recovery and stored conversations. Local Web binds to loopback. Hosted Web requires HTTPS and application-owned authorization. [Client contract](docs/interfaces.md) · [Web HTTP API](packages/web/openapi.yaml) · [Security](SECURITY.md) · [Verification](docs/qualification.md)
 
