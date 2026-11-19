@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- `workspace: "chat"` in `defineAgent`, with a `workspace` host setting, gives each chat of that agent its own disposable workspace under `dispatch serve`. The workspace starts on the chat's first shell or file tool call, and delegated children of the chat share it. Automatic suspension and per-chat desktop tools are not included.
+
 ## [0.39.2] - 2026-11-18
 
 - `skills` in `defineAgent` also accepts a list of skill IDs, such as `["company/code-review"]`. That agent's catalog, `read_skill` and fingerprint then cover only the listed skills, so a shared skill meant for other agents stays out of its instructions. `skills: true` still means the whole catalog.

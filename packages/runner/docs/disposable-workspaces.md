@@ -139,9 +139,50 @@ regular files and do not follow a final symlink; exports remain inside
 
 ## Connect a host
 
-`host.json` and `dispatch serve` have no workspace setting, and the CLI has no
-workspace command. A host that embeds Runner selects the controller command and
-run itself, then supplies the workspace as the native execution environment:
+### One workspace per chat
+
+An agent asks for a workspace of its own for each chat in `agent.ts`:
+
+```ts
+export default defineAgent({ extensions: [CodingTools], workspace: "chat" });
+```
+
+The host names its installed controller command and the image descriptor in
+`host.json`, then starts with `dispatch serve` as usual:
+
+```json
+{
+  "workspace": {
+    "command": ["sudo", "-n", "/usr/local/libexec/example-workspace"],
+    "image": {
+      "format": 1,
+      "contract": "dispatch-workspace-v1",
+      "platform": "linux/amd64",
+      "image": "registry.example.com/workspace@sha256:<64 hexadecimal characters>",
+      "sourceRevision": "<40 hexadecimal characters>"
+    }
+  }
+}
+```
+
+A chat's first shell or file tool call creates its workspace. A turn that uses
+neither creates none. Later turns and delegated children of that chat use the
+same workspace; other chats cannot reach it. The workspace identity is saved
+with the chat's native state. The host refuses to start an agent that selects
+`workspace: "chat"` without this setting. Agents without the option keep their
+existing tools and working directory.
+
+The controller binds each workspace to the application root and the agent's
+definition fingerprint, so `allowedReleaseRoots` must cover the application
+root. Repository instructions inside a workspace are read once this host has
+started it. The host does not yet suspend or finish these workspaces, and
+desktop tools are not bound per chat.
+
+### An embedding host
+
+The CLI has no workspace command. A host that embeds Runner can instead select
+the controller command and run itself, then supply the workspace as the native
+execution environment:
 
 ```ts
 import { run, WorkspaceClient } from "@dispatch/runner";

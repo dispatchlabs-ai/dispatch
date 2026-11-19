@@ -4,6 +4,7 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import type { ClientConnection } from "./client.js";
 import type { ServiceConfig } from "./service.js";
+import { chatWorkspaceHost } from "./workspace.js";
 
 function hostPaths(root: string, stateRoot = join(root, ".state")) {
   // Unix socket names are short even when the application lives in a deeply nested checkout.
@@ -62,6 +63,7 @@ export async function readHostConfig(filename: string): Promise<FileConfig> {
   if (input.cwd !== undefined) config.cwd = settingPath(directory, input.cwd);
   if (input.socket !== undefined) config.socket = settingPath(directory, input.socket);
   else if (input.http || input.url) delete config.socket;
+  if (input.workspace !== undefined) config.workspace = chatWorkspaceHost(input.workspace);
   if (input.gateway) config.gateway = { ...input.gateway, credentialFile: settingPath(directory, input.gateway.credentialFile) };
   if (input.modelProviders) {
     if (!Array.isArray(input.modelProviders)) throw new Error("modelProviders must be a list.");

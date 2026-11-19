@@ -1,6 +1,9 @@
 import { spawn } from "node:child_process";
+import { createHash, randomBytes } from "node:crypto";
+import { realpath } from "node:fs/promises";
 import { posix } from "node:path";
 import type { Context } from "@earendil-works/chord/context";
+import { defineDoc, type ConversationId, type Harness, type HarnessOptions } from "@earendil-works/pi-durable";
 import {
   ExecutionError, FileError, LineScanner, err, ok,
   type BinaryReader, type DirReader, type ExecutionEnv, type FileInfo, type Result,
@@ -18,6 +21,8 @@ export type WorkspaceRecord = { run: string; release: WorkspaceRelease; state: s
 /** A host-owned, run-bound route to the workspace controller. */
 export interface WorkspaceTransport {
   readonly run: string;
+  /** False until this host has started the workspace; absent when the embedding host starts it before work. */
+  readonly started?: boolean;
   request<T>(request: Record<string, unknown>, signal?: AbortSignal, output?: ShellExecOptions["onOutput"], context?: Context): Promise<T>;
 }
 
@@ -180,4 +185,82 @@ export class WorkspaceEnvironment implements ExecutionEnv {
     } finally { if (timer) clearTimeout(timer); this.commands.delete(controller); }
   }
   async cleanup() { for (const controller of this.commands) controller.abort(); }
+}
+
+/** Host settings for agents that select `workspace: "chat"`: the installed controller command and the pinned image. */
+export type ChatWorkspaceHost = { command: string[]; image: WorkspaceImage };
+
+export function chatWorkspaceHost(value: unknown): ChatWorkspaceHost {
+  const host = value as Partial<ChatWorkspaceHost> | null;
+  if (!host || typeof host !== "object" || !Array.isArray(host.command) || !host.command.length
+    || host.command.some(part => typeof part !== "string" || !part) || !host.image || typeof host.image !== "object") {
+    throw new Error("workspace needs a controller command and an image descriptor.");
+  }
+  return { command: host.command, image: host.image };
+}
+
+/** Starts a chat's workspace on its first tool request, so a turn without shell or file work creates none. */
+class ChatWorkspace implements WorkspaceTransport {
+  started = false;
+  private starting?: Promise<void>;
+  constructor(private readonly client: WorkspaceClient, private readonly release: () => Promise<Omit<WorkspaceRelease, "runtimeEntryPoint">>) {}
+  get run() { return this.client.run; }
+  // One caller's cancellation must not interrupt a start that other tool calls are waiting for.
+  private start() {
+    return this.starting ??= (async () => {
+      await this.client.request({ op: "bind", release: await this.release() });
+      await this.client.request({ op: "ensure" });
+      this.started = true;
+    })().catch(error => { this.starting = undefined; throw error; });
+  }
+  async request<T>(request: Record<string, unknown>, signal?: AbortSignal, output?: ShellExecOptions["onOutput"], context?: Context): Promise<T> {
+    await this.start();
+    return this.client.request<T>(request, signal, output, context);
+  }
+}
+
+type OpenHarness = Awaited<ReturnType<typeof Harness.open>>;
+export type ChatWorkspaces = {
+  /** Save the store's workspace identity once, before any conversation resolves an environment. */
+  identify(harness: OpenHarness, context: Context): Promise<void>;
+  /** Every conversation of one chat, including delegated children, resolves to that chat's workspace. */
+  environment(host: ChatWorkspaceHost, agent: { root: string; fingerprint: string }, harness: () => OpenHarness): NonNullable<HarnessOptions["env"]>;
+};
+
+export function createChatWorkspaces(namespace: string): ChatWorkspaces {
+  // A random value saved with the store keeps each chat's workspace identity with its Pi state.
+  const Identity = defineDoc<{ store: string }>({
+    kind: `${namespace}.chat-workspaces`, version: 1, scope: "session",
+    checkpointWhen: () => false, initial: () => ({ store: "" }),
+  });
+  async function identify(harness: OpenHarness, context: Context) {
+    await harness.commit(async tx => {
+      const state = await tx.doc(Identity);
+      state.store ||= randomBytes(32).toString("hex");
+    }, context);
+  }
+  function environment(host: ChatWorkspaceHost, agent: { root: string; fingerprint: string }, harness: () => OpenHarness): NonNullable<HarnessOptions["env"]> {
+    const chats = new Map<ConversationId, ConversationId>();
+    const workspaces = new Map<string, ChatWorkspace>();
+    const release = async () => ({ definitionsRoot: await realpath(agent.root), runtimeRevision: agent.fingerprint, workspace: host.image });
+    return async (target, context) => {
+      let chat = chats.get(target.conversationId);
+      if (chat === undefined) {
+        chat = await harness().commit(async tx => {
+          let id = target.conversationId;
+          for (let record = await tx.conversation(id); record?.owner; record = await tx.conversation(id)) id = record.owner.conversationId;
+          return id;
+        }, context);
+        chats.set(target.conversationId, chat);
+      }
+      // identify() saved this before the host resumed any work.
+      const { store } = (await target.read.snapshot(Identity, context))!;
+      const run = createHash("sha256").update(`${store}\0${chat}`).digest("hex");
+      let workspace = workspaces.get(run);
+      if (!workspace) workspaces.set(run, workspace = new ChatWorkspace(new WorkspaceClient(host.command, run), release));
+      // The conversation's saved working directory is a host path; the guest has its own.
+      return new WorkspaceEnvironment(workspace, "/workspace");
+    };
+  }
+  return { identify, environment };
 }

@@ -3,6 +3,7 @@ import { readFile, realpath, stat } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { getOrThrow } from "@earendil-works/pi-durable/env";
 import { defineExtension, section } from "@earendil-works/pi-durable";
+import { WorkspaceEnvironment } from "./workspace.js";
 
 export type RepositoryInstruction = { path: string; revision: string; text: string };
 
@@ -59,6 +60,8 @@ export function repositoryInstructionsExtension(definition: { root: string; sour
     name: "dispatch.repository-instructions",
     sections: [section("repository_instructions", async (input, context) => {
       if (!input.env?.cwd) return undefined;
+      // Reading a chat's workspace here would start it on every request, including turns that never use it.
+      if (input.env instanceof WorkspaceEnvironment && input.env.client.started === false) return undefined;
       const cwd = input.env.cwd;
       const env = input.env;
       const currentDirectory = getOrThrow(await env.canonicalPath(cwd, context));

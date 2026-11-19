@@ -4,6 +4,29 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## Per-chat workspaces — November 19, 2026 UTC
+
+A `dispatch serve` host with the unreleased `workspace: "chat"` option ran on an
+x86_64 Amazon Linux 2023 instance (8 vCPU, 64 GiB) with Docker 25, the gVisor
+and Cua packages pinned by Dispatch 0.39.2 and a published workspace image. The
+model was scripted. The host, Pi Durable, the controller, gVisor and the guests
+were real.
+
+- A turn with no tool call created no container.
+- Each of three chats got its own `runsc` container on its first shell command.
+  Two chats wrote different contents to `/workspace/note.txt` and each read back
+  its own. A delegated child read its parent chat's file.
+- A guest could not reach instance metadata or another chat's guest, and saw no
+  host paths.
+- After a host restart the same containers served the same chats.
+- The first workspace took 64 seconds including the image pull. Later ones took
+  about 5 seconds from the request to the command's output. An idle workspace
+  with its desktop held about 310 MiB.
+
+On macOS arm64 the same build refused to start an agent that selects the option
+when the host has no `workspace` setting. Desktop tools, suspension and
+restoration, a real model, concurrent load and arm64 guests were not exercised.
+
 ## Native iPhone personal builds — November 18, 2026 UTC
 
 Xcode 27 built the checked-in project from a clean clone. An iOS 18.5 simulator

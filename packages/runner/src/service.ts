@@ -14,6 +14,7 @@ import { hostModels, type HostModelsConfig } from "./host-models.js";
 import { serviceSettings, type ServicePolicy } from "./settings.js";
 import { privateStateDirectory } from "./private-state.js";
 import type { McpServers } from "./mcp.js";
+import type { ChatWorkspaceHost } from "./workspace.js";
 
 import { configuredReviewActions, type ReviewPolicy } from "./review-actions.js";
 
@@ -34,6 +35,8 @@ export type ServiceConfig = ServicePolicy & HostModelsConfig & ReviewPolicy & {
   /** Disable factory schedules without disabling recovery of admitted work. */
   schedules?: boolean;
   definitionResources?: boolean;
+  /** The installed workspace controller and pinned image for agents that select `workspace: "chat"`. */
+  workspace?: ChatWorkspaceHost;
   adapters?: { module: string; optionsFile: string }[];
   mcpServers?: McpServers;
 };

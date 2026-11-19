@@ -5,6 +5,8 @@ export type OpenOptions = {
   cwd?: string;
   /** A trusted host supplies remote execution before any local environment is considered. */
   env?: HarnessOptions["env"];
+  /** Gives each chat of a `workspace: "chat"` agent its own disposable workspace. Ignored when `env` is supplied. */
+  workspace?: ChatWorkspaceHost;
   /** Read-only packaged references, shared with this agent's native children. */
   definitionResources?: boolean;
   models: Models;
@@ -63,6 +65,7 @@ import { ArtifactStore, type ArtifactOptions, type createArtifacts } from "./art
 import { compactionExtension } from "./compaction.js";
 import { definitionResourcesExtension } from "./definition-resources.js";
 import { selectMessageTools } from "./messages.js";
+import { createChatWorkspaces, type ChatWorkspaceHost } from "./workspace.js";
 
 const context = BACKGROUND_CONTEXT;
 export type RunnerState = {
@@ -192,6 +195,7 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
     },
   });
 
+  const chatWorkspaces = createChatWorkspaces(namespace);
   const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
   async function readStatus(directory: string): Promise<StatusFile | null> {
@@ -207,6 +211,9 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
     const { agent, models } = options;
     if (agent.messages?.length && !options.extensions?.some(extension => extension.name === `${namespace}.instance-messages.${agent.id}`)) {
       throw new Error(`${agent.id} needs instance messaging. Open it through ChatService, or supply instanceMessagingExtension with the owning service.`);
+    }
+    if (agent.workspace && !options.env && !options.workspace) {
+      throw new Error(`${agent.id} selects workspace: "chat". Add workspace to the host settings.`);
     }
     const directory = resolve(options.directory);
     const cwd = options.cwd ? (options.env ? options.cwd : await realpath(resolve(options.cwd))) : undefined;
@@ -268,12 +275,15 @@ export function createRuntime(namespace: string, agentConfiguration: ReturnType<
       const { configuration, installed } = setup;
       for (const extension of new Map([...installed, reviews, ...(options.registryExtensions ?? [])].map(extension => [extension.name, extension])).values()) registry.install(extension);
       storage = options.storage ? await options.storage(agent) : await openNodeSqliteStorage(join(directory, "session.sqlite"));
+      const chatWorkspace = agent.workspace && options.workspace && !options.env
+        ? chatWorkspaces.environment(options.workspace, agent, () => harness!) : undefined;
       harness = await Harness.open(storage, {
         models, registry, now, settings: options.settings,
-        env: options.env ?? (async (target, ctx) => await codingEnvironment(target, ctx) ??
+        env: options.env ?? chatWorkspace ?? (async (target, ctx) => await codingEnvironment(target, ctx) ??
           (cwd ? new NodeExecutionEnv({ cwd: target.cwd ?? cwd }) : undefined)),
         onReport: (report) => reportError(`[${agent.id}] Pi Durable (${report.kind}):`, report.error),
       }, context);
+      if (chatWorkspace) await chatWorkspaces.identify(harness, context);
       root = await harness.root(context, {
         agent: configuration, init: (tx, id) => selectMessageTools(tx, id, agent),
       });

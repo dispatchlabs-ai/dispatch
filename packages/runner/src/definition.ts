@@ -28,6 +28,8 @@ export type AgentDefinition = {
   mcp?: string[];
   /** Native coding tools, with a private checkout selected by the agent. */
   coding?: boolean;
+  /** "chat" runs each chat's shell and file tools in its own disposable workspace, which the host's `workspace` setting supplies. */
+  workspace?: "chat";
   /** Company skills and this agent's own: true for the whole catalog, or the skill IDs this agent may read. Opt-in for existing stores. */
   skills?: boolean | string[];
   /** Named agents available for native foreground delegation. */
@@ -106,6 +108,7 @@ export function defineAgent(definition: AgentDefinition = {}): AgentDefinition &
     throw new Error("runImmediately must be a boolean.");
   }
   if (definition.coding !== undefined && typeof definition.coding !== "boolean") throw new Error("coding must be a boolean.");
+  if (definition.workspace !== undefined && definition.workspace !== "chat") throw new Error('workspace must be "chat".');
   if (definition.skills !== undefined && typeof definition.skills !== "boolean" && !(Array.isArray(definition.skills)
     && definition.skills.length && definition.skills.every(id => typeof id === "string" && skillId.test(id))
     && new Set(definition.skills).size === definition.skills.length)) {
@@ -121,7 +124,7 @@ export function defineAgent(definition: AgentDefinition = {}): AgentDefinition &
 
 const frontmatterKeys = ["description", "model", "mcp", "environment", "progressNotes"];
 const modelKeys = ["provider", "id", "thinking"];
-const agentModuleKeys = ["trigger", "input", "schedules", "extensions", "coding", "skills", "delegates", "clones", "messages", "messageTools", "handoff"];
+const agentModuleKeys = ["trigger", "input", "schedules", "extensions", "coding", "workspace", "skills", "delegates", "clones", "messages", "messageTools", "handoff"];
 
 /** Settings Dispatch does not read must not silently change an agent's fingerprint. */
 function validateFrontmatter(meta: unknown, source: string): void {

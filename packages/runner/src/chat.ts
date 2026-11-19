@@ -143,6 +143,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       schedules?: boolean;
       cwd?: string;
       env?: OpenOptions["env"];
+      workspace?: OpenOptions["workspace"];
       definitionResources?: OpenOptions["definitionResources"];
       reviewActions?: OpenOptions["reviewActions"];
       storage?: StorageFactory;
@@ -185,7 +186,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
               ...(agent.messages?.length ? [instanceMessagingExtension(namespace, agent, service)] : [])],
             replySink: options.replySink, updateDefinitions: options.updateDefinitions,
             registryExtensions: [calendar.extension],
-            cwd: options.cwd, env: options.env, storage: options.storage, settings: options.settings,
+            cwd: options.cwd, env: options.env, workspace: options.workspace, storage: options.storage, settings: options.settings,
             definitionResources: options.definitionResources, reviewActions: options.reviewActions,
             artifacts: options.artifacts,
           });

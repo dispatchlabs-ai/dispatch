@@ -41,6 +41,7 @@ export type RunOptions = {
   /** Explicit local working directory for native tools and repository instructions. */
   cwd?: string;
   env?: OpenOptions["env"];
+  workspace?: OpenOptions["workspace"];
   definitionResources?: OpenOptions["definitionResources"];
   runner?: Runner;
   models?: Models;
@@ -167,7 +168,7 @@ export async function run(options: RunOptions = {}) {
         updateDefinitions: options.updateDefinitions, initialize: options.initialize,
         resume: options.resume, schedules: options.schedules,
         deferResume: true,
-        cwd: options.cwd, env: options.env, storage: options.storage, settings: options.settings,
+        cwd: options.cwd, env: options.env, workspace: options.workspace, storage: options.storage, settings: options.settings,
         definitionResources: options.definitionResources, reviewActions: options.preview || options.demo ? undefined : options.reviewActions,
         extensions, replySink, artifacts,
       });
