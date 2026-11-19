@@ -2,6 +2,8 @@
 
   engine.py convert --data-dir DIR [--bundle-root DIR] [--clock-kind KIND] [--runtime DISPATCH,PI_DURABLE]
 
+Convert only trusted Dispatch stores: custom table and index definitions are replayed from the source database.
+
 The schema-1 file is opened read-only and is kept, renamed to `assessments.schema1.sqlite`. Every row is carried
 over with its ID, so assessment history, frozen requirements, versions, runs and comparisons keep their links and
 nothing has to be graded again. What moves:
@@ -35,8 +37,12 @@ RENAMED = {"conversations": "units", "runs": "cycles", "eval_runs": "runs", "eva
 KNOWN = {"conversations", "bundles", "requirements", "assessments", "versions", "failures", "runs", "eval_runs", "eval_results", "eval_comparisons"}
 
 
+def quote_identifier(name: str) -> str:
+    return '"' + name.replace('"', '""') + '"'
+
+
 def columns(con: sqlite3.Connection, table: str) -> list[str]:
-    return [r[1] for r in con.execute(f'pragma table_info("{table}")')]
+    return [r[1] for r in con.execute(f'pragma table_info({quote_identifier(table)})')]
 
 
 def convert(data_dir: Path, bundle_root: Path, clock_kind: str | None, runtime: dict | None) -> dict:
@@ -45,7 +51,7 @@ def convert(data_dir: Path, bundle_root: Path, clock_kind: str | None, runtime: 
     target = data_dir / "assessments.schema2.tmp.sqlite"
     if not source.exists():
         raise SystemExit(f"no store at {source}")
-    old = sqlite3.connect(f"file:{source}?mode=ro", uri=True)
+    old = sqlite3.connect(source.absolute().as_uri() + "?mode=ro", uri=True)
     old.row_factory = sqlite3.Row
     found = E.store_schema(old)
     if found == E.SCHEMA_VERSION:
@@ -135,8 +141,9 @@ def convert(data_dir: Path, bundle_root: Path, clock_kind: str | None, runtime: 
             raise SystemExit(f"schema-1 table {name} has the name of a schema-{E.SCHEMA_VERSION} table; rename it before converting")
         new.execute(sql)
         width = len(columns(old, name))
-        rows = old.execute(f'select * from "{name}"').fetchall()
-        new.executemany(f'insert into "{name}" values({",".join("?" * width)})', [tuple(r) for r in rows])
+        identifier = quote_identifier(name)
+        rows = old.execute(f'select * from {identifier}').fetchall()
+        new.executemany(f'insert into {identifier} values({",".join("?" * width)})', [tuple(r) for r in rows])
         for (index_sql,) in old.execute("select sql from sqlite_master where type='index' and tbl_name=? and sql is not null", (name,)):
             new.execute(index_sql)
         counts[name] = len(rows)
@@ -146,8 +153,8 @@ def convert(data_dir: Path, bundle_root: Path, clock_kind: str | None, runtime: 
     for table in names - {"sqlite_sequence"}:
         if table.startswith("sqlite_"):
             continue
-        before = old.execute(f'select count(*) from "{table}"').fetchone()[0]
-        after = new.execute(f'select count(*) from "{RENAMED.get(table, table)}"').fetchone()[0]
+        before = old.execute(f'select count(*) from {quote_identifier(table)}').fetchone()[0]
+        after = new.execute(f'select count(*) from {quote_identifier(RENAMED.get(table, table))}').fetchone()[0]
         if before != after:
             new.close()
             target.unlink()

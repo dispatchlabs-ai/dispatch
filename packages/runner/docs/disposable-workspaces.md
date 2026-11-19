@@ -66,12 +66,16 @@ output rather than copying only `runsc`.
 The configured Docker runtime must
 use `--net-raw`, `--allow-packet-socket-write`, `--allow-suid`, and
 `--overlay2=none`. Runtime names are host-owned. Provision a dedicated bridge and
-its nftables rules with `configure-network` before admitting work. These rules
-block guest access to new host connections, other workspaces on that bridge and
-cloud instance metadata. The Cua control port is bound only to host loopback.
-Containers never restart automatically: after a host reboot, `ensure` verifies the network policy before
-starting a retained computer. Host provisioning must restore the nftables rules
-before admitting workspace operations.
+its nftables rules with `configure-network` before admitting work. Use nftables
+with JSON support (`nft -j`). The rules block guest access to new host connections,
+other workspaces on that bridge and cloud instance metadata. The Cua control
+port is bound only to host loopback.
+
+`ensure` refuses to create or start a workspace if the Dispatch-managed table
+is missing or does not contain the expected chains and rules. Keep custom rules
+in a separate table. Containers never restart automatically: after a host reboot
+or firewall reset, restore the policy with `configure-network` before admitting
+workspace operations.
 
 ## Host controller
 

@@ -77,6 +77,42 @@ def descriptor(value):
     return {key: value[key] for key in ('format', 'contract', 'platform', 'image', 'sourceRevision')}
 
 
+def firewall_policy(table, bridge):
+    scope = {'family': 'inet', 'table': table}
+
+    def match(left, right, op='=='):
+        return {'match': {'left': left, 'op': op, 'right': right}}
+
+    incoming = match({'meta': {'key': 'iifname'}}, bridge)
+    chains = {
+        'input': [
+            (match({'ct': {'key': 'state'}}, {'set': ['established', 'related']}, '!='),
+             {'reject': {'type': 'icmpx', 'expr': 'port-unreachable'}}),
+        ],
+        'forward': [
+            (match({'payload': {'protocol': 'ip', 'field': 'daddr'}}, '169.254.169.254'), {'drop': None}),
+            (match({'payload': {'protocol': 'ip6', 'field': 'daddr'}}, 'fd00:ec2::254'), {'drop': None}),
+            (match({'meta': {'key': 'oifname'}}, bridge), {'drop': None}),
+        ],
+    }
+    return [
+        {'table': {'family': 'inet', 'name': table}},
+        *({'chain': {**scope, 'name': hook, 'type': 'filter', 'hook': hook, 'prio': -5, 'policy': 'accept'}}
+          for hook in chains),
+        *({'rule': {**scope, 'chain': hook, 'expr': [incoming, condition, verdict]}}
+          for hook, rules in chains.items() for condition, verdict in rules),
+    ]
+
+
+def firewall_objects(entries):
+    # Kernel handles and listing order between chains are incidental; rule order within a chain is not.
+    return sorted(
+        ((kind, {key: value for key, value in attributes.items() if key != 'handle'})
+         for entry in entries for kind, attributes in entry.items() if kind != 'metainfo'),
+        key=lambda item: (item[0], item[1].get('chain', item[1].get('name', ''))),
+    )
+
+
 class Controller:
     def __init__(self, config):
         s = config.lstat()
@@ -239,26 +275,28 @@ class Controller:
                 row.get('Options', {}).get('com.docker.network.bridge.name') != c['bridge'] or
                 row.get('Options', {}).get('com.docker.network.bridge.enable_icc') != 'false'):
             raise ValueError('Configured workspace network does not match its owner')
-        if configure:
-            nft = c.get('nft', '/usr/sbin/nft'); table = c['firewallTable']; bridge = c['bridge']
-            present = subprocess.run([nft, 'list', 'table', 'inet', table], capture_output=True).returncode == 0
-            rules = ('delete table inet ' + table + '\n' if present else '') + f'''table inet {table} {{
- chain input {{
-  type filter hook input priority -5; policy accept;
-  iifname "{bridge}" ct state != {{ established, related }} reject
- }}
- chain forward {{
-  type filter hook forward priority -5; policy accept;
-  iifname "{bridge}" ip daddr 169.254.169.254 drop
-  iifname "{bridge}" ip6 daddr fd00:ec2::254 drop
-  iifname "{bridge}" oifname "{bridge}" drop
- }}
-}}
-'''
-            for flags in (['-c', '-f', '-'], ['-f', '-']): self.command([nft, *flags], input=rules, text=True)
-        else:
-            self.command([c.get('nft', '/usr/sbin/nft'), 'list', 'table', 'inet', c['firewallTable']], text=True)
+        self.firewall(configure)
         return {'network': row['Name'], 'owner': self.owner}
+
+    def firewall(self, configure):
+        c = self.config
+        nft = c.get('nft', '/usr/sbin/nft')
+        table = c['firewallTable']
+        listing = [nft, '-j', 'list', 'table', 'inet', table]
+        policy = firewall_policy(table, c['bridge'])
+        if configure:
+            commands = [{'add': entry} for entry in policy]
+            if subprocess.run(listing, capture_output=True).returncode == 0:
+                commands.insert(0, {'delete': policy[0]})
+            batch = json.dumps({'nftables': commands})
+            for flags in (['-c'], []):
+                self.command([nft, '-j', *flags, '-f', '-'], input=batch, text=True)
+        try:
+            installed = json.loads(self.command(listing, text=True))['nftables']
+        except (RuntimeError, ValueError, KeyError) as error:
+            raise ValueError('Cannot read workspace firewall; run configure-network on the host') from error
+        if firewall_objects(installed) != firewall_objects(policy):
+            raise ValueError('Workspace firewall differs from the expected policy; run configure-network on the host')
 
     def image(self, workspace):
         image = workspace['image']; c = self.config
