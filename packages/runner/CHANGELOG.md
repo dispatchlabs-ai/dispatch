@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-11-19
+
 - A chat's workspace is suspended after 15 minutes without a shell or file request (`workspace.suspendAfterMinutes`; `0` keeps it running). Its files under `/workspace` are checkpointed, and the chat's next request restores it. The host records its running workspaces so a restart still suspends them.
 - Track an independent message separately from a request awaiting input. Recover the turn's reply for channels that deliver after request-status bookkeeping.
 - A host whose storage cannot give each chat its own store sets `refusesChats` on its `StorageFactory`. `ChatService.create` then refuses the chat before it writes the chat list or the reopen mark.

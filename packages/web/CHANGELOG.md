@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-11-19
+
 - Retire the separate Dispatch Observer desktop app. Use Web or the iPhone app to browse saved conversations.
 
 ## [0.39.1] - 2026-11-18

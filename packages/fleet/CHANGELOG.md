@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-11-19
+
 - Refuses a chat before anything is saved for it.
 - Not converted to the runner's per-chat stores: creating a chat in a fleet run fails with a message.
 

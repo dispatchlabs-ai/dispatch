@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-11-19
+
 - Local history and Web read each chat from its own store. The central PostgreSQL mode is not converted to per-chat stores.
 
 ## [0.37.0] - 2026-11-18
