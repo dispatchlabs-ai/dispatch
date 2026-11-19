@@ -4,7 +4,7 @@ import {
   AssistantEntry, ConversationBusy, InboxDoc, LiveDoc, defineDoc, defineExtension, defineTask,
   type ConversationId, type Cursor, type EntryId, type TaskId, type Tx,
 } from "@earendil-works/pi-durable";
-import { context, prepareContent, type AttachmentFile, publicAnswer, publicCommentary, ThreadProcesses,
+import { context, prepareContent, type AttachmentFile, requestReply, publicCommentary, ThreadProcesses,
   type ChatService, type ReplyDestination, type ReplySink, type StatusSink, type Runner, type ThreadExecutor } from "@dispatch/runner";
 import { GoogleApiError, GoogleChatApi, messageChunk, messageId, type GoogleCredentials } from "./api.js";
 import { googleThreadKey, interaction, type GoogleChatConfig, type GoogleChatInput } from "./events.js";
@@ -209,9 +209,7 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
         }
         let text = "The reply stopped before it completed. Please try again.";
         if (receipt.status === "done" && receipt.type === "input") {
-          const entry = await runtime.entry(AssistantEntry, receipt.answer, ctx);
-          const message = entry?.model?.[0];
-          if (message?.role === "assistant" && !["error", "aborted"].includes(message.stopReason)) text = publicAnswer(message);
+          text = await requestReply(runtime, receipt, ctx);
         }
         if (!text.trim()) text = "The assistant ended without a final answer; completion has not been verified.";
         await runtime.commit(async tx => {

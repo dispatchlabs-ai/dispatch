@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Track an independent message separately from a request awaiting input. Recover the turn's reply for channels that deliver after request-status bookkeeping.
 - A host whose storage cannot give each chat its own store sets `refusesChats` on its `StorageFactory`. `ChatService.create` then refuses the chat before it writes the chat list or the reopen mark.
 - Refuse to ensure a disposable workspace unless the Dispatch-managed nftables table contains the expected isolation rules.
 - **Breaking:** each chat now has its own store under `<stateRoot>/<agent>/chats/<n>`. An agent's own store keeps its chat list, schedules and channel adapter state. A chat's store opens on first use, closes when nothing there is runnable or sleeping, and reopens after a restart if the chat has unsettled work. Chat IDs keep their form; the number is now a chat number. Chats saved by an earlier release are not converted: the host refuses that state folder and asks you to move it aside or choose a new `stateRoot`.

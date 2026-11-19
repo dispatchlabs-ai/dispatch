@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Deliver the turn's text when request-status bookkeeping closes it after the reply was written.
 - Works with the runner's per-chat stores: each turn is created in its chat's store and per-thread state lives there. Messages has not yet run against its live channel in this layout.
 
 ## [0.27.0] - 2026-11-16

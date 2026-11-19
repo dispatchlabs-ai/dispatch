@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { basename } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { AssistantEntry, defineDoc, defineExtension, defineTask, type ConversationId, type TaskId, type Tx } from "@earendil-works/pi-durable";
-import { ContentError, context, publicAnswer, type Adapter, type ChatService, type ReplyDestination, type Runner } from "@dispatch/runner";
+import { defineDoc, defineExtension, defineTask, type ConversationId, type TaskId, type Tx } from "@earendil-works/pi-durable";
+import { ContentError, context, requestReply, type Adapter, type ChatService, type ReplyDestination, type Runner } from "@dispatch/runner";
 import { matchesPart, MessagesRpc, RpcError, scan, type Chat, type Message, type RpcCommand } from "./rpc.js";
 import { incomingImages, stageTable } from "./attachments.js";
 import { messageParts, type MessagePart } from "./text.js";
@@ -149,9 +149,7 @@ function prepare(runner: Runner, options: ImsgOptions) {
       if (receipt.status !== "done" || receipt.type !== "input") {
         await runtime.commit(() => failed("Messages input ended without an answer."), ctx); return;
       }
-      const entry = await runtime.entry(AssistantEntry, receipt.answer, ctx);
-      const reply = entry?.model?.[0];
-      const text = reply?.role === "assistant" && !["aborted", "error"].includes(reply.stopReason) && publicAnswer(reply).trim();
+      const text = await requestReply(runtime, receipt, ctx);
       await runtime.commit(async tx => {
         if (!text) return failed("The model ended without a text reply.");
         await enqueue(tx, runtime.conversationId, task.input.destination, text, `answer:${receipt.answer}`);
