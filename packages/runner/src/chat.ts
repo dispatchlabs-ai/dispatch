@@ -127,6 +127,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     chats: Map<string, Promise<AgentHost>>; closing: Map<string, Promise<void>>;
     used: Map<string, number>; watched: Map<string, number>;
     open?: (agent: LoadedAgent, chat: Chat) => Promise<AgentHost>; started: boolean; sweep?: ReturnType<typeof setInterval>;
+    refusal?: string;
     opened: Set<(chat: Chat, host: AgentHost) => void | Promise<void>>;
   };
   const openStores = new WeakMap<object, OpenStores>();
@@ -278,6 +279,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
           artifacts: options.artifacts,
         });
         storesOf(service).open = (agent, chat) => openStore(agent, join(stateRoot, agent.id, "chats", chatNumber(chat.id)), chat.id);
+        storesOf(service).refusal = options.storage?.refusesChats;
         const results = await Promise.allSettled(agents.map(async agent => {
           service.calendars.set(agent.id, createSchedules(namespace, agent, service, options.resume !== false));
           service.hosts.set(agent.id, await openStore(agent, join(stateRoot, agent.id)));
@@ -428,6 +430,9 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     }
 
     async create(agent: string, source: Chat["source"], key: string, title = "New chat", origin?: JsonObject): Promise<Chat> {
+      // A host that could never open the chat's store saves nothing for it: no list entry and no reopen mark.
+      const { open, refusal } = storesOf(this);
+      if (refusal || !open) throw new Error(refusal ?? "This service was attached to stores it did not open and cannot create a chat.");
       const created = await this.host(agent).harness.commit(async tx => {
         const index = await tx.doc(Chats);
         const existing = index.keys[key];

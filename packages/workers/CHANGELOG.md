@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Refuses a chat before anything is saved for it.
 - Not converted to the runner's per-chat stores: creating a chat on a worker host fails with a message.
 
 ## [0.13.0] - 2026-11-13

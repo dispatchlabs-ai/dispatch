@@ -261,7 +261,8 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
   const ready = new Promise<ChatService>(resolve => { startService = resolve; });
   const artifacts = slackArtifacts(runner, client, config.teamId, ready);
   const responses = createResponseDelivery(namespace, client, { team: config.teamId, onStream: options.onStream,
-    allowProgressText: options.allowProgressText });
+    allowProgressText: options.allowProgressText,
+    chat: async (runtime, ctx) => (await runtime.snapshot(runner.ChatIdentity, ctx))?.id ?? "" });
   const slackIdentity = (handle: string) => ({ channel: "slack", scope: config.teamId, handle });
   const allowedUser = (user: string) => !Array.isArray(config.allowedUsers) || config.allowedUsers.includes(user);
   const enrolled = (service: ChatService, user: string, agent: string) =>

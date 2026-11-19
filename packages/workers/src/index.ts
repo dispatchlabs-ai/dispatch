@@ -38,6 +38,7 @@ async function scan<T>(
   } while (cursor);
   return result;
 }
+const unconverted = "Workers are not converted to per-chat stores, so this host cannot create a chat.";
 /** Check while the storage reservation/native owner is held, before resume/abort. */
 async function admit(
   service: runner.ChatService,
@@ -168,8 +169,8 @@ export async function startWorker(config: WorkerConfig) {
           cwd: config.host.cwd,
           definitionResources: true,
           settings: serviceSettings(config.host),
-          storage: async (agent, chat) => {
-            if (chat) throw new Error("Workers are not converted to per-chat stores, so this host cannot create a chat.");
+          storage: Object.assign(async (agent: runner.LoadedAgent, chat?: string) => {
+            if (chat) throw new Error(unconverted);
             const storage = await RemoteStorage.open((request) =>
               storageCall(agent.id, request),
             );
@@ -202,7 +203,7 @@ export async function startWorker(config: WorkerConfig) {
                 { status: 409 },
               );
             return storage;
-          },
+          }, { refusesChats: unconverted }),
         });
         return service;
       } catch (error) {

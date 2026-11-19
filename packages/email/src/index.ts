@@ -383,7 +383,10 @@ export function createAdapter(options: GmailOptions): Adapter {
             if (args.replyAll) cc ??= addresses(header(original.payload, "Cc")).filter(value => !own.has(value) && !to!.includes(value));
           }
           if (!to?.length && !cc?.length && !bcc?.length) throw new Error("Email needs at least one recipient.");
-          const key = `send:${agent}:${api.conversationId}:${api.taskId}`;
+          // Every chat's store numbers its conversations and tasks from one, so the key names the chat too.
+          // Without it two chats would share a delivery receipt.
+          const chat = (await api.snapshot(runner.ChatIdentity, ctx))?.id;
+          const key = `send:${chat || agent}:${api.conversationId}:${api.taskId}`;
           const files = filesFor({ address: route.address, key });
           await files.prepare();
           const attachments: MailFile[] = [];

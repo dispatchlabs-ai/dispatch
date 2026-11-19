@@ -35,8 +35,9 @@ export type OpenOptions = {
 /** Agents opened in this process whose changed definition waits for their saved work to finish. */
 export const deferredDefinitionUpdates = new Set<string>();
 
-/** `chat` names a chat's own store. Return a different store for each chat and for the agent's own. */
-export type StorageFactory = (agent: LoadedAgent, chat?: string) => Promise<Storage>;
+/** `chat` names a chat's own store. Return a different store for each chat and for the agent's own.
+ * A host that cannot do that sets `refusesChats` to the reason, and a chat is then refused before anything is saved. */
+export type StorageFactory = ((agent: LoadedAgent, chat?: string) => Promise<Storage>) & { refusesChats?: string };
 export type StatusFile = {
   agent: string; pid: number; hostRunning: boolean; updatedAt: string;
   conversationId: number; state: RunnerState;

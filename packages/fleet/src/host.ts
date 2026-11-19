@@ -93,15 +93,17 @@ const modelProxy = createServer(async (incoming, outgoing) => {
 await new Promise<void>(done => modelProxy.listen(0, "127.0.0.1", done));
 const modelOrigin = `http://127.0.0.1:${(modelProxy.address() as { port: number }).port}`;
 const environments = new Set<WorkspaceEnvironment>();
+const unconverted = "Fleet runs are not converted to per-chat stores, so this run cannot create a chat.";
 const context: FleetRunContext = {
   assignment, root, namespace: descriptor.namespace, roles: descriptor.roles,
   stateRoot: join(directory, "native"), runtimeRoot,
-  async storage(agent, chat) {
-    if (chat) throw new Error("Fleet runs are not converted to per-chat stores, so this run cannot create a chat.");
+  // The reason travels with the factory, so a run refuses a chat before saving anything for it.
+  storage: Object.assign(async (agent: { id: string } | string, chat?: string) => {
+    if (chat) throw new Error(unconverted);
     const role = typeof agent === "string" ? agent : agent.id;
     if (!descriptor.roles.includes(role)) throw new Error("Store is outside this immutable run profile.");
     return createRemoteStorage(role, socketPath);
-  },
+  }, { refusesChats: unconverted }),
   workspace,
   env(target) { const env = new WorkspaceEnvironment(workspace, target.cwd ?? "/workspace"); environments.add(env); return env; },
   relay,

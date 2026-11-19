@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { AssistantEntry, LiveDoc, defineDoc, defineTask, type ConversationId, type EntryRecord, type EntryId, type TaskId, type Tx } from "@earendil-works/pi-durable";
+import { AssistantEntry, LiveDoc, defineDoc, defineTask, type ConversationId, type DocumentReader, type EntryRecord, type EntryId, type TaskId, type Tx } from "@earendil-works/pi-durable";
+import type { context as backgroundContext } from "@dispatch/runner";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { SlackWebApi } from "./api.js";
 import { fallbackText, markdownText, replyBlocks, replyChunk, streamText, userBlocks } from "./text.js";
@@ -13,6 +14,8 @@ type ResponseFields = { stream: string | null; opening?: boolean; ordinary?: boo
 type ResponseState = ({phase: "watch"} | {phase: "deliver"}) & ResponseFields;
 type Options = {
   team: string;
+  /** The chat a store holds. Stores number their own conversations and tasks, so a delivery's identity names its chat. */
+  chat: (runtime: { snapshot: DocumentReader["snapshot"] }, context: typeof backgroundContext) => Promise<string>;
   onStream?: (event: { key: string; ts: string; done?: boolean }) => void | Promise<void>;
   allowProgressText?: (id: number, inputs: readonly number[]) => boolean | Promise<boolean>;
 };
@@ -63,7 +66,7 @@ export function createResponseDelivery(namespace: string, client: SlackWebApi, o
           await runtime.commit(() => ({ status: "running", checkpoint: state }), ctx);
         };
         if (state.retryAt > runtime.now()) return runtime.sleepUntil(state.retryAt, state, ctx);
-        const hash = deliveryHash(`${runtime.conversationId}:${task.input.key}:0`);
+        const hash = deliveryHash(`${await options.chat(runtime, ctx)}/${runtime.conversationId}:${task.input.key}:0`);
         try {
           // startStream has no supported idempotency key. Record its intent first.
           // If the response was lost, find its block marker; never blindly start a second stream.
@@ -176,7 +179,7 @@ export function createResponseDelivery(namespace: string, client: SlackWebApi, o
         }
         // Reserve the quote prefix within Slack's 12,000-character Markdown budget.
         const text = replyChunk(source, state.offset, task.input.attribution ? Math.floor((12_000 - 2) / 5) : undefined);
-        const hash = deliveryHash(`${task.input.origin ?? runtime.conversationId}:${task.input.key}:${state.offset}`);
+        const hash = deliveryHash(`${await options.chat(runtime, ctx)}/${task.input.origin ?? runtime.conversationId}:${task.input.key}:${state.offset}`);
         try {
           const payload = { channel: task.input.channel,
             text: fallbackText(task.input.attribution ? `${task.input.attribution}\n\n${text}` : text),
@@ -232,7 +235,7 @@ export function createResponseDelivery(namespace: string, client: SlackWebApi, o
     },
     async abort(task, runtime, ctx) {
       const state = task.state.checkpoint;
-      const hash = deliveryHash(`${runtime.conversationId}:${task.input.key}:0`);
+      const hash = deliveryHash(`${await options.chat(runtime, ctx)}/${runtime.conversationId}:${task.input.key}:0`);
       const ts = state.stream ?? (state.opening ? await findDelivery(client, namespace, task.input, hash) : undefined);
       if (ts) {
         try { await client.chat.stopStream({ channel: task.input.channel, ts }); }
