@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.39.3] - 2026-11-19
+
 - Track an independent message separately from a request awaiting input. Recover the turn's reply for channels that deliver after request-status bookkeeping.
 
 ## [0.39.2] - 2026-11-18

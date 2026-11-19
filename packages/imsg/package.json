@@ -1,6 +1,6 @@
 {
   "name": "@dispatch/imsg",
-  "version": "0.39.2",
+  "version": "0.39.3",
   "description": "Apple Messages transport for Dispatch Runner",
   "license": "MIT",
   "type": "module",
@@ -43,7 +43,7 @@
     "typescript": "6.0.3"
   },
   "peerDependencies": {
-    "@dispatch/runner": "0.39.2",
+    "@dispatch/runner": "0.39.3",
     "@earendil-works/pi-durable": "1.5.2"
   },
   "repository": {
