@@ -1,15 +1,15 @@
 import type { Context } from "@earendil-works/chord/context";
-import { defineDoc, ROOT_CONVERSATION_ID, type ConversationId, type Tx } from "@earendil-works/pi-durable";
+import { defineDoc, ROOT_CONVERSATION_ID, type ConversationId, type JsonObject, type Tx } from "@earendil-works/pi-durable";
 
 function define(namespace: string) {
-  return defineDoc<{ id: string }>({
+  return defineDoc<{ id: string; source?: string; origin?: JsonObject }>({
     kind: `${namespace}.chat`, version: 1, scope: "session",
     checkpointWhen: () => false, initial: () => ({ id: "" }),
   });
 }
 const identities = new Map<string, ReturnType<typeof define>>();
 
-/** A chat's own store names the chat it holds. An agent's own store has no such name. */
+/** A chat's own store names the chat it holds, with the channel and origin it was created for. An agent's own store has no such name. */
 export function chatIdentity(namespace: string) {
   let identity = identities.get(namespace);
   if (!identity) identities.set(namespace, identity = define(namespace));

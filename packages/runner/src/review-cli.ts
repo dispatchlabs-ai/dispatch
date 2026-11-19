@@ -13,8 +13,11 @@ import { ReviewPending } from "./review-group.js";
 import { configuredReviewActions } from "./review-actions.js";
 
 export async function reviewCommand(config: ServiceConfig, name: string, submission: number, action?: "prepare" | "publish") {
-  const agent = await loadAgent(config.root, name);
-  const directory = join(config.stateRoot, agent.id);
+  // A chat's runs are in the chat's own store. An agent's scheduled runs are in the agent's.
+  const [agentName, chat] = name.split(":");
+  if (chat !== undefined && !/^[0-9]+$/.test(chat)) throw new Error("Name an agent, or a chat such as researcher:12.");
+  const agent = await loadAgent(config.root, agentName);
+  const directory = chat ? join(config.stateRoot, agent.id, "chats", chat) : join(config.stateRoot, agent.id);
   const run = retainedRun(join(directory, "session.sqlite"), submission);
   const models = createModels({ authContext: { env: async () => undefined, fileExists: async () => false } });
   const connection = hostModels(config, config.cwd);
@@ -27,7 +30,7 @@ export async function reviewCommand(config: ServiceConfig, name: string, submiss
     if (action) {
       const handler = configuredReviewActions(config);
       if (!handler) throw new Error("Configure a review action in the host file first.");
-      const output = await handler({ agent: agent.id, run, report: result.report, model, models, settings: serviceSettings(config, models) }, undefined, action === "prepare")
+      const output = await handler({ directory, agent: agent.id, run, report: result.report, model, models, settings: serviceSettings(config, models) }, undefined, action === "prepare")
         .catch(error => { if (error instanceof ReviewPending) return error.message; throw error; });
       if (output) console.error(terminalText(output));
     }

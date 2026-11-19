@@ -106,7 +106,7 @@ export async function runSlackHost(options: SlackHostOptions) {
         return service;
       },
     });
-    for (const host of service.hosts.values()) host.harness.resume();
+    await service.resume();
     if (thread) {
       let latest = thread.key, admitting = 0, received = false, checking = false;
       timer = setInterval(() => {

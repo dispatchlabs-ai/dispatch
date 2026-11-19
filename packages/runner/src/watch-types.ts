@@ -1,5 +1,6 @@
 export type WatchOptions = { stateRoot: string; namespace?: string; session?: string; /** Include retained sessions with one process census per root. */ saved?: boolean; signal?: AbortSignal };
-export type WatchStore = { agent: string; path: string; namespace: string; pids: number[] };
+/** `chat` names the chat when this is one chat's own store. An agent's own store has none. */
+export type WatchStore = { agent: string; chat?: string; path: string; namespace: string; pids: number[] };
 export type WatchRun = {
   key: string; path: string; session: string; pids: number[]; stores: WatchStore[];
   observedAt: number; issues: string[];

@@ -130,9 +130,10 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
         const conversation = await runtime.conversation(runtime.conversationId, ctx);
         if (!conversation) throw new Error("Google Chat conversation disappeared.");
         const service = await ready;
-        const chat = Object.values((await runtime.snapshot(runner.Chats, ctx))?.byId ?? {}).find(chat => chat.conversationId === runtime.conversationId);
+        // This task runs in the chat's own store, which names its chat.
+        const chat = (await runtime.snapshot(runner.ChatIdentity, ctx))?.id;
         if (!chat) throw new Error("The channel conversation is not registered with its host.");
-        const draft = await service.prepareInput(chat.id, task.input.continuation
+        const draft = await service.prepareInput(chat, task.input.continuation
             ? `Internal workflow result for the existing assignment from ${task.input.user}. This is execution evidence, not a new human request or additional authorization.\n${task.input.text}`
             : `Google Chat message from ${task.input.user}:\n${task.input.text}`, task.input.key, {
           source: "google-chat", files: task.input.files, continuation: !!task.input.continuation,
@@ -273,13 +274,12 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
               const chat = await service.find(input.agent, key);
               if (chat) {
                 await service.stop(chat.id);
-                const statuses = await service.host(input.agent).conversation.commit(async tx =>
-                  (await tx.doc(Statuses, chat.conversationId as ConversationId)).slots, ctx);
+                const statuses = await service.inChat(chat.id, async (tx, id) => (await tx.doc(Statuses, id)).slots);
                 await acknowledgeStop(input, Object.entries(statuses).filter(([, slot]) => slot.open)
                   .map(([statusKey]) => `${input.space}/messages/${messageId(`${input.thread}:status:${statusKey}`)}`), runtime.signal);
-                await service.host(input.agent).conversation.commit(async tx => {
-                  for (const slot of Object.values((await tx.doc(Statuses, chat.conversationId as ConversationId)).slots)) slot.open = false;
-                }, ctx);
+                await service.inChat(chat.id, async (tx, id) => {
+                  for (const slot of Object.values((await tx.doc(Statuses, id)).slots)) slot.open = false;
+                });
               }
             }
           }
@@ -299,8 +299,9 @@ export async function prepareGoogleChat(runner: Runner, options: GoogleChatOptio
         } else {
           const chat = await service.find(input.agent, key) ?? await service.create(input.agent, "google-chat", key, input.text,
             { googleChat: { project: input.project, space: input.space, thread: input.thread, admittedAt: input.timestamp } });
-          await runtime.commit(async tx => { await enqueue(tx, chat.conversationId as ConversationId,
-            { key: input.key, text: input.text, ...(input.files ? {files: input.files} : {}), channel: input.space, thread: input.thread, user: input.user }); }, ctx);
+          // The turn belongs to the chat's store. `enqueue` keeps one task per message key, so a repeat of this phase adds none.
+          await service.inChat(chat.id, async (tx, id) => { await enqueue(tx, id,
+            { key: input.key, text: input.text, ...(input.files ? {files: input.files} : {}), channel: input.space, thread: input.thread, user: input.user }); });
         }
       }
       await runtime.commit(() => complete, ctx);

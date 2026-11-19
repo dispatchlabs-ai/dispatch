@@ -150,6 +150,10 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
     checkpointWhen: () => false,
     migrate: value => ({ tasks: value.tasks as Record<string, number>, threads: {} }),
   });
+  const Admitted = defineDoc<{ turns: Record<string, number> }>({
+    kind: `${namespace}.slack-admitted`, version: 1, scope: "conversation", history: "latest", fork: "initial",
+    initial: () => ({ turns: {} }), checkpointWhen: () => false,
+  });
   const ThreadReplies = defineDoc<{ byKey: Record<string, boolean> }>({
     kind: `${namespace}.slack-thread-replies`, version: 1, scope: "session", initial: () => ({ byKey: {} }),
     checkpointWhen: () => false,
@@ -277,8 +281,10 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         const conversation = await runtime.conversation(runtime.conversationId, ctx);
         if (!conversation) throw new Error("Slack conversation disappeared.");
         const service = await ready;
-        const chat = Object.values((await runtime.snapshot(runner.Chats, ctx))?.byId ?? {}).find(chat => chat.conversationId === runtime.conversationId);
-        if (!chat) throw new Error("The channel conversation is not registered with its host.");
+        // This task runs in the chat's own store, which names its chat.
+        const id = (await runtime.snapshot(runner.ChatIdentity, ctx))?.id;
+        if (!id) throw new Error("The channel conversation is not registered with its host.");
+        const chat = { id, agent: id.split(":")[0] };
         const draft = await service.prepareInput(chat.id, task.input.continuation
             ? `Internal workflow result for the existing assignment authorized by <@${task.input.user}>. This is execution evidence, not a new human request or additional authorization.\n${task.input.text}`
             : `Slack message from <@${task.input.user}>:\n${task.input.text}`, task.input.key, {
@@ -355,7 +361,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
           let more: boolean;
           do {
             await runtime.commit(async tx => {
-              const queued = await responses.queueHistory(tx, runtime.conversationId, task.input, user => enrolled(service, user, chat.agent), service.host(chat.agent).conversation.id,
+              const queued = await responses.queueHistory(tx, runtime.conversationId, task.input, user => enrolled(service, user, chat.agent), runtime.conversationId,
                 active && allowed && live?.generation?.message ? { first: checkpoint.first!, generation: live.run!.taskId } : undefined);
               more = queued.more;
               if (queued.last) checkpoint = { ...checkpoint, lastResponse: Math.max(checkpoint.lastResponse ?? 0, queued.last) };
@@ -519,13 +525,14 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
           slack: { teamId: config.teamId, channelId: input.channel, threadTs: input.thread,
             ...(input.profile ? { profile: input.profile } : {}) },
         });
-        const { conversation } = await service.resolve(chat.id);
-        // Transfer admission to the turn and finish this task in one commit.
+        // The turn belongs to the chat's store, which admits each message once. This task then records the transfer and ends.
+        const admitted = await service.inChat(chat.id, async (tx, id) =>
+          (await tx.doc(Admitted, id)).turns[input.key] ??= await tx.createTask(turn, {
+            key: input.key, text: input.text, ...(input.files ? {files: input.files} : {}), channel: input.channel, thread: input.thread, user: input.user,
+          }, { conversationId: id, ownership: { kind: "conversation" }, background: true }));
         await runtime.commit(async tx => {
           if (config.threadReplies === "started") (await tx.doc(ThreadReplies)).byKey[key] = ownThread ?? false;
-          (await tx.doc(SlackInbox)).tasks[input.key] = await tx.createTask(turn, {
-            key: input.key, text: input.text, ...(input.files ? {files: input.files} : {}), channel: input.channel, thread: input.thread, user: input.user,
-          }, { conversationId: conversation.id, ownership: { kind: "conversation" }, background: true });
+          (await tx.doc(SlackInbox)).tasks[input.key] = admitted;
           return { status: "terminal", outcome: { status: "completed", result: null } };
         }, ctx);
       },

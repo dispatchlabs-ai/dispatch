@@ -1,4 +1,4 @@
-import type { EntryRecord, TaskRecord } from "@earendil-works/pi-durable";
+import { ROOT_CONVERSATION_ID, type EntryRecord, type TaskRecord } from "@earendil-works/pi-durable";
 import { projectChatMessages } from "./chat.js";
 import { projectChatTurns } from "./chat-turns.js";
 import type { SubmissionRecord } from "@earendil-works/pi-durable";
@@ -18,6 +18,18 @@ export type * from "./watch-types.js";
 type Data = Record<string, any>;
 type Row = Record<string, unknown>;
 const exec = promisify(execFile);
+const root = Number(ROOT_CONVERSATION_ID);
+// A chat's ID names its own conversation. Any other conversation is `<store>/<number>`, where the store is an
+// agent's own or a chat's.
+const storeName = (store: WatchStore) => store.chat ?? store.agent;
+const conversationKey = (store: WatchStore, id: number) => store.chat && id === root ? store.chat : `${storeName(store)}/${id}`;
+function locate(run: WatchRun, key: string) {
+  const chat = run.stores.find(store => store.chat === key);
+  if (chat) return { store: chat, conversationId: root };
+  const split = key.lastIndexOf("/"), id = Number(key.slice(split + 1));
+  const store = run.stores.find(item => storeName(item) === key.slice(0, split));
+  return store && split > 0 && Number.isSafeInteger(id) && id >= 1 && String(id) === key.slice(split + 1) ? { store, conversationId: id } : undefined;
+}
 const pageSize = 100;
 const keyPattern = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
 export const isWatchSessionKey = (value: string): boolean =>
@@ -79,7 +91,7 @@ async function withStore<T>(path: string, read: (db: DatabaseSync) => T): Promis
 }
 
 /** Narrow reconstruction for the Runner chat index, never provider/live documents. */
-function chats(db: DatabaseSync, namespace: string, key?: string): Map<number, Data> {
+function chats(db: DatabaseSync, namespace: string, key?: string): Map<string, Data> {
   const doc = db.prepare("SELECT id FROM documents WHERE kind=? AND scope_kind='session'")
     .get(JSON.stringify(`${namespace}.chats`));
   if (!doc) return new Map();
@@ -90,12 +102,22 @@ function chats(db: DatabaseSync, namespace: string, key?: string): Map<number, D
     value = document.value as Data;
   } catch { return new Map(); }
   return new Map(Object.values(value?.byId ?? {}).filter((chat: any) =>
-    chat && (key === undefined || value.keys?.[key] === chat.id) && Number.isSafeInteger(chat.conversationId) && chat.id === `${chat.agent}:${chat.conversationId}`)
-    .map((chat: any) => [chat.conversationId, chat]));
+    chat && (key === undefined || value.keys?.[key] === chat.id) && typeof chat.id === "string" && chat.id.startsWith(`${chat.agent}:`))
+    .map((chat: any) => [chat.id, chat]));
+}
+/** Chat titles and origins are listed in each agent's own store. */
+async function chatIndex(run: WatchRun) {
+  const index = new Map<string, Data>();
+  for (const store of run.stores) if (!store.chat) {
+    try { for (const [id, chat] of await withStore(store.path, db => chats(db, store.namespace))) index.set(id, chat); }
+    catch { /* The catalog reports an unreadable store where it reads its conversations. */ }
+  }
+  return index;
 }
 
-async function validateStore(path: string, pids: number[], namespace?: string): Promise<WatchStore> {
-  const agent = basename(dirname(path));
+async function validateStore(path: string, pids: number[], namespace?: string, chatOf?: string): Promise<WatchStore> {
+  const agent = chatOf ?? basename(dirname(path));
+  const chat = chatOf ? `${chatOf}:${basename(dirname(path))}` : undefined;
   let status: Data | undefined;
   const statusPath = join(dirname(path), "status.json");
   try {
@@ -115,7 +137,11 @@ async function validateStore(path: string, pids: number[], namespace?: string): 
       throw new Error("Runner host has no retained agent identity.");
     const registered = [...chats(db, namespaces[0]).values()];
     if (registered.some(chat => chat.agent !== agent)) throw new Error("Stored agent identity does not match its directory.");
-    return { agent, path, namespace: namespaces[0], pids };
+    if (chat) {
+      const doc = db.prepare("SELECT id FROM documents WHERE kind=? AND scope_kind='session'").get(JSON.stringify(`${namespaces[0]}.chat`));
+      if (!doc || (readSqliteDocument(db, number(doc.id)).value as Data)?.id !== chat) throw new Error("Stored chat identity does not match its directory.");
+    }
+    return { agent, ...(chat ? { chat } : {}), path, namespace: namespaces[0], pids };
   });
 }
 
@@ -152,7 +178,8 @@ export async function discoverWatchRuns(options: WatchOptions): Promise<{ runs: 
       const found = owners.get(path) ?? new Set<number>(); found.add(pid); owners.set(path, found);
     }
   }
-  const sessions = new Set([...owners.keys()].map(path => relative(root, dirname(dirname(path))).split(sep).join("/") || "."));
+  const agentDirectory = (path: string) => basename(dirname(dirname(path))) === "chats" ? dirname(dirname(dirname(path))) : dirname(path);
+  const sessions = new Set([...owners.keys()].map(path => relative(root, dirname(agentDirectory(path))).split(sep).join("/") || "."));
   if (options.saved && options.session === undefined) {
     // One process census for the whole configured root, including retained runs.
     // Validate each ancestor; never follow a directory symlink into another store.
@@ -187,6 +214,16 @@ export async function discoverWatchRuns(options: WatchOptions): Promise<{ runs: 
         try { stores.push(await validateStore(file, [...owners.get(file) ?? []], options.namespace)); }
         catch (error) {
           if ((error as NodeJS.ErrnoException).code !== "ENOENT") runIssues.push(`${child.name}: ${errorText(error)}`);
+          continue;
+        }
+        const chatsDirectory = join(path, child.name, "chats");
+        for (const chat of await readdir(chatsDirectory, { withFileTypes: true }).catch(() => [])) {
+          if (!chat.isDirectory() || chat.isSymbolicLink() || !keyPattern.test(chat.name)) continue;
+          const chatFile = join(chatsDirectory, chat.name, "session.sqlite");
+          try { stores.push(await validateStore(chatFile, [...owners.get(chatFile) ?? []], options.namespace, child.name)); }
+          catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ENOENT") runIssues.push(`${child.name}:${chat.name}: ${errorText(error)}`);
+          }
         }
       }
     } catch (error) { issues.push(`${session}: ${errorText(error)}`); continue; }
@@ -212,8 +249,8 @@ function projectEntries(store: WatchStore, rows: Row[]): WatchActivity[] {
     const record = parse(row.record), conversationId = number(record.conversationId), entryId = number(record.id);
     let ordinal = 0;
     for (const message of messages(record)) {
-      const base = { conversationKey: `${store.agent}:${conversationId}`, entryId, sequence: number(row.commit_seq), at: timestamp(message.timestamp) };
-      const id = () => `${store.agent}:${entryId}:${ordinal++}`;
+      const base = { conversationKey: conversationKey(store, conversationId), entryId, sequence: number(row.commit_seq), at: timestamp(message.timestamp) };
+      const id = () => `${storeName(store)}:${entryId}:${ordinal++}`;
       if (message.role === "toolResult") items.push({ ...base, id: id(), kind: "tool-result",
         title: String(message.toolName ?? "Tool result"), text: text(message.content),
         toolCallId: typeof message.toolCallId === "string" ? message.toolCallId : undefined, error: message.isError === true });
@@ -263,23 +300,23 @@ const openingTitle = (entry: Data | undefined): string => {
  * authoritative. Schema, I/O and stored agent identity validation still fail. */
 export async function readWatchCatalog(run: WatchRun): Promise<WatchCatalog> {
   const conversations: WatchCatalogConversation[] = [], issues = [...run.issues];
+  const registered = await chatIndex(run);
   for (const store of run.stores) try {
     conversations.push(...await withStore(store.path, db => {
-      const registered = chats(db, store.namespace);
       // Sort identifiers only, then fetch the winning record. Sorting full entry
       // payloads spills large histories to temporary storage on every refresh.
       return db.prepare(`SELECT c.id,c.record,
         (SELECT record FROM entries WHERE id=(SELECT e.id FROM entries e WHERE e.conversation_id=c.id ORDER BY e.commit_seq,e.id LIMIT 1)) AS first_entry,
         EXISTS(SELECT 1 FROM tasks t WHERE t.conversation_id=c.id AND t.status<>'terminal') AS active
         FROM conversations c ORDER BY c.id`).all().flatMap(row => {
-          const record = parse(row.record), id = number(record.id), chat = registered.get(id);
+          const record = parse(row.record), id = number(record.id), chat = store.chat && id === root ? registered.get(store.chat) : undefined;
           if (id < 1 || id !== number(row.id)) throw new Error("Unsupported native conversation identity.");
           if (!row.first_entry && !row.active && !chat && !record.owner) return [];
           const first = row.first_entry ? parse(row.first_entry) : undefined;
           const firstMessage = first && messages(first)[0];
-          return [{ key: `${store.agent}:${id}`, agent: store.agent, conversationId: id,
+          return [{ key: conversationKey(store, id), agent: store.agent, conversationId: id,
             title: redact(chat?.title) || openingTitle(first) || store.agent,
-            parentKey: Number.isSafeInteger(record.owner?.conversationId) ? `${store.agent}:${record.owner.conversationId}` : undefined,
+            parentKey: Number.isSafeInteger(record.owner?.conversationId) ? conversationKey(store, record.owner.conversationId) : undefined,
             startedAt: timestamp(chat?.createdAt) ?? timestamp(firstMessage?.timestamp),
             registered: Boolean(chat), ...(typeof chat?.source === "string" ? { transport: chat.source } : {}) }];
         });
@@ -289,18 +326,17 @@ export async function readWatchCatalog(run: WatchRun): Promise<WatchCatalog> {
 }
 
 export async function readWatchRun(run: WatchRun, key?: string): Promise<WatchSnapshot> {
-  const split = key?.lastIndexOf(":") ?? -1;
-  const agent = key?.slice(0, split), selected = key === undefined ? undefined : Number(key.slice(split + 1));
-  if (key !== undefined && (split < 1 || String(selected) !== key.slice(split + 1) || !Number.isSafeInteger(selected) || selected! < 1 || !run.stores.some(store => store.agent === agent)))
-    throw new Error("Unknown conversation in this run.");
+  const target = key === undefined ? undefined : locate(run, key);
+  if (key !== undefined && !target) throw new Error("Unknown conversation in this run.");
+  const selected = target?.conversationId;
   const conversations: WatchConversation[] = [], activity: WatchActivity[] = [], issues = [...run.issues];
   const unavailableAgents: string[] = [];
+  const registered = await chatIndex(run);
   for (const store of run.stores) {
-    if (agent !== undefined && store.agent !== agent) continue;
+    if (target && store !== target.store) continue;
     try {
       const observed = await withStore(store.path, db => {
         const conversations: WatchConversation[] = [], activity: WatchActivity[] = [];
-        const registered = chats(db, store.namespace);
         const tasks = db.prepare(`SELECT record FROM tasks WHERE status<>'terminal' ${selected === undefined ? "" : "AND conversation_id=?"} ORDER BY id`)
           .all(...(selected === undefined ? [] : [selected])).map(row => parse(row.record));
         const rows = db.prepare(`SELECT c.record,
@@ -310,7 +346,7 @@ export async function readWatchRun(run: WatchRun, key?: string): Promise<WatchSn
           FROM conversations c ${selected === undefined ? "" : "WHERE c.id=?"} ORDER BY c.id`)
           .all(...(selected === undefined ? [] : [selected]));
         for (const row of rows) {
-          const record = parse(row.record), id = number(record.id), chat = registered.get(id);
+          const record = parse(row.record), id = number(record.id), chat = store.chat && id === root ? registered.get(store.chat) : undefined;
           const active = tasks.filter(task => task.conversationId === id), entryCount = number(row.entry_count);
           if (!entryCount && !active.length && !chat && !record.owner) continue;
           const latestRows = db.prepare("SELECT record,commit_seq FROM entries WHERE conversation_id=? ORDER BY commit_seq DESC,id DESC LIMIT 8").all(id).reverse();
@@ -351,9 +387,9 @@ export async function readWatchRun(run: WatchRun, key?: string): Promise<WatchSn
                       : last?.text ?? "No recorded activity";
           const first = row.first_entry ? parse(row.first_entry) : undefined;
           const firstMessage = first && messages(first)[0];
-          conversations.push({ key: `${store.agent}:${id}`, agent: store.agent, conversationId: id,
+          conversations.push({ key: conversationKey(store, id), agent: store.agent, conversationId: id,
             title: redact(chat?.title) || openingTitle(first) || store.agent,
-            parentKey: Number.isSafeInteger(record.owner?.conversationId) ? `${store.agent}:${record.owner.conversationId}` : undefined,
+            parentKey: Number.isSafeInteger(record.owner?.conversationId) ? conversationKey(store, record.owner.conversationId) : undefined,
             active: active.length, failed: number(row.failed), status, activity: detail.replace(/\s+/g, " ").slice(0, 240),
             updatedAt: last?.at, startedAt: timestamp(chat?.createdAt) ?? timestamp(firstMessage?.timestamp), entryCount,
             latestMessage, currentTools: toolCalls });
@@ -401,9 +437,9 @@ export async function readWatchStates(run: WatchRun): Promise<{ key: string; sta
 }
 
 export async function readWatchConversation(run: WatchRun, key: string, before?: WatchCursor): Promise<WatchPage> {
-  const split = key.lastIndexOf(":"), agent = key.slice(0, split), conversationId = Number(key.slice(split + 1));
-  const store = run.stores.find(item => item.agent === agent);
-  if (!store || !Number.isSafeInteger(conversationId) || conversationId < 1) throw new Error("Unknown conversation in this run.");
+  const target = locate(run, key);
+  if (!target) throw new Error("Unknown conversation in this run.");
+  const { store, conversationId } = target;
   if (before && (!Number.isSafeInteger(before.sequence) || !Number.isSafeInteger(before.entryId))) throw new Error("Invalid history cursor.");
   return withStore(store.path, db => {
     if (!db.prepare("SELECT id FROM conversations WHERE id=?").get(conversationId)) throw new Error("Conversation is no longer available.");
@@ -420,12 +456,10 @@ export async function readWatchConversation(run: WatchRun, key: string, before?:
 
 /** Refresh one retained activity without moving the reader's history position. */
 export async function readWatchActivity(run: WatchRun, activity: WatchActivity): Promise<WatchActivity | undefined> {
-  const split = activity.conversationKey.lastIndexOf(":"), agent = activity.conversationKey.slice(0, split);
-  const conversationId = Number(activity.conversationKey.slice(split + 1));
-  const store = run.stores.find(item => item.agent === agent);
-  if (!store || !Number.isSafeInteger(conversationId) || conversationId < 1
-    || !Number.isSafeInteger(activity.entryId) || activity.entryId < 1 || !Number.isSafeInteger(activity.sequence))
+  const target = locate(run, activity.conversationKey);
+  if (!target || !Number.isSafeInteger(activity.entryId) || activity.entryId < 1 || !Number.isSafeInteger(activity.sequence))
     throw new Error("Invalid activity identity in this run.");
+  const { store, conversationId } = target;
   return withStore(store.path, db => {
     const row = db.prepare("SELECT record,commit_seq FROM entries WHERE id=? AND conversation_id=? AND commit_seq=?")
       .get(activity.entryId, conversationId, activity.sequence);
@@ -438,16 +472,16 @@ export async function readWatchActivity(run: WatchRun, activity: WatchActivity):
 
 /** Retained terminal-key lookup; never opens a writer or creates a chat. */
 export async function readWatchChat(run: WatchRun, agent: string, key: string) {
-  const store = run.stores.find(store => store.agent === agent);
+  const store = run.stores.find(store => store.agent === agent && !store.chat);
   if (!store) return;
   return withStore(store.path, db => [...chats(db, store.namespace, key).values()][0] as import("./chat.js").Chat | undefined);
 }
 
 /** Full retained public chat projection from the selected native store; no owner. */
 export async function readWatchChatProjection(run: WatchRun, key: string) {
-  const split = key.lastIndexOf(":"), agent = key.slice(0, split), id = Number(key.slice(split + 1));
-  const store = run.stores.find(store => store.agent === agent);
-  if (!store || !Number.isSafeInteger(id) || id < 1 || String(id) !== key.slice(split + 1)) throw new Error("Unknown native conversation.");
+  const target = locate(run, key);
+  if (!target) throw new Error("Unknown native conversation.");
+  const { store, conversationId: id } = target;
   return withStore(store.path, db => {
     const entries = db.prepare("SELECT record FROM entries WHERE conversation_id=? ORDER BY commit_seq,id").all(id).map(row => parse(row.record) as EntryRecord);
     const tasks = db.prepare("SELECT record FROM tasks WHERE conversation_id=? AND kind=?").all(id, JSON.stringify("pi.tool")).map(row => parse(row.record));

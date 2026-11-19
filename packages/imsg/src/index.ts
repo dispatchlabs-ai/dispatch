@@ -44,7 +44,7 @@ function prepare(runner: Runner, options: ImsgOptions) {
     kind: name + ".inbox", version: 1, scope: "session", initial: () => ({ seen: {} as Record<string, boolean> }),
     checkpointWhen: () => false,
   });
-  const Thread = defineDoc<{ destination?: Destination; lastDelivery?: number; deliveries: Record<string, number>; receipts: Record<string, string> }>({
+  const Thread = defineDoc<{ destination?: Destination; lastDelivery?: number; deliveries: Record<string, number>; receipts: Record<string, string>; admitted?: Record<string, true> }>({
     kind: name + ".thread", version: 1, scope: "conversation", history: "latest", fork: "initial",
     initial: () => ({ deliveries: {}, receipts: {} }), checkpointWhen: () => false,
   });
@@ -104,7 +104,8 @@ function prepare(runner: Runner, options: ImsgOptions) {
           await runtime.commit(() => failed("Messages delivery is uncertain. Inspect the original chat before resending."), ctx);
           return;
         }
-        const cursor = (await runtime.snapshot(Inbox, ctx))?.cursor ?? 0;
+        // The scan cursor belongs to the agent's own store; this task runs in a chat's.
+        const cursor = (await service.host(agent).harness.snapshot(Inbox, ctx))?.cursor ?? 0;
         const since = await scan(rpc, cursor, async () => {}, chat.id);
         attempted = { ...ready, since, attemptedAt: runtime.now() };
         await runtime.commit(() => ({ status: "running", checkpoint: attempted }), ctx);
@@ -185,16 +186,17 @@ function prepare(runner: Runner, options: ImsgOptions) {
       if (!(error instanceof ContentError) || !files.length) throw error;
       return service.prepareInput(record.id, input + "\nImages unavailable: " + error.message, key, options);
     });
-    await host.harness.commit(async tx => {
-      const inbox = await tx.doc(Inbox);
-      if (inbox.seen[key]) return;
-      (await tx.doc(Thread, conversation.id)).destination = destination;
+    // The chat's store admits each message once. The agent's inbox only spares a rescan, so it is marked afterwards.
+    await service.inChat(record.id, async (tx, id) => {
+      const thread = await tx.doc(Thread, id);
+      if (thread.admitted?.[key]) return;
+      thread.destination = destination;
       const submission = await conversation.submit(tx, draft);
       await tx.createTask(answer, { chat: record.id, submission, destination },
-        { conversationId: conversation.id, ownership: { kind: "conversation" }, background: true });
-      inbox.seen[key] = true;
-    }, context);
-    host.harness.resume();
+        { conversationId: id, ownership: { kind: "conversation" }, background: true });
+      thread.admitted = { ...thread.admitted, [key]: true };
+    });
+    await host.harness.commit(async tx => { (await tx.doc(Inbox)).seen[key] = true; }, context);
   }
   async function listen() {
     const host = service.host(agent);

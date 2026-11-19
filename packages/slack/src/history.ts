@@ -11,52 +11,47 @@ export function createHistorySync(runner: Runner, responses: ReturnType<typeof c
   allowProgressText?: (id: number, inputs: readonly number[]) => boolean | Promise<boolean>;
 }) {
   const watches = new Map<string, { watch: ConversationWatch; pending: Promise<void> }>();
-  let list: Awaited<ReturnType<ChatService["watchList"]>> | undefined;
+  let unsubscribe: (() => void) | undefined;
   let closing = false;
   return {
     async start(service: ChatService) {
-      list = await service.watchList(async () => {
-        for (const [agent, host] of service.hosts) {
-          const chats = await host.harness.snapshot(runner.Chats, context);
-          for (const [key, id] of Object.entries(chats?.keys ?? {})) {
-            if (watches.has(id)) continue;
-            const [transport, team, channel, thread, extra] = key.split(":");
-            if (transport !== "slack" || team !== options.team || !channel || !thread || extra
-              || !options.accepts(channel, agent)) continue;
-            const chat = chats!.byId[id];
-            const conversation = await host.harness.conversation(chat.conversationId as ConversationId, context);
-            if (!conversation) continue;
-            // Attach before the census; coalesced notifications cannot lose entries.
-            const watch = await conversation.watch(context);
-            const state = { watch, pending: Promise.resolve() };
-            watches.set(id, state);
-            const sync = async () => {
-              if (closing) return;
-              const live = await host.harness.snapshot(LiveDoc, conversation.id, context);
-              const allowed = live?.run && (!options.allowProgressText
-                || await options.allowProgressText(conversation.id, live.run.inputs));
-              let more: boolean;
-              do {
-                ({ more } = await conversation.commit(tx => responses.queueHistory(tx, conversation.id, { channel, thread }, user => options.enrolled(service, user, agent), host.conversation.id,
-                  allowed && live?.generation?.message ? { generation: live.run!.taskId, first: live.run!.first ?? 0 } : undefined), context));
-              } while (more && !closing);
-              host.harness.resume();
-            };
-            watch.start(async call => {
-              state.pending = (call.kind === "failed" ? Promise.reject(call.error) : sync()).catch(error => {
-                if (!closing) console.error("Slack history sync:", error instanceof Error ? error.message : String(error));
-              });
-              await state.pending;
-            });
-            // A startup failure must not silently report a connected adapter.
-            await sync();
-          }
-        }
+      // A chat's conversation changes only while its store is open, so the census follows each store as it opens.
+      unsubscribe = service.onChatOpen(async (chat, host) => {
+        if (closing || watches.has(chat.id)) return;
+        const keys = (await service.host(chat.agent).harness.snapshot(runner.Chats, context))?.keys ?? {};
+        const [transport, team, channel, thread, extra] = (Object.keys(keys).find(key => keys[key] === chat.id) ?? "").split(":");
+        if (transport !== "slack" || team !== options.team || !channel || !thread || extra
+          || !options.accepts(channel, chat.agent)) return;
+        const conversation = host.conversation;
+        // Attach before the census; coalesced notifications cannot lose entries.
+        const watch = await conversation.watch(context);
+        const state = { watch, pending: Promise.resolve() };
+        watches.set(chat.id, state);
+        void watch.closed.then(() => { if (watches.get(chat.id) === state) watches.delete(chat.id); });
+        const sync = async () => {
+          if (closing) return;
+          const live = await host.harness.snapshot(LiveDoc, conversation.id, context);
+          const allowed = live?.run && (!options.allowProgressText
+            || await options.allowProgressText(conversation.id, live.run.inputs));
+          let more: boolean;
+          do {
+            ({ more } = await conversation.commit(tx => responses.queueHistory(tx, conversation.id, { channel, thread }, user => options.enrolled(service, user, chat.agent), conversation.id,
+              allowed && live?.generation?.message ? { generation: live.run!.taskId, first: live.run!.first ?? 0 } : undefined), context));
+          } while (more && !closing);
+          host.harness.resume();
+        };
+        watch.start(async call => {
+          state.pending = (call.kind === "failed" ? Promise.reject(call.error) : sync()).catch(error => {
+            if (!closing) console.error("Slack history sync:", error instanceof Error ? error.message : String(error));
+          });
+          await state.pending;
+        });
+        await sync();
       });
     },
     async close() {
       closing = true;
-      await list?.stop();
+      unsubscribe?.();
       await Promise.all([...watches.values()].map(async state => { await state.watch.stop(); await state.pending; }));
       watches.clear();
     },

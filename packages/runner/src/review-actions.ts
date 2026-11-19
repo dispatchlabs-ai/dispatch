@@ -24,7 +24,7 @@ export type ReviewPolicy = {
   onActionableReview?: { paused?: boolean; openDraftPR: { repository: string; paths?: string[] }; onPROpened?: { notify: string } };
 };
 type Config = ReviewPolicy & { root: string; stateRoot: string; cwd?: string; mcpServers?: McpServers };
-type Input = { agent: string; run: ReviewRun; report: string; models: Models; settings?: HarnessOptions["settings"]; model: LoadedAgent["model"] };
+type Input = { /** The store that holds the run: the agent's own, or one chat's. */ directory: string; agent: string; run: ReviewRun; report: string; models: Models; settings?: HarnessOptions["settings"]; model: LoadedAgent["model"] };
 export type RunReviewActions = (input: Input, signal?: AbortSignal, prepareOnly?: boolean) => Promise<string | undefined>;
 type Result = { kind: "skip"; reason: string } | { kind: "pr"; pull: ReviewPull };
 const hash = (value: string) => createHash("sha256").update(value).digest("hex").slice(0, 32);
@@ -102,7 +102,7 @@ export function configuredReviewActions(config: Config): RunReviewActions | unde
       });
     }
     if (!repository || !event.complete) return;
-    const family = reviewFamily(join(config.stateRoot, input.agent, "session.sqlite"), input.run);
+    const family = reviewFamily(join(input.directory, "session.sqlite"), input.run);
     if (family.owned) return "Private review saved for the owning top-level run.";
     if (policy?.paused && !prepareOnly) throw new ReviewPending("Draft publication is paused in the host configuration.");
     if (family.pending) throw new ReviewPending("Waiting for owned runs and their private reviews.");

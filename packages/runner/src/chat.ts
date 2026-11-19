@@ -20,7 +20,7 @@ import { isDeepStrictEqual } from "node:util";
 import { join, resolve } from "node:path";
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import {
-  defineDoc, LiveDoc, ROOT_CONVERSATION_ID, type ConversationView, type Cursor, type TaskInspection,
+  defineDoc, LiveDoc, ROOT_CONVERSATION_ID, type ConversationId, type ConversationView, type Cursor, type TaskInspection,
   type SubmissionDraft, type EntryRecord, type TaskRecord, type Extension, type LiveState, type SubmissionId, type Tx, type JsonObject,
 } from "@earendil-works/pi-durable";
 import { catalog, enabledAgents, loadAgent, type LoadedAgent } from "./definition.js";
@@ -127,11 +127,12 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     chats: Map<string, Promise<AgentHost>>; closing: Map<string, Promise<void>>;
     used: Map<string, number>; watched: Map<string, number>;
     open?: (agent: LoadedAgent, chat: Chat) => Promise<AgentHost>; started: boolean; sweep?: ReturnType<typeof setInterval>;
+    opened: Set<(chat: Chat, host: AgentHost) => void | Promise<void>>;
   };
   const openStores = new WeakMap<object, OpenStores>();
   const storesOf = (service: object) => {
     let stores = openStores.get(service);
-    if (!stores) openStores.set(service, stores = { chats: new Map(), closing: new Map(), used: new Map(), watched: new Map(), started: false });
+    if (!stores) openStores.set(service, stores = { chats: new Map(), closing: new Map(), used: new Map(), watched: new Map(), started: false, opened: new Set() });
     return stores;
   };
 
@@ -157,10 +158,16 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
           const identity = await tx.doc(Identity);
           if (identity.id) return;
           identity.id = chat.id;
+          identity.source = chat.source;
+          if (chat.origin) identity.origin = chat.origin;
           if (agent.handoff) await tx.doc(Handoffs, ROOT_CONVERSATION_ID);
           await service.initialize?.(tx, chat, host);
         }, context);
         if (stores.started) host.harness.resume();
+        // An adapter's per-chat work must not decide whether the chat can be used.
+        for (const listener of stores.opened) {
+          await Promise.resolve(listener(chat, host)).catch(error => reportError(`[${chat.id}] A chat-open listener failed:`, error));
+        }
         return host;
       } catch (error) { await host.close(); throw error; }
     })();
@@ -300,14 +307,28 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     }
 
     async start() {
-      storesOf(this).started = true;
+      await this.resume();
       for (const agent of this.agents) {
-        const host = this.host(agent.id);
-        host.harness.resume();
-        if (this.enabled.has(agent.id) && agent.trigger.mode !== "manual") await host.start();
+        if (this.enabled.has(agent.id) && agent.trigger.mode !== "manual") await this.host(agent.id).start();
+      }
+    }
+
+    /** Enable scheduling in every agent's own store, in the chats left with unsettled work, and in chat stores opened later. */
+    async resume() {
+      storesOf(this).started = true;
+      for (const host of this.hosts.values()) host.harness.resume();
+      for (const host of this.hosts.values()) {
         const index = await host.harness.snapshot(Chats, context);
         for (const id of Object.keys(index?.open ?? {})) if (index!.byId[id]) await chatStore(this, index!.byId[id]);
       }
+      for (const { host } of await this.stores()) host.harness.resume();
+    }
+
+    /** Call `listener` whenever a chat's store opens. A channel adapter attaches its per-chat work there. Returns a function that stops the calls. */
+    onChatOpen(listener: (chat: Chat, host: AgentHost) => void | Promise<void>) {
+      const { opened } = storesOf(this);
+      opened.add(listener);
+      return () => { opened.delete(listener); };
     }
 
     /** Every open store: each agent's own, then each open chat's. A closed chat store holds no runnable work. */
@@ -430,7 +451,10 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       }, context);
       // Opening the store configures the chat's conversation. A crash before this leaves an entry that the next use opens.
       const host = await chatStore(this, created.chat);
-      if (created.adopted) await host.harness.commit(tx => this.initialize?.(tx, created.chat, host), context);
+      if (created.adopted) await host.harness.commit(async tx => {
+        (await tx.doc(Identity)).origin = created.chat.origin;
+        await this.initialize?.(tx, created.chat, host);
+      }, context);
       return created.chat;
     }
 
@@ -446,6 +470,12 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
       if (!chat) throw new Error("Unknown conversation.");
       const host = await chatStore(this, chat);
       return { host, chat, conversation: host.conversation };
+    }
+
+    /** Commit in the chat's own store. `conversationId` is the chat's conversation there. */
+    async inChat<T>(id: string, change: (tx: Tx, conversationId: ConversationId) => T | Promise<T>): Promise<T> {
+      const { conversation } = await this.resolve(id);
+      return conversation.commit(tx => change(tx, conversation.id), context);
     }
 
     async rename(id: string, title: string) {
@@ -668,7 +698,7 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
     }
   }
 
-  return { Chats, ChatService };
+  return { Chats, ChatIdentity: Identity, ChatService };
 }
 
 export type ChatService = ReturnType<ReturnType<typeof createChats>["ChatService"]["attach"]>;

@@ -165,7 +165,7 @@ export async function createFleetSlackRun(context: FleetRunContext, options: Fle
     });
     await context.emit({ type: "ready" });
     if (!bootstrap.closing || bootstrap.cancelling || context.assignment.cancelPending)
-      for (const host of service.hosts.values()) host.harness.resume();
+      await service.resume();
     timer = setInterval(() => {
       if (checking || admitting || closing || !received || !accepting) return;
       checking = true;

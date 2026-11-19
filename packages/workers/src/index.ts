@@ -268,7 +268,7 @@ export async function startWorker(config: WorkerConfig) {
             }
           }
           if (value.method === "submit")
-            for (const host of owner.hosts.values()) host.harness.resume();
+            await owner.resume();
           if (value.method === "create")
             result = await owner.create(
               value.args[0],

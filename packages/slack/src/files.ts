@@ -101,9 +101,9 @@ export function slackArtifacts(runner: Runner, client: SlackWebApi, teamId: stri
     },
   });
   const queue: ArtifactSink = async (tx, conversationId, artifact) => {
-    const chats = await tx.doc(runner.Chats);
-    const chat = Object.values(chats.byId).find(chat => chat.conversationId === conversationId);
-    if (chat?.source !== "slack") return [];
+    // This runs in the chat's own store, which names its chat and origin.
+    const chat = await tx.doc(runner.ChatIdentity);
+    if (chat.source !== "slack") return [];
     const route = chat.origin?.slack as { teamId?: string; channelId?: string; threadTs?: string } | undefined;
     if (!route || route.teamId !== teamId || !route.channelId || !route.threadTs) {
       throw new Error("Artifact delivery requires this conversation's authenticated Slack origin.");
