@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Start workspaces after a chat's SQLite store closes and reopens. Record the guest before startup so a later host can reclaim it, and allow idle suspension of workspaces with a Git repository that has no commits.
+
 ## [0.40.0] - 2026-11-19
 
 - A chat's workspace is suspended after 15 minutes without a shell or file request (`workspace.suspendAfterMinutes`; `0` keeps it running). Its files under `/workspace` are checkpointed, and the chat's next request restores it. The host records its running workspaces so a restart still suspends them.

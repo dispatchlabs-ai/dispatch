@@ -34,8 +34,10 @@ def inventory():
                 selected.update(files)
                 if (tree / '.git').is_file(): selected.add(tree / '.git')
                 origin = subprocess.run(['git', '-C', str(tree), 'remote', 'get-url', 'origin'], capture_output=True, text=True)
+                head = subprocess.run(['git', '-C', str(tree), 'rev-parse', '--verify', '--quiet', 'HEAD'], capture_output=True, text=True)
+                if head.returncode not in (0, 1): head.check_returncode()
                 repositories.append({'path': str(tree), 'repository': origin.stdout.strip() if not origin.returncode else None,
-                    'head': git(tree, 'rev-parse', 'HEAD').decode().strip(), 'dirty': bool(git(tree, 'status', '--porcelain', '--untracked-files=all'))})
+                    'head': head.stdout.strip() if head.returncode == 0 else None, 'dirty': bool(git(tree, 'status', '--porcelain', '--untracked-files=all'))})
                 # Git lists a submodule as a directory, not the files it owns.
                 # Re-enter each initialized repository so its own ignore rules
                 # and nested submodules apply, preserving dirty/untracked work.

@@ -213,10 +213,9 @@ type Binding = { release: () => Promise<Omit<WorkspaceRelease, "runtimeEntryPoin
 
 /** Creates a chat's workspace on its first tool request, so a turn without shell or file work creates none,
  * and suspends it once it has gone unused. The next request restores it. */
-class ChatWorkspace implements WorkspaceTransport {
+class ChatWorkspace {
   /** False while this chat has never had a workspace. */
-  created: boolean;
-  private binding?: Binding;
+  created = false;
   private ready?: Promise<void>;
   private suspending?: Promise<void>;
   private busy = 0;
@@ -224,30 +223,25 @@ class ChatWorkspace implements WorkspaceTransport {
   private used: number;
   /** `running` is true for a workspace an earlier host process left running. */
   constructor(private readonly client: WorkspaceClient, private readonly listed: (running: boolean) => Promise<void>, running = false) {
-    this.created = running;
     this.used = running ? Date.now() : 0;
   }
   get run() { return this.client.run; }
-  bind(binding: Binding, created: boolean) {
-    this.binding ??= binding;
-    this.created ||= created;
-    return this;
-  }
   // One caller's cancellation must not interrupt a start that other tool calls are waiting for.
-  private start() {
+  private start(binding: Binding) {
     return this.ready ??= (async () => {
       await this.suspending;
-      await this.client.request({ op: "bind", release: await this.binding!.release() });
-      await this.client.request({ op: "ensure" });
-      if (!this.created) { await this.binding!.record(); this.created = true; }
-      this.used = Date.now();
+      await this.client.request({ op: "bind", release: await binding.release() });
+      // Persist the intent before a guest can start. An interrupted ensure can still leave it running.
       await this.listed(true);
+      this.used = Date.now();
+      await this.client.request({ op: "ensure" });
+      if (!this.created) { await binding.record(); this.created = true; }
     })().catch(error => { this.ready = undefined; throw error; });
   }
-  async request<T>(request: Record<string, unknown>, signal?: AbortSignal, output?: ShellExecOptions["onOutput"], context?: Context): Promise<T> {
+  async request<T>(binding: Binding, request: Record<string, unknown>, signal?: AbortSignal, output?: ShellExecOptions["onOutput"], context?: Context): Promise<T> {
     this.busy++;
     try {
-      const ready = this.start();
+      const ready = this.start(binding);
       await ready;
       try { return await this.client.request<T>(request, signal, output, context); }
       catch (error) {
@@ -256,7 +250,7 @@ class ChatWorkspace implements WorkspaceTransport {
         // shell command is never repeated.
         if (!String(error).includes(NOT_RUNNING)) throw error;
         if (this.ready === ready) this.ready = undefined;
-        await this.start();
+        await this.start(binding);
         if (request.op === "shell") throw new Error("The workspace had stopped and has been started again. This command was not repeated and may have been cut off.");
         return this.client.request<T>(request, signal, output, context);
       }
@@ -275,10 +269,10 @@ class ChatWorkspace implements WorkspaceTransport {
       try { await this.client.request({ op: "suspend" }); }
       catch (error) {
         // A run the controller no longer knows has nothing left to suspend. Anything else is tried again later.
-        if (!String(error).includes(UNKNOWN_RUN)) { this.used = Date.now(); throw error; }
+        if (!String(error).includes(UNKNOWN_RUN)) throw error;
       }
       await this.listed(false);
-    })().finally(() => { this.suspending = undefined; });
+    })().catch(error => { this.used = Date.now(); throw error; }).finally(() => { this.suspending = undefined; });
   }
 }
 
@@ -313,15 +307,18 @@ export function createChatWorkspaces(namespace: string): ChatWorkspaces {
   let loaded: Promise<void> | undefined;
   function load(host: ChatWorkspaceSettings) {
     const listed = (run: string) => (on: boolean) => {
-      if (on === running.has(run)) return saved;
-      if (on) running.add(run); else running.delete(run);
-      const { ledger } = host;
-      if (!ledger) return saved;
-      // A lost ledger write must not fail the tool call that started or outlived a workspace.
-      return saved = saved.then(async () => {
-        await writeFile(`${ledger}.tmp`, JSON.stringify({ runs: [...running] }), { mode: 0o600 });
-        await rename(`${ledger}.tmp`, ledger);
-      }).catch(error => reportError("Could not record running chat workspaces:", error));
+      const update = saved.then(async () => {
+        if (on === running.has(run)) return;
+        const { ledger } = host;
+        if (ledger) {
+          const runs = on ? [...running, run] : [...running].filter(item => item !== run);
+          await writeFile(`${ledger}.tmp`, JSON.stringify({ runs }), { mode: 0o600 });
+          await rename(`${ledger}.tmp`, ledger);
+        }
+        if (on) running.add(run); else running.delete(run);
+      });
+      saved = update.catch(() => undefined);
+      return update;
     };
     const workspace = (run: string, left = false) => {
       let found = workspaces.get(run);
@@ -364,13 +361,17 @@ export function createChatWorkspaces(namespace: string): ChatWorkspaces {
       const { store, created } = (await target.read.snapshot(Identity, context))!;
       const run = createHash("sha256").update(`${store}\0${chat}`).digest("hex");
       const key = String(chat);
-      const bound = workspace(run).bind({ release, record: () => harness().commit(async tx => {
+      const binding = { release, record: () => harness().commit(async tx => {
         const saved = await tx.doc(Identity);
         // Assign a whole value: the document records assignments, not later changes to an assigned object.
         saved.created = { ...saved.created, [key]: true };
-      }, BACKGROUND_CONTEXT) }, created?.[key] === true);
+      }, BACKGROUND_CONTEXT) };
       // The conversation's saved working directory is a host path; the guest has its own.
-      return new WorkspaceEnvironment(bound, "/workspace");
+      return new WorkspaceEnvironment({
+        run,
+        get created() { return created?.[key] === true || workspaces.get(run)?.created === true; },
+        request: (request, signal, output, context) => workspace(run).request(binding, request, signal, output, context),
+      }, "/workspace");
     };
   }
   return { identify, environment };
