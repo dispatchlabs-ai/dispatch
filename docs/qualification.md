@@ -4,6 +4,46 @@ Dispatch is pre-1.0 source-alpha software. This record separates public source,
 built artifacts and observed behavior. A successful build is not production
 installation, model-quality or security qualification.
 
+## Chat workspace idle suspension — November 19, 2026 UTC
+
+A `dispatch serve` host on macOS arm64 ran with a stand-in controller that
+records requests and starts nothing, a scripted model and a three-second idle
+period.
+
+- Four seconds after a chat's last command the host asked the controller to
+  suspend that chat's workspace and removed it from `workspaces.json`.
+- The chat's next command bound and ensured the workspace again before running.
+- No suspend was requested during an eight-second command.
+- The host was killed while a workspace was listed as running. Restarted, with no
+  chat activity, it asked for that workspace's suspension and cleared the list.
+
+The same build then ran on an x86_64 Amazon Linux 2023 instance (8 vCPU,
+64 GiB) with Docker 25, the gVisor and Cua packages pinned by Dispatch 0.39.2, a
+published workspace image and a 30-second idle period. The model was scripted.
+The host, Pi Durable, the controller, gVisor and the guests were real.
+
+- A chat's guest was checkpointed and removed 42 seconds after its last command,
+  and the host's memory use fell by about 260 MiB.
+- The chat's next command restored the workspace in about 5 seconds. A file under
+  `/workspace` was kept. A file under `/tmp` and a background process were gone.
+- A 55-second command ran to its end with its guest in place.
+- With one chat in use and another idle, only the idle chat's guest was removed.
+  Each chat later read back its own file.
+- The host was killed with two guests running. Restarted, with no chat activity,
+  it removed both within 30 seconds, and each chat then restored its own files.
+- A cleanly stopped host left its guest running; the next start removed it after
+  the idle period.
+- A delegated child restored its suspended parent chat's workspace and read the
+  parent's file.
+- A turn with no tool call in a chat whose workspace was suspended restored the
+  workspace. It took 4.8 seconds where the same turn took 0.8 seconds before the
+  chat had a workspace.
+- With `suspendAfterMinutes` at `0` a guest was still running after 80 idle
+  seconds. A negative value was refused at startup.
+
+Desktop state, a Git repository in the workspace, a real model, a checkpoint of
+more than a few bytes and concurrent load were not exercised.
+
 ## Per-chat stores — November 19, 2026 UTC
 
 A `dispatch serve` host on macOS arm64 ran two agents with a scripted model and

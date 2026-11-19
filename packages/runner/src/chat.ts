@@ -274,7 +274,9 @@ export function createChats(namespace: string, openAgent: ReturnType<typeof crea
             ...(agent.messages?.length ? [instanceMessagingExtension(namespace, agent, service)] : [])],
           replySink: options.replySink, updateDefinitions: options.updateDefinitions,
           registryExtensions: [service.calendars.get(agent.id)!.extension],
-          cwd: options.cwd, env: options.env, workspace: options.workspace, storage: options.storage, settings: options.settings,
+          cwd: options.cwd, env: options.env, storage: options.storage, settings: options.settings,
+          // The host's record of running workspaces sits beside its stores.
+          workspace: options.workspace && { ...options.workspace, ledger: join(stateRoot, "workspaces.json") },
           definitionResources: options.definitionResources, reviewActions: options.reviewActions,
           artifacts: options.artifacts,
         });

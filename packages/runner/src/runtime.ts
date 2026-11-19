@@ -8,7 +8,7 @@ export type OpenOptions = {
   /** A trusted host supplies remote execution before any local environment is considered. */
   env?: HarnessOptions["env"];
   /** Gives each chat of a `workspace: "chat"` agent its own disposable workspace. A host that supplies `env` cannot open such an agent. */
-  workspace?: ChatWorkspaceHost;
+  workspace?: ChatWorkspaceSettings;
   /** Read-only packaged references, shared with this agent's native children. */
   definitionResources?: boolean;
   models: Models;
@@ -69,7 +69,7 @@ import { ArtifactStore, type ArtifactOptions, type createArtifacts } from "./art
 import { compactionExtension } from "./compaction.js";
 import { definitionResourcesExtension } from "./definition-resources.js";
 import { selectMessageTools } from "./messages.js";
-import { createChatWorkspaces, type ChatWorkspaceHost } from "./workspace.js";
+import { createChatWorkspaces, type ChatWorkspaceSettings } from "./workspace.js";
 
 const context = BACKGROUND_CONTEXT;
 export type RunnerState = {

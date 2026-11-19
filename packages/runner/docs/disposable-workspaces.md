@@ -187,8 +187,19 @@ root. Repository instructions inside a workspace are read once the chat has
 one. After a host restart, the first request of such a chat starts its
 workspace again to read them. If a guest has stopped, the next request starts it
 again. A file request is then repeated. A shell command is reported as possibly
-cut off and is not repeated. The host does not yet suspend or finish these
-workspaces, and desktop tools are not bound per chat.
+cut off and is not repeated.
+
+The host suspends a chat's workspace after 15 minutes without a shell or file
+request. Set `suspendAfterMinutes` in the `workspace` setting to change that;
+`0` keeps workspaces running. Suspending checkpoints the files under
+`/workspace` to the controller's durable storage and removes the guest. Running
+processes, browser pages, installed packages and files outside `/workspace` are
+not kept, and a Git repository's ignored files are left out. The chat's next
+request restores the workspace, including the instruction read at the start of
+its next turn. The host records the workspaces it has running in
+`workspaces.json` beside its stores, so a restarted host still suspends those
+that then go unused. Workspaces are not finished when a chat ends, and desktop
+tools are not bound per chat.
 
 ### An embedding host
 

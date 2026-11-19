@@ -1,9 +1,10 @@
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { realpath } from "node:fs/promises";
+import { readFile, realpath, rename, writeFile } from "node:fs/promises";
 import { posix } from "node:path";
 import { BACKGROUND_CONTEXT, type Context } from "@earendil-works/chord/context";
 import { defineDoc, type ConversationId, type Harness, type HarnessOptions } from "@earendil-works/pi-durable";
+import { reportError } from "./terminal-output.js";
 import {
   ExecutionError, FileError, LineScanner, err, ok,
   type BinaryReader, type DirReader, type ExecutionEnv, type FileInfo, type Result,
@@ -187,8 +188,9 @@ export class WorkspaceEnvironment implements ExecutionEnv {
   async cleanup() { for (const controller of this.commands) controller.abort(); }
 }
 
-/** Host settings for agents that select `workspace: "chat"`: the installed controller command and the pinned image. */
-export type ChatWorkspaceHost = { command: string[]; image: WorkspaceImage };
+/** Host settings for agents that select `workspace: "chat"`: the installed controller command and the pinned image.
+ * A chat's workspace is suspended after `suspendAfterMinutes` without a request. The default is 15; 0 keeps it running. */
+export type ChatWorkspaceHost = { command: string[]; image: WorkspaceImage; suspendAfterMinutes?: number };
 
 export function chatWorkspaceHost(value: unknown): ChatWorkspaceHost {
   const host = value as Partial<ChatWorkspaceHost> | null;
@@ -196,49 +198,98 @@ export function chatWorkspaceHost(value: unknown): ChatWorkspaceHost {
     || host.command.some(part => typeof part !== "string" || !part) || !host.image || typeof host.image !== "object") {
     throw new Error("workspace needs a controller command and an image descriptor.");
   }
-  return { command: host.command, image: host.image };
+  const minutes = host.suspendAfterMinutes;
+  if (minutes !== undefined && (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes < 0)) {
+    throw new Error("workspace.suspendAfterMinutes must be zero or a positive number.");
+  }
+  return { command: host.command, image: host.image, ...(minutes === undefined ? {} : { suspendAfterMinutes: minutes }) };
 }
 
-// The controller's answer for a guest that is not running.
+// The controller's answers for a guest that is not running, and for a run it has no record of.
 const NOT_RUNNING = "Workspace is not running";
+const UNKNOWN_RUN = "Bind this workflow to a release";
 
-/** Creates a chat's workspace on its first tool request, so a turn without shell or file work creates none. */
+type Binding = { release: () => Promise<Omit<WorkspaceRelease, "runtimeEntryPoint">>; record: () => Promise<void> };
+
+/** Creates a chat's workspace on its first tool request, so a turn without shell or file work creates none,
+ * and suspends it once it has gone unused. The next request restores it. */
 class ChatWorkspace implements WorkspaceTransport {
+  /** False while this chat has never had a workspace. */
+  created: boolean;
+  private binding?: Binding;
   private ready?: Promise<void>;
-  constructor(private readonly client: WorkspaceClient, private readonly release: () => Promise<Omit<WorkspaceRelease, "runtimeEntryPoint">>,
-    public created: boolean, private readonly record: () => Promise<void>) {}
+  private suspending?: Promise<void>;
+  private busy = 0;
+  // When the workspace last served a request; zero while this host does not hold it running.
+  private used: number;
+  /** `running` is true for a workspace an earlier host process left running. */
+  constructor(private readonly client: WorkspaceClient, private readonly listed: (running: boolean) => Promise<void>, running = false) {
+    this.created = running;
+    this.used = running ? Date.now() : 0;
+  }
   get run() { return this.client.run; }
+  bind(binding: Binding, created: boolean) {
+    this.binding ??= binding;
+    this.created ||= created;
+    return this;
+  }
   // One caller's cancellation must not interrupt a start that other tool calls are waiting for.
   private start() {
     return this.ready ??= (async () => {
-      await this.client.request({ op: "bind", release: await this.release() });
+      await this.suspending;
+      await this.client.request({ op: "bind", release: await this.binding!.release() });
       await this.client.request({ op: "ensure" });
-      if (!this.created) { await this.record(); this.created = true; }
+      if (!this.created) { await this.binding!.record(); this.created = true; }
+      this.used = Date.now();
+      await this.listed(true);
     })().catch(error => { this.ready = undefined; throw error; });
   }
   async request<T>(request: Record<string, unknown>, signal?: AbortSignal, output?: ShellExecOptions["onOutput"], context?: Context): Promise<T> {
-    const ready = this.start();
-    await ready;
-    try { return await this.client.request<T>(request, signal, output, context); }
-    catch (error) {
-      // The guest stopped after this host last started it. The controller refuses a file request before running
-      // it, so that request is asked again. It gives the same answer for a shell command the stop cut off, so a
-      // shell command is never repeated.
-      if (!String(error).includes(NOT_RUNNING)) throw error;
-      if (this.ready === ready) this.ready = undefined;
-      await this.start();
-      if (request.op === "shell") throw new Error("The workspace had stopped and has been started again. This command was not repeated and may have been cut off.");
-      return this.client.request<T>(request, signal, output, context);
+    this.busy++;
+    try {
+      const ready = this.start();
+      await ready;
+      try { return await this.client.request<T>(request, signal, output, context); }
+      catch (error) {
+        // The guest stopped after this host last started it. The controller refuses a file request before running
+        // it, so that request is asked again. It gives the same answer for a shell command the stop cut off, so a
+        // shell command is never repeated.
+        if (!String(error).includes(NOT_RUNNING)) throw error;
+        if (this.ready === ready) this.ready = undefined;
+        await this.start();
+        if (request.op === "shell") throw new Error("The workspace had stopped and has been started again. This command was not repeated and may have been cut off.");
+        return this.client.request<T>(request, signal, output, context);
+      }
+    } finally {
+      this.busy--;
+      if (this.used) this.used = Date.now();
     }
+  }
+  /** Checkpoint and remove the workspace if nothing has used it since `before`. Files under /workspace are kept;
+   * running processes, browser pages and files elsewhere are not. */
+  suspendIfIdle(before: number): Promise<void> | undefined {
+    if (this.busy || this.suspending || !this.used || this.used > before) return;
+    this.used = 0;
+    this.ready = undefined;
+    return this.suspending = (async () => {
+      try { await this.client.request({ op: "suspend" }); }
+      catch (error) {
+        // A run the controller no longer knows has nothing left to suspend. Anything else is tried again later.
+        if (!String(error).includes(UNKNOWN_RUN)) { this.used = Date.now(); throw error; }
+      }
+      await this.listed(false);
+    })().finally(() => { this.suspending = undefined; });
   }
 }
 
 type OpenHarness = Awaited<ReturnType<typeof Harness.open>>;
+/** `ledger` is where the host records the workspaces it has running, so a restarted host can still suspend them. */
+export type ChatWorkspaceSettings = ChatWorkspaceHost & { ledger?: string };
 export type ChatWorkspaces = {
   /** Save the store's workspace identity once, before any conversation resolves an environment. */
   identify(harness: OpenHarness, context: Context): Promise<void>;
   /** Every conversation of one chat, including delegated children, resolves to that chat's workspace. */
-  environment(host: ChatWorkspaceHost, agent: { root: string; fingerprint: string }, harness: () => OpenHarness): NonNullable<HarnessOptions["env"]>;
+  environment(host: ChatWorkspaceSettings, agent: { root: string; fingerprint: string }, harness: () => OpenHarness): NonNullable<HarnessOptions["env"]>;
 };
 
 export function createChatWorkspaces(namespace: string): ChatWorkspaces {
@@ -254,11 +305,52 @@ export function createChatWorkspaces(namespace: string): ChatWorkspaces {
       state.store ||= randomBytes(32).toString("hex");
     }, context);
   }
-  function environment(host: ChatWorkspaceHost, agent: { root: string; fingerprint: string }, harness: () => OpenHarness): NonNullable<HarnessOptions["env"]> {
+
+  // Every agent of this host shares one set of workspaces, one ledger and one idle check.
+  const workspaces = new Map<string, ChatWorkspace>();
+  const running = new Set<string>();
+  let saved = Promise.resolve();
+  let loaded: Promise<void> | undefined;
+  function load(host: ChatWorkspaceSettings) {
+    const listed = (run: string) => (on: boolean) => {
+      if (on === running.has(run)) return saved;
+      if (on) running.add(run); else running.delete(run);
+      const { ledger } = host;
+      if (!ledger) return saved;
+      // A lost ledger write must not fail the tool call that started or outlived a workspace.
+      return saved = saved.then(async () => {
+        await writeFile(`${ledger}.tmp`, JSON.stringify({ runs: [...running] }), { mode: 0o600 });
+        await rename(`${ledger}.tmp`, ledger);
+      }).catch(error => reportError("Could not record running chat workspaces:", error));
+    };
+    const workspace = (run: string, left = false) => {
+      let found = workspaces.get(run);
+      if (!found) workspaces.set(run, found = new ChatWorkspace(new WorkspaceClient(host.command, run), listed(run), left));
+      return found;
+    };
+    loaded ??= (async () => {
+      const text = host.ledger ? await readFile(host.ledger, "utf8").catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return undefined;
+        throw error;
+      }) : undefined;
+      // Workspaces an earlier process left running count as used now, and are suspended once they go unused.
+      for (const run of text ? (JSON.parse(text) as { runs: string[] }).runs : []) { running.add(run); workspace(run, true); }
+      const idle = (host.suspendAfterMinutes ?? 15) * 60_000;
+      if (idle > 0) setInterval(() => {
+        for (const item of workspaces.values()) {
+          item.suspendIfIdle(Date.now() - idle)?.catch(error => reportError(`Could not suspend chat workspace ${item.run}:`, error));
+        }
+      }, Math.min(idle / 2, 60_000)).unref();
+    })();
+    return { loaded, workspace };
+  }
+
+  function environment(host: ChatWorkspaceSettings, agent: { root: string; fingerprint: string }, harness: () => OpenHarness): NonNullable<HarnessOptions["env"]> {
     const chats = new Map<ConversationId, ConversationId>();
-    const workspaces = new Map<string, ChatWorkspace>();
     const release = async () => ({ definitionsRoot: await realpath(agent.root), runtimeRevision: agent.fingerprint, workspace: host.image });
+    const { loaded, workspace } = load(host);
     return async (target, context) => {
+      await loaded;
       let chat = chats.get(target.conversationId);
       if (chat === undefined) {
         chat = await harness().commit(async tx => {
@@ -271,18 +363,14 @@ export function createChatWorkspaces(namespace: string): ChatWorkspaces {
       // identify() saved this before the host resumed any work.
       const { store, created } = (await target.read.snapshot(Identity, context))!;
       const run = createHash("sha256").update(`${store}\0${chat}`).digest("hex");
-      let workspace = workspaces.get(run);
-      if (!workspace) {
-        const key = String(chat);
-        workspaces.set(run, workspace = new ChatWorkspace(new WorkspaceClient(host.command, run), release, created?.[key] === true,
-          () => harness().commit(async tx => {
-            const saved = await tx.doc(Identity);
-            // Assign a whole value: the document records assignments, not later changes to an assigned object.
-            saved.created = { ...saved.created, [key]: true };
-          }, BACKGROUND_CONTEXT)));
-      }
+      const key = String(chat);
+      const bound = workspace(run).bind({ release, record: () => harness().commit(async tx => {
+        const saved = await tx.doc(Identity);
+        // Assign a whole value: the document records assignments, not later changes to an assigned object.
+        saved.created = { ...saved.created, [key]: true };
+      }, BACKGROUND_CONTEXT) }, created?.[key] === true);
       // The conversation's saved working directory is a host path; the guest has its own.
-      return new WorkspaceEnvironment(workspace, "/workspace");
+      return new WorkspaceEnvironment(bound, "/workspace");
     };
   }
   return { identify, environment };
