@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.41.1] - 2026-11-20
+
 - Keep thread status visible when a progress note exceeds Slack’s rotating loading-line length limit.
 
 ## [0.41.0] - 2026-11-20
