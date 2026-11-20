@@ -24,8 +24,9 @@ implementation or deployment.
   native response identity, not text or whole-run answer. Stream only the current
   response, recover ordered chunks/receipts, and preserve completed messages on
   Stop. Public tool labels remain independent from prose and private thinking.
-  Keep unchanged external-workflow heartbeats in one editable status. Hosts select
-  safe public operation labels; earlier completion must not clear later activity.
+  Keep unchanged external-workflow heartbeats in one editable status. Surface the active request's public progress note and
+  describe meaningful activity in plain language using the host's model connection.
+  Hosts can select public operation labels and subjects; earlier completion must not clear later activity.
 - **SLK-005 — Share a workspace:** allow an agent in invited channels and DMs;
   direct explicit mentions to the intended bot and keep another bot's threads
   from becoming competing automatic conversations. One app can select trusted

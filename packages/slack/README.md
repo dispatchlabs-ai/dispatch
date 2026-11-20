@@ -271,10 +271,19 @@ committed long responses split into ordered Slack-sized messages without an
 application response-length limit. Stop closes current streams without replacing
 their text or deleting prior responses, with a separate keyed acknowledgement.
 
-Tool activity stays in the independent native thread loading indicator. Hosts
-can supply `describeTool({name,arguments})` for safe labels/subjects. Select only
-public fields; never credentials, raw commands or tool output. No extra model
-summary pass or raw private reasoning is exposed.
+The Slack loading indicator displays the current request’s public progress note
+verbatim. Between notes, a lightweight model describes the observed action using
+its public subject or the human’s message in that thread. A new note takes
+priority for the normal one-minute reporting interval. Slack refreshes reuse the
+saved line. Native labels appear immediately and cover unavailable narration.
+The final answer follows its normal delivery path.
+
+The adapter looks for GPT-6 Luna or another lightweight model on the agent’s
+existing provider. Set the Slack connection’s optional `activityModel` to a
+model ID on that provider to select it explicitly, or to `false` to use public
+notes and native labels only. Hosts can supply `describeTool({name,arguments})`
+to select public labels and subjects. Narration receives the selected activity,
+never tool arguments, results or private reasoning.
 
 This changes the native `slack-turn` task to version2. Upgrade an old owner only
 at native idle with no unfinished version1 deliveries; retain its original

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Show current public progress notes in the loading indicator by default and narrate observed activity using a lightweight model on the agent’s provider. Reuse generated lines across refresh and recovery.
+
 ## [0.40.0] - 2026-11-19
 
 - A reply's delivery identity names its chat, so two agents answering in one thread cannot mistake each other's posts for their own.

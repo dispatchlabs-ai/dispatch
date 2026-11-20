@@ -15,14 +15,14 @@ const labels: Record<string, string> = {
 
 /** Read the native execution intent, including repaired arguments and nested calls. */
 export async function currentToolActivity(live: Readonly<LiveState>, reader: Reader,
-  context: Context, describe?: SlackToolDescription): Promise<{ activity: SlackActivity; running: boolean } | undefined> {
+  context: Context, describe?: SlackToolDescription): Promise<{ activity: SlackActivity; name: string; running: boolean } | undefined> {
   const slot = live.nestedTools?.findLast(tool => tool.status === "running")
     ?? live.tools?.find(tool => tool.status === "running")
     ?? live.nestedTools?.findLast(tool => tool.status === "done")
     ?? live.tools?.findLast(tool => tool.status === "done");
   if (!slot) return undefined;
   const fallback = { label: labels[slot.name] ?? "Using a connected tool" };
-  const result = (activity = fallback) => ({ activity, running: slot.status === "running" });
+  const result = (activity = fallback) => ({ activity, name: slot.name, running: slot.status === "running" });
   if (!describe || !slot.taskId) return result();
   const task = await reader.getTask(slot.taskId, context);
   if (!task || task.kind !== ToolTask.definition.name) return result();

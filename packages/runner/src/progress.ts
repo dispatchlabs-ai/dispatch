@@ -1,6 +1,6 @@
 import { Type } from "typebox";
 import type { Context } from "@earendil-works/chord/context";
-import { defineDoc, defineExtension, defineTool, wrapSection, type ToolExecutionApi, type ToolRegistration, type Wrap } from "@earendil-works/pi-durable";
+import { LiveDoc, defineDoc, defineExtension, defineTool, wrapSection, type ToolExecutionApi, type ToolRegistration, type Wrap } from "@earendil-works/pi-durable";
 import type { LoadedAgent } from "./definition.js";
 
 type BatchNote = { completed: number; summary: string; at: number };
@@ -40,7 +40,7 @@ export function createProgress(namespace: string, hostEnabled = true) {
       ...tool, callers: [], execute: async () => ({ output: [{ type: "text", text: "Progress notes are off." }] }),
     }) },
   ];
-  const Progress = defineDoc<{ summary: string; sequence: number; at?: number }>({
+  const Progress = defineDoc<{ summary: string; sequence: number; at?: number; input?: number }>({
     kind: `${namespace}.progress`, version: 1, scope: "conversation", history: "latest", fork: "initial",
     checkpointWhen: () => false,
     initial: () => ({ summary: "", sequence: 0 }),
@@ -70,11 +70,14 @@ export function createProgress(namespace: string, hostEnabled = true) {
         const requestId = `${namespace}.progress:${api.taskId}`;
         await api.commit(async tx => {
           const state = await tx.doc(Progress, api.conversationId);
-          if (state.summary === text || await tx.submissionByRequest(api.conversationId, requestId)) return;
+          const input = (await tx.doc(LiveDoc, api.conversationId)).run?.inputs.at(-1);
+          if ((state.input === input && state.summary === text) || await tx.submissionByRequest(api.conversationId, requestId)) return;
           const at = api.now();
           await conversation.submit(tx, { type: "write", requestId,
             entry: { kind: `${namespace}.background-reply`, data: { text, at, key: requestId } },
           });
+          if (input === undefined) delete state.input;
+          else state.input = input;
           state.summary = text;
           state.sequence++;
           state.at = at;

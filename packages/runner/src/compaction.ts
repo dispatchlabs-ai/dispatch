@@ -1,11 +1,12 @@
+import { recordModelUsage } from "./model-usage.js";
 import { createHash, randomUUID } from "node:crypto";
-import type { Message, ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
+import type { Message, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { estimateMessageTokens } from "@earendil-works/pi-ai/utils/estimate";
 import { isContextOverflow } from "@earendil-works/pi-ai/utils/overflow";
 import { isRetryableAssistantError, retryDelayMs } from "@earendil-works/pi-ai/utils/retry";
 import {
-  CompactionTask, defineDoc, defineExtension, defineTask, hook, UsageDoc,
-  type ConversationId, type ConversationStreamOptions, type Harness, type ModelRef, type TaskId, type Tx,
+  CompactionTask, defineDoc, defineExtension, defineTask, hook,
+  type ConversationStreamOptions, type Harness, type ModelRef, type TaskId,
 } from "@earendil-works/pi-durable";
 
 type Selection = { model: ModelRef; thinking: ModelThinkingLevel; stream: ConversationStreamOptions };
@@ -37,16 +38,6 @@ function transcript(messages: readonly Message[]): string {
     }).join("\n");
     return [`[${message.role}]\n${content}`];
   }).join("\n\n");
-}
-
-async function usage(tx: Tx, conversationId: ConversationId, model: string, value: Usage) {
-  const totals = (await tx.doc(UsageDoc, conversationId)).models;
-  const previous = Object.hasOwn(totals, model) ? totals[model] : undefined;
-  if (!previous) { totals[model] = JSON.parse(JSON.stringify(value)); return; }
-  for (const key of ["input", "output", "cacheRead", "cacheWrite", "totalTokens", "reasoning", "cacheWrite1h"] as const) {
-    if (value[key] !== undefined) previous[key] = (previous[key] ?? 0) + value[key];
-  }
-  for (const key of ["input", "output", "cacheRead", "cacheWrite", "total"] as const) previous.cost[key] += value.cost[key];
 }
 
 /** Pi owns the compaction, its summary work, retries, cancellation and placement. */
@@ -86,7 +77,7 @@ export function compactionExtension(namespace: string, host: () => Harness) {
           && runtime.settings.retry.enabled && request.attempt <= runtime.settings.retry.maxRetries;
         const until = retry ? runtime.now() + retryDelayMs(runtime.settings.retry, request.attempt) : 0;
         await runtime.commit(async tx => {
-          await usage(tx, runtime.conversationId, `${message.provider}/${message.model}`, message.usage);
+          await recordModelUsage(tx, runtime.conversationId, `${message.provider}/${message.model}`, message.usage);
           if (message.stopReason === "stop" && text && !message.content.some(block => block.type === "toolCall")) {
             return { status: "terminal", outcome: { status: "completed", result: text } };
           }

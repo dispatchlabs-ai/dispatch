@@ -88,3 +88,5 @@ export { sessionAgent } from "./session-agent.js";
 export { piDurableVersion } from "./runtime-version.js";
 
 export { unfinishedStores } from "./store-status.js";
+
+export { recordModelUsage } from "./model-usage.js";

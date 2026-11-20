@@ -12,6 +12,7 @@ import { fallbackText, replyBlocks, replyChunk } from "./text.js";
 import { slackArtifacts } from "./files.js";
 import { createStatusDelivery } from "./status.js";
 import { createResponseDelivery, findDelivery } from "./responses.js";
+import { createActivityNarration } from "./narration.js";
 import { createHistorySync } from "./history.js";
 import { activityLabel, currentToolActivity, type SlackActivity, type SlackToolDescription } from "./progress.js";
 import type { SlackWebApi } from "./api.js";
@@ -28,6 +29,8 @@ export type SlackConfig = {
   teamId: string; channels: Record<string, string | SlackChannelProfile>; directMessagesAgent?: string;
   allowedUsers?: string[] | "users"; botTokenEnv?: string; appTokenEnv?: string; credentialsEnv?: string;
   displayName?: string;
+  /** Lightweight model on the agent's existing provider. False disables generated status lines. */
+  activityModel?: string | false;
   /** Ignore messages addressed to a peer bot unless this bot is also mentioned. */
   peerBotUserIds?: string[];
   /** With "started", require mentions inside threads started for another bot. */
@@ -121,6 +124,7 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
   const factory = options.config ? undefined : parse(await readFile(join(root, "factory.yaml"), "utf8"));
   const config = options.config ?? (options.connection ? factory?.slack?.connections?.[options.connection] : factory?.slack) as SlackConfig | undefined;
   if (!config?.teamId || !config.channels || typeof config.channels !== "object" || Array.isArray(config.channels)
+    || (config.activityModel !== undefined && config.activityModel !== false && (typeof config.activityModel !== "string" || !config.activityModel.trim()))
     || Object.values(config.channels).some(route => !validChannelRoute(route))
     || (config.threadReplies !== undefined && !["all", "started"].includes(config.threadReplies))
     || (config.peerBotUserIds !== undefined && (!Array.isArray(config.peerBotUserIds)
@@ -172,14 +176,16 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
   const identity = await client.auth.test();
   if (identity.team_id !== config.teamId || !identity.user_id) throw new Error("Slack token does not belong to the configured workspace.");
   const statusDelivery = createStatusDelivery(namespace, client);
+  const narrate = createActivityNarration(namespace, config.activityModel);
+  type Narration = { key: string; cancel: AbortController; line?: string };
   const statuses = new Map<string, {
     pending: Promise<void>; active?: boolean; run?: number; previous?: SlackActivity;
+    narration?: Narration;
     published?: string; renewAt: number; retryAt: number;
   }>();
   // Serialize only Slack's shared thread indicator, never native execution.
   // Read current state inside the queue: an older turn must not clear a newer one.
-  const refreshStatus = async (input: SlackInput, runtime: Pick<TaskRuntime<unknown, unknown, null, object>,
-    "signal" | "snapshot" | "conversationId" | "now" | "report" | "getTask" | "entry">, ctx: Context, force = false) => {
+  const refreshStatus = async (input: SlackInput, runtime: TaskRuntime<unknown, unknown, null, object>, ctx: Context, force = false) => {
     const key = threadKey(config.teamId, input.channel, input.thread);
     let state = statuses.get(key);
     if (!state) {
@@ -194,18 +200,47 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         const live = await runtime.snapshot(LiveDoc, runtime.conversationId, ctx);
         const active = !!live?.run;
         // Keep the indicator through final delivery; its task clears it once.
+        if (!active) { status.narration?.cancel.abort(); status.narration = undefined; }
         if (!active && !force) return;
         idle = !active;
-        const run = live?.run?.inputs[0];
+        const run = live?.run?.inputs.at(-1);
         if (run !== status.run) { status.run = run; status.previous = undefined; }
         const tool = active ? await currentToolActivity(live!, runtime, ctx, options.describeTool) : undefined;
         if (tool) status.previous = { ...tool.activity, subject: tool.activity.subject ?? status.previous?.subject };
-        const label = active ? activityLabel(live!, tool?.running ? tool.activity : undefined, status.previous) : "";
+        const native = active ? activityLabel(live!, tool?.running ? tool.activity : undefined, status.previous) : "";
+        const allowed = run !== undefined && (!options.allowProgressText || await options.allowProgressText(runtime.conversationId, live!.run!.inputs));
+        const progress = allowed ? await runtime.snapshot(runner.Progress, runtime.conversationId, ctx) : undefined;
+        const note = progress?.input === run ? progress?.summary : undefined;
+        const freshNote = note && progress?.at !== undefined && runtime.now() - progress.at < 60_000 ? note : undefined;
+        // Keep the native label visible while inference runs. A late result can only
+        // fill its own slot; every Slack write still reads the current run and gate.
+        const describingWork = (tool?.running && native.startsWith(tool.activity.label))
+          || native.startsWith("Reviewing results") || native === "Planning the next step";
+        const observation = allowed && !freshNote && describingWork && config.activityModel !== false
+          ? { action: native, subject: tool?.activity.subject ?? status.previous?.subject,
+            tool: tool?.running && !options.describeTool ? tool.name : undefined } : undefined;
+        const narrationKey = observation && JSON.stringify([run, observation]);
+        if (status.narration?.key !== narrationKey) {
+          status.narration?.cancel.abort();
+          status.narration = undefined;
+          if (!force && observation && narrationKey && run !== undefined) {
+            const slot: Narration = { key: narrationKey, cancel: new AbortController() };
+            status.narration = slot;
+            const signal = AbortSignal.any([runtime.signal, slot.cancel.signal]);
+            void narrate(runtime, ctx, run, input, observation, signal).then(async line => {
+              if (!line || signal.aborted) return;
+              slot.line = line;
+              await refreshStatus(input, runtime, ctx);
+            }).catch(() => { /* The native status remains available during a model outage. */ });
+          }
+        }
+        const visibleNote = freshNote || (!status.narration?.line ? note : undefined);
+        const label = visibleNote || status.narration?.line || native;
         if (runtime.now() < status.retryAt) return;
         if (!force && active === status.active && label === status.published && runtime.now() < status.renewAt) return;
         await client.assistant.threads.setStatus({
           channel_id: input.channel, thread_ts: input.thread,
-          status: active ? `is ${label[0]!.toLowerCase()}${label.slice(1)}…` : "",
+          status: visibleNote || (active ? `is ${label[0]!.toLowerCase()}${label.slice(1)}…` : ""),
           ...(active ? { loading_messages: [label] } : {}),
         });
         status.active = active;
@@ -229,19 +264,21 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
     name: `${namespace}.slack-indicator`, version: 1, initial: () => ({ phase: "watch" }),
     phases: { async watch(task, runtime, ctx) {
       const watch = await runtime.watchDoc(LiveDoc, runtime.conversationId, ctx);
+      const notes = await runtime.watchDoc(runner.Progress, runtime.conversationId, ctx);
       let pending = Promise.resolve();
       const refresh = () => {
         pending = pending.then(async () => { await refreshStatus(task.input, runtime, ctx); });
         return pending;
       };
       watch?.start(refresh);
+      notes?.start(refresh);
       const timer = setInterval(() => { void refresh().catch(error => runtime.report(error)); }, 5_000);
       try {
         await refresh();
         await runtime.waitForTask(task.input.turn as TaskId, ctx);
       } finally {
         clearInterval(timer);
-        await watch?.stop();
+        await Promise.all([watch?.stop(), notes?.stop()]);
         await pending;
       }
       // Finalizing a message may clear a newer turn's indicator. Re-read that
