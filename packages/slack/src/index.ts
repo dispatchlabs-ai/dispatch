@@ -240,10 +240,12 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         const label = visibleNote || status.narration?.line || native;
         if (runtime.now() < status.retryAt) return;
         if (!force && active === status.active && label === status.published && runtime.now() < status.renewAt) return;
+        // Keep the visible loading line within Slack's 50-character limit.
+        const loadingLine = label.length <= 50 ? label : `${label.slice(0, 49).replace(/\s+\S*$|[\uD800-\uDBFF]$/u, "")}…`;
         await client.assistant.threads.setStatus({
           channel_id: input.channel, thread_ts: input.thread,
           status: visibleNote || (active ? `is ${label[0]!.toLowerCase()}${label.slice(1)}…` : ""),
-          ...(active ? { loading_messages: [label] } : {}),
+          ...(active ? { loading_messages: [loadingLine] } : {}),
         });
         status.active = active;
         status.published = label;

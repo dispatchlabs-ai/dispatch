@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Keep thread status visible when a progress note exceeds Slack’s rotating loading-line length limit.
+
 ## [0.41.0] - 2026-11-20
 
 - Show current public progress notes in the loading indicator by default and narrate observed activity using a lightweight model on the agent’s provider. Reuse generated lines across refresh and recovery.
