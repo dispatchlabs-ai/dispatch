@@ -208,17 +208,19 @@ export async function prepareSlack(root: string, runner: Runner, options: SlackO
         const tool = active ? await currentToolActivity(live!, runtime, ctx, options.describeTool) : undefined;
         if (tool) status.previous = { ...tool.activity, subject: tool.activity.subject ?? status.previous?.subject };
         const native = active ? activityLabel(live!, tool?.running ? tool.activity : undefined, status.previous) : "";
-        const allowed = run !== undefined && (!options.allowProgressText || await options.allowProgressText(runtime.conversationId, live!.run!.inputs));
+        const allowed = run !== undefined && (!options.allowProgressText ||
+          await Promise.resolve().then(() => options.allowProgressText!(runtime.conversationId, live!.run!.inputs)).catch(() => false));
         const progress = allowed ? await runtime.snapshot(runner.Progress, runtime.conversationId, ctx) : undefined;
         const note = progress?.input === run ? progress?.summary : undefined;
         const freshNote = note && progress?.at !== undefined && runtime.now() - progress.at < 60_000 ? note : undefined;
         // Keep the native label visible while inference runs. A late result can only
         // fill its own slot; every Slack write still reads the current run and gate.
-        const describingWork = (tool?.running && native.startsWith(tool.activity.label))
-          || native.startsWith("Reviewing results") || native === "Planning the next step";
+        const runningTool = tool?.running && native.startsWith(tool.activity.label) ? tool : undefined;
+        const describingWork = runningTool || native.startsWith("Reviewing results") || native === "Planning the next step";
+        const operation = runningTool && !options.describeTool && runningTool.activity.label === "Using a connected tool"
+          ? runningTool.name : runningTool?.activity.label ?? native;
         const observation = allowed && !freshNote && describingWork && config.activityModel !== false
-          ? { action: native, subject: tool?.activity.subject ?? status.previous?.subject,
-            tool: tool?.running && !options.describeTool ? tool.name : undefined } : undefined;
+          ? { operation, subject: runningTool ? runningTool.activity.subject : status.previous?.subject } : undefined;
         const narrationKey = observation && JSON.stringify([run, observation]);
         if (status.narration?.key !== narrationKey) {
           status.narration?.cancel.abort();
