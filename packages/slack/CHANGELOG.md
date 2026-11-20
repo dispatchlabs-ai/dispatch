@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-11-20
+
 - Show current public progress notes in the loading indicator by default and narrate observed activity using a lightweight model on the agent’s provider. Reuse generated lines across refresh and recovery.
 
 ## [0.40.0] - 2026-11-19

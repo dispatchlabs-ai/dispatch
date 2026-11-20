@@ -5,7 +5,7 @@ version or immutable release archive, update the application's lockfile, and run
 its build and relevant checks. For an application using only Runner:
 
 ```sh
-npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.40.1/dispatch-runner-0.40.1.tgz
+npm install https://github.com/dispatchlabs-ai/dispatch/releases/download/v0.41.0/dispatch-runner-0.41.0.tgz
 ```
 
 From 0.40.0 each chat is kept in its own store. Chats saved by earlier releases

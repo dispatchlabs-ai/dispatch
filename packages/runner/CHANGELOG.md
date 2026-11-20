@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-11-20
+
 - Associate committed public progress notes with the active input so channel adapters can distinguish new requests and steering.
 
 ## [0.40.1] - 2026-11-19
